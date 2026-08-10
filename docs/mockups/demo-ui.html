@@ -1,0 +1,577 @@
+<title>SDVICO. Bản demo giao diện tự động hóa 7 ngày</title>
+<style>
+  :root{
+    --bg:#eef2f7; --surface:#ffffff; --surface-2:#f4f7fb; --line:#d7deea;
+    --ink:#132030; --ink-2:#425064; --ink-3:#6d7a8c;
+    --accent:#123a5e; --accent-2:#1f6f8b; --accent-soft:#e2edf4;
+    --ok:#1c7a4d; --ok-soft:#dcf1e6; --warn:#a4620a; --warn-soft:#f7ecd6;
+    --bad:#b02a2a; --bad-soft:#f7e0df; --pend:#6b4ea8; --pend-soft:#ece6f6;
+    --shadow:0 1px 2px rgba(19,32,48,.06),0 8px 24px rgba(19,32,48,.06);
+    --mono:ui-monospace,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0d131c; --surface:#151d29; --surface-2:#1a2431; --line:#293648;
+    --ink:#e7edf5; --ink-2:#a7b4c8; --ink-3:#79879d;
+    --accent:#6fb0d6; --accent-2:#8fd0e0; --accent-soft:#172a3a;
+    --ok:#63c795; --ok-soft:#14271e; --warn:#dfaa5c; --warn-soft:#2c2410;
+    --bad:#e58a84; --bad-soft:#321a1a; --pend:#b6a2e6; --pend-soft:#211b31;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  }}
+  :root[data-theme="light"]{--bg:#eef2f7;--surface:#fff;--surface-2:#f4f7fb;--line:#d7deea;--ink:#132030;--ink-2:#425064;--ink-3:#6d7a8c;--accent:#123a5e;--accent-2:#1f6f8b;--accent-soft:#e2edf4;--ok:#1c7a4d;--ok-soft:#dcf1e6;--warn:#a4620a;--warn-soft:#f7ecd6;--bad:#b02a2a;--bad-soft:#f7e0df;--pend:#6b4ea8;--pend-soft:#ece6f6;}
+  :root[data-theme="dark"]{--bg:#0d131c;--surface:#151d29;--surface-2:#1a2431;--line:#293648;--ink:#e7edf5;--ink-2:#a7b4c8;--ink-3:#79879d;--accent:#6fb0d6;--accent-2:#8fd0e0;--accent-soft:#172a3a;--ok:#63c795;--ok-soft:#14271e;--warn:#dfaa5c;--warn-soft:#2c2410;--bad:#e58a84;--bad-soft:#321a1a;--pend:#b6a2e6;--pend-soft:#211b31;}
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55}
+  h1,h2,h3,h4{margin:0;text-wrap:balance}
+  button{font-family:inherit;cursor:pointer}
+  code{font-family:var(--mono)}
+  .app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+
+  .rail{background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:2px;overflow:auto}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 12px}
+  .brand .logo{width:34px;height:34px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+  .brand b{font-size:14px} .brand small{display:block;color:var(--ink-3);font-size:11px;font-weight:500}
+  .nav button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:0;color:var(--ink-2);padding:9px 10px;border-radius:8px;font-size:13.5px;font-weight:500}
+  .nav button .ic{width:20px;text-align:center;opacity:.85}
+  .nav button:hover{background:var(--surface-2);color:var(--ink)}
+  .nav button.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .rail .foot{margin-top:auto;padding-top:10px;border-top:1px solid var(--line);color:var(--ink-3);font-size:11px}
+
+  .main{padding:20px 26px 70px;max-width:1160px}
+  .top{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}
+  .top .h{flex:1}
+  .top h1{font-size:20px;letter-spacing:-.01em}
+  .top p{margin:3px 0 0;color:var(--ink-3);font-size:13px}
+  .demo{font-size:11px;font-weight:600;color:var(--warn);background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);padding:4px 9px;border-radius:20px;white-space:nowrap}
+  .tbtn{background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:8px;padding:6px 10px;font-size:12px}
+
+  .view{display:none} .view.show{display:block}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr} .g3{grid-template-columns:1fr 1fr 1fr} .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:900px){.g2,.g3,.g4{grid-template-columns:1fr}}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);overflow:hidden}
+  .card .hd{display:flex;align-items:center;gap:10px;padding:12px 15px;border-bottom:1px solid var(--line)}
+  .card .hd h2{font-size:14px} .card .hd h3{font-size:13.5px}
+  .card .hd .sub{margin-left:auto;color:var(--ink-3);font-size:12px}
+  .card .bd{padding:14px 15px}
+  .card .bd.tight{padding:6px 15px 12px}
+  .sec-h{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);font-weight:700;margin:22px 2px 10px}
+  .sec-h:first-child{margin-top:4px}
+
+  .tile{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:13px 14px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .tile .lab{font-size:11px;color:var(--ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+  .tile .num{font-family:var(--mono);font-size:23px;font-weight:600;margin-top:3px}
+  .tile .goal{font-size:11px;color:var(--ink-3);margin-top:2px}
+  .tile .stripe{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+  .tile.ok .stripe{background:var(--ok)} .tile.warn .stripe{background:var(--warn)} .tile.bad .stripe{background:var(--bad)} .tile.pend .stripe{background:var(--pend)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  .twrap{overflow-x:auto}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-3);font-weight:700;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:10px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--surface-2)}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;border:1px solid transparent}
+  .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .p-ok{color:var(--ok);background:var(--ok-soft)} .p-warn{color:var(--warn);background:var(--warn-soft)} .p-bad{color:var(--bad);background:var(--bad-soft)} .p-mut{color:var(--ink-3);background:var(--surface-2);border-color:var(--line)} .p-acc{color:var(--accent);background:var(--accent-soft)} .p-pend{color:var(--pend);background:var(--pend-soft)}
+
+  .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink-2);border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:600;white-space:nowrap}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.pri{background:var(--accent);border-color:var(--accent);color:#fff} .btn.pri:hover{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
+  .btn.ok{background:var(--ok);border-color:var(--ok);color:#fff} .btn.no{background:var(--bad);border-color:var(--bad);color:#fff}
+  .btn.sm{padding:4px 9px;font-size:11.5px}
+  .rowact{display:flex;gap:6px;flex-wrap:wrap}
+
+  ul.clean{margin:6px 0;padding-left:20px} ul.clean li{margin:4px 0;color:var(--ink-2)}
+  ol.clean{margin:6px 0;padding-left:22px} ol.clean li{margin:5px 0;color:var(--ink-2)}
+  .note{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--ink-2)}
+  .note.warn{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 30%,transparent);color:var(--warn)}
+  .note.bad{background:var(--bad-soft);border-color:color-mix(in srgb,var(--bad) 30%,transparent);color:var(--bad)}
+  .kv{display:flex;flex-direction:column;gap:8px}
+  .kv .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+  .muted{color:var(--ink-3)}
+  .bars .bar{height:8px;border-radius:5px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden}
+  .bars .bar i{display:block;height:100%;background:var(--accent)}
+  .axis{display:grid;grid-template-columns:150px 1fr 40px;gap:10px;align-items:center;font-size:12.5px;margin:7px 0}
+  .axis .v{font-family:var(--mono);text-align:right}
+
+  .toggle{width:40px;height:23px;border-radius:20px;background:var(--line);position:relative;border:0;flex:none}
+  .toggle i{position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.16s}
+  .toggle.on{background:var(--bad)} .toggle.on i{left:18px}
+
+  .banner{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:12px 15px;box-shadow:var(--shadow);margin-bottom:16px}
+  .banner .b{display:flex;flex-direction:column;gap:1px} .banner .b small{color:var(--ink-3);font-size:11px} .banner .b b{font-size:13.5px}
+  .banner .sep{width:1px;align-self:stretch;background:var(--line)}
+
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:820px){.steps{grid-template-columns:1fr 1fr}}
+  .step{border:1px solid var(--line);border-radius:9px;padding:11px 12px;background:var(--surface-2)}
+  .step .n{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700}
+  .step b{display:block;font-size:13px;margin:2px 0 4px} .step p{margin:0;font-size:12px;color:var(--ink-2)}
+
+  .scrim{position:fixed;inset:0;background:rgba(8,14,22,.5);opacity:0;pointer-events:none;transition:.2s;z-index:40}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:min(520px,95vw);background:var(--surface);border-left:1px solid var(--line);transform:translateX(100%);transition:transform .22s;z-index:41;display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer .dh{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid var(--line)}
+  .drawer .dh b{font-size:15px} .drawer .dh .x{margin-left:auto;background:none;border:0;font-size:20px;color:var(--ink-3)}
+  .drawer .db{padding:18px;overflow:auto;flex:1}
+  .drawer .db pre{white-space:pre-wrap;font-family:var(--sans);font-size:13px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,18px);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:60}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  :focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+  @media(max-width:720px){.app{grid-template-columns:1fr}.rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap}.rail .foot{display:none}.nav{display:flex;flex-wrap:wrap}}
+</style>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><div class="logo">SDV</div><div><b>SDVICO</b><small>Tự động hóa 7 ngày</small></div></div>
+    <nav class="nav" id="nav">
+      <button data-v="overview" class="active"><span class="ic">◫</span> Tổng quan</button>
+      <button data-v="approval"><span class="ic">✔</span> Hàng đợi duyệt <span class="pill p-pend" style="margin-left:auto">5</span></button>
+      <button data-v="hr"><span class="ic">☰</span> Tuyển dụng</button>
+      <button data-v="mkt"><span class="ic">◆</span> Marketing</button>
+      <button data-v="ops"><span class="ic">◉</span> Vận hành và an toàn</button>
+      <button data-v="chuan"><span class="ic">§</span> Chuẩn và nghiệm thu</button>
+    </nav>
+    <div class="foot">Bản demo tham khảo. Dữ liệu mẫu.<br>Máy soạn, người bấm.</div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div class="h"><h1 id="vt">Tổng quan</h1><p id="vs">Bảng điều hành hệ thống tự động hóa Tuyển dụng và Marketing của SDVICO</p></div>
+      <span class="demo">Bản demo, dữ liệu mẫu</span>
+      <button class="tbtn" id="theme">Giao diện</button>
+    </div>
+
+    <!-- ================= OVERVIEW ================= -->
+    <section class="view show" id="v-overview">
+      <div class="banner">
+        <div class="b"><small>Công tắc dừng khẩn</small><b><span class="pill p-ok">Đang tắt</span></b></div>
+        <div class="sep"></div>
+        <div class="b"><small>Chi phí mô hình trong tuần</small><b>1.240.000 trên 3.000.000 đồng</b></div>
+        <div class="sep"></div>
+        <div class="b"><small>Cảnh báo khi chạm</small><b>80 phần trăm hạn mức</b></div>
+        <div class="sep"></div>
+        <div class="b"><small>Hạn mức hôm nay</small><b>Tin tuyển dụng 2 trên 5, bài mạng xã hội 1 trên 3</b></div>
+      </div>
+
+      <div class="grid g4">
+        <div class="tile pend"><span class="stripe"></span><div class="lab">Chờ duyệt</div><div class="num">5</div><div class="goal">Máy soạn, người bấm</div></div>
+        <div class="tile ok"><span class="stripe"></span><div class="lab">CV chấm trong ngày</div><div class="num">92%</div><div class="goal">Mục tiêu trên 90 phần trăm</div></div>
+        <div class="tile ok"><span class="stripe"></span><div class="lab">Trích đúng trường CV</div><div class="num">94%</div><div class="goal">Mục tiêu tối thiểu 90 phần trăm</div></div>
+        <div class="tile"><span class="stripe"></span><div class="lab">Soạn một JD</div><div class="num">11 phút</div><div class="goal">Mục tiêu dưới 20 phút</div></div>
+      </div>
+
+      <div class="grid g2" style="margin-top:14px">
+        <div class="card">
+          <div class="hd"><h2>Tiến độ bảy ngày</h2><span class="sub">theo kế hoạch giao việc</span></div>
+          <div class="bd tight">
+            <table><tbody>
+              <tr><td>Ngày 1. Nền chung, cơ sở dữ liệu, hàng đợi duyệt</td><td style="text-align:right"><span class="pill p-ok">Xong</span></td></tr>
+              <tr><td>Ngày 2. Đầu vào, JD, nạp CV, kho từ khóa</td><td style="text-align:right"><span class="pill p-acc">Đang làm</span></td></tr>
+              <tr><td>Ngày 3. Chấm CV, rà soát SEO, cỗ máy nội dung</td><td style="text-align:right"><span class="pill p-mut">Chưa tới</span></td></tr>
+              <tr><td>Ngày 4. Đăng tự động trên môi trường thử nghiệm</td><td style="text-align:right"><span class="pill p-mut">Chưa tới</span></td></tr>
+              <tr><td>Ngày 5. Phỏng vấn và dây chuyền video</td><td style="text-align:right"><span class="pill p-mut">Chưa tới</span></td></tr>
+              <tr><td>Ngày 6. Đo lường và làm cứng</td><td style="text-align:right"><span class="pill p-mut">Chưa tới</span></td></tr>
+              <tr><td>Ngày 7. Chuyển tài khoản thật và bàn giao</td><td style="text-align:right"><span class="pill p-mut">Chưa tới</span></td></tr>
+            </tbody></table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="hd"><h2>Việc cần bạn quyết hôm nay</h2><span class="sub">rút gọn</span></div>
+          <div class="bd tight">
+            <table><tbody>
+              <tr><td><b>Thư mời phỏng vấn</b><div class="muted">Nguyễn Văn Hùng, nhân viên kinh doanh</div></td><td style="text-align:right"><span class="pill p-pend">Chờ</span></td></tr>
+              <tr><td><b>Bài website về giám sát tàu cá</b><div class="muted">Có cờ duyệt cấp quản lý</div></td><td style="text-align:right"><span class="pill p-warn">Cấp quản lý</span></td></tr>
+              <tr><td><b>Bài Facebook máy lọc nước</b><div class="muted">Page nháp, chế độ phát triển</div></td><td style="text-align:right"><span class="pill p-pend">Chờ</span></td></tr>
+            </tbody></table>
+            <div class="note" style="margin-top:10px">Mở tab Hàng đợi duyệt để xem nội dung đã soạn sẵn và bấm quyết.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= APPROVAL ================= -->
+    <section class="view" id="v-approval">
+      <div class="note" style="margin-bottom:14px">Đây là nơi thực thi điều cấm 1 và 2. Mọi thư, tin nhắn và bài đăng chờ ở đây. Máy chỉ soạn, người bấm mới gửi hoặc đăng. Không có tự động gửi.</div>
+      <div id="queue" class="grid"></div>
+    </section>
+
+    <!-- ================= HR ================= -->
+    <section class="view" id="v-hr">
+      <div class="sec-h">Sinh mô tả công việc, lệnh hr-jd</div>
+      <div class="card">
+        <div class="hd"><h3>Nhân viên kinh doanh thiết bị giám sát tàu cá</h3><span class="sub">bốn phiên bản cho bốn kênh</span></div>
+        <div class="bd">
+          <div class="rowact">
+            <button class="btn sm" data-open="tpl-jd-web">Bản website</button>
+            <button class="btn sm" data-open="tpl-jd-fb">Bản Facebook</button>
+            <button class="btn sm" data-open="tpl-jd-san">Bản sàn tuyển dụng</button>
+            <button class="btn sm" data-open="tpl-jd-ngan">Bản ngắn dán nhóm</button>
+          </div>
+          <div class="note" style="margin-top:10px">Thời gian soạn dưới 20 phút. Nội dung theo chuẩn giọng văn, không mô tả phần mềm của hãng như của SDVICO.</div>
+        </div>
+      </div>
+
+      <div class="sec-h">Nạp CV từ hộp thư, lệnh hr-intake, chạy 30 phút một lần</div>
+      <div class="card">
+        <div class="hd"><h3>Hồ sơ đã chuẩn hóa</h3><span class="sub">trích PDF và DOCX, OCR cho ảnh, khử trùng lặp</span></div>
+        <div class="twrap"><table>
+          <thead><tr><th>Ứng viên</th><th>Liên hệ</th><th>Định dạng</th><th>Cờ</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+            <tr><td><b>Trần Thị Mai</b></td><td>mai@... , 09xx</td><td>PDF</td><td><span class="pill p-ok">Đủ trường</span></td><td><span class="pill p-acc">Đã chấm</span></td></tr>
+            <tr><td><b>Nguyễn Văn Hùng</b></td><td>hung@... , 09xx</td><td>DOCX</td><td><span class="pill p-ok">Đủ trường</span></td><td><span class="pill p-acc">Đã chấm</span></td></tr>
+            <tr><td><b>Lê Thị Lan</b></td><td>lan@... , thiếu sđt</td><td>Ảnh chụp</td><td><span class="pill p-warn">OCR đọc kém</span></td><td><span class="pill p-warn">Chuyển người</span></td></tr>
+            <tr><td><b>Phạm Văn Sơn</b></td><td>son@... , 09xx</td><td>PDF</td><td><span class="pill p-mut">Trùng với hồ sơ cũ</span></td><td><span class="pill p-mut">Đã gộp</span></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+
+      <div class="sec-h">Chấm CV, skill cv-screening, thang điểm cố định theo vị trí</div>
+      <div class="card">
+        <div class="hd"><h3>Trần Thị Mai, nhân viên kinh doanh</h3><span class="sub">máy xếp hạng, người quyết</span></div>
+        <div class="bd">
+          <div class="note" style="margin-bottom:12px">Dữ liệu đưa vào chấm đã bỏ tên, giới tính, tuổi, ảnh, quê quán để chống thiên vị. Thang điểm cố định theo vị trí, không để mô hình tự nghĩ tiêu chí.</div>
+          <div class="axis"><span>Kinh nghiệm bán hàng</span><div class="bars"><div class="bar"><i style="width:80%"></i></div></div><span class="v">20/25</span></div>
+          <div class="axis"><span>Hiểu ngành thủy sản</span><div class="bars"><div class="bar"><i style="width:72%"></i></div></div><span class="v">18/25</span></div>
+          <div class="axis"><span>Kỹ năng giao tiếp</span><div class="bars"><div class="bar"><i style="width:88%"></i></div></div><span class="v">22/25</span></div>
+          <div class="axis"><span>Mức độ ổn định</span><div class="bars"><div class="bar"><i style="width:64%"></i></div></div><span class="v">16/25</span></div>
+          <div class="grid g3" style="margin-top:12px">
+            <div><b>Ba câu tóm tắt</b><ul class="clean"><li>Hai năm bán thiết bị hàng hải.</li><li>Có tệp khách chủ tàu.</li><li>Chưa quen sản phẩm vệ tinh.</li></ul></div>
+            <div><b>Ba điểm mạnh</b><ul class="clean"><li>Giao tiếp tốt.</li><li>Chốt đơn nhanh.</li><li>Chịu đi công tác biển.</li></ul></div>
+            <div><b>Ba điểm cần làm rõ</b><ul class="clean"><li>Lý do rời chỗ cũ.</li><li>Doanh số thực tế.</li><li>Hiểu về IUU.</li></ul></div>
+          </div>
+          <div class="rowact" style="margin-top:12px"><button class="btn pri" data-toast="Đã tạo bộ câu hỏi phỏng vấn cho Trần Thị Mai">Tạo bộ câu hỏi phỏng vấn</button><button class="btn" data-toast="Đã đưa vào diện xem xét">Đưa vào diện xem xét</button></div>
+        </div>
+      </div>
+
+      <div class="sec-h">Phỏng vấn, sinh riêng theo ứng viên</div>
+      <div class="card">
+        <div class="hd"><h3>Bộ câu hỏi và bài về nhà</h3><span class="sub">tám kỹ thuật, bốn hành vi, một bài ba giờ</span></div>
+        <div class="bd">
+          <div class="grid g2">
+            <div class="note">Tám câu kỹ thuật bám dự án ứng viên đã ghi, bốn câu hành vi, một bài về nhà ba giờ kèm barem chấm. Hệ thống đề xuất ba khung giờ phỏng vấn.</div>
+            <div class="kv">
+              <div class="row"><span>Khung giờ đề xuất 1</span><span class="muted">Thứ Tư, 09:00</span></div>
+              <div class="row"><span>Khung giờ đề xuất 2</span><span class="muted">Thứ Tư, 14:00</span></div>
+              <div class="row"><span>Khung giờ đề xuất 3</span><span class="muted">Thứ Năm, 10:00</span></div>
+            </div>
+          </div>
+          <div class="rowact" style="margin-top:12px"><button class="btn sm" data-open="tpl-phongvan">Xem bộ câu hỏi</button><button class="btn pri sm" data-toast="Đã đẩy thư mời vào hàng đợi duyệt">Tạo thư mời, đưa vào hàng đợi</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= MARKETING ================= -->
+    <section class="view" id="v-mkt">
+      <div class="sec-h">Kho từ khóa, tối thiểu 150 mục</div>
+      <div class="card">
+        <div class="hd"><h3>Kho từ khóa</h3><span class="sub">nguồn gợi ý tìm kiếm, hộp thư, tổng đài 1900 23 23 49, đối thủ</span></div>
+        <div class="twrap"><table>
+          <thead><tr><th>Từ khóa</th><th>Ý định</th><th>Trang đích</th></tr></thead>
+          <tbody>
+            <tr><td>thiết bị giám sát hành trình tàu cá</td><td><span class="pill p-acc">Thương mại</span></td><td>trang sản phẩm S-Tracking</td></tr>
+            <tr><td>máy lọc nước biển thành nước ngọt</td><td><span class="pill p-acc">Thương mại</span></td><td>trang sản phẩm máy lọc nước</td></tr>
+            <tr><td>giám sát tàu cá là gì</td><td><span class="pill p-mut">Thông tin</span></td><td>bài blog giám sát tàu cá</td></tr>
+            <tr><td>giá điện thoại vệ tinh</td><td><span class="pill p-warn">Giao dịch</span></td><td>trang điện thoại vệ tinh XT-Pro</td></tr>
+          </tbody>
+        </table></div>
+        <div class="bd tight"><div class="muted" style="padding-top:8px">Tổng 150 mục, phân loại theo ý định tìm kiếm và gán trang đích.</div></div>
+      </div>
+
+      <div class="sec-h">Skill giọng văn và ranh giới sản phẩm</div>
+      <div class="grid g2">
+        <div class="card"><div class="hd"><h3>brand-voice</h3><span class="sub">kiểm 20 đoạn cài lỗi</span></div><div class="bd">
+          <div class="note bad">Bắt được 18 trên 20 đoạn có lỗi. Các lỗi bắt gồm gạch dài, mũi tên, dấu chấm tròn giữa câu, ký hiệu thay chữ và, số sai chuẩn Việt Nam.</div>
+        </div></div>
+        <div class="card"><div class="hd"><h3>product-boundary</h3><span class="sub">điều cấm 4 và 5</span></div><div class="bd">
+          <div class="note bad">Chặn mô tả phần mềm của Viettel hay Thuraya như năng lực của SDVICO. Chặn bịa số liệu, giải thưởng, khách hàng, đối tác.</div>
+        </div></div>
+      </div>
+
+      <div class="sec-h">Rà soát SEO tự động, xếp lỗi theo mức tác động</div>
+      <div class="card"><div class="twrap"><table>
+        <thead><tr><th>Lỗi</th><th>Trang</th><th>Mức tác động</th></tr></thead>
+        <tbody>
+          <tr><td>Thiếu thẻ mô tả</td><td>trang sản phẩm máy lọc nước</td><td><span class="pill p-bad">Cao</span></td></tr>
+          <tr><td>Ảnh nặng, tải chậm</td><td>trang chủ</td><td><span class="pill p-warn">Trung bình</span></td></tr>
+          <tr><td>Thiếu chữ thay ảnh</td><td>bài blog giám sát tàu cá</td><td><span class="pill p-mut">Thấp</span></td></tr>
+        </tbody>
+      </table></div><div class="bd tight"><div class="muted" style="padding-top:8px">Chạy bằng Playwright và Lighthouse trên bản staging.</div></div></div>
+
+      <div class="sec-h">Cỗ máy nội dung bốn bước</div>
+      <div class="steps">
+        <div class="step"><div class="n">Bước 1</div><b>mkt-brief</b><p>Dựng đề cương từ từ khóa và trang đích.</p></div>
+        <div class="step"><div class="n">Bước 2</div><b>mkt-draft</b><p>Viết nháp, đưa vào hàng đợi duyệt.</p></div>
+        <div class="step"><div class="n">Bước 3</div><b>Người duyệt</b><p>Nội dung quy định nhà nước qua cấp quản lý.</p></div>
+        <div class="step"><div class="n">Bước 4</div><b>mkt-publish</b><p>Đăng nội dung đã duyệt, ưu tiên API.</p></div>
+      </div>
+      <div class="note warn" style="margin-top:12px">Điều cấm 3. Nội dung liên quan quy định nhà nước, IUU, Cục Thủy sản và Kiểm ngư phải qua duyệt của cấp quản lý trước khi đăng. Bản ghi có cờ needs_gov_review.</div>
+
+      <div class="sec-h">Dây chuyền video</div>
+      <div class="card"><div class="bd">
+        <ol class="clean">
+          <li>Sinh kịch bản từ bài đã đăng.</li>
+          <li>Ghép hình từ kho tư liệu công ty sở hữu hoặc có giấy phép.</li>
+          <li>Phụ đề bằng Whisper, có từ điển thuật ngữ chuyên ngành.</li>
+          <li>Chèn nhận diện thương hiệu.</li>
+          <li>Xuất bản dọc 60 giây và bản ngang ba tới năm phút.</li>
+          <li>Sinh ba tiêu đề và ba ảnh đại diện.</li>
+        </ol>
+        <div class="note">Chỉ dùng tư liệu ghi trong bảng brand_assets, nhãn sở hữu hoặc có giấy phép.</div>
+      </div></div>
+
+      <div class="sec-h">Đo lường</div>
+      <div class="grid g4">
+        <div class="tile"><span class="stripe"></span><div class="lab">Search Console</div><div class="num">1.842</div><div class="goal">lượt hiển thị tuần</div></div>
+        <div class="tile"><span class="stripe"></span><div class="lab">Analytics</div><div class="num">512</div><div class="goal">phiên truy cập</div></div>
+        <div class="tile"><span class="stripe"></span><div class="lab">Facebook</div><div class="num">7.300</div><div class="goal">lượt tiếp cận</div></div>
+        <div class="tile"><span class="stripe"></span><div class="lab">YouTube</div><div class="num">1.120</div><div class="goal">lượt xem</div></div>
+      </div>
+    </section>
+
+    <!-- ================= OPS ================= -->
+    <section class="view" id="v-ops">
+      <div class="sec-h">Bốn mức môi trường thử nghiệm</div>
+      <div class="grid g4">
+        <div class="card"><div class="bd"><b>Mức T0</b><p class="muted" style="margin:4px 0 0">Bản sao trang cục bộ. Chạy hàng trăm lần, không chạm sàn.</p></div></div>
+        <div class="card"><div class="bd"><b>Mức T1</b><p class="muted" style="margin:4px 0 0">Sandbox chính thức. Test User và Page thử của Facebook.</p></div></div>
+        <div class="card"><div class="bd"><b>Mức T2</b><p class="muted" style="margin:4px 0 0">Tài khoản thử hợp lệ của công ty, chưa công bố.</p></div></div>
+        <div class="card"><div class="bd"><b>Mức T3</b><p class="muted" style="margin:4px 0 0">Diễn tập trên tài khoản thật, dừng trước nút gửi cuối.</p></div></div>
+      </div>
+
+      <div class="grid g2" style="margin-top:14px">
+        <div class="card">
+          <div class="hd"><h3>Browser runner</h3><span class="sub">thiết kế bắt buộc Phần 6.4</span></div>
+          <div class="bd"><div class="kv">
+            <div class="row"><span>Công tắc dừng khẩn</span><button class="toggle" id="estop" aria-label="Công tắc dừng khẩn"><i></i></button></div>
+            <div class="row"><span>Chế độ diễn tập, dừng trước nút gửi</span><span class="pill p-ok">Bật</span></div>
+            <div class="row"><span>Giữ hồ sơ trình duyệt theo tài khoản</span><span class="pill p-ok">Có</span></div>
+            <div class="row"><span>Hàng đợi tuần tự theo tài khoản</span><span class="pill p-ok">Có</span></div>
+          </div><div class="muted" style="margin-top:10px;font-size:12px">Bật công tắc dừng khẩn sẽ tắt mọi tác vụ đăng bài và thao tác web.</div></div>
+        </div>
+        <div class="card">
+          <div class="hd"><h3>Hạn mức tự đặt, thấp hơn hạn mức của sàn</h3></div>
+          <div class="bd"><div class="kv">
+            <div class="row"><span>Tin tuyển dụng mỗi ngày mỗi sàn</span><span class="muted">2 trên 5</span></div>
+            <div class="row"><span>Bài mỗi ngày mỗi trang mạng xã hội</span><span class="muted">1 trên 3</span></div>
+            <div class="row"><span>Số lần thử lại tối đa một nhánh</span><span class="muted">3</span></div>
+          </div><div class="muted" style="margin-top:10px;font-size:12px">Bộ đếm lưu trong cơ sở dữ liệu, không giữ trong bộ nhớ.</div></div>
+        </div>
+      </div>
+
+      <div class="sec-h">Bảy nguyên lý tránh bị chặn</div>
+      <div class="card"><div class="bd"><ol class="clean">
+        <li>Đăng nhập là thao tác rủi ro nhất, đăng nhập càng ít càng tốt.</li>
+        <li>Dùng Chrome thật, không dùng trình duyệt rút gọn.</li>
+        <li>Một địa chỉ mạng ổn định, không xoay proxy.</li>
+        <li>Nhịp độ của người, giãn cách ngẫu nhiên, gõ từng ký tự.</li>
+        <li>Hạn mức tự đặt thấp hơn hạn mức của sàn.</li>
+        <li>Chờ theo trạng thái, không chờ theo thời gian cố định.</li>
+        <li>Gặp rào là dừng, không phá rào.</li>
+      </ol></div></div>
+
+      <div class="grid g2">
+        <div class="card"><div class="hd"><h3>Bốn thứ tuyệt đối không làm</h3></div><div class="bd"><ul class="clean">
+          <li>Không giả mạo dấu vân tay trình duyệt.</li>
+          <li>Không xoay proxy, không dùng proxy dân cư.</li>
+          <li>Không dùng dịch vụ giải mã xác nhận hình ảnh.</li>
+          <li>Không tạo tài khoản phụ, không tương tác giả.</li>
+        </ul></div></div>
+        <div class="card"><div class="hd"><h3>Sáu điều kiện chuyển test sang thật</h3><span class="sub">mục 5.4, người khác ký</span></div><div class="bd"><ul class="clean">
+          <li>Chạy sạch 20 lần liên tiếp ở mức T0.</li>
+          <li>Chạy sạch 5 lần ở mức T1 hoặc T2.</li>
+          <li>Trần hạn mức ngày đã cài và đã kiểm chứng.</li>
+          <li>Công tắc dừng khẩn tắt được trong dưới 30 giây.</li>
+          <li>Mọi nhánh lỗi đều dừng và đẩy vào hàng đợi duyệt.</li>
+          <li>Có người vận hành ngồi cạnh lần chạy thật đầu tiên.</li>
+        </ul></div></div>
+      </div>
+
+      <div class="sec-h">Nhật ký thao tác, run_log</div>
+      <div class="card"><div class="twrap"><table>
+        <thead><tr><th>Thời điểm</th><th>Tác vụ</th><th>Nơi chạy</th><th>Kết quả</th></tr></thead>
+        <tbody>
+          <tr><td style="font-family:var(--mono)">09:30</td><td>Nạp CV từ hộp thư</td><td>hr-intake</td><td><span class="pill p-ok">Xong</span></td></tr>
+          <tr><td style="font-family:var(--mono)">10:00</td><td>Chấm 6 CV</td><td>cv-screening</td><td><span class="pill p-ok">Xong</span></td></tr>
+          <tr><td style="font-family:var(--mono)">10:15</td><td>Diễn tập đăng tin, mức T0</td><td>browser-runner</td><td><span class="pill p-ok">Xong</span></td></tr>
+          <tr><td style="font-family:var(--mono)">10:22</td><td>Đăng Facebook Page nháp</td><td>mkt-publish</td><td><span class="pill p-warn">Chờ duyệt</span></td></tr>
+        </tbody>
+      </table></div></div>
+    </section>
+
+    <!-- ================= CHUAN ================= -->
+    <section class="view" id="v-chuan">
+      <div class="sec-h">Bảy điều cấm</div>
+      <div class="card"><div class="bd"><ol class="clean">
+        <li>Máy soạn, người bấm gửi. Không tự động gửi thư hoặc tin nhắn tới ứng viên và khách hàng.</li>
+        <li>Không tự động loại ứng viên. Máy xếp hạng, người quyết.</li>
+        <li>Nội dung liên quan quy định nhà nước, IUU, Cục Thủy sản và Kiểm ngư phải qua duyệt của cấp quản lý trước khi đăng.</li>
+        <li>Không mô tả phần mềm đối tác như năng lực của SDVICO. Công ty phân phối thiết bị, không sở hữu phần mềm của họ.</li>
+        <li>Không bịa số liệu, giải thưởng, khách hàng, đối tác.</li>
+        <li>Không đưa dữ liệu ứng viên ra khỏi hạ tầng công ty.</li>
+        <li>Không commit khóa và mật khẩu vào Git.</li>
+      </ol></div></div>
+
+      <div class="sec-h">Chuẩn giọng văn</div>
+      <div class="card"><div class="bd"><ul class="clean">
+        <li>Không dùng gạch dài, mũi tên, dấu chấm tròn giữa câu, ký hiệu thay chữ và.</li>
+        <li>Số theo chuẩn Việt Nam, dấu chấm ngăn cách hàng nghìn, ví dụ 3.000.000 đồng.</li>
+        <li>Câu rõ ràng, không sáo rỗng, không dịch máy.</li>
+        <li>Giọng gần gũi ngư dân và chủ tàu, nhấn mạnh ra khơi an toàn và tiết kiệm chi phí.</li>
+      </ul></div></div>
+
+      <div class="sec-h">Bảng nghiệm thu sau bảy ngày</div>
+      <div class="card"><div class="twrap"><table>
+        <thead><tr><th>Chỉ tiêu</th><th>Mức đạt</th></tr></thead>
+        <tbody>
+          <tr><td>CV chấm tự động trong ngày nhận</td><td>Trên 90 phần trăm</td></tr>
+          <tr><td>Độ chính xác trích trường bắt buộc</td><td>Tối thiểu 90 phần trăm</td></tr>
+          <tr><td>Thời gian soạn một mô tả công việc</td><td>Dưới 20 phút</td></tr>
+          <tr><td>Luồng đăng tin sạch trên môi trường test</td><td>Ba kênh, mỗi kênh 5 lần liên tiếp</td></tr>
+          <tr><td>Tin tuyển dụng trên tài khoản thật</td><td>Một vị trí, có ảnh chụp</td></tr>
+          <tr><td>Bài website qua hệ thống</td><td>Ba bài staging, một bài trang thật</td></tr>
+          <tr><td>Bài Facebook</td><td>Năm bài Page nháp, một bài Page thật</td></tr>
+          <tr><td>Video hoàn chỉnh</td><td>Một bản dọc và một bản ngang</td></tr>
+          <tr><td>Tác vụ theo lịch chạy thành công</td><td>Tối thiểu 95 phần trăm ngày 6 và 7</td></tr>
+          <tr><td>Chi phí mô hình cả tuần</td><td>Dưới 3.000.000 đồng</td></tr>
+        </tbody>
+      </table></div></div>
+
+      <div class="sec-h">Cấp quyền</div>
+      <div class="note">Danh sách tài khoản và quyền cần cấp nằm trong tài liệu docs/can-cung-cap.md, chia theo mốc trước ngày một cho môi trường thử nghiệm và trước ngày sáu cho tài khoản thật.</div>
+    </section>
+  </main>
+</div>
+
+<!-- hidden templates for drawer -->
+<div id="tpls" style="display:none">
+  <div data-title="JD bản website" id="tpl-jd-web">SDVICO tuyển nhân viên kinh doanh thiết bị giám sát tàu cá.
+
+Công việc. Tư vấn và bán thiết bị giám sát hành trình, điện thoại vệ tinh, máy lọc nước cho chủ tàu và doanh nghiệp thủy sản. Chăm sóc khách sau bán.
+
+Yêu cầu. Có kinh nghiệm bán hàng, giao tiếp tốt, sẵn sàng đi công tác vùng biển.
+
+Quyền lợi. Cần bổ sung lương thưởng theo thông tin công ty.
+
+Cách ứng tuyển. Gửi hồ sơ về hộp thư tuyển dụng của công ty.</div>
+  <div data-title="JD bản Facebook" id="tpl-jd-fb">SDVICO đang tìm nhân viên kinh doanh cho ngành thiết bị tàu cá.
+
+Bạn thích công việc gặp gỡ chủ tàu, tư vấn giải pháp giám sát và liên lạc trên biển. Về đội mình nhé.
+
+Ứng tuyển qua đường dẫn trong phần bình luận.</div>
+  <div data-title="JD bản sàn tuyển dụng" id="tpl-jd-san">Vị trí. Nhân viên kinh doanh thiết bị hàng hải.
+Địa điểm. Vũng Tàu.
+Mô tả. Bán và tư vấn thiết bị giám sát tàu cá, điện thoại vệ tinh, máy lọc nước.
+Yêu cầu. Kinh nghiệm bán hàng, hiểu ngành thủy sản là lợi thế.</div>
+  <div data-title="JD bản ngắn dán nhóm" id="tpl-jd-ngan">SDVICO tuyển nhân viên kinh doanh thiết bị tàu cá tại Vũng Tàu. Ai quan tâm để lại bình luận, mình gửi thông tin.</div>
+  <div data-title="Bộ câu hỏi phỏng vấn" id="tpl-phongvan">Tám câu kỹ thuật.
+1. Kể một hợp đồng bán thiết bị bạn từng chốt.
+2. Bạn xử lý khách phàn nàn về bảo hành ra sao.
+3. Bạn hiểu gì về thiết bị giám sát hành trình tàu cá.
+4. Cách bạn tìm khách chủ tàu mới.
+5. Bạn giải thích chi phí thuê bao vệ tinh cho khách thế nào.
+6. Một lần bạn mất khách và bài học.
+7. Bạn theo dõi chỉ tiêu doanh số bằng cách nào.
+8. Bạn biết gì về quy định chống khai thác bất hợp pháp.
+
+Bốn câu hành vi.
+1. Một lần bạn làm việc dưới áp lực thời gian.
+2. Cách bạn phối hợp với bộ phận kỹ thuật.
+3. Bạn học sản phẩm mới nhanh cỡ nào.
+4. Điều gì khiến bạn gắn bó với công việc.
+
+Bài về nhà ba giờ. Lập kế hoạch tiếp cận 10 chủ tàu tại một cảng, kèm barem chấm theo độ rõ ràng và tính khả thi.</div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer"><div class="dh"><b id="dtitle">Chi tiết</b><button class="x" id="dclose">×</button></div><div class="db" id="dbody"></div></aside>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var QUEUE=[
+    {kind:"Thư mời phỏng vấn",who:"Nguyễn Văn Hùng, nhân viên kinh doanh",tag:"Tuyển dụng",gov:false,
+     body:"Kính gửi anh Hùng,\n\nCảm ơn anh đã ứng tuyển vị trí nhân viên kinh doanh tại SDVICO. Chúng tôi muốn mời anh tham gia buổi phỏng vấn.\nAnh vui lòng chọn một trong ba khung giờ chúng tôi đề xuất.\n\nTrân trọng."},
+    {kind:"Bài website",who:"Giám sát tàu cá giúp ngư dân tự tin ra khơi",tag:"Marketing",gov:true,
+     body:"Bài viết giới thiệu lợi ích của thiết bị giám sát hành trình tàu cá. Có nhắc quy định nhà nước nên cần cấp quản lý duyệt trước khi đăng."},
+    {kind:"Bài Facebook",who:"Máy lọc nước biển thành nước ngọt cho tàu xa bờ",tag:"Marketing",gov:false,
+     body:"Bài đăng ngắn giới thiệu máy lọc nước biển thành nước ngọt. Đăng trên Page nháp ở chế độ phát triển."},
+    {kind:"Thư mời phỏng vấn",who:"Trần Thị Mai, nhân viên kinh doanh",tag:"Tuyển dụng",gov:false,
+     body:"Kính gửi chị Mai,\n\nCảm ơn chị đã ứng tuyển. Chúng tôi mời chị phỏng vấn và gửi kèm ba khung giờ đề xuất.\n\nTrân trọng."},
+    {kind:"Kịch bản video",who:"Video dọc 60 giây về điện thoại vệ tinh",tag:"Marketing",gov:false,
+     body:"Kịch bản video dọc 60 giây, ghép từ tư liệu công ty có giấy phép, phụ đề bằng Whisper."}
+  ];
+  function tag(t){var m={"Tuyển dụng":"p-acc","Marketing":"p-pend"};return '<span class="pill '+(m[t]||"p-mut")+'">'+t+'</span>';}
+
+  function renderQueue(){
+    var box=document.getElementById("queue");box.innerHTML="";
+    if(QUEUE.length===0){box.innerHTML='<div class="note">Không có mục nào chờ duyệt.</div>';markCount();return;}
+    QUEUE.forEach(function(it,i){
+      var gov=it.gov?'<span class="pill p-warn">Cần cấp quản lý duyệt</span>':'';
+      var d=document.createElement("div");d.className="card";
+      d.innerHTML='<div class="hd"><h3>'+it.kind+'</h3><span class="sub">'+tag(it.tag)+' '+gov+'</span></div>'+
+        '<div class="bd"><div style="font-weight:600;margin-bottom:6px">'+it.who+'</div>'+
+        '<div class="note" style="white-space:pre-line;max-height:88px;overflow:hidden">'+it.body+'</div>'+
+        '<div class="rowact" style="margin-top:11px">'+
+        '<button class="btn sm" data-view="'+i+'">Xem đầy đủ</button>'+
+        '<input class="btn" style="flex:1;min-width:140px;color:var(--ink)" placeholder="Ghi chú" data-note="'+i+'">'+
+        '<button class="btn ok sm" data-ok="'+i+'">Duyệt</button>'+
+        '<button class="btn no sm" data-no="'+i+'">Từ chối</button></div></div>';
+      box.appendChild(d);
+    });
+    markCount();
+  }
+  function markCount(){
+    document.querySelectorAll('#nav button[data-v="approval"] .pill').forEach(function(p){p.textContent=QUEUE.length;});
+  }
+  function decide(i,ok){var it=QUEUE[i];QUEUE.splice(i,1);renderQueue();showToast((ok?"Đã duyệt và ghi nhật ký. ":"Đã từ chối. ")+it.kind);}
+
+  var scrim=document.getElementById("scrim"),drawer=document.getElementById("drawer");
+  function openDrawer(title,body){document.getElementById("dtitle").textContent=title;document.getElementById("dbody").innerHTML='<pre>'+String(body).replace(/</g,"&lt;")+'</pre>';scrim.classList.add("open");drawer.classList.add("open");}
+  function closeDrawer(){scrim.classList.remove("open");drawer.classList.remove("open");}
+  document.getElementById("dclose").addEventListener("click",closeDrawer);
+  scrim.addEventListener("click",closeDrawer);
+  document.addEventListener("keydown",function(e){if(e.key==="Escape")closeDrawer();});
+
+  var toast=document.getElementById("toast"),tt;
+  function showToast(m){toast.textContent=m;toast.classList.add("show");clearTimeout(tt);tt=setTimeout(function(){toast.classList.remove("show");},2400);}
+
+  var titles={overview:["Tổng quan","Bảng điều hành hệ thống tự động hóa Tuyển dụng và Marketing của SDVICO"],
+    approval:["Hàng đợi duyệt","Máy soạn, người bấm. Duyệt hoặc từ chối từng mục"],
+    hr:["Tuyển dụng","JD, nạp CV, chấm CV, phỏng vấn"],
+    mkt:["Marketing","Từ khóa, nội dung, video, đo lường"],
+    ops:["Vận hành và an toàn","Môi trường test, browser runner, hạn mức, nhật ký"],
+    chuan:["Chuẩn và nghiệm thu","Bảy điều cấm, giọng văn, bảng nghiệm thu, cấp quyền"]};
+  document.getElementById("nav").addEventListener("click",function(e){
+    var b=e.target.closest("button[data-v]");if(!b)return;
+    this.querySelectorAll("button").forEach(function(x){x.classList.remove("active");});
+    b.classList.add("active");var v=b.dataset.v;
+    document.querySelectorAll(".view").forEach(function(s){s.classList.remove("show");});
+    document.getElementById("v-"+v).classList.add("show");
+    document.getElementById("vt").textContent=titles[v][0];
+    document.getElementById("vs").textContent=titles[v][1];
+    window.scrollTo({top:0,behavior:"smooth"});
+  });
+
+  document.body.addEventListener("click",function(e){
+    var v=e.target.closest("[data-view]");if(v){openDrawer(QUEUE[+v.dataset.view].kind,QUEUE[+v.dataset.view].body);return;}
+    var ok=e.target.closest("[data-ok]");if(ok){decide(+ok.dataset.ok,true);return;}
+    var no=e.target.closest("[data-no]");if(no){decide(+no.dataset.no,false);return;}
+    var op=e.target.closest("[data-open]");if(op){var el=document.getElementById(op.dataset.open);if(el)openDrawer(el.getAttribute("data-title")||"Chi tiết",el.textContent);return;}
+    var t=e.target.closest("[data-toast]");if(t){showToast(t.dataset.toast);return;}
+  });
+
+  var estop=document.getElementById("estop");
+  if(estop)estop.addEventListener("click",function(){this.classList.toggle("on");showToast(this.classList.contains("on")?"Đã bật công tắc dừng khẩn. Mọi tác vụ đăng bài và thao tác web dừng.":"Đã tắt công tắc dừng khẩn.");});
+
+  document.getElementById("theme").addEventListener("click",function(){var r=document.documentElement;var c=r.getAttribute("data-theme");if(!c)c=window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";r.setAttribute("data-theme",c==="dark"?"light":"dark");});
+
+  renderQueue();
+})();
+</script>
