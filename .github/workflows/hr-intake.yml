@@ -35,5 +35,7 @@ jobs:
           MAIL_IMAP_PORT: ${{ secrets.MAIL_IMAP_PORT }}
           MAIL_IMAP_USER: ${{ secrets.MAIL_IMAP_USER }}
           MAIL_IMAP_PASSWORD: ${{ secrets.MAIL_IMAP_PASSWORD }}
+          MAIL_IMAP_MAILBOX: ${{ secrets.MAIL_IMAP_MAILBOX }}
+          MAIL_INTAKE_ALLOWED_SENDERS: ${{ secrets.MAIL_INTAKE_ALLOWED_SENDERS }}
           CV_BUCKET: ${{ secrets.CV_BUCKET }}
           HR_RETENTION_MONTHS: ${{ secrets.HR_RETENTION_MONTHS }}
