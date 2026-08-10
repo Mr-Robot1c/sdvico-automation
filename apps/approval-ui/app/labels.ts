@@ -88,6 +88,30 @@ export function payloadRows(payload: unknown): PayloadRow[] {
   return rows;
 }
 
+// Nhãn và màu cho trạng thái hồ sơ ứng tuyển (hr_applications.stage).
+export function stageMeta(stage: string): { label: string; tone: string } {
+  switch (stage) {
+    case 'new': return { label: 'Mới nhận', tone: 'hr' };
+    case 'screening': return { label: 'Đang chấm', tone: 'mkt' };
+    case 'review': return { label: 'Chờ xem', tone: 'mkt' };
+    case 'interview': return { label: 'Phỏng vấn', tone: 'web' };
+    case 'offer': return { label: 'Mời nhận việc', tone: 'ok' };
+    case 'rejected': return { label: 'Từ chối', tone: 'no' };
+    case 'pool': return { label: 'Lưu nguồn', tone: 'demo' };
+    default: return { label: stage, tone: 'default' };
+  }
+}
+
+// Nhãn nguồn ứng viên.
+export function sourceLabel(source?: string | null): string {
+  switch (source) {
+    case 'email': return 'Hộp thư';
+    case 'verify-synthetic': return 'Dữ liệu test';
+    case 'dry-file': return 'Tệp cục bộ';
+    default: return source || 'Không rõ';
+  }
+}
+
 function safeStringify(v: unknown): string {
   try {
     return JSON.stringify(v, null, 2);
