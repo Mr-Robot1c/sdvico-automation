@@ -24,6 +24,14 @@ supabase/            lược đồ và RLS, xem supabase/README.md
 .github/workflows/   lịch chạy
 ```
 
+## Tài liệu
+
+- `docs/ke-hoach-7-ngay.md`: kế hoạch giao việc gốc.
+- `docs/can-cung-cap.md`: danh sách tài khoản, quyền truy cập và dữ kiện cần cung cấp.
+- `docs/app-map/README.md`: bản đồ hệ thống, nền chung.
+- `docs/app-map/tuyen-dung.md`: workflow và app map mảng Tuyển dụng.
+- `docs/app-map/marketing.md`: workflow và app map mảng Marketing.
+
 ## Cơ sở dữ liệu
 
 Xem `supabase/README.md` để biết cách áp dụng migration và bật RLS. Không commit khóa và mật khẩu, chép `.env.example` thành `.env` rồi điền giá trị thật.
