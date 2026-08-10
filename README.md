@@ -26,6 +26,7 @@ supabase/            lược đồ và RLS, xem supabase/README.md
 
 ## Tài liệu
 
+- `docs/tai-lieu-tong-hop.md`: tài liệu tổng hợp, kế hoạch, luồng, đầu vào đầu ra, cách hoạt động của code, có sơ đồ.
 - `docs/ke-hoach-7-ngay.md`: kế hoạch giao việc gốc.
 - `docs/can-cung-cap.md`: danh sách tài khoản, quyền truy cập và dữ kiện cần cung cấp.
 - `docs/app-map/README.md`: bản đồ hệ thống, nền chung.
