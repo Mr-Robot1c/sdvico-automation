@@ -30,7 +30,7 @@ Diễn tập một tệp CV cục bộ, không cần hộp thư, không ghi gì,
 node packages/hr/src/intake/run.mjs --dry-run --file duong/dan/cv.pdf
 ```
 
-Diễn tập trên hộp thư, đọc thư chưa đọc nhưng không ghi và không đánh dấu đã đọc:
+Diễn tập trên hộp thư, đọc thư gần đây nhưng không ghi và không đánh dấu đã xử lý:
 
 ```bash
 node packages/hr/src/intake/run.mjs --dry-run

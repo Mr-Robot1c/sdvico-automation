@@ -32,7 +32,7 @@ Sinh mô tả công việc bốn phiên bản cho bốn kênh (website, trang tu
 
 ## Đường nạp CV
 
-Luồng: đọc thư chưa đọc, trích PDF và DOCX, OCR cho CV ảnh, chuẩn hóa JSON, khử trùng theo email và số điện thoại, lưu tệp lên Storage, ghi `hr_candidates` và `hr_applications`, ghi `run_log`, đánh dấu thư đã đọc.
+Luồng: đọc thư gần đây (theo ngày, không dựa cờ đã đọc), trích PDF và DOCX, OCR cho CV ảnh, chuẩn hóa JSON, khử trùng theo email và số điện thoại, lưu tệp lên Storage, ghi `hr_candidates` và `hr_applications`, ghi `run_log`, đánh dấu thư đã xử lý trong cơ sở dữ liệu.
 
 Chạy thử một tệp cục bộ (không cần hộp thư, không ghi gì):
 
@@ -56,6 +56,10 @@ node packages/hr/src/intake/run.mjs
 ### Khử trùng lặp
 
 Ứng viên coi là trùng khi khớp email HOẶC số điện thoại với bản ghi đã có. Khi trùng thì cập nhật bản ghi cũ, không tạo mới. `dedup_key` ưu tiên email, không có thì dùng số điện thoại đã chuẩn hóa về dạng 0xxxxxxxxx.
+
+### Chống nạp trùng thư (không dựa cờ đã đọc)
+
+Pipeline đọc thư gần đây theo ngày (`--since-days`, mặc định 3), không lọc theo trạng thái đọc. Thư đã xử lý được ghi message-id vào `app_config` (khóa `hr_intake_processed`) qua `intake/seen.js`, lượt sau bỏ qua. Nhờ vậy người mở thư trong hộp thư không làm pipeline bỏ sót, và thư CV mới không bị rơi khỏi lô khi hộp thư có nhiều thư chưa đọc khác. Danh sách message-id tự cắt bớt mục cũ hơn 14 ngày.
 
 ### Consent và thời hạn lưu
 

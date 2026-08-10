@@ -1,16 +1,19 @@
 // Đường nạp CV từ hộp thư. Chạy 30 phút một lần qua GitHub Actions.
-// Luồng: đọc thư chưa đọc -> trích PDF/DOCX/OCR ảnh -> chuẩn hóa JSON ->
+// Luồng: đọc thư gần đây -> trích PDF/DOCX/OCR ảnh -> chuẩn hóa JSON ->
 //        khử trùng theo email và số điện thoại -> lưu tệp lên Storage ->
-//        ghi hr_candidates và hr_applications -> đánh dấu thư đã đọc -> ghi run_log.
+//        ghi hr_candidates và hr_applications -> đánh dấu đã xử lý -> ghi run_log.
+//
+// Chống nạp trùng bằng bộ đánh dấu đã xử lý trong cơ sở dữ liệu (seen.js),
+// không dựa cờ "đã đọc" của hộp thư, nên người mở thư không làm pipeline bỏ sót.
 //
 // Điều cấm 1 và 2: chỉ nạp và xếp vào luồng, không tự trả lời, không tự loại ai.
 // Điều cấm 6: tệp và dữ liệu nằm trong Supabase công ty.
 //
 // Cách chạy:
 //   Thật:     node packages/hr/src/intake/run.mjs
-//   Diễn tập một tệp cục bộ (không cần IMAP, không ghi gì):
+//   Diễn tập một tệp cục bộ (không cần hộp thư, không ghi gì):
 //             node packages/hr/src/intake/run.mjs --dry-run --file duong/dan/cv.pdf
-//   Diễn tập hộp thư (đọc IMAP, không ghi, không đánh dấu đã đọc):
+//   Diễn tập hộp thư (đọc thư gần đây, không ghi, không đánh dấu):
 //             node packages/hr/src/intake/run.mjs --dry-run
 
 import { readFile } from 'node:fs/promises';
@@ -20,14 +23,16 @@ import { extractText, detectKind } from './extract.js';
 import { normalizeCv } from './normalize.js';
 import { ensureBucket, uploadCv } from './storage.js';
 import { upsertCandidate, ensureApplication } from './candidates.js';
-import { getMailConfig, withMailbox, fetchUnseenCvMessages, markSeen } from './mailbox.js';
+import { getMailConfig, withMailbox, fetchRecentCvMessages } from './mailbox.js';
+import { loadProcessed, saveProcessed } from './seen.js';
 
 function parseArgs(argv) {
-  const args = { dryRun: false, file: null, limit: 50 };
+  const args = { dryRun: false, file: null, max: 300, sinceDays: 3 };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--dry-run') args.dryRun = true;
     else if (argv[i] === '--file') args.file = argv[++i];
-    else if (argv[i] === '--limit') args.limit = Number(argv[++i]);
+    else if (argv[i] === '--max') args.max = Number(argv[++i]);
+    else if (argv[i] === '--since-days') args.sinceDays = Number(argv[++i]);
   }
   return args;
 }
@@ -75,15 +80,12 @@ async function runDryFile(file) {
 
 // Xử lý một thư đã lấy từ hộp thư. Trả về tóm tắt để ghi log.
 async function processMessage(client, msg, { dryRun }) {
-  if (!msg.attachments || msg.attachments.length === 0) {
-    return { uid: msg.uid, from: msg.from, skipped: 'không có đính kèm CV' };
-  }
   const year = String((msg.date ? new Date(msg.date) : new Date()).getFullYear());
   const { text, parts } = await extractAll(msg.attachments);
 
   const cv = normalizeCv(text, {
     source: 'email',
-    sourceMessage: { from: msg.from, subject: msg.subject, date: msg.date, uid: msg.uid },
+    sourceMessage: { from: msg.from, subject: msg.subject, date: msg.date, uid: msg.uid, messageId: msg.messageId },
     attachments: parts,
     parsedAt: new Date().toISOString()
   });
@@ -91,6 +93,7 @@ async function processMessage(client, msg, { dryRun }) {
   if (dryRun) {
     return {
       uid: msg.uid,
+      messageId: msg.messageId,
       from: msg.from,
       subject: msg.subject,
       dedup_key: cv.dedup_key,
@@ -120,10 +123,9 @@ async function processMessage(client, msg, { dryRun }) {
   });
   const app = await ensureApplication(client.__db, candidateId);
 
-  await markSeen(client, msg.uid);
-
   return {
     uid: msg.uid,
+    messageId: msg.messageId,
     from: msg.from,
     subject: msg.subject,
     candidate_id: candidateId,
@@ -147,37 +149,50 @@ async function main() {
   const config = getMailConfig();
 
   if (!args.dryRun) await ensureBucket(db);
+  const processed = args.dryRun ? {} : await loadProcessed(db);
 
   const results = await withMailbox(config, async (imap) => {
-    // Gắn client cơ sở dữ liệu vào để processMessage dùng chung, tránh truyền nhiều tham số.
     imap.__db = db;
-    const messages = await fetchUnseenCvMessages(imap, { limit: args.limit });
+    const messages = await fetchRecentCvMessages(imap, { sinceDays: args.sinceDays, max: args.max });
     const out = [];
     for (const msg of messages) {
+      // Bỏ qua thư không có đính kèm CV.
+      if (!msg.attachments || msg.attachments.length === 0) continue;
+
+      const mid = msg.messageId || `uid:${config.mailbox}:${msg.uid}`;
+      if (!args.dryRun && processed[mid]) {
+        out.push({ messageId: mid, from: msg.from, skipped: 'đã xử lý trước đó' });
+        continue;
+      }
+
       try {
-        out.push(await processMessage(imap, msg, { dryRun: args.dryRun }));
+        const r = await processMessage(imap, msg, { dryRun: args.dryRun });
+        out.push(r);
+        if (!args.dryRun && r.candidate_id) processed[mid] = new Date().toISOString();
       } catch (err) {
-        out.push({ uid: msg.uid, from: msg.from, error: err.message });
+        out.push({ messageId: mid, from: msg.from, error: err.message });
       }
     }
     return out;
   });
 
   const okCount = results.filter((r) => r.candidate_id).length;
+  const skipCount = results.filter((r) => r.skipped).length;
   const errCount = results.filter((r) => r.error).length;
 
   if (!args.dryRun) {
+    await saveProcessed(db, processed);
     await logRun(db, {
       task: 'hr-intake',
       actor: 'github-actions',
       status: errCount ? 'error' : 'ok',
-      detail: { tong_thu: results.length, ghi_ung_vien: okCount, loi: errCount, ket_qua: results }
+      detail: { thu_co_cv: results.length, ghi_ung_vien: okCount, bo_qua_da_xu_ly: skipCount, loi: errCount, ket_qua: results }
     });
   }
 
   console.log(
     JSON.stringify(
-      { dryRun: args.dryRun, tong_thu: results.length, ghi_ung_vien: okCount, loi: errCount, ket_qua: results },
+      { dryRun: args.dryRun, thu_co_cv: results.length, ghi_ung_vien: okCount, bo_qua_da_xu_ly: skipCount, loi: errCount, ket_qua: results },
       null,
       2
     )

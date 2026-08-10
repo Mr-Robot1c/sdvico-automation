@@ -356,17 +356,20 @@ Bước sinh nội dung do Claude Code làm theo hướng dẫn trong `hr-jd.md`
 flowchart TD
     T["GitHub Actions, 30 phút một lần"] --> R["run.mjs"]
     R --> EB["ensureBucket, đảm bảo bucket cv"]
-    EB --> MB["mailbox.js, đọc thư chưa đọc qua IMAP"]
+    EB --> MB["mailbox.js, đọc thư gần đây theo ngày qua IMAP"]
     MB --> LOOP{"Còn thư?"}
-    LOOP -->|"Không"| LOG["Ghi run_log, in kết quả"]
-    LOOP -->|"Có"| AT["Lọc đính kèm CV: pdf, docx, ảnh đủ lớn"]
+    LOOP -->|"Không"| SAVE["seen.js, lưu message-id đã xử lý vào app_config"]
+    SAVE --> LOG["Ghi run_log, in kết quả"]
+    LOOP -->|"Có"| SEEN{"Đã xử lý trước đó?"}
+    SEEN -->|"Rồi"| LOOP
+    SEEN -->|"Chưa"| AT["Lọc đính kèm CV: pdf, docx, ảnh đủ lớn"]
     AT --> EX["extract.js, trích văn bản"]
     EX --> NR["normalize.js, rút email, phone, tên, dedup_key"]
     NR --> UP["storage.js, tải tệp lên Storage"]
     UP --> CA["candidates.js, khử trùng và ghi ứng viên"]
     CA --> AP["ensureApplication, tạo hồ sơ nếu chưa có"]
-    AP --> SEEN["markSeen, đánh dấu thư đã đọc"]
-    SEEN --> LOOP
+    AP --> MARK["Đánh dấu message-id đã xử lý"]
+    MARK --> LOOP
 ```
 
 **Trích văn bản theo loại tệp**, trong `packages/hr/src/intake/extract.js`:

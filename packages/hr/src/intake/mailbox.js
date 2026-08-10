@@ -90,7 +90,37 @@ export async function fetchUnseenCvMessages(client, { limit = 50 } = {}) {
   return messages;
 }
 
-// Đánh dấu một thư đã đọc, gọi sau khi xử lý xong để không nạp lại lượt sau.
+// Lấy thư gần đây theo ngày, KHÔNG lọc theo trạng thái đọc.
+// Bộ đánh dấu đã xử lý (seen.js) mới là thứ chống nạp trùng, nên đọc cả thư đã đọc.
+// Cửa sổ sinceDays đủ rộng để không sót thư mới, nhưng vẫn bó số thư phải quét.
+// Kèm message-id để seen.js nhận diện thư, message-id là mã toàn cục duy nhất của thư.
+export async function fetchRecentCvMessages(client, { sinceDays = 3, max = 300 } = {}) {
+  const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+  const messages = [];
+  for await (const msg of client.fetch({ since }, { uid: true, source: true, envelope: true })) {
+    if (messages.length >= max) break;
+    let parsed;
+    try {
+      parsed = await simpleParser(msg.source);
+    } catch (err) {
+      messages.push({ uid: msg.uid, messageId: null, parseError: err.message, attachments: [] });
+      continue;
+    }
+    const env = msg.envelope || {};
+    const from = env.from && env.from[0] ? env.from[0].address : (parsed.from?.value?.[0]?.address || null);
+    messages.push({
+      uid: msg.uid,
+      messageId: parsed.messageId || (env.messageId || null),
+      from,
+      subject: env.subject || parsed.subject || null,
+      date: env.date || parsed.date || null,
+      attachments: pickCvAttachments(parsed)
+    });
+  }
+  return messages;
+}
+
+// Đánh dấu một thư đã đọc. Không còn dùng để chống nạp trùng, giữ lại cho trường hợp cần.
 export async function markSeen(client, uid) {
   await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
 }

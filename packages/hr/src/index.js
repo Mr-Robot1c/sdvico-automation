@@ -12,4 +12,5 @@ export {
 export { detectKind, extractText } from './intake/extract.js';
 export { upsertCandidate, ensureApplication } from './intake/candidates.js';
 export { ensureBucket, uploadCv, CV_BUCKET } from './intake/storage.js';
-export { getMailConfig, withMailbox, fetchUnseenCvMessages, markSeen } from './intake/mailbox.js';
+export { getMailConfig, withMailbox, fetchRecentCvMessages, fetchUnseenCvMessages, markSeen } from './intake/mailbox.js';
+export { loadProcessed, saveProcessed } from './intake/seen.js';
