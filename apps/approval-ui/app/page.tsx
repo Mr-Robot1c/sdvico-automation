@@ -1,6 +1,7 @@
 import { getServerClient } from '../lib/supabase-server';
-import { decideForm } from './actions';
 import AutoRefresh from './auto-refresh';
+import DecideActions from './decide-actions';
+import { kindMeta, formatRelative, payloadRows } from './labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,7 @@ type Item = {
   created_at: string;
 };
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: { kind?: string } }) {
   const client = getServerClient();
   const { data, error } = await client
     .from('approval_queue')
@@ -21,36 +22,87 @@ export default async function Page() {
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
 
-  const items = (data || []) as Item[];
+  const all = (data || []) as Item[];
+
+  // Đếm theo loại để dựng thanh lọc.
+  const counts = new Map<string, number>();
+  for (const it of all) counts.set(it.kind, (counts.get(it.kind) || 0) + 1);
+
+  const selected = searchParams?.kind || null;
+  const items = selected ? all.filter((it) => it.kind === selected) : all;
 
   return (
     <main>
-      <div className="head-row">
-        <h1>Hàng đợi duyệt</h1>
+      <header className="head-row">
+        <div>
+          <h1>Hàng đợi duyệt</h1>
+          <p className="sub">Máy soạn, người bấm. Xem từng mục rồi Duyệt hoặc Từ chối.</p>
+        </div>
         <AutoRefresh seconds={30} />
-      </div>
-      <p className="sub">Máy soạn, người bấm. Duyệt hoặc từ chối từng mục. Đang chờ: {items.length} mục.</p>
+      </header>
 
-      {error ? <p className="err">Lỗi tải dữ liệu: {error.message}</p> : null}
-      {!error && items.length === 0 ? <p>Không có mục nào chờ duyệt.</p> : null}
+      {error ? (
+        <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p>
+      ) : null}
+
+      {!error && all.length > 0 ? (
+        <nav className="filters" aria-label="Lọc theo loại">
+          <a className={`chip ${selected ? '' : 'on'}`} href="/">
+            Tất cả <span className="n">{all.length}</span>
+          </a>
+          {[...counts.entries()].map(([kind, n]) => {
+            const meta = kindMeta(kind);
+            return (
+              <a
+                key={kind}
+                className={`chip ${selected === kind ? 'on' : ''}`}
+                href={`/?kind=${encodeURIComponent(kind)}`}
+              >
+                <span aria-hidden="true">{meta.icon}</span> {meta.label} <span className="n">{n}</span>
+              </a>
+            );
+          })}
+        </nav>
+      ) : null}
+
+      {!error && all.length === 0 ? (
+        <div className="empty">
+          <div className="empty-icon" aria-hidden="true">✓</div>
+          <p>Không có mục nào chờ duyệt.</p>
+          <p className="sub">Khi máy soạn nội dung mới, mục sẽ hiện ở đây.</p>
+        </div>
+      ) : null}
 
       <ul className="list">
-        {items.map((item) => (
-          <li key={item.id} className="card">
-            <div className="head">
-              <span className="kind">{item.kind}</span>
-              <span className="time">{new Date(item.created_at).toLocaleString('vi-VN')}</span>
-            </div>
-            <div className="title">{item.title}</div>
-            <pre className="payload">{JSON.stringify(item.payload, null, 2)}</pre>
-            <form className="row" action={decideForm}>
-              <input type="hidden" name="id" value={item.id} />
-              <input className="note" name="note" placeholder="Ghi chú" />
-              <button className="ok" name="action" value="approve">Duyệt</button>
-              <button className="no" name="action" value="reject">Từ chối</button>
-            </form>
-          </li>
-        ))}
+        {items.map((item) => {
+          const meta = kindMeta(item.kind);
+          const rows = payloadRows(item.payload);
+          return (
+            <li key={item.id} className={`card tone-${meta.tone}`}>
+              <div className="head">
+                <span className="kind">
+                  <span aria-hidden="true">{meta.icon}</span> {meta.label}
+                </span>
+                <time className="time" dateTime={item.created_at}>{formatRelative(item.created_at)}</time>
+              </div>
+
+              <div className="title">{item.title}</div>
+
+              {rows.length > 0 ? (
+                <dl className="fields">
+                  {rows.map((r) => (
+                    <div className={`field ${r.long ? 'field-long' : ''}`} key={r.key}>
+                      <dt>{r.label}</dt>
+                      <dd>{r.long ? <pre>{r.value}</pre> : r.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
+
+              <DecideActions id={item.id} title={item.title} />
+            </li>
+          );
+        })}
       </ul>
     </main>
   );
