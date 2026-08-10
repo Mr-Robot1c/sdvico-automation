@@ -27,14 +27,25 @@ import { getMailConfig, withMailbox, fetchRecentCvMessages } from './mailbox.js'
 import { loadProcessed, saveProcessed } from './seen.js';
 
 function parseArgs(argv) {
-  const args = { dryRun: false, file: null, max: 300, sinceDays: 3 };
+  const args = { dryRun: false, file: null, max: 300, sinceDays: 3, from: null };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--dry-run') args.dryRun = true;
     else if (argv[i] === '--file') args.file = argv[++i];
     else if (argv[i] === '--max') args.max = Number(argv[++i]);
     else if (argv[i] === '--since-days') args.sinceDays = Number(argv[++i]);
+    else if (argv[i] === '--from') args.from = argv[++i];
   }
   return args;
+}
+
+// Danh sách người gửi được phép, từ biến môi trường hoặc cờ --from.
+// Giai đoạn test dùng hộp thư cá nhân có lẫn thư thật, chỉ nạp CV từ người gửi trong danh sách,
+// tránh ghi nhầm dữ liệu người thật (Nghị định 13, điều cấm 6). Rỗng nghĩa là nhận mọi người gửi.
+function getAllowedSenders(args) {
+  return (process.env.MAIL_INTAKE_ALLOWED_SENDERS || args.from || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 function mimeFromName(name = '') {
@@ -147,6 +158,7 @@ async function main() {
 
   const db = getServiceClient();
   const config = getMailConfig();
+  const allowedSenders = getAllowedSenders(args);
 
   if (!args.dryRun) await ensureBucket(db);
   const processed = args.dryRun ? {} : await loadProcessed(db);
@@ -156,6 +168,8 @@ async function main() {
     const messages = await fetchRecentCvMessages(imap, { sinceDays: args.sinceDays, max: args.max });
     const out = [];
     for (const msg of messages) {
+      // Chỉ nạp thư từ người gửi được phép, nếu có đặt danh sách.
+      if (allowedSenders.length && !allowedSenders.includes((msg.from || '').toLowerCase())) continue;
       // Bỏ qua thư không có đính kèm CV.
       if (!msg.attachments || msg.attachments.length === 0) continue;
 
@@ -186,13 +200,13 @@ async function main() {
       task: 'hr-intake',
       actor: 'github-actions',
       status: errCount ? 'error' : 'ok',
-      detail: { thu_co_cv: results.length, ghi_ung_vien: okCount, bo_qua_da_xu_ly: skipCount, loi: errCount, ket_qua: results }
+      detail: { nguoi_gui_cho_phep: allowedSenders, thu_co_cv: results.length, ghi_ung_vien: okCount, bo_qua_da_xu_ly: skipCount, loi: errCount, ket_qua: results }
     });
   }
 
   console.log(
     JSON.stringify(
-      { dryRun: args.dryRun, thu_co_cv: results.length, ghi_ung_vien: okCount, bo_qua_da_xu_ly: skipCount, loi: errCount, ket_qua: results },
+      { dryRun: args.dryRun, nguoi_gui_cho_phep: allowedSenders, thu_co_cv: results.length, ghi_ung_vien: okCount, bo_qua_da_xu_ly: skipCount, loi: errCount, ket_qua: results },
       null,
       2
     )

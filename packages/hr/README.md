@@ -51,6 +51,7 @@ node packages/hr/src/intake/run.mjs
 - Cấu hình hộp thư đọc từ biến môi trường `MAIL_IMAP_*`, không hardcode.
 - Giai đoạn test dùng hộp thư riêng theo Mức T2 của kế hoạch, không phải `tuyendung@sdvico.vn`.
 - Với Gmail phải dùng App Password, không phải mật khẩu tài khoản, và bật xác thực hai bước trước.
+- `MAIL_INTAKE_ALLOWED_SENDERS`: chỉ nạp CV từ các địa chỉ này (cách nhau bằng dấu phẩy). Hộp thư cá nhân có lẫn thư thật thì đặt chính địa chỉ của bạn để chỉ nạp CV bạn tự gửi, tránh ghi nhầm dữ liệu người thật. Rỗng nghĩa là nhận mọi người gửi. Cũng có thể truyền `--from` khi chạy tay.
 - **Cảnh báo:** hộp thư cá nhân chỉ dùng để chạy thử với CV giả. Trước khi CV thật của ứng viên chảy vào, phải đổi sang hộp thư do công ty kiểm soát, nếu không sẽ vi phạm điều cấm 6 (không đưa dữ liệu ứng viên ra khỏi hạ tầng công ty).
 
 ### Khử trùng lặp

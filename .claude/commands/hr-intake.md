@@ -19,7 +19,7 @@ Nạp CV từ hộp thư nhận hồ sơ, trích văn bản, chuẩn hóa thành
 ## Chuẩn bị (một lần)
 
 1. Cài phụ thuộc: `npm install` ở gốc repo.
-2. Điền `.env` các biến `MAIL_IMAP_HOST`, `MAIL_IMAP_USER`, `MAIL_IMAP_PASSWORD` (Gmail cần App Password), và `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+2. Điền `.env` các biến `MAIL_IMAP_HOST`, `MAIL_IMAP_USER`, `MAIL_IMAP_PASSWORD` (Gmail cần App Password), và `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Nếu hộp thư có lẫn thư thật, đặt `MAIL_INTAKE_ALLOWED_SENDERS` để chỉ nạp CV từ địa chỉ cho phép.
 3. Đã áp migration Supabase (xem `supabase/README.md`).
 
 ## Cách chạy
