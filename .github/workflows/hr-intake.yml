@@ -1,11 +1,14 @@
 name: hr-intake
 
-# Đường nạp CV từ hộp thư, chạy 30 phút một lần theo yêu cầu Ngày 2.
+# Đường nạp CV từ hộp thư, chạy 5 phút một lần.
 # Chỉ nạp và xếp hồ sơ vào luồng, không tự trả lời ứng viên (điều cấm 1, 2).
 # Có thể chạy tay bằng workflow_dispatch để kiểm.
+# Lưu ý: 5 phút là mức dày nhất GitHub Actions cho phép với lịch cron, và
+# lịch có thể bị trễ hoặc bỏ lượt khi hệ thống tải cao. concurrency ở dưới
+# đảm bảo không chạy chồng lượt nếu một lượt kéo dài quá 5 phút.
 on:
   schedule:
-    - cron: '*/30 * * * *'   # 30 phút một lần
+    - cron: '*/5 * * * *'   # 5 phút một lần
   workflow_dispatch: {}
 
 # Không chạy chồng lượt, tránh nạp trùng một thư khi lượt trước chưa xong.
