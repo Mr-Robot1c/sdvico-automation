@@ -1,0 +1,27 @@
+name: daily-demo
+
+# Tác vụ theo lịch cho mốc cuối Ngày 1: sinh một mục chờ duyệt.
+# Chạy trong khung giờ hành chính, ngày làm việc. Có thể chạy tay bằng workflow_dispatch.
+on:
+  schedule:
+    - cron: '0 2 * * 1-5'   # 09:00 giờ Việt Nam các ngày thứ Hai tới thứ Sáu
+  workflow_dispatch: {}
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cài phụ thuộc
+        run: npm install
+
+      - name: Chạy tác vụ demo
+        run: node scripts/demo-approval.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

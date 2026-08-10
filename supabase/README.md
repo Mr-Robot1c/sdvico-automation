@@ -4,6 +4,7 @@ Thư mục này chứa lược đồ cơ sở dữ liệu và chính sách bảo
 
 - `migrations/20260810090000_init.sql`: tạo mười bảng tối thiểu.
 - `migrations/20260810090100_rls.sql`: bật RLS và chính sách v1.
+- `migrations/20260810140000_core.sql`: bảng app_config cho công tắc dừng khẩn và daily_counters cho bộ đếm hạn mức, kèm RLS.
 
 ## Cách áp dụng
 
@@ -14,7 +15,8 @@ Máy phát triển hiện chưa cài Supabase CLI và Docker, nên chưa chạy 
 1. Mở dự án Supabase của công ty, vào mục SQL Editor.
 2. Mở `migrations/20260810090000_init.sql`, dán toàn bộ, chạy.
 3. Mở `migrations/20260810090100_rls.sql`, dán toàn bộ, chạy.
-4. Vào Table Editor kiểm tra đủ mười bảng. Vào Authentication và Policies kiểm tra RLS đã bật ở `hr_candidates` và `hr_applications`.
+4. Mở `migrations/20260810140000_core.sql`, dán toàn bộ, chạy.
+5. Vào Table Editor kiểm tra đủ các bảng. Vào Authentication và Policies kiểm tra RLS đã bật ở `hr_candidates` và `hr_applications`.
 
 ### Cách 2: Dùng Supabase CLI
 

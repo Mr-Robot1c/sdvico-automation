@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "description": "Tự động hóa Tuyển dụng và Marketing cho SDVICO",
+  "scripts": {
+    "demo:approval": "node scripts/demo-approval.mjs",
+    "ui:dev": "npm --workspace approval-ui run dev"
+  },
   "workspaces": [
     "packages/*",
     "apps/*"
