@@ -1,0 +1,327 @@
+<title>SDVICO · Demo giao diện Duyệt và Hồ sơ</title>
+<style>
+  :root{
+    --bg:#f4f6fa; --surface:#fff; --surface-2:#f6f8fb; --line:#dce2ec;
+    --ink:#1a2230; --ink-2:#5b6879;
+    --ok:#1c7a4d; --ok-bg:#e7f4ec; --no:#b02a2a; --no-bg:#fbeaea;
+    --accent:#1f4e79; --accent-bg:#e6eef7; --chip:#eef1f6;
+    --tone-hr:#1f4e79; --tone-mkt:#8a5a00; --tone-web:#6b3fa0; --tone-demo:#5b6879; --tone-default:#5b6879;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0f141b; --surface:#171e28; --surface-2:#1e2733; --line:#2a3542;
+    --ink:#e7ecf3; --ink-2:#9aa7b6;
+    --ok:#4cc38a; --ok-bg:#12301f; --no:#f06a6a; --no-bg:#341717;
+    --accent:#7fb2e5; --accent-bg:#16273a; --chip:#1e2733;
+    --tone-hr:#7fb2e5; --tone-mkt:#e0b354; --tone-web:#b79ae0; --tone-demo:#9aa7b6; --tone-default:#9aa7b6;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0f141b; --surface:#171e28; --surface-2:#1e2733; --line:#2a3542;
+    --ink:#e7ecf3; --ink-2:#9aa7b6;
+    --ok:#4cc38a; --ok-bg:#12301f; --no:#f06a6a; --no-bg:#341717;
+    --accent:#7fb2e5; --accent-bg:#16273a; --chip:#1e2733;
+    --tone-hr:#7fb2e5; --tone-mkt:#e0b354; --tone-web:#b79ae0; --tone-demo:#9aa7b6; --tone-default:#9aa7b6;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6fa; --surface:#fff; --surface-2:#f6f8fb; --line:#dce2ec;
+    --ink:#1a2230; --ink-2:#5b6879;
+    --ok:#1c7a4d; --ok-bg:#e7f4ec; --no:#b02a2a; --no-bg:#fbeaea;
+    --accent:#1f4e79; --accent-bg:#e6eef7; --chip:#eef1f6;
+    --tone-hr:#1f4e79; --tone-mkt:#8a5a00; --tone-web:#6b3fa0; --tone-demo:#5b6879; --tone-default:#5b6879;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;}
+
+  .topbar{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--line);}
+  .topbar-inner{max-width:860px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .brand{font-weight:700;font-size:15px;color:var(--accent);}
+  .tabs{display:flex;gap:6px;}
+  .tab{background:transparent;border:0;text-decoration:none;color:var(--ink-2);font:inherit;font-size:14px;font-weight:500;padding:6px 12px;border-radius:8px;cursor:pointer;}
+  .tab:hover{background:var(--chip);color:var(--ink);}
+  .tab.on{background:var(--accent-bg);color:var(--accent);font-weight:600;}
+  .tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  main{max-width:860px;margin:0 auto;padding:24px 20px 64px;}
+  .panel[hidden]{display:none;}
+  .head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+  h1{font-size:22px;margin:0 0 4px;}
+  .sub{color:var(--ink-2);margin:0;font-size:14px;}
+  .refresh{color:var(--ink-2);font-size:12px;white-space:nowrap;padding-top:4px;}
+
+  .filters{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0;}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip);border:1px solid transparent;border-radius:20px;padding:5px 12px;font:inherit;font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;line-height:1.3;}
+  .chip:hover{border-color:var(--line);}
+  .chip.on{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:600;}
+  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .chip .n{font-size:12px;font-weight:700;background:var(--surface);border-radius:10px;padding:0 7px;min-width:20px;text-align:center;}
+
+  .toolbar{margin:16px 0 10px;}
+  .search{width:100%;padding:10px 14px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);}
+  .search:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent);}
+
+  .stats{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0;}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px;min-width:96px;}
+  .stat-n{font-size:22px;font-weight:700;color:var(--accent);}
+  .stat-l{font-size:12px;color:var(--ink-2);}
+
+  .list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--tone-default);border-radius:10px;padding:16px;}
+  .card.tone-hr{border-left-color:var(--tone-hr);}
+  .card.tone-mkt{border-left-color:var(--tone-mkt);}
+  .card.tone-web{border-left-color:var(--tone-web);}
+  .card.tone-demo{border-left-color:var(--tone-demo);}
+  .card[hidden]{display:none;}
+  .head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;}
+  .kind{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-bg);border-radius:20px;padding:3px 11px;}
+  .time{color:var(--ink-2);font-size:12px;white-space:nowrap;}
+  .title,.cand-name{font-weight:700;font-size:16px;margin-bottom:6px;}
+
+  .stages{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px;}
+  .stage{font-size:12px;font-weight:600;border-radius:20px;padding:2px 10px;background:var(--accent-bg);color:var(--accent);}
+  .stage.tone-hr{color:var(--tone-hr);}
+  .stage.tone-web{background:#efe8f7;color:var(--tone-web);}
+  .stage.tone-ok{background:var(--ok-bg);color:var(--ok);}
+  .stage.tone-no{background:var(--no-bg);color:var(--no);}
+  .stage.tone-demo,.stage.tone-default{background:var(--chip);color:var(--ink-2);}
+  @media (prefers-color-scheme:dark){.stage.tone-web{background:#241a33;}}
+  .src{font-size:12px;color:var(--ink-2);margin-left:auto;}
+
+  .fields{margin:0 0 12px;display:flex;flex-direction:column;gap:8px;}
+  .field{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:start;}
+  .field dt{color:var(--ink-2);font-size:13px;}
+  .field dd{margin:0;font-size:14px;word-break:break-word;}
+  .field-long{grid-template-columns:1fr;gap:4px;}
+  .field pre,.raw pre{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;overflow-x:auto;margin:0;white-space:pre-wrap;}
+  .raw{margin:0 0 12px;}
+  .raw summary{cursor:pointer;font-size:13px;color:var(--accent);}
+  .raw pre{margin-top:8px;}
+  .job-desc{margin:0 0 10px;}
+  .jd-versions{display:flex;flex-direction:column;gap:6px;}
+
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .note{flex:1;min-width:180px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);}
+  .btn{font-family:inherit;font-size:14px;font-weight:600;border:0;border-radius:8px;padding:9px 18px;cursor:pointer;color:#fff;}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .ok{background:var(--ok);} .no{background:var(--no);}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);}
+  .muted{color:var(--ink-2);font-size:13px;}
+  .empty{text-align:center;padding:48px 20px;color:var(--ink-2);}
+  .empty-icon{font-size:34px;margin-bottom:8px;}
+
+  .demo-note{max-width:860px;margin:0 auto;padding:8px 20px 0;color:var(--ink-2);font-size:12px;}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;font-size:14px;box-shadow:0 6px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .2s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  @media (prefers-reduced-motion:reduce){.toast{transition:none;}}
+
+  @media (max-width:560px){
+    main{padding:20px 14px 48px;}
+    .field{grid-template-columns:1fr;gap:2px;}
+    .field dt{font-weight:600;}
+  }
+</style>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">SDVICO · Duyệt và Hồ sơ</div>
+    <nav class="tabs" aria-label="Điều hướng">
+      <button class="tab on" data-tab="queue">Hàng đợi duyệt</button>
+      <button class="tab" data-tab="hoso">Hồ sơ ứng viên</button>
+      <button class="tab" data-tab="vitri">Vị trí tuyển dụng</button>
+    </nav>
+  </div>
+</header>
+<p class="demo-note">Bản demo tương tác, dữ liệu là ví dụ giả. Chuyển tab ở trên. Trang Hồ sơ có ô tìm kiếm và lọc theo trạng thái đang chạy thật.</p>
+
+<!-- Tab 1: Hàng đợi duyệt -->
+<main class="panel" id="queue">
+  <header class="head-row">
+    <div><h1>Hàng đợi duyệt</h1><p class="sub">Máy soạn, người bấm. Xem từng mục rồi Duyệt hoặc Từ chối.</p></div>
+    <span class="refresh">Tự làm mới sau 30 giây</span>
+  </header>
+  <nav class="filters">
+    <span class="chip on">Tất cả <span class="n">3</span></span>
+    <span class="chip">✉️ Thư tuyển dụng <span class="n">1</span></span>
+    <span class="chip">📣 Bài marketing <span class="n">1</span></span>
+    <span class="chip">🚧 Gặp rào chắn web <span class="n">1</span></span>
+  </nav>
+  <ul class="list">
+    <li class="card tone-hr">
+      <div class="head"><span class="kind">✉️ Thư tuyển dụng</span><time class="time">5 phút trước</time></div>
+      <div class="title">Thư mời phỏng vấn: Kỹ thuật viên lắp đặt thiết bị hàng hải</div>
+      <dl class="fields">
+        <div class="field"><dt>Tới</dt><dd>cuong.tran@sdvico.vn</dd></div>
+        <div class="field field-long"><dt>Nội dung</dt><dd><pre>Chào anh Cường, SDVICO mời anh phỏng vấn vị trí Kỹ thuật viên lắp đặt.
+Ba khung giờ đề xuất: 9h thứ Tư, 14h thứ Tư, 10h thứ Năm.</pre></dd></div>
+      </dl>
+      <form class="row" onsubmit="return false"><input class="note" placeholder="Ghi chú (không bắt buộc)"><button class="btn ok" data-decide="Đã duyệt">Duyệt</button><button class="btn no" data-decide="Đã từ chối">Từ chối</button></form>
+    </li>
+    <li class="card tone-mkt">
+      <div class="head"><span class="kind">📣 Bài marketing</span><time class="time">22 phút trước</time></div>
+      <div class="title">Bài Facebook: Máy lọc nước biển cho tàu cá</div>
+      <dl class="fields"><div class="field"><dt>Kênh</dt><dd>facebook</dd></div><div class="field"><dt>Ghi chú</dt><dd>Chờ duyệt trước khi đăng lên Page nháp</dd></div></dl>
+      <form class="row" onsubmit="return false"><input class="note" placeholder="Ghi chú (không bắt buộc)"><button class="btn ok" data-decide="Đã duyệt">Duyệt</button><button class="btn no" data-decide="Đã từ chối">Từ chối</button></form>
+    </li>
+    <li class="card tone-web">
+      <div class="head"><span class="kind">🚧 Gặp rào chắn web</span><time class="time">1 giờ trước</time></div>
+      <div class="title">Gặp rào chắn khi chạy publish:topcv trên topcv</div>
+      <dl class="fields"><div class="field"><dt>Tác vụ</dt><dd>publish:topcv</dd></div><div class="field field-long"><dt>Thông báo</dt><dd><pre>Yêu cầu xác thực hai bước, dừng theo điều cấm phá rào</pre></dd></div></dl>
+      <form class="row" onsubmit="return false"><input class="note" placeholder="Ghi chú (không bắt buộc)"><button class="btn ok" data-decide="Đã duyệt">Duyệt</button><button class="btn no" data-decide="Đã từ chối">Từ chối</button></form>
+    </li>
+  </ul>
+</main>
+
+<!-- Tab 2: Hồ sơ ứng viên -->
+<main class="panel" id="hoso" hidden>
+  <header class="head-row">
+    <div><h1>Hồ sơ ứng viên</h1><p class="sub">CV nạp tự động từ hộp thư. Máy xếp, người quyết, không tự loại ai.</p></div>
+    <span class="refresh">Tự làm mới sau 30 giây</span>
+  </header>
+  <div class="stats">
+    <div class="stat"><div class="stat-n">4</div><div class="stat-l">Tổng hồ sơ</div></div>
+    <div class="stat"><div class="stat-n">2</div><div class="stat-l">Mới nhận</div></div>
+    <div class="stat"><div class="stat-n">1</div><div class="stat-l">Phỏng vấn</div></div>
+    <div class="stat"><div class="stat-n">1</div><div class="stat-l">Lưu nguồn</div></div>
+  </div>
+  <div class="toolbar"><input class="search" id="cand-search" type="search" placeholder="Tìm theo tên, email, số điện thoại..." aria-label="Tìm hồ sơ"></div>
+  <nav class="filters" id="cand-filters" aria-label="Lọc theo trạng thái">
+    <button class="chip on" data-stage="all">Tất cả <span class="n">4</span></button>
+    <button class="chip" data-stage="new">Mới nhận <span class="n">2</span></button>
+    <button class="chip" data-stage="interview">Phỏng vấn <span class="n">1</span></button>
+    <button class="chip" data-stage="pool">Lưu nguồn <span class="n">1</span></button>
+  </nav>
+  <p class="sub" id="cand-count">Hiện 4 trên 4 hồ sơ.</p>
+  <ul class="list" id="cand-list">
+    <li class="card tone-hr" data-stages="new" data-search="tran van cuong cuong.tran@sdvico.vn 0912345678">
+      <div class="head"><span class="cand-name">TRAN VAN CUONG</span><time class="time">vừa xong</time></div>
+      <div class="stages"><span class="stage tone-hr">Mới nhận</span><span class="src">Nguồn: Hộp thư</span></div>
+      <dl class="fields">
+        <div class="field"><dt>Email</dt><dd>cuong.tran@sdvico.vn</dd></div>
+        <div class="field"><dt>Điện thoại</dt><dd>0912345678</dd></div>
+        <div class="field"><dt>Khóa khử trùng</dt><dd>email:cuong.tran@sdvico.vn</dd></div>
+        <div class="field"><dt>Đính kèm</dt><dd>cv-cuong.docx</dd></div>
+        <div class="field"><dt>Đồng ý / lưu tới</dt><dd>10/8/2026 · 2027-08-10</dd></div>
+      </dl>
+      <details class="raw"><summary>Xem nội dung CV đã trích (194 ký tự)</summary><pre>TRAN VAN CUONG
+Ky thuat vien lap dat thiet bi hang hai
+Kinh nghiem: 3 nam lap dat may loc nuoc bien cho tau ca tai Vung Tau.</pre></details>
+      <div class="row"><a class="btn ghost" href="#">Tải CV gốc</a></div>
+    </li>
+    <li class="card tone-hr" data-stages="new" data-search="nguyen thi bich bich.nguyen@email.vn 0905123456">
+      <div class="head"><span class="cand-name">NGUYEN THI BICH</span><time class="time">12 phút trước</time></div>
+      <div class="stages"><span class="stage tone-hr">Mới nhận</span><span class="src">Nguồn: Hộp thư</span></div>
+      <dl class="fields">
+        <div class="field"><dt>Email</dt><dd>bich.nguyen@email.vn</dd></div>
+        <div class="field"><dt>Điện thoại</dt><dd>0905123456</dd></div>
+        <div class="field"><dt>Đính kèm</dt><dd>CV_NguyenThiBich.pdf</dd></div>
+        <div class="field"><dt>Đồng ý / lưu tới</dt><dd>10/8/2026 · 2027-08-10</dd></div>
+      </dl>
+      <div class="row"><a class="btn ghost" href="#">Tải CV gốc</a></div>
+    </li>
+    <li class="card tone-hr" data-stages="interview" data-search="le van chien chien.le@email.vn 0938777888">
+      <div class="head"><span class="cand-name">LE VAN CHIEN</span><time class="time">2 giờ trước</time></div>
+      <div class="stages"><span class="stage tone-web">Phỏng vấn</span><span class="src">Nguồn: Hộp thư</span></div>
+      <dl class="fields">
+        <div class="field"><dt>Email</dt><dd>chien.le@email.vn</dd></div>
+        <div class="field"><dt>Điện thoại</dt><dd>0938777888</dd></div>
+        <div class="field"><dt>Đính kèm</dt><dd>chien-cv.pdf, bang-cap.jpg</dd></div>
+        <div class="field"><dt>Đồng ý / lưu tới</dt><dd>8/8/2026 · 2027-08-08</dd></div>
+      </dl>
+      <div class="row"><a class="btn ghost" href="#">Tải CV gốc</a></div>
+    </li>
+    <li class="card tone-hr" data-stages="pool" data-search="pham minh duc duc.pham@email.vn 0977001122">
+      <div class="head"><span class="cand-name">PHAM MINH DUC</span><time class="time">3 ngày trước</time></div>
+      <div class="stages"><span class="stage tone-demo">Lưu nguồn</span><span class="src">Nguồn: Hộp thư</span></div>
+      <dl class="fields">
+        <div class="field"><dt>Email</dt><dd>duc.pham@email.vn</dd></div>
+        <div class="field"><dt>Điện thoại</dt><dd>0977001122</dd></div>
+        <div class="field"><dt>Đính kèm</dt><dd>duc-resume.pdf</dd></div>
+        <div class="field"><dt>Đồng ý / lưu tới</dt><dd>7/8/2026 · 2027-08-07</dd></div>
+      </dl>
+      <div class="row"><a class="btn ghost" href="#">Tải CV gốc</a></div>
+    </li>
+  </ul>
+  <p class="muted" id="cand-empty" hidden>Không có hồ sơ khớp bộ lọc.</p>
+</main>
+
+<!-- Tab 3: Vị trí tuyển dụng -->
+<main class="panel" id="vitri" hidden>
+  <header class="head-row">
+    <div><h1>Vị trí tuyển dụng</h1><p class="sub">Vị trí và bốn phiên bản mô tả công việc theo kênh. Sinh bằng lệnh /hr-jd.</p></div>
+    <span class="refresh">Tự làm mới sau 30 giây</span>
+  </header>
+  <ul class="list">
+    <li class="card tone-mkt">
+      <div class="head"><span class="cand-name">Kỹ thuật viên lắp đặt thiết bị hàng hải</span><time class="time">1 ngày trước</time></div>
+      <div class="stages"><span class="stage tone-ok">Đang tuyển</span><span class="src">Kỹ thuật · Vũng Tàu</span></div>
+      <p class="job-desc">Lắp đặt và bảo hành thiết bị giám sát hành trình, máy lọc nước cho tàu cá.</p>
+      <dl class="fields"><div class="field"><dt>Yêu cầu</dt><dd>Tốt nghiệp trung cấp điện hoặc điện tử trở lên, chịu được đi công tác cảng cá.</dd></div></dl>
+      <div class="jd-versions">
+        <details class="raw"><summary>Website công ty (128 từ)</summary><pre>SDVICO tuyển Kỹ thuật viên lắp đặt thiết bị hàng hải tại Vũng Tàu. Công việc gồm lắp đặt, bảo hành thiết bị giám sát hành trình và máy lọc nước biển cho tàu cá... (bản đầy đủ)</pre></details>
+        <details class="raw"><summary>Trang tuyển dụng (86 từ)</summary><pre>Kỹ thuật viên lắp đặt thiết bị hàng hải, làm việc tại Vũng Tàu. Yêu cầu trung cấp điện, điện tử. Quyền lợi cạnh tranh... (bản chuẩn)</pre></details>
+        <details class="raw"><summary>Facebook (42 từ)</summary><pre>SDVICO cần Kỹ thuật viên lắp đặt thiết bị cho tàu cá tại Vũng Tàu. Ra khơi an toàn, tiết kiệm chi phí. Ứng tuyển: tuyendung@sdvico.vn</pre></details>
+        <details class="raw"><summary>Zalo / SMS (24 từ)</summary><pre>SDVICO tuyển KTV lắp đặt thiết bị tàu cá, Vũng Tàu. Gửi CV: tuyendung@sdvico.vn hoặc gọi 1900 23 23 49.</pre></details>
+      </div>
+    </li>
+    <li class="card tone-mkt">
+      <div class="head"><span class="cand-name">Nhân viên kinh doanh thiết bị tàu cá</span><time class="time">4 ngày trước</time></div>
+      <div class="stages"><span class="stage tone-demo">Nháp</span><span class="src">Kinh doanh · Vũng Tàu</span></div>
+      <p class="job-desc">Tư vấn và bán thiết bị định vị, dầu nhớt, máy lọc nước cho ngư dân và chủ tàu.</p>
+      <dl class="fields"><div class="field"><dt>Yêu cầu</dt><dd>Giao tiếp tốt, hiểu ngành biển là lợi thế.</dd></div></dl>
+      <div class="jd-versions">
+        <details class="raw"><summary>Website công ty (140 từ)</summary><pre>SDVICO tuyển Nhân viên kinh doanh thiết bị tàu cá... (bản đầy đủ)</pre></details>
+        <details class="raw"><summary>Zalo / SMS (22 từ)</summary><pre>SDVICO tuyển NV kinh doanh thiết bị tàu cá, Vũng Tàu. Gửi CV: tuyendung@sdvico.vn.</pre></details>
+      </div>
+    </li>
+  </ul>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  // Chuyển tab
+  const tabs = document.querySelectorAll('.tab');
+  const panels = { queue: document.getElementById('queue'), hoso: document.getElementById('hoso'), vitri: document.getElementById('vitri') };
+  tabs.forEach((t) => t.addEventListener('click', () => {
+    tabs.forEach((x) => x.classList.toggle('on', x === t));
+    const id = t.getAttribute('data-tab');
+    Object.entries(panels).forEach(([k, p]) => { p.hidden = k !== id; });
+  }));
+
+  // Tìm kiếm và lọc hồ sơ
+  const search = document.getElementById('cand-search');
+  const chips = document.querySelectorAll('#cand-filters .chip');
+  const cards = [...document.querySelectorAll('#cand-list .card')];
+  const countEl = document.getElementById('cand-count');
+  const emptyEl = document.getElementById('cand-empty');
+  let stage = 'all';
+
+  function applyFilter() {
+    const q = (search.value || '').trim().toLowerCase();
+    let shown = 0;
+    cards.forEach((c) => {
+      const okStage = stage === 'all' || (c.getAttribute('data-stages') || '').split(' ').includes(stage);
+      const okText = !q || (c.getAttribute('data-search') || '').toLowerCase().includes(q);
+      const show = okStage && okText;
+      c.hidden = !show;
+      if (show) shown++;
+    });
+    countEl.textContent = 'Hiện ' + shown + ' trên ' + cards.length + ' hồ sơ.';
+    emptyEl.hidden = shown !== 0;
+  }
+  search.addEventListener('input', applyFilter);
+  chips.forEach((ch) => ch.addEventListener('click', () => {
+    chips.forEach((x) => x.classList.toggle('on', x === ch));
+    stage = ch.getAttribute('data-stage');
+    applyFilter();
+  }));
+
+  // Thông báo nhỏ khi bấm Duyệt/Từ chối trong demo
+  const toast = document.getElementById('toast');
+  let toastTimer;
+  document.querySelectorAll('[data-decide]').forEach((b) => b.addEventListener('click', () => {
+    toast.textContent = b.getAttribute('data-decide') + ' (demo)';
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1600);
+  }));
+</script>
