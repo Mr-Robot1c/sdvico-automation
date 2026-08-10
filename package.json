@@ -1,0 +1,13 @@
+{
+  "name": "sdvico-automation",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Tự động hóa Tuyển dụng và Marketing cho SDVICO",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}

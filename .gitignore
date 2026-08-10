@@ -1,0 +1,42 @@
+# Bí mật. Điều cấm 7: không commit khóa và mật khẩu.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+out/
+*.log
+npm-debug.log*
+
+# Hồ sơ trình duyệt Playwright và dữ liệu phiên. Không đưa cookie vào Git.
+profiles/
+playwright-profiles/
+.playwright/
+test-results/
+playwright-report/
+
+# Supabase cục bộ
+supabase/.branches/
+supabase/.temp/
+
+# Vercel
+.vercel/
+
+# Máy nội bộ, video, mô hình
+tmp/
+*.mp4
+*.mov
+whisper-models/
+
+# Hệ điều hành và IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
