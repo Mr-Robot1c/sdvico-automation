@@ -10,23 +10,35 @@ Ghi chú: đây là dự án riêng cho SDVICO, tách khỏi thử nghiệm `aut
 
 ## 1. Bối cảnh công ty
 
-- Tên: Công ty TNHH Hiệp Lực Phát Triển Việt (viết tắt SDVICO).
-- Lĩnh vực: phân phối thiết bị giám sát hành trình tàu cá và thiết bị liên lạc hàng hải cho ngành thủy sản. `[CẦN XÁC NHẬN với Phòng Kinh doanh: mô tả chính thức ngành nghề, quy mô, địa bàn]`
-- Kênh liên hệ đã biết: tên miền sdvico.vn, hộp thư tuyển dụng tuyendung@sdvico.vn, tổng đài 1900 23 23 49.
-- Vai trò trong chuỗi: SDVICO **phân phối thiết bị**. SDVICO **không sở hữu phần mềm** của các hãng đối tác (xem điều cấm 4).
-- `[CẦN XÁC NHẬN: tầm nhìn, giá trị cốt lõi, khách hàng mục tiêu, khu vực hoạt động, số năm kinh nghiệm]`
+- Tên: Công ty TNHH Hiệp Lực Phát Triển Việt, viết tắt SDVICO.
+- Khẩu hiệu: "Công nghệ số cho ngành biển và thủy sản".
+- Lĩnh vực: cung cấp sản phẩm và giải pháp công nghệ cho ngành biển và thủy sản, phục vụ ngư dân, tàu cá và doanh nghiệp trong ngành, hướng tới nâng cao hiệu quả đánh bắt và giảm chi phí đầu vào.
+- Nguồn gốc: theo trang sdvico.vn, công ty khởi đầu từ sản phẩm máy lọc nước biển thành nước ngọt cho tàu cá, do một nhóm giảng viên Trường Đại học Bà Rịa Vũng Tàu phát triển, thành lập năm 2014. `[CẦN XÁC NHẬN với Phòng Kinh doanh: năm thành lập và pháp nhân chính xác]`
+- Khách hàng mục tiêu: ngư dân, chủ tàu cá, doanh nghiệp ngành biển và thủy sản.
+- Địa chỉ: 283 Nguyễn Hữu Cảnh, Vũng Tàu. `[CẦN XÁC NHẬN: tên phường và đơn vị hành chính hiện hành, vì các nguồn ghi khác nhau]`
+- Liên hệ: website sdvico.vn, hotline 1900 23 23 49, hộp thư tuyển dụng tuyendung@sdvico.vn.
+- Vai trò trong chuỗi: SDVICO vừa phát triển một số sản phẩm, khởi đầu là máy lọc nước, vừa phân phối và lắp đặt thiết bị của các hãng. SDVICO không sở hữu phần mềm của các hãng đối tác, xem điều cấm 4.
 
-Nguyên tắc điền mục này: chỉ ghi điều đã được Phòng Nhân sự hoặc Phòng Kinh doanh xác nhận. Không suy đoán, không lấy từ nguồn ngoài chưa kiểm chứng (điều cấm 5).
+Nguyên tắc điền mục này: các dữ kiện lấy từ trang chính thức sdvico.vn, tra ngày 10/8/2026. Mục nào còn đánh dấu cần xác nhận thì Phòng Kinh doanh hoặc Phòng Nhân sự chốt lại. Không suy đoán, không lấy từ nguồn ngoài chưa kiểm chứng, điều cấm 5.
 
 ## 2. Danh mục sản phẩm
 
-Thiết bị đối tác mà SDVICO phân phối (nêu trong văn bản giao việc): Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya.
+Nhóm sản phẩm theo trang sdvico.vn:
+
+1. Thiết bị giám sát hành trình tàu cá: Viettel S-Tracking, Thuraya MarineStar MNB-01 loại hỗ trợ nghe gọi.
+2. Điện thoại vệ tinh: XT-Pro.
+3. Máy lọc nước biển thành nước ngọt, ví dụ máy lọc nước 80 lít.
+4. Thiết bị xử lý dầu, giúp tiết kiệm dầu diesel cho tàu cá.
+5. Dầu nhớt: PVOil Nano Graphene và PV Engine RMI Nano Graphene. SDVICO là nhà phân phối ủy quyền dầu nhớt PVOIL.
+
+Thương hiệu và hãng nhắc trên trang: Viettel, Thuraya, PVOIL. Văn bản giao việc còn nêu VNPT VSS và Vishipel. `[CẦN XÁC NHẬN với Phòng Kinh doanh: SDVICO có phân phối VNPT VSS và Vishipel không, và danh mục đầy đủ còn sản phẩm nào khác]`
 
 Ranh giới bắt buộc khi viết nội dung về sản phẩm:
-- Mô tả đúng vai trò: SDVICO là nhà phân phối, cung cấp, lắp đặt, bảo hành thiết bị. Không mô tả phần mềm của đối tác như năng lực do SDVICO làm ra.
-- Chỉ nêu tính năng có trong tài liệu chính thức của hãng hoặc do công ty cung cấp. Không tự thêm thông số.
+- Phân biệt rõ sản phẩm do SDVICO phát triển, như máy lọc nước, với thiết bị SDVICO phân phối và lắp đặt, như thiết bị định vị và dầu nhớt.
+- Với thiết bị của hãng, mô tả đúng vai trò của SDVICO là phân phối, cung cấp, lắp đặt, bảo hành. Không mô tả phần mềm của hãng như năng lực do SDVICO làm ra, điều cấm 4.
+- Chỉ nêu tính năng có trong tài liệu chính thức của hãng hoặc do công ty cung cấp. Không tự thêm thông số, điều cấm 5.
 
-`[CẦN XÁC NHẬN với Phòng Kinh doanh: danh mục sản phẩm đầy đủ, nhóm sản phẩm, giá niêm yết nếu được công bố, chính sách bảo hành, dịch vụ kèm theo, tài liệu kỹ thuật gốc để trích dẫn]`
+`[CẦN XÁC NHẬN với Phòng Kinh doanh: giá niêm yết nếu được công bố, chính sách bảo hành, dịch vụ kèm theo, tài liệu kỹ thuật gốc để trích dẫn]`
 
 ## 3. Bảy điều cấm
 
@@ -54,7 +66,7 @@ Quy tắc bắt buộc:
 - Không dùng gạch dài. Không dùng mũi tên. Không dùng dấu chấm tròn giữa câu. Không dùng ký hiệu thay chữ "và".
 - Số theo chuẩn Việt Nam, dùng dấu chấm ngăn cách hàng nghìn. Ví dụ 3.000.000 đồng.
 - Câu rõ ràng, không sáo rỗng, không dịch máy. Không mở đầu bằng những cụm như "trong thế giới ngày nay".
-- Xưng hô và giọng điệu phù hợp ngành thủy sản và khách hàng là chủ tàu, doanh nghiệp, ngư dân. `[CẦN XÁC NHẬN: tông giọng thương hiệu mong muốn, điều nên tránh nói]`
+- Xưng hô và giọng điệu gần gũi với ngư dân và chủ tàu, thực tế, dễ hiểu. Nhấn mạnh lợi ích cụ thể như ra khơi an toàn, tuân thủ quy định, tiết kiệm chi phí nhiên liệu và nước ngọt. Chuyên nghiệp nhưng tránh thuật ngữ rườm rà. `[Phòng Kinh doanh có thể tinh chỉnh tông giọng và bổ sung điều nên tránh nói]`
 - Không hứa hẹn quá khả năng, không so sánh hạ thấp đối thủ, không bịa (nối điều cấm 5).
 
 Kiểm thử giọng văn: Skill `brand-voice` và `product-boundary` phải bắt được các lỗi trên, kiểm trên tối thiểu 20 đoạn văn cài lỗi sẵn (theo lịch Ngày 2).
@@ -108,5 +120,7 @@ Quy tắc dữ liệu:
 - Kết thúc thông điệp commit bằng dòng đồng tác giả theo quy ước của đội.
 
 ---
+
+Nguồn dữ kiện công ty và sản phẩm: trang chính thức sdvico.vn, tra ngày 10/8/2026. Các mục còn đánh dấu cần xác nhận vẫn chờ Phòng Kinh doanh hoặc Phòng Nhân sự chốt.
 
 Cập nhật lần cuối: 10/8/2026.
