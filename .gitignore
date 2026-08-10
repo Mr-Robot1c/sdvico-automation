@@ -14,6 +14,7 @@ build/
 out/
 *.log
 npm-debug.log*
+*.tsbuildinfo
 
 # Hồ sơ trình duyệt Playwright và dữ liệu phiên. Không đưa cookie vào Git.
 profiles/
