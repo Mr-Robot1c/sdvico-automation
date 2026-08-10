@@ -1,5 +1,6 @@
 import { getServerClient } from '../lib/supabase-server';
 import { decideForm } from './actions';
+import AutoRefresh from './auto-refresh';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 export const dynamic = 'force-dynamic';
@@ -24,8 +25,11 @@ export default async function Page() {
 
   return (
     <main>
-      <h1>Hàng đợi duyệt</h1>
-      <p className="sub">Máy soạn, người bấm. Duyệt hoặc từ chối từng mục.</p>
+      <div className="head-row">
+        <h1>Hàng đợi duyệt</h1>
+        <AutoRefresh seconds={30} />
+      </div>
+      <p className="sub">Máy soạn, người bấm. Duyệt hoặc từ chối từng mục. Đang chờ: {items.length} mục.</p>
 
       {error ? <p className="err">Lỗi tải dữ liệu: {error.message}</p> : null}
       {!error && items.length === 0 ? <p>Không có mục nào chờ duyệt.</p> : null}
