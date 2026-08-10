@@ -35,6 +35,8 @@ tmp/
 *.mp4
 *.mov
 whisper-models/
+# Mô hình OCR tesseract.js tải về lúc chạy
+*.traineddata
 
 # Hệ điều hành và IDE
 .DS_Store
