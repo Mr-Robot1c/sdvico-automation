@@ -8,7 +8,8 @@ export default function Nav() {
   const path = usePathname();
   const tabs = [
     { href: '/', label: 'Hàng đợi duyệt' },
-    { href: '/ho-so', label: 'Hồ sơ ứng viên' }
+    { href: '/ho-so', label: 'Hồ sơ ứng viên' },
+    { href: '/vi-tri', label: 'Vị trí tuyển dụng' }
   ];
   return (
     <nav className="tabs" aria-label="Điều hướng">
