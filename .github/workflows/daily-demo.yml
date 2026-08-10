@@ -15,7 +15,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22   # cần Node >= 22 vì @supabase/supabase-js dùng WebSocket có sẵn, Node 20 chưa bật mặc định
 
       - name: Cài phụ thuộc
         run: npm install
