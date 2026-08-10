@@ -1,0 +1,22 @@
+{
+  "name": "@sdvico/hr",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "intake": "node src/intake/run.mjs",
+    "intake:dry": "node src/intake/run.mjs --dry-run"
+  },
+  "dependencies": {
+    "@sdvico/core": "*",
+    "imapflow": "^1.0.164",
+    "mailparser": "^3.7.1",
+    "mammoth": "^1.8.0",
+    "pdf-parse": "^1.1.1",
+    "tesseract.js": "^5.1.1"
+  }
+}

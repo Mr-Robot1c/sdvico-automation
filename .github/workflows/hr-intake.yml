@@ -1,0 +1,39 @@
+name: hr-intake
+
+# Đường nạp CV từ hộp thư, chạy 30 phút một lần theo yêu cầu Ngày 2.
+# Chỉ nạp và xếp hồ sơ vào luồng, không tự trả lời ứng viên (điều cấm 1, 2).
+# Có thể chạy tay bằng workflow_dispatch để kiểm.
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # 30 phút một lần
+  workflow_dispatch: {}
+
+# Không chạy chồng lượt, tránh nạp trùng một thư khi lượt trước chưa xong.
+concurrency:
+  group: hr-intake
+  cancel-in-progress: false
+
+jobs:
+  intake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cài phụ thuộc
+        run: npm install
+
+      - name: Nạp CV từ hộp thư
+        run: node packages/hr/src/intake/run.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MAIL_IMAP_HOST: ${{ secrets.MAIL_IMAP_HOST }}
+          MAIL_IMAP_PORT: ${{ secrets.MAIL_IMAP_PORT }}
+          MAIL_IMAP_USER: ${{ secrets.MAIL_IMAP_USER }}
+          MAIL_IMAP_PASSWORD: ${{ secrets.MAIL_IMAP_PASSWORD }}
+          CV_BUCKET: ${{ secrets.CV_BUCKET }}
+          HR_RETENTION_MONTHS: ${{ secrets.HR_RETENTION_MONTHS }}
