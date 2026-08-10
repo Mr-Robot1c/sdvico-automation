@@ -1,11 +1,19 @@
 name: daily-demo
 
-# Tác vụ theo lịch cho mốc cuối Ngày 1: sinh một mục chờ duyệt.
-# Chạy trong khung giờ hành chính, ngày làm việc. Có thể chạy tay bằng workflow_dispatch.
+# Tác vụ theo lịch: bù hàng đợi duyệt về mức 10 mục chờ.
+# Chạy 5 phút một lần, mọi ngày. Script tự giới hạn: đủ 10 thì không thêm,
+# nên chạy dày không tạo rác, chỉ bù khi có mục vừa được duyệt hoặc từ chối.
+# Lưu ý: 5 phút là mức dày nhất GitHub Actions cho phép với lịch cron, và
+# lịch có thể bị trễ hoặc bỏ lượt khi hệ thống tải cao.
 on:
   schedule:
-    - cron: '0 2 * * 1-5'   # 09:00 giờ Việt Nam các ngày thứ Hai tới thứ Sáu
+    - cron: '*/5 * * * *'   # 5 phút một lần, mọi ngày
   workflow_dispatch: {}
+
+# Không chạy chồng lượt.
+concurrency:
+  group: daily-demo
+  cancel-in-progress: false
 
 jobs:
   demo:
