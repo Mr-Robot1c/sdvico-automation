@@ -442,3 +442,56 @@ Cách lan bền và không mất tài khoản, tất cả đều là việc th�
 
 Không làm, nhắc lại cho chắc: không mua lượt xem và người theo dõi, không tài khoản phụ, không thích và
 bình luận hàng loạt bằng máy, không xoay proxy. Cái giá của mất tài khoản chính danh lớn hơn nhiều lần.
+
+---
+
+## PHẦN P. PHỄU B2C VÀ B2B, CHATBOT, HẬU MÃI (BẢN TUÂN THỦ)
+
+Phần này lấy các ý tối ưu hóa tốt về phân luồng khách và tự động hóa chăm sóc, rồi chỉnh cho đúng bảy
+điều cấm, nhất là điều cấm 1 (máy soạn, người bấm gửi), điều cấm 4 (không nhận vơ sản phẩm đối tác) và
+điều cấm 5 (không bịa model, thông số).
+
+### P.1. Phân luồng khách và hai phễu
+
+Khách của SDVICO chia hai nhóm rất khác nhau, cần hai phễu riêng.
+
+- B2C, ngư dân và chủ tàu: kênh hiệu quả là Zalo OA và SMS, không phải email. Máy soạn báo giá sơ bộ
+  dạng infographic kèm tin nhắn ngắn thân thiện, đẩy vào hàng đợi duyệt, người bấm gửi. Không nêu tên
+  model và thông số chưa được Phòng Kinh doanh xác nhận, chỉ nói nhóm thiết bị chung.
+- B2B, doanh nghiệp thủy sản, cảng cá, cơ quan quản lý: kênh email nuôi dưỡng. Chuỗi hàng tuần gửi các
+  câu chuyện triển khai thật, báo cáo tích hợp, nhật ký điện tử. Câu chuyện phải là việc thật, không
+  dựng. Cũng qua duyệt trước khi gửi.
+
+Điểm chung bắt buộc: mọi tin ra ngoài đều là bản nháp chờ duyệt. Máy không tự gửi cho khách.
+
+### P.2. Chatbot phân luồng
+
+- Câu đầu là menu, không phải lời chào chung chung. Ví dụ: đang cần tư vấn cho (1) tàu đánh bắt xa bờ,
+  (2) cảng cá và cơ quan quản lý, (3) giải pháp nước ngọt và nhiên liệu. Chỉ bật nhóm 3 nếu Phòng Kinh
+  doanh xác nhận công ty có phân phối nhóm đó.
+- Máy gán thẻ theo lựa chọn và gửi thông báo nội bộ cho đúng bộ phận kỹ thuật. Định tuyến nội bộ được
+  phép vì không phải gửi ra ngoài cho khách.
+- Trả lời khách chỉ dùng câu mẫu đã duyệt. Không để máy tự chế câu trả lời về giá, cước, quy định. Gặp
+  câu hỏi liên quan quy định nhà nước thì chuyển người, không tự trả lời.
+
+### P.3. Hậu mãi theo mốc thời gian (đúng luật)
+
+- Máy xếp lịch nhắc sau 1 tháng, 3 tháng, 6 tháng kể từ ngày lắp, soạn sẵn nội dung hỏi thăm tình trạng
+  hoạt động và nhắc lịch bảo trì, đẩy vào hàng đợi duyệt. Người bấm gửi.
+- Chỉ nhắn tới số điện thoại khách đã đồng ý nhận, dữ liệu giữ trong hạ tầng công ty, theo Nghị định
+  13/2023.
+- Mục đích là chăm sóc và nhắc lịch, tạo an tâm và truyền miệng, không phải rải quảng cáo.
+
+### P.4. Ranh giới nhắc lại
+
+- Không mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO. Chỉ
+  nói phân phối thiết bị tương thích.
+- Không nêu tên model và thông số chưa xác nhận. Chưa có dữ liệu Phòng Kinh doanh thì nói chung chung.
+- Mọi tin nhắn, email, báo giá gửi ra ngoài đều qua hàng đợi duyệt. Máy soạn, người bấm gửi.
+
+### P.5. Nối vào backend
+
+- Bảng approval_queue giữ mọi bản nháp tin nhắn với loại việc mkt_send_message. Phần payload chứa kênh,
+  người nhận, nội dung, và cờ cần cấp quản lý duyệt nếu chạm quy định.
+- Worker gửi thật chỉ chạy sau khi một dòng đổi sang approved, giống hệt luồng đăng bài. Máy chỉ được
+  ghi vào hàng đợi, không được tự gửi.

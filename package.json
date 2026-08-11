@@ -6,7 +6,8 @@
   "scripts": {
     "demo:approval": "node scripts/demo-approval.mjs",
     "ui:dev": "npm --workspace approval-ui run dev",
-    "seed:keywords": "node packages/marketing/src/seed-keywords.mjs"
+    "seed:keywords": "node packages/marketing/src/seed-keywords.mjs",
+    "demo:outbound": "node packages/marketing/src/demo-outbound.mjs"
   },
   "workspaces": [
     "packages/*",
