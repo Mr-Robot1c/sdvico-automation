@@ -12,13 +12,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="vi">
       <body>
-        <header className="topbar">
-          <div className="topbar-inner">
-            <div className="brand">SDVICO · {marketingOnly ? 'Duyệt nội dung Marketing' : 'Duyệt và Hồ sơ'}</div>
+        <div className="shell">
+          <aside className="sidebar">
+            <div className="brand">
+              <span className="brand-badge">S</span>
+              <span className="brand-text">SDVICO<small>{marketingOnly ? 'Marketing' : 'Duyệt và Hồ sơ'}</small></span>
+            </div>
+            <div className="nav-group">Trạm kiểm soát nội dung</div>
             <Nav marketingOnly={marketingOnly} />
-          </div>
-        </header>
-        {children}
+            <div className="sidebar-foot">Máy soạn, người bấm gửi.</div>
+          </aside>
+          <div className="content">{children}</div>
+        </div>
       </body>
     </html>
   );

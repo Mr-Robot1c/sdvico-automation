@@ -60,6 +60,12 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
     for (const c of cs || []) drafts.set(c.id as string, (c.draft as string) || '');
   }
 
+  // Số liệu tổng quan cho thẻ thống kê trên cùng.
+  const [{ count: kwCount }, { count: postCount }] = await Promise.all([
+    client.from('mkt_keywords').select('*', { count: 'exact', head: true }),
+    client.from('mkt_posts').select('*', { count: 'exact', head: true }).eq('status', 'published')
+  ]);
+
   return (
     <main>
       <header className="head-row">
@@ -69,6 +75,25 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
         </div>
         <AutoRefresh seconds={30} />
       </header>
+
+      <div className="statgrid">
+        <div className="statcard">
+          <span className="statcard-label">Bài chờ duyệt</span>
+          <span className="statcard-num">{all.length}</span>
+        </div>
+        <div className="statcard red">
+          <span className="statcard-label">Cờ đỏ cần cấp quản lý</span>
+          <span className="statcard-num">{redCount}</span>
+        </div>
+        <div className="statcard">
+          <span className="statcard-label">Từ khóa trong kho</span>
+          <span className="statcard-num">{kwCount ?? 0}</span>
+        </div>
+        <div className="statcard">
+          <span className="statcard-label">Bài đã đăng</span>
+          <span className="statcard-num">{postCount ?? 0}</span>
+        </div>
+      </div>
 
       {error ? (
         <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p>
