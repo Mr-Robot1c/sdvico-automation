@@ -1,0 +1,10 @@
+{
+  "name": "@sdvico/marketing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/keywords.mjs",
+  "dependencies": {
+    "@sdvico/core": "*"
+  }
+}

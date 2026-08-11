@@ -5,7 +5,8 @@
   "description": "Tự động hóa Tuyển dụng và Marketing cho SDVICO",
   "scripts": {
     "demo:approval": "node scripts/demo-approval.mjs",
-    "ui:dev": "npm --workspace approval-ui run dev"
+    "ui:dev": "npm --workspace approval-ui run dev",
+    "seed:keywords": "node packages/marketing/src/seed-keywords.mjs"
   },
   "workspaces": [
     "packages/*",
