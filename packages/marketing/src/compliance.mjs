@@ -70,18 +70,27 @@ export function scanPartner(text) {
   return PARTNER_TERMS.filter((term) => t.includes(term));
 }
 
-// Trả về danh sách token giống model hoặc thông số mà KHÔNG có trong nguồn đã duyệt.
-// knownValues: một Set các chuỗi đã chuẩn hóa (chữ thường, bỏ khoảng trắng) lấy từ product-facts.
-export function scanUnverifiedSpecs(text, knownValues = new Set()) {
-  const found = new Set();
+// Quét mọi token giống model hoặc thông số trong văn bản. Trả về mảng { raw, norm }.
+function scanSpecTokens(text) {
+  const found = new Map();
   for (const re of SPEC_PATTERNS) {
     const matches = (text || '').match(re) || [];
     for (const raw of matches) {
       const norm = raw.toLowerCase().replace(/\s+/g, '');
-      if (!knownValues.has(norm)) found.add(raw.trim());
+      if (!found.has(norm)) found.set(norm, raw.trim());
     }
   }
-  return [...found];
+  return [...found.entries()].map(([norm, raw]) => ({ norm, raw }));
+}
+
+// Thông số KHÔNG có trong nguồn đã duyệt (nghi bịa). knownValues gồm cả thật lẫn test.
+export function scanUnverifiedSpecs(text, knownValues = new Set()) {
+  return scanSpecTokens(text).filter((t) => !knownValues.has(t.norm)).map((t) => t.raw);
+}
+
+// Thông số có trong nguồn nhưng là DỮ LIỆU TEST (verified:false). Không được coi là sạch.
+export function scanTestSpecs(text, testValues = new Set()) {
+  return scanSpecTokens(text).filter((t) => testValues.has(t.norm)).map((t) => t.raw);
 }
 
 // Đánh giá tổng hợp một bản nháp.
@@ -89,18 +98,19 @@ export function scanUnverifiedSpecs(text, knownValues = new Set()) {
 //  risk = 'red'   khi chạm quy định (Điều cấm 3) -> phải cấp quản lý duyệt.
 //  risk = 'amber' khi nhắc đối tác hoặc có thông số chưa xác nhận -> người phụ trách rà.
 //  risk = 'none'  khi sạch.
-export function assessDraft(text, { knownFactValues = new Set() } = {}) {
+export function assessDraft(text, { knownFactValues = new Set(), testFactValues = new Set() } = {}) {
   const regulation = scanRegulation(text);
   const partner = scanPartner(text);
   const unverifiedSpecs = scanUnverifiedSpecs(text, knownFactValues);
+  const testSpecs = scanTestSpecs(text, testFactValues);
 
   let risk = 'none';
   if (regulation.length) risk = 'red';
-  else if (partner.length || unverifiedSpecs.length) risk = 'amber';
+  else if (partner.length || unverifiedSpecs.length || testSpecs.length) risk = 'amber';
 
   return {
     risk,
     needsManagerApproval: risk === 'red',
-    flags: { regulation, partner, unverifiedSpecs },
+    flags: { regulation, partner, unverifiedSpecs, testSpecs },
   };
 }

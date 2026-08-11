@@ -26,7 +26,7 @@ const INTENT_LABEL: Record<string, string> = {
   dieu_huong: 'điều hướng'
 };
 
-type Flags = { regulation?: string[]; partner?: string[]; unverifiedSpecs?: string[] };
+type Flags = { regulation?: string[]; partner?: string[]; unverifiedSpecs?: string[]; testSpecs?: string[] };
 type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags } | null;
 type Content = {
   id: string;
@@ -89,7 +89,7 @@ export default async function Page() {
                 {c.brief?.keyword ? <span className="src">từ khóa: {c.brief.keyword}</span> : null}
               </div>
 
-              {(f.regulation?.length || f.partner?.length || f.unverifiedSpecs?.length) ? (
+              {(f.regulation?.length || f.partner?.length || f.unverifiedSpecs?.length || f.testSpecs?.length) ? (
                 <dl className="fields">
                   {f.regulation?.length ? (
                     <div className="field"><dt>Chạm quy định</dt><dd>{f.regulation.join(', ')}</dd></div>
@@ -99,6 +99,9 @@ export default async function Page() {
                   ) : null}
                   {f.unverifiedSpecs?.length ? (
                     <div className="field"><dt>Thông số chưa xác nhận</dt><dd>{f.unverifiedSpecs.join(', ')}</dd></div>
+                  ) : null}
+                  {f.testSpecs?.length ? (
+                    <div className="field"><dt>Thông số TEST (chưa xác nhận)</dt><dd>{f.testSpecs.join(', ')}</dd></div>
                   ) : null}
                 </dl>
               ) : null}

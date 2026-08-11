@@ -17,7 +17,7 @@
 // được cả trên schema cũ lẫn schema mới, không phụ thuộc biến thể core nào.
 
 import { assessDraft } from './compliance.mjs';
-import { PRODUCT_FACTS, knownFactValues } from './product-facts.mjs';
+import { PRODUCT_FACTS, knownFactValues, testFactValues } from './product-facts.mjs';
 
 // Loại việc dùng chung cho mọi tin nhắn Marketing chờ duyệt.
 export const OUTBOUND_KIND = 'mkt_send_message';
@@ -80,7 +80,10 @@ export async function queueOutbound(client, {
 }) {
   // Tự đánh giá tuân thủ trước khi vào hàng đợi: gắn cờ đỏ nếu chạm quy định (Điều cấm 3),
   // cảnh báo nếu nhắc đối tác hoặc có thông số chưa xác nhận (Điều cấm 4 và 5).
-  const assessment = assessDraft(`${title}\n${body}`, { knownFactValues: knownFactValues(PRODUCT_FACTS) });
+  const assessment = assessDraft(`${title}\n${body}`, {
+    knownFactValues: knownFactValues(PRODUCT_FACTS),
+    testFactValues: testFactValues(PRODUCT_FACTS),
+  });
 
   const payload = {
     channel,

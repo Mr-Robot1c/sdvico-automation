@@ -113,9 +113,67 @@ function draftBody(brief) {
   return parts.join('\n');
 }
 
-// Tiện ích: sinh cả brief và draft cho một từ khóa.
+// Tiện ích: sinh cả brief và draft cho một từ khóa bằng BẢN MẪU (tất định, không cần khóa).
 export function generateContent(kw) {
   const brief = buildBrief(kw);
+  const { title, body } = buildDraft(brief);
+  return { title, brief, draft: body };
+}
+
+// Model marketing mặc định, đổi bằng biến MKT_MODEL. Dùng chung nhà Gemini với phần chấm CV.
+const MKT_MODEL = process.env.MKT_MODEL || process.env.HR_SCREEN_MODEL || 'gemini-2.0-flash';
+
+// Sinh draft bằng Gemini. CHỈ gọi khi có GEMINI_API_KEY. Import động để khi không có khóa,
+// gói @google/genai không cần cài và bản mẫu vẫn chạy. Trả về văn bản, hoặc ném lỗi để chỗ
+// gọi tự lùi về bản mẫu.
+export async function generateDraftLLM(brief, facts = []) {
+  const { GoogleGenAI } = await import('@google/genai');
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+  const allowed = facts
+    .filter((f) => f.value)
+    .map((f) => `${f.brand || ''} ${f.model || ''} ${f.attribute}: ${f.value}${f.verified ? '' : ' (CHƯA XÁC NHẬN, dữ liệu test)'}`.trim());
+
+  const system = [
+    'Bạn viết nội dung marketing cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
+    'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay ở câu đầu, đọc trên điện thoại.',
+    'Số theo chuẩn Việt Nam, dấu chấm ngăn cách hàng nghìn. Không gạch dài, mũi tên, dấu chấm tròn giữa câu.',
+    'CẤM bịa model và thông số. Chỉ được nêu thông số có trong danh sách đã duyệt dưới đây. Không có thì nói chung chung.',
+    'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO, chỉ nói tương thích.',
+    'Không hứa pháp lý tuyệt đối. Nội dung chạm quy định nhà nước thì nói trung thực, sẽ có người duyệt.',
+    'Kết bài bằng lời mời gọi tổng đài 1900 23 23 49.',
+    '',
+    allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số nào được duyệt, viết chung chung, không nêu số cụ thể.',
+  ].join('\n');
+
+  const user = [
+    `Viết một bài cho từ khóa: "${brief.keyword}".`,
+    `Ý định tìm kiếm: ${brief.intent}.`,
+    `Các phần nên có: ${(brief.sections || []).join('; ')}.`,
+    'Viết tiếng Việt, dài vừa phải, sẵn sàng cho người duyệt.',
+  ].join('\n');
+
+  const res = await ai.models.generateContent({
+    model: MKT_MODEL,
+    contents: user,
+    config: { systemInstruction: system },
+  });
+  const text = (res.text || '').trim();
+  if (!text) throw new Error('Gemini trả về rỗng.');
+  return text;
+}
+
+// Sinh nội dung, ưu tiên Gemini khi có khóa, không thì lùi về bản mẫu. Luôn trả draft dùng được.
+export async function generateContentAsync(kw, { facts = [] } = {}) {
+  const brief = buildBrief(kw);
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const draft = await generateDraftLLM(brief, facts);
+      return { title: draftTitle(brief), brief: { ...brief, generator: 'gemini' }, draft };
+    } catch (e) {
+      console.warn('Gemini lỗi, lùi về bản mẫu:', e.message);
+    }
+  }
   const { title, body } = buildDraft(brief);
   return { title, brief, draft: body };
 }

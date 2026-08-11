@@ -1,12 +1,15 @@
 // test-compliance.mjs — kiểm thử hàng rào tuân thủ, chạy offline, không đụng mạng.
 // Chạy: node packages/marketing/src/test-compliance.mjs
 //
-// Bốn ca: sạch, chạm quy định (đỏ), bịa thông số (amber), nhắc đối tác (amber).
+// Năm ca: sạch, chạm quy định (đỏ), bịa thông số lạ (amber), nhắc đối tác (amber),
+// và dùng thông số TEST trong allowlist (amber, phải gắn cảnh báo test, không được sạch).
 
 import { assessDraft } from './compliance.mjs';
-import { PRODUCT_FACTS, knownFactValues } from './product-facts.mjs';
+import { PRODUCT_FACTS, knownFactValues, testFactValues } from './product-facts.mjs';
 
-const known = knownFactValues(PRODUCT_FACTS); // đang rỗng, nên mọi thông số đều bị chặn
+const known = knownFactValues(PRODUCT_FACTS);
+const testVals = testFactValues(PRODUCT_FACTS);
+const opts = { knownFactValues: known, testFactValues: testVals };
 
 const cases = [
   {
@@ -20,8 +23,8 @@ const cases = [
     mong: 'red',
   },
   {
-    ten: 'Bịa model và thông số chưa xác nhận',
-    text: 'Máy lọc dầu SF-50 công suất 40 L/h, bo mạch định vị chuẩn kháng nước IP67, pin 5000 mAh.',
+    ten: 'Bịa model và thông số lạ chưa xác nhận',
+    text: 'Máy lọc dầu SF-50 công suất 40 L/h, bo mạch định vị chuẩn kháng nước IP69.',
     mong: 'amber',
   },
   {
@@ -29,11 +32,16 @@ const cases = [
     text: 'SDVICO cung cấp phần mềm S-Tracking của Viettel giúp theo dõi tàu.',
     mong: 'amber',
   },
+  {
+    ten: 'Dùng thông số TEST trong allowlist (phải cảnh báo test)',
+    text: 'Thiết bị GS-TEST-01 đạt chuẩn kháng nước IP67, pin 10000 mAh.',
+    mong: 'amber',
+  },
 ];
 
 let pass = 0;
 for (const c of cases) {
-  const r = assessDraft(c.text, { knownFactValues: known });
+  const r = assessDraft(c.text, opts);
   const ok = r.risk === c.mong;
   if (ok) pass++;
   console.log(`[${ok ? 'ĐẠT' : 'SAI'}] ${c.ten}`);
@@ -41,7 +49,8 @@ for (const c of cases) {
   const f = r.flags;
   if (f.regulation.length) console.log(`   quy định: ${f.regulation.join(', ')}`);
   if (f.partner.length) console.log(`   đối tác: ${f.partner.join(', ')}`);
-  if (f.unverifiedSpecs.length) console.log(`   thông số chưa xác nhận: ${f.unverifiedSpecs.join(', ')}`);
+  if (f.unverifiedSpecs.length) console.log(`   thông số lạ chưa xác nhận: ${f.unverifiedSpecs.join(', ')}`);
+  if (f.testSpecs.length) console.log(`   thông số TEST (chưa xác nhận): ${f.testSpecs.join(', ')}`);
   console.log('');
 }
 

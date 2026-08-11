@@ -14,6 +14,13 @@ type Item = {
   created_at: string;
 };
 
+// Cờ đỏ: chạm quy định nhà nước, cần cấp quản lý duyệt trước (Điều cấm 3).
+function isRedFlag(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Record<string, unknown>;
+  return p.risk === 'red' || p.needs_manager_approval === true;
+}
+
 export default async function Page({ searchParams }: { searchParams: { kind?: string } }) {
   const client = getServerClient();
   const { data, error } = await client
@@ -29,7 +36,10 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   for (const it of all) counts.set(it.kind, (counts.get(it.kind) || 0) + 1);
 
   const selected = searchParams?.kind || null;
-  const items = selected ? all.filter((it) => it.kind === selected) : all;
+  const filtered = selected ? all.filter((it) => it.kind === selected) : all;
+  // Cờ đỏ (chạm quy định, cần cấp quản lý) xếp lên đầu. Sort ổn định nên phần còn lại giữ thứ tự cũ.
+  const items = [...filtered].sort((a, b) => Number(isRedFlag(b.payload)) - Number(isRedFlag(a.payload)));
+  const redCount = filtered.filter((it) => isRedFlag(it.payload)).length;
 
   return (
     <main>
@@ -43,6 +53,12 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
 
       {error ? (
         <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p>
+      ) : null}
+
+      {!error && redCount > 0 ? (
+        <p className="err" role="status">
+          {redCount} mục cờ đỏ chạm quy định, cần cấp quản lý duyệt trước. Đã xếp lên đầu.
+        </p>
       ) : null}
 
       {!error && all.length > 0 ? (
@@ -87,6 +103,12 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
               </div>
 
               <div className="title">{item.title}</div>
+
+              {isRedFlag(item.payload) ? (
+                <div className="stages">
+                  <span className="stage tone-no">Cờ đỏ, cấp quản lý duyệt</span>
+                </div>
+              ) : null}
 
               {rows.length > 0 ? (
                 <dl className="fields">

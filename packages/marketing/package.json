@@ -5,6 +5,7 @@
   "type": "module",
   "main": "src/keywords.mjs",
   "dependencies": {
-    "@sdvico/core": "*"
+    "@sdvico/core": "*",
+    "@google/genai": "^1.52.0"
   }
 }
