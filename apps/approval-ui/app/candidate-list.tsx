@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatRelative, stageMeta, sourceLabel } from './labels';
-import { advanceToInterview } from './actions';
+import { advanceToInterview, saveNote } from './actions';
 
 export type CandView = {
   id: string;
@@ -18,6 +18,7 @@ export type CandView = {
   stages: string[];
   appId: string | null;
   appStage: string | null;
+  note: string;
   score: number | null;
   scoreAxes: { label: string; diem: number }[];
   summary: string;
@@ -77,6 +78,9 @@ function CandidateCard({ c }: { c: CandView }) {
         {hasInterview ? (
           <button className={`cand-tab ${tab === 'pv' ? 'on' : ''}`} onClick={() => toggle('pv')}>Câu hỏi phỏng vấn</button>
         ) : null}
+        {c.appId ? (
+          <button className={`cand-tab ${tab === 'ghichu' ? 'on' : ''}`} onClick={() => toggle('ghichu')}>Ghi chú{c.note ? ' •' : ''}</button>
+        ) : null}
       </div>
 
       {tab === 'cv' ? (
@@ -113,6 +117,16 @@ function CandidateCard({ c }: { c: CandView }) {
           {c.interview.kyThuat ? <div className="cand-sub"><b>Câu hỏi kỹ thuật</b><pre>{c.interview.kyThuat}</pre></div> : null}
           {c.interview.hanhVi ? <div className="cand-sub"><b>Câu hỏi hành vi</b><pre>{c.interview.hanhVi}</pre></div> : null}
           {c.interview.baiVeNha ? <div className="cand-sub"><b>Bài về nhà</b><pre>{c.interview.baiVeNha}</pre></div> : null}
+        </div>
+      ) : null}
+
+      {tab === 'ghichu' && c.appId ? (
+        <div className="cand-panel">
+          <form action={saveNote}>
+            <input type="hidden" name="appId" value={c.appId} />
+            <textarea className="note-area" name="note" defaultValue={c.note} placeholder="Ghi chú về ứng viên này..." />
+            <div style={{ marginTop: 8 }}><button className="btn ok" type="submit">Lưu ghi chú</button></div>
+          </form>
         </div>
       ) : null}
 

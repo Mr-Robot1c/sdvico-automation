@@ -7,10 +7,11 @@ import { usePathname } from 'next/navigation';
 export default function Nav() {
   const path = usePathname();
   const tabs = [
-    { href: '/', label: 'Hàng đợi duyệt' },
     { href: '/ho-so', label: 'Hồ sơ ứng viên' },
     { href: '/lich', label: 'Lịch phỏng vấn' },
-    { href: '/vi-tri', label: 'Vị trí tuyển dụng' }
+    { href: '/dang-tin', label: 'Đăng tin' },
+    { href: '/vi-tri', label: 'Vị trí tuyển dụng' },
+    { href: '/', label: 'Duyệt & gửi' }
   ];
   return (
     <nav className="tabs" aria-label="Điều hướng">

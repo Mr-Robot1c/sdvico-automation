@@ -35,8 +35,8 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
     <main>
       <header className="head-row">
         <div>
-          <h1>Hàng đợi duyệt</h1>
-          <p className="sub">Máy soạn, người bấm. Xem từng mục rồi Duyệt hoặc Từ chối.</p>
+          <h1>Duyệt &amp; gửi</h1>
+          <p className="sub">Nội dung máy đã soạn chờ bạn gửi: thư mời phỏng vấn, bài marketing. Xem rồi Duyệt hoặc Từ chối (điều cấm 1).</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>

@@ -1,6 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { formatRelative } from '../labels';
+import { saveWindows } from '../actions';
 
 // Lịch phỏng vấn đã tự sắp. Đọc các mục thư mời trong hàng đợi, gom khung giờ theo trạng thái.
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,10 @@ export default async function Page() {
   const rows = (data || []) as Row[];
   const active = rows.filter((r) => r.status !== 'rejected');
 
+  // Khung giờ phỏng vấn mong muốn, dùng cho tự sắp lịch.
+  const { data: cfg } = await client.from('app_config').select('value').eq('key', 'interview_windows').maybeSingle();
+  const windows: string[] = Array.isArray(cfg?.value) ? (cfg!.value as string[]) : ['09:00', '10:30', '14:00', '15:30'];
+
   return (
     <main>
       <header className="head-row">
@@ -46,6 +51,16 @@ export default async function Page() {
       </header>
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
+
+      <form action={saveWindows} className="settings-box">
+        <label htmlFor="windows"><b>Khung giờ phỏng vấn mong muốn</b></label>
+        <p className="muted" style={{ margin: '2px 0 8px' }}>Máy tự sắp lịch trong các khung này, các ngày làm việc. Nhập giờ cách nhau bằng dấu phẩy.</p>
+        <div className="row">
+          <input className="note" id="windows" name="windows" defaultValue={windows.join(', ')} placeholder="09:00, 10:30, 14:00, 15:30" />
+          <button className="btn ok" type="submit">Lưu khung giờ</button>
+        </div>
+      </form>
+
 
       {!error && active.length === 0 ? (
         <div className="empty">

@@ -17,7 +17,9 @@ function slotLabel(day, time) {
 }
 
 // Lưới khung giờ sắp tới: các ngày làm việc, mỗi ngày các ca, bắt đầu từ ngày mai.
-export function buildGrid({ from = new Date(), days = 40 } = {}) {
+// times: khung giờ mong muốn, mặc định WORK_TIMES nếu không truyền.
+export function buildGrid({ from = new Date(), days = 40, times = WORK_TIMES } = {}) {
+  const useTimes = Array.isArray(times) && times.length ? times : WORK_TIMES;
   const slots = [];
   const day = new Date(from);
   day.setHours(0, 0, 0, 0);
@@ -25,11 +27,23 @@ export function buildGrid({ from = new Date(), days = 40 } = {}) {
   for (let i = 0; i < days; i++) {
     const wd = day.getDay();
     if (wd !== 0 && wd !== 6) {
-      for (const t of WORK_TIMES) slots.push(slotLabel(day, t));
+      for (const t of useTimes) slots.push(slotLabel(day, t));
     }
     day.setDate(day.getDate() + 1);
   }
   return slots;
+}
+
+// Đọc khung giờ phỏng vấn mong muốn từ app_config. Không có thì dùng mặc định.
+export async function loadWindows(client) {
+  const { data, error } = await client
+    .from('app_config')
+    .select('value')
+    .eq('key', 'interview_windows')
+    .maybeSingle();
+  if (error) return WORK_TIMES;
+  const v = data?.value;
+  return Array.isArray(v) && v.length ? v : WORK_TIMES;
 }
 
 // Cấp n khung giờ còn trống, bỏ qua khung đã có trong tập taken.

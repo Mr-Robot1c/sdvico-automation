@@ -18,7 +18,7 @@ import { getServiceClient, logRun, pushApproval } from '../../../core/src/index.
 import { anonymizeCv } from '../screen/anonymize.js';
 import { fetchForInterview } from './applications.js';
 import { generateInterview } from './generate.js';
-import { allocateSlots, loadTakenSlots } from './schedule.js';
+import { allocateSlots, loadTakenSlots, loadWindows } from './schedule.js';
 import { composeLetter, composeTakeHome, numberList } from './compose.js';
 
 function parseArgs(argv) {
@@ -35,8 +35,10 @@ async function main() {
   const client = getServiceClient();
 
   const apps = await fetchForInterview(client, { max: args.max });
-  // Tự sắp lịch: gom các khung giờ đã đề xuất trước đó để không cấp trùng.
+  // Tự sắp lịch: gom các khung giờ đã đề xuất trước đó để không cấp trùng,
+  // dùng khung giờ mong muốn do người vận hành đặt trên web.
   const taken = await loadTakenSlots(client);
+  const windows = await loadWindows(client);
   const results = [];
 
   for (const app of apps) {
@@ -51,7 +53,7 @@ async function main() {
     const name = cand.full_name || 'anh/chị';
     const { text } = anonymizeCv(cv);
     // Cấp ba khung giờ còn trống, không trùng ứng viên khác (tự sắp lịch).
-    const slots = allocateSlots(taken, 3);
+    const slots = allocateSlots(taken, 3, { times: windows });
 
     if (args.dryRun) {
       results.push({ application_id: app.id, ung_vien: name, vi_tri: position, khung_gio: slots, dry: true });
