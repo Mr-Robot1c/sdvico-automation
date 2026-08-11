@@ -15,8 +15,9 @@ export const config = {
 export function middleware(req: NextRequest) {
   if (process.env.NODE_ENV !== 'production') return NextResponse.next();
 
-  const pass = process.env.APPROVAL_UI_PASSWORD;
-  const user = process.env.APPROVAL_UI_USER || 'sdvico';
+  // .trim() phòng khi giá trị biến môi trường dính ký tự xuống dòng hoặc khoảng trắng thừa.
+  const pass = (process.env.APPROVAL_UI_PASSWORD || '').trim();
+  const user = (process.env.APPROVAL_UI_USER || 'sdvico').trim();
 
   // Chưa đặt mật khẩu ở production thì khóa, không để lộ dữ liệu.
   if (!pass) {
