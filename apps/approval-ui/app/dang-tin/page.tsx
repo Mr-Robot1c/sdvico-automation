@@ -35,7 +35,9 @@ export default async function Page() {
     .limit(100);
 
   // Chưa chạy migration thì hai bảng chưa có. Hiện hướng dẫn thay vì lỗi.
-  const needMigration = pRes.error?.code === '42P01' || jRes.error?.code === '42P01';
+  // PostgREST báo PGRST205 khi không thấy bảng; Postgres thô báo 42P01.
+  const missing = (code?: string) => code === 'PGRST205' || code === '42P01';
+  const needMigration = missing(pRes.error?.code) || missing(jRes.error?.code);
   const platforms = (pRes.data || []) as Platform[];
   const posts = (jRes.data || []) as Post[];
   const platformName = new Map(platforms.map((p) => [p.id, p.ten]));
