@@ -29,7 +29,10 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
 
-  const all = (data || []) as Item[];
+  const raw = (data || []) as Item[];
+  // Bản deploy marketing-only chỉ hiện mục marketing (kind bắt đầu bằng 'mkt'), ẩn HR và demo.
+  const marketingOnly = process.env.MARKETING_ONLY === 'true' || process.env.MARKETING_ONLY === '1';
+  const all = marketingOnly ? raw.filter((it) => it.kind.startsWith('mkt')) : raw;
 
   // Đếm theo loại để dựng thanh lọc.
   const counts = new Map<string, number>();

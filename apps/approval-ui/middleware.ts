@@ -13,6 +13,12 @@ export const config = {
 };
 
 export function middleware(req: NextRequest) {
+  // Bản deploy marketing-only: chặn hẳn route dữ liệu ứng viên, kể cả vào bằng URL trực tiếp.
+  const marketingOnly = process.env.MARKETING_ONLY === 'true' || process.env.MARKETING_ONLY === '1';
+  if (marketingOnly && /^\/(ho-so|vi-tri)(\/|$)/.test(req.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL('/', req.url));
+  }
+
   if (process.env.NODE_ENV !== 'production') return NextResponse.next();
 
   // .trim() phòng khi giá trị biến môi trường dính ký tự xuống dòng hoặc khoảng trắng thừa.
