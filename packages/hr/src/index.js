@@ -25,3 +25,6 @@ export { WORK_TIMES, buildGrid, allocateSlots, loadTakenSlots } from './intervie
 export { generateInterview } from './interview/generate.js';
 export { composeLetter, composeTakeHome, numberList } from './interview/compose.js';
 export { fetchForInterview } from './interview/applications.js';
+// Sourcing: phân tích JD, ưu tiên địa điểm
+export { normalizeLocation, prioritizeLocations } from './sourcing/locations.js';
+export { analyzeJd, buildTargeting } from './sourcing/jd-analyzer.js';

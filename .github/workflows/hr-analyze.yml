@@ -1,0 +1,30 @@
+name: hr-analyze
+
+# Phân tích một mô tả công việc thành tiêu chí tuyển dụng (vai trò, kỹ năng,
+# địa điểm ưu tiên HCM/Vũng Tàu và lân cận, từ khóa tìm kiếm).
+# Chạy tay từ tab Actions: nhập JD, xem kết quả trong log. Bộ não cho đăng tin và tìm kiếm.
+on:
+  workflow_dispatch:
+    inputs:
+      jd:
+        description: 'Mô tả công việc để phân tích'
+        required: true
+        type: string
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Cài phụ thuộc
+        run: npm install
+      - name: Phân tích JD
+        env:
+          # Truyền JD qua biến môi trường để tránh chèn lệnh vào shell.
+          JD: ${{ inputs.jd }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          HR_ANALYZE_MODEL: ${{ secrets.HR_ANALYZE_MODEL }}
+        run: node packages/hr/src/sourcing/run.mjs --text "$JD"
