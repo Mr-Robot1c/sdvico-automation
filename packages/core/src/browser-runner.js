@@ -41,29 +41,32 @@ export async function runBrowserFlow(client, {
   profileDir,
   task,
   dryRun = true,
+  // Mặc định theo Phần 6: Chrome thật, có giao diện. Mức T0 (bản sao cục bộ) chạy
+  // headless bằng chromium đi kèm để không cần màn hình, đặt channel null khi đó.
+  headless = false,
+  channel = 'chrome',
   flow
 }) {
   await assertNotStopped(client);
 
   const { chromium } = await import('playwright');
-  const ctx = await chromium.launchPersistentContext(profileDir, {
-    channel: 'chrome',
-    headless: false,
-    viewport: { width: 1440, height: 900 }
-  });
+  const launchOpts = { headless, viewport: { width: 1440, height: 900 } };
+  if (channel) launchOpts.channel = channel;
+  const ctx = await chromium.launchPersistentContext(profileDir, launchOpts);
   const page = ctx.pages()[0] || (await ctx.newPage());
 
   // Nơi gọi phải gọi checkStop trước mỗi thao tác quan trọng.
   const checkStop = async () => { await assertNotStopped(client); };
 
   try {
-    await flow({ page, dryRun, checkStop, humanType, randomDelay, BarrierError });
+    const result = await flow({ page, dryRun, checkStop, humanType, randomDelay, BarrierError });
     await logRun(client, {
       task,
       actor: 'browser-runner',
       status: 'ok',
       detail: { account, dryRun }
     });
+    return result;
   } catch (err) {
     let shot = null;
     try {

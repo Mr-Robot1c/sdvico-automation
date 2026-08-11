@@ -19,6 +19,7 @@
   "dependencies": {
     "@sdvico/core": "*",
     "groq-sdk": "^0.9.1",
+    "playwright": "^1.47.0",
     "imapflow": "^1.0.164",
     "mailparser": "^3.7.1",
     "mammoth": "^1.8.0",

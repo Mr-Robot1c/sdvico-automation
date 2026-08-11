@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Sàn tuyển dụng (bản mô phỏng T0)</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 640px; margin: 24px auto; padding: 0 16px; }
+    h1 { font-size: 20px; }
+    label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    input, textarea, select { width: 100%; padding: 8px; box-sizing: border-box; }
+    textarea { min-height: 140px; }
+    button { margin-top: 16px; padding: 10px 20px; font-size: 15px; cursor: pointer; }
+    #ket_qua { margin-top: 16px; color: green; font-weight: 600; }
+    .note { color: #888; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Đăng tin tuyển dụng</h1>
+  <p class="note">Trang mô phỏng để chạy thử luồng đăng tin ở mức T0. Không phải sàn thật.</p>
+
+  <form id="form_dang_tin">
+    <label for="title">Tiêu đề tin tuyển dụng</label>
+    <input id="title" name="title" type="text" />
+
+    <label for="location">Địa điểm</label>
+    <input id="location" name="location" type="text" />
+
+    <label for="salary">Mức lương</label>
+    <input id="salary" name="salary" type="text" />
+
+    <label for="email">Email liên hệ</label>
+    <input id="email" name="email" type="text" />
+
+    <label for="description">Mô tả công việc</label>
+    <textarea id="description" name="description"></textarea>
+
+    <button id="submit" type="button">Đăng tin</button>
+  </form>
+
+  <div id="ket_qua" hidden>Đã đăng tin thành công.</div>
+
+  <script>
+    // Nút gửi cuối. Luồng diễn tập (dryRun) phải dừng trước bước này, không bấm.
+    document.getElementById('submit').addEventListener('click', function () {
+      document.getElementById('ket_qua').hidden = false;
+    });
+  </script>
+</body>
+</html>
