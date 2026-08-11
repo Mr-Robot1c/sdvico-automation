@@ -10,6 +10,7 @@
   "scripts": {
     "intake": "node src/intake/run.mjs",
     "intake:dry": "node src/intake/run.mjs --dry-run",
+    "intake:files": "node src/intake/seed-files.mjs",
     "screen": "node src/screen/run.mjs",
     "screen:dry": "node src/screen/run.mjs --dry-run",
     "interview": "node src/interview/run.mjs",
