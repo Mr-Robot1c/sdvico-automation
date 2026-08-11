@@ -37,3 +37,7 @@ Tiêu đề bám từ khóa người thật gõ. Đoạn mở trả lời ngay, 
 Không đạt: "Giải pháp giám sát hành trình tối tân, đẳng cấp, tích hợp công nghệ AI vượt trội đem lại trải nghiệm hoàn hảo cho quý khách hàng."
 
 Đạt: "Tàu mất kết nối giám sát, đừng lo. Kiểm tra nguồn điện và ăng-ten trước, rồi khởi động lại thiết bị. Chưa được thì gọi 1900 23 23 49, có người hỗ trợ tận bến."
+
+## Nối vào máy
+
+Bộ rà `packages/marketing/src/brand-voice-check.mjs` (hàm `scanStyle`) tự bắt lỗi giọng: gạch dài, mũi tên, dấu chấm tròn giữa câu, ký hiệu thay chữ và, số sai chuẩn Việt Nam, hứa pháp lý tuyệt đối, lời hoa mỹ và khẳng định quá. Cặp với `compliance.mjs` (lo ranh giới sản phẩm). Bộ kiểm thử 20 đoạn gài lỗi ở `test-skills.mjs`, chạy `npm run test:skills`.

@@ -46,7 +46,9 @@ export const PARTNER_TERMS = [
 const SPEC_PATTERNS = [
   /\bip\s?\d{2}\b/gi, // chuẩn kháng nước IP67
   /\b[A-Z]{2,}[-\s]?\d{2,}[A-Z]?\b/g, // model kiểu SEA-40, SF 50
-  /\b\d+([.,]\d+)?\s?(w|kw|kwh|wh|v|mah|ah|l\/h|lít\/giờ|hải lý|db|nits)\b/gi, // công suất, dung lượng
+  // Công suất, dung lượng. Đơn vị dài xếp trước; theo sau không được là chữ cái để tránh
+  // khớp nhầm "1 v" trong "số 1 và" (dùng cờ u và lookahead \p{L}).
+  /\b\d+([.,]\d+)?\s?(kwh|kw|wh|mah|ah|l\/h|lít\/giờ|hải lý|nits|db|w|v)(?![\p{L}])/giu,
 ];
 
 function lower(text) {
