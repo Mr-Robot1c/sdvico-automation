@@ -18,7 +18,7 @@ import { getServiceClient, logRun, pushApproval } from '../../../core/src/index.
 import { anonymizeCv } from '../screen/anonymize.js';
 import { fetchForInterview } from './applications.js';
 import { generateInterview } from './generate.js';
-import { proposeSlots } from './slots.js';
+import { allocateSlots, loadTakenSlots } from './schedule.js';
 import { composeLetter, composeTakeHome, numberList } from './compose.js';
 
 function parseArgs(argv) {
@@ -35,6 +35,8 @@ async function main() {
   const client = getServiceClient();
 
   const apps = await fetchForInterview(client, { max: args.max });
+  // Tự sắp lịch: gom các khung giờ đã đề xuất trước đó để không cấp trùng.
+  const taken = await loadTakenSlots(client);
   const results = [];
 
   for (const app of apps) {
@@ -48,7 +50,8 @@ async function main() {
     const position = app.hr_jobs?.title || 'vị trí đã ứng tuyển';
     const name = cand.full_name || 'anh/chị';
     const { text } = anonymizeCv(cv);
-    const slots = proposeSlots(3);
+    // Cấp ba khung giờ còn trống, không trùng ứng viên khác (tự sắp lịch).
+    const slots = allocateSlots(taken, 3);
 
     if (args.dryRun) {
       results.push({ application_id: app.id, ung_vien: name, vi_tri: position, khung_gio: slots, dry: true });
@@ -63,6 +66,7 @@ async function main() {
         ung_vien: name,
         vi_tri: position,
         email: cand.email || '',
+        khung_gio: slots,
         thu_moi: letter,
         cau_hoi_ky_thuat: numberList(pack.cau_hoi_ky_thuat),
         cau_hoi_hanh_vi: numberList(pack.cau_hoi_hanh_vi),

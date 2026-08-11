@@ -21,6 +21,7 @@ export { scoreCv } from './screen/score.js';
 export { fetchUnscored, saveScore } from './screen/applications.js';
 // Phỏng vấn và thư mời
 export { proposeSlots } from './interview/slots.js';
+export { WORK_TIMES, buildGrid, allocateSlots, loadTakenSlots } from './interview/schedule.js';
 export { generateInterview } from './interview/generate.js';
 export { composeLetter, composeTakeHome, numberList } from './interview/compose.js';
 export { fetchForInterview } from './interview/applications.js';
