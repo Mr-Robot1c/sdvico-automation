@@ -28,3 +28,5 @@ export { fetchForInterview } from './interview/applications.js';
 // Sourcing: phân tích JD, ưu tiên địa điểm
 export { normalizeLocation, prioritizeLocations } from './sourcing/locations.js';
 export { analyzeJd, buildTargeting } from './sourcing/jd-analyzer.js';
+// Dữ liệu giả để chạy thử pipeline
+export { generateSyntheticCandidates } from './synthetic/generate.js';
