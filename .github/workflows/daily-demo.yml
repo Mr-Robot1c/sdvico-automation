@@ -1,13 +1,13 @@
 name: daily-demo
 
 # Tác vụ theo lịch: bù hàng đợi duyệt về mức 10 mục chờ.
-# Chạy 5 phút một lần, mọi ngày. Script tự giới hạn: đủ 10 thì không thêm,
-# nên chạy dày không tạo rác, chỉ bù khi có mục vừa được duyệt hoặc từ chối.
-# Lưu ý: 5 phút là mức dày nhất GitHub Actions cho phép với lịch cron, và
-# lịch có thể bị trễ hoặc bỏ lượt khi hệ thống tải cao.
+# Chạy 4 giờ một lần, mọi ngày. Đây chỉ là tác vụ bù demo, hàng đợi rút chậm
+# theo tốc độ người duyệt bấm, nên không cần chạy dày. Chạy thưa để tiết kiệm
+# phút chạy miễn phí của repo private, dành hạn mức cho hr-intake.
+# Script tự giới hạn: đủ 10 thì không thêm.
 on:
   schedule:
-    - cron: '*/5 * * * *'   # 5 phút một lần, mọi ngày
+    - cron: '0 */4 * * *'   # 4 giờ một lần, mọi ngày
   workflow_dispatch: {}
 
 # Không chạy chồng lượt.
