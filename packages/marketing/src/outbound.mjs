@@ -92,10 +92,10 @@ export async function queueOutbound(client, {
   return data.id;
 }
 
-// Ghi một dòng run_log tối giản, dùng cột chung. status 'info' hợp lệ ở cả hai schema.
+// Ghi một dòng run_log tối giản. status 'ok' theo ràng buộc của repo (ok, error, skipped).
 export async function logInfo(client, task, detail = {}) {
   const { error } = await client
     .from('run_log')
-    .insert({ task, status: 'info', detail });
+    .insert({ task, status: 'ok', detail });
   if (error) throw new Error('Ghi run_log lỗi: ' + error.message);
 }
