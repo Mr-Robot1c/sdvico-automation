@@ -9,9 +9,12 @@
   },
   "scripts": {
     "intake": "node src/intake/run.mjs",
-    "intake:dry": "node src/intake/run.mjs --dry-run"
+    "intake:dry": "node src/intake/run.mjs --dry-run",
+    "screen": "node src/screen/run.mjs",
+    "screen:dry": "node src/screen/run.mjs --dry-run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
     "@sdvico/core": "*",
     "imapflow": "^1.0.164",
     "mailparser": "^3.7.1",

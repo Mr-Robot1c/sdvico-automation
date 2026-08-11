@@ -14,3 +14,8 @@ export { upsertCandidate, ensureApplication } from './intake/candidates.js';
 export { ensureBucket, uploadCv, CV_BUCKET } from './intake/storage.js';
 export { getMailConfig, withMailbox, fetchRecentCvMessages, fetchUnseenCvMessages, markSeen } from './intake/mailbox.js';
 export { loadProcessed, saveProcessed } from './intake/seen.js';
+// Chấm CV
+export { DEFAULT_RUBRIC, pickRubric, weightedScore, totalWeight } from './screen/rubric.js';
+export { anonymizeCv } from './screen/anonymize.js';
+export { scoreCv } from './screen/score.js';
+export { fetchUnscored, saveScore } from './screen/applications.js';

@@ -73,7 +73,15 @@ Diễn giải từng bước:
 
 ### Lịch chạy
 
-- `hr-intake` chạy 30 phút một lần bằng GitHub Actions schedule hoặc cron nội bộ.
+- `hr-intake` chạy 30 phút một lần (phút 0 và 30) bằng GitHub Actions schedule.
+- `hr-screen` chấm CV chạy 30 phút một lần (phút 15 và 45), lệch sau đường nạp CV. Cần `ANTHROPIC_API_KEY`.
+
+### Trạng thái xây dựng
+
+- Bước 1 sinh JD: có lệnh `/hr-jd`.
+- Bước 3 nạp CV: có, chạy tự động (`hr-intake`).
+- Bước 4 chấm CV: có, skill `cv-screening` và `packages/hr/src/screen`, chạy tự động (`hr-screen`).
+- Bước 2 đăng tin, bước 6 câu hỏi phỏng vấn và thư mời: chưa làm.
 
 ### Chỉ tiêu nghiệm thu liên quan
 
