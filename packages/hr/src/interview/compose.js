@@ -14,20 +14,22 @@ export function composeTakeHome(bai) {
 }
 
 // Thư mời phỏng vấn. name có thể null. slots là mảng chuỗi khung giờ.
-export function composeLetter({ name, position, slots }) {
+// xh là cách xưng hô (anh, chị, hoặc anh/chị) suy từ giới tính ứng viên.
+export function composeLetter({ name, position, slots, xh = 'anh/chị' }) {
   const hasName = name && name.trim() && name.trim() !== 'anh/chị';
-  const greeting = hasName ? `Kính gửi anh/chị ${name.trim()},` : 'Kính gửi anh/chị,';
+  const XH = xh.charAt(0).toUpperCase() + xh.slice(1); // đầu câu viết hoa
+  const greeting = hasName ? `Kính gửi ${xh} ${name.trim()},` : `Kính gửi ${xh},`;
   const lines = [
     greeting,
     '',
-    `Cảm ơn anh/chị đã ứng tuyển ${position} tại Công ty SDVICO. Sau khi xem hồ sơ, chúng tôi trân trọng mời anh/chị tham gia phỏng vấn.`,
+    `Cảm ơn ${xh} đã ứng tuyển ${position} tại Công ty SDVICO. Sau khi xem hồ sơ, chúng tôi trân trọng mời ${xh} tham gia phỏng vấn.`,
     '',
-    'Đề xuất ba khung giờ, anh/chị chọn giúp một khung phù hợp:',
+    `Đề xuất ba khung giờ, ${xh} chọn giúp một khung phù hợp:`,
     ...slots.map((s, i) => `${i + 1}. ${s}`),
     '',
-    'Buổi làm việc gồm phần trao đổi chuyên môn và một bài về nhà ngắn khoảng ba giờ để anh/chị thể hiện năng lực thực tế. Chúng tôi sẽ gửi đề bài sau khi anh/chị xác nhận lịch.',
+    `Buổi làm việc gồm phần trao đổi chuyên môn và một bài về nhà ngắn khoảng ba giờ để ${xh} thể hiện năng lực thực tế. Chúng tôi sẽ gửi đề bài sau khi ${xh} xác nhận lịch.`,
     '',
-    'Anh/chị vui lòng phản hồi thư này để xác nhận khung giờ. Nếu cả ba đều chưa tiện, xin đề xuất giúp thời gian khác.',
+    `${XH} vui lòng phản hồi thư này để xác nhận khung giờ. Nếu cả ba đều chưa tiện, xin đề xuất giúp thời gian khác.`,
     '',
     'Trân trọng,',
     'Phòng Nhân sự, Công ty TNHH Hiệp Lực Phát Triển Việt (SDVICO)'

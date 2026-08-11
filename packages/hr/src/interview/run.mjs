@@ -20,6 +20,7 @@ import { fetchForInterview } from './applications.js';
 import { generateInterview } from './generate.js';
 import { allocateSlots, loadTakenSlots, loadWindows } from './schedule.js';
 import { composeLetter, composeTakeHome, numberList } from './compose.js';
+import { guessGender, xungHo } from './gender.js';
 
 function parseArgs(argv) {
   const args = { dryRun: false, max: 20 };
@@ -62,7 +63,9 @@ async function main() {
 
     try {
       const pack = await generateInterview(text, { position });
-      const letter = composeLetter({ name, position, slots });
+      // Xưng hô đúng anh/chị suy từ tên và CV gốc (cục bộ, không đưa lên mô hình).
+      const xh = xungHo(guessGender(name, cv.raw_text));
+      const letter = composeLetter({ name, position, slots, xh });
 
       const payload = {
         ung_vien: name,

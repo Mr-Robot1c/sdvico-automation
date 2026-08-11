@@ -6,6 +6,17 @@ import { addPlatform, removePlatform, addJobPost, updateJobPost } from '../actio
 // Quản lý nền tảng đăng tuyển và theo dõi tin đăng. Đăng thật lên sàn cần tài khoản công ty.
 export const dynamic = 'force-dynamic';
 
+type Job = {
+  id: string;
+  title: string;
+  department: string | null;
+  location: string | null;
+  short_desc: string | null;
+  requirements: string | null;
+  jd_versions: Record<string, string> | null;
+  status: string;
+  created_at: string;
+};
 type Platform = { id: string; ten: string; loai: string; bat: boolean; ghi_chu: string | null };
 type Post = {
   id: string;
@@ -17,6 +28,13 @@ type Post = {
   created_at: string;
 };
 
+const JD_LABELS: Record<string, string> = { website: 'Website công ty', job_board: 'Trang tuyển dụng', facebook: 'Facebook', zalo_sms: 'Zalo / SMS' };
+const JD_ORDER = ['website', 'job_board', 'facebook', 'zalo_sms'];
+const JOB_STATUS: Record<string, { label: string; tone: string }> = {
+  draft: { label: 'Nháp', tone: 'demo' },
+  open: { label: 'Đang tuyển', tone: 'ok' },
+  closed: { label: 'Đã đóng', tone: 'no' }
+};
 const LOAI_LABEL: Record<string, string> = { job_board: 'Sàn tuyển dụng', social: 'Mạng xã hội', other: 'Khác' };
 const TT_LABEL: Record<string, { label: string; tone: string }> = {
   draft: { label: 'Nháp', tone: 'default' },
@@ -27,6 +45,12 @@ const TT_LABEL: Record<string, { label: string; tone: string }> = {
 
 export default async function Page() {
   const client = getServerClient();
+  const jobsRes = await client
+    .from('hr_jobs')
+    .select('id, title, department, location, short_desc, requirements, jd_versions, status, created_at')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  const jobs = (jobsRes.data || []) as Job[];
   const pRes = await client.from('hr_platforms').select('id, ten, loai, bat, ghi_chu').order('created_at', { ascending: true });
   const jRes = await client
     .from('hr_job_posts')
@@ -46,11 +70,47 @@ export default async function Page() {
     <main>
       <header className="head-row">
         <div>
-          <h1>Đăng tin</h1>
-          <p className="sub">Quản lý nền tảng đăng tuyển và theo dõi tin đăng. Đăng thật lên sàn cần tài khoản công ty (điều cấm 5, Phần 6).</p>
+          <h1>Vị trí &amp; Đăng tin</h1>
+          <p className="sub">Vị trí tuyển dụng, nền tảng đăng tuyển và theo dõi tin đăng. Đăng thật lên sàn cần tài khoản công ty (Phần 6).</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>
+
+      <section>
+        <h2 className="sec-title">Vị trí tuyển dụng</h2>
+        <ul className="list">
+          {jobs.map((j) => {
+            const st = JOB_STATUS[j.status] || { label: j.status, tone: 'default' };
+            const meta = [j.department, j.location].filter(Boolean).join(' · ');
+            const versions = j.jd_versions || {};
+            const keys = JD_ORDER.filter((k) => versions[k]).concat(Object.keys(versions).filter((k) => !JD_ORDER.includes(k)));
+            return (
+              <li key={j.id} className="card tone-mkt">
+                <div className="head">
+                  <span className="cand-name">{j.title}</span>
+                  <time className="time" dateTime={j.created_at}>{formatRelative(j.created_at)}</time>
+                </div>
+                <div className="stages">
+                  <span className={`stage tone-${st.tone}`}>{st.label}</span>
+                  {meta ? <span className="src">{meta}</span> : null}
+                </div>
+                {j.short_desc ? <p className="job-desc">{j.short_desc}</p> : null}
+                {keys.length ? (
+                  <div className="jd-versions">
+                    {keys.map((k) => (
+                      <details className="raw" key={k}>
+                        <summary>{JD_LABELS[k] || k} ({String(versions[k]).trim().split(/\s+/).length} từ)</summary>
+                        <pre>{versions[k]}</pre>
+                      </details>
+                    ))}
+                  </div>
+                ) : <p className="muted">Chưa có phiên bản JD nào.</p>}
+              </li>
+            );
+          })}
+          {jobs.length === 0 ? <p className="muted">Chưa có vị trí nào. Dùng lệnh /hr-jd để sinh mô tả công việc.</p> : null}
+        </ul>
+      </section>
 
       {needMigration ? (
         <div className="err" role="alert">

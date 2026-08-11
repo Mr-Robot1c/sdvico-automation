@@ -9,8 +9,7 @@ export default function Nav() {
   const tabs = [
     { href: '/ho-so', label: 'Hồ sơ ứng viên' },
     { href: '/lich', label: 'Lịch phỏng vấn' },
-    { href: '/dang-tin', label: 'Đăng tin' },
-    { href: '/vi-tri', label: 'Vị trí tuyển dụng' },
+    { href: '/dang-tin', label: 'Vị trí & Đăng tin' },
     { href: '/', label: 'Duyệt & gửi' }
   ];
   return (
