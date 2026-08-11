@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatRelative, stageMeta, sourceLabel } from './labels';
+import { advanceToInterview } from './actions';
 
 export type CandView = {
   id: string;
@@ -15,6 +16,9 @@ export type CandView = {
   consent: string;
   createdAt: string;
   stages: string[];
+  appId: string | null;
+  appStage: string | null;
+  score: number | null;
   rawLen: number;
   raw: string;
   cvUrl: string | null;
@@ -74,7 +78,10 @@ export default function CandidateList({ candidates }: { candidates: CandView[] }
           <li key={c.id} className="card tone-hr">
             <div className="head">
               <span className="cand-name">{c.name}</span>
-              <time className="time" dateTime={c.createdAt}>{formatRelative(c.createdAt)}</time>
+              <span className="row-right">
+                {c.score !== null ? <span className="score" title="Điểm chấm tự động">{c.score}/100</span> : null}
+                <time className="time" dateTime={c.createdAt}>{formatRelative(c.createdAt)}</time>
+              </span>
             </div>
 
             <div className="stages">
@@ -111,6 +118,19 @@ export default function CandidateList({ candidates }: { candidates: CandView[] }
               ) : (
                 <span className="muted">Không có tệp CV</span>
               )}
+              {c.appStage === 'review' && c.appId ? (
+                <form
+                  action={advanceToInterview}
+                  onSubmit={(e) => {
+                    const ok = window.confirm(`Đưa hồ sơ này vào phỏng vấn?\n\n${c.name}\n\nMáy sẽ soạn câu hỏi và thư mời chờ bạn duyệt.`);
+                    if (!ok) e.preventDefault();
+                  }}
+                >
+                  <input type="hidden" name="appId" value={c.appId} />
+                  <button className="btn ok" type="submit">Đưa vào phỏng vấn</button>
+                </form>
+              ) : null}
+              {c.appStage === 'interview' ? <span className="muted">Đã vào phỏng vấn</span> : null}
             </div>
           </li>
         ))}

@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 const BUCKET = process.env.CV_BUCKET || 'cv';
 
-type App = { id: string; stage: string; created_at: string };
+type App = { id: string; stage: string; created_at: string; score_json: { diem_tong?: number } | null };
 type CvJson = {
   raw_text?: string;
   attachments?: { filename?: string }[];
@@ -33,7 +33,7 @@ export default async function Page() {
   const { data, error } = await client
     .from('hr_candidates')
     .select(
-      'id, full_name, email, phone, source, cv_storage_path, cv_json, dedup_key, consent_at, retention_until, created_at, hr_applications(id, stage, created_at)'
+      'id, full_name, email, phone, source, cv_storage_path, cv_json, dedup_key, consent_at, retention_until, created_at, hr_applications(id, stage, created_at, score_json)'
     )
     .order('created_at', { ascending: false })
     .limit(100);
@@ -55,6 +55,7 @@ export default async function Page() {
   // Chuẩn hóa thành dữ liệu phẳng để đưa xuống component lọc phía trình duyệt.
   const candidates: CandView[] = rows.map((c) => {
     const raw = (c.cv_json?.raw_text || '').trim();
+    const app = (c.hr_applications || [])[0] || null;
     return {
       id: c.id,
       name: c.full_name || 'Chưa rõ tên',
@@ -68,6 +69,9 @@ export default async function Page() {
         (c.consent_at ? new Date(c.consent_at).toLocaleDateString('vi-VN') : '—') + ' · ' + (c.retention_until || '—'),
       createdAt: c.created_at,
       stages: (c.hr_applications || []).map((a) => a.stage),
+      appId: app?.id || null,
+      appStage: app?.stage || null,
+      score: typeof app?.score_json?.diem_tong === 'number' ? app.score_json.diem_tong : null,
       rawLen: raw.length,
       raw: raw.slice(0, 4000),
       cvUrl: signed.get(c.id) || null

@@ -1,0 +1,34 @@
+name: hr-interview
+
+# Sinh câu hỏi phỏng vấn và thư mời cho hồ sơ người đã chọn vào phỏng vấn.
+# Chạy mỗi giờ. Chỉ soạn cho hồ sơ ở bước 'interview' (người quyết, điều cấm 2).
+# Thư mời đẩy vào approval_queue trạng thái pending, người bấm gửi (điều cấm 1).
+on:
+  schedule:
+    - cron: '25 * * * *'   # phút 25 mỗi giờ, lệch với nạp CV và chấm CV
+  workflow_dispatch: {}
+
+concurrency:
+  group: hr-interview
+  cancel-in-progress: false
+
+jobs:
+  interview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cài phụ thuộc
+        run: npm install
+
+      - name: Sinh câu hỏi phỏng vấn và thư mời
+        run: node packages/hr/src/interview/run.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          HR_INTERVIEW_MODEL: ${{ secrets.HR_INTERVIEW_MODEL }}
