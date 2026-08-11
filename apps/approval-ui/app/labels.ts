@@ -113,6 +113,19 @@ export function stageMeta(stage: string): { label: string; tone: string } {
   }
 }
 
+// Nhãn các trục điểm chấm CV (khớp packages/hr/src/screen/rubric.js).
+const AXIS_LABELS: Record<string, string> = {
+  chuyen_mon: 'Chuyên môn',
+  kinh_nghiem: 'Kinh nghiệm',
+  thanh_tuu: 'Thành tựu',
+  ky_nang_mem: 'Kỹ năng mềm',
+  on_dinh: 'Ổn định'
+};
+
+export function axisLabel(key: string): string {
+  return AXIS_LABELS[key] || key;
+}
+
 // Nhãn nguồn ứng viên.
 export function sourceLabel(source?: string | null): string {
   switch (source) {

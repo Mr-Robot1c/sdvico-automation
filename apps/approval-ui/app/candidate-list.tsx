@@ -19,15 +19,130 @@ export type CandView = {
   appId: string | null;
   appStage: string | null;
   score: number | null;
+  scoreAxes: { label: string; diem: number }[];
+  summary: string;
+  strengths: string[];
+  clarifications: string[];
+  interview: { kyThuat: string; hanhVi: string; baiVeNha: string; khungGio: string[] } | null;
   rawLen: number;
   raw: string;
   cvUrl: string | null;
 };
 
-// Danh sách hồ sơ có ô tìm kiếm và lọc theo trạng thái, lọc ngay trên trình duyệt.
+// Một thẻ hồ sơ, có tab chi tiết mở khi bấm để giao diện gọn gàng.
+function CandidateCard({ c }: { c: CandView }) {
+  const [tab, setTab] = useState<string | null>(null);
+  const toggle = (t: string) => setTab((cur) => (cur === t ? null : t));
+
+  const hasScore = c.score !== null;
+  const hasCv = c.raw.length > 0;
+  const hasInterview = c.interview !== null;
+
+  return (
+    <li className="card tone-hr">
+      <div className="head">
+        <span className="cand-name">{c.name}</span>
+        <span className="row-right">
+          {hasScore ? <span className="score" title="Điểm chấm tự động">{c.score}/100</span> : null}
+          <time className="time" dateTime={c.createdAt}>{formatRelative(c.createdAt)}</time>
+        </span>
+      </div>
+
+      <div className="stages">
+        {c.stages.length === 0 ? (
+          <span className="stage tone-default">Chưa có hồ sơ ứng tuyển</span>
+        ) : (
+          c.stages.map((s, i) => {
+            const m = stageMeta(s);
+            return <span key={i} className={`stage tone-${m.tone}`}>{m.label}</span>;
+          })
+        )}
+        <span className="src">Nguồn: {sourceLabel(c.source)}</span>
+      </div>
+
+      <dl className="fields">
+        <div className="field"><dt>Email</dt><dd>{c.email || '—'}</dd></div>
+        <div className="field"><dt>Điện thoại</dt><dd>{c.phone || '—'}</dd></div>
+        <div className="field"><dt>Đồng ý / lưu tới</dt><dd>{c.consent}</dd></div>
+      </dl>
+
+      {/* Tab chi tiết. Bấm mở, bấm lại đóng. Chỉ hiện tab có nội dung. */}
+      <div className="cand-tabs" role="tablist">
+        {hasCv ? (
+          <button className={`cand-tab ${tab === 'cv' ? 'on' : ''}`} onClick={() => toggle('cv')}>Xem CV</button>
+        ) : null}
+        {hasScore ? (
+          <button className={`cand-tab ${tab === 'diem' ? 'on' : ''}`} onClick={() => toggle('diem')}>Điểm từng phần</button>
+        ) : null}
+        {hasInterview ? (
+          <button className={`cand-tab ${tab === 'pv' ? 'on' : ''}`} onClick={() => toggle('pv')}>Câu hỏi phỏng vấn</button>
+        ) : null}
+      </div>
+
+      {tab === 'cv' ? (
+        <div className="cand-panel">
+          <div className="muted" style={{ marginBottom: 6 }}>Nội dung CV đã trích ({c.rawLen} ký tự)</div>
+          <pre>{c.raw}</pre>
+        </div>
+      ) : null}
+
+      {tab === 'diem' ? (
+        <div className="cand-panel">
+          {c.scoreAxes.map((a, i) => (
+            <div className="axis-row" key={i}>
+              <span className="muted">{a.label}</span>
+              <span className="axis-bar"><i style={{ width: `${a.diem * 10}%` }} /></span>
+              <span className="axis-n">{a.diem}/10</span>
+            </div>
+          ))}
+          {c.summary ? <p className="cand-sum"><b>Tóm tắt:</b> {c.summary}</p> : null}
+          {c.strengths.length ? (
+            <div className="cand-sub"><b>Điểm mạnh</b><ul>{c.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul></div>
+          ) : null}
+          {c.clarifications.length ? (
+            <div className="cand-sub"><b>Cần làm rõ khi phỏng vấn</b><ul>{c.clarifications.map((s, i) => <li key={i}>{s}</li>)}</ul></div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {tab === 'pv' && c.interview ? (
+        <div className="cand-panel">
+          {c.interview.khungGio.length ? (
+            <div className="cand-sub"><b>Khung giờ đã sắp</b><ol className="slots">{c.interview.khungGio.map((s, i) => <li key={i}>{s}</li>)}</ol></div>
+          ) : null}
+          {c.interview.kyThuat ? <div className="cand-sub"><b>Câu hỏi kỹ thuật</b><pre>{c.interview.kyThuat}</pre></div> : null}
+          {c.interview.hanhVi ? <div className="cand-sub"><b>Câu hỏi hành vi</b><pre>{c.interview.hanhVi}</pre></div> : null}
+          {c.interview.baiVeNha ? <div className="cand-sub"><b>Bài về nhà</b><pre>{c.interview.baiVeNha}</pre></div> : null}
+        </div>
+      ) : null}
+
+      <div className="row" style={{ marginTop: 12 }}>
+        {c.cvUrl ? (
+          <a className="btn ghost" href={c.cvUrl} target="_blank" rel="noopener noreferrer">Tải CV gốc</a>
+        ) : null}
+        {c.appStage === 'review' && c.appId ? (
+          <form
+            action={advanceToInterview}
+            onSubmit={(e) => {
+              const ok = window.confirm(`Xét duyệt và đưa hồ sơ này vào phỏng vấn?\n\n${c.name}\n\nMáy sẽ soạn câu hỏi và tự sắp lịch, thư mời chờ bạn duyệt.`);
+              if (!ok) e.preventDefault();
+            }}
+          >
+            <input type="hidden" name="appId" value={c.appId} />
+            <button className="btn ok" type="submit">Xét duyệt vào phỏng vấn</button>
+          </form>
+        ) : null}
+        {c.appStage === 'interview' ? <span className="muted">Đã vào phỏng vấn</span> : null}
+      </div>
+    </li>
+  );
+}
+
+// Danh sách hồ sơ: tìm kiếm, lọc theo trạng thái, sắp xếp theo mới nhất hoặc điểm.
 export default function CandidateList({ candidates }: { candidates: CandView[] }) {
   const [q, setQ] = useState('');
   const [stage, setStage] = useState<string | null>(null);
+  const [sort, setSort] = useState<'moi' | 'diem'>('moi');
 
   const stageCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -37,12 +152,16 @@ export default function CandidateList({ candidates }: { candidates: CandView[] }
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return candidates.filter((c) => {
+    const list = candidates.filter((c) => {
       const okStage = !stage || c.stages.includes(stage);
       const okText = !t || [c.name, c.email, c.phone, c.dedupKey, c.subject].some((v) => (v || '').toLowerCase().includes(t));
       return okStage && okText;
     });
-  }, [candidates, q, stage]);
+    return [...list].sort((a, b) => {
+      if (sort === 'diem') return (b.score ?? -1) - (a.score ?? -1);
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [candidates, q, stage, sort]);
 
   return (
     <>
@@ -55,6 +174,12 @@ export default function CandidateList({ candidates }: { candidates: CandView[] }
           onChange={(e) => setQ(e.target.value)}
           aria-label="Tìm hồ sơ"
         />
+      </div>
+
+      <div className="sortbar">
+        <span className="muted">Sắp xếp:</span>
+        <button className={`chip ${sort === 'moi' ? 'on' : ''}`} onClick={() => setSort('moi')}>Mới nhất</button>
+        <button className={`chip ${sort === 'diem' ? 'on' : ''}`} onClick={() => setSort('diem')}>Điểm cao</button>
       </div>
 
       <nav className="filters" aria-label="Lọc theo trạng thái">
@@ -74,66 +199,7 @@ export default function CandidateList({ candidates }: { candidates: CandView[] }
       <p className="sub">Hiện {filtered.length} trên {candidates.length} hồ sơ.</p>
 
       <ul className="list">
-        {filtered.map((c) => (
-          <li key={c.id} className="card tone-hr">
-            <div className="head">
-              <span className="cand-name">{c.name}</span>
-              <span className="row-right">
-                {c.score !== null ? <span className="score" title="Điểm chấm tự động">{c.score}/100</span> : null}
-                <time className="time" dateTime={c.createdAt}>{formatRelative(c.createdAt)}</time>
-              </span>
-            </div>
-
-            <div className="stages">
-              {c.stages.length === 0 ? (
-                <span className="stage tone-default">Chưa có hồ sơ ứng tuyển</span>
-              ) : (
-                c.stages.map((s, i) => {
-                  const m = stageMeta(s);
-                  return <span key={i} className={`stage tone-${m.tone}`}>{m.label}</span>;
-                })
-              )}
-              <span className="src">Nguồn: {sourceLabel(c.source)}</span>
-            </div>
-
-            <dl className="fields">
-              <div className="field"><dt>Email</dt><dd>{c.email || '—'}</dd></div>
-              <div className="field"><dt>Điện thoại</dt><dd>{c.phone || '—'}</dd></div>
-              <div className="field"><dt>Khóa khử trùng</dt><dd>{c.dedupKey || '—'}</dd></div>
-              {c.subject ? <div className="field"><dt>Thư nguồn</dt><dd>{c.subject}</dd></div> : null}
-              <div className="field"><dt>Đính kèm</dt><dd>{c.attachments || '—'}</dd></div>
-              <div className="field"><dt>Đồng ý / lưu tới</dt><dd>{c.consent}</dd></div>
-            </dl>
-
-            {c.raw ? (
-              <details className="raw">
-                <summary>Xem nội dung CV đã trích ({c.rawLen} ký tự)</summary>
-                <pre>{c.raw}</pre>
-              </details>
-            ) : null}
-
-            <div className="row">
-              {c.cvUrl ? (
-                <a className="btn ghost" href={c.cvUrl} target="_blank" rel="noopener noreferrer">Tải CV gốc</a>
-              ) : (
-                <span className="muted">Không có tệp CV</span>
-              )}
-              {c.appStage === 'review' && c.appId ? (
-                <form
-                  action={advanceToInterview}
-                  onSubmit={(e) => {
-                    const ok = window.confirm(`Đưa hồ sơ này vào phỏng vấn?\n\n${c.name}\n\nMáy sẽ soạn câu hỏi và thư mời chờ bạn duyệt.`);
-                    if (!ok) e.preventDefault();
-                  }}
-                >
-                  <input type="hidden" name="appId" value={c.appId} />
-                  <button className="btn ok" type="submit">Đưa vào phỏng vấn</button>
-                </form>
-              ) : null}
-              {c.appStage === 'interview' ? <span className="muted">Đã vào phỏng vấn</span> : null}
-            </div>
-          </li>
-        ))}
+        {filtered.map((c) => <CandidateCard key={c.id} c={c} />)}
       </ul>
 
       {filtered.length === 0 ? <p className="muted">Không có hồ sơ khớp bộ lọc.</p> : null}
