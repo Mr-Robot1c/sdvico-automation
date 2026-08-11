@@ -9,7 +9,10 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   const tabs = marketingOnly
     ? [
         { href: '/', label: 'Hàng đợi duyệt' },
-        { href: '/noi-dung', label: 'Nội dung marketing' }
+        { href: '/noi-dung', label: 'Nội dung' },
+        { href: '/da-dang', label: 'Lịch sử xuất bản' },
+        { href: '/tu-khoa', label: 'Kho từ khóa' },
+        { href: '/du-kien', label: 'Nguồn dữ kiện' }
       ]
     : [
         { href: '/', label: 'Hàng đợi duyệt' },

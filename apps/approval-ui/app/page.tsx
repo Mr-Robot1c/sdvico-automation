@@ -1,6 +1,7 @@
 import { getServerClient } from '../lib/supabase-server';
 import AutoRefresh from './auto-refresh';
 import DecideActions from './decide-actions';
+import { editDraft } from './actions';
 import { kindMeta, formatRelative, payloadRows } from './labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
@@ -19,6 +20,13 @@ function isRedFlag(payload: unknown): boolean {
   if (!payload || typeof payload !== 'object') return false;
   const p = payload as Record<string, unknown>;
   return p.risk === 'red' || p.needs_manager_approval === true;
+}
+
+// Lấy content_id từ payload (bài marketing) để nạp bản nháp cho nút Chỉnh sửa.
+function contentIdOf(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const p = payload as Record<string, unknown>;
+  return typeof p.content_id === 'string' ? p.content_id : null;
 }
 
 export default async function Page({ searchParams }: { searchParams: { kind?: string } }) {
@@ -43,6 +51,14 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   // Cờ đỏ (chạm quy định, cần cấp quản lý) xếp lên đầu. Sort ổn định nên phần còn lại giữ thứ tự cũ.
   const items = [...filtered].sort((a, b) => Number(isRedFlag(b.payload)) - Number(isRedFlag(a.payload)));
   const redCount = filtered.filter((it) => isRedFlag(it.payload)).length;
+
+  // Nạp bản nháp cho các bài marketing, để nút Chỉnh sửa preload đúng nội dung.
+  const contentIds = items.map((it) => contentIdOf(it.payload)).filter((x): x is string => !!x);
+  const drafts = new Map<string, string>();
+  if (contentIds.length) {
+    const { data: cs } = await client.from('mkt_content').select('id, draft').in('id', contentIds);
+    for (const c of cs || []) drafts.set(c.id as string, (c.draft as string) || '');
+  }
 
   return (
     <main>
@@ -125,6 +141,21 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
               ) : null}
 
               <DecideActions id={item.id} title={item.title} />
+
+              {(() => {
+                const cid = contentIdOf(item.payload);
+                const draft = cid ? drafts.get(cid) : undefined;
+                return cid && draft !== undefined ? (
+                  <details className="raw editbox">
+                    <summary>Chỉnh sửa bản nháp</summary>
+                    <form action={editDraft} className="editform">
+                      <input type="hidden" name="content_id" value={cid} />
+                      <textarea name="draft" defaultValue={draft} rows={10} aria-label="Bản nháp" />
+                      <button className="btn ok" type="submit">Lưu chỉnh sửa</button>
+                    </form>
+                  </details>
+                ) : null;
+              })()}
             </li>
           );
         })}

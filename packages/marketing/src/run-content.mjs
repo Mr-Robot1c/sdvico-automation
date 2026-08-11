@@ -9,12 +9,14 @@
 import { getServiceClient, logRun } from '@sdvico/core';
 import { generateContentAsync, INTENT_LABEL } from './content.mjs';
 import { assessDraft } from './compliance.mjs';
-import { PRODUCT_FACTS, knownFactValues, testFactValues } from './product-facts.mjs';
+import { knownFactValues, testFactValues } from './product-facts.mjs';
+import { loadFacts } from './facts.mjs';
 
 const limit = Number(process.argv[2]) || 3;
 const client = getServiceClient();
-const known = knownFactValues(PRODUCT_FACTS);
-const testVals = testFactValues(PRODUCT_FACTS);
+const facts = await loadFacts(client); // nguồn dữ kiện từ bảng product_facts
+const known = knownFactValues(facts);
+const testVals = testFactValues(facts);
 
 // Các từ khóa đã có bài, để không làm trùng. Lưu keyword trong brief jsonb.
 const { data: existingContent } = await client.from('mkt_content').select('brief');
@@ -51,7 +53,7 @@ console.log(`Sẽ viết ${chosen.length} bài từ các từ khóa ưu tiên ca
 
 const results = [];
 for (const kw of chosen) {
-  const { title, brief, draft } = await generateContentAsync(kw, { facts: PRODUCT_FACTS });
+  const { title, brief, draft } = await generateContentAsync(kw, { facts });
   const assess = assessDraft(`${title}\n${draft}`, { knownFactValues: known, testFactValues: testVals });
 
   // Lưu bài vào mkt_content. Gắn cờ duyệt cấp quản lý (needs_gov_review) nếu chạm quy định.
