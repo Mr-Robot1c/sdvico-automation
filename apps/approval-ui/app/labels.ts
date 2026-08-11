@@ -14,6 +14,10 @@ export function kindMeta(kind: string): KindMeta {
       return { label: 'Bài marketing', icon: '📣', tone: 'mkt' };
     case 'mkt_publish':
       return { label: 'Đăng nội dung', icon: '🌐', tone: 'mkt' };
+    case 'mkt_publish_content':
+      return { label: 'Bài chờ duyệt', icon: '📝', tone: 'mkt' };
+    case 'mkt_send_message':
+      return { label: 'Tin nhắn chăm sóc', icon: '💬', tone: 'mkt' };
     case 'browser_action':
       return { label: 'Thao tác web', icon: '🖥️', tone: 'web' };
     case 'browser_barrier':

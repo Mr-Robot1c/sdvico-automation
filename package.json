@@ -8,7 +8,8 @@
     "ui:dev": "npm --workspace approval-ui run dev",
     "seed:keywords": "node packages/marketing/src/seed-keywords.mjs",
     "demo:outbound": "node packages/marketing/src/demo-outbound.mjs",
-    "test:compliance": "node packages/marketing/src/test-compliance.mjs"
+    "test:compliance": "node packages/marketing/src/test-compliance.mjs",
+    "content:run": "node packages/marketing/src/run-content.mjs"
   },
   "workspaces": [
     "packages/*",
