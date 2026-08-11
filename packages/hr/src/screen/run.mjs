@@ -1,5 +1,5 @@
 // Chấm CV tự động. Chạy theo lịch sau đường nạp CV.
-// Luồng: lấy hồ sơ chưa chấm -> ẩn danh CV -> chấm theo thang cố định bằng Claude ->
+// Luồng: lấy hồ sơ chưa chấm -> ẩn danh CV -> chấm theo thang cố định bằng Gemini ->
 //        ghi điểm, tóm tắt, điểm mạnh, điểm cần làm rõ -> chuyển hồ sơ sang bước 'review'.
 //
 // Cổng an toàn:

@@ -1,32 +1,34 @@
-// Chấm một CV đã ẩn danh bằng Claude, theo thang điểm cố định.
+// Chấm một CV đã ẩn danh bằng Google Gemini, theo thang điểm cố định.
 // Mô hình chỉ chấm theo trục có sẵn, không tự nghĩ tiêu chí (cổng an toàn mục 2).
 // Đầu ra: điểm từng trục, ba câu tóm tắt, ba điểm mạnh, ba điểm cần làm rõ khi phỏng vấn.
 // Không đưa ra quyết định đỗ hay trượt (điều cấm 2): việc đó của con người.
+//
+// Dùng Gemini API miễn phí (Google AI Studio) thay cho API tính phí.
+// Ẩn danh trước khi gọi (mục 1, điều cấm 6): giảm dữ liệu nhận dạng rời hạ tầng công ty.
 
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import { weightedScore } from './rubric.js';
 
-// Mặc định dùng model mạnh nhất. Đổi bằng biến môi trường HR_SCREEN_MODEL nếu cần cân đối chi phí.
-const MODEL = process.env.HR_SCREEN_MODEL || 'claude-opus-5';
+// Model mặc định miễn phí. Đổi bằng biến môi trường HR_SCREEN_MODEL nếu muốn model khác.
+const MODEL = process.env.HR_SCREEN_MODEL || 'gemini-2.0-flash';
 
+// Lược đồ JSON theo định dạng Gemini (kiểu viết hoa, không có additionalProperties).
 function buildSchema(rubric) {
   const scoreProps = {};
   for (const axis of rubric.axes) {
-    scoreProps[axis.key] = { type: 'integer' };
+    scoreProps[axis.key] = { type: 'INTEGER' };
   }
   return {
-    type: 'object',
-    additionalProperties: false,
+    type: 'OBJECT',
     properties: {
       diem_tung_truc: {
-        type: 'object',
-        additionalProperties: false,
+        type: 'OBJECT',
         properties: scoreProps,
         required: rubric.axes.map((a) => a.key)
       },
-      tom_tat: { type: 'array', items: { type: 'string' } },
-      diem_manh: { type: 'array', items: { type: 'string' } },
-      can_lam_ro: { type: 'array', items: { type: 'string' } }
+      tom_tat: { type: 'ARRAY', items: { type: 'STRING' } },
+      diem_manh: { type: 'ARRAY', items: { type: 'STRING' } },
+      can_lam_ro: { type: 'ARRAY', items: { type: 'STRING' } }
     },
     required: ['diem_tung_truc', 'tom_tat', 'diem_manh', 'can_lam_ro']
   };
@@ -56,36 +58,34 @@ function buildSystemPrompt(rubric) {
 
 // Chấm một CV. Trả { score_json, summary, strengths, clarifications, overall, model }.
 // score_json gồm điểm từng trục và điểm tổng thang 100.
-export async function scoreCv(anonymizedText, rubric, { apiKey = process.env.ANTHROPIC_API_KEY } = {}) {
+export async function scoreCv(anonymizedText, rubric, { apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY } = {}) {
   if (!apiKey) {
-    throw new Error('Thiếu ANTHROPIC_API_KEY. Đặt khóa để chạy chấm CV.');
+    throw new Error('Thiếu GEMINI_API_KEY. Đặt khóa Google AI Studio để chạy chấm CV.');
   }
   if (!anonymizedText || anonymizedText.trim().length < 20) {
     throw new Error('Văn bản CV quá ngắn để chấm.');
   }
 
-  const client = new Anthropic({ apiKey });
-  const schema = buildSchema(rubric);
+  const ai = new GoogleGenAI({ apiKey });
 
-  const response = await client.messages.create({
+  const response = await ai.models.generateContent({
     model: MODEL,
-    max_tokens: 2000,
-    system: buildSystemPrompt(rubric),
-    output_config: { format: { type: 'json_schema', schema } },
-    messages: [
-      {
-        role: 'user',
-        content: `Hồ sơ ứng tuyển đã ẩn danh, chấm theo thang điểm:\n\n${anonymizedText}`
-      }
-    ]
+    contents: `Hồ sơ ứng tuyển đã ẩn danh, chấm theo thang điểm:\n\n${anonymizedText}`,
+    config: {
+      systemInstruction: buildSystemPrompt(rubric),
+      responseMimeType: 'application/json',
+      responseSchema: buildSchema(rubric),
+      temperature: 0.2,
+      maxOutputTokens: 2000
+    }
   });
 
-  const textBlock = response.content.find((b) => b.type === 'text');
-  if (!textBlock) throw new Error('Mô hình không trả về nội dung chấm.');
+  const raw = response.text;
+  if (!raw) throw new Error('Mô hình không trả về nội dung chấm.');
 
   let parsed;
   try {
-    parsed = JSON.parse(textBlock.text);
+    parsed = JSON.parse(raw);
   } catch (err) {
     throw new Error('Không đọc được JSON chấm điểm: ' + err.message);
   }
@@ -93,8 +93,8 @@ export async function scoreCv(anonymizedText, rubric, { apiKey = process.env.ANT
   // Kẹp điểm từng trục về 0..10 và tính điểm tổng thang 100.
   const axisScores = {};
   for (const axis of rubric.axes) {
-    const raw = Number(parsed.diem_tung_truc?.[axis.key]);
-    axisScores[axis.key] = Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 0;
+    const rawScore = Number(parsed.diem_tung_truc?.[axis.key]);
+    axisScores[axis.key] = Number.isFinite(rawScore) ? Math.max(0, Math.min(10, Math.round(rawScore))) : 0;
   }
   const overall = weightedScore(rubric, axisScores);
 

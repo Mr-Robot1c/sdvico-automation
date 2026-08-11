@@ -14,7 +14,7 @@
     "screen:dry": "node src/screen/run.mjs --dry-run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.68.0",
+    "@google/genai": "^1.52.0",
     "@sdvico/core": "*",
     "imapflow": "^1.0.164",
     "mailparser": "^3.7.1",

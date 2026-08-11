@@ -49,7 +49,7 @@ Chấm mỗi CV theo một thang điểm cố định, ẩn danh trước khi ch
 node packages/hr/src/screen/run.mjs --dry-run
 ```
 
-- Chạy thật cần biến môi trường `ANTHROPIC_API_KEY`. Model mặc định `claude-opus-5`, đổi bằng `HR_SCREEN_MODEL`.
+- Chạy thật cần biến môi trường `GEMINI_API_KEY` (Google AI Studio, miễn phí). Model mặc định `gemini-2.0-flash`, đổi bằng `HR_SCREEN_MODEL`.
 
 ## Giọng văn
 
