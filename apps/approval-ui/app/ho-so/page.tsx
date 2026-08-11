@@ -104,6 +104,7 @@ export default async function Page() {
       stages: (c.hr_applications || []).map((a) => a.stage),
       appId: app?.id || null,
       appStage: app?.stage || null,
+      sourced: (c.source || '').startsWith('sourced'),
       note: (app?.id && notes.get(app.id)) || '',
       score: typeof app?.score_json?.diem_tong === 'number' ? app.score_json!.diem_tong! : null,
       scoreAxes,

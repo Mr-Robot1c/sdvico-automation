@@ -41,6 +41,33 @@ export async function advanceToInterview(formData: FormData) {
   revalidatePath('/ho-so');
 }
 
+// Từ chối một ứng viên nguồn ngoài và XOÁ khỏi cơ sở dữ liệu.
+// Nghị định 13: dữ liệu nguồn ngoài chưa có consent thì tối thiểu hóa, từ chối là xoá luôn.
+// Chốt an toàn: chỉ xoá ứng viên nguồn ngoài chưa có consent, KHÔNG đụng ứng viên đã tự nộp.
+export async function rejectSourced(formData: FormData) {
+  const candidateId = String(formData.get('candidateId') || '');
+  if (!candidateId) return;
+
+  const client = getServerClient();
+  const { data: cand, error: e1 } = await client
+    .from('hr_candidates')
+    .select('id, source, consent_at')
+    .eq('id', candidateId)
+    .single();
+  if (e1) throw new Error(e1.message);
+
+  const sourced = String(cand.source || '').startsWith('sourced');
+  if (!sourced || cand.consent_at) {
+    // Ứng viên đã tự nộp hoặc có consent thì không xoá cứng, tránh mất dữ liệu có nghĩa vụ lưu.
+    throw new Error('Chỉ xoá được ứng viên nguồn ngoài chưa có consent.');
+  }
+
+  // Xoá ứng viên. Hồ sơ ứng tuyển liên kết tự xoá theo (on delete cascade).
+  const { error: e2 } = await client.from('hr_candidates').delete().eq('id', candidateId);
+  if (e2) throw new Error(e2.message);
+  revalidatePath('/ho-so');
+}
+
 // Lưu ghi chú của người duyệt cho một hồ sơ.
 export async function saveNote(formData: FormData) {
   const appId = String(formData.get('appId') || '');

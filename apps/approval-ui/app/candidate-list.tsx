@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatRelative, stageMeta, sourceLabel } from './labels';
-import { advanceToInterview, saveNote } from './actions';
+import { advanceToInterview, saveNote, rejectSourced } from './actions';
 
 export type CandView = {
   id: string;
@@ -18,6 +18,7 @@ export type CandView = {
   stages: string[];
   appId: string | null;
   appStage: string | null;
+  sourced: boolean;
   note: string;
   score: number | null;
   scoreAxes: { label: string; diem: number }[];
@@ -147,6 +148,18 @@ function CandidateCard({ c }: { c: CandView }) {
           </form>
         ) : null}
         {c.appStage === 'interview' ? <span className="muted">Đã vào phỏng vấn</span> : null}
+        {c.sourced ? (
+          <form
+            action={rejectSourced}
+            onSubmit={(e) => {
+              const ok = window.confirm(`Từ chối và XOÁ khỏi cơ sở dữ liệu?\n\n${c.name}\n\nỨng viên nguồn ngoài chưa có consent, từ chối sẽ xoá hẳn thông tin (Nghị định 13).`);
+              if (!ok) e.preventDefault();
+            }}
+          >
+            <input type="hidden" name="candidateId" value={c.id} />
+            <button className="btn no" type="submit">Từ chối &amp; xoá</button>
+          </form>
+        ) : null}
       </div>
     </li>
   );
