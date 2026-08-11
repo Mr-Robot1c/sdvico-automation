@@ -1,37 +1,28 @@
-// Chấm một CV đã ẩn danh bằng Google Gemini, theo thang điểm cố định.
+// Chấm một CV đã ẩn danh bằng Groq (Llama 3.3 70B), theo thang điểm cố định.
 // Mô hình chỉ chấm theo trục có sẵn, không tự nghĩ tiêu chí (cổng an toàn mục 2).
 // Đầu ra: điểm từng trục, ba câu tóm tắt, ba điểm mạnh, ba điểm cần làm rõ khi phỏng vấn.
 // Không đưa ra quyết định đỗ hay trượt (điều cấm 2): việc đó của con người.
 //
-// Dùng Gemini API miễn phí (Google AI Studio) thay cho API tính phí.
+// Dùng Groq API miễn phí (console.groq.com). Groq không huấn luyện trên dữ liệu người dùng.
 // Ẩn danh trước khi gọi (mục 1, điều cấm 6): giảm dữ liệu nhận dạng rời hạ tầng công ty.
 
-import { GoogleGenAI } from '@google/genai';
+import Groq from 'groq-sdk';
 import { weightedScore } from './rubric.js';
 
 // Model mặc định miễn phí. Đổi bằng biến môi trường HR_SCREEN_MODEL nếu muốn model khác.
-const MODEL = process.env.HR_SCREEN_MODEL || 'gemini-2.0-flash';
+const MODEL = process.env.HR_SCREEN_MODEL || 'llama-3.3-70b-versatile';
 
-// Lược đồ JSON theo định dạng Gemini (kiểu viết hoa, không có additionalProperties).
-function buildSchema(rubric) {
-  const scoreProps = {};
-  for (const axis of rubric.axes) {
-    scoreProps[axis.key] = { type: 'INTEGER' };
-  }
-  return {
-    type: 'OBJECT',
-    properties: {
-      diem_tung_truc: {
-        type: 'OBJECT',
-        properties: scoreProps,
-        required: rubric.axes.map((a) => a.key)
-      },
-      tom_tat: { type: 'ARRAY', items: { type: 'STRING' } },
-      diem_manh: { type: 'ARRAY', items: { type: 'STRING' } },
-      can_lam_ro: { type: 'ARRAY', items: { type: 'STRING' } }
-    },
-    required: ['diem_tung_truc', 'tom_tat', 'diem_manh', 'can_lam_ro']
-  };
+// Mô tả dạng JSON để mô hình trả đúng khóa. Groq dùng chế độ json_object, không có lược đồ chặt.
+function jsonShape(rubric) {
+  const axes = rubric.axes.map((a) => `"${a.key}": số nguyên 0 tới 10`).join(', ');
+  return [
+    '{',
+    `  "diem_tung_truc": { ${axes} },`,
+    '  "tom_tat": ["câu 1", "câu 2", "câu 3"],',
+    '  "diem_manh": ["điểm mạnh 1", "điểm mạnh 2", "điểm mạnh 3"],',
+    '  "can_lam_ro": ["điều cần làm rõ 1", "điều cần làm rõ 2", "điều cần làm rõ 3"]',
+    '}'
+  ].join('\n');
 }
 
 function buildSystemPrompt(rubric) {
@@ -49,38 +40,38 @@ function buildSystemPrompt(rubric) {
     '- Chỉ chấm theo bằng chứng có trong hồ sơ. Không suy đoán, không bịa (điều cấm 5).',
     '- Không quyết định đỗ hay trượt. Chỉ chấm điểm và nêu nhận xét (điều cấm 2).',
     '- Viết tiếng Việt tự nhiên. Không dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
-    '- tom_tat: đúng ba câu ngắn tóm tắt hồ sơ.',
-    '- diem_manh: đúng ba điểm mạnh cụ thể.',
-    '- can_lam_ro: đúng ba điều cần làm rõ khi phỏng vấn.',
-    '- Nếu hồ sơ quá sơ sài để chấm một trục, cho điểm thấp và ghi lý do vào can_lam_ro.'
+    '- tom_tat: đúng ba câu ngắn. diem_manh: đúng ba điểm. can_lam_ro: đúng ba điều.',
+    '- Nếu hồ sơ quá sơ sài để chấm một trục, cho điểm thấp và ghi lý do vào can_lam_ro.',
+    '',
+    'Chỉ trả về một đối tượng JSON đúng dạng sau, không kèm chữ nào khác:',
+    jsonShape(rubric)
   ].join('\n');
 }
 
 // Chấm một CV. Trả { score_json, summary, strengths, clarifications, overall, model }.
 // score_json gồm điểm từng trục và điểm tổng thang 100.
-export async function scoreCv(anonymizedText, rubric, { apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY } = {}) {
+export async function scoreCv(anonymizedText, rubric, { apiKey = process.env.GROQ_API_KEY } = {}) {
   if (!apiKey) {
-    throw new Error('Thiếu GEMINI_API_KEY. Đặt khóa Google AI Studio để chạy chấm CV.');
+    throw new Error('Thiếu GROQ_API_KEY. Đặt khóa Groq để chạy chấm CV.');
   }
   if (!anonymizedText || anonymizedText.trim().length < 20) {
     throw new Error('Văn bản CV quá ngắn để chấm.');
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const groq = new Groq({ apiKey });
 
-  const response = await ai.models.generateContent({
+  const completion = await groq.chat.completions.create({
     model: MODEL,
-    contents: `Hồ sơ ứng tuyển đã ẩn danh, chấm theo thang điểm:\n\n${anonymizedText}`,
-    config: {
-      systemInstruction: buildSystemPrompt(rubric),
-      responseMimeType: 'application/json',
-      responseSchema: buildSchema(rubric),
-      temperature: 0.2,
-      maxOutputTokens: 2000
-    }
+    temperature: 0.2,
+    max_tokens: 2000,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: buildSystemPrompt(rubric) },
+      { role: 'user', content: `Hồ sơ ứng tuyển đã ẩn danh, chấm theo thang điểm:\n\n${anonymizedText}` }
+    ]
   });
 
-  const raw = response.text;
+  const raw = completion.choices?.[0]?.message?.content;
   if (!raw) throw new Error('Mô hình không trả về nội dung chấm.');
 
   let parsed;

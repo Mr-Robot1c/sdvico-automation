@@ -74,7 +74,7 @@ Diễn giải từng bước:
 ### Lịch chạy
 
 - `hr-intake` chạy 30 phút một lần (phút 0 và 30) bằng GitHub Actions schedule.
-- `hr-screen` chấm CV chạy 30 phút một lần (phút 15 và 45), lệch sau đường nạp CV. Dùng Google Gemini API miễn phí, cần `GEMINI_API_KEY`.
+- `hr-screen` chấm CV chạy 30 phút một lần (phút 15 và 45), lệch sau đường nạp CV. Dùng Groq API miễn phí, cần `GROQ_API_KEY`.
 
 ### Trạng thái xây dựng
 
