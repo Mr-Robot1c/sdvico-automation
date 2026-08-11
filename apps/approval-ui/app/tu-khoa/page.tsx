@@ -16,9 +16,8 @@ export default async function Page() {
   const client = getServerClient();
   const { data, error } = await client
     .from('mkt_keywords')
-    .select('id, keyword, intent, landing_url, source, priority')
-    .order('priority', { ascending: false })
-    .order('keyword', { ascending: true })
+    .select('id, keyword, intent, landing_url, source, priority, created_at')
+    .order('created_at', { ascending: false })
     .limit(500);
 
   const rows = (data || []) as Kw[];

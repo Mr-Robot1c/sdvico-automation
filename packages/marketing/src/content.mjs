@@ -95,22 +95,91 @@ function draftBody(brief) {
         'Gọi ' + TONGDAI + ' để được tư vấn trực tiếp.'
     );
   } else {
-    // giao_dich và dieu_huong: dịch vụ, sự cố, lắp đặt.
-    parts.push(
-      'Cần ' + keyword + ', bà con liên hệ SDVICO để được hỗ trợ nhanh, có mặt tận bến.',
-      '',
-      'Khi tàu gặp sự cố kết nối, làm theo thứ tự:',
-      '- Kiểm tra nguồn điện và cầu chì của thiết bị.',
-      '- Kiểm tra ăng-ten và dây kết nối.',
-      '- Khởi động lại thiết bị.',
-      '- Chưa được thì ghi lại thời điểm và gọi hỗ trợ.',
-      '',
-      'SDVICO phân phối, lắp đặt và bảo trì thiết bị giám sát hành trình đạt chuẩn, hỗ trợ tận bến. ' +
-        'Gọi ' + TONGDAI + '.'
-    );
+    // giao_dich và dieu_huong: rẽ theo chủ đề của từ khóa để mỗi bài một khác.
+    parts.push(...serviceBody(keyword));
   }
 
   return parts.join('\n');
+}
+
+// Lấy tỉnh trong từ khóa nếu có (dạng "... ở Bình Định"), để chèn vào bài cho khác nhau.
+function provinceIn(keyword) {
+  const m = keyword.match(/(?:ở|tại)\s+(.+)$/i);
+  return m ? m[1].trim() : '';
+}
+
+// Thân bài nhóm dịch vụ, rẽ theo chủ đề. Mỗi nhánh một nội dung riêng.
+function serviceBody(keyword) {
+  const k = keyword.toLowerCase();
+  const tinh = provinceIn(keyword);
+  const noiDia = tinh ? ` ở ${tinh}` : '';
+  const chot = 'Gọi ' + TONGDAI + ' để được hỗ trợ tận bến.';
+
+  if (/mất kết nối|mất tín hiệu|không lên tín hiệu|báo lỗi/.test(k)) {
+    return [
+      'Tàu mất kết nối giám sát thì bình tĩnh kiểm tra theo thứ tự dưới đây trước khi gọi hỗ trợ.',
+      '',
+      '1. Kiểm tra nguồn điện và cầu chì của thiết bị.',
+      '2. Kiểm tra ăng-ten, xem có bị che, gãy hay lỏng dây không.',
+      '3. Khởi động lại thiết bị theo hướng dẫn.',
+      '4. Vẫn không lên tín hiệu thì ghi lại thời điểm và liên hệ ngay.',
+      '',
+      'Để bờ không thấy tàu lâu dễ ảnh hưởng chuyến biển. ' + chot,
+    ];
+  }
+  if (/gia hạn|cước/.test(k)) {
+    return [
+      'Gia hạn cước giám sát hành trình đúng hạn giúp tàu không bị đứt kết nối giữa chuyến biển.',
+      '',
+      'Nên kiểm tra hạn cước trước mỗi chuyến đi xa. Sát hạn mới lo dễ bị gián đoạn đúng lúc cần.',
+      '',
+      'SDVICO hỗ trợ gia hạn nhanh và nhắc lịch giúp bà con' + noiDia + '. ' + chot,
+    ];
+  }
+  if (/bảo trì|bảo dưỡng/.test(k)) {
+    return [
+      'Bảo trì thiết bị giám sát định kỳ giúp giữ kết nối ổn định, tránh hỏng hóc bất ngờ ngoài khơi.',
+      '',
+      'Nên kiểm tra nguồn, ăng-ten và dây kết nối trước mỗi chuyến biển dài.',
+      '',
+      'SDVICO nhận bảo trì tận bến' + noiDia + ', kiểm tra và xử lý sớm trước khi thành sự cố lớn. ' + chot,
+    ];
+  }
+  if (/thay|sửa/.test(k)) {
+    return [
+      'Thiết bị giám sát cũ hay trục trặc nên được kiểm tra để sửa hoặc thay kịp thời, tránh hỏng giữa biển.',
+      '',
+      'Dấu hiệu nên thay: hay mất tín hiệu, khởi động chậm, đèn báo bất thường.',
+      '',
+      'SDVICO kiểm tra, sửa và thay thiết bị đạt chuẩn' + noiDia + ', hỗ trợ tận bến. ' + chot,
+    ];
+  }
+  if (/lắp|lắp đặt/.test(k)) {
+    return [
+      'Lắp thiết bị giám sát hành trình' + noiDia + ' nên chọn nơi tư vấn đúng thiết bị hợp quy định và lắp tận bến.',
+      '',
+      'Quy trình gọn: khảo sát, chọn thiết bị hợp quy định, lắp đặt, hướng dẫn sử dụng.',
+      '',
+      'SDVICO phân phối và lắp đặt thiết bị đạt chuẩn, giúp chủ tàu khỏi mua nhầm. ' + chot,
+    ];
+  }
+  if (/đại lý|ở đâu|tổng đài/.test(k)) {
+    return [
+      'Cần tìm nơi lắp và hỗ trợ thiết bị giám sát tàu cá' + noiDia + ' thì liên hệ SDVICO.',
+      '',
+      'SDVICO có mặt tại địa phương, lắp đặt và bảo trì tận bến, tư vấn đúng thiết bị hợp quy định.',
+      '',
+      chot,
+    ];
+  }
+  // Mặc định cho các từ khóa dịch vụ còn lại.
+  return [
+    'Cần ' + keyword + ', bà con liên hệ SDVICO để được hỗ trợ nhanh, có mặt tận bến' + noiDia + '.',
+    '',
+    'SDVICO phân phối, lắp đặt và bảo trì thiết bị giám sát hành trình đạt chuẩn.',
+    '',
+    chot,
+  ];
 }
 
 // Tiện ích: sinh cả brief và draft cho một từ khóa bằng BẢN MẪU (tất định, không cần khóa).

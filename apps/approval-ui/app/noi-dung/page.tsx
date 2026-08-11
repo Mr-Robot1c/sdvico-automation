@@ -1,5 +1,6 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
+import { editDraft } from '../actions';
 import { formatRelative } from '../labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
@@ -107,10 +108,20 @@ export default async function Page() {
               ) : null}
 
               {c.draft ? (
-                <details className="raw">
-                  <summary>Xem bản nháp ({words} từ)</summary>
-                  <pre>{c.draft}</pre>
-                </details>
+                <>
+                  <details className="raw">
+                    <summary>Xem bản nháp ({words} từ)</summary>
+                    <pre>{c.draft}</pre>
+                  </details>
+                  <details className="raw editbox">
+                    <summary>Chỉnh sửa bản nháp</summary>
+                    <form action={editDraft} className="editform">
+                      <input type="hidden" name="content_id" value={c.id} />
+                      <textarea name="draft" defaultValue={c.draft} rows={10} aria-label="Bản nháp" />
+                      <button className="btn ok" type="submit">Lưu chỉnh sửa</button>
+                    </form>
+                  </details>
+                </>
               ) : (
                 <p className="muted">Chưa có bản nháp.</p>
               )}
