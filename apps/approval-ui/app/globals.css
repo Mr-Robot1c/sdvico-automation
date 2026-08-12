@@ -395,6 +395,23 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
   border-radius: 12px; border: 1px solid var(--line); background: #0b0f14;
 }
 
+/* Xưởng ảnh: tìm Unsplash + ghép banner */
+.studio-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.studio-row .note { flex: 1 1 240px; min-width: 200px; }
+.btn.sm { padding: 6px 12px; font-size: 13px; }
+.studio-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px; margin-top: 4px;
+}
+.studio-card {
+  border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  background: var(--surface-2); display: flex; flex-direction: column;
+}
+.studio-card > img { width: 100%; height: 100px; object-fit: cover; display: block; }
+.studio-card-actions { display: flex; gap: 6px; padding: 8px; }
+.studio-card-actions .btn { flex: 1; }
+.studio-credit { font-size: 10.5px; color: var(--ink-2); padding: 0 8px 8px; }
+
 /* Thanh tiến trình tải file lên */
 .uploadbar {
   width: 100%; height: 8px; border-radius: 6px; overflow: hidden;

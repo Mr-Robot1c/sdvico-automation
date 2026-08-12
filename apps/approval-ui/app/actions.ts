@@ -149,6 +149,133 @@ export async function registerAsset(input: {
   revalidatePath('/san-xuat');
 }
 
+// Báo lượt tải về cho Unsplash theo hướng dẫn API (chạy ngầm, không chặn).
+function triggerUnsplashDownload(loc?: string) {
+  const key = process.env.UNSPLASH_ACCESS_KEY;
+  if (!loc || !key) return;
+  fetch(`${loc}${loc.includes('?') ? '&' : '?'}client_id=${key}`).catch(() => {});
+}
+
+// Tải một buffer ảnh lên brand-assets và ghi bản ghi, trả { id, url }.
+async function uploadImageBuffer(
+  client: ReturnType<typeof getServerClient>,
+  buf: Buffer,
+  title: string,
+  contentType: string,
+  licenseNote: string | null
+) {
+  const ext = contentType.includes('png') ? 'png' : 'jpg';
+  const safe = (title || 'anh').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
+  const path = `${Date.now()}-${safe}.${ext}`;
+  const { error: upErr } = await client.storage.from('brand-assets').upload(path, buf, { contentType });
+  if (upErr) throw new Error('Tải lên Storage lỗi: ' + upErr.message);
+  const { data, error } = await client
+    .from('brand_assets')
+    .insert({
+      kind: 'image',
+      title: title || path,
+      storage_path: path,
+      license: licenseNote ? 'licensed' : 'owned',
+      license_note: licenseNote
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(error.message);
+  const url = client.storage.from('brand-assets').getPublicUrl(path).data.publicUrl;
+  return { id: (data as { id: string }).id, url };
+}
+
+// Lấy bytes ảnh của một brand_asset (theo id) từ Storage.
+async function assetBuffer(client: ReturnType<typeof getServerClient>, assetId: string): Promise<Buffer> {
+  const { data } = await client.from('brand_assets').select('storage_path').eq('id', assetId).single();
+  const sp = (data as { storage_path?: string } | null)?.storage_path;
+  if (!sp) throw new Error('Không tìm thấy ảnh sản phẩm.');
+  const url = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Không tải được ảnh sản phẩm.');
+  return Buffer.from(await r.arrayBuffer());
+}
+
+// Tìm ảnh trên Unsplash theo từ khóa. Trả danh sách ảnh kèm thông tin tác giả.
+export async function searchUnsplash(query: string) {
+  const key = process.env.UNSPLASH_ACCESS_KEY;
+  if (!key) throw new Error('Chưa cấu hình UNSPLASH_ACCESS_KEY trên máy chủ.');
+  const q = (query || '').trim() || 'fishing boat sea';
+  const r = await fetch(
+    `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=12&orientation=landscape&content_filter=high&client_id=${key}`
+  );
+  if (!r.ok) throw new Error('Lỗi Unsplash: ' + r.status);
+  const j = await r.json();
+  return ((j.results as any[]) || []).map((x) => ({
+    id: x.id as string,
+    thumb: x.urls?.small as string,
+    regular: x.urls?.regular as string,
+    downloadLocation: x.links?.download_location as string | undefined,
+    author: x.user?.name as string | undefined,
+    authorUrl: x.user?.links?.html as string | undefined
+  }));
+}
+
+// Lưu thẳng một ảnh Unsplash vào kho tư liệu để dùng làm ảnh minh họa.
+export async function saveUnsplashAsAsset(input: {
+  regular: string;
+  downloadLocation?: string;
+  author?: string;
+  title?: string;
+}) {
+  if (!input?.regular) throw new Error('Thiếu ảnh Unsplash.');
+  const client = getServerClient();
+  const r = await fetch(input.regular);
+  if (!r.ok) throw new Error('Không tải được ảnh Unsplash.');
+  const buf = Buffer.from(await r.arrayBuffer());
+  const ct = r.headers.get('content-type') || 'image/jpeg';
+  const res = await uploadImageBuffer(
+    client,
+    buf,
+    input.title || 'anh-unsplash',
+    ct,
+    input.author ? `Unsplash: ${input.author}` : 'Unsplash'
+  );
+  triggerUnsplashDownload(input.downloadLocation);
+  revalidatePath('/san-xuat');
+  return res;
+}
+
+// Ghép banner: ảnh sản phẩm thật (giữ nguyên) trên nền Unsplash (hoặc nền thương hiệu) + tiêu đề + hotline.
+export async function createBannerFromBackground(input: {
+  productAssetId: string;
+  background?: string;
+  downloadLocation?: string;
+  title?: string;
+  author?: string;
+}) {
+  if (!input?.productAssetId) throw new Error('Chọn ảnh sản phẩm trước khi ghép banner.');
+  const client = getServerClient();
+  const productBuffer = await assetBuffer(client, input.productAssetId);
+  let backgroundBuffer: Buffer | null = null;
+  if (input.background) {
+    const r = await fetch(input.background);
+    if (r.ok) backgroundBuffer = Buffer.from(await r.arrayBuffer());
+  }
+  // @ts-ignore — module JS thuần, không có .d.ts
+  const { buildBanner } = await import('../lib/gen/banner.mjs');
+  const png = (await buildBanner({
+    productBuffer,
+    backgroundBuffer,
+    title: input.title || ''
+  } as any)) as Buffer;
+  const res = await uploadImageBuffer(
+    client,
+    png,
+    'banner-' + (input.title || 'sdvico'),
+    'image/png',
+    input.author ? `Nền Unsplash: ${input.author}` : null
+  );
+  triggerUnsplashDownload(input.downloadLocation);
+  revalidatePath('/san-xuat');
+  return res;
+}
+
 // Xóa một tư liệu, gỡ cả file trên Storage.
 export async function deleteAsset(formData: FormData) {
   const id = String(formData.get('id') || '');

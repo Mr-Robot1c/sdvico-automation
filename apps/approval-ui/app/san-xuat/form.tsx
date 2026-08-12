@@ -1,8 +1,10 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { generateTextForTitle, createContent } from '../actions';
 import AssetUploader from './asset-uploader';
+import ImageStudio from './image-studio';
 
 type Asset = { id: string; kind: string; title: string; storage_path: string; url: string };
 type Keyword = { id: string; keyword: string; intent: string | null; landing_url: string | null };
@@ -32,6 +34,7 @@ export default function SanXuatForm({
   const [genBusy, setGenBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   const selectedImg = images.find((a) => a.id === imgId);
   const selectedVid = videos.find((a) => a.id === vidId);
@@ -273,6 +276,16 @@ export default function SanXuatForm({
           </p>
         </form>
       </section>
+
+      <ImageStudio
+        productId={imgId}
+        productTitle={title || selectedKw?.keyword || ''}
+        onAttach={(id) => {
+          setImgId(id);
+          setMsg('Đã gắn ảnh mới vào bài. Kéo lên khung ảnh để xem.');
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
