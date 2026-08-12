@@ -26,6 +26,12 @@ function cleanAssetName(s: string): string {
     .trim();
 }
 
+// Gộp tên nhiều tệp (ảnh + video) thành một cụm từ khóa, bỏ trùng và phần rỗng.
+function combineNames(...titles: (string | undefined)[]): string {
+  const parts = titles.map((t) => cleanAssetName(t || '')).filter(Boolean);
+  return [...new Set(parts)].join(' ');
+}
+
 export default function SanXuatForm({
   images,
   videos,
@@ -65,7 +71,13 @@ export default function SanXuatForm({
     }
   };
 
-  const runGenerate = async (kw: string, intent: string, landingUrl: string | null, assetHint: string) => {
+  const runGenerate = async (
+    kw: string,
+    intent: string,
+    landingUrl: string | null,
+    assetHint: string,
+    format: string = 'social'
+  ) => {
     if (!kw.trim()) {
       setMsg('Chọn từ khóa trong kho, hoặc gõ tay tiêu đề trước khi sinh text.');
       return;
@@ -73,7 +85,7 @@ export default function SanXuatForm({
     setGenBusy(true);
     setMsg('Đang sinh text theo từ khóa...');
     try {
-      const t = await generateTextForTitle(kw, intent, landingUrl, assetHint);
+      const t = await generateTextForTitle(kw, intent, landingUrl, assetHint, format);
       setDraft(t);
       setMsg(t ? 'Đã sinh xong. Sửa lại rồi bấm Xong để đẩy vào hàng đợi.' : 'Sinh xong nhưng không có text — thử từ khóa khác.');
     } catch (e: any) {
@@ -84,16 +96,14 @@ export default function SanXuatForm({
   };
 
   const onGenerate = () => {
-    // Ưu tiên từ khóa/tiêu đề; nếu chưa có thì lấy tên ảnh mô tả làm nguồn để AI viết theo hình.
-    const nameKw = cleanAssetName(selectedImg?.title || selectedVid?.title || '');
+    // Ưu tiên từ khóa/tiêu đề; nếu chưa có thì gộp tên ảnh + video làm nguồn để AI viết theo hình.
+    const nameKw = combineNames(selectedImg?.title, selectedVid?.title);
     const kw = selectedKw?.keyword || title.trim() || nameKw;
     if (kw && !title.trim() && !selectedKw) setTitle(kw);
-    return runGenerate(
-      kw,
-      selectedKw?.intent || 'giao_dich',
-      selectedKw?.landing_url || null,
-      selectedImg?.title || selectedVid?.title || ''
-    );
+    // Gợi ý cho AI kèm cả tên ảnh và tên video (nếu có cả hai).
+    const assetHint = [selectedImg?.title, selectedVid?.title].filter(Boolean).join(' / ');
+    // kind là kênh đăng (social/article/video) — quyết định định dạng nội dung.
+    return runGenerate(kw, selectedKw?.intent || 'giao_dich', selectedKw?.landing_url || null, assetHint, kind);
   };
 
   const onSubmit = (formData: FormData) => {
@@ -123,23 +133,29 @@ export default function SanXuatForm({
     });
   };
 
-  // Chọn ảnh: hiện tên ảnh và tiêu đề tự đổi theo ảnh (trừ khi người tự gõ tay hoặc đã chọn từ khóa).
+  // Chọn ảnh: tiêu đề tự đổi, GỘP tên ảnh + video đang chọn (trừ khi người tự gõ tay hoặc đã chọn từ khóa).
   const onSelectImage = (a: Asset) => {
     const newId = a.id === imgId ? '' : a.id;
     setImgId(newId);
-    if (newId && !selectedKw && (titleAuto || !title.trim())) {
-      setTitle(cleanAssetName(a.title));
-      setTitleAuto(true);
+    if (!selectedKw && (titleAuto || !title.trim())) {
+      const t = combineNames(newId ? a.title : '', selectedVid?.title);
+      if (t) {
+        setTitle(t);
+        setTitleAuto(true);
+      }
     }
   };
 
-  // Chọn video: tương tự, tiêu đề tự đổi theo tên video.
+  // Chọn video: tương tự, gộp tên ảnh đang chọn + video này.
   const onSelectVideo = (a: Asset) => {
     const newId = a.id === vidId ? '' : a.id;
     setVidId(newId);
-    if (newId && !selectedKw && (titleAuto || !title.trim())) {
-      setTitle(cleanAssetName(a.title));
-      setTitleAuto(true);
+    if (!selectedKw && (titleAuto || !title.trim())) {
+      const t = combineNames(selectedImg?.title, newId ? a.title : '');
+      if (t) {
+        setTitle(t);
+        setTitleAuto(true);
+      }
     }
   };
 
@@ -249,7 +265,8 @@ export default function SanXuatForm({
                 kwText,
                 selectedKw?.intent || 'giao_dich',
                 selectedKw?.landing_url || null,
-                productName
+                productName,
+                kind
               );
             } else {
               setMsg('Đã ghép xong và gắn vào bài.');

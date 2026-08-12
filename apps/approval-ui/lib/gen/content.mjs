@@ -339,7 +339,25 @@ const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-latest';
 // Sinh draft bằng Gemini. CHỈ gọi khi có GEMINI_API_KEY. Import động để khi không có khóa,
 // gói @google/genai không cần cài và bản mẫu vẫn chạy. Trả về văn bản, hoặc ném lỗi để chỗ
 // gọi tự lùi về bản mẫu.
-export async function generateDraftLLM(brief, facts = [], assetHint = '') {
+// Hướng dẫn định dạng theo kênh đăng, để mỗi kênh ra một kiểu nội dung khác nhau.
+function formatInstruction(format) {
+  if (format === 'video') {
+    return [
+      'ĐỊNH DẠNG: KỊCH BẢN VIDEO DỌC 60 GIÂY cho YouTube/TikTok. Chia đúng 4 nhịp có mốc thời gian:',
+      '[0-3s] Mồi bằng một câu hỏi hoặc tình huống bắt trúng nỗi lo của bà con.',
+      '[3-10s] Nêu hậu quả thật nếu không xử lý.',
+      '[10-45s] Nội dung chính, mỗi ý một câu ngắn, cầm tay chỉ việc.',
+      '[45-60s] Chốt: gọi tổng đài 1900 23 23 49, hiện số to trên màn hình.',
+      'Mỗi dòng có thể kèm gợi ý cảnh quay ngắn trong ngoặc. KHÔNG viết thành đoạn văn dài.',
+    ].join('\n');
+  }
+  if (format === 'article') {
+    return 'ĐỊNH DẠNG: BÀI WEBSITE DÀI. Trả lời ngay ở câu đầu, sau đó vài đoạn phân tích rõ ràng, có thể dùng gạch đầu dòng ngắn cho các bước, kết bằng lời mời gọi tổng đài.';
+  }
+  return 'ĐỊNH DẠNG: BÀI FACEBOOK NGẮN. Chỉ hai tới bốn câu: một câu hook mở đầu bắt trúng vấn đề, một hai câu lợi ích, một lời kêu gọi gọi tổng đài. Không tiêu đề riêng, không dài dòng.';
+}
+
+export async function generateDraftLLM(brief, facts = [], assetHint = '', format = 'social') {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -360,13 +378,13 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '') {
   ].join('\n');
 
   const user = [
-    `Viết một bài cho từ khóa: "${brief.keyword}".`,
+    `Viết nội dung cho từ khóa: "${brief.keyword}".`,
     `Ý định tìm kiếm: ${brief.intent}.`,
-    `Các phần nên có: ${(brief.sections || []).join('; ')}.`,
+    formatInstruction(format),
     assetHint
       ? `Bài này đăng kèm ảnh hoặc video tên tệp: "${assetHint}". Viết nội dung ăn khớp với hình đó, mô tả đúng thứ trong hình, không bịa chi tiết ngoài tên tệp và từ khóa.`
       : '',
-    'Viết tiếng Việt, dài vừa phải, sẵn sàng cho người duyệt.',
+    'Viết tiếng Việt, sẵn sàng cho người duyệt.',
   ].filter(Boolean).join('\n');
 
   const res = await ai.models.generateContent({
@@ -380,15 +398,24 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '') {
 }
 
 // Sinh nội dung, ưu tiên Gemini khi có khóa, không thì lùi về bản mẫu. Luôn trả draft dùng được.
-export async function generateContentAsync(kw, { facts = [], assetHint = '' } = {}) {
+export async function generateContentAsync(kw, { facts = [], assetHint = '', format = 'social' } = {}) {
   const brief = buildBrief(kw);
   if (process.env.GEMINI_API_KEY) {
     try {
-      const draft = await generateDraftLLM(brief, facts, assetHint);
+      const draft = await generateDraftLLM(brief, facts, assetHint, format);
       return { title: draftTitle(brief), brief: { ...brief, generator: 'gemini' }, draft };
     } catch (e) {
       console.warn('Gemini lỗi, lùi về bản mẫu:', e.message);
     }
+  }
+  // Bản mẫu theo đúng định dạng kênh khi không có Gemini.
+  if (format === 'video') {
+    const v = buildVideoScript(brief);
+    return { title: v.title, brief, draft: v.draft };
+  }
+  if (format === 'social') {
+    const s = buildSocial(brief);
+    return { title: s.title, brief, draft: s.draft };
   }
   const { title, body } = buildDraft(brief);
   return { title, brief, draft: body };

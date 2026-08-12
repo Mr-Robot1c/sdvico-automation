@@ -23,13 +23,15 @@ export default function LibUploader() {
   const router = useRouter();
 
   // Tự nhận loại theo file được chọn (video/ảnh/âm thanh) để không lưu nhầm loại.
+  // Nhận theo MIME; nếu MIME rỗng (một số file .mp4) thì nhận theo đuôi tên tệp.
   const onPickFile = () => {
     const f = fileRef.current?.files?.[0];
     if (!f) return;
     const t = f.type || '';
-    if (t.startsWith('video/')) setKind('video');
-    else if (t.startsWith('audio/')) setKind('audio');
-    else if (t.startsWith('image/')) setKind('image');
+    const name = (f.name || '').toLowerCase();
+    if (t.startsWith('video/') || /\.(mp4|mov|webm|m4v|avi|mkv)$/.test(name)) setKind('video');
+    else if (t.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg)$/.test(name)) setKind('audio');
+    else if (t.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/.test(name)) setKind('image');
     setMsg('');
   };
 
