@@ -36,7 +36,8 @@ function formatDate(iso: string): string {
 }
 
 type Flags = Record<string, string[] | undefined>;
-type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags } | null;
+type Assets = { image?: string | null; video?: string | null } | null;
+type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets } | null;
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
 export default async function Page({ searchParams }: { searchParams: { loai?: string } }) {
@@ -52,6 +53,25 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     .limit(200);
 
   const items = (data || []) as Content[];
+
+  // Đổi id ảnh/video đã gắn (brief.assets) ra link công khai để hiện trong modal.
+  const assetIds = new Set<string>();
+  for (const c of items) {
+    const a = c.brief?.assets;
+    if (a?.image) assetIds.add(a.image);
+    if (a?.video) assetIds.add(a.video);
+  }
+  const assetUrl = new Map<string, { url: string; kind: string; title: string }>();
+  if (assetIds.size) {
+    const { data: as } = await client
+      .from('brand_assets')
+      .select('id, storage_path, kind, title')
+      .in('id', [...assetIds]);
+    for (const a of as || []) {
+      const url = client.storage.from('brand-assets').getPublicUrl(a.storage_path as string).data.publicUrl;
+      assetUrl.set(a.id as string, { url, kind: (a.kind as string) || '', title: (a.title as string) || '' });
+    }
+  }
 
   const [{ count: cBai }, { count: cVid }] = await Promise.all([
     client.from('mkt_content').select('*', { count: 'exact', head: true }).in('kind', ['article', 'social']),
@@ -122,6 +142,8 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                 const flagRows = Object.entries(COMPLIANCE_LABELS)
                   .map(([k, label]) => ({ label, items: Array.isArray(f[k]) ? (f[k] as string[]) : [] }))
                   .filter((x) => x.items.length > 0);
+                const img = c.brief?.assets?.image ? assetUrl.get(c.brief.assets.image) : undefined;
+                const vid = c.brief?.assets?.video ? assetUrl.get(c.brief.assets.video) : undefined;
                 return (
                   <tr key={c.id}>
                     <td className="cell-code">{shortCode(c.id)}</td>
@@ -139,6 +161,12 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                     </td>
                     <td className="col-actions">
                       <ViewModal title={c.title} label="Xem bài viết">
+                        {img || vid ? (
+                          <div className="modal-media">
+                            {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} /> : null}
+                            {vid ? <video src={vid.url} controls preload="metadata" /> : null}
+                          </div>
+                        ) : null}
                         <div className="badges">
                           <span className="badge badge-format">{formatLabel(c.kind)}</span>
                           <span className={`badge tone-${risk.tone}`}>{risk.label}</span>
