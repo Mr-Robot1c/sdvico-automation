@@ -9,6 +9,7 @@
 import { getServiceClient, logRun } from '@sdvico/core';
 import { generateAllFormats, INTENT_LABEL } from './content.mjs';
 import { assessDraft } from './compliance.mjs';
+import { scanStyle } from './brand-voice-check.mjs';
 import { knownFactValues, testFactValues } from './product-facts.mjs';
 import { loadFacts } from './facts.mjs';
 
@@ -65,8 +66,14 @@ for (const kw of chosen) {
 
   for (const fmt of FORMATS) {
     const piece = all[fmt.key]; // { title, draft }
-    const assess = assessDraft(`${piece.title}\n${piece.draft}`, { knownFactValues: known, testFactValues: testVals });
-    const briefFull = { ...all.brief, format: fmt.key, risk: assess.risk, compliance: assess.flags };
+    const text = `${piece.title}\n${piece.draft}`;
+    // Chạy CẢ HAI: compliance (ranh giới sản phẩm, quy định) và brand-voice (giọng văn).
+    const assess = assessDraft(text, { knownFactValues: known, testFactValues: testVals });
+    const style = scanStyle(text);
+    // Cờ đỏ nếu chạm quy định; amber nếu có cảnh báo sản phẩm HOẶC lỗi giọng.
+    const risk = assess.risk === 'red' ? 'red' : (assess.risk === 'amber' || style.length > 0) ? 'amber' : 'none';
+    const flagsAll = { ...assess.flags, style };
+    const briefFull = { ...all.brief, format: fmt.key, risk, compliance: flagsAll };
 
     const { data: inserted, error: e1 } = await client
       .from('mkt_content')
@@ -75,8 +82,8 @@ for (const kw of chosen) {
         title: piece.title,
         brief: briefFull,
         draft: piece.draft,
-        status: assess.risk === 'red' ? 'review' : 'draft',
-        needs_gov_review: assess.risk === 'red',
+        status: risk === 'red' ? 'review' : 'draft',
+        needs_gov_review: risk === 'red',
       })
       .select('id')
       .single();
@@ -92,9 +99,9 @@ for (const kw of chosen) {
         keyword: kw.keyword,
         intent: kw.intent,
         landing_url: kw.landing_url,
-        risk: assess.risk,
+        risk,
         needs_manager_approval: assess.needsManagerApproval,
-        compliance: assess.flags,
+        compliance: flagsAll,
       },
       ref_table: 'mkt_content',
       ref_id: inserted.id,
@@ -102,8 +109,8 @@ for (const kw of chosen) {
     });
     if (e2) throw new Error('Đẩy approval_queue lỗi: ' + e2.message);
 
-    results.push({ title: piece.title, format: fmt.key, risk: assess.risk });
-    if (assess.risk !== 'none') flags.push(`${fmt.label}:${assess.risk}`);
+    results.push({ title: piece.title, format: fmt.key, risk });
+    if (risk !== 'none') flags.push(`${fmt.label}:${risk}`);
   }
 
   const gen = all.brief?.generator === 'gemini' ? 'Gemini' : 'bản mẫu';
