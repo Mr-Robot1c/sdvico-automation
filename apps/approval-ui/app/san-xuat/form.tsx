@@ -125,6 +125,15 @@ export default function SanXuatForm({
     }
   };
 
+  // Chọn video: tương tự, điền từ khóa từ tên video nếu chưa có.
+  const onSelectVideo = (a: Asset) => {
+    const newId = a.id === vidId ? '' : a.id;
+    setVidId(newId);
+    if (newId && !title.trim() && !selectedKw) {
+      setTitle(cleanAssetName(a.title));
+    }
+  };
+
   return (
     <div className="sx-grid">
       <section className="sx-slot">
@@ -187,6 +196,10 @@ export default function SanXuatForm({
           )}
         </div>
 
+        {selectedVid ? (
+          <p className="muted sx-selected-name">Video đang chọn: <b>{selectedVid.title}</b></p>
+        ) : null}
+
         {videos.length > 0 ? (
           <div className="sx-thumbs" role="listbox" aria-label="Chọn video từ kho">
             {videos.slice(0, 8).map((a) => (
@@ -194,7 +207,7 @@ export default function SanXuatForm({
                 key={a.id}
                 type="button"
                 className={`sx-thumb sx-thumb-video ${vidId === a.id ? 'on' : ''}`}
-                onClick={() => setVidId(a.id === vidId ? '' : a.id)}
+                onClick={() => onSelectVideo(a)}
                 aria-pressed={vidId === a.id}
                 title={a.title}
               >
