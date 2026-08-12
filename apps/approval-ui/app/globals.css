@@ -20,27 +20,21 @@
   --tone-default: #5b6879;
 }
 
+/* Biến màu tối. Áp tự động theo hệ thống KHI người dùng chưa tự chọn (:not([data-theme])),
+   và áp khi người dùng bấm chọn tối (:root[data-theme='dark']). */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f141b;
-    --surface: #171e28;
-    --surface-2: #1e2733;
-    --line: #2a3542;
-    --ink: #e7ecf3;
-    --ink-2: #9aa7b6;
-    --ok: #4cc38a;
-    --ok-bg: #12301f;
-    --no: #f06a6a;
-    --no-bg: #341717;
-    --accent: #7fb2e5;
-    --accent-bg: #16273a;
-    --chip: #1e2733;
-    --tone-hr: #7fb2e5;
-    --tone-mkt: #e0b354;
-    --tone-web: #b79ae0;
-    --tone-demo: #9aa7b6;
-    --tone-default: #9aa7b6;
+  :root:not([data-theme]) {
+    --bg: #0f141b; --surface: #171e28; --surface-2: #1e2733; --line: #2a3542;
+    --ink: #e7ecf3; --ink-2: #9aa7b6; --ok: #4cc38a; --ok-bg: #12301f;
+    --no: #f06a6a; --no-bg: #341717; --accent: #7fb2e5; --accent-bg: #16273a; --chip: #1e2733;
+    --tone-hr: #7fb2e5; --tone-mkt: #e0b354; --tone-web: #b79ae0; --tone-demo: #9aa7b6; --tone-default: #9aa7b6;
   }
+}
+:root[data-theme='dark'] {
+  --bg: #0f141b; --surface: #171e28; --surface-2: #1e2733; --line: #2a3542;
+  --ink: #e7ecf3; --ink-2: #9aa7b6; --ok: #4cc38a; --ok-bg: #12301f;
+  --no: #f06a6a; --no-bg: #341717; --accent: #7fb2e5; --accent-bg: #16273a; --chip: #1e2733;
+  --tone-hr: #7fb2e5; --tone-mkt: #e0b354; --tone-web: #b79ae0; --tone-demo: #9aa7b6; --tone-default: #9aa7b6;
 }
 
 * { box-sizing: border-box; }
@@ -367,3 +361,25 @@ a.chip:hover { filter: brightness(0.98); }
 .card { border-radius: 16px; }
 .card .title { font-weight: 700; font-size: 16px; margin: 2px 0; }
 .statcard { border-radius: 16px; }
+
+/* ===== Logo, khẩu hiệu, nút chuyển sáng tối ===== */
+.brand-logo { display: inline-flex; }
+.brand-logo svg { display: block; }
+.sidebar-foot { display: flex; flex-direction: column; gap: 8px; }
+.foot-note { color: var(--ink-2); font-size: 11px; margin: 0; }
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 8px; width: 100%;
+  padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer;
+  transition: filter .12s ease;
+}
+.theme-toggle:hover { filter: brightness(0.97); }
+
+/* ===== Thẻ thống kê có icon ===== */
+.statcard { flex-direction: row; align-items: center; gap: 14px; }
+.statcard-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.statcard-icon {
+  font-size: 22px; width: 46px; height: 46px; border-radius: 13px; flex-shrink: 0;
+  display: grid; place-items: center; background: var(--accent-bg);
+}
+.statcard.red .statcard-icon { background: var(--no-bg); }

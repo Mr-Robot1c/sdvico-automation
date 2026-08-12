@@ -101,20 +101,32 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
 
       <div className="statgrid">
         <div className="statcard">
-          <span className="statcard-label">Bài chờ duyệt</span>
-          <span className="statcard-num">{all.length}</span>
+          <span className="statcard-icon" aria-hidden="true">📥</span>
+          <div className="statcard-body">
+            <span className="statcard-label">Bài chờ duyệt</span>
+            <span className="statcard-num">{all.length}</span>
+          </div>
         </div>
         <div className="statcard red">
-          <span className="statcard-label">Cờ đỏ cần cấp quản lý</span>
-          <span className="statcard-num">{redCount}</span>
+          <span className="statcard-icon" aria-hidden="true">🚩</span>
+          <div className="statcard-body">
+            <span className="statcard-label">Cờ đỏ cần cấp quản lý</span>
+            <span className="statcard-num">{redCount}</span>
+          </div>
         </div>
         <div className="statcard">
-          <span className="statcard-label">Từ khóa trong kho</span>
-          <span className="statcard-num">{kwCount ?? 0}</span>
+          <span className="statcard-icon" aria-hidden="true">🔑</span>
+          <div className="statcard-body">
+            <span className="statcard-label">Từ khóa trong kho</span>
+            <span className="statcard-num">{kwCount ?? 0}</span>
+          </div>
         </div>
         <div className="statcard">
-          <span className="statcard-label">Bài đã đăng</span>
-          <span className="statcard-num">{postCount ?? 0}</span>
+          <span className="statcard-icon" aria-hidden="true">🌐</span>
+          <div className="statcard-body">
+            <span className="statcard-label">Bài đã đăng</span>
+            <span className="statcard-num">{postCount ?? 0}</span>
+          </div>
         </div>
       </div>
 
