@@ -1,11 +1,14 @@
 import { getServerClient } from '../lib/supabase-server';
 import AutoRefresh from './auto-refresh';
 import DecideActions from './decide-actions';
+import GenerateButton from './generate-button';
 import { editDraft } from './actions';
 import { kindMeta, formatRelative, payloadRows } from './labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 export const dynamic = 'force-dynamic';
+// Sinh nội dung gọi Gemini, cho phép chạy tới 60 giây.
+export const maxDuration = 60;
 
 type Item = {
   id: string;
@@ -73,7 +76,10 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
           <h1>Hàng đợi duyệt</h1>
           <p className="sub">Máy soạn, người bấm. Xem từng mục rồi Duyệt hoặc Từ chối.</p>
         </div>
-        <AutoRefresh seconds={30} />
+        <div className="head-actions">
+          <GenerateButton />
+          <AutoRefresh seconds={30} />
+        </div>
       </header>
 
       <div className="statgrid">
