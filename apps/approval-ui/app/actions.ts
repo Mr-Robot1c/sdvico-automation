@@ -78,6 +78,45 @@ export async function deleteFact(formData: FormData) {
   revalidatePath('/du-kien');
 }
 
+// Tải tư liệu thật lên kho brand_assets (ảnh, clip, logo do công ty sở hữu hoặc có giấy phép).
+// Giới hạn kích thước qua server action khoảng 4,5MB. File lớn thì tải qua Supabase Storage.
+export async function uploadAsset(formData: FormData) {
+  const file = formData.get('file') as File | null;
+  const kind = String(formData.get('kind') || 'image');
+  if (!file || file.size === 0) return;
+
+  const client = getServerClient();
+  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${Date.now()}-${safe}`;
+  const buf = Buffer.from(await file.arrayBuffer());
+
+  const { error: upErr } = await client.storage
+    .from('brand-assets')
+    .upload(path, buf, { contentType: file.type || 'application/octet-stream' });
+  if (upErr) throw new Error('Tải lên lỗi: ' + upErr.message);
+
+  const { error } = await client.from('brand_assets').insert({
+    kind,
+    path,
+    license: String(formData.get('license') || '').trim() || null,
+    source: String(formData.get('source') || '').trim() || null,
+    note: String(formData.get('note') || '').trim() || null
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath('/tu-lieu');
+}
+
+// Xóa một tư liệu, gỡ cả file trên Storage.
+export async function deleteAsset(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  const path = String(formData.get('path') || '');
+  if (!id) return;
+  const client = getServerClient();
+  if (path) await client.storage.from('brand-assets').remove([path]);
+  await client.from('brand_assets').delete().eq('id', id);
+  revalidatePath('/tu-lieu');
+}
+
 // Chỉnh sửa bản nháp trước khi duyệt. Người sửa là người kiểm soát (điều cấm 1).
 export async function editDraft(formData: FormData) {
   const contentId = String(formData.get('content_id') || '');
