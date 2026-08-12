@@ -10,7 +10,6 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
     ? [
         { href: '/', label: 'Hàng đợi duyệt', icon: '📥' },
         { href: '/noi-dung', label: 'Nội dung', icon: '📝' },
-        { href: '/video', label: 'Kịch bản video', icon: '🎬' },
         { href: '/da-dang', label: 'Lịch sử xuất bản', icon: '🌐' },
         { href: '/tu-khoa', label: 'Kho từ khóa', icon: '🔑' },
         { href: '/du-kien', label: 'Nguồn dữ kiện', icon: '📊' },
