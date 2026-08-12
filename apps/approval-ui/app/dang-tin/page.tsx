@@ -1,11 +1,10 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { formatRelative } from '../labels';
-import { addPlatform, removePlatform, addJobPost, updateJobPost, queueFacebookPost, editJobPostDraft, publishJobPost } from '../actions';
+import { addJobPost, updateJobPost, queueFacebookPost, editJobPostDraft, publishJobPost } from '../actions';
 import DangTinSections from '../dang-tin-sections';
+import { SubmitButton } from '../submit-button';
 
-// Quản lý vị trí, nền tảng đăng tuyển và theo dõi tin đăng.
-// Tin đăng là tự động, không qua hàng đợi duyệt: chỉ mở xem và huỷ đăng nếu cần.
 export const dynamic = 'force-dynamic';
 
 type Job = {
@@ -13,10 +12,9 @@ type Job = {
   short_desc: string | null; requirements: string | null; jd_versions: Record<string, string> | null;
   status: string; created_at: string;
 };
-type Platform = { id: string; ten: string; loai: string; bat: boolean; ghi_chu: string | null };
 type Post = {
   id: string; tieu_de: string; trang_thai: string; scheduled_at: string | null;
-  posted_at: string | null; platform_id: string | null; noi_dung: string | null;
+  posted_at: string | null; noi_dung: string | null;
   kenh: string | null; url: string | null; image_url: string | null; ghi_chu: string | null; created_at: string;
 };
 
@@ -25,7 +23,6 @@ const JD_ORDER = ['website', 'job_board', 'facebook', 'zalo_sms'];
 const JOB_STATUS: Record<string, { label: string; tone: string }> = {
   draft: { label: 'Nháp', tone: 'demo' }, open: { label: 'Đang tuyển', tone: 'ok' }, closed: { label: 'Đã đóng', tone: 'no' }
 };
-const LOAI_LABEL: Record<string, string> = { job_board: 'Sàn tuyển dụng', social: 'Mạng xã hội', other: 'Khác' };
 const TT_LABEL: Record<string, { label: string; tone: string }> = {
   draft: { label: 'Nháp, chờ duyệt', tone: 'default' }, scheduled: { label: 'Đặt lịch', tone: 'mkt' },
   posted: { label: 'Đã đăng', tone: 'ok' }, failed: { label: 'Đăng lỗi', tone: 'no' }, cancelled: { label: 'Đã huỷ', tone: 'no' }
@@ -37,10 +34,9 @@ export default async function Page() {
     .from('hr_jobs')
     .select('id, title, department, location, short_desc, requirements, jd_versions, status, created_at')
     .order('created_at', { ascending: false }).limit(100);
-  const pRes = await client.from('hr_platforms').select('id, ten, loai, bat, ghi_chu').order('created_at', { ascending: true });
   const jRes = await client
     .from('hr_job_posts')
-    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, platform_id, noi_dung, kenh, url, image_url, ghi_chu, created_at')
+    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, kenh, url, image_url, ghi_chu, created_at')
     .order('created_at', { ascending: false }).limit(100);
   const aqRes = await client
     .from('approval_queue')
@@ -50,10 +46,8 @@ export default async function Page() {
 
   const jobs = (jobsRes.data || []) as Job[];
   const missing = (code?: string) => code === 'PGRST205' || code === '42P01' || code === '42703';
-  const needMigration = missing(pRes.error?.code) || missing(jRes.error?.code);
-  const platforms = (pRes.data || []) as Platform[];
+  const needMigration = missing(jRes.error?.code);
   const posts = (jRes.data || []) as Post[];
-  const platformName = new Map(platforms.map((p) => [p.id, p.ten]));
   const approvedPostIds = new Set((aqRes.data || []).map((r) => r.ref_id as string));
 
   const migrationNote = (
@@ -92,52 +86,13 @@ export default async function Page() {
             ) : <p className="muted">Chưa có phiên bản JD nào.</p>}
             <form action={queueFacebookPost} style={{ marginTop: 8 }}>
               <input type="hidden" name="job_id" value={j.id} />
-              <button className="btn ok" type="submit">Soạn bài Facebook và đưa vào hàng đợi duyệt</button>
+              <SubmitButton label="Soạn bài Facebook và đưa vào hàng đợi duyệt" pendingLabel="Đang soạn bài..." />
             </form>
           </li>
         );
       })}
-      {jobs.length === 0 ? <p className="muted">Chưa có vị trí nào. Dùng lệnh /hr-jd để sinh mô tả công việc.</p> : null}
+      {jobs.length === 0 ? <p className="muted">Chưa có vị trí nào. Dùng trang Tạo JD để tạo mô tả công việc.</p> : null}
     </ul>
-  );
-
-  const nenTang = needMigration ? migrationNote : (
-    <>
-      <ul className="list">
-        {platforms.map((p) => (
-          <li key={p.id} className="card tone-web">
-            <div className="head">
-              <span className="cand-name">{p.ten}</span>
-              <form action={removePlatform}>
-                <input type="hidden" name="id" value={p.id} />
-                <button className="btn no" type="submit">Xoá</button>
-              </form>
-            </div>
-            <div className="stages">
-              <span className="stage tone-web">{LOAI_LABEL[p.loai] || p.loai}</span>
-              {p.ghi_chu ? <span className="src">{p.ghi_chu}</span> : null}
-            </div>
-          </li>
-        ))}
-        {platforms.length === 0 ? <p className="muted">Chưa có nền tảng nào. Thêm bên dưới.</p> : null}
-      </ul>
-      <form action={addPlatform} className="settings-box">
-        <b>Thêm nền tảng</b>
-        <p className="muted" style={{ margin: '2px 0 8px' }}>Danh mục quản lý. Đăng thật vẫn cần tài khoản chính danh của nền tảng đó.</p>
-        <div className="row">
-          <input className="note" name="ten" placeholder="Tên (TopCV, Facebook, Việc Làm 24h...)" />
-          <select className="note" name="loai" defaultValue="job_board" aria-label="Loại nền tảng">
-            <option value="job_board">Sàn tuyển dụng</option>
-            <option value="social">Mạng xã hội</option>
-            <option value="other">Khác</option>
-          </select>
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          <input className="note" name="ghi_chu" placeholder="Ghi chú (không bắt buộc)" />
-          <button className="btn ok" type="submit">Thêm nền tảng</button>
-        </div>
-      </form>
-    </>
   );
 
   const tinDang = needMigration ? migrationNote : (
@@ -163,7 +118,7 @@ export default async function Page() {
                 </span>
               </div>
               <dl className="fields">
-                <div className="field"><dt>Nền tảng</dt><dd>{(j.platform_id && platformName.get(j.platform_id)) || (j.kenh === 'facebook' ? 'Facebook' : '—')}</dd></div>
+                <div className="field"><dt>Kênh</dt><dd>{j.kenh === 'facebook' ? 'Facebook' : (j.kenh || '—')}</dd></div>
                 <div className="field"><dt>Giờ đặt đăng</dt><dd>{j.scheduled_at ? new Date(j.scheduled_at).toLocaleString('vi-VN') : '—'}</dd></div>
                 {j.posted_at ? <div className="field"><dt>Đã đăng lúc</dt><dd>{new Date(j.posted_at).toLocaleString('vi-VN')}</dd></div> : null}
               </dl>
@@ -191,7 +146,7 @@ export default async function Page() {
                     <textarea name="noi_dung" defaultValue={j.noi_dung || ''} rows={8} aria-label="Nội dung bài đăng" style={{ width: '100%', boxSizing: 'border-box' }} />
                     <input className="note" type="url" name="image_url" defaultValue={j.image_url || ''} placeholder="URL hình ảnh (để trống nếu không cần ảnh)" aria-label="URL hình ảnh" />
                     <input className="note" type="datetime-local" name="scheduled_at" defaultValue={scheduledDefault} aria-label="Giờ đặt đăng" />
-                    <button className="btn ok" type="submit">Lưu chỉnh sửa</button>
+                    <SubmitButton label="Lưu chỉnh sửa" pendingLabel="Đang lưu..." />
                   </form>
                 </details>
               ) : null}
@@ -199,9 +154,10 @@ export default async function Page() {
                 {(isApproved || canRetry) && canEdit ? (
                   <form action={publishJobPost}>
                     <input type="hidden" name="post_id" value={j.id} />
-                    <button className="btn ok" type="submit">
-                      {canRetry ? 'Thử đăng lại' : 'Đăng ngay lên Facebook'}
-                    </button>
+                    <SubmitButton
+                      label={canRetry ? 'Thử đăng lại' : 'Đăng ngay lên Facebook'}
+                      pendingLabel="Đang đăng lên Facebook..."
+                    />
                   </form>
                 ) : null}
                 {!isApproved && !canRetry && canEdit ? (
@@ -211,39 +167,35 @@ export default async function Page() {
                   <form action={updateJobPost}>
                     <input type="hidden" name="id" value={j.id} />
                     <input type="hidden" name="action" value="posted" />
-                    <button className="btn ghost" type="submit">Đánh dấu đã đăng (thủ công)</button>
+                    <SubmitButton label="Đánh dấu đã đăng (thủ công)" className="btn ghost" />
                   </form>
                 ) : null}
                 {j.trang_thai !== 'cancelled' ? (
                   <form action={updateJobPost}>
                     <input type="hidden" name="id" value={j.id} />
                     <input type="hidden" name="action" value="cancel" />
-                    <button className="btn ghost" type="submit">Huỷ</button>
+                    <SubmitButton label="Huỷ" className="btn ghost" />
                   </form>
                 ) : null}
                 <form action={updateJobPost}>
                   <input type="hidden" name="id" value={j.id} />
                   <input type="hidden" name="action" value="delete" />
-                  <button className="btn no" type="submit">Xoá</button>
+                  <SubmitButton label="Xoá" className="btn no" />
                 </form>
               </div>
             </li>
           );
         })}
-        {posts.length === 0 ? <p className="muted">Chưa có tin đăng nào.</p> : null}
+        {posts.length === 0 ? <p className="muted">Chưa có tin đăng nào. Vào tab Vị trí, bấm "Soạn bài Facebook" để tạo bài.</p> : null}
       </ul>
       <form action={addJobPost} className="settings-box">
-        <b>Thêm tin đăng</b>
+        <b>Thêm tin đăng thủ công</b>
         <div className="row" style={{ marginTop: 8 }}>
-          <input className="note" name="tieu_de" placeholder="Tiêu đề tin" />
-          <select className="note" name="platform_id" defaultValue="" aria-label="Nền tảng">
-            <option value="">Chọn nền tảng</option>
-            {platforms.map((p) => <option key={p.id} value={p.id}>{p.ten}</option>)}
-          </select>
+          <input className="note" name="tieu_de" placeholder="Tiêu đề tin" required />
+          <input className="note" type="datetime-local" name="scheduled_at" aria-label="Giờ đặt đăng" />
         </div>
         <div className="row" style={{ marginTop: 8 }}>
-          <input className="note" type="datetime-local" name="scheduled_at" aria-label="Giờ đặt đăng" />
-          <button className="btn ok" type="submit">Thêm</button>
+          <SubmitButton label="Thêm" />
         </div>
       </form>
     </>
@@ -254,16 +206,15 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Vị trí &amp; Đăng tin</h1>
-          <p className="sub">Chọn mục để xem. Tin đăng chạy tự động, không qua duyệt, mở xem và huỷ được.</p>
+          <p className="sub">Soạn bài từ vị trí tuyển dụng, duyệt rồi đăng Facebook.</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>
 
       <DangTinSections
         viTri={viTri}
-        nenTang={nenTang}
         tinDang={tinDang}
-        counts={{ vitri: jobs.length, nentang: platforms.length, tindang: posts.length }}
+        counts={{ vitri: jobs.length, tindang: posts.length }}
       />
     </main>
   );

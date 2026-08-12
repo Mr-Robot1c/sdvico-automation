@@ -1,36 +1,44 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 
-// Bộ chọn mục cho trang Vị trí & Đăng tin, để khỏi kéo dài. Chọn mục nào hiện mục đó.
+type Section = 'vitri' | 'tindang';
+
+// Bộ chọn mục cho trang Vị trí & Đăng tin. Lưu tab vào sessionStorage
+// để AutoRefresh (router.refresh()) không reset tab về mặc định.
 export default function DangTinSections({
   viTri,
-  nenTang,
   tinDang,
   counts
 }: {
   viTri: ReactNode;
-  nenTang: ReactNode;
   tinDang: ReactNode;
-  counts: { vitri: number; nentang: number; tindang: number };
+  counts: { vitri: number; tindang: number };
 }) {
-  const [sec, setSec] = useState<'vitri' | 'nentang' | 'tindang'>('vitri');
+  const [sec, setSec] = useState<Section>('vitri');
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem('dang-tin-tab') as Section | null;
+    if (saved === 'vitri' || saved === 'tindang') setSec(saved);
+  }, []);
+
+  const changeTab = (tab: Section) => {
+    setSec(tab);
+    sessionStorage.setItem('dang-tin-tab', tab);
+  };
+
   return (
     <>
       <div className="sortbar" role="tablist" aria-label="Chọn mục">
-        <button className={`chip ${sec === 'vitri' ? 'on' : ''}`} onClick={() => setSec('vitri')}>
+        <button className={`chip ${sec === 'vitri' ? 'on' : ''}`} onClick={() => changeTab('vitri')}>
           Vị trí tuyển dụng <span className="n">{counts.vitri}</span>
         </button>
-        <button className={`chip ${sec === 'nentang' ? 'on' : ''}`} onClick={() => setSec('nentang')}>
-          Nền tảng <span className="n">{counts.nentang}</span>
-        </button>
-        <button className={`chip ${sec === 'tindang' ? 'on' : ''}`} onClick={() => setSec('tindang')}>
+        <button className={`chip ${sec === 'tindang' ? 'on' : ''}`} onClick={() => changeTab('tindang')}>
           Tin đăng <span className="n">{counts.tindang}</span>
         </button>
       </div>
 
       {sec === 'vitri' ? viTri : null}
-      {sec === 'nentang' ? nenTang : null}
       {sec === 'tindang' ? tinDang : null}
     </>
   );

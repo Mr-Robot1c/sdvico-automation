@@ -2,6 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import { formatRelative } from '../labels';
 import { JOB_GROUPS, JD_CHANNELS, GROUP_BY_KEY } from '../../lib/jd-groups';
 import { createJdDraft, editJdVersion, regenerateJd, finalizeJd, deleteJd } from '../actions';
+import { SubmitButton } from '../submit-button';
 
 // Luôn lấy dữ liệu mới.
 export const dynamic = 'force-dynamic';
@@ -63,7 +64,7 @@ export default async function Page() {
         <textarea name="requirements" rows={3} placeholder="Yêu cầu ứng viên" style={{ width: '100%', marginTop: 8, boxSizing: 'border-box' }} aria-label="Yêu cầu ứng viên" />
         <textarea name="benefits" rows={2} placeholder="Quyền lợi, phúc lợi. Để trống thì AI ghi chung là thỏa thuận, không bịa số." style={{ width: '100%', marginTop: 8, boxSizing: 'border-box' }} aria-label="Quyền lợi" />
         <div className="row" style={{ marginTop: 8 }}>
-          <button className="btn ok" type="submit">Tạo bốn bản JD bằng AI</button>
+          <SubmitButton label="Tạo bốn bản JD bằng AI" pendingLabel="AI đang viết, chờ vài giây..." />
         </div>
         <p className="muted" style={{ marginTop: 6 }}>Cần khóa GROQ_API_KEY trong môi trường máy chủ để AI viết. Chưa có khóa thì hệ thống vẫn tạo bản ghép cơ bản để bạn sửa.</p>
       </form>
@@ -114,7 +115,7 @@ export default async function Page() {
                       style={{ width: '100%', boxSizing: 'border-box' }}
                       aria-label={`Bản ${c.ten}`}
                     />
-                    <button className="btn ok" type="submit" style={{ marginTop: 6 }}>Lưu bản {c.ten}</button>
+                    <SubmitButton label={`Lưu bản ${c.ten}`} pendingLabel="Đang lưu..." className="btn ok" style={{ marginTop: 6 }} />
                   </form>
                 </details>
               ))}
@@ -122,15 +123,15 @@ export default async function Page() {
               <div className="row" style={{ marginTop: 8 }}>
                 <form action={regenerateJd}>
                   <input type="hidden" name="job_id" value={j.id} />
-                  <button className="btn ghost" type="submit">Viết lại bằng AI</button>
+                  <SubmitButton label="Viết lại bằng AI" pendingLabel="AI đang viết lại..." className="btn ghost" />
                 </form>
                 <form action={finalizeJd}>
                   <input type="hidden" name="job_id" value={j.id} />
-                  <button className="btn ok" type="submit">Hoàn thành, đưa vào danh sách tuyển</button>
+                  <SubmitButton label="Hoàn thành, đưa vào danh sách tuyển" pendingLabel="Đang xử lý..." />
                 </form>
                 <form action={deleteJd}>
                   <input type="hidden" name="job_id" value={j.id} />
-                  <button className="btn no" type="submit">Xóa nháp</button>
+                  <SubmitButton label="Xóa nháp" pendingLabel="Đang xoá..." className="btn no" />
                 </form>
               </div>
             </li>
