@@ -243,6 +243,40 @@ export async function editJobPostDraft(formData: FormData) {
   revalidatePath('/');
 }
 
+// Helper nội bộ: gọi Facebook Graph API để đăng bài. Ném lỗi nếu thất bại.
+// Trả về fbPostId (string). Không ghi DB, không revalidate — người gọi chịu.
+async function callFacebookApi(post: { tieu_de: string; noi_dung: string; image_url: string | null }): Promise<string> {
+  const pageId = process.env.FACEBOOK_PAGE_ID;
+  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const version = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+  if (!pageId || !token) throw new Error('Thiếu FACEBOOK_PAGE_ID hoặc FACEBOOK_PAGE_ACCESS_TOKEN trong biến môi trường Vercel.');
+  if (!post.noi_dung) throw new Error('Bài chưa có nội dung.');
+
+  const message = [post.tieu_de, '', post.noi_dung].join('\n').trim();
+
+  if (post.image_url) {
+    const res = await fetch(`https://graph.facebook.com/${version}/${pageId}/photos`, {
+      method: 'POST', body: new URLSearchParams({ url: post.image_url, caption: message, access_token: token }), cache: 'no-store'
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      const msg = json.error?.message || `HTTP ${res.status}`;
+      throw new Error(msg + (json.error?.code ? ` (mã ${json.error.code})` : ''));
+    }
+    return json.post_id || json.id;
+  } else {
+    const res = await fetch(`https://graph.facebook.com/${version}/${pageId}/feed`, {
+      method: 'POST', body: new URLSearchParams({ message, access_token: token }), cache: 'no-store'
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      const msg = json.error?.message || `HTTP ${res.status}`;
+      throw new Error(msg + (json.error?.code ? ` (mã ${json.error.code})` : ''));
+    }
+    return json.id;
+  }
+}
+
 // Đăng ngay lên Facebook sau khi đã được duyệt (điều cấm 1: cổng duyệt đã qua).
 // Gọi thẳng Graph API từ server, không chờ worker cron. Chỉ hoạt động khi bài đã approved.
 // Lỗi Facebook API được bắt và ghi vào run_log + ghi_chu để người dùng biết nguyên nhân.
@@ -276,59 +310,8 @@ export async function publishJobPost(formData: FormData) {
   if (e1 || !post) { revalidatePath('/dang-tin'); return; }
   if (post.trang_thai === 'posted') { revalidatePath('/dang-tin'); return; }
 
-  const pageId = process.env.FACEBOOK_PAGE_ID;
-  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
-  const version = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
-
-  if (!pageId || !token) {
-    await client.from('hr_job_posts')
-      .update({ trang_thai: 'failed', ghi_chu: 'Thiếu FACEBOOK_PAGE_ID hoặc FACEBOOK_PAGE_ACCESS_TOKEN trong biến môi trường Vercel.' })
-      .eq('id', postId);
-    await client.from('run_log').insert({ task: 'hr.publish_facebook_ui', status: 'error', detail: { postId, error: 'missing env vars' } });
-    revalidatePath('/dang-tin');
-    return;
-  }
-
-  if (!post.noi_dung) {
-    await client.from('hr_job_posts')
-      .update({ trang_thai: 'failed', ghi_chu: 'Bài chưa có nội dung.' })
-      .eq('id', postId);
-    revalidatePath('/dang-tin');
-    return;
-  }
-
-  const message = [post.tieu_de, '', post.noi_dung].join('\n').trim();
-
   try {
-    let fbPostId: string;
-    if (post.image_url) {
-      const res = await fetch(`https://graph.facebook.com/${version}/${pageId}/photos`, {
-        method: 'POST',
-        body: new URLSearchParams({ url: post.image_url, caption: message, access_token: token }),
-        cache: 'no-store'
-      });
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        const errMsg = json.error?.message || json.error?.type || `HTTP ${res.status}`;
-        const errCode = json.error?.code ? ` (mã ${json.error.code})` : '';
-        throw new Error(errMsg + errCode);
-      }
-      fbPostId = json.post_id || json.id;
-    } else {
-      const res = await fetch(`https://graph.facebook.com/${version}/${pageId}/feed`, {
-        method: 'POST',
-        body: new URLSearchParams({ message, access_token: token }),
-        cache: 'no-store'
-      });
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        const errMsg = json.error?.message || json.error?.type || `HTTP ${res.status}`;
-        const errCode = json.error?.code ? ` (mã ${json.error.code})` : '';
-        throw new Error(errMsg + errCode);
-      }
-      fbPostId = json.id;
-    }
-
+    const fbPostId = await callFacebookApi(post);
     const externalUrl = `https://www.facebook.com/${fbPostId}`;
     await client.from('hr_job_posts')
       .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), url: externalUrl, ghi_chu: null })
@@ -438,4 +421,76 @@ export async function deleteJd(formData: FormData) {
   const { error } = await client.from('hr_jobs').delete().eq('id', jobId).eq('status', 'draft');
   if (error) throw new Error(error.message);
   revalidatePath('/tao-jd');
+}
+
+// Duyệt và đăng ngay lên Facebook trong một bước, không cần chờ worker cron.
+// Điều cấm 1: người bấm Duyệt là cổng kiểm soát. Action này chỉ chạy khi người dùng bấm.
+export async function approveAndPublish(formData: FormData) {
+  const queueId = String(formData.get('queue_id') || '');
+  const postId = String(formData.get('post_id') || '');
+  if (!queueId || !postId) return;
+
+  const client = getServerClient();
+
+  // Duyệt trong hàng đợi.
+  const { error: approveErr } = await client.from('approval_queue')
+    .update({ status: 'approved', decided_at: new Date().toISOString() })
+    .eq('id', queueId).eq('status', 'pending');
+  if (approveErr) throw new Error(approveErr.message);
+
+  // Đọc bài đăng.
+  const { data: post, error: e1 } = await client.from('hr_job_posts')
+    .select('id, tieu_de, noi_dung, trang_thai, image_url')
+    .eq('id', postId).single();
+  if (e1 || !post || post.trang_thai === 'posted') {
+    revalidatePath('/'); revalidatePath('/dang-tin'); return;
+  }
+
+  // Đăng lên Facebook và cập nhật trạng thái.
+  try {
+    const fbPostId = await callFacebookApi(post);
+    const externalUrl = `https://www.facebook.com/${fbPostId}`;
+    await client.from('hr_job_posts')
+      .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), url: externalUrl, ghi_chu: null })
+      .eq('id', postId);
+    await client.from('run_log').insert({ task: 'hr.approve_and_publish', status: 'ok', detail: { postId, fbPostId, externalUrl } });
+  } catch (err: unknown) {
+    const errStr = err instanceof Error ? err.message : String(err);
+    await client.from('hr_job_posts').update({ trang_thai: 'failed', ghi_chu: errStr }).eq('id', postId);
+    await client.from('run_log').insert({ task: 'hr.approve_and_publish', status: 'error', detail: { postId, error: errStr } });
+  }
+
+  revalidatePath('/');
+  revalidatePath('/dang-tin');
+}
+
+// Duyệt và đặt lịch đăng. Worker cron sẽ đăng khi đến giờ (chạy mỗi 5 phút).
+// Nhận minutes (X phút sau) hoặc scheduled_at (giờ cụ thể dạng ISO hoặc datetime-local).
+export async function approveAndSchedule(formData: FormData) {
+  const queueId = String(formData.get('queue_id') || '');
+  const postId = String(formData.get('post_id') || '');
+  const minutesStr = String(formData.get('minutes') || '');
+  const scheduledRaw = String(formData.get('scheduled_at') || '').trim();
+  if (!queueId || !postId) return;
+
+  let scheduled_at: string;
+  if (scheduledRaw) {
+    scheduled_at = new Date(scheduledRaw).toISOString();
+  } else {
+    const minutes = Math.max(1, parseInt(minutesStr, 10) || 30);
+    scheduled_at = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+  }
+
+  const client = getServerClient();
+
+  await client.from('approval_queue')
+    .update({ status: 'approved', decided_at: new Date().toISOString() })
+    .eq('id', queueId).eq('status', 'pending');
+
+  await client.from('hr_job_posts')
+    .update({ scheduled_at, trang_thai: 'scheduled' })
+    .eq('id', postId).neq('trang_thai', 'posted');
+
+  revalidatePath('/');
+  revalidatePath('/dang-tin');
 }

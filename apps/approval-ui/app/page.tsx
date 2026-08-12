@@ -1,6 +1,8 @@
 import { getServerClient } from '../lib/supabase-server';
 import AutoRefresh from './auto-refresh';
 import DecideActions from './decide-actions';
+import { SubmitButton } from './submit-button';
+import { editJobPostDraft } from './actions';
 import { kindMeta, formatRelative, payloadRows } from './labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
@@ -13,6 +15,21 @@ type Item = {
   payload: unknown;
   created_at: string;
 };
+
+type HrPost = {
+  id: string;
+  tieu_de: string;
+  noi_dung: string | null;
+  image_url: string | null;
+  scheduled_at: string | null;
+};
+
+// Lấy đoạn hook (đoạn đầu) từ nội dung để xem trước mà không cuộn.
+function hookPreview(text: string): { hook: string; hasMore: boolean } {
+  const para = text.trim().split(/\n{2,}/)[0] || '';
+  const rest = text.trim().slice(para.length).trim();
+  return { hook: para, hasMore: rest.length > 0 };
+}
 
 export default async function Page({ searchParams }: { searchParams: { kind?: string } }) {
   const client = getServerClient();
@@ -30,6 +47,21 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
 
   const selected = searchParams?.kind || null;
   const items = selected ? all.filter((it) => it.kind === selected) : all;
+
+  // Lấy nội dung thực tế của các bài đăng Facebook để hiển thị và sửa ngay tại đây.
+  const jobPostIds = all
+    .filter((it) => it.kind === 'hr_job_post')
+    .map((it) => ((it.payload as Record<string, unknown>)?.post_id as string) || '')
+    .filter(Boolean);
+
+  const hrPostMap: Record<string, HrPost> = {};
+  if (jobPostIds.length > 0) {
+    const { data: hrPosts } = await client
+      .from('hr_job_posts')
+      .select('id, tieu_de, noi_dung, image_url, scheduled_at')
+      .in('id', jobPostIds);
+    for (const p of hrPosts || []) hrPostMap[p.id] = p as HrPost;
+  }
 
   return (
     <main>
@@ -77,6 +109,10 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
         {items.map((item) => {
           const meta = kindMeta(item.kind);
           const rows = payloadRows(item.payload);
+          const payload = item.payload as Record<string, unknown>;
+          const postId = item.kind === 'hr_job_post' ? (payload?.post_id as string) : null;
+          const hrPost = postId ? hrPostMap[postId] : null;
+
           return (
             <li key={item.id} className={`card tone-${meta.tone}`}>
               <div className="head">
@@ -88,18 +124,60 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
 
               <div className="title">{item.title}</div>
 
-              {rows.length > 0 ? (
-                <dl className="fields">
-                  {rows.map((r) => (
-                    <div className={`field ${r.long ? 'field-long' : ''}`} key={r.key}>
-                      <dt>{r.label}</dt>
-                      <dd>{r.long ? <pre>{r.value}</pre> : r.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : null}
+              {/* Bài đăng Facebook: hiển thị nội dung có thể sửa ngay tại đây */}
+              {hrPost ? (
+                <>
+                  {hrPost.noi_dung ? (() => {
+                    const { hook, hasMore } = hookPreview(hrPost.noi_dung);
+                    return (
+                      <div className="fields" style={{ margin: '8px 0 4px' }}>
+                        <p style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: '0.9em' }}>{hook}</p>
+                        {hasMore ? (
+                          <details style={{ marginTop: 4 }}>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.85em', color: 'var(--muted)' }}>Xem toàn bộ nội dung...</summary>
+                            <pre style={{ marginTop: 6, fontSize: '0.85em' }}>{hrPost.noi_dung}</pre>
+                          </details>
+                        ) : null}
+                      </div>
+                    );
+                  })() : <p className="muted" style={{ margin: '6px 0' }}>Chưa có nội dung.</p>}
 
-              <DecideActions id={item.id} title={item.title} />
+                  {hrPost.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={hrPost.image_url} alt="Ảnh đính kèm" style={{ maxWidth: '100%', maxHeight: 140, borderRadius: 6, margin: '4px 0 6px', objectFit: 'cover' }} />
+                  ) : null}
+
+                  <details className="raw" style={{ marginTop: 6 }}>
+                    <summary>Sửa nội dung trước khi duyệt</summary>
+                    <form action={editJobPostDraft} style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <input type="hidden" name="post_id" value={hrPost.id} />
+                      <textarea
+                        name="noi_dung"
+                        defaultValue={hrPost.noi_dung || ''}
+                        rows={7}
+                        aria-label="Nội dung bài đăng"
+                        style={{ width: '100%', boxSizing: 'border-box' }}
+                      />
+                      <input className="note" type="url" name="image_url" defaultValue={hrPost.image_url || ''} placeholder="URL hình ảnh (để trống nếu không cần)" />
+                      <SubmitButton label="Lưu chỉnh sửa" pendingLabel="Đang lưu..." />
+                    </form>
+                  </details>
+                </>
+              ) : (
+                /* Các loại khác: hiển thị trường payload dạng danh sách */
+                rows.length > 0 ? (
+                  <dl className="fields">
+                    {rows.map((r) => (
+                      <div className={`field ${r.long ? 'field-long' : ''}`} key={r.key}>
+                        <dt>{r.label}</dt>
+                        <dd>{r.long ? <pre>{r.value}</pre> : r.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null
+              )}
+
+              <DecideActions id={item.id} title={item.title} kind={item.kind} postId={postId} />
             </li>
           );
         })}

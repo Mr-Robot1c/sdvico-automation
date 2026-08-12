@@ -2,8 +2,8 @@ name: HR — Đăng tin tuyển dụng Facebook
 
 on:
   schedule:
-    # Mỗi 30 phút, 6h–22h giờ Hà Nội (ICT = UTC+7): 23:00–15:00 UTC
-    - cron: '*/30 23-15 * * *'
+    # Mỗi 5 phút, 6h–22h giờ Hà Nội (ICT = UTC+7): 23:00–15:00 UTC
+    - cron: '*/5 23-15 * * *'
   workflow_dispatch:
     inputs:
       dry_run:

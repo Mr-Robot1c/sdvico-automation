@@ -14,7 +14,7 @@ type Job = {
 };
 type Post = {
   id: string; tieu_de: string; trang_thai: string; scheduled_at: string | null;
-  posted_at: string | null; noi_dung: string | null;
+  posted_at: string | null; noi_dung: string | null; job_id: string | null;
   kenh: string | null; url: string | null; image_url: string | null; ghi_chu: string | null; created_at: string;
 };
 
@@ -36,7 +36,7 @@ export default async function Page() {
     .order('created_at', { ascending: false }).limit(100);
   const jRes = await client
     .from('hr_job_posts')
-    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, kenh, url, image_url, ghi_chu, created_at')
+    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, created_at')
     .order('created_at', { ascending: false }).limit(100);
   const aqRes = await client
     .from('approval_queue')
@@ -49,6 +49,13 @@ export default async function Page() {
   const needMigration = missing(jRes.error?.code);
   const posts = (jRes.data || []) as Post[];
   const approvedPostIds = new Set((aqRes.data || []).map((r) => r.ref_id as string));
+
+  // Ánh xạ job_id → bài đăng Facebook gần nhất (ưu tiên: posted > scheduled > draft > failed).
+  const ORDER = ['posted', 'scheduled', 'draft', 'failed', 'cancelled'];
+  const postByJobId = new Map<string, Post>();
+  for (const p of [...posts].sort((a, b) => ORDER.indexOf(a.trang_thai) - ORDER.indexOf(b.trang_thai))) {
+    if (p.job_id && !postByJobId.has(p.job_id)) postByJobId.set(p.job_id, p);
+  }
 
   const migrationNote = (
     <div className="err" role="alert">
@@ -84,10 +91,42 @@ export default async function Page() {
                 ))}
               </div>
             ) : <p className="muted">Chưa có phiên bản JD nào.</p>}
-            <form action={queueFacebookPost} style={{ marginTop: 8 }}>
-              <input type="hidden" name="job_id" value={j.id} />
-              <SubmitButton label="Soạn bài Facebook và đưa vào hàng đợi duyệt" pendingLabel="Đang soạn bài..." />
-            </form>
+
+            {/* Trạng thái bài Facebook liên kết — hiển thị ngay tại đây, không cần chuyển tab */}
+            {(() => {
+              const p = postByJobId.get(j.id);
+              if (!p) {
+                return (
+                  <form action={queueFacebookPost} style={{ marginTop: 8 }}>
+                    <input type="hidden" name="job_id" value={j.id} />
+                    <SubmitButton label="Soạn bài Facebook và đưa vào hàng đợi duyệt" pendingLabel="Đang soạn bài..." />
+                  </form>
+                );
+              }
+              const tt = TT_LABEL[p.trang_thai] || { label: p.trang_thai, tone: 'default' };
+              const isApproved = approvedPostIds.has(p.id);
+              const canPost = (isApproved || p.trang_thai === 'failed') && p.trang_thai !== 'posted';
+              return (
+                <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  <span className={`stage tone-${tt.tone}`} style={{ fontSize: '0.85em' }}>Facebook: {tt.label}</span>
+                  {p.trang_thai === 'scheduled' && p.scheduled_at
+                    ? <span className="muted" style={{ fontSize: '0.82em' }}>Đặt lúc {new Date(p.scheduled_at).toLocaleString('vi-VN')}</span>
+                    : null}
+                  {p.url ? <a href={p.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.85em' }}>Xem bài</a> : null}
+                  {canPost ? (
+                    <form action={publishJobPost}>
+                      <input type="hidden" name="post_id" value={p.id} />
+                      <SubmitButton label={p.trang_thai === 'failed' ? 'Thử lại' : 'Đăng ngay'} pendingLabel="Đang đăng..." className="btn ok" style={{ fontSize: '0.85em', padding: '4px 10px' }} />
+                    </form>
+                  ) : null}
+                  {p.trang_thai !== 'posted' ? (
+                    <a href="/" style={{ fontSize: '0.82em', color: 'var(--muted)' }}>
+                      {isApproved ? 'Đã duyệt' : 'Vào trang Duyệt để duyệt'}
+                    </a>
+                  ) : null}
+                </div>
+              );
+            })()}
           </li>
         );
       })}
