@@ -7,6 +7,7 @@ import { editDraft } from './actions';
 import { kindMeta, formatRelative, payloadRows, formatLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from './labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
+// (Hàng đợi duyệt hiện ảnh/video đã gắn từ payload.assets — build 2026-08-12.)
 export const dynamic = 'force-dynamic';
 // Sinh nội dung gọi Gemini, cho phép chạy tới 60 giây.
 export const maxDuration = 60;
