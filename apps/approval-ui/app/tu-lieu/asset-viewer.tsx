@@ -1,26 +1,22 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 // Ảnh/clip/âm thanh trong Kho tư liệu: bấm vào để xem/nghe bản lớn trong hộp thoại.
-// Đóng hộp thoại thì DỪNG hẳn video/âm thanh (đóng dialog không tự dừng media).
+// Media (video/audio) CHỈ được gắn vào DOM khi mở modal, nên không tự phát tiếng lúc tải trang.
 export default function AssetViewer({ url, kind, title }: { url: string; kind: string; title: string }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
   const isImg = kind === 'image' || kind === 'logo';
   const isVid = kind === 'video' || kind === 'clip';
   const isAudio = kind === 'audio';
 
-  const stopMedia = () => {
-    const m = ref.current?.querySelector('video, audio') as HTMLMediaElement | null;
-    if (m) {
-      m.pause();
-      try {
-        m.currentTime = 0;
-      } catch {}
-    }
+  const openModal = () => {
+    setOpen(true);
+    ref.current?.showModal();
   };
   const close = () => {
-    stopMedia();
+    setOpen(false); // gỡ media khỏi DOM -> dừng hẳn video/âm thanh
     ref.current?.close();
   };
 
@@ -29,7 +25,7 @@ export default function AssetViewer({ url, kind, title }: { url: string; kind: s
       <button
         type="button"
         className="asset-preview-btn"
-        onClick={() => ref.current?.showModal()}
+        onClick={openModal}
         aria-label={`Xem ${title}`}
         title="Bấm để xem lớn"
       >
@@ -50,7 +46,7 @@ export default function AssetViewer({ url, kind, title }: { url: string; kind: s
       <dialog
         ref={ref}
         className="modal"
-        onClose={stopMedia}
+        onClose={() => setOpen(false)}
         onClick={(e) => {
           if (e.target === ref.current) close();
         }}
@@ -64,7 +60,7 @@ export default function AssetViewer({ url, kind, title }: { url: string; kind: s
           </div>
           <div className="modal-body">
             <div className="modal-media">
-              {isImg ? (
+              {!open ? null : isImg ? (
                 <img src={url} alt={title} />
               ) : isVid ? (
                 <video src={url} controls autoPlay preload="metadata" />

@@ -26,10 +26,10 @@ function cleanAssetName(s: string): string {
     .trim();
 }
 
-// Gộp tên nhiều tệp (ảnh + video) thành một cụm từ khóa, bỏ trùng và phần rỗng.
+// Gộp tên nhiều tệp (ảnh + video) thành một tiêu đề, ngăn bằng dấu cộng, bỏ trùng và phần rỗng.
 function combineNames(...titles: (string | undefined)[]): string {
   const parts = titles.map((t) => cleanAssetName(t || '')).filter(Boolean);
-  return [...new Set(parts)].join(' ');
+  return [...new Set(parts)].join(' + ');
 }
 
 export default function SanXuatForm({
