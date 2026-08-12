@@ -330,3 +330,40 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
 .btn:hover:not(:disabled) { filter: brightness(1.06); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .tab.on { box-shadow: inset 2px 0 0 var(--accent); }
+
+/* ===== Badge tiếng Việt, dòng cờ, hộp nội dung bài ===== */
+.badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; align-items: center; }
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 11px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  background: var(--chip); color: var(--ink-2); white-space: nowrap;
+}
+.badge-format { background: var(--accent-bg); color: var(--accent); }
+.badge.tone-ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.badge.tone-no { background: color-mix(in srgb, var(--no) 16%, transparent); color: var(--no); }
+.badge.tone-demo { background: color-mix(in srgb, var(--tone-mkt) 18%, transparent); color: var(--tone-mkt); }
+.badge.tone-web { background: color-mix(in srgb, var(--tone-web) 18%, transparent); color: var(--tone-web); }
+.badge.tone-mkt { background: color-mix(in srgb, var(--tone-mkt) 18%, transparent); color: var(--tone-mkt); }
+.badge.tone-default { background: var(--chip); color: var(--ink-2); }
+
+.flagline { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.flagchip {
+  font-size: 12px; padding: 3px 9px; border-radius: 8px;
+  background: color-mix(in srgb, var(--no) 12%, transparent); color: var(--no);
+}
+
+.draftbox {
+  white-space: pre-wrap; line-height: 1.65; color: var(--ink);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px; margin: 10px 0; font-size: 14px; max-height: 340px; overflow: auto;
+}
+.metaline { color: var(--ink-2); font-size: 12.5px; margin: 4px 0 2px; }
+
+/* Chip lọc bấm được, tô đậm khi đang chọn */
+a.chip { text-decoration: none; cursor: pointer; }
+a.chip:hover { filter: brightness(0.98); }
+
+/* Polish thêm: thẻ bo tròn mềm hơn, tiêu đề đậm */
+.card { border-radius: 16px; }
+.card .title { font-weight: 700; font-size: 16px; margin: 2px 0; }
+.statcard { border-radius: 16px; }

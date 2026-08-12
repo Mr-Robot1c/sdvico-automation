@@ -3,7 +3,7 @@ import AutoRefresh from './auto-refresh';
 import DecideActions from './decide-actions';
 import GenerateButton from './generate-button';
 import { editDraft } from './actions';
-import { kindMeta, formatRelative, payloadRows } from './labels';
+import { kindMeta, formatRelative, payloadRows, formatLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from './labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 export const dynamic = 'force-dynamic';
@@ -32,13 +32,30 @@ function contentIdOf(payload: unknown): string | null {
   return typeof p.content_id === 'string' ? p.content_id : null;
 }
 
+// Trích thông tin bài marketing từ payload để hiển thị gọn gàng.
+function mktInfo(payload: unknown) {
+  const p = (payload && typeof payload === 'object' ? payload : {}) as Record<string, any>;
+  const compliance = (p.compliance || {}) as Record<string, string[]>;
+  const flags = Object.entries(COMPLIANCE_LABELS)
+    .map(([k, label]) => ({ label, items: Array.isArray(compliance[k]) ? compliance[k] : [] }))
+    .filter((f) => f.items.length > 0);
+  return {
+    format: p.format as string | undefined,
+    intent: p.intent as string | undefined,
+    risk: p.risk as string | undefined,
+    keyword: p.keyword as string | undefined,
+    landingUrl: p.landing_url as string | undefined,
+    flags
+  };
+}
+
 export default async function Page({ searchParams }: { searchParams: { kind?: string } }) {
   const client = getServerClient();
   const { data, error } = await client
     .from('approval_queue')
     .select('id, kind, title, payload, created_at')
     .eq('status', 'pending')
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false });
 
   const raw = (data || []) as Item[];
   // Bản deploy marketing-only chỉ hiện mục marketing (kind bắt đầu bằng 'mkt'), ẩn HR và demo.
@@ -142,6 +159,62 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
       <ul className="list">
         {items.map((item) => {
           const meta = kindMeta(item.kind);
+          const cid = contentIdOf(item.payload);
+          const draft = cid ? drafts.get(cid) : undefined;
+
+          // Thẻ bài marketing: đẹp, có nội dung, badge tiếng Việt.
+          if (item.kind === 'mkt_publish_content') {
+            const info = mktInfo(item.payload);
+            const rk = riskMeta(info.risk);
+            const cleanTitle = item.title.replace(/^\[[^\]]+\]\s*/, '');
+            return (
+              <li key={item.id} className="card tone-mkt">
+                <div className="head">
+                  <span className="kind"><span aria-hidden="true">{meta.icon}</span> {meta.label}</span>
+                  <time className="time" dateTime={item.created_at}>{formatRelative(item.created_at)}</time>
+                </div>
+
+                <div className="title">{cleanTitle}</div>
+
+                <div className="badges">
+                  <span className="badge badge-format">{formatLabel(info.format)}</span>
+                  {info.intent ? <span className="badge">{intentLabel(info.intent)}</span> : null}
+                  <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
+                </div>
+
+                {info.flags.length ? (
+                  <div className="flagline">
+                    {info.flags.map((f) => (
+                      <span className="flagchip" key={f.label}>{f.label}: {f.items.join(', ')}</span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {draft ? <div className="draftbox">{draft}</div> : null}
+
+                {info.keyword ? (
+                  <div className="metaline">
+                    Từ khóa: {info.keyword}{info.landingUrl ? ` · Trang đích: ${info.landingUrl}` : ''}
+                  </div>
+                ) : null}
+
+                <DecideActions id={item.id} title={cleanTitle} />
+
+                {cid && draft !== undefined ? (
+                  <details className="raw editbox">
+                    <summary>Chỉnh sửa bản nháp</summary>
+                    <form action={editDraft} className="editform">
+                      <input type="hidden" name="content_id" value={cid} />
+                      <textarea name="draft" defaultValue={draft} rows={10} aria-label="Bản nháp" />
+                      <button className="btn ok" type="submit">Lưu chỉnh sửa</button>
+                    </form>
+                  </details>
+                ) : null}
+              </li>
+            );
+          }
+
+          // Thẻ chung cho các loại việc khác.
           const rows = payloadRows(item.payload);
           return (
             <li key={item.id} className={`card tone-${meta.tone}`}>
@@ -172,21 +245,6 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
               ) : null}
 
               <DecideActions id={item.id} title={item.title} />
-
-              {(() => {
-                const cid = contentIdOf(item.payload);
-                const draft = cid ? drafts.get(cid) : undefined;
-                return cid && draft !== undefined ? (
-                  <details className="raw editbox">
-                    <summary>Chỉnh sửa bản nháp</summary>
-                    <form action={editDraft} className="editform">
-                      <input type="hidden" name="content_id" value={cid} />
-                      <textarea name="draft" defaultValue={draft} rows={10} aria-label="Bản nháp" />
-                      <button className="btn ok" type="submit">Lưu chỉnh sửa</button>
-                    </form>
-                  </details>
-                ) : null;
-              })()}
             </li>
           );
         })}

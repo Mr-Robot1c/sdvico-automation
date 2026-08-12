@@ -48,8 +48,49 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 export function fieldLabel(key: string): string {
-  return FIELD_LABELS[key] || key;
+  if (FIELD_LABELS[key]) return FIELD_LABELS[key];
+  const s = key.replace(/_/g, ' ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+// Nhãn định dạng nội dung marketing.
+export function formatLabel(f?: string): string {
+  switch (f) {
+    case 'article': return 'Bài website';
+    case 'social': return 'Bài Facebook';
+    case 'video': return 'Kịch bản video';
+    default: return f || 'Bài viết';
+  }
+}
+
+// Nhãn ý định tìm kiếm.
+export function intentLabel(i?: string): string {
+  switch (i) {
+    case 'thong_tin': return 'Thông tin';
+    case 'thuong_mai': return 'So sánh';
+    case 'giao_dich': return 'Giao dịch';
+    case 'dieu_huong': return 'Điều hướng';
+    default: return i || '';
+  }
+}
+
+// Nhãn và màu mức rủi ro.
+export function riskMeta(r?: string): { label: string; tone: string } {
+  switch (r) {
+    case 'red': return { label: 'Cờ đỏ, cấp quản lý duyệt', tone: 'no' };
+    case 'amber': return { label: 'Cần rà lại', tone: 'demo' };
+    default: return { label: 'Sạch', tone: 'ok' };
+  }
+}
+
+// Nhãn cho từng nhóm cờ tuân thủ.
+export const COMPLIANCE_LABELS: Record<string, string> = {
+  regulation: 'Chạm quy định',
+  partner: 'Nhắc đối tác',
+  unverifiedSpecs: 'Thông số chưa xác nhận',
+  testSpecs: 'Thông số test',
+  style: 'Lỗi giọng văn'
+};
 
 // Thời gian tương đối, dễ đọc hơn mốc tuyệt đối. Cập nhật mỗi lần trang làm mới.
 export function formatRelative(iso: string): string {
