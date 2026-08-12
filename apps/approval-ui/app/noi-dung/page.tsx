@@ -1,6 +1,5 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
-import GenerateButton from '../generate-button';
 import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
 import { formatLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
@@ -9,10 +8,18 @@ export const dynamic = 'force-dynamic';
 
 const STATUS: Record<string, { label: string; tone: string }> = {
   draft: { label: 'Nháp', tone: 'demo' },
-  review: { label: 'Chờ duyệt', tone: 'no' },
+  review: { label: 'Chờ duyệt', tone: 'demo' },
   approved: { label: 'Đã duyệt', tone: 'ok' },
+  rejected: { label: 'Đã từ chối', tone: 'no' },
   published: { label: 'Đã đăng', tone: 'web' }
 };
+
+// Các mốc lọc theo trạng thái trên thanh chip.
+const STATUS_TABS: { key: string; label: string }[] = [
+  { key: 'review', label: 'Chờ duyệt' },
+  { key: 'approved', label: 'Đã duyệt' },
+  { key: 'rejected', label: 'Đã từ chối' }
+];
 
 // Kênh đăng suy từ loại nội dung (kind): article → Website, social → Facebook, video → YouTube.
 function channelOf(kind: string): string {
@@ -40,9 +47,10 @@ type Assets = { image?: string | null; video?: string | null } | null;
 type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets } | null;
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
-export default async function Page({ searchParams }: { searchParams: { loai?: string } }) {
+export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
   const tab = searchParams?.loai === 'video' ? 'video' : 'baiviet';
   const kinds = tab === 'video' ? ['video'] : ['article', 'social'];
+  const statusFilter = searchParams?.trangthai && STATUS[searchParams.trangthai] ? searchParams.trangthai : null;
 
   const client = getServerClient();
   const { data, error } = await client
@@ -52,7 +60,32 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const items = (data || []) as Content[];
+  const rawItems = (data || []) as Content[];
+
+  // Trạng thái duyệt là ở approval_queue (nguồn sự thật của điều cấm 1). Lấy về để suy trạng thái
+  // thực của mỗi bài: đã duyệt, đã từ chối, hay còn chờ.
+  const { data: qRows } = await client
+    .from('approval_queue')
+    .select('payload, status')
+    .eq('kind', 'mkt_publish_content');
+  const queueStatus = new Map<string, string>();
+  for (const q of qRows || []) {
+    const cid = (q.payload && typeof q.payload === 'object' ? (q.payload as any).content_id : null) as string | null;
+    if (cid) queueStatus.set(cid, q.status as string);
+  }
+  const effStatus = (c: Content): string => {
+    const qs = queueStatus.get(c.id);
+    if (qs === 'approved') return 'approved';
+    if (qs === 'rejected') return 'rejected';
+    if (qs === 'pending') return 'review';
+    return c.status || 'draft';
+  };
+
+  // Đếm theo trạng thái (trên tập đã lọc theo loại) để dựng thanh chip.
+  const statusCount = new Map<string, number>();
+  for (const c of rawItems) statusCount.set(effStatus(c), (statusCount.get(effStatus(c)) || 0) + 1);
+
+  const items = statusFilter ? rawItems.filter((c) => effStatus(c) === statusFilter) : rawItems;
 
   // Đổi id ảnh/video đã gắn (brief.assets) ra link công khai để hiện trong modal.
   const assetIds = new Set<string>();
@@ -78,26 +111,51 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     client.from('mkt_content').select('*', { count: 'exact', head: true }).eq('kind', 'video')
   ]);
 
+  // Giữ nguyên loại khi đổi trạng thái, và ngược lại.
+  const withParams = (patch: { loai?: string | null; trangthai?: string | null }) => {
+    const loai = patch.loai !== undefined ? patch.loai : (tab === 'video' ? 'video' : null);
+    const tt = patch.trangthai !== undefined ? patch.trangthai : statusFilter;
+    const qs = new URLSearchParams();
+    if (loai) qs.set('loai', loai);
+    if (tt) qs.set('trangthai', tt);
+    const s = qs.toString();
+    return s ? `/noi-dung?${s}` : '/noi-dung';
+  };
+
   return (
     <main>
       <header className="head-row">
         <div>
           <h1>Quản lý bài viết</h1>
-          <p className="sub">Danh sách bài đã sinh, đã duyệt, đã đăng. Bấm mắt để xem nội dung.</p>
+          <p className="sub">Danh sách bài đã sinh, đã duyệt, đã từ chối, đã đăng. Bấm mắt để xem nội dung.</p>
         </div>
         <div className="head-actions">
-          <GenerateButton />
           <AutoRefresh seconds={30} />
         </div>
       </header>
 
       <nav className="filters" aria-label="Loại nội dung">
-        <a className={`chip ${tab === 'baiviet' ? 'on' : ''}`} href="/noi-dung">
+        <a className={`chip ${tab === 'baiviet' ? 'on' : ''}`} href={withParams({ loai: null })}>
           <span aria-hidden="true">📝</span> Bài viết <span className="n">{cBai ?? 0}</span>
         </a>
-        <a className={`chip ${tab === 'video' ? 'on' : ''}`} href="/noi-dung?loai=video">
+        <a className={`chip ${tab === 'video' ? 'on' : ''}`} href={withParams({ loai: 'video' })}>
           <span aria-hidden="true">🎬</span> Video <span className="n">{cVid ?? 0}</span>
         </a>
+      </nav>
+
+      <nav className="filters" aria-label="Lọc theo trạng thái">
+        <a className={`chip ${!statusFilter ? 'on' : ''}`} href={withParams({ trangthai: null })}>
+          Tất cả <span className="n">{rawItems.length}</span>
+        </a>
+        {STATUS_TABS.map((s) => (
+          <a
+            key={s.key}
+            className={`chip ${statusFilter === s.key ? 'on' : ''}`}
+            href={withParams({ trangthai: s.key })}
+          >
+            {s.label} <span className="n">{statusCount.get(s.key) || 0}</span>
+          </a>
+        ))}
       </nav>
 
       {tab === 'video' ? (
@@ -115,8 +173,8 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       {!error && items.length === 0 ? (
         <div className="empty">
           <div className="empty-icon" aria-hidden="true">{tab === 'video' ? '🎬' : '📝'}</div>
-          <p>Chưa có {tab === 'video' ? 'kịch bản video' : 'bài viết'} nào.</p>
-          <p className="sub">Bấm Sinh nội dung ở trên để máy soạn thêm.</p>
+          <p>Chưa có {tab === 'video' ? 'kịch bản video' : 'bài viết'} nào{statusFilter ? ` ở mục ${STATUS[statusFilter].label}` : ''}.</p>
+          <p className="sub">Vào <a className="src" href="/san-xuat">Xưởng sản xuất</a> để soạn bài mới.</p>
         </div>
       ) : null}
 
@@ -136,7 +194,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
             </thead>
             <tbody>
               {items.map((c) => {
-                const st = STATUS[c.status] || { label: c.status, tone: 'default' };
+                const st = STATUS[effStatus(c)] || { label: effStatus(c), tone: 'default' };
                 const risk = riskMeta(c.brief?.risk);
                 const f: Flags = c.brief?.compliance || {};
                 const flagRows = Object.entries(COMPLIANCE_LABELS)

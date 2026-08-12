@@ -9,6 +9,7 @@ ttl_days: 180
 <!-- re-verified: 2026-08-12 - Hang doi duyet gio resolve payload.assets (id) ra public URL, hien anh/video tren card va modal. /san-xuat upload doi tu server action sang browser PUT thang len Storage qua signed URL (vuot gioi han 4,5MB Vercel). Them action createAssetUploadUrl + registerAsset. Luong approval_queue, kind=mkt_publish_content, va cac bang du lieu KHONG doi. -->
 <!-- re-verified: 2026-08-12 - Them build marker o page.tsx de trigger deploy Vercel. Khong doi logic. -->
 <!-- re-verified: 2026-08-12 - /noi-dung modal: them hien anh/video tu brief.assets, va sua .modal text-align:left (truoc bi lech phai do .col-actions text-align:right). asset-uploader: them thanh tien trinh % (XHR) + bao loi 413. Luong du lieu KHONG doi. -->
+<!-- re-verified: 2026-08-12 - Bo nut Sinh noi dung (GenerateButton) khoi / va /noi-dung. Doi nhan rui ro red: "Co do..." -> "Can xem xet hoac uu tien". /noi-dung them loc trang thai (Cho duyet/Da duyet/Da tu choi) suy tu approval_queue.status theo payload.content_id. Media modal doi sang kieu Facebook (xep doc, full-width, can giua). Xuong san xuat: Sinh text nhan them assetHint (ten file anh/video da chon) de AI viet an khop. decideForm revalidate them /noi-dung. Luong approval_queue va cac bang KHONG doi. -->
 
 
 Hệ thống chia hai mảng, mỗi mảng một file workflow và app map riêng:

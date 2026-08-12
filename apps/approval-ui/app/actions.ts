@@ -21,6 +21,7 @@ export async function decideForm(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath('/');
+  revalidatePath('/noi-dung');
 }
 
 // Thêm một từ khóa vào kho.
@@ -165,14 +166,15 @@ export async function deleteAsset(formData: FormData) {
 export async function generateTextForTitle(
   keyword: string,
   intent: string = 'giao_dich',
-  landing_url: string | null = null
+  landing_url: string | null = null,
+  assetHint: string = ''
 ): Promise<string> {
   const clean = (keyword || '').trim();
   if (!clean) return '';
   // @ts-ignore — module JS thuần, không có .d.ts
   const { generateContentAsync } = await import('../lib/gen/content.mjs');
   try {
-    const r = await generateContentAsync({ keyword: clean, intent, landing_url });
+    const r = await generateContentAsync({ keyword: clean, intent, landing_url }, { assetHint: (assetHint || '').trim() });
     return (r?.draft as string) || '';
   } catch (e: any) {
     return `Không sinh được bằng AI: ${e?.message || e}. Bấm Xong để tự soạn tay và đẩy vào hàng đợi.`;

@@ -339,7 +339,7 @@ const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-latest';
 // Sinh draft bằng Gemini. CHỈ gọi khi có GEMINI_API_KEY. Import động để khi không có khóa,
 // gói @google/genai không cần cài và bản mẫu vẫn chạy. Trả về văn bản, hoặc ném lỗi để chỗ
 // gọi tự lùi về bản mẫu.
-export async function generateDraftLLM(brief, facts = []) {
+export async function generateDraftLLM(brief, facts = [], assetHint = '') {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -363,8 +363,11 @@ export async function generateDraftLLM(brief, facts = []) {
     `Viết một bài cho từ khóa: "${brief.keyword}".`,
     `Ý định tìm kiếm: ${brief.intent}.`,
     `Các phần nên có: ${(brief.sections || []).join('; ')}.`,
+    assetHint
+      ? `Bài này đăng kèm ảnh hoặc video tên tệp: "${assetHint}". Viết nội dung ăn khớp với hình đó, mô tả đúng thứ trong hình, không bịa chi tiết ngoài tên tệp và từ khóa.`
+      : '',
     'Viết tiếng Việt, dài vừa phải, sẵn sàng cho người duyệt.',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   const res = await ai.models.generateContent({
     model: MKT_MODEL,
@@ -377,11 +380,11 @@ export async function generateDraftLLM(brief, facts = []) {
 }
 
 // Sinh nội dung, ưu tiên Gemini khi có khóa, không thì lùi về bản mẫu. Luôn trả draft dùng được.
-export async function generateContentAsync(kw, { facts = [] } = {}) {
+export async function generateContentAsync(kw, { facts = [], assetHint = '' } = {}) {
   const brief = buildBrief(kw);
   if (process.env.GEMINI_API_KEY) {
     try {
-      const draft = await generateDraftLLM(brief, facts);
+      const draft = await generateDraftLLM(brief, facts, assetHint);
       return { title: draftTitle(brief), brief: { ...brief, generator: 'gemini' }, draft };
     } catch (e) {
       console.warn('Gemini lỗi, lùi về bản mẫu:', e.message);

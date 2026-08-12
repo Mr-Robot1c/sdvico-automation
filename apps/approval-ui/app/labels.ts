@@ -77,7 +77,7 @@ export function intentLabel(i?: string): string {
 // Nhãn và màu mức rủi ro.
 export function riskMeta(r?: string): { label: string; tone: string } {
   switch (r) {
-    case 'red': return { label: 'Cờ đỏ, cấp quản lý duyệt', tone: 'no' };
+    case 'red': return { label: 'Cần xem xét hoặc ưu tiên', tone: 'no' };
     case 'amber': return { label: 'Cần rà lại', tone: 'demo' };
     default: return { label: 'Sạch', tone: 'ok' };
   }

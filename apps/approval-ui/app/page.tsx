@@ -1,7 +1,6 @@
 import { getServerClient } from '../lib/supabase-server';
 import AutoRefresh from './auto-refresh';
 import DecideActions from './decide-actions';
-import GenerateButton from './generate-button';
 import ViewModal from './view-modal';
 import { editDraft } from './actions';
 import { kindMeta, formatRelative, payloadRows, formatLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from './labels';
@@ -126,7 +125,6 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
           <p className="sub">Máy soạn, người bấm. Xem từng mục rồi Duyệt hoặc Từ chối.</p>
         </div>
         <div className="head-actions">
-          <GenerateButton />
           <AutoRefresh seconds={30} />
         </div>
       </header>
@@ -142,7 +140,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
         <div className="statcard red">
           <span className="statcard-icon" aria-hidden="true">🚩</span>
           <div className="statcard-body">
-            <span className="statcard-label">Cờ đỏ cần cấp quản lý</span>
+            <span className="statcard-label">Cần xem xét hoặc ưu tiên</span>
             <span className="statcard-num">{redCount}</span>
           </div>
         </div>
@@ -168,7 +166,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
 
       {!error && redCount > 0 ? (
         <p className="err" role="status">
-          {redCount} mục cờ đỏ chạm quy định, cần cấp quản lý duyệt trước. Đã xếp lên đầu.
+          {redCount} mục cần xem xét hoặc ưu tiên (chạm quy định nhà nước). Đã xếp lên đầu.
         </p>
       ) : null}
 
@@ -296,7 +294,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
 
               {isRedFlag(item.payload) ? (
                 <div className="stages">
-                  <span className="stage tone-no">Cờ đỏ, cấp quản lý duyệt</span>
+                  <span className="stage tone-no">Cần xem xét hoặc ưu tiên</span>
                 </div>
               ) : null}
 

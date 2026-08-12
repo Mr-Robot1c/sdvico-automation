@@ -55,10 +55,13 @@ export default function SanXuatForm({
     setGenBusy(true);
     setMsg('Đang sinh text theo từ khóa...');
     try {
+      // Nếu đã chọn ảnh hoặc video, đưa tên tệp của nó làm gợi ý để AI viết ăn khớp với hình.
+      const assetHint = selectedImg?.title || selectedVid?.title || '';
       const t = await generateTextForTitle(
         kw,
         selectedKw?.intent || 'giao_dich',
-        selectedKw?.landing_url || null
+        selectedKw?.landing_url || null,
+        assetHint
       );
       setDraft(t);
       setMsg(t ? 'Đã sinh xong. Sửa lại rồi bấm Xong để đẩy vào hàng đợi.' : 'Sinh xong nhưng không có text — thử từ khóa khác.');
