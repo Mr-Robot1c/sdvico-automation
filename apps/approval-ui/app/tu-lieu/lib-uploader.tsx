@@ -4,32 +4,23 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createAssetUploadUrl, registerAsset } from '../actions';
 
-// Tải ảnh/video THẲNG từ trình duyệt lên Supabase Storage qua URL ký sẵn.
-// Không đi qua server action nên không dính giới hạn 4,5MB của Vercel — video lớn tải được.
-// Dùng XMLHttpRequest để hiện phần trăm tiến trình, tránh cảm giác treo với file lớn.
+// Tải tư liệu (ảnh, video, âm thanh, logo) THẲNG từ trình duyệt lên Supabase Storage qua URL ký sẵn.
+// Không qua server action nên video lớn tải được (vượt giới hạn 4,5MB của Vercel). Giữ tên tệp gốc
+// nếu không nhập tên.
 function mb(bytes: number) {
   return (bytes / (1024 * 1024)).toFixed(1);
 }
 
-export default function AssetUploader({ kind }: { kind: 'image' | 'video' }) {
+export default function LibUploader() {
+  const [kind, setKind] = useState('image');
+  const [title, setTitle] = useState('');
+  const [license, setLicense] = useState('owned');
+  const [source, setSource] = useState('');
   const [busy, setBusy] = useState(false);
   const [pct, setPct] = useState(0);
   const [msg, setMsg] = useState('');
-  const [title, setTitle] = useState('');
-  const [fileName, setFileName] = useState('');
-  const [fileSize, setFileSize] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-
-  const isVideo = kind === 'video';
-
-  const onPick = () => {
-    const f = fileRef.current?.files?.[0];
-    setFileName(f?.name || '');
-    setFileSize(f?.size || 0);
-    setMsg('');
-    setPct(0);
-  };
 
   const putWithProgress = (url: string, file: File) =>
     new Promise<void>((resolve, reject) => {
@@ -52,25 +43,21 @@ export default function AssetUploader({ kind }: { kind: 'image' | 'video' }) {
   const onUpload = async () => {
     const file = fileRef.current?.files?.[0];
     if (!file) {
-      setMsg(isVideo ? 'Chọn video trước.' : 'Chọn ảnh trước.');
+      setMsg('Chọn file trước.');
       return;
     }
     setBusy(true);
     setPct(0);
     setMsg(`Đang tải lên (${mb(file.size)}MB)...`);
     try {
-      // 1. Xin URL ký sẵn từ máy chủ (dùng khóa service role, an toàn).
       const { path, uploadUrl } = await createAssetUploadUrl(file.name, kind);
-      // 2. Trình duyệt PUT file thẳng lên Storage, có hiện phần trăm.
       await putWithProgress(uploadUrl, file);
-      // 3. Ghi nhận vào brand_assets để hiện trong kho. Chưa nhập tên thì giữ tên tệp gốc.
       setMsg('Đã tải xong, đang ghi nhận...');
-      await registerAsset({ path, kind, title: title.trim() || file.name, license: 'owned' });
-      setMsg('Đã tải lên xong. Chọn từ kho bên trên để gắn vào bài.');
+      await registerAsset({ path, kind, title: title.trim() || file.name, license, source });
+      setMsg('Đã tải tư liệu lên kho.');
       setPct(0);
       setTitle('');
-      setFileName('');
-      setFileSize(0);
+      setSource('');
       if (fileRef.current) fileRef.current.value = '';
       router.refresh();
     } catch (e: any) {
@@ -82,33 +69,38 @@ export default function AssetUploader({ kind }: { kind: 'image' | 'video' }) {
 
   return (
     <div className="factform">
-      <input
-        ref={fileRef}
-        type="file"
-        accept={isVideo ? 'video/*' : 'image/*'}
-        aria-label={isVideo ? 'Chọn video từ máy' : 'Chọn ảnh từ máy'}
-        onChange={onPick}
-        disabled={busy}
-      />
+      <input ref={fileRef} type="file" aria-label="Chọn file" disabled={busy} />
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder={isVideo ? 'Tên video (tùy chọn)' : 'Tên ảnh (tùy chọn)'}
-        aria-label={isVideo ? 'Tên video' : 'Tên ảnh'}
+        placeholder="Tên tư liệu (để trống thì giữ tên tệp gốc)"
+        aria-label="Tên"
+        disabled={busy}
+      />
+      <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Loại" disabled={busy}>
+        <option value="image">Ảnh</option>
+        <option value="video">Clip</option>
+        <option value="audio">Âm thanh</option>
+        <option value="logo">Logo</option>
+      </select>
+      <select value={license} onChange={(e) => setLicense(e.target.value)} aria-label="Giấy phép" disabled={busy}>
+        <option value="owned">Công ty sở hữu</option>
+        <option value="licensed">Có giấy phép</option>
+      </select>
+      <input
+        value={source}
+        onChange={(e) => setSource(e.target.value)}
+        placeholder="Nguồn (ai quay, ở đâu)"
+        aria-label="Nguồn"
         disabled={busy}
       />
       <button className="btn ok" type="button" onClick={onUpload} disabled={busy}>
-        {busy ? `Đang tải... ${pct}%` : isVideo ? 'Tải video lên' : 'Tải ảnh lên'}
+        {busy ? `Đang tải... ${pct}%` : 'Tải lên'}
       </button>
       {busy && pct > 0 ? (
         <div className="uploadbar" aria-hidden="true">
           <span style={{ width: `${pct}%` }} />
         </div>
-      ) : null}
-      {fileName && !busy ? (
-        <span className="muted">
-          Đã chọn: {fileName} ({mb(fileSize)}MB)
-        </span>
       ) : null}
       {msg ? <span className="muted">{msg}</span> : null}
     </div>

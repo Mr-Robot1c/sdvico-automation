@@ -1,6 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { uploadAsset, deleteAsset, renameAsset } from '../actions';
+import { deleteAsset, renameAsset } from '../actions';
 import AssetViewer from './asset-viewer';
+import LibUploader from './lib-uploader';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -46,22 +47,7 @@ export default async function Page() {
         Video dùng để dựng phải là cảnh quay thật. FFmpeg lấy tư liệu từ đây để ghép. File lớn hơn 4,5MB thì tải thẳng qua Supabase Storage, bucket brand-assets.
       </p>
 
-      <form className="factform" action={uploadAsset} encType="multipart/form-data">
-        <input type="file" name="file" aria-label="Chọn file" required />
-        <input name="title" placeholder="Tên tư liệu" aria-label="Tên" />
-        <select name="kind" aria-label="Loại" defaultValue="image">
-          <option value="image">Ảnh</option>
-          <option value="video">Clip</option>
-          <option value="audio">Âm thanh</option>
-          <option value="logo">Logo</option>
-        </select>
-        <select name="license" aria-label="Giấy phép" defaultValue="owned">
-          <option value="owned">Công ty sở hữu</option>
-          <option value="licensed">Có giấy phép</option>
-        </select>
-        <input name="source" placeholder="Nguồn (ai quay, ở đâu)" aria-label="Nguồn" />
-        <button className="btn ok" type="submit">Tải lên</button>
-      </form>
+      <LibUploader />
 
       {!error && rows.length === 0 ? (
         <div className="empty">

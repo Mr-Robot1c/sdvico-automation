@@ -132,17 +132,20 @@ export async function registerAsset(input: {
   kind: string;
   title?: string;
   license?: string;
+  source?: string;
 }) {
   const path = String(input?.path || '').trim();
   if (!path) throw new Error('Thiếu đường dẫn file đã tải lên.');
-  const kind = input.kind === 'video' ? 'video' : 'image';
+  const KINDS = ['image', 'video', 'audio', 'logo', 'clip'];
+  const kind = KINDS.includes(input.kind) ? input.kind : 'image';
   const license = input.license === 'licensed' ? 'licensed' : 'owned';
   const client = getServerClient();
   const { error } = await client.from('brand_assets').insert({
     kind,
     title: String(input.title || '').trim() || path,
     storage_path: path,
-    license
+    license,
+    source: String(input.source || '').trim() || null
   });
   if (error) throw new Error(error.message);
   revalidatePath('/tu-lieu');
