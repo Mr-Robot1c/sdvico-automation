@@ -262,7 +262,7 @@ export default function SanXuatForm({
               type="button"
               className="btn ghost"
               onClick={onGenerate}
-              disabled={genBusy || (!selectedKw && !title.trim())}
+              disabled={genBusy || (!selectedKw && !title.trim() && !selectedImg && !selectedVid)}
             >
               {genBusy ? 'Đang sinh...' : '✨ Sinh text bằng AI'}
             </button>

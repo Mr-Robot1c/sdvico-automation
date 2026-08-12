@@ -64,3 +64,4 @@ Kiến trúc đã chốt, chi tiết ở CLAUDE.md mục 5.
 | run_log | Chung | Có thể chứa, thận trọng |
 
 Cập nhật lần cuối: 10/8/2026.
+<!-- re-verified: 2026-08-12 - Fix nut Sinh text: disabled cu chi cho bam khi co keyword/title, gio cho bam khi da chon anh/video (de sinh text theo ten anh). Khong doi luong. -->
