@@ -21,7 +21,7 @@ export default function ImageStudio({
 }: {
   productId: string;
   productTitle: string;
-  onAttach: (assetId: string) => void;
+  onAttach: (assetId: string, meta?: { banner?: boolean }) => void;
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UnsplashItem[]>([]);
@@ -54,7 +54,7 @@ export default function ImageStudio({
         title: (query || productTitle || 'anh') + '-unsplash'
       });
       onAttach(res.id);
-      setMsg('Đã chèn ảnh vào bài. Bấm Xong khi hoàn tất.');
+      setMsg('Đã chèn ảnh vào bài.');
     } catch (e: any) {
       setMsg('Lỗi chèn ảnh: ' + (e?.message || e));
     } finally {
@@ -77,7 +77,7 @@ export default function ImageStudio({
         title: productTitle,
         author: it?.author
       });
-      onAttach(res.id);
+      onAttach(res.id, { banner: true });
       setMsg('Đã tạo banner và gắn vào bài. Xem khung ảnh ở trên.');
     } catch (e: any) {
       setMsg('Lỗi ghép banner: ' + (e?.message || e));

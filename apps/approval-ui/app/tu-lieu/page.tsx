@@ -1,5 +1,6 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { uploadAsset, deleteAsset } from '../actions';
+import AssetViewer from './asset-viewer';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -76,13 +77,7 @@ export default async function Page() {
           return (
             <li key={a.id} className="assetcard">
               <div className="asset-preview">
-                {a.kind === 'image' || a.kind === 'logo' ? (
-                  <img src={url} alt={a.title} loading="lazy" />
-                ) : a.kind === 'video' || a.kind === 'clip' ? (
-                  <video src={url} controls preload="metadata" />
-                ) : (
-                  <a href={url} target="_blank" rel="noreferrer">Mở file</a>
-                )}
+                <AssetViewer url={url} kind={a.kind} title={a.title} />
               </div>
               <div className="asset-meta">
                 <span className="badge badge-format">{KIND_LABEL[a.kind] || a.kind}</span>

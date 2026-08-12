@@ -16,6 +16,16 @@ const INTENT_LABEL: Record<string, string> = {
   dieu_huong: 'Điều hướng'
 };
 
+// Làm sạch tên tệp thành cụm từ khóa: bỏ timestamp đầu, bỏ đuôi file, đổi gạch/underscore thành khoảng trắng.
+function cleanAssetName(s: string): string {
+  return (s || '')
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/^\d{10,}[-_]/, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default function SanXuatForm({
   images,
   videos,
@@ -49,23 +59,15 @@ export default function SanXuatForm({
     }
   };
 
-  const onGenerate = async () => {
-    const kw = selectedKw?.keyword || title.trim();
-    if (!kw) {
+  const runGenerate = async (kw: string, intent: string, landingUrl: string | null, assetHint: string) => {
+    if (!kw.trim()) {
       setMsg('Chọn từ khóa trong kho, hoặc gõ tay tiêu đề trước khi sinh text.');
       return;
     }
     setGenBusy(true);
     setMsg('Đang sinh text theo từ khóa...');
     try {
-      // Nếu đã chọn ảnh hoặc video, đưa tên tệp của nó làm gợi ý để AI viết ăn khớp với hình.
-      const assetHint = selectedImg?.title || selectedVid?.title || '';
-      const t = await generateTextForTitle(
-        kw,
-        selectedKw?.intent || 'giao_dich',
-        selectedKw?.landing_url || null,
-        assetHint
-      );
+      const t = await generateTextForTitle(kw, intent, landingUrl, assetHint);
       setDraft(t);
       setMsg(t ? 'Đã sinh xong. Sửa lại rồi bấm Xong để đẩy vào hàng đợi.' : 'Sinh xong nhưng không có text — thử từ khóa khác.');
     } catch (e: any) {
@@ -73,6 +75,17 @@ export default function SanXuatForm({
     } finally {
       setGenBusy(false);
     }
+  };
+
+  const onGenerate = () => {
+    const kw = selectedKw?.keyword || title.trim();
+    // Nếu đã chọn ảnh hoặc video, đưa tên tệp của nó làm gợi ý để AI viết ăn khớp với hình.
+    return runGenerate(
+      kw,
+      selectedKw?.intent || 'giao_dich',
+      selectedKw?.landing_url || null,
+      selectedImg?.title || selectedVid?.title || ''
+    );
   };
 
   const onSubmit = (formData: FormData) => {
@@ -182,6 +195,34 @@ export default function SanXuatForm({
         <AssetUploader kind="video" />
       </section>
 
+      <ImageStudio
+        productId={imgId}
+        productTitle={title || selectedKw?.keyword || ''}
+        onAttach={(id, meta) => {
+          const productName = selectedImg?.title || '';
+          setImgId(id);
+          router.refresh();
+          if (meta?.banner) {
+            // Tạo banner xong thì tự sinh text luôn, ưu tiên từ khóa/tiêu đề, không thì lấy tên ảnh mô tả.
+            const kwText = (selectedKw?.keyword || title.trim() || cleanAssetName(productName)).trim();
+            if (kwText && !genBusy) {
+              if (!title.trim() && !selectedKw) setTitle(cleanAssetName(productName));
+              setMsg('Đã tạo banner. Đang tự sinh text theo hình...');
+              runGenerate(
+                kwText,
+                selectedKw?.intent || 'giao_dich',
+                selectedKw?.landing_url || null,
+                productName
+              );
+            } else {
+              setMsg('Đã tạo banner và gắn vào bài.');
+            }
+          } else {
+            setMsg('Đã gắn ảnh vào bài.');
+          }
+        }}
+      />
+
       <section className="sx-compose">
         <header className="sx-slot-head">
           <span className="sx-slot-title">Soạn bài viết</span>
@@ -276,16 +317,6 @@ export default function SanXuatForm({
           </p>
         </form>
       </section>
-
-      <ImageStudio
-        productId={imgId}
-        productTitle={title || selectedKw?.keyword || ''}
-        onAttach={(id) => {
-          setImgId(id);
-          setMsg('Đã gắn ảnh mới vào bài. Kéo lên khung ảnh để xem.');
-          router.refresh();
-        }}
-      />
     </div>
   );
 }
