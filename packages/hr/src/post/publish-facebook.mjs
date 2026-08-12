@@ -38,18 +38,24 @@ if (jobs.length === 0) {
   process.exit(0);
 }
 
-// 2. Đọc nội dung nháp, bỏ bài đã đăng hoặc thiếu nội dung.
+// 2. Đọc nội dung nháp, bỏ bài đã đăng, thiếu nội dung, hoặc chưa đến giờ đặt lịch.
 const postIds = jobs.map((j) => j.postId);
 const { data: posts, error: e2 } = await client
   .from('hr_job_posts')
-  .select('id, tieu_de, noi_dung, trang_thai, url')
+  .select('id, tieu_de, noi_dung, trang_thai, url, image_url, scheduled_at')
   .in('id', postIds);
 if (e2) throw new Error('Đọc hr_job_posts lỗi: ' + e2.message);
 const byId = new Map((posts || []).map((p) => [p.id, p]));
 
+const now = new Date().toISOString();
 const queue = jobs.filter((j) => {
   const p = byId.get(j.postId);
-  return p && p.trang_thai !== 'posted' && p.noi_dung && p.noi_dung.trim();
+  if (!p) return false;
+  if (p.trang_thai === 'posted') return false;
+  if (!p.noi_dung || !p.noi_dung.trim()) return false;
+  // Bài đặt lịch: chỉ đăng khi đã đến hoặc qua giờ.
+  if (p.scheduled_at && p.scheduled_at > now) return false;
+  return true;
 });
 
 console.log(`=== Đăng tin tuyển dụng lên Facebook (${LIVE ? 'LIVE' : 'CHẠY THỬ'}) ===`);
@@ -91,12 +97,26 @@ for (const j of queue) {
   }
 
   try {
-    const url = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
-    const res = await fetch(url, { method: 'POST', body: new URLSearchParams({ message, access_token: TOKEN }) });
-    const json = await res.json();
-    if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
+    let fbPostId;
+    if (p.image_url) {
+      // Đăng ảnh kèm caption. Facebook tự tải ảnh từ URL, đăng dạng photo post.
+      const photoUrl = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/photos`;
+      const res = await fetch(photoUrl, {
+        method: 'POST',
+        body: new URLSearchParams({ url: p.image_url, caption: message, access_token: TOKEN })
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
+      fbPostId = json.post_id || json.id;
+    } else {
+      // Không có ảnh: đăng text-only.
+      const feedUrl = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
+      const res = await fetch(feedUrl, { method: 'POST', body: new URLSearchParams({ message, access_token: TOKEN }) });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
+      fbPostId = json.id;
+    }
 
-    const fbPostId = json.id; // dạng {pageId}_{postId}
     const externalUrl = `https://www.facebook.com/${fbPostId}`;
     await client.from('hr_job_posts')
       .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), url: externalUrl })

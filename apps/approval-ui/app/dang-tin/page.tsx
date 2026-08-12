@@ -1,7 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { formatRelative } from '../labels';
-import { addPlatform, removePlatform, addJobPost, updateJobPost, queueFacebookPost, editJobPostDraft } from '../actions';
+import { addPlatform, removePlatform, addJobPost, updateJobPost, queueFacebookPost, editJobPostDraft, publishJobPost } from '../actions';
 import DangTinSections from '../dang-tin-sections';
 
 // Quản lý vị trí, nền tảng đăng tuyển và theo dõi tin đăng.
@@ -17,7 +17,7 @@ type Platform = { id: string; ten: string; loai: string; bat: boolean; ghi_chu: 
 type Post = {
   id: string; tieu_de: string; trang_thai: string; scheduled_at: string | null;
   posted_at: string | null; platform_id: string | null; noi_dung: string | null;
-  kenh: string | null; url: string | null; created_at: string;
+  kenh: string | null; url: string | null; image_url: string | null; ghi_chu: string | null; created_at: string;
 };
 
 const JD_LABELS: Record<string, string> = { website: 'Website công ty', job_board: 'Trang tuyển dụng', facebook: 'Facebook', zalo_sms: 'Zalo / SMS' };
@@ -40,8 +40,13 @@ export default async function Page() {
   const pRes = await client.from('hr_platforms').select('id, ten, loai, bat, ghi_chu').order('created_at', { ascending: true });
   const jRes = await client
     .from('hr_job_posts')
-    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, platform_id, noi_dung, kenh, url, created_at')
+    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, platform_id, noi_dung, kenh, url, image_url, ghi_chu, created_at')
     .order('created_at', { ascending: false }).limit(100);
+  const aqRes = await client
+    .from('approval_queue')
+    .select('ref_id')
+    .eq('kind', 'hr_job_post')
+    .eq('status', 'approved');
 
   const jobs = (jobsRes.data || []) as Job[];
   const missing = (code?: string) => code === 'PGRST205' || code === '42P01' || code === '42703';
@@ -49,6 +54,7 @@ export default async function Page() {
   const platforms = (pRes.data || []) as Platform[];
   const posts = (jRes.data || []) as Post[];
   const platformName = new Map(platforms.map((p) => [p.id, p.ten]));
+  const approvedPostIds = new Set((aqRes.data || []).map((r) => r.ref_id as string));
 
   const migrationNote = (
     <div className="err" role="alert">
@@ -140,11 +146,18 @@ export default async function Page() {
       <ul className="list">
         {posts.map((j) => {
           const tt = TT_LABEL[j.trang_thai] || { label: j.trang_thai, tone: 'default' };
+          const isApproved = approvedPostIds.has(j.id);
+          const canEdit = j.trang_thai !== 'posted' && j.trang_thai !== 'cancelled';
+          const canRetry = j.trang_thai === 'failed';
+          const scheduledDefault = j.scheduled_at
+            ? new Date(j.scheduled_at).toISOString().slice(0, 16)
+            : '';
           return (
             <li key={j.id} className="card tone-hr">
               <div className="head">
                 <span className="cand-name">{j.tieu_de}</span>
                 <span className="row-right">
+                  {isApproved && canEdit ? <span className="stage tone-ok">Đã duyệt</span> : null}
                   <span className={`stage tone-${tt.tone}`}>{tt.label}</span>
                   <time className="time" dateTime={j.created_at}>{formatRelative(j.created_at)}</time>
                 </span>
@@ -154,38 +167,58 @@ export default async function Page() {
                 <div className="field"><dt>Giờ đặt đăng</dt><dd>{j.scheduled_at ? new Date(j.scheduled_at).toLocaleString('vi-VN') : '—'}</dd></div>
                 {j.posted_at ? <div className="field"><dt>Đã đăng lúc</dt><dd>{new Date(j.posted_at).toLocaleString('vi-VN')}</dd></div> : null}
               </dl>
+              {j.trang_thai === 'failed' && j.ghi_chu ? (
+                <div className="err" role="alert" style={{ margin: '6px 0', fontSize: '0.9em' }}>
+                  Lỗi khi đăng: {j.ghi_chu}
+                </div>
+              ) : null}
+              {j.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={j.image_url} alt="Ảnh đính kèm" style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 6, margin: '4px 0 6px', objectFit: 'cover' }} />
+              ) : null}
               {j.url ? <p className="muted" style={{ margin: '2px 0 6px' }}><a href={j.url} target="_blank" rel="noreferrer">Xem bài đã đăng</a></p> : null}
               {j.noi_dung ? (
-                <>
-                  <details className="raw">
-                    <summary>Xem nội dung ({j.noi_dung.trim().split(/\s+/).length} từ)</summary>
-                    <pre>{j.noi_dung}</pre>
-                  </details>
-                  {j.trang_thai !== 'posted' ? (
-                    <details className="raw">
-                      <summary>Chỉnh sửa nội dung</summary>
-                      <form action={editJobPostDraft} style={{ marginTop: 6 }}>
-                        <input type="hidden" name="post_id" value={j.id} />
-                        <textarea name="noi_dung" defaultValue={j.noi_dung} rows={8} aria-label="Nội dung bài đăng" style={{ width: '100%', boxSizing: 'border-box' }} />
-                        <button className="btn ok" type="submit" style={{ marginTop: 6 }}>Lưu chỉnh sửa</button>
-                      </form>
-                    </details>
-                  ) : null}
-                </>
+                <details className="raw">
+                  <summary>Xem nội dung ({j.noi_dung.trim().split(/\s+/).length} từ)</summary>
+                  <pre>{j.noi_dung}</pre>
+                </details>
               ) : null}
-              <div className="row">
+              {canEdit ? (
+                <details className="raw">
+                  <summary>Chỉnh sửa nội dung, ảnh và giờ đặt đăng</summary>
+                  <form action={editJobPostDraft} style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <input type="hidden" name="post_id" value={j.id} />
+                    <textarea name="noi_dung" defaultValue={j.noi_dung || ''} rows={8} aria-label="Nội dung bài đăng" style={{ width: '100%', boxSizing: 'border-box' }} />
+                    <input className="note" type="url" name="image_url" defaultValue={j.image_url || ''} placeholder="URL hình ảnh (để trống nếu không cần ảnh)" aria-label="URL hình ảnh" />
+                    <input className="note" type="datetime-local" name="scheduled_at" defaultValue={scheduledDefault} aria-label="Giờ đặt đăng" />
+                    <button className="btn ok" type="submit">Lưu chỉnh sửa</button>
+                  </form>
+                </details>
+              ) : null}
+              <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
+                {(isApproved || canRetry) && canEdit ? (
+                  <form action={publishJobPost}>
+                    <input type="hidden" name="post_id" value={j.id} />
+                    <button className="btn ok" type="submit">
+                      {canRetry ? 'Thử đăng lại' : 'Đăng ngay lên Facebook'}
+                    </button>
+                  </form>
+                ) : null}
+                {!isApproved && !canRetry && canEdit ? (
+                  <span className="muted" style={{ fontSize: '0.85em', alignSelf: 'center' }}>Duyệt trên trang Duyệt để mở khoá Đăng ngay</span>
+                ) : null}
                 {j.trang_thai !== 'posted' && j.trang_thai !== 'cancelled' ? (
                   <form action={updateJobPost}>
                     <input type="hidden" name="id" value={j.id} />
                     <input type="hidden" name="action" value="posted" />
-                    <button className="btn ok" type="submit">Đánh dấu đã đăng</button>
+                    <button className="btn ghost" type="submit">Đánh dấu đã đăng (thủ công)</button>
                   </form>
                 ) : null}
                 {j.trang_thai !== 'cancelled' ? (
                   <form action={updateJobPost}>
                     <input type="hidden" name="id" value={j.id} />
                     <input type="hidden" name="action" value="cancel" />
-                    <button className="btn ghost" type="submit">Huỷ đăng</button>
+                    <button className="btn ghost" type="submit">Huỷ</button>
                   </form>
                 ) : null}
                 <form action={updateJobPost}>

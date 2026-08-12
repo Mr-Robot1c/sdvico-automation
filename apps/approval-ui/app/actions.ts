@@ -208,15 +208,24 @@ export async function queueFacebookPost(formData: FormData) {
   revalidatePath('/');
 }
 
-// Sửa nội dung bài đăng trước khi duyệt. Người sửa là người kiểm soát (điều cấm 1).
+// Sửa nội dung, hình ảnh, giờ đặt đăng trước khi duyệt. Người sửa là người kiểm soát (điều cấm 1).
 // Đồng bộ cả bản xem trong hàng đợi để trang Duyệt không lệch với nội dung sẽ đăng.
 export async function editJobPostDraft(formData: FormData) {
   const postId = String(formData.get('post_id') || '');
   const noi_dung = String(formData.get('noi_dung') || '');
+  const image_url = String(formData.get('image_url') || '').trim() || null;
+  const scheduledRaw = String(formData.get('scheduled_at') || '').trim();
   if (!postId) return;
 
+  const scheduled_at = scheduledRaw ? new Date(scheduledRaw).toISOString() : null;
+  const trang_thai = scheduled_at ? 'scheduled' : 'draft';
+
   const client = getServerClient();
-  const { error } = await client.from('hr_job_posts').update({ noi_dung }).eq('id', postId);
+  const { error } = await client
+    .from('hr_job_posts')
+    .update({ noi_dung, image_url, scheduled_at, trang_thai })
+    .eq('id', postId)
+    .neq('trang_thai', 'posted');
   if (error) throw new Error(error.message);
 
   const { data: rows } = await client
@@ -226,8 +235,111 @@ export async function editJobPostDraft(formData: FormData) {
     .eq('kind', 'hr_job_post')
     .eq('status', 'pending');
   for (const row of rows || []) {
-    const payload = { ...((row.payload || {}) as Record<string, unknown>), body: noi_dung };
+    const payload = { ...((row.payload || {}) as Record<string, unknown>), body: noi_dung, image_url };
     await client.from('approval_queue').update({ payload }).eq('id', row.id);
+  }
+
+  revalidatePath('/dang-tin');
+  revalidatePath('/');
+}
+
+// Đăng ngay lên Facebook sau khi đã được duyệt (điều cấm 1: cổng duyệt đã qua).
+// Gọi thẳng Graph API từ server, không chờ worker cron. Chỉ hoạt động khi bài đã approved.
+// Lỗi Facebook API được bắt và ghi vào run_log + ghi_chu để người dùng biết nguyên nhân.
+export async function publishJobPost(formData: FormData) {
+  const postId = String(formData.get('post_id') || '');
+  if (!postId) return;
+
+  const client = getServerClient();
+
+  // Cổng an toàn: phải có mục approved trong hàng đợi cho bài này.
+  const { data: approved } = await client
+    .from('approval_queue')
+    .select('id')
+    .eq('ref_id', postId)
+    .eq('kind', 'hr_job_post')
+    .eq('status', 'approved')
+    .limit(1);
+  if (!approved || approved.length === 0) {
+    await client.from('hr_job_posts')
+      .update({ trang_thai: 'failed', ghi_chu: 'Bài chưa được duyệt trong hàng đợi.' })
+      .eq('id', postId);
+    revalidatePath('/dang-tin');
+    return;
+  }
+
+  const { data: post, error: e1 } = await client
+    .from('hr_job_posts')
+    .select('id, tieu_de, noi_dung, trang_thai, image_url')
+    .eq('id', postId)
+    .single();
+  if (e1 || !post) { revalidatePath('/dang-tin'); return; }
+  if (post.trang_thai === 'posted') { revalidatePath('/dang-tin'); return; }
+
+  const pageId = process.env.FACEBOOK_PAGE_ID;
+  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const version = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+
+  if (!pageId || !token) {
+    await client.from('hr_job_posts')
+      .update({ trang_thai: 'failed', ghi_chu: 'Thiếu FACEBOOK_PAGE_ID hoặc FACEBOOK_PAGE_ACCESS_TOKEN trong biến môi trường Vercel.' })
+      .eq('id', postId);
+    await client.from('run_log').insert({ task: 'hr.publish_facebook_ui', status: 'error', detail: { postId, error: 'missing env vars' } });
+    revalidatePath('/dang-tin');
+    return;
+  }
+
+  if (!post.noi_dung) {
+    await client.from('hr_job_posts')
+      .update({ trang_thai: 'failed', ghi_chu: 'Bài chưa có nội dung.' })
+      .eq('id', postId);
+    revalidatePath('/dang-tin');
+    return;
+  }
+
+  const message = [post.tieu_de, '', post.noi_dung].join('\n').trim();
+
+  try {
+    let fbPostId: string;
+    if (post.image_url) {
+      const res = await fetch(`https://graph.facebook.com/${version}/${pageId}/photos`, {
+        method: 'POST',
+        body: new URLSearchParams({ url: post.image_url, caption: message, access_token: token }),
+        cache: 'no-store'
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        const errMsg = json.error?.message || json.error?.type || `HTTP ${res.status}`;
+        const errCode = json.error?.code ? ` (mã ${json.error.code})` : '';
+        throw new Error(errMsg + errCode);
+      }
+      fbPostId = json.post_id || json.id;
+    } else {
+      const res = await fetch(`https://graph.facebook.com/${version}/${pageId}/feed`, {
+        method: 'POST',
+        body: new URLSearchParams({ message, access_token: token }),
+        cache: 'no-store'
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        const errMsg = json.error?.message || json.error?.type || `HTTP ${res.status}`;
+        const errCode = json.error?.code ? ` (mã ${json.error.code})` : '';
+        throw new Error(errMsg + errCode);
+      }
+      fbPostId = json.id;
+    }
+
+    const externalUrl = `https://www.facebook.com/${fbPostId}`;
+    await client.from('hr_job_posts')
+      .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), url: externalUrl, ghi_chu: null })
+      .eq('id', postId);
+    await client.from('run_log').insert({ task: 'hr.publish_facebook_ui', status: 'ok', detail: { postId, fbPostId, externalUrl } });
+  } catch (err: unknown) {
+    const errStr = err instanceof Error ? err.message : String(err);
+    await client.from('hr_job_posts')
+      .update({ trang_thai: 'failed', ghi_chu: errStr })
+      .eq('id', postId);
+    await client.from('run_log').insert({ task: 'hr.publish_facebook_ui', status: 'error', detail: { postId, error: errStr } });
   }
 
   revalidatePath('/dang-tin');
