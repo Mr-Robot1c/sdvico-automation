@@ -230,6 +230,67 @@ export async function saveUnsplashAsAsset(input: {
   return res;
 }
 
+// Cắt nền ảnh sản phẩm bằng remove.bg, trả PNG trong suốt (Buffer). Free tier độ phân giải preview.
+async function removeBgCutout(imageUrl: string): Promise<Buffer> {
+  const key = process.env.REMOVE_BG_API_KEY;
+  if (!key) throw new Error('Chưa cấu hình REMOVE_BG_API_KEY trên máy chủ.');
+  const form = new FormData();
+  form.append('image_url', imageUrl);
+  form.append('size', 'preview');
+  form.append('type', 'product');
+  form.append('format', 'png');
+  const r = await fetch('https://api.remove.bg/v1.0/removebg', {
+    method: 'POST',
+    headers: { 'X-Api-Key': key },
+    body: form
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    throw new Error(`remove.bg lỗi ${r.status}: ${t.slice(0, 160)}`);
+  }
+  return Buffer.from(await r.arrayBuffer());
+}
+
+// Ghép: cắt nền ảnh sản phẩm (remove.bg) rồi đặt lên nền Unsplash (hoặc nền thương hiệu) có bóng đổ,
+// thêm tiêu đề và hotline. Sản phẩm giữ nguyên, chỉ tách khỏi nền cũ (điều cấm 5).
+export async function createCompositeFromBackground(input: {
+  productAssetId: string;
+  background?: string;
+  downloadLocation?: string;
+  title?: string;
+  author?: string;
+}) {
+  if (!input?.productAssetId) throw new Error('Chọn ảnh sản phẩm trước khi ghép.');
+  const client = getServerClient();
+  const { data } = await client.from('brand_assets').select('storage_path').eq('id', input.productAssetId).single();
+  const sp = (data as { storage_path?: string } | null)?.storage_path;
+  if (!sp) throw new Error('Không tìm thấy ảnh sản phẩm.');
+  const productUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  const cutoutBuffer = await removeBgCutout(productUrl);
+  let backgroundBuffer: Buffer | null = null;
+  if (input.background) {
+    const r = await fetch(input.background);
+    if (r.ok) backgroundBuffer = Buffer.from(await r.arrayBuffer());
+  }
+  // @ts-ignore — module JS thuần, không có .d.ts
+  const { buildBanner } = await import('../lib/gen/banner.mjs');
+  const png = (await buildBanner({
+    cutoutBuffer,
+    backgroundBuffer,
+    title: input.title || ''
+  } as any)) as Buffer;
+  const res = await uploadImageBuffer(
+    client,
+    png,
+    'banner-' + (input.title || 'sdvico'),
+    'image/png',
+    input.author ? `Nền Unsplash: ${input.author}` : null
+  );
+  triggerUnsplashDownload(input.downloadLocation);
+  revalidatePath('/san-xuat');
+  return res;
+}
+
 // Đổi tên (title) một tư liệu. Tên này cũng là gợi ý cho AI khi sinh text theo hình.
 export async function renameAsset(formData: FormData) {
   const id = String(formData.get('id') || '');

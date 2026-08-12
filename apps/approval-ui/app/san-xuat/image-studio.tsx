@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { searchUnsplash, saveUnsplashAsAsset } from '../actions';
+import { searchUnsplash, saveUnsplashAsAsset, createCompositeFromBackground } from '../actions';
 
 type UnsplashItem = {
   id: string;
@@ -12,14 +12,16 @@ type UnsplashItem = {
   authorUrl?: string;
 };
 
-// Tìm ảnh minh họa trên Unsplash và chèn thẳng làm ảnh bài đăng. Không ghép/đóng khung —
-// ảnh dùng nguyên bản (ảnh chụp thật miễn phí, hợp làm nền hoặc minh họa).
+// Tìm ảnh nền trên Unsplash. Chèn thẳng làm ảnh minh họa, hoặc GHÉP: cắt nền ảnh sản phẩm đã chọn
+// (remove.bg) rồi đặt lên nền đó thành một ảnh — sản phẩm nằm trong cảnh, không "trồng chất lên".
 export default function ImageStudio({
+  productId,
   productTitle,
   onAttach
 }: {
+  productId: string;
   productTitle: string;
-  onAttach: (assetId: string) => void;
+  onAttach: (assetId: string, meta?: { banner?: boolean }) => void;
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UnsplashItem[]>([]);
@@ -28,12 +30,12 @@ export default function ImageStudio({
 
   const onSearch = async () => {
     setBusy('search');
-    setMsg('Đang tìm ảnh trên Unsplash...');
+    setMsg('Đang tìm ảnh nền trên Unsplash...');
     try {
-      const q = query.trim() || productTitle.trim() || 'fishing boat sea';
+      const q = query.trim() || productTitle.trim() || 'ocean sea sky';
       const r = await searchUnsplash(q);
       setResults(r);
-      setMsg(r.length ? `Tìm thấy ${r.length} ảnh. Bấm "Chèn ảnh" để dùng làm ảnh bài.` : 'Không thấy ảnh nào, thử từ khóa tiếng Anh.');
+      setMsg(r.length ? `Tìm thấy ${r.length} ảnh. "Chèn ảnh" để dùng ảnh nền, hoặc "Ghép sản phẩm" để cắt nền sản phẩm rồi ghép lên.` : 'Không thấy ảnh nào, thử từ khóa tiếng Anh.');
     } catch (e: any) {
       setMsg('Lỗi tìm ảnh: ' + (e?.message || e));
     } finally {
@@ -60,10 +62,34 @@ export default function ImageStudio({
     }
   };
 
+  const onCompose = async (it: UnsplashItem) => {
+    if (!productId) {
+      setMsg('Chọn 1 ảnh sản phẩm ở khung ảnh phía trên trước khi ghép.');
+      return;
+    }
+    setBusy('cmp-' + it.id);
+    setMsg('Đang cắt nền sản phẩm và ghép lên ảnh nền...');
+    try {
+      const res = await createCompositeFromBackground({
+        productAssetId: productId,
+        background: it.regular,
+        downloadLocation: it.downloadLocation,
+        title: productTitle,
+        author: it.author
+      });
+      onAttach(res.id, { banner: true });
+      setMsg('Đã ghép xong và gắn vào bài. Xem khung ảnh ở trên.');
+    } catch (e: any) {
+      setMsg('Lỗi ghép: ' + (e?.message || e));
+    } finally {
+      setBusy('');
+    }
+  };
+
   return (
     <section className="sx-compose">
       <header className="sx-slot-head">
-        <span className="sx-slot-title">Tìm ảnh minh họa (Unsplash)</span>
+        <span className="sx-slot-title">Xưởng ảnh — tìm nền & ghép sản phẩm</span>
       </header>
 
       <div className="studio-row">
@@ -72,11 +98,11 @@ export default function ImageStudio({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onSearch(); } }}
-          placeholder="Từ khóa tìm ảnh (nên gõ tiếng Anh: fishing boat, ocean, harbor...)"
+          placeholder="Từ khóa tìm ảnh nền (nên gõ tiếng Anh: ocean, fishing boat, harbor...)"
           aria-label="Từ khóa Unsplash"
         />
         <button type="button" className="btn ghost" onClick={onSearch} disabled={!!busy}>
-          {busy === 'search' ? 'Đang tìm...' : '🔎 Tìm ảnh Unsplash'}
+          {busy === 'search' ? 'Đang tìm...' : '🔎 Tìm ảnh nền'}
         </button>
       </div>
 
@@ -86,8 +112,17 @@ export default function ImageStudio({
             <div className="studio-card" key={it.id}>
               <img src={it.thumb} alt={it.author ? `Ảnh của ${it.author}` : 'Ảnh Unsplash'} loading="lazy" />
               <div className="studio-card-actions">
-                <button type="button" className="btn ok sm" onClick={() => onInsert(it)} disabled={!!busy}>
+                <button type="button" className="btn ghost sm" onClick={() => onInsert(it)} disabled={!!busy}>
                   {busy === 'ins-' + it.id ? '...' : 'Chèn ảnh'}
+                </button>
+                <button
+                  type="button"
+                  className="btn ok sm"
+                  onClick={() => onCompose(it)}
+                  disabled={!!busy || !productId}
+                  title={productId ? 'Cắt nền sản phẩm rồi ghép lên nền này' : 'Chọn ảnh sản phẩm trước'}
+                >
+                  {busy === 'cmp-' + it.id ? '...' : 'Ghép sản phẩm'}
                 </button>
               </div>
               {it.author ? <span className="studio-credit">Ảnh: {it.author} / Unsplash</span> : null}
@@ -98,8 +133,8 @@ export default function ImageStudio({
 
       {msg ? <p className="muted">{msg}</p> : null}
       <p className="sx-note">
-        Ảnh Unsplash là ảnh chụp thật miễn phí, hợp làm nền hoặc minh họa. Ảnh sản phẩm cụ thể vẫn nên dùng ảnh thật
-        của SDVICO (tải lên ở khung ảnh phía trên). Đặt tên ảnh mô tả rõ để nút Sinh text viết bám theo hình.
+        "Ghép sản phẩm" sẽ cắt nền ảnh sản phẩm bạn đang chọn (bằng remove.bg) rồi đặt lên ảnh nền, ra một
+        tấm ảnh sản phẩm nằm trong cảnh. Đặt tên ảnh sản phẩm mô tả rõ để phần Sinh text viết bám theo hình.
       </p>
     </section>
   );
