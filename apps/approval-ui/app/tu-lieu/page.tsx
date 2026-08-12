@@ -2,25 +2,33 @@ import { getServerClient } from '../../lib/supabase-server';
 import { uploadAsset, deleteAsset } from '../actions';
 
 export const dynamic = 'force-dynamic';
-// Tải file cho phép chạy tới 60 giây.
 export const maxDuration = 60;
 
 const KIND_LABEL: Record<string, string> = {
-  image: 'Ảnh', video: 'Clip', audio: 'Âm thanh', logo: 'Logo'
+  image: 'Ảnh', video: 'Clip', clip: 'Clip', audio: 'Âm thanh', logo: 'Logo', doc: 'Tài liệu'
 };
 
-type Asset = { id: string; kind: string; path: string; license: string | null; source: string | null; note: string | null; created_at: string };
+type Asset = {
+  id: string;
+  kind: string;
+  title: string;
+  storage_path: string;
+  license: string | null;
+  license_note: string | null;
+  source: string | null;
+  created_at: string;
+};
 
 export default async function Page() {
   const client = getServerClient();
   const { data, error } = await client
     .from('brand_assets')
-    .select('id, kind, path, license, source, note, created_at')
+    .select('id, kind, title, storage_path, license, license_note, source, created_at')
     .order('created_at', { ascending: false })
     .limit(200);
 
   const rows = (data || []) as Asset[];
-  const urlOf = (path: string) => client.storage.from('brand-assets').getPublicUrl(path).data.publicUrl;
+  const urlOf = (p: string) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
 
   return (
     <main>
@@ -39,14 +47,18 @@ export default async function Page() {
 
       <form className="factform" action={uploadAsset} encType="multipart/form-data">
         <input type="file" name="file" aria-label="Chọn file" required />
+        <input name="title" placeholder="Tên tư liệu" aria-label="Tên" />
         <select name="kind" aria-label="Loại" defaultValue="image">
           <option value="image">Ảnh</option>
           <option value="video">Clip</option>
           <option value="audio">Âm thanh</option>
           <option value="logo">Logo</option>
         </select>
+        <select name="license" aria-label="Giấy phép" defaultValue="owned">
+          <option value="owned">Công ty sở hữu</option>
+          <option value="licensed">Có giấy phép</option>
+        </select>
         <input name="source" placeholder="Nguồn (ai quay, ở đâu)" aria-label="Nguồn" />
-        <input name="license" placeholder="Giấy phép (công ty sở hữu...)" aria-label="Giấy phép" />
         <button className="btn ok" type="submit">Tải lên</button>
       </form>
 
@@ -60,13 +72,13 @@ export default async function Page() {
 
       <ul className="assetgrid">
         {rows.map((a) => {
-          const url = urlOf(a.path);
+          const url = urlOf(a.storage_path);
           return (
             <li key={a.id} className="assetcard">
               <div className="asset-preview">
                 {a.kind === 'image' || a.kind === 'logo' ? (
-                  <img src={url} alt={a.source || 'tư liệu'} loading="lazy" />
-                ) : a.kind === 'video' ? (
+                  <img src={url} alt={a.title} loading="lazy" />
+                ) : a.kind === 'video' || a.kind === 'clip' ? (
                   <video src={url} controls preload="metadata" />
                 ) : (
                   <a href={url} target="_blank" rel="noreferrer">Mở file</a>
@@ -74,11 +86,12 @@ export default async function Page() {
               </div>
               <div className="asset-meta">
                 <span className="badge badge-format">{KIND_LABEL[a.kind] || a.kind}</span>
+                <div className="title">{a.title}</div>
                 {a.source ? <div className="metaline">Nguồn: {a.source}</div> : null}
-                {a.license ? <div className="metaline">Giấy phép: {a.license}</div> : null}
+                <div className="metaline">{a.license === 'licensed' ? 'Có giấy phép' : 'Công ty sở hữu'}</div>
                 <form action={deleteAsset}>
                   <input type="hidden" name="id" value={a.id} />
-                  <input type="hidden" name="path" value={a.path} />
+                  <input type="hidden" name="storage_path" value={a.storage_path} />
                   <button className="btn no" type="submit" aria-label="Xóa tư liệu">Xóa</button>
                 </form>
               </div>

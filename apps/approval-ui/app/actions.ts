@@ -95,12 +95,14 @@ export async function uploadAsset(formData: FormData) {
     .upload(path, buf, { contentType: file.type || 'application/octet-stream' });
   if (upErr) throw new Error('Tải lên lỗi: ' + upErr.message);
 
+  const license = String(formData.get('license') || 'owned') === 'licensed' ? 'licensed' : 'owned';
   const { error } = await client.from('brand_assets').insert({
     kind,
-    path,
-    license: String(formData.get('license') || '').trim() || null,
-    source: String(formData.get('source') || '').trim() || null,
-    note: String(formData.get('note') || '').trim() || null
+    title: String(formData.get('title') || '').trim() || file.name,
+    storage_path: path,
+    license,
+    license_note: String(formData.get('license_note') || '').trim() || null,
+    source: String(formData.get('source') || '').trim() || null
   });
   if (error) throw new Error(error.message);
   revalidatePath('/tu-lieu');
@@ -109,10 +111,10 @@ export async function uploadAsset(formData: FormData) {
 // Xóa một tư liệu, gỡ cả file trên Storage.
 export async function deleteAsset(formData: FormData) {
   const id = String(formData.get('id') || '');
-  const path = String(formData.get('path') || '');
+  const storagePath = String(formData.get('storage_path') || '');
   if (!id) return;
   const client = getServerClient();
-  if (path) await client.storage.from('brand-assets').remove([path]);
+  if (storagePath) await client.storage.from('brand-assets').remove([storagePath]);
   await client.from('brand_assets').delete().eq('id', id);
   revalidatePath('/tu-lieu');
 }
