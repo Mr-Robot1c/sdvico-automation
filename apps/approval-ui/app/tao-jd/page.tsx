@@ -63,6 +63,13 @@ export default async function Page() {
         <textarea name="short_desc" rows={3} placeholder="Mô tả công việc" style={{ width: '100%', marginTop: 8, boxSizing: 'border-box' }} aria-label="Mô tả công việc" />
         <textarea name="requirements" rows={3} placeholder="Yêu cầu ứng viên" style={{ width: '100%', marginTop: 8, boxSizing: 'border-box' }} aria-label="Yêu cầu ứng viên" />
         <textarea name="benefits" rows={2} placeholder="Quyền lợi, phúc lợi. Để trống thì AI ghi chung là thỏa thuận, không bịa số." style={{ width: '100%', marginTop: 8, boxSizing: 'border-box' }} aria-label="Quyền lợi" />
+        <input
+          className="note"
+          name="image_hint"
+          placeholder="Từ khóa ảnh (không bắt buộc) — giúp Unsplash tìm ảnh đúng ngành hơn, ví dụ: tàu cá biển định vị GPS"
+          style={{ width: '100%', marginTop: 8, boxSizing: 'border-box' }}
+          aria-label="Từ khóa ảnh Unsplash"
+        />
         <div className="row" style={{ marginTop: 8 }}>
           <SubmitButton label="Tạo bốn bản JD bằng AI" pendingLabel="AI đang viết, chờ vài giây..." />
         </div>

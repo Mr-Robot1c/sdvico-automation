@@ -162,7 +162,7 @@ export async function queueFacebookPost(formData: FormData) {
   const client = getServerClient();
   const { data: job, error: e0 } = await client
     .from('hr_jobs')
-    .select('id, title, location, short_desc, jd_versions')
+    .select('id, title, location, short_desc, jd_versions, image_hint')
     .eq('id', jobId)
     .single();
   if (e0) throw new Error(e0.message);
@@ -190,9 +190,13 @@ export async function queueFacebookPost(formData: FormData) {
     return dong.join('\n');
   })();
 
+  // Đọc cài đặt thương hiệu để gắn footer liên hệ và dùng logo khi không có ảnh.
+  const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
+  const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; email?: string; website?: string; company_desc?: string };
+
   // Rewrite bằng Groq để thêm cảm xúc và hook — chạy song song với Unsplash.
   // Thất bại thì dùng bản gốc, không làm hỏng luồng.
-  const [noi_dung, image_url] = await Promise.all([
+  const [noi_dung_raw, unsplash_url] = await Promise.all([
     groqChat(
       [
         'Bạn là chuyên gia viết content tuyển dụng viral cho Facebook Việt Nam, ngành biển và thủy sản.',
@@ -215,8 +219,20 @@ export async function queueFacebookPost(formData: FormData) {
       baseFb || fallbackContent,
       { temperature: 0.8, maxTokens: 400 }
     ).then((r) => r?.trim() || baseFb || fallbackContent),
-    fetchUnsplashPhoto(job.title, job.location || undefined),
+    fetchUnsplashPhoto(job.title, job.location || undefined, (job as Record<string, unknown>).image_hint as string | null),
   ]);
+
+  // Gắn footer liên hệ thương hiệu vào cuối bài (không ghi đè bởi Groq).
+  const footerParts = [
+    brand.hotline ? `Hotline: ${brand.hotline}` : null,
+    brand.email ? `Email: ${brand.email}` : null,
+    brand.website ? brand.website : null,
+  ].filter(Boolean);
+  const footer = footerParts.length ? '\n\n' + footerParts.join('  |  ') : '';
+  const noi_dung = noi_dung_raw + footer;
+
+  // Ảnh: dùng Unsplash nếu có, không thì dùng logo công ty nếu đã cài đặt.
+  const image_url = unsplash_url || brand.logo_url || null;
 
   const tieu_de = `Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`;
 
@@ -401,6 +417,7 @@ export async function createJdDraft(formData: FormData) {
     benefits: String(formData.get('benefits') || '').trim() || undefined,
     nhom: String(formData.get('nhom') || '').trim() || undefined
   };
+  const image_hint = String(formData.get('image_hint') || '').trim() || null;
   const { versions } = await composeJdVersions(job);
 
   const client = getServerClient();
@@ -412,11 +429,31 @@ export async function createJdDraft(formData: FormData) {
     requirements: job.requirements || null,
     jd_versions: versions,
     nhom: job.nhom || null,
+    image_hint,
     status: 'draft'
   });
   if (error) throw new Error(error.message);
   revalidatePath('/tao-jd');
   revalidatePath('/dang-tin');
+}
+
+// Lưu cài đặt thương hiệu công ty: logo, hotline, email, website, mô tả ngắn.
+// Dùng để gắn footer liên hệ vào bài đăng Facebook và làm ảnh mặc định khi không có ảnh khác.
+export async function saveBrandConfig(formData: FormData) {
+  const config = {
+    logo_url: String(formData.get('logo_url') || '').trim() || null,
+    hotline: String(formData.get('hotline') || '').trim() || null,
+    email: String(formData.get('email') || '').trim() || null,
+    website: String(formData.get('website') || '').trim() || null,
+    company_desc: String(formData.get('company_desc') || '').trim() || null,
+  };
+  const client = getServerClient();
+  const { error } = await client.from('app_config').upsert(
+    { key: 'brand_config', value: config, updated_at: new Date().toISOString() },
+    { onConflict: 'key' }
+  );
+  if (error) throw new Error(error.message);
+  revalidatePath('/cai-dat');
 }
 
 // Sửa một phiên bản JD của một vị trí. Người sửa là người kiểm soát (điều cấm 1).

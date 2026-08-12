@@ -11,7 +11,8 @@ export default function Nav() {
     { href: '/ho-so', label: 'Hồ sơ ứng viên' },
     { href: '/lich', label: 'Lịch phỏng vấn' },
     { href: '/dang-tin', label: 'Vị trí & Đăng tin' },
-    { href: '/', label: 'Duyệt & gửi' }
+    { href: '/', label: 'Duyệt & gửi' },
+    { href: '/cai-dat', label: 'Cài đặt' }
   ];
   return (
     <nav className="tabs" aria-label="Điều hướng">
