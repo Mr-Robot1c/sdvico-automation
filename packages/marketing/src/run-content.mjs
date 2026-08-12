@@ -7,7 +7,7 @@
 // Không đăng gì. Người duyệt bấm Duyệt thì worker mới đăng (viết sau).
 
 import { getServiceClient, logRun } from '@sdvico/core';
-import { generateContentAsync, INTENT_LABEL } from './content.mjs';
+import { generateAllFormats, INTENT_LABEL } from './content.mjs';
 import { assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues } from './product-facts.mjs';
 import { loadFacts } from './facts.mjs';
@@ -49,51 +49,66 @@ if (chosen.length === 0) {
   process.exit(0);
 }
 
-console.log(`Sẽ viết ${chosen.length} bài từ các từ khóa ưu tiên cao.\n`);
+console.log(`Sẽ viết ${chosen.length} từ khóa, mỗi từ khóa 3 định dạng (website, Facebook, video).\n`);
+
+// Ba định dạng và kênh đích tương ứng.
+const FORMATS = [
+  { key: 'article', kind: 'article', channel: 'website', label: 'Website' },
+  { key: 'social', kind: 'social', channel: 'facebook', label: 'Facebook' },
+  { key: 'video', kind: 'video', channel: 'youtube', label: 'Video' },
+];
 
 const results = [];
 for (const kw of chosen) {
-  const { title, brief, draft } = await generateContentAsync(kw, { facts });
-  const assess = assessDraft(`${title}\n${draft}`, { knownFactValues: known, testFactValues: testVals });
+  const all = await generateAllFormats(kw, { facts });
+  const flags = [];
 
-  // Lưu bài vào mkt_content. Gắn cờ duyệt cấp quản lý (needs_gov_review) nếu chạm quy định.
-  const briefFull = { ...brief, risk: assess.risk, compliance: assess.flags };
-  const { data: inserted, error: e1 } = await client
-    .from('mkt_content')
-    .insert({
-      kind: 'article',
-      title,
-      brief: briefFull,
-      draft,
-      status: assess.risk === 'red' ? 'review' : 'draft',
-      needs_gov_review: assess.risk === 'red',
-    })
-    .select('id')
-    .single();
-  if (e1) throw new Error('Lưu mkt_content lỗi: ' + e1.message);
+  for (const fmt of FORMATS) {
+    const piece = all[fmt.key]; // { title, draft }
+    const assess = assessDraft(`${piece.title}\n${piece.draft}`, { knownFactValues: known, testFactValues: testVals });
+    const briefFull = { ...all.brief, format: fmt.key, risk: assess.risk, compliance: assess.flags };
 
-  // Đẩy vào hàng đợi duyệt, kèm cờ tuân thủ để người duyệt thấy ngay.
-  const { error: e2 } = await client.from('approval_queue').insert({
-    kind: 'mkt_publish_content',
-    title,
-    payload: {
-      content_id: inserted.id,
-      keyword: kw.keyword,
-      intent: kw.intent,
-      landing_url: kw.landing_url,
-      risk: assess.risk,
-      needs_manager_approval: assess.needsManagerApproval,
-      compliance: assess.flags,
-    },
-    ref_table: 'mkt_content',
-    ref_id: inserted.id,
-    status: 'pending',
-  });
-  if (e2) throw new Error('Đẩy approval_queue lỗi: ' + e2.message);
+    const { data: inserted, error: e1 } = await client
+      .from('mkt_content')
+      .insert({
+        kind: fmt.kind,
+        title: piece.title,
+        brief: briefFull,
+        draft: piece.draft,
+        status: assess.risk === 'red' ? 'review' : 'draft',
+        needs_gov_review: assess.risk === 'red',
+      })
+      .select('id')
+      .single();
+    if (e1) throw new Error('Lưu mkt_content lỗi: ' + e1.message);
 
-  results.push({ title, intent: kw.intent, risk: assess.risk });
-  const co = assess.risk === 'red' ? ' (CỜ ĐỎ, cấp quản lý duyệt)' : assess.risk === 'amber' ? ' (amber, cần rà)' : '';
-  console.log(`- [${INTENT_LABEL[kw.intent] || kw.intent}] ${title}${co}`);
+    const { error: e2 } = await client.from('approval_queue').insert({
+      kind: 'mkt_publish_content',
+      title: `[${fmt.label}] ${piece.title}`,
+      payload: {
+        content_id: inserted.id,
+        format: fmt.key,
+        channel: fmt.channel,
+        keyword: kw.keyword,
+        intent: kw.intent,
+        landing_url: kw.landing_url,
+        risk: assess.risk,
+        needs_manager_approval: assess.needsManagerApproval,
+        compliance: assess.flags,
+      },
+      ref_table: 'mkt_content',
+      ref_id: inserted.id,
+      status: 'pending',
+    });
+    if (e2) throw new Error('Đẩy approval_queue lỗi: ' + e2.message);
+
+    results.push({ title: piece.title, format: fmt.key, risk: assess.risk });
+    if (assess.risk !== 'none') flags.push(`${fmt.label}:${assess.risk}`);
+  }
+
+  const gen = all.brief?.generator === 'gemini' ? 'Gemini' : 'bản mẫu';
+  const co = flags.length ? ' (' + flags.join(', ') + ')' : '';
+  console.log(`- [${INTENT_LABEL[kw.intent] || kw.intent}] ${kw.keyword} -> 3 bản bằng ${gen}${co}`);
 }
 
 await logRun(client, {
@@ -102,4 +117,4 @@ await logRun(client, {
   detail: { generated: results.length, items: results },
 });
 
-console.log(`\nXong. ${results.length} bài đã vào mkt_content và hàng đợi duyệt, chờ người bấm Duyệt.`);
+console.log(`\nXong. ${results.length} bản (${chosen.length} từ khóa x 3 định dạng) đã vào hàng đợi duyệt.`);

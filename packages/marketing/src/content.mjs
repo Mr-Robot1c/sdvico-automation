@@ -182,11 +182,155 @@ function serviceBody(keyword) {
   ];
 }
 
-// Tiện ích: sinh cả brief và draft cho một từ khóa bằng BẢN MẪU (tất định, không cần khóa).
+// Nhận diện chủ đề từ khóa, dùng chung cho cả ba định dạng.
+function topicOf(keyword) {
+  const k = keyword.toLowerCase();
+  if (/mất kết nối|mất tín hiệu|không lên tín hiệu|báo lỗi/.test(k)) return 'suco';
+  if (/gia hạn|cước/.test(k)) return 'giahan';
+  if (/bảo trì|bảo dưỡng/.test(k)) return 'baotri';
+  if (/thay|sửa/.test(k)) return 'thaythe';
+  if (/lắp/.test(k)) return 'lapdat';
+  if (/đại lý|ở đâu|tổng đài/.test(k)) return 'lienhe';
+  return 'chung';
+}
+
+// Định dạng 2: bài Facebook ngắn. Hook một câu, một ý, rồi gọi tổng đài.
+export function buildSocial(brief) {
+  const t = topicOf(brief.keyword);
+  const line = {
+    suco: 'Tàu mất kết nối giám sát? Kiểm tra nguồn điện và ăng-ten, khởi động lại thiết bị. Chưa được thì gọi ngay.',
+    giahan: 'Sắp hết hạn cước giám sát? Gia hạn sớm để tàu không bị đứt kết nối giữa chuyến biển.',
+    baotri: 'Bảo trì thiết bị giám sát trước mỗi chuyến biển dài, tránh hỏng hóc bất ngờ ngoài khơi.',
+    thaythe: 'Thiết bị giám sát hay trục trặc? Kiểm tra để sửa hoặc thay kịp thời, khỏi hỏng giữa biển.',
+    lapdat: 'Lắp thiết bị giám sát hành trình đạt chuẩn, tư vấn đúng loại hợp quy định, lắp tận bến.',
+    lienhe: 'Cần lắp và hỗ trợ thiết bị giám sát tàu cá? SDVICO có mặt tại địa phương, hỗ trợ tận bến.',
+    chung: 'SDVICO phân phối, lắp đặt và bảo trì thiết bị giám sát hành trình đạt chuẩn, hỗ trợ tận bến.',
+    thong_tin: 'Quy định lắp giám sát hành trình tàu cá, chủ tàu cần nắm để đi biển hợp lệ. Nội dung này chờ cấp quản lý duyệt.',
+    thuong_mai: 'Chọn thiết bị giám sát tàu cá nên nhìn độ ổn định kết nối và hỗ trợ khi sự cố, không chỉ nhìn giá.',
+  };
+  const key = brief.intent === 'thong_tin' ? 'thong_tin' : brief.intent === 'thuong_mai' ? 'thuong_mai' : t;
+  const draft = [line[key], '', 'Gọi ' + TONGDAI + '.'].join('\n');
+  return { title: draftTitle(brief), draft };
+}
+
+// Định dạng 3: kịch bản video dọc 60 giây theo khung bốn nhịp (day2.md Phần L).
+export function buildVideoScript(brief) {
+  const t = brief.intent === 'thong_tin' ? 'thong_tin' : brief.intent === 'thuong_mai' ? 'thuong_mai' : topicOf(brief.keyword);
+  const moi = {
+    suco: 'Tàu mất kết nối giám sát giữa biển, làm gì trước?',
+    giahan: 'Cước giám sát sắp hết hạn, không gia hạn kịp thì sao?',
+    baotri: 'Thiết bị giám sát lâu không kiểm tra, rủi ro gì khi ra khơi?',
+    thaythe: 'Thiết bị giám sát hay lỗi, khi nào nên thay?',
+    lapdat: 'Lắp thiết bị giám sát tàu cá, chọn sao cho đúng quy định?',
+    lienhe: 'Cần lắp và hỗ trợ thiết bị giám sát tàu cá, gọi ai?',
+    chung: 'Thiết bị giám sát hành trình tàu cá, cần lưu ý gì?',
+    thong_tin: 'Tàu bao nhiêu mét phải lắp giám sát hành trình?',
+    thuong_mai: 'Chọn thiết bị giám sát tàu cá loại nào hợp?',
+  };
+  const than = brief.intent === 'thong_tin'
+    ? 'Nói ngắn về quy định, trung thực, chờ cấp quản lý duyệt trước khi đăng.'
+    : 'Nêu vài bước hoặc lợi ích chính, mỗi ý một câu, cầm tay chỉ việc.';
+  const draft = [
+    '[0-3s] Mồi: ' + (moi[t] || moi.chung),
+    '[3-10s] Nêu hậu quả thật nếu không xử lý.',
+    '[10-45s] ' + than,
+    '[45-60s] Chốt: Gọi ' + TONGDAI + ' để được hỗ trợ tận bến. Hiện số to trên màn hình.',
+    '',
+    'Ghi chú: phụ đề cháy chữ, chỉ dùng tư liệu trong brand_assets, không nêu model hay thông số chưa xác nhận.',
+  ].join('\n');
+  return { title: draftTitle(brief), draft };
+}
+
+// Sinh cả ba định dạng bằng BẢN MẪU (không cần khóa).
+export function generateFormatsTemplate(kw) {
+  const brief = buildBrief(kw);
+  const { title, body } = buildDraft(brief);
+  return {
+    brief,
+    article: { title, draft: body },
+    social: buildSocial(brief),
+    video: buildVideoScript(brief),
+  };
+}
+
+// Tiện ích cũ: sinh một bài article bằng bản mẫu.
 export function generateContent(kw) {
   const brief = buildBrief(kw);
   const { title, body } = buildDraft(brief);
   return { title, brief, draft: body };
+}
+
+// Hệ chỉ dẫn dùng chung cho Gemini: giọng brand-voice và ranh giới product-boundary.
+function boundarySystem(facts) {
+  const allowed = facts
+    .filter((f) => f.value)
+    .map((f) => `${f.brand || ''} ${f.model || ''} ${f.attribute}: ${f.value}${f.verified ? '' : ' (CHƯA XÁC NHẬN, dữ liệu test)'}`.trim());
+  return [
+    'Bạn viết nội dung marketing cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
+    'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay ở câu đầu, đọc trên điện thoại.',
+    'Số theo chuẩn Việt Nam, dấu chấm ngăn cách hàng nghìn. Không gạch dài, mũi tên, dấu chấm tròn giữa câu.',
+    'CẤM bịa model và thông số. Chỉ được nêu thông số có trong danh sách đã duyệt dưới đây. Không có thì nói chung chung.',
+    'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO, chỉ nói tương thích.',
+    'Không hứa pháp lý tuyệt đối. Nội dung chạm quy định nhà nước thì nói trung thực, sẽ có người duyệt.',
+    'Kết mỗi phần bằng lời mời gọi tổng đài 1900 23 23 49.',
+    '',
+    allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số nào được duyệt, viết chung chung, không nêu số cụ thể.',
+  ].join('\n');
+}
+
+// Sinh CẢ BA định dạng trong một lần gọi Gemini, trả JSON { article, social, video }.
+export async function generateFormatsLLM(brief, facts = []) {
+  const { GoogleGenAI } = await import('@google/genai');
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+  const system = boundarySystem(facts) + '\n\n' + [
+    'Tạo ba phiên bản nội dung cho cùng một từ khóa:',
+    '- article: bài website dài, trả lời ngay đầu bài, có vài đoạn phân tích, dẫn về tổng đài.',
+    '- social: bài Facebook ngắn, hai tới bốn câu, một hook và một lời kêu gọi liên hệ.',
+    '- video: kịch bản video dọc 60 giây, bốn nhịp có mốc thời gian [0-3s], [3-10s], [10-45s], [45-60s].',
+  ].join('\n');
+
+  const user = [
+    `Từ khóa: "${brief.keyword}". Ý định: ${brief.intent}.`,
+    `Các phần gợi ý cho bài dài: ${(brief.sections || []).join('; ')}.`,
+  ].join('\n');
+
+  const res = await ai.models.generateContent({
+    model: MKT_MODEL,
+    contents: user,
+    config: {
+      systemInstruction: system,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: { article: { type: 'STRING' }, social: { type: 'STRING' }, video: { type: 'STRING' } },
+        required: ['article', 'social', 'video'],
+      },
+    },
+  });
+  const parsed = JSON.parse((res.text || '{}').trim());
+  if (!parsed.article || !parsed.social || !parsed.video) throw new Error('Gemini thiếu định dạng.');
+  return parsed;
+}
+
+// Điều phối: sinh ba định dạng, ưu tiên Gemini khi có khóa, không thì bản mẫu.
+export async function generateAllFormats(kw, { facts = [] } = {}) {
+  const brief = buildBrief(kw);
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const f = await generateFormatsLLM(brief, facts);
+      const title = draftTitle(brief);
+      return {
+        brief: { ...brief, generator: 'gemini' },
+        article: { title, draft: f.article },
+        social: { title, draft: f.social },
+        video: { title, draft: f.video },
+      };
+    } catch (e) {
+      console.warn('Gemini lỗi, lùi về bản mẫu:', e.message);
+    }
+  }
+  return generateFormatsTemplate(kw);
 }
 
 // Model marketing mặc định, đổi bằng biến MKT_MODEL. Dùng chung nhà Gemini với phần chấm CV.

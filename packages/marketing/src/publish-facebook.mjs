@@ -33,8 +33,9 @@ const { data: approved, error: e1 } = await client
 if (e1) throw new Error('Đọc approval_queue lỗi: ' + e1.message);
 
 const jobs = (approved || [])
-  .map((a) => ({ approvalId: a.id, title: a.title, contentId: a.payload?.content_id }))
-  .filter((j) => j.contentId);
+  .map((a) => ({ approvalId: a.id, title: a.title, contentId: a.payload?.content_id, channel: a.payload?.channel }))
+  // Chỉ đăng Facebook bản định dạng Facebook (social). Bài website và kịch bản video đi kênh khác.
+  .filter((j) => j.contentId && (j.channel === 'facebook' || !j.channel));
 
 if (jobs.length === 0) {
   console.log('Không có bài nào đã duyệt chờ đăng. Xong.');

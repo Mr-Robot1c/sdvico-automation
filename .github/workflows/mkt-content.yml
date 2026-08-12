@@ -1,0 +1,35 @@
+name: Sinh nội dung marketing
+
+# Bốc từ khóa, sinh 3 định dạng (website, Facebook, video), đẩy vào hàng đợi duyệt.
+# KHÔNG đăng gì. Người duyệt bấm Duyệt thì worker mới đăng.
+#
+# LỊCH THỬ: mỗi 5 phút. Đây là quá dày cho hạn mức GitHub Actions miễn phí của repo
+# private (mỗi tháng 2.000 phút). Sau khi thử xong nên giãn ra, ví dụ mỗi ngày một lần
+# ('0 1 * * *'), hoặc tắt lịch và chỉ chạy tay bằng "Run workflow".
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+# Không chạy chồng nếu lần trước chưa xong.
+concurrency:
+  group: mkt-content
+  cancel-in-progress: false
+
+jobs:
+  content:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Sinh 1 từ khóa x 3 định dạng
+        run: node packages/marketing/src/run-content.mjs 1
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MKT_MODEL: ${{ secrets.MKT_MODEL }}
