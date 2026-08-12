@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../lib/supabase-server';
 import { composeJdVersions } from '../lib/jd-compose';
+import { groqChat } from '../lib/groq';
+import { fetchUnsplashPhoto } from '../lib/unsplash';
 
 // Người quyết. Đọc từ form, cập nhật trạng thái, chỉ đổi mục còn pending.
 export async function decideForm(formData: FormData) {
@@ -178,18 +180,49 @@ export async function queueFacebookPost(formData: FormData) {
   }
 
   const versions = (job.jd_versions || {}) as Record<string, string>;
-  let noi_dung = String(versions.facebook || '').trim();
-  if (!noi_dung) {
+  const baseFb = String(versions.facebook || '').trim();
+
+  // Fallback nếu chưa có bản Facebook (JD cũ hoặc Groq chưa chạy).
+  const fallbackContent = (() => {
     const dong = [`Công ty SDVICO tuyển ${job.title}${job.location ? ' tại ' + job.location : ''}.`];
     if (job.short_desc) dong.push('', String(job.short_desc).trim());
     dong.push('', 'Ứng tuyển: gửi CV về tuyendung@sdvico.vn. Hotline 1900 23 23 49.');
-    noi_dung = dong.join('\n');
-  }
+    return dong.join('\n');
+  })();
+
+  // Rewrite bằng Groq để thêm cảm xúc và hook — chạy song song với Unsplash.
+  // Thất bại thì dùng bản gốc, không làm hỏng luồng.
+  const [noi_dung, image_url] = await Promise.all([
+    groqChat(
+      [
+        'Bạn là chuyên gia viết content tuyển dụng viral cho Facebook Việt Nam, ngành biển và thủy sản.',
+        'Nhiệm vụ: viết lại bài tuyển dụng sao cho người lướt Facebook phải dừng lại đọc.',
+        '',
+        'Quy tắc cứng:',
+        '- Không bịa lương, thưởng, phúc lợi, giải thưởng hay con số nào không có trong bản gốc.',
+        '- Không bắt đầu bằng tên công ty, "SDVICO tuyển", hay "Công ty cần tuyển".',
+        '- Câu ngắn. Xuống dòng nhiều. Viết như người thật nói chuyện, không như thông báo HR.',
+        '- Dùng 1-2 emoji nếu tự nhiên. Kết bằng CTA rõ và 2-3 hashtag tiếng Việt.',
+        '- Độ dài 80-130 từ. Trả về nội dung bài đăng, không kèm giải thích hay tiêu đề.',
+        '',
+        'Phong cách: hook chạm cảm xúc hoặc khơi tò mò → thông tin ngắn gọn → kêu gọi hành động.',
+        '',
+        'Ví dụ hook tốt:',
+        '"Ra khơi không chỉ có ngư dân — còn có người đứng sau đảm bảo mỗi con tàu về bờ an toàn."',
+        '"Bạn có muốn làm việc mà mỗi ngày nhìn ra biển không?"',
+        '"Ngành thủy sản Việt Nam đang lớn. SDVICO cần người đi cùng."',
+      ].join('\n'),
+      baseFb || fallbackContent,
+      { temperature: 0.8, maxTokens: 400 }
+    ).then((r) => r?.trim() || baseFb || fallbackContent),
+    fetchUnsplashPhoto(job.title, job.location || undefined),
+  ]);
+
   const tieu_de = `Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`;
 
   const { data: post, error: e1 } = await client
     .from('hr_job_posts')
-    .insert({ job_id: jobId, kenh: 'facebook', tieu_de, noi_dung, trang_thai: 'draft' })
+    .insert({ job_id: jobId, kenh: 'facebook', tieu_de, noi_dung, image_url, trang_thai: 'draft' })
     .select('id')
     .single();
   if (e1) throw new Error(e1.message);

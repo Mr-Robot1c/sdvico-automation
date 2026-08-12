@@ -35,7 +35,7 @@ function systemPrompt(): string {
     '{',
     '  "website": "bản đầy đủ khoảng 400 tới 700 từ: giới thiệu ngắn công ty, mô tả, yêu cầu, quyền lợi, cách ứng tuyển",',
     '  "job_board": "bản chuẩn khoảng 250 tới 450 từ cho sàn tuyển dụng, gạch đầu dòng bằng câu ngắn",',
-    '  "facebook": "bản Facebook khoảng 80 tới 150 từ. Đoạn đầu 1-2 câu hook cuốn hút nêu ngay lợi ích hoặc điểm nổi bật. Dòng trống. Đoạn sau nêu yêu cầu chính, cách ứng tuyển, hashtag tuyển dụng và ngành.",',
+    '  "facebook": "bản Facebook 80-130 từ. KHÔNG bắt đầu bằng tên công ty hay chữ tuyển. Đoạn 1: hook 1-2 câu chạm đúng cảm xúc hoặc khơi gợi tò mò về công việc hay ngành biển. Dòng trống. Đoạn 2: vị trí, yêu cầu chính viết ngắn như đang nói chuyện. Dòng trống. Đoạn 3: CTA rõ ràng và 2-3 hashtag. Câu ngắn, xuống dòng nhiều, dùng 1-2 emoji nếu tự nhiên.",',
     '  "zalo_sms": "bản rất ngắn khoảng 20 tới 45 từ, một đoạn, chỉ vị trí, nơi làm, một điểm chính, cách ứng tuyển"',
     '}'
   ].join('\n');
