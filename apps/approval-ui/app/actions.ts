@@ -185,17 +185,6 @@ async function uploadImageBuffer(
   return { id: (data as { id: string }).id, url };
 }
 
-// Lấy bytes ảnh của một brand_asset (theo id) từ Storage.
-async function assetBuffer(client: ReturnType<typeof getServerClient>, assetId: string): Promise<Buffer> {
-  const { data } = await client.from('brand_assets').select('storage_path').eq('id', assetId).single();
-  const sp = (data as { storage_path?: string } | null)?.storage_path;
-  if (!sp) throw new Error('Không tìm thấy ảnh sản phẩm.');
-  const url = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error('Không tải được ảnh sản phẩm.');
-  return Buffer.from(await r.arrayBuffer());
-}
-
 // Tìm ảnh trên Unsplash theo từ khóa. Trả danh sách ảnh kèm thông tin tác giả.
 export async function searchUnsplash(query: string) {
   const key = process.env.UNSPLASH_ACCESS_KEY;
@@ -235,41 +224,6 @@ export async function saveUnsplashAsAsset(input: {
     input.title || 'anh-unsplash',
     ct,
     input.author ? `Unsplash: ${input.author}` : 'Unsplash'
-  );
-  triggerUnsplashDownload(input.downloadLocation);
-  revalidatePath('/san-xuat');
-  return res;
-}
-
-// Ghép banner: ảnh sản phẩm thật (giữ nguyên) trên nền Unsplash (hoặc nền thương hiệu) + tiêu đề + hotline.
-export async function createBannerFromBackground(input: {
-  productAssetId: string;
-  background?: string;
-  downloadLocation?: string;
-  title?: string;
-  author?: string;
-}) {
-  if (!input?.productAssetId) throw new Error('Chọn ảnh sản phẩm trước khi ghép banner.');
-  const client = getServerClient();
-  const productBuffer = await assetBuffer(client, input.productAssetId);
-  let backgroundBuffer: Buffer | null = null;
-  if (input.background) {
-    const r = await fetch(input.background);
-    if (r.ok) backgroundBuffer = Buffer.from(await r.arrayBuffer());
-  }
-  // @ts-ignore — module JS thuần, không có .d.ts
-  const { buildBanner } = await import('../lib/gen/banner.mjs');
-  const png = (await buildBanner({
-    productBuffer,
-    backgroundBuffer,
-    title: input.title || ''
-  } as any)) as Buffer;
-  const res = await uploadImageBuffer(
-    client,
-    png,
-    'banner-' + (input.title || 'sdvico'),
-    'image/png',
-    input.author ? `Nền Unsplash: ${input.author}` : null
   );
   triggerUnsplashDownload(input.downloadLocation);
   revalidatePath('/san-xuat');

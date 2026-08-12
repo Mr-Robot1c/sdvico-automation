@@ -78,8 +78,10 @@ export default function SanXuatForm({
   };
 
   const onGenerate = () => {
-    const kw = selectedKw?.keyword || title.trim();
-    // Nếu đã chọn ảnh hoặc video, đưa tên tệp của nó làm gợi ý để AI viết ăn khớp với hình.
+    // Ưu tiên từ khóa/tiêu đề; nếu chưa có thì lấy tên ảnh mô tả làm nguồn để AI viết theo hình.
+    const nameKw = cleanAssetName(selectedImg?.title || selectedVid?.title || '');
+    const kw = selectedKw?.keyword || title.trim() || nameKw;
+    if (kw && !title.trim() && !selectedKw) setTitle(kw);
     return runGenerate(
       kw,
       selectedKw?.intent || 'giao_dich',
@@ -196,30 +198,11 @@ export default function SanXuatForm({
       </section>
 
       <ImageStudio
-        productId={imgId}
         productTitle={title || selectedKw?.keyword || ''}
-        onAttach={(id, meta) => {
-          const productName = selectedImg?.title || '';
+        onAttach={(id) => {
           setImgId(id);
+          setMsg('Đã gắn ảnh vào bài. Bấm Sinh text để viết nội dung.');
           router.refresh();
-          if (meta?.banner) {
-            // Tạo banner xong thì tự sinh text luôn, ưu tiên từ khóa/tiêu đề, không thì lấy tên ảnh mô tả.
-            const kwText = (selectedKw?.keyword || title.trim() || cleanAssetName(productName)).trim();
-            if (kwText && !genBusy) {
-              if (!title.trim() && !selectedKw) setTitle(cleanAssetName(productName));
-              setMsg('Đã tạo banner. Đang tự sinh text theo hình...');
-              runGenerate(
-                kwText,
-                selectedKw?.intent || 'giao_dich',
-                selectedKw?.landing_url || null,
-                productName
-              );
-            } else {
-              setMsg('Đã tạo banner và gắn vào bài.');
-            }
-          } else {
-            setMsg('Đã gắn ảnh vào bài.');
-          }
         }}
       />
 

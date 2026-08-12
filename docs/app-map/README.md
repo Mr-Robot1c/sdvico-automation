@@ -14,6 +14,7 @@ ttl_days: 180
 <!-- re-verified: 2026-08-12 - Xuong san xuat them "Xuong anh": tim anh Unsplash (searchUnsplash), chen anh (saveUnsplashAsAsset), va ghep banner (createBannerFromBackground) = anh san pham that + nen Unsplash/gradient + tieu de + hotline, dung @napi-rs/canvas + font Be Vietnam Pro nhung base64 (lib/gen/banner.mjs, fonts-data.mjs). Anh moi vao brand_assets, gan vao bai qua form. Can env UNSPLASH_ACCESS_KEY. next.config: serverComponentsExternalPackages ['@napi-rs/canvas']. Giu nguyen san pham, khong bia (dieu cam 5). Luong approval_queue KHONG doi. -->
 <!-- re-verified: 2026-08-12 - Xuong anh chuyen xuong duoi khung anh/video (tren Soan bai viet). Tao banner xong tu dong sinh text: onAttach meta.banner -> runGenerate voi tu khoa = tieu de/keyword hoac cleanAssetName(ten anh san pham). Kho tu lieu (/tu-lieu): bam anh/clip mo hop thoai xem lon (AssetViewer). Khong doi du lieu. -->
 <!-- re-verified: 2026-08-12 - Kho tu lieu (/tu-lieu): them doi ten tu lieu (renameAsset). Ten title cung la goi y AI sinh text. Khong doi luong. -->
+<!-- re-verified: 2026-08-12 - Bo hoan toan ghep banner (createBannerFromBackground, banner.mjs, fonts-data.mjs, @napi-rs/canvas, serverComponentsExternalPackages). Xuong anh chi con tim + chen anh Unsplash truc tiep (searchUnsplash, saveUnsplashAsAsset). Nut Sinh text: neu chua co keyword/title thi lay ten anh (cleanAssetName) lam nguon. Ly do: ghep code chi dat anh len (trong chat), khong hoa canh; nguoi dung chon dung anh san/Unsplash. -->
 
 
 Hệ thống chia hai mảng, mỗi mảng một file workflow và app map riêng:
