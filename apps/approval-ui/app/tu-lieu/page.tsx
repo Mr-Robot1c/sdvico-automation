@@ -1,5 +1,5 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { uploadAsset, deleteAsset } from '../actions';
+import { uploadAsset, deleteAsset, renameAsset } from '../actions';
 import AssetViewer from './asset-viewer';
 
 export const dynamic = 'force-dynamic';
@@ -81,13 +81,16 @@ export default async function Page() {
               </div>
               <div className="asset-meta">
                 <span className="badge badge-format">{KIND_LABEL[a.kind] || a.kind}</span>
-                <div className="title">{a.title}</div>
+                <form action={renameAsset} className="rename-form">
+                  <input name="title" defaultValue={a.title} aria-label="Tên tư liệu" title="Đặt tên mô tả rõ để AI sinh text bám theo" />
+                  <button className="btn ghost sm" type="submit">Đổi tên</button>
+                </form>
                 {a.source ? <div className="metaline">Nguồn: {a.source}</div> : null}
                 <div className="metaline">{a.license === 'licensed' ? 'Có giấy phép' : 'Công ty sở hữu'}</div>
                 <form action={deleteAsset}>
                   <input type="hidden" name="id" value={a.id} />
                   <input type="hidden" name="storage_path" value={a.storage_path} />
-                  <button className="btn no" type="submit" aria-label="Xóa tư liệu">Xóa</button>
+                  <button className="btn no sm" type="submit" aria-label="Xóa tư liệu">Xóa</button>
                 </form>
               </div>
             </li>

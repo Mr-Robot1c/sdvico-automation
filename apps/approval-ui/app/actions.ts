@@ -276,6 +276,18 @@ export async function createBannerFromBackground(input: {
   return res;
 }
 
+// Đổi tên (title) một tư liệu. Tên này cũng là gợi ý cho AI khi sinh text theo hình.
+export async function renameAsset(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  const title = String(formData.get('title') || '').trim();
+  if (!id || !title) return;
+  const client = getServerClient();
+  const { error } = await client.from('brand_assets').update({ title }).eq('id', id);
+  if (error) throw new Error(error.message);
+  revalidatePath('/tu-lieu');
+  revalidatePath('/san-xuat');
+}
+
 // Xóa một tư liệu, gỡ cả file trên Storage.
 export async function deleteAsset(formData: FormData) {
   const id = String(formData.get('id') || '');

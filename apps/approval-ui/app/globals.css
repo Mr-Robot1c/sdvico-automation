@@ -395,6 +395,13 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
   border-radius: 12px; border: 1px solid var(--line); background: #0b0f14;
 }
 
+/* Kho tư liệu: đổi tên tư liệu */
+.rename-form { display: flex; gap: 6px; align-items: center; margin: 2px 0; }
+.rename-form input {
+  flex: 1; min-width: 0; padding: 6px 9px; font-size: 13px; font-family: inherit;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);
+}
+
 /* Kho tư liệu: bấm ảnh/clip để xem lớn */
 .asset-preview-btn {
   width: 100%; height: 100%; padding: 0; border: none; background: var(--surface-2);
