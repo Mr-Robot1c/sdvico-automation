@@ -2,6 +2,7 @@ import { getServerClient } from '../lib/supabase-server';
 import AutoRefresh from './auto-refresh';
 import DecideActions from './decide-actions';
 import GenerateButton from './generate-button';
+import ViewModal from './view-modal';
 import { editDraft } from './actions';
 import { kindMeta, formatRelative, payloadRows, formatLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from './labels';
 
@@ -174,7 +175,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
           const cid = contentIdOf(item.payload);
           const draft = cid ? drafts.get(cid) : undefined;
 
-          // Thẻ bài marketing: đẹp, có nội dung, badge tiếng Việt.
+          // Thẻ bài marketing: card gọn, chi tiết mở qua nút mắt.
           if (item.kind === 'mkt_publish_content') {
             const info = mktInfo(item.payload);
             const rk = riskMeta(info.risk);
@@ -192,42 +193,44 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   <span className="badge badge-format">{formatLabel(info.format)}</span>
                   {info.intent ? <span className="badge">{intentLabel(info.intent)}</span> : null}
                   <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
+                  {info.keyword ? <span className="src">từ khóa: {info.keyword}</span> : null}
                 </div>
 
-                {info.flags.length ? (
-                  <div className="flagline">
-                    {info.flags.map((f) => (
-                      <span className="flagchip" key={f.label}>{f.label}: {f.items.join(', ')}</span>
-                    ))}
-                  </div>
-                ) : null}
-
-                {draft ? <div className="draftbox">{draft}</div> : null}
-
-                {info.keyword ? (
-                  <div className="metaline">
-                    Từ khóa: {info.keyword}{info.landingUrl ? ` · Trang đích: ${info.landingUrl}` : ''}
-                  </div>
-                ) : null}
-
-                <DecideActions id={item.id} title={cleanTitle} />
-
-                {cid && draft !== undefined ? (
-                  <details className="raw editbox">
-                    <summary>Chỉnh sửa bản nháp</summary>
-                    <form action={editDraft} className="editform">
-                      <input type="hidden" name="content_id" value={cid} />
-                      <textarea name="draft" defaultValue={draft} rows={10} aria-label="Bản nháp" />
-                      <button className="btn ok" type="submit">Lưu chỉnh sửa</button>
-                    </form>
-                  </details>
-                ) : null}
+                <div className="card-actions">
+                  <ViewModal title={cleanTitle} label="Xem bài viết">
+                    {info.flags.length ? (
+                      <div className="flagline">
+                        {info.flags.map((f) => (
+                          <span className="flagchip" key={f.label}>{f.label}: {f.items.join(', ')}</span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {info.keyword ? (
+                      <div className="metaline">
+                        Từ khóa: {info.keyword}{info.landingUrl ? ` · Trang đích: ${info.landingUrl}` : ''}
+                      </div>
+                    ) : null}
+                    {draft ? <div className="draftbox">{draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
+                    {cid && draft !== undefined ? (
+                      <details className="raw editbox">
+                        <summary>Chỉnh sửa bản nháp</summary>
+                        <form action={editDraft} className="editform">
+                          <input type="hidden" name="content_id" value={cid} />
+                          <textarea name="draft" defaultValue={draft} rows={10} aria-label="Bản nháp" />
+                          <button className="btn ok" type="submit">Lưu chỉnh sửa</button>
+                        </form>
+                      </details>
+                    ) : null}
+                  </ViewModal>
+                  <DecideActions id={item.id} title={cleanTitle} />
+                </div>
               </li>
             );
           }
 
           // Thẻ chung cho các loại việc khác.
           const rows = payloadRows(item.payload);
+          const hasDetail = rows.length > 0 || isRedFlag(item.payload);
           return (
             <li key={item.id} className={`card tone-${meta.tone}`}>
               <div className="head">
@@ -245,18 +248,25 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                 </div>
               ) : null}
 
-              {rows.length > 0 ? (
-                <dl className="fields">
-                  {rows.map((r) => (
-                    <div className={`field ${r.long ? 'field-long' : ''}`} key={r.key}>
-                      <dt>{r.label}</dt>
-                      <dd>{r.long ? <pre>{r.value}</pre> : r.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : null}
-
-              <DecideActions id={item.id} title={item.title} />
+              <div className="card-actions">
+                {hasDetail ? (
+                  <ViewModal title={item.title} label="Xem chi tiết">
+                    {rows.length > 0 ? (
+                      <dl className="fields">
+                        {rows.map((r) => (
+                          <div className={`field ${r.long ? 'field-long' : ''}`} key={r.key}>
+                            <dt>{r.label}</dt>
+                            <dd>{r.long ? <pre>{r.value}</pre> : r.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : (
+                      <p className="muted">Không có dữ liệu chi tiết.</p>
+                    )}
+                  </ViewModal>
+                ) : null}
+                <DecideActions id={item.id} title={item.title} />
+              </div>
             </li>
           );
         })}

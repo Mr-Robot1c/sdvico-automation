@@ -119,6 +119,66 @@ export async function deleteAsset(formData: FormData) {
   revalidatePath('/tu-lieu');
 }
 
+// Sinh text cho khung sản xuất: nhập tiêu đề, trả bản nháp qua bản mẫu (hoặc Gemini nếu có khóa).
+// Trả string, gọi từ client component qua await. Không đụng DB, không tạo hàng đợi.
+export async function generateTextForTitle(title: string, intent: string = 'giao_dich'): Promise<string> {
+  const clean = (title || '').trim();
+  if (!clean) return '';
+  // @ts-ignore — module JS thuần, không có .d.ts
+  const { generateContentAsync } = await import('../lib/gen/content.mjs');
+  try {
+    const r = await generateContentAsync({ keyword: clean, intent, landing_url: null });
+    return (r?.draft as string) || '';
+  } catch (e: any) {
+    return `Không sinh được bằng AI: ${e?.message || e}. Bấm Xong để tự soạn tay và đẩy vào hàng đợi.`;
+  }
+}
+
+// Xong khung sản xuất: tạo bản ghi mkt_content + đẩy vào approval_queue.
+// KHÔNG tự đăng — người duyệt bấm 'Duyệt' ở Hàng đợi duyệt mới thực sự lên trang (Điều cấm 1).
+export async function createContent(formData: FormData) {
+  const title = String(formData.get('title') || '').trim();
+  const draft = String(formData.get('draft') || '').trim();
+  const kind = (String(formData.get('kind') || 'social') as 'article' | 'social' | 'video');
+  const imageAssetId = String(formData.get('image_asset_id') || '') || null;
+  const videoAssetId = String(formData.get('video_asset_id') || '') || null;
+  if (!title || !draft) return;
+
+  const client = getServerClient();
+  const brief = {
+    keyword: title,
+    intent: 'giao_dich',
+    landing_url: null,
+    generator: 'xuong-san-xuat',
+    assets: { image: imageAssetId, video: videoAssetId }
+  };
+  const { data: inserted, error } = await client
+    .from('mkt_content')
+    .insert({ kind, title, brief, draft, status: 'review' })
+    .select('id')
+    .single();
+  if (error) throw new Error(error.message);
+
+  const contentId = (inserted as { id: string })?.id;
+  const { error: qErr } = await client.from('approval_queue').insert({
+    kind: 'mkt_publish_content',
+    title: `[${kind === 'video' ? 'Video' : kind === 'article' ? 'Bài website' : 'Bài Facebook'}] ${title}`,
+    payload: {
+      content_id: contentId,
+      format: kind,
+      keyword: title,
+      risk: 'amber',
+      assets: { image: imageAssetId, video: videoAssetId }
+    },
+    status: 'pending'
+  });
+  if (qErr) throw new Error(qErr.message);
+
+  revalidatePath('/');
+  revalidatePath('/noi-dung');
+  revalidatePath('/san-xuat');
+}
+
 // Chỉnh sửa bản nháp trước khi duyệt. Người sửa là người kiểm soát (điều cấm 1).
 export async function editDraft(formData: FormData) {
   const contentId = String(formData.get('content_id') || '');

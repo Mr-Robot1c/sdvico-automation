@@ -1,7 +1,7 @@
 import './globals.css';
 import type { ReactNode } from 'react';
 import Nav from './nav';
-import ThemeToggle from './theme-toggle';
+import TopHeader from './top-header';
 
 export const metadata = {
   title: 'SDVICO · Duyệt nội dung',
@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <div className="shell">
-          <aside className="sidebar">
+          <aside className="sidebar" aria-label="Thanh điều hướng">
             <div className="brand">
               <span className="brand-logo" aria-hidden="true">
                 <svg viewBox="0 0 40 40" width="36" height="36">
@@ -38,17 +38,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </svg>
               </span>
               <span className="brand-text">
-                SDVICO<small>{marketingOnly ? 'Duyệt nội dung Marketing' : 'Duyệt và Hồ sơ'}</small>
+                SDVICO<small>nghề cá thịnh vượng</small>
               </span>
             </div>
-            <div className="nav-group">Trạm kiểm soát nội dung</div>
             <Nav marketingOnly={marketingOnly} />
             <div className="sidebar-foot">
-              <ThemeToggle />
               <p className="foot-note">Máy soạn, người bấm gửi.</p>
             </div>
           </aside>
-          <div className="content">{children}</div>
+          <div className="main-col">
+            <TopHeader marketingOnly={marketingOnly} />
+            <div className="content">{children}</div>
+          </div>
         </div>
       </body>
     </html>

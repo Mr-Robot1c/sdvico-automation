@@ -23,9 +23,9 @@ export default function ThemeToggle() {
   };
 
   return (
-    <button className="theme-toggle" onClick={toggle} aria-label="Đổi giao diện sáng tối">
+    <button className="theme-toggle" onClick={toggle} aria-label={theme === 'dark' ? 'Chuyển nền sáng' : 'Chuyển nền tối'} title={theme === 'dark' ? 'Nền sáng' : 'Nền tối'}>
       <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
-      {theme === 'dark' ? 'Nền sáng' : 'Nền tối'}
+      <span className="theme-toggle-label">{theme === 'dark' ? 'Nền sáng' : 'Nền tối'}</span>
     </button>
   );
 }
