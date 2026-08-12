@@ -108,6 +108,46 @@ export async function uploadAsset(formData: FormData) {
   revalidatePath('/tu-lieu');
 }
 
+// Tạo URL tải lên ký sẵn để TRÌNH DUYỆT tải thẳng file lên Supabase Storage.
+// Dùng cho video và ảnh lớn: đi thẳng browser -> Supabase, không qua server action,
+// nên không dính giới hạn body 4,5MB của hàm serverless trên Vercel.
+export async function createAssetUploadUrl(fileName: string, kind: string) {
+  const client = getServerClient();
+  const safe = (fileName || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${Date.now()}-${safe}`;
+  const { data, error } = await client.storage.from('brand-assets').createSignedUploadUrl(path);
+  if (error || !data) throw new Error('Không tạo được URL tải lên: ' + (error?.message || 'không rõ'));
+  // Supabase trả sẵn signedUrl đầy đủ; nếu thiếu thì tự dựng để trình duyệt PUT thẳng file lên.
+  const base = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+  const uploadUrl =
+    data.signedUrl || `${base}/storage/v1/object/upload/sign/brand-assets/${data.path}?token=${data.token}`;
+  return { path: data.path, uploadUrl };
+}
+
+// Ghi nhận tư liệu vào brand_assets sau khi trình duyệt đã tải file lên Storage xong.
+// Chỉ nhận đường dẫn, không nhận nội dung file, nên nhẹ và không dính giới hạn dung lượng.
+export async function registerAsset(input: {
+  path: string;
+  kind: string;
+  title?: string;
+  license?: string;
+}) {
+  const path = String(input?.path || '').trim();
+  if (!path) throw new Error('Thiếu đường dẫn file đã tải lên.');
+  const kind = input.kind === 'video' ? 'video' : 'image';
+  const license = input.license === 'licensed' ? 'licensed' : 'owned';
+  const client = getServerClient();
+  const { error } = await client.from('brand_assets').insert({
+    kind,
+    title: String(input.title || '').trim() || path,
+    storage_path: path,
+    license
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath('/tu-lieu');
+  revalidatePath('/san-xuat');
+}
+
 // Xóa một tư liệu, gỡ cả file trên Storage.
 export async function deleteAsset(formData: FormData) {
   const id = String(formData.get('id') || '');

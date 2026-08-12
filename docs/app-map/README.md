@@ -5,9 +5,10 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-12
 ttl_days: 180
-<!-- re-verified: 2026-08-12 - approval-ui UI redesign (sidebar chia 5 nhom, eye modal, /san-xuat moi). Luong approval_queue va cac bang du lieu KHONG doi. Nut Xong o /san-xuat van di qua approval_queue kind=mkt_publish_content dung dieu cam 1. -->
-
 <!-- DOC-STATUS: SUSPECT (2026-08-12) — code 'apps/approval-ui' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-12 - approval-ui UI redesign (sidebar chia 5 nhom, eye modal, /san-xuat moi). Luong approval_queue va cac bang du lieu KHONG doi. Nut Xong o /san-xuat van di qua approval_queue kind=mkt_publish_content dung dieu cam 1. -->
+<!-- re-verified: 2026-08-12 - Hang doi duyet gio resolve payload.assets (id) ra public URL, hien anh/video tren card va modal. /san-xuat upload doi tu server action sang browser PUT thang len Storage qua signed URL (vuot gioi han 4,5MB Vercel). Them action createAssetUploadUrl + registerAsset. Luong approval_queue, kind=mkt_publish_content, va cac bang du lieu KHONG doi. -->
+
 
 Hệ thống chia hai mảng, mỗi mảng một file workflow và app map riêng:
 

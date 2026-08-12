@@ -33,6 +33,17 @@ function contentIdOf(payload: unknown): string | null {
   return typeof p.content_id === 'string' ? p.content_id : null;
 }
 
+// Lấy id ảnh/video đã gắn từ payload.assets để resolve ra link xem được.
+function assetIdsOf(payload: unknown): { image?: string; video?: string } {
+  if (!payload || typeof payload !== 'object') return {};
+  const a = (payload as Record<string, any>).assets;
+  if (!a || typeof a !== 'object') return {};
+  return {
+    image: typeof a.image === 'string' ? a.image : undefined,
+    video: typeof a.video === 'string' ? a.video : undefined
+  };
+}
+
 // Trích thông tin bài marketing từ payload để hiển thị gọn gàng.
 function mktInfo(payload: unknown) {
   const p = (payload && typeof payload === 'object' ? payload : {}) as Record<string, any>;
@@ -79,6 +90,25 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   if (contentIds.length) {
     const { data: cs } = await client.from('mkt_content').select('id, draft').in('id', contentIds);
     for (const c of cs || []) drafts.set(c.id as string, (c.draft as string) || '');
+  }
+
+  // Nạp ảnh/video đã gắn: đổi id trong brand_assets ra link công khai để hiện trong modal và trên card.
+  const assetIds = new Set<string>();
+  for (const it of items) {
+    const a = assetIdsOf(it.payload);
+    if (a.image) assetIds.add(a.image);
+    if (a.video) assetIds.add(a.video);
+  }
+  const assetUrl = new Map<string, { url: string; kind: string; title: string }>();
+  if (assetIds.size) {
+    const { data: as } = await client
+      .from('brand_assets')
+      .select('id, storage_path, kind, title')
+      .in('id', [...assetIds]);
+    for (const a of as || []) {
+      const url = client.storage.from('brand-assets').getPublicUrl(a.storage_path as string).data.publicUrl;
+      assetUrl.set(a.id as string, { url, kind: (a.kind as string) || '', title: (a.title as string) || '' });
+    }
   }
 
   // Số liệu tổng quan cho thẻ thống kê trên cùng.
@@ -180,6 +210,9 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
             const info = mktInfo(item.payload);
             const rk = riskMeta(info.risk);
             const cleanTitle = item.title.replace(/^\[[^\]]+\]\s*/, '');
+            const ids = assetIdsOf(item.payload);
+            const img = ids.image ? assetUrl.get(ids.image) : undefined;
+            const vid = ids.video ? assetUrl.get(ids.video) : undefined;
             return (
               <li key={item.id} className="card tone-mkt">
                 <div className="head">
@@ -196,8 +229,26 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   {info.keyword ? <span className="src">từ khóa: {info.keyword}</span> : null}
                 </div>
 
+                {img || vid ? (
+                  <div className="card-media">
+                    {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} loading="lazy" /> : null}
+                    {vid ? (
+                      <span className="card-media-vid">
+                        <video src={vid.url} muted preload="metadata" />
+                        <span className="card-media-badge" aria-hidden="true">▶</span>
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div className="card-actions">
                   <ViewModal title={cleanTitle} label="Xem bài viết">
+                    {img || vid ? (
+                      <div className="modal-media">
+                        {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} /> : null}
+                        {vid ? <video src={vid.url} controls preload="metadata" /> : null}
+                      </div>
+                    ) : null}
                     {info.flags.length ? (
                       <div className="flagline">
                         {info.flags.map((f) => (

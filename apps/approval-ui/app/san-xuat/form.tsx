@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { uploadAsset, generateTextForTitle, createContent } from '../actions';
+import { generateTextForTitle, createContent } from '../actions';
+import AssetUploader from './asset-uploader';
 
 type Asset = { id: string; kind: string; title: string; storage_path: string; url: string };
 type Keyword = { id: string; keyword: string; intent: string | null; landing_url: string | null };
@@ -132,13 +133,7 @@ export default function SanXuatForm({
           <p className="muted">Kho ảnh đang trống. Tải ảnh lên bên dưới.</p>
         )}
 
-        <form className="factform" action={uploadAsset} encType="multipart/form-data">
-          <input type="file" name="file" accept="image/*" aria-label="Chọn ảnh từ máy" required />
-          <input type="hidden" name="kind" value="image" />
-          <input type="hidden" name="license" value="owned" />
-          <input name="title" placeholder="Tên ảnh (tùy chọn)" aria-label="Tên ảnh" />
-          <button className="btn ok" type="submit">Tải ảnh lên</button>
-        </form>
+        <AssetUploader kind="image" />
       </section>
 
       <section className="sx-slot">
@@ -178,13 +173,7 @@ export default function SanXuatForm({
           <p className="muted">Kho video đang trống. Tải video lên bên dưới.</p>
         )}
 
-        <form className="factform" action={uploadAsset} encType="multipart/form-data">
-          <input type="file" name="file" accept="video/*" aria-label="Chọn video từ máy" required />
-          <input type="hidden" name="kind" value="video" />
-          <input type="hidden" name="license" value="owned" />
-          <input name="title" placeholder="Tên video (tùy chọn)" aria-label="Tên video" />
-          <button className="btn ok" type="submit">Tải video lên</button>
-        </form>
+        <AssetUploader kind="video" />
       </section>
 
       <section className="sx-compose">
