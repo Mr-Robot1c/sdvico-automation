@@ -119,15 +119,20 @@ export async function deleteAsset(formData: FormData) {
   revalidatePath('/tu-lieu');
 }
 
-// Sinh text cho khung sản xuất: nhập tiêu đề, trả bản nháp qua bản mẫu (hoặc Gemini nếu có khóa).
-// Trả string, gọi từ client component qua await. Không đụng DB, không tạo hàng đợi.
-export async function generateTextForTitle(title: string, intent: string = 'giao_dich'): Promise<string> {
-  const clean = (title || '').trim();
+// Sinh text cho khung sản xuất: nhập từ khóa (kèm intent/landing_url tùy chọn), trả bản nháp
+// qua bản mẫu (hoặc Gemini nếu có khóa). Trả string, gọi từ client component qua await.
+// Không đụng DB, không tạo hàng đợi.
+export async function generateTextForTitle(
+  keyword: string,
+  intent: string = 'giao_dich',
+  landing_url: string | null = null
+): Promise<string> {
+  const clean = (keyword || '').trim();
   if (!clean) return '';
   // @ts-ignore — module JS thuần, không có .d.ts
   const { generateContentAsync } = await import('../lib/gen/content.mjs');
   try {
-    const r = await generateContentAsync({ keyword: clean, intent, landing_url: null });
+    const r = await generateContentAsync({ keyword: clean, intent, landing_url });
     return (r?.draft as string) || '';
   } catch (e: any) {
     return `Không sinh được bằng AI: ${e?.message || e}. Bấm Xong để tự soạn tay và đẩy vào hàng đợi.`;
@@ -142,13 +147,18 @@ export async function createContent(formData: FormData) {
   const kind = (String(formData.get('kind') || 'social') as 'article' | 'social' | 'video');
   const imageAssetId = String(formData.get('image_asset_id') || '') || null;
   const videoAssetId = String(formData.get('video_asset_id') || '') || null;
+  const keywordId = String(formData.get('keyword_id') || '') || null;
+  const keyword = String(formData.get('keyword') || '').trim() || title;
+  const intent = String(formData.get('intent') || 'giao_dich').trim() || 'giao_dich';
+  const landingUrl = String(formData.get('landing_url') || '').trim() || null;
   if (!title || !draft) return;
 
   const client = getServerClient();
   const brief = {
-    keyword: title,
-    intent: 'giao_dich',
-    landing_url: null,
+    keyword,
+    intent,
+    landing_url: landingUrl,
+    keyword_id: keywordId,
     generator: 'xuong-san-xuat',
     assets: { image: imageAssetId, video: videoAssetId }
   };
@@ -166,7 +176,9 @@ export async function createContent(formData: FormData) {
     payload: {
       content_id: contentId,
       format: kind,
-      keyword: title,
+      keyword,
+      intent,
+      landing_url: landingUrl,
       risk: 'amber',
       assets: { image: imageAssetId, video: videoAssetId }
     },
