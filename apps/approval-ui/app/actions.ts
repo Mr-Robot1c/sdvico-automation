@@ -273,10 +273,10 @@ export async function editJobPostDraft(formData: FormData) {
         const { data: { publicUrl } } = client.storage.from('post-images').getPublicUrl(path);
         image_url = publicUrl;
       } else {
-        await client.from('run_log').insert({ task: 'upload_post_image', status: 'error', detail: { postId, error: uploadErr.message } }).catch(() => {});
+        try { await client.from('run_log').insert({ task: 'upload_post_image', status: 'error', detail: { postId, error: uploadErr.message } }); } catch {}
       }
     } catch (err: unknown) {
-      await client.from('run_log').insert({ task: 'upload_post_image', status: 'error', detail: { postId, error: String(err) } }).catch(() => {});
+      try { await client.from('run_log').insert({ task: 'upload_post_image', status: 'error', detail: { postId, error: String(err) } }); } catch {}
     }
   }
   const { error } = await client
