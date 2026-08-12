@@ -149,3 +149,86 @@ export async function updateJobPost(formData: FormData) {
   }
   revalidatePath('/dang-tin');
 }
+
+// Đưa một vị trí vào hàng đợi đăng Facebook: soạn nháp từ bản JD sẵn có rồi đẩy vào hàng đợi duyệt.
+// Máy soạn, người bấm Duyệt (điều cấm 1). KHÔNG đăng gì ở đây. Worker publish-facebook mới đăng.
+export async function queueFacebookPost(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  if (!jobId) return;
+
+  const client = getServerClient();
+  const { data: job, error: e0 } = await client
+    .from('hr_jobs')
+    .select('id, title, location, short_desc, jd_versions')
+    .eq('id', jobId)
+    .single();
+  if (e0) throw new Error(e0.message);
+
+  // Vị trí đã có bài Facebook đang chờ hoặc đã đăng thì thôi, tránh trùng.
+  const { data: existing } = await client
+    .from('hr_job_posts')
+    .select('id')
+    .eq('job_id', jobId)
+    .eq('kenh', 'facebook')
+    .in('trang_thai', ['draft', 'scheduled', 'posted']);
+  if (existing && existing.length) {
+    revalidatePath('/dang-tin');
+    return;
+  }
+
+  const versions = (job.jd_versions || {}) as Record<string, string>;
+  let noi_dung = String(versions.facebook || '').trim();
+  if (!noi_dung) {
+    const dong = [`Công ty SDVICO tuyển ${job.title}${job.location ? ' tại ' + job.location : ''}.`];
+    if (job.short_desc) dong.push('', String(job.short_desc).trim());
+    dong.push('', 'Ứng tuyển: gửi CV về tuyendung@sdvico.vn. Hotline 1900 23 23 49.');
+    noi_dung = dong.join('\n');
+  }
+  const tieu_de = `Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`;
+
+  const { data: post, error: e1 } = await client
+    .from('hr_job_posts')
+    .insert({ job_id: jobId, kenh: 'facebook', tieu_de, noi_dung, trang_thai: 'draft' })
+    .select('id')
+    .single();
+  if (e1) throw new Error(e1.message);
+
+  const { error: e2 } = await client.from('approval_queue').insert({
+    kind: 'hr_job_post',
+    title: tieu_de,
+    payload: { post_id: post.id, job_id: jobId, kenh: 'facebook', dia_diem: job.location || null, body: noi_dung },
+    ref_table: 'hr_job_posts',
+    ref_id: post.id,
+    status: 'pending'
+  });
+  if (e2) throw new Error(e2.message);
+
+  revalidatePath('/dang-tin');
+  revalidatePath('/');
+}
+
+// Sửa nội dung bài đăng trước khi duyệt. Người sửa là người kiểm soát (điều cấm 1).
+// Đồng bộ cả bản xem trong hàng đợi để trang Duyệt không lệch với nội dung sẽ đăng.
+export async function editJobPostDraft(formData: FormData) {
+  const postId = String(formData.get('post_id') || '');
+  const noi_dung = String(formData.get('noi_dung') || '');
+  if (!postId) return;
+
+  const client = getServerClient();
+  const { error } = await client.from('hr_job_posts').update({ noi_dung }).eq('id', postId);
+  if (error) throw new Error(error.message);
+
+  const { data: rows } = await client
+    .from('approval_queue')
+    .select('id, payload')
+    .eq('ref_id', postId)
+    .eq('kind', 'hr_job_post')
+    .eq('status', 'pending');
+  for (const row of rows || []) {
+    const payload = { ...((row.payload || {}) as Record<string, unknown>), body: noi_dung };
+    await client.from('approval_queue').update({ payload }).eq('id', row.id);
+  }
+
+  revalidatePath('/dang-tin');
+  revalidatePath('/');
+}

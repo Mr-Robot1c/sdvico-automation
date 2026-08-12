@@ -12,6 +12,8 @@ export function kindMeta(kind: string): KindMeta {
       return { label: 'Thư tuyển dụng', icon: '✉️', tone: 'hr' };
     case 'hr_interview':
       return { label: 'Thư mời phỏng vấn', icon: '📅', tone: 'hr' };
+    case 'hr_job_post':
+      return { label: 'Tin tuyển dụng (Facebook)', icon: '📣', tone: 'hr' };
     case 'mkt_post':
       return { label: 'Bài marketing', icon: '📣', tone: 'mkt' };
     case 'mkt_publish':
@@ -41,6 +43,10 @@ const FIELD_LABELS: Record<string, string> = {
   body: 'Nội dung',
   candidate_id: 'Mã ứng viên',
   job_id: 'Mã vị trí',
+  post_id: 'Mã tin đăng',
+  kenh: 'Kênh',
+  dia_diem: 'Địa điểm',
+  nguon_soan: 'Nguồn soạn',
   channel: 'Kênh',
   url: 'Đường dẫn',
   ung_vien: 'Ứng viên',

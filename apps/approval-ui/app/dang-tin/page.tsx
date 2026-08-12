@@ -1,7 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { formatRelative } from '../labels';
-import { addPlatform, removePlatform, addJobPost, updateJobPost } from '../actions';
+import { addPlatform, removePlatform, addJobPost, updateJobPost, queueFacebookPost, editJobPostDraft } from '../actions';
 import DangTinSections from '../dang-tin-sections';
 
 // Quản lý vị trí, nền tảng đăng tuyển và theo dõi tin đăng.
@@ -16,7 +16,8 @@ type Job = {
 type Platform = { id: string; ten: string; loai: string; bat: boolean; ghi_chu: string | null };
 type Post = {
   id: string; tieu_de: string; trang_thai: string; scheduled_at: string | null;
-  posted_at: string | null; platform_id: string | null; created_at: string;
+  posted_at: string | null; platform_id: string | null; noi_dung: string | null;
+  kenh: string | null; url: string | null; created_at: string;
 };
 
 const JD_LABELS: Record<string, string> = { website: 'Website công ty', job_board: 'Trang tuyển dụng', facebook: 'Facebook', zalo_sms: 'Zalo / SMS' };
@@ -26,8 +27,8 @@ const JOB_STATUS: Record<string, { label: string; tone: string }> = {
 };
 const LOAI_LABEL: Record<string, string> = { job_board: 'Sàn tuyển dụng', social: 'Mạng xã hội', other: 'Khác' };
 const TT_LABEL: Record<string, { label: string; tone: string }> = {
-  draft: { label: 'Nháp', tone: 'default' }, scheduled: { label: 'Đặt lịch', tone: 'mkt' },
-  posted: { label: 'Đã đăng', tone: 'ok' }, cancelled: { label: 'Đã huỷ', tone: 'no' }
+  draft: { label: 'Nháp, chờ duyệt', tone: 'default' }, scheduled: { label: 'Đặt lịch', tone: 'mkt' },
+  posted: { label: 'Đã đăng', tone: 'ok' }, failed: { label: 'Đăng lỗi', tone: 'no' }, cancelled: { label: 'Đã huỷ', tone: 'no' }
 };
 
 export default async function Page() {
@@ -39,11 +40,11 @@ export default async function Page() {
   const pRes = await client.from('hr_platforms').select('id, ten, loai, bat, ghi_chu').order('created_at', { ascending: true });
   const jRes = await client
     .from('hr_job_posts')
-    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, platform_id, created_at')
+    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, platform_id, noi_dung, kenh, url, created_at')
     .order('created_at', { ascending: false }).limit(100);
 
   const jobs = (jobsRes.data || []) as Job[];
-  const missing = (code?: string) => code === 'PGRST205' || code === '42P01';
+  const missing = (code?: string) => code === 'PGRST205' || code === '42P01' || code === '42703';
   const needMigration = missing(pRes.error?.code) || missing(jRes.error?.code);
   const platforms = (pRes.data || []) as Platform[];
   const posts = (jRes.data || []) as Post[];
@@ -51,7 +52,7 @@ export default async function Page() {
 
   const migrationNote = (
     <div className="err" role="alert">
-      Chưa bật tính năng này. Chạy đoạn SQL trong <code>supabase/migrations/20260811100000_management.sql</code> ở Supabase SQL editor, rồi tải lại trang.
+      Chưa bật đủ tính năng này. Chạy các migration còn thiếu trong <code>supabase/migrations/</code> (mới nhất: <code>20260812090000_hr_social_posts.sql</code>) ở Supabase SQL editor, rồi tải lại trang.
     </div>
   );
 
@@ -83,6 +84,10 @@ export default async function Page() {
                 ))}
               </div>
             ) : <p className="muted">Chưa có phiên bản JD nào.</p>}
+            <form action={queueFacebookPost} style={{ marginTop: 8 }}>
+              <input type="hidden" name="job_id" value={j.id} />
+              <button className="btn ok" type="submit">Soạn bài Facebook và đưa vào hàng đợi duyệt</button>
+            </form>
           </li>
         );
       })}
@@ -131,7 +136,7 @@ export default async function Page() {
 
   const tinDang = needMigration ? migrationNote : (
     <>
-      <p className="muted" style={{ margin: '0 0 10px' }}>Tin đăng chạy tự động, không qua duyệt. Bạn mở xem hoặc huỷ đăng khi cần.</p>
+      <p className="muted" style={{ margin: '0 0 10px' }}>Máy soạn bài, đẩy vào hàng đợi. Bạn xem và sửa ở đây, bấm Duyệt ở trang Duyệt, rồi worker mới đăng lên Facebook. Máy soạn, người bấm (điều cấm 1).</p>
       <ul className="list">
         {posts.map((j) => {
           const tt = TT_LABEL[j.trang_thai] || { label: j.trang_thai, tone: 'default' };
@@ -145,10 +150,29 @@ export default async function Page() {
                 </span>
               </div>
               <dl className="fields">
-                <div className="field"><dt>Nền tảng</dt><dd>{(j.platform_id && platformName.get(j.platform_id)) || '—'}</dd></div>
+                <div className="field"><dt>Nền tảng</dt><dd>{(j.platform_id && platformName.get(j.platform_id)) || (j.kenh === 'facebook' ? 'Facebook' : '—')}</dd></div>
                 <div className="field"><dt>Giờ đặt đăng</dt><dd>{j.scheduled_at ? new Date(j.scheduled_at).toLocaleString('vi-VN') : '—'}</dd></div>
                 {j.posted_at ? <div className="field"><dt>Đã đăng lúc</dt><dd>{new Date(j.posted_at).toLocaleString('vi-VN')}</dd></div> : null}
               </dl>
+              {j.url ? <p className="muted" style={{ margin: '2px 0 6px' }}><a href={j.url} target="_blank" rel="noreferrer">Xem bài đã đăng</a></p> : null}
+              {j.noi_dung ? (
+                <>
+                  <details className="raw">
+                    <summary>Xem nội dung ({j.noi_dung.trim().split(/\s+/).length} từ)</summary>
+                    <pre>{j.noi_dung}</pre>
+                  </details>
+                  {j.trang_thai !== 'posted' ? (
+                    <details className="raw">
+                      <summary>Chỉnh sửa nội dung</summary>
+                      <form action={editJobPostDraft} style={{ marginTop: 6 }}>
+                        <input type="hidden" name="post_id" value={j.id} />
+                        <textarea name="noi_dung" defaultValue={j.noi_dung} rows={8} aria-label="Nội dung bài đăng" style={{ width: '100%', boxSizing: 'border-box' }} />
+                        <button className="btn ok" type="submit" style={{ marginTop: 6 }}>Lưu chỉnh sửa</button>
+                      </form>
+                    </details>
+                  ) : null}
+                </>
+              ) : null}
               <div className="row">
                 {j.trang_thai !== 'posted' && j.trang_thai !== 'cancelled' ? (
                   <form action={updateJobPost}>
