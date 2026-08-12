@@ -1,0 +1,76 @@
+# {{NN}} — <Topic Title>
+
+> Load khi: <e.g. designing/fixing X feature, or integrating Y with Z>
+covers: {{src/feature-x, supabase/migrations — path prefix phẩy ngăn cách; doc thuần decision/vision thì XÓA 3 dòng metadata này}}
+last_verified: {{YYYY-MM-DD — ngày đối chiếu nội dung với code thật, KHÔNG phải ngày sửa doc}}
+ttl_days: {{90 cho flow/quickstart hay đổi | 180 cho domain spec | 365 cho architecture}}
+
+> **Mục đích / Purpose**: 1-2 câu mô tả file này.
+
+---
+
+## 1. State hiện tại / Current state
+
+### Data model
+- `<table_name>` — <description>
+  - Fields: ...
+  - Migration: [<filename>](../../<path>)
+
+### Hooks / Modules
+- `useX()` — <one-line>
+- `useY()` — <one-line>
+
+### UI
+- `{{Component}}` — <where used, mode props>
+- `{{OtherComponent}}` — ...
+
+---
+
+## 2. Logic / Rules
+
+### Invariants
+1. ...
+2. ...
+
+### Edge cases
+| Case | Handling |
+|---|---|
+| Empty data | <action> |
+| Network error | <action> |
+| Permission denied | <action> |
+
+---
+
+## 3. Diagrams (optional)
+
+```
+[ASCII diagram nếu hữu ích]
+```
+
+---
+
+## 4. Cross-references
+
+- See also: [{{NN-related}}]({{NN-related}}.md)
+- ADR: [{{NNNN-decision}}](../decisions/{{NNNN}}.md)
+
+---
+
+## 5. Implementation status (nếu là feature đang build)
+
+| # | Item | Status | Files / commit |
+|---|---|---|---|
+| 1 | ... | ✅ Done | <link> |
+| 2 | ... | 🟡 In progress | <link> |
+| 3 | ... | ❌ Deferred | reason |
+
+---
+
+## 6. History (nếu major change)
+
+- **v2** (2026-04-29): <what changed and why>
+- **v1** (2026-04-01): initial
+
+---
+
+**Last updated**: {{YYYY-MM-DD}}

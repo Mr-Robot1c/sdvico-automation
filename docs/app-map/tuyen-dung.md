@@ -1,6 +1,9 @@
 # Tuyển dụng: workflow và app map
 
 > Đọc khi làm phần Tuyển dụng. Phụ trách Bạn A. Nền chung ở [README.md](README.md), điều cấm và giọng văn ở CLAUDE.md.
+covers: packages/hr
+last_verified: 2026-08-12
+ttl_days: 180
 
 ## 1. Workflow tuyển dụng, từ đầu tới cuối
 

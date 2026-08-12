@@ -1,0 +1,281 @@
+#!/bin/sh
+# ai-simple-version: 1.5.0
+# doc-health-report — đo lường nguyên tắc 12 v2 (event-first). 3 chế độ:
+#   sh doc-health-report.sh              -> report đầy đủ ra stdout (exit 0 kể cả khi có vấn đề)
+#   sh doc-health-report.sh --ci         -> exit 1 khi: doc-lag quá ngưỡng / _generated stale /
+#                                           broken cross-ref -> fail PR
+#   sh doc-health-report.sh --status     -> regenerate docs/app-map/_generated/doc-status.md
+#                                           (cổng đọc verify-on-use đọc file này; gọi từ hook/CI)
+#
+# Wiring:
+#   Windows (scheduled task khởi động ở System32 -> PHẢI cd vào repo trước):
+#     schtasks /create /tn "doc-health" /sc weekly /d MON /st 08:00 ^
+#       /tr "\"C:\Program Files\Git\bin\sh.exe\" -c \"cd /c/path/repo && sh scripts/doc-health-report.sh\""
+# Yêu cầu: git >= 1.9 (pathspec ':(exclude)'), GNU date (macOS: brew install coreutils).
+# Chủ sở hữu tín hiệu dead-symbol: --ci (fail PR) + full --status hằng tuần (đặt marker);
+# hook per-commit dùng --fast nên KHÔNG bắt dead-symbol — by design, xem nguyên tắc 12.
+#   GitHub Actions (.github/workflows/doc-health.yml — fetch-depth: 0 bắt buộc cho timestamp):
+#     on: { schedule: [ { cron: "0 1 * * 1" } ], pull_request: {} }
+#     jobs: { report: { runs-on: ubuntu-latest, steps: [
+#       { uses: actions/checkout@v4, with: { fetch-depth: 0 } },
+#       { run: "sh scripts/doc-health-report.sh --status && sh scripts/doc-health-report.sh --ci" } ] } }
+
+# ── CONFIG — sửa theo layout repo ──────────────────────────────────────
+MIGRATIONS_DIR='supabase/migrations'   # prisma/migrations | db/migrate ...
+DOC_LAG_MAX_DAYS=7                     # --ci fail nếu có doc SUSPECT lệch quá N ngày
+CLAUDE_MD_CHAR_BUDGET=${CLAUDE_MD_CHAR_BUDGET:-24000}
+
+NOW=$(date +%s)
+
+# Đọc frontmatter 1 doc -> in 1 DÒNG "paths_phẩy_ngăn|last_verified_epoch|ttl"
+# (paths giữ dạng phẩy-ngăn trên 1 dòng — KHÔNG newline, vì cut xử lý theo dòng;
+#  bug đa-covers vòng review 8 sinh ra từ đúng chỗ này)
+read_meta() {
+  CLINE=$(head -10 "$1" | grep -i '^covers:' | head -1)
+  [ -n "$CLINE" ] || { echo ""; return; }
+  LV=$(head -10 "$1" | grep -i '^last_verified:' | head -1 | sed 's/^[^:]*:[[:space:]]*//')
+  TTL=$(head -10 "$1" | grep -i '^ttl_days:' | head -1 | sed 's/^[^:]*:[[:space:]]*//')
+  LV_TS=$(date -d "$LV" +%s 2>/dev/null)
+  if [ -z "$LV_TS" ]; then
+    LV_TS=0
+    echo "WARN: khong parse duoc last_verified '$LV' trong $1 — can GNU date (macOS: brew install coreutils, dung gdate). Doc se bi coi la SUSPECT." >&2
+  fi
+  PATHS=$(echo "$CLINE" | sed 's/^[Cc]overs:[[:space:]]*//; s/[[:space:]]*,[[:space:]]*/,/g; s/^[[:space:]]*//; s/[[:space:]]*$//')
+  echo "$PATHS|$LV_TS|${TTL:-365}"
+}
+
+# Tính trạng thái 1 doc -> "STATE|REASON|LAG_DAYS"
+# SEMANTICS covers (thống nhất với hook): mỗi entry là FILE/DIR CÓ THẬT; match anchored.
+doc_state() {
+  META=$(read_meta "$1")
+  [ -n "$META" ] || { echo "NO-COVERS|doc khong gan code (chi hop le cho decision/vision)|0"; return; }
+  PATHS=$(echo "$META" | cut -d'|' -f1 | tr ',' ' ')
+  LV_TS=$(echo "$META" | cut -d'|' -f2)
+  TTL=$(echo "$META" | cut -d'|' -f3)
+  # Mốc verify hiệu lực: last_verified, NÂNG lên timestamp commit cuối của doc CHỈ KHI
+  # commit đó là "gate-1-shaped" (cùng chạm covers path — tức đã qua cổng ghi) hoặc message
+  # bắt đầu re-verify( . Commit chạm doc kiểu khác (chore/typo) KHÔNG được tính là xác nhận
+  # — chống "SUSPECT laundering" (vòng 9): commit vu vơ không được rửa trạng thái SUSPECT.
+  EFF_TS=$LV_TS
+  DOC_COMMIT=$(git log -1 --format=%H -- "$1" 2>/dev/null)
+  if [ -n "$DOC_COMMIT" ]; then
+    DOC_TS=$(git log -1 --format=%ct -- "$1" 2>/dev/null || echo 0)
+    if [ "$DOC_TS" -gt "$EFF_TS" ]; then
+      MSG=$(git show -s --format=%s "$DOC_COMMIT" 2>/dev/null)
+      ATTEST=0
+      case "$MSG" in re-verify\(*) ATTEST=1;; esac
+      if [ "$ATTEST" -eq 0 ]; then
+        CFILES=$(git show --name-only --format= "$DOC_COMMIT" 2>/dev/null)
+        for p in $PATHS; do
+          [ -n "$p" ] || continue
+          H=$(echo "$CFILES" | while read -r c; do case "$c" in "$p"|"$p"/*) echo 1; break;; esac; done)
+          [ -n "$H" ] && { ATTEST=1; break; }
+        done
+      fi
+      [ "$ATTEST" -eq 1 ] && EFF_TS=$DOC_TS
+    fi
+  fi
+  STATE="VERIFIED"; REASON="ok"; LAG=0
+  for p in $PATHS; do
+    [ -n "$p" ] || continue
+    if [ ! -e "$p" ]; then echo "ORPHANED|path '$p' khong con ton tai|0"; return; fi
+    CTS=$(git log -1 --format=%ct -- "$p" 2>/dev/null || echo 0)
+    if [ "$CTS" -gt "$EFF_TS" ]; then
+      L=$(( (NOW - CTS) / 86400 + 1 ))
+      [ "$L" -gt "$LAG" ] && LAG=$L
+      STATE="SUSPECT"; REASON="code '$p' doi sau last_verified"
+    fi
+  done
+  # Symbol-level rot (EMSE 2024): doc nhắc `funcName(` mà symbol không còn TRONG REPO
+  # (tìm toàn repo, loại file .md/.template — symbol sống ở util ngoài covers vẫn là sống;
+  # vòng 9 fix: chỉ check trong covers sẽ SUSPECT oan doc nhắc shared util) -> SUSPECT.
+  # Cap 20 symbol; CHIẾN LƯỢC CHI PHÍ: skip ở --status --fast (hook per-commit), chạy đủ
+  # ở --ci/tuần — dead symbol hiếm khi cần phát hiện trong-phút, đáng đổi lấy commit nhanh.
+  if [ "${FAST:-0}" -ne 1 ]; then
+    SYMS=$(grep -oE '`[A-Za-z_][A-Za-z0-9_]{2,}\(' "$1" 2>/dev/null | tr -d '`(' | sort -u | head -20)
+    for s in $SYMS; do
+      git grep -qF "$s" -- ':(exclude)*.md' ':(exclude)*.template' 2>/dev/null \
+        || { STATE="SUSPECT"; REASON="symbol '$s()' khong tim thay trong repo (da xoa/rename?)"; }
+    done
+  fi
+  if [ "$STATE" = "VERIFIED" ] && [ "$LV_TS" -gt 0 ]; then
+    AGE=$(( (NOW - LV_TS) / 86400 ))
+    [ "$AGE" -gt "$TTL" ] && { STATE="SUSPECT"; REASON="qua TTL (${AGE}d > ${TTL}d)"; LAG=$((AGE - TTL)); }
+  fi
+  echo "$STATE|$REASON|$LAG"
+}
+
+# Chèn/xóa marker DOC-STATUS trong chính doc. Anchor fallback: ttl_days -> last_verified
+# -> covers (doc cẩu thả frontmatter vẫn phải nhận marker — vòng 9 Bug 3).
+update_marker() {
+  sed -i '/<!-- DOC-STATUS:/d' "$1"
+  if [ "$2" = "SUSPECT" ] || [ "$2" = "ORPHANED" ]; then
+    if grep -qi '^ttl_days:' "$1"; then A='^[Tt][Tt][Ll]_days:'
+    elif grep -qi '^last_verified:' "$1"; then A='^[Ll]ast_verified:'
+    else A='^[Cc]overs:'; fi
+    sed -i "/$A/a <!-- DOC-STATUS: $2 ($(date +%Y-%m-%d)) — $3. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->" "$1"
+  fi
+}
+
+# ── chế độ --self-test: fixture tổng hợp trong temp repo, bắt regression lớp Bug A/B ──
+if [ "$1" = "--self-test" ]; then
+  SELF="$0"; case "$SELF" in /*|[A-Za-z]:*) ;; *) SELF="$(pwd)/$SELF";; esac
+  T=$(mktemp -d) && OLDPWD_ST=$(pwd) && cd "$T" || exit 1
+  git init -q . && git config user.email t@t.t && git config user.name t
+  mkdir -p src/a src/b docs/app-map
+  echo "function calcX() { return 1 }" > src/a/f.ts
+  echo "export const g = 2" > src/b/g.ts
+  printf '# 01 t\n> Load khi: test\ncovers: src/a, src/b\nlast_verified: %s\nttl_days: 90\n\nDung \140calcX(\140 va noi dung.\n' "$(date +%Y-%m-%d)" > docs/app-map/01-t.md
+  git add -A && git commit -qm c1
+  RC=0
+  ST=$(doc_state docs/app-map/01-t.md 2>/dev/null | cut -d'|' -f1)
+  [ "$ST" = "VERIFIED" ] && echo "PASS: multi-covers + same-day commit -> VERIFIED" || { echo "FAIL: mong VERIFIED, ra '$ST' (Bug A/B lop)"; RC=1; }
+  sleep 1; echo "// change" >> src/b/g.ts; git add src/b/g.ts; git commit -qm c2
+  ST=$(doc_state docs/app-map/01-t.md 2>/dev/null | cut -d'|' -f1)
+  [ "$ST" = "SUSPECT" ] && echo "PASS: code doi sau verify (multi-covers path 2) -> SUSPECT" || { echo "FAIL: mong SUSPECT, ra '$ST'"; RC=1; }
+  # Laundering (vòng 9 Bug 1): commit chore chỉ chạm doc KHÔNG được rửa SUSPECT
+  sleep 1; echo "ghi chu vo thuong" >> docs/app-map/01-t.md; git add docs/app-map/01-t.md; git commit -qm "chore: tidy"
+  ST=$(doc_state docs/app-map/01-t.md 2>/dev/null | cut -d'|' -f1)
+  [ "$ST" = "SUSPECT" ] && echo "PASS: chore-commit khong launder duoc SUSPECT" || { echo "FAIL: SUSPECT bi rua boi chore commit ('$ST')"; RC=1; }
+  # re-verify commit message hop le (kem dong re-verified comment — flow chuan, vi bump
+  # date cung ngay la no-op khong co gi de stage) -> VERIFIED
+  sleep 1
+  sed -i "/^ttl_days:/a <!-- re-verified: $(date '+%Y-%m-%d %H:%M') - calcX van khop -->" docs/app-map/01-t.md
+  git add docs/app-map/01-t.md; git commit -qm "re-verify(01-t): calcX van khop"
+  ST=$(doc_state docs/app-map/01-t.md 2>/dev/null | cut -d'|' -f1)
+  [ "$ST" = "VERIFIED" ] && echo "PASS: re-verify(...) commit -> VERIFIED" || { echo "FAIL: re-verify khong duoc cong nhan ('$ST')"; RC=1; }
+  # Symbol song NGOAI covers (vòng 9 Bug 2): phai VERIFIED, khong SUSPECT oan
+  mkdir -p src/c && echo "function helperZ() {}" > src/c/h.ts
+  printf 'Dung them \140helperZ(\140 ngoai covers.\n' >> docs/app-map/01-t.md
+  git add -A; git commit -qm "re-verify(01-t): them ref helperZ"
+  ST=$(doc_state docs/app-map/01-t.md 2>/dev/null | cut -d'|' -f1)
+  [ "$ST" = "VERIFIED" ] && echo "PASS: symbol song ngoai covers -> van VERIFIED" || { echo "FAIL: SUSPECT oan voi shared util ('$ST')"; RC=1; }
+  sed -i 's/calcX/deadFn/' docs/app-map/01-t.md && git add -A && git commit -qm "re-verify(01-t): doi ref"
+  ST=$(doc_state docs/app-map/01-t.md 2>/dev/null)
+  echo "$ST" | grep -q "symbol 'deadFn()'" && echo "PASS: symbol chet (toan repo) -> SUSPECT" || { echo "FAIL: symbol chet khong bi bat ($ST)"; RC=1; }
+  # Symbol chết phải làm --ci FAIL (detector có răng — vòng 10)
+  sh "$SELF" --ci >/dev/null 2>&1
+  [ $? -eq 1 ] && echo "PASS: dead symbol -> --ci exit 1" || { echo "FAIL: --ci khong fail voi symbol chet"; RC=1; }
+  # --fast phải skip symbol scan (hook per-commit dùng — vòng 10)
+  FAST=1; STF=$(doc_state docs/app-map/01-t.md 2>/dev/null | cut -d'|' -f1); FAST=0
+  [ "$STF" = "VERIFIED" ] && echo "PASS: --fast skip symbol scan" || { echo "FAIL: --fast van scan symbol ('$STF')"; RC=1; }
+  # Contract test matcher (CÙNG bảng với hook --self-test — hợp đồng chung của matcher 2 nơi)
+  M=$(echo "src/lib-utils/a.ts" | while read -r c; do case "$c" in "src/lib"|"src/lib"/*) echo 1;; esac; done)
+  [ -z "$M" ] && echo "PASS: matcher contract — sibling KHONG khop" || { echo "FAIL: matcher overmatch sibling"; RC=1; }
+  M=$(echo "src/lib/x.ts" | while read -r c; do case "$c" in "src/lib"|"src/lib"/*) echo 1;; esac; done)
+  [ -n "$M" ] && echo "PASS: matcher contract — child khop" || { echo "FAIL: matcher miss child"; RC=1; }
+  git rm -rq src/a && git commit -qm c4
+  ST=$(doc_state docs/app-map/01-t.md 2>/dev/null | cut -d'|' -f1)
+  [ "$ST" = "ORPHANED" ] && echo "PASS: covers path xoa -> ORPHANED" || { echo "FAIL: mong ORPHANED, ra '$ST'"; RC=1; }
+  # Marker fallback anchor (vòng 9 Bug 3): doc thieu ttl_days van nhan marker
+  printf '# 02 t2\n> Load khi: t\ncovers: src/b\nlast_verified: 2026-01-01\n\nNoi dung.\n' > docs/app-map/02-t2.md
+  git add docs/app-map/02-t2.md; git commit -qm "re-verify(02-t2): init"
+  update_marker docs/app-map/02-t2.md SUSPECT "test"
+  grep -q 'DOC-STATUS: SUSPECT' docs/app-map/02-t2.md && echo "PASS: marker fallback anchor (thieu ttl_days)" || { echo "FAIL: doc thieu ttl khong nhan marker"; RC=1; }
+  cd "$OLDPWD_ST" && rm -rf "$T"
+  [ "$RC" -eq 0 ] && echo "self-test: ALL PASS" || echo "self-test: CO FAIL"
+  exit $RC
+fi
+
+DOCS=$(git ls-files 'docs/app-map/*.md' 'docs/app-map/**/*.md' 2>/dev/null | grep -v '_generated/' | sort -u)
+
+# ── chế độ --status: regenerate doc-status.md ──────────────────────────
+# --status --fast: skip symbol-scan (hook per-commit dùng — giữ commit nhanh);
+# --status đầy đủ chạy ở CI/tuần sẽ bắt dead-symbol.
+if [ "$1" = "--status" ]; then
+  [ "$2" = "--fast" ] && FAST=1
+  mkdir -p docs/app-map/_generated
+  OUT=docs/app-map/_generated/doc-status.md
+  {
+    echo "<!-- AUTO-GENERATED by doc-health-report --status — DO NOT EDIT. Regenerate: sh scripts/doc-health-report.sh --status -->"
+    echo "# Doc status — $(date +%Y-%m-%d)"
+    echo ""
+    echo "| Doc | Trang thai | Ly do |"
+    echo "|---|---|---|"
+    for doc in $DOCS; do
+      DS=$(doc_state "$doc")
+      echo "| $doc | $(echo "$DS" | cut -d'|' -f1) | $(echo "$DS" | cut -d'|' -f2) |"
+    done
+  } > "$OUT"
+  # Marker trong CHÍNH doc (đóng đường đọc-trực-tiếp không qua /fl — STALE mitigation
+  # phải hiện ở mọi lối vào). Máy quản lý dòng này: xóa marker cũ, chèn lại nếu != VERIFIED.
+  # Marker để unstaged có chủ đích — commit tự nhiên ở lần doc được sửa/verify kế tiếp.
+  for doc in $DOCS; do
+    DS=$(doc_state "$doc")
+    ST=$(echo "$DS" | cut -d'|' -f1)
+    update_marker "$doc" "$ST" "$(echo "$DS" | cut -d'|' -f2)"
+  done
+  echo "regenerated: $OUT (+ DOC-STATUS markers)"
+  exit 0
+fi
+
+CI_MODE=0
+if [ "$1" = "--ci" ]; then CI_MODE=1; shift; fi
+CI_FAIL=0
+
+echo "=== Doc health report — $(date +%Y-%m-%d) ==="
+
+# ── 1. Doc-lag (nguyên tắc 12 v2 — thay drift%): doc SUSPECT/ORPHANED ──
+echo "--- Doc-lag: SUSPECT / ORPHANED ---"
+SUSPECTS=""
+for doc in $DOCS; do
+  DS=$(doc_state "$doc")
+  ST=$(echo "$DS" | cut -d'|' -f1)
+  case "$ST" in
+    SUSPECT|ORPHANED)
+      LAG=$(echo "$DS" | cut -d'|' -f3)
+      LINE="  $doc — $ST: $(echo "$DS" | cut -d'|' -f2) (lag ${LAG}d)"
+      SUSPECTS="${SUSPECTS}${LINE}
+"
+      [ "$ST" = "ORPHANED" ] && CI_FAIL=1
+      [ "$LAG" -gt "$DOC_LAG_MAX_DAYS" ] && CI_FAIL=1
+      # Symbol chết là sai NGAY BÂY GIỜ (không phải lag) -> CI fail luôn, không đợi 7 ngày
+      echo "$DS" | grep -q "symbol '" && CI_FAIL=1
+      ;;
+  esac
+done
+if [ -n "$SUSPECTS" ]; then printf '%s' "$SUSPECTS"; else echo "  (khong co — moi doc VERIFIED)"; fi
+
+# ── 2. _generated/ cũ hơn source of truth (nguyên tắc 09) ──────────────
+if [ -d docs/app-map/_generated ] && [ -d "$MIGRATIONS_DIR" ]; then
+  GEN_TS=$(git log -1 --format=%ct -- docs/app-map/_generated/ 2>/dev/null)
+  MIG_TS=$(git log -1 --format=%ct -- "$MIGRATIONS_DIR/" 2>/dev/null)
+  if [ -n "$GEN_TS" ] && [ -n "$MIG_TS" ] && [ "$MIG_TS" -gt "$GEN_TS" ]; then
+    echo "STALE: migrations moi hon _generated/ -> chay lai generator (schema doc dang cu)"
+    CI_FAIL=1
+  fi
+fi
+
+# ── 3. Token budget ─────────────────────────────────────────────────────
+if [ -f CLAUDE.md ]; then
+  echo "CLAUDE.md: $(wc -c < CLAUDE.md | tr -d ' ') chars (budget $CLAUDE_MD_CHAR_BUDGET ~ 6K tokens)"
+fi
+
+# ── 4. Lint app-map: thiếu Load khi / thiếu covers ──────────────────────
+echo "--- App-map lint ---"
+for f in $DOCS; do
+  head -5 "$f" | grep -qiE 'load (khi|when)' || echo "  $f: thieu 'Load khi'"
+  head -10 "$f" | grep -qi '^covers:' || echo "  $f: thieu 'covers:' (ngoai vong bao ve — chi OK cho doc decision/vision)"
+done
+
+# ── 5. Broken cross-ref ─────────────────────────────────────────────────
+# Gom output ra biến vì while-trong-pipe là subshell — set CI_FAIL ở đó sẽ mất.
+echo "--- Broken cross-ref ---"
+BROKEN=$(git ls-files 'docs/app-map/*.md' 'docs/app-map/**/*.md' 2>/dev/null | sort -u | while read -r f; do
+  DIR=$(dirname "$f")
+  grep -oE '\]\(([^)#]+\.md)' "$f" | sed 's/](//' | while read -r link; do
+    case "$link" in http*|/*) continue ;; esac
+    [ -f "$DIR/$link" ] || echo "  $f -> $link (khong ton tai)"
+  done
+done)
+if [ -n "$BROKEN" ]; then
+  echo "$BROKEN"
+  CI_FAIL=1
+fi
+
+echo "=== Het report ==="
+if [ "$CI_MODE" -eq 1 ] && [ "$CI_FAIL" -eq 1 ]; then
+  echo "CI: FAIL — doc-lag/ORPHANED qua nguong / _generated stale / broken cross-ref (xem tren)"
+  exit 1
+fi
+exit 0

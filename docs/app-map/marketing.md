@@ -1,6 +1,10 @@
 # Marketing: workflow và app map
 
 > Đọc khi làm phần Marketing. Phụ trách Bạn B. Nền chung ở [README.md](README.md), điều cấm và giọng văn ở CLAUDE.md.
+covers: packages/marketing
+last_verified: 2026-08-12
+ttl_days: 180
+<!-- DOC-STATUS: SUSPECT (2026-08-12) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 
 ## 1. Workflow marketing, từ đầu tới cuối
 

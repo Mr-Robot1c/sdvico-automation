@@ -1,0 +1,38 @@
+---
+description: Phân tích task → output files context cần đọc trước khi code (gọi context-router agent)
+argument-hint: <mô tả task>
+---
+
+**Cổng conflict (nguyên tắc 13) — chạy TRƯỚC khi spawn router** (router chỉ có Read/Glob/Grep, không đọc được registry/git — việc này là của bạn, main agent): nếu task sẽ đụng path đã đoán được, chạy:
+
+```
+npx ai-simple parallel status --check <path1,path2>
+```
+
+CLEAR (exit 0) → đi tiếp, không nhắc gì. CONFLICT/STALE/PROTECTED (exit 2, output ≤ 100 token) → xử theo nguyên tắc 13 (đợi lot kia / đổi ranh giới / recovery; PROTECTED = dirty của user → hỏi user) — KHÔNG phải RED, không đốt confirm. Lệnh chưa cài / không có registry → bỏ qua, coi như CLEAR.
+
+Spawn `context-router` agent với task:
+
+**Task**: $ARGUMENTS
+
+Agent sẽ:
+1. Classify domain (auth / db / ui / ops / ...)
+2. Output ordered list `.md` files cần đọc + lý do
+3. Chấm risk tier GREEN / YELLOW / RED (nguyên tắc 06)
+4. CHỈ kèm câu confirm khi tier RED
+
+KHÔNG code, KHÔNG explore source. Chỉ ROUTE context.
+
+Sau khi agent trả output → append 1 dòng vào `docs/.fl-routing-log` (tạo file nếu chưa có):
+`<YYYY-MM-DD> | <domain> | <danh sách file .md được route, cách nhau dấu phẩy>`
+— log này cho audit quý biết doc nào "lạnh" (90 ngày không được route): để check router thiếu keyword và ưu tiên verify, KHÔNG phải để xóa (nguyên tắc 12 — doc sống theo code, không theo lượt đọc). Log COMMIT vào repo (append-only, như `docs/audit-history.md`) — gitignore nó thì audit trên fresh clone bị mù.
+
+Rồi đọc các file trong list. **Cổng đọc (nguyên tắc 12 v2)**: file nào ⚠️ SUSPECT (router gắn, hoặc thấy marker `<!-- DOC-STATUS:` trong doc) → TRƯỚC KHI TIN, đối chiếu CHỈ các khẳng định sắp dùng (tên hàm, luồng, schema, rule) với code thật — bound phạm vi, không verify cả doc. Khớp → bump `last_verified:` VÀ thêm/cập nhật dòng `<!-- re-verified: <YYYY-MM-DD HH:MM> — <claims đã check> -->` ngay dưới frontmatter (dòng này đảm bảo luôn có thay đổi staged kể cả khi re-verify cùng ngày, và là chứng cứ cho audit spot-check; commit message: `re-verify(<doc>): <claims>`). Lệch → sửa doc trước rồi mới code, VÀ append 1 dòng vào `docs/.escaped-drift.log` (append-only, commit): `<date> | <doc> | <sai gì> | <pattern hook đề xuất>` — mỗi case là 1 cơ hội siết cổng ghi. File ☠️ ORPHANED → không dùng, báo trong Assumptions để đi flow RETIRE.
+
+Sau đó:
+- **GREEN**: code luôn.
+- **YELLOW**: code luôn theo phương án an toàn (reversible bắt buộc), ghi mục `## Assumptions` trong báo cáo cuối — KHÔNG hỏi trước.
+- **RED**: hỏi đúng 1 câu confirm gộp của router (kèm phương án khuyến nghị), đợi trả lời rồi mới code phần RED — phần còn lại của task vẫn tự làm.
+- **Router trả `## Conflict check`** (nguyên tắc 13 — chỉ khi có session song song): CONFLICT → không đụng path đó, đợi lot kia merge hoặc đổi ranh giới lot; PROTECTED (dirty work của user) → bất khả xâm phạm, hỏi user; STALE → recovery checklist NT13, không silent takeover. Đây không phải RED — không đốt lượt confirm.
+
+Skip `/fl` cho task trivial (1 file, đã biết đường, < 5 phút) — routing tốn ~1-2K tokens, chỉ đáng khi task chạm nhiều domain hoặc session mới.

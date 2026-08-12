@@ -2,6 +2,10 @@
 
 > Đọc khi cần biết luồng chạy và thành phần của một mảng. Đây là trang chỉ mục.
 > Nguồn sự thật khác: `CLAUDE.md` cho bảy điều cấm và giọng văn, `supabase/migrations` cho lược đồ, `docs/ke-hoach-7-ngay.md` cho kế hoạch gốc.
+covers: packages/core, apps/approval-ui, supabase/migrations
+last_verified: 2026-08-12
+ttl_days: 180
+<!-- DOC-STATUS: SUSPECT (2026-08-12) — code 'apps/approval-ui' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 
 Hệ thống chia hai mảng, mỗi mảng một file workflow và app map riêng:
 
