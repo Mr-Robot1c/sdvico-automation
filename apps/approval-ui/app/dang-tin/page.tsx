@@ -183,7 +183,14 @@ export default async function Page() {
                   <form action={editJobPostDraft} style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <input type="hidden" name="post_id" value={j.id} />
                     <textarea name="noi_dung" defaultValue={j.noi_dung || ''} rows={8} aria-label="Nội dung bài đăng" style={{ width: '100%', boxSizing: 'border-box' }} />
-                    <input className="note" type="url" name="image_url" defaultValue={j.image_url || ''} placeholder="URL hình ảnh (để trống nếu không cần ảnh)" aria-label="URL hình ảnh" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <label style={{ fontSize: '0.82em', color: 'var(--muted)' }}>Ảnh đính kèm — dán URL hoặc chọn file từ máy (file ưu tiên hơn URL)</label>
+                      <input className="note" type="url" name="image_url" defaultValue={j.image_url || ''} placeholder="https://... (để trống nếu không cần)" aria-label="URL hình ảnh" />
+                      <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                        <span style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>Hoặc chọn từ máy:</span>
+                        <input type="file" name="image_file" accept="image/*" style={{ fontSize: '0.85em' }} />
+                      </label>
+                    </div>
                     <input className="note" type="datetime-local" name="scheduled_at" defaultValue={scheduledDefault} aria-label="Giờ đặt đăng" />
                     <SubmitButton label="Lưu chỉnh sửa" pendingLabel="Đang lưu..." />
                   </form>

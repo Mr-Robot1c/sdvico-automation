@@ -243,10 +243,12 @@ export async function queueFacebookPost(formData: FormData) {
 
 // Sửa nội dung, hình ảnh, giờ đặt đăng trước khi duyệt. Người sửa là người kiểm soát (điều cấm 1).
 // Đồng bộ cả bản xem trong hàng đợi để trang Duyệt không lệch với nội dung sẽ đăng.
+// Ảnh: file từ máy ưu tiên hơn URL nhập tay. Cả hai đều tuỳ chọn.
 export async function editJobPostDraft(formData: FormData) {
   const postId = String(formData.get('post_id') || '');
   const noi_dung = String(formData.get('noi_dung') || '');
-  const image_url = String(formData.get('image_url') || '').trim() || null;
+  const imageUrlInput = String(formData.get('image_url') || '').trim() || null;
+  const imageFile = formData.get('image_file') as File | null;
   const scheduledRaw = String(formData.get('scheduled_at') || '').trim();
   if (!postId) return;
 
@@ -254,6 +256,29 @@ export async function editJobPostDraft(formData: FormData) {
   const trang_thai = scheduled_at ? 'scheduled' : 'draft';
 
   const client = getServerClient();
+
+  // Upload ảnh từ máy lên Supabase Storage nếu người dùng chọn file.
+  // File ưu tiên hơn URL nhập tay để tránh xung đột. Thất bại thì giữ nguyên URL cũ.
+  let image_url = imageUrlInput;
+  if (imageFile && imageFile.size > 0) {
+    try {
+      const bytes = await imageFile.arrayBuffer();
+      const rawExt = imageFile.name.split('.').pop() || 'jpg';
+      const ext = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
+      const path = `posts/${postId}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await client.storage
+        .from('post-images')
+        .upload(path, bytes, { contentType: imageFile.type, upsert: true });
+      if (!uploadErr) {
+        const { data: { publicUrl } } = client.storage.from('post-images').getPublicUrl(path);
+        image_url = publicUrl;
+      } else {
+        await client.from('run_log').insert({ task: 'upload_post_image', status: 'error', detail: { postId, error: uploadErr.message } }).catch(() => {});
+      }
+    } catch (err: unknown) {
+      await client.from('run_log').insert({ task: 'upload_post_image', status: 'error', detail: { postId, error: String(err) } }).catch(() => {});
+    }
+  }
   const { error } = await client
     .from('hr_job_posts')
     .update({ noi_dung, image_url, scheduled_at, trang_thai })
