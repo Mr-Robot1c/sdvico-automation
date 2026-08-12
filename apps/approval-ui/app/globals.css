@@ -387,7 +387,7 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
 /* Media kiểu bài Facebook: ảnh/video full-width, căn giữa, xếp dọc, rồi tới nội dung */
 .modal-media {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
-  margin: 0 0 16px;
+  margin: 14px 0 2px;
 }
 .modal-media img,
 .modal-media video {

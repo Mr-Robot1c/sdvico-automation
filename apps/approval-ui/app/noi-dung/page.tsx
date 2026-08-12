@@ -219,12 +219,6 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                     </td>
                     <td className="col-actions">
                       <ViewModal title={c.title} label="Xem bài viết">
-                        {img || vid ? (
-                          <div className="modal-media">
-                            {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} /> : null}
-                            {vid ? <video src={vid.url} controls preload="metadata" /> : null}
-                          </div>
-                        ) : null}
                         <div className="badges">
                           <span className="badge badge-format">{formatLabel(c.kind)}</span>
                           <span className={`badge tone-${risk.tone}`}>{risk.label}</span>
@@ -256,6 +250,12 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                         ) : (
                           <p className="muted">Chưa có bản nháp.</p>
                         )}
+                        {img || vid ? (
+                          <div className="modal-media">
+                            {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} /> : null}
+                            {vid ? <video src={vid.url} controls preload="metadata" /> : null}
+                          </div>
+                        ) : null}
                       </ViewModal>
                     </td>
                   </tr>

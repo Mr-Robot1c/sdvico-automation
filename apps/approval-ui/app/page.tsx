@@ -242,12 +242,6 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
 
                 <div className="card-actions">
                   <ViewModal title={cleanTitle} label="Xem bài viết">
-                    {img || vid ? (
-                      <div className="modal-media">
-                        {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} /> : null}
-                        {vid ? <video src={vid.url} controls preload="metadata" /> : null}
-                      </div>
-                    ) : null}
                     {info.flags.length ? (
                       <div className="flagline">
                         {info.flags.map((f) => (
@@ -270,6 +264,12 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                           <button className="btn ok" type="submit">Lưu chỉnh sửa</button>
                         </form>
                       </details>
+                    ) : null}
+                    {img || vid ? (
+                      <div className="modal-media">
+                        {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} /> : null}
+                        {vid ? <video src={vid.url} controls preload="metadata" /> : null}
+                      </div>
                     ) : null}
                   </ViewModal>
                   <DecideActions id={item.id} title={cleanTitle} />
