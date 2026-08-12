@@ -334,7 +334,8 @@ export async function generateAllFormats(kw, { facts = [] } = {}) {
 }
 
 // Model marketing mặc định, đổi bằng biến MKT_MODEL. Dùng chung nhà Gemini với phần chấm CV.
-const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-latest';
+// Mặc định dùng flash-lite: quota free cao hơn nhiều so với gemini-flash-latest (chỉ 20 lượt/ngày).
+const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 
 // Sinh draft bằng Gemini. CHỈ gọi khi có GEMINI_API_KEY. Import động để khi không có khóa,
 // gói @google/genai không cần cài và bản mẫu vẫn chạy. Trả về văn bản, hoặc ném lỗi để chỗ
