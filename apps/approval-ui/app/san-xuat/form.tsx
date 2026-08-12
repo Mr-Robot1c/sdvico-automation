@@ -116,6 +116,15 @@ export default function SanXuatForm({
     });
   };
 
+  // Chọn ảnh: hiện tên ảnh và điền từ khóa trọng tâm từ tên ảnh (nếu chưa có) để sẵn sàng sinh text.
+  const onSelectImage = (a: Asset) => {
+    const newId = a.id === imgId ? '' : a.id;
+    setImgId(newId);
+    if (newId && !title.trim() && !selectedKw) {
+      setTitle(cleanAssetName(a.title));
+    }
+  };
+
   return (
     <div className="sx-grid">
       <section className="sx-slot">
@@ -135,6 +144,10 @@ export default function SanXuatForm({
           )}
         </div>
 
+        {selectedImg ? (
+          <p className="muted sx-selected-name">Ảnh đang chọn: <b>{selectedImg.title}</b></p>
+        ) : null}
+
         {images.length > 0 ? (
           <div className="sx-thumbs" role="listbox" aria-label="Chọn ảnh từ kho">
             {images.slice(0, 12).map((a) => (
@@ -142,7 +155,7 @@ export default function SanXuatForm({
                 key={a.id}
                 type="button"
                 className={`sx-thumb ${imgId === a.id ? 'on' : ''}`}
-                onClick={() => setImgId(a.id === imgId ? '' : a.id)}
+                onClick={() => onSelectImage(a)}
                 aria-pressed={imgId === a.id}
                 title={a.title}
               >

@@ -66,3 +66,4 @@ Kiến trúc đã chốt, chi tiết ở CLAUDE.md mục 5.
 Cập nhật lần cuối: 10/8/2026.
 <!-- re-verified: 2026-08-12 - Fix nut Sinh text: disabled cu chi cho bam khi co keyword/title, gio cho bam khi da chon anh/video (de sinh text theo ten anh). Khong doi luong. -->
 <!-- re-verified: 2026-08-12 - Ghep 2 anh dung remove.bg: cat nen anh san pham (removeBgCutout, REMOVE_BG_API_KEY) roi dat len nen Unsplash co bong do (banner.mjs buildBanner nhan cutoutBuffer). Nut "Ghep san pham" tren moi anh Unsplash. Ghep xong tu sinh text theo ten anh. Canvas + font base64 tro lai. Free tier remove.bg do phan giai preview. Dieu cam 5: chi cat nen, khong ve lai. -->
+<!-- re-verified: 2026-08-12 - Fix doi ten tu lieu: form thieu input hidden id nen renameAsset khong chay; da them. Ghep san pham: dat ten anh ghep + tieu de banner theo ten anh san pham (mo ta ro). Chon anh o Khung anh: hien ten anh + dien tu khoa trong tam (cleanAssetName) neu chua co, san sang Sinh text. Khong doi luong. -->

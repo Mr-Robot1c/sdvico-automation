@@ -82,6 +82,7 @@ export default async function Page() {
               <div className="asset-meta">
                 <span className="badge badge-format">{KIND_LABEL[a.kind] || a.kind}</span>
                 <form action={renameAsset} className="rename-form">
+                  <input type="hidden" name="id" value={a.id} />
                   <input name="title" defaultValue={a.title} aria-label="Tên tư liệu" title="Đặt tên mô tả rõ để AI sinh text bám theo" />
                   <button className="btn ghost sm" type="submit">Đổi tên</button>
                 </form>

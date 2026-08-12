@@ -262,9 +262,21 @@ export async function createCompositeFromBackground(input: {
 }) {
   if (!input?.productAssetId) throw new Error('Chọn ảnh sản phẩm trước khi ghép.');
   const client = getServerClient();
-  const { data } = await client.from('brand_assets').select('storage_path').eq('id', input.productAssetId).single();
+  const { data } = await client
+    .from('brand_assets')
+    .select('storage_path, title')
+    .eq('id', input.productAssetId)
+    .single();
   const sp = (data as { storage_path?: string } | null)?.storage_path;
   if (!sp) throw new Error('Không tìm thấy ảnh sản phẩm.');
+  // Tên mô tả lấy từ tên ảnh sản phẩm (đã đặt rõ), làm tiêu đề banner và tên ảnh ghép.
+  const prodName = String((data as { title?: string } | null)?.title || '')
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/^\d{10,}[-_]/, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const bannerTitle = String(input.title || '').trim() || prodName;
   const productUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
   const cutoutBuffer = await removeBgCutout(productUrl);
   let backgroundBuffer: Buffer | null = null;
@@ -277,12 +289,12 @@ export async function createCompositeFromBackground(input: {
   const png = (await buildBanner({
     cutoutBuffer,
     backgroundBuffer,
-    title: input.title || ''
+    title: bannerTitle
   } as any)) as Buffer;
   const res = await uploadImageBuffer(
     client,
     png,
-    'banner-' + (input.title || 'sdvico'),
+    (bannerTitle || 'anh ghép sdvico') + ' (ghép)',
     'image/png',
     input.author ? `Nền Unsplash: ${input.author}` : null
   );
