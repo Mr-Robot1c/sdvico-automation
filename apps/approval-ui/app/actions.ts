@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../lib/supabase-server';
+import { composeJdVersions } from '../lib/jd-compose';
 
 // Người quyết. Đọc từ form, cập nhật trạng thái, chỉ đổi mục còn pending.
 export async function decideForm(formData: FormData) {
@@ -231,4 +232,98 @@ export async function editJobPostDraft(formData: FormData) {
 
   revalidatePath('/dang-tin');
   revalidatePath('/');
+}
+
+// Tạo bản nháp JD từ thông tin người dùng nhập. AI viết bốn phiên bản, lưu nháp để duyệt.
+// Máy soạn, người xác nhận (điều cấm 1). Không đăng, không tự mở tuyển.
+export async function createJdDraft(formData: FormData) {
+  const title = String(formData.get('title') || '').trim();
+  if (!title) return;
+  const job = {
+    title,
+    department: String(formData.get('department') || '').trim() || undefined,
+    location: String(formData.get('location') || '').trim() || undefined,
+    short_desc: String(formData.get('short_desc') || '').trim() || undefined,
+    requirements: String(formData.get('requirements') || '').trim() || undefined,
+    benefits: String(formData.get('benefits') || '').trim() || undefined,
+    nhom: String(formData.get('nhom') || '').trim() || undefined
+  };
+  const { versions } = await composeJdVersions(job);
+
+  const client = getServerClient();
+  const { error } = await client.from('hr_jobs').insert({
+    title: job.title,
+    department: job.department || null,
+    location: job.location || null,
+    short_desc: job.short_desc || null,
+    requirements: job.requirements || null,
+    jd_versions: versions,
+    nhom: job.nhom || null,
+    status: 'draft'
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath('/tao-jd');
+  revalidatePath('/dang-tin');
+}
+
+// Sửa một phiên bản JD của một vị trí. Người sửa là người kiểm soát (điều cấm 1).
+export async function editJdVersion(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  const key = String(formData.get('key') || '');
+  const value = String(formData.get('value') || '');
+  if (!jobId || !key) return;
+  const client = getServerClient();
+  const { data: job, error: e1 } = await client.from('hr_jobs').select('jd_versions').eq('id', jobId).single();
+  if (e1) throw new Error(e1.message);
+  const versions = { ...((job.jd_versions || {}) as Record<string, string>), [key]: value };
+  const { error: e2 } = await client.from('hr_jobs').update({ jd_versions: versions }).eq('id', jobId);
+  if (e2) throw new Error(e2.message);
+  revalidatePath('/tao-jd');
+  revalidatePath('/dang-tin');
+}
+
+// Viết lại bốn phiên bản bằng AI từ thông tin đã lưu của vị trí.
+export async function regenerateJd(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  if (!jobId) return;
+  const client = getServerClient();
+  const { data: job, error: e1 } = await client
+    .from('hr_jobs')
+    .select('title, department, location, short_desc, requirements, nhom')
+    .eq('id', jobId)
+    .single();
+  if (e1) throw new Error(e1.message);
+  const { versions } = await composeJdVersions({
+    title: job.title,
+    department: job.department || undefined,
+    location: job.location || undefined,
+    short_desc: job.short_desc || undefined,
+    requirements: job.requirements || undefined,
+    nhom: job.nhom || undefined
+  });
+  const { error: e2 } = await client.from('hr_jobs').update({ jd_versions: versions }).eq('id', jobId);
+  if (e2) throw new Error(e2.message);
+  revalidatePath('/tao-jd');
+  revalidatePath('/dang-tin');
+}
+
+// Hoàn thành: đưa vị trí sang trạng thái đang tuyển, sẵn sàng đăng tin. Chỉ đổi bản còn nháp.
+export async function finalizeJd(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  if (!jobId) return;
+  const client = getServerClient();
+  const { error } = await client.from('hr_jobs').update({ status: 'open' }).eq('id', jobId).eq('status', 'draft');
+  if (error) throw new Error(error.message);
+  revalidatePath('/tao-jd');
+  revalidatePath('/dang-tin');
+}
+
+// Xóa một bản nháp JD. Chỉ xóa được bản còn nháp, tránh mất vị trí đang tuyển.
+export async function deleteJd(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  if (!jobId) return;
+  const client = getServerClient();
+  const { error } = await client.from('hr_jobs').delete().eq('id', jobId).eq('status', 'draft');
+  if (error) throw new Error(error.message);
+  revalidatePath('/tao-jd');
 }

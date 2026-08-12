@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 export default function Nav() {
   const path = usePathname();
   const tabs = [
+    { href: '/tao-jd', label: 'Tạo JD' },
     { href: '/ho-so', label: 'Hồ sơ ứng viên' },
     { href: '/lich', label: 'Lịch phỏng vấn' },
     { href: '/dang-tin', label: 'Vị trí & Đăng tin' },
