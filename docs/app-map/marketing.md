@@ -5,6 +5,7 @@ covers: packages/marketing
 last_verified: 2026-08-12
 ttl_days: 180
 <!-- DOC-STATUS: SUSPECT (2026-08-12) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-12 - publish-facebook.mjs: them dang anh (brief.assets.image qua /photos), lay post_id dung. Van chi dang approval_queue status=approved, tran MKT_MAX_POSTS_PER_RUN. Them workflow mkt-publish.yml chay --live moi 30 phut. Luong may soan nguoi bam KHONG doi. -->
 
 ## 1. Workflow marketing, từ đầu tới cuối
 

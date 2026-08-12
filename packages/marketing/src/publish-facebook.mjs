@@ -51,12 +51,31 @@ const { data: posted } = await client
   .in('content_id', contentIds);
 const done = new Set((posted || []).map((p) => p.content_id));
 
-// 3. Lấy nội dung bản nháp.
+// 3. Lấy nội dung bản nháp (kèm brief để biết ảnh đã gắn).
 const { data: contents } = await client
   .from('mkt_content')
-  .select('id, title, draft')
+  .select('id, title, draft, brief')
   .in('id', contentIds);
 const byId = new Map((contents || []).map((c) => [c.id, c]));
+
+// 3b. Đổi id ảnh đã gắn (brief.assets.image) ra link công khai để đăng kèm bài.
+const imageAssetIds = [
+  ...new Set(
+    (contents || [])
+      .map((c) => c?.brief?.assets?.image)
+      .filter((x) => typeof x === 'string')
+  ),
+];
+const imageUrlById = new Map();
+if (imageAssetIds.length) {
+  const { data: assets } = await client
+    .from('brand_assets')
+    .select('id, storage_path')
+    .in('id', imageAssetIds);
+  for (const a of assets || []) {
+    imageUrlById.set(a.id, client.storage.from('brand-assets').getPublicUrl(a.storage_path).data.publicUrl);
+  }
+}
 
 const queue = jobs.filter((j) => !done.has(j.contentId)).slice(0, CAP);
 console.log(`=== Đăng Facebook (${LIVE ? 'LIVE' : 'CHẠY THỬ'}) ===`);
@@ -76,25 +95,31 @@ let publishedCount = 0;
 for (const j of queue) {
   const c = byId.get(j.contentId);
   const message = [c?.title || j.title, '', c?.draft || ''].join('\n').trim();
+  const imageUrl = c?.brief?.assets?.image ? imageUrlById.get(c.brief.assets.image) : null;
 
-  console.log(`- ${j.title}`);
+  console.log(`- ${j.title}${imageUrl ? ' (kèm ảnh)' : ''}`);
   if (!LIVE) {
     console.log('  (chạy thử, chưa đăng) nội dung:');
     for (const line of message.split('\n')) console.log('    ' + line);
+    if (imageUrl) console.log('    [ảnh] ' + imageUrl);
     console.log('');
     continue;
   }
 
   try {
-    const url = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
-    const res = await fetch(url, {
-      method: 'POST',
-      body: new URLSearchParams({ message, access_token: TOKEN }),
-    });
+    // Có ảnh thì đăng qua /photos (ảnh + chú thích); không thì đăng chữ qua /feed.
+    const url = imageUrl
+      ? `https://graph.facebook.com/${VERSION}/${PAGE_ID}/photos`
+      : `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
+    const body = imageUrl
+      ? new URLSearchParams({ url: imageUrl, caption: message, access_token: TOKEN })
+      : new URLSearchParams({ message, access_token: TOKEN });
+    const res = await fetch(url, { method: 'POST', body });
     const json = await res.json();
     if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
 
-    const postId = json.id; // dạng {pageId}_{postId}
+    // /feed trả {id: pageId_postId}; /photos trả {id: photoId, post_id: pageId_postId}.
+    const postId = json.post_id || json.id;
     const externalUrl = `https://www.facebook.com/${postId}`;
 
     await client.from('mkt_posts').insert({

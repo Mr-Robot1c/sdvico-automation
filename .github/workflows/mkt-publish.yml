@@ -1,0 +1,35 @@
+name: Đăng Facebook bài đã duyệt
+
+# CƠ CẤU CHẤP HÀNH: đăng lên Facebook Page các bài trong approval_queue có status='approved'.
+# Máy soạn, người bấm Duyệt, worker này mới đăng (điều cấm 1). Chỉ đăng bài chưa đăng, trần 3 bài/lần.
+#
+# Cần đặt Secrets trong repo (Settings > Secrets and variables > Actions):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, FACEBOOK_PAGE_ID, FACEBOOK_PAGE_ACCESS_TOKEN
+# Chưa đặt token thì workflow sẽ báo thiếu và dừng an toàn, không đăng gì.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # mỗi 30 phút; giãn/tắt tùy nhu cầu để tiết kiệm phút Actions
+  workflow_dispatch:
+
+concurrency:
+  group: mkt-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Đăng bài đã duyệt lên Facebook
+        run: node packages/marketing/src/publish-facebook.mjs --live
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+          MKT_MAX_POSTS_PER_RUN: '3'
