@@ -37,6 +37,8 @@ export default function SanXuatForm({
 }) {
   const [keywordId, setKeywordId] = useState<string>('');
   const [title, setTitle] = useState('');
+  // Tiêu đề đang tự động theo tên ảnh/video (true) hay do người tự gõ/chọn từ khóa (false).
+  const [titleAuto, setTitleAuto] = useState(true);
   const [draft, setDraft] = useState('');
   const [kind, setKind] = useState<'social' | 'article' | 'video'>('social');
   const [imgId, setImgId] = useState<string>('');
@@ -54,8 +56,12 @@ export default function SanXuatForm({
     setKeywordId(id);
     const kw = keywords.find((k) => k.id === id);
     if (kw) {
-      // Điền tiêu đề tự động theo từ khóa, nhưng người dùng vẫn có thể chỉnh tay.
+      // Chọn từ khóa thì tiêu đề theo từ khóa, không tự đổi theo ảnh nữa.
       setTitle(kw.keyword);
+      setTitleAuto(false);
+    } else {
+      // Bỏ từ khóa thì cho tên ảnh điều khiển lại tiêu đề.
+      setTitleAuto(true);
     }
   };
 
@@ -107,6 +113,7 @@ export default function SanXuatForm({
         setMsg('Xong. Nội dung đã ở Hàng đợi duyệt, chờ người bấm Duyệt để đăng.');
         setKeywordId('');
         setTitle('');
+        setTitleAuto(true);
         setDraft('');
         setImgId('');
         setVidId('');
@@ -116,21 +123,23 @@ export default function SanXuatForm({
     });
   };
 
-  // Chọn ảnh: hiện tên ảnh và điền từ khóa trọng tâm từ tên ảnh (nếu chưa có) để sẵn sàng sinh text.
+  // Chọn ảnh: hiện tên ảnh và tiêu đề tự đổi theo ảnh (trừ khi người tự gõ tay hoặc đã chọn từ khóa).
   const onSelectImage = (a: Asset) => {
     const newId = a.id === imgId ? '' : a.id;
     setImgId(newId);
-    if (newId && !title.trim() && !selectedKw) {
+    if (newId && !selectedKw && (titleAuto || !title.trim())) {
       setTitle(cleanAssetName(a.title));
+      setTitleAuto(true);
     }
   };
 
-  // Chọn video: tương tự, điền từ khóa từ tên video nếu chưa có.
+  // Chọn video: tương tự, tiêu đề tự đổi theo tên video.
   const onSelectVideo = (a: Asset) => {
     const newId = a.id === vidId ? '' : a.id;
     setVidId(newId);
-    if (newId && !title.trim() && !selectedKw) {
+    if (newId && !selectedKw && (titleAuto || !title.trim())) {
       setTitle(cleanAssetName(a.title));
+      setTitleAuto(true);
     }
   };
 
@@ -287,7 +296,7 @@ export default function SanXuatForm({
             <input
               className="note"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => { setTitle(e.target.value); setTitleAuto(false); }}
               placeholder="Ví dụ: lắp giám sát hành trình ở Bình Định"
               required
             />

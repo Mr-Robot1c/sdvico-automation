@@ -22,6 +22,17 @@ export default function LibUploader() {
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
+  // Tự nhận loại theo file được chọn (video/ảnh/âm thanh) để không lưu nhầm loại.
+  const onPickFile = () => {
+    const f = fileRef.current?.files?.[0];
+    if (!f) return;
+    const t = f.type || '';
+    if (t.startsWith('video/')) setKind('video');
+    else if (t.startsWith('audio/')) setKind('audio');
+    else if (t.startsWith('image/')) setKind('image');
+    setMsg('');
+  };
+
   const putWithProgress = (url: string, file: File) =>
     new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -69,7 +80,7 @@ export default function LibUploader() {
 
   return (
     <div className="factform">
-      <input ref={fileRef} type="file" aria-label="Chọn file" disabled={busy} />
+      <input ref={fileRef} type="file" aria-label="Chọn file" onChange={onPickFile} disabled={busy} />
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}

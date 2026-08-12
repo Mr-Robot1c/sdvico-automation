@@ -14,7 +14,15 @@ export default function ViewModal({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const open = () => ref.current?.showModal();
-  const close = () => ref.current?.close();
+  // Đóng thì dừng hẳn video/âm thanh bên trong (đóng dialog không tự dừng media).
+  const stopMedia = () => {
+    const m = ref.current?.querySelector('video, audio') as HTMLMediaElement | null;
+    if (m) m.pause();
+  };
+  const close = () => {
+    stopMedia();
+    ref.current?.close();
+  };
 
   return (
     <>
@@ -30,6 +38,7 @@ export default function ViewModal({
       <dialog
         ref={ref}
         className="modal"
+        onClose={stopMedia}
         onClick={(e) => {
           // Bấm ngoài card nội dung (tức bấm vào backdrop) thì đóng.
           if (e.target === ref.current) close();
