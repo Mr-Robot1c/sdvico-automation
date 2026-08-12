@@ -11,7 +11,8 @@
     "test:compliance": "node packages/marketing/src/test-compliance.mjs",
     "test:skills": "node packages/marketing/src/test-skills.mjs",
     "content:run": "node packages/marketing/src/run-content.mjs",
-    "publish:fb": "node packages/marketing/src/publish-facebook.mjs"
+    "publish:fb": "node packages/marketing/src/publish-facebook.mjs",
+    "seo:audit": "node packages/marketing/src/seo-audit.mjs"
   },
   "workspaces": [
     "packages/*",

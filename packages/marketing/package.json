@@ -6,6 +6,8 @@
   "main": "src/keywords.mjs",
   "dependencies": {
     "@google/genai": "^1.52.0",
-    "@sdvico/core": "*"
+    "@sdvico/core": "*",
+    "chrome-launcher": "^1.2.1",
+    "lighthouse": "^13.4.1"
   }
 }
