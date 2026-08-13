@@ -139,13 +139,6 @@ export default function PostListClient({
                     {!isApproved && canEdit ? (
                       <span className="muted" style={{ fontSize: '0.85em', alignSelf: 'center' }}>Duyệt trên trang Duyệt để mở khoá Đăng</span>
                     ) : null}
-                    {p.trang_thai !== 'posted' && p.trang_thai !== 'cancelled' ? (
-                      <form action={updateJobPost}>
-                        <input type="hidden" name="id" value={p.id} />
-                        <input type="hidden" name="action" value="posted" />
-                        <SubmitButton label="Đánh dấu đã đăng" className="btn ghost" />
-                      </form>
-                    ) : null}
                   </div>
                 </div>
               )}
