@@ -771,12 +771,67 @@ export async function deleteJd(formData: FormData) {
   revalidatePath('/tao-jd');
 }
 
+// Bật/tắt chế độ tự động đăng bài định kỳ cho một vị trí. Người bật, worker thực hiện (điều cấm 1).
+export async function toggleAutoPost(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  const current = formData.get('current') === 'true';
+  if (!jobId) return;
+  const client = getServerClient();
+  await client.from('hr_jobs').update({ auto_post: !current }).eq('id', jobId);
+  revalidatePath('/tao-jd');
+}
+
+// Tạo bản nháp JD từ panel slide-in. Trả về dữ liệu thay vì redirect để panel hiển thị xem trước.
+// Ký hiệu _prev, formData dùng với useFormState trong AddJobPanel (điều cấm 1: người xem trước khi đưa duyệt).
+export async function createJdDraftForPanel(
+  _prev: { jobId: string; title: string; versions: Record<string, string> } | null,
+  formData: FormData
+): Promise<{ jobId: string; title: string; versions: Record<string, string> } | null> {
+  const title = String(formData.get('title') || '').trim();
+  if (!title) return _prev;
+  const headcount = Math.max(1, parseInt(String(formData.get('headcount') || '1'), 10) || 1);
+  const job = {
+    title,
+    department: String(formData.get('department') || '').trim() || undefined,
+    location: String(formData.get('location') || '').trim() || undefined,
+    short_desc: String(formData.get('short_desc') || '').trim() || undefined,
+    requirements: String(formData.get('requirements') || '').trim() || undefined,
+    benefits: String(formData.get('benefits') || '').trim() || undefined,
+    nhom: String(formData.get('nhom') || '').trim() || undefined,
+  };
+  const image_hint = String(formData.get('image_hint') || '').trim() || null;
+  const { versions } = await composeJdVersions(job);
+
+  const client = getServerClient();
+  const { data, error } = await client.from('hr_jobs').insert({
+    title: job.title,
+    department: job.department || null,
+    location: job.location || null,
+    short_desc: job.short_desc || null,
+    requirements: job.requirements || null,
+    jd_versions: versions,
+    nhom: job.nhom || null,
+    image_hint,
+    headcount,
+    status: 'draft',
+  }).select('id').single();
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/tao-jd');
+  return { jobId: String(data.id), title: job.title, versions };
+}
+
 // Duyệt và đăng ngay lên Facebook trong một bước, không cần chờ worker cron.
 // Điều cấm 1: người bấm Duyệt là cổng kiểm soát. Action này chỉ chạy khi người dùng bấm.
+// Hỗ trợ gỡ bài cũ cùng lúc nếu người dùng tick "Gỡ bài cũ khi đăng bài này".
 export async function approveAndPublish(formData: FormData) {
   const queueId = String(formData.get('queue_id') || '');
   const postId = String(formData.get('post_id') || '');
   if (!queueId || !postId) return;
+
+  const deleteOld = formData.get('delete_old_post') === 'yes';
+  const deleteOldPostId = String(formData.get('delete_old_post_id') || '');
+  const deleteOldFbPostId = String(formData.get('delete_old_fb_post_id') || '');
 
   const client = getServerClient();
 
@@ -803,6 +858,19 @@ export async function approveAndPublish(formData: FormData) {
       .eq('id', postId);
     if (updateErr) throw new Error(`Lưu DB thất bại: ${updateErr.message}`);
     await client.from('run_log').insert({ task: 'hr.approve_and_publish', status: 'ok', detail: { postId, fbPostId, externalUrl } });
+
+    // Gỡ bài cũ sau khi bài mới đăng thành công.
+    if (deleteOld && deleteOldPostId && deleteOldFbPostId) {
+      try {
+        await callFacebookDeleteApi(deleteOldFbPostId);
+        await client.from('hr_job_posts')
+          .update({ trang_thai: 'cancelled', ghi_chu: 'Gỡ tự động khi đăng bài mới' })
+          .eq('id', deleteOldPostId);
+        await client.from('run_log').insert({ task: 'hr.delete_old_post', status: 'ok', detail: { oldPostId: deleteOldPostId, oldFbPostId: deleteOldFbPostId } });
+      } catch (delErr) {
+        await client.from('run_log').insert({ task: 'hr.delete_old_post', status: 'error', detail: { error: String(delErr) } });
+      }
+    }
   } catch (err: unknown) {
     const errStr = err instanceof Error ? err.message : String(err);
     await client.from('hr_job_posts').update({ trang_thai: 'failed', ghi_chu: errStr }).eq('id', postId);
@@ -813,8 +881,9 @@ export async function approveAndPublish(formData: FormData) {
   revalidatePath('/dang-tin');
 }
 
-// Duyệt và đặt lịch đăng. Worker cron sẽ đăng khi đến giờ (chạy mỗi 5 phút).
+// Duyệt và đặt lịch đăng. Worker cron sẽ đăng khi đến giờ (chạy mỗi 15 phút qua GitHub Actions).
 // Nhận minutes (X phút sau) hoặc scheduled_at (giờ cụ thể dạng ISO hoặc datetime-local).
+// Hỗ trợ gỡ bài cũ ngay lúc đặt lịch nếu người dùng tick checkbox.
 export async function approveAndSchedule(formData: FormData) {
   const queueId = String(formData.get('queue_id') || '');
   const postId = String(formData.get('post_id') || '');
@@ -822,10 +891,12 @@ export async function approveAndSchedule(formData: FormData) {
   const scheduledRaw = String(formData.get('scheduled_at') || '').trim();
   if (!queueId || !postId) return;
 
+  const deleteOld = formData.get('delete_old_post') === 'yes';
+  const deleteOldPostId = String(formData.get('delete_old_post_id') || '');
+  const deleteOldFbPostId = String(formData.get('delete_old_fb_post_id') || '');
+
   let scheduled_at: string;
   if (scheduledRaw) {
-    // datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
-    // Server Vercel chạy UTC nên phải thêm +07:00 để parse đúng giờ Việt Nam.
     scheduled_at = parseVNTime(scheduledRaw);
   } else {
     const minutes = Math.max(1, parseInt(minutesStr, 10) || 30);
@@ -841,6 +912,19 @@ export async function approveAndSchedule(formData: FormData) {
   await client.from('hr_job_posts')
     .update({ scheduled_at, trang_thai: 'scheduled' })
     .eq('id', postId).neq('trang_thai', 'posted');
+
+  // Gỡ bài cũ ngay khi đặt lịch (bài cũ đã xong vai trò, bài mới sẽ lên theo lịch).
+  if (deleteOld && deleteOldPostId && deleteOldFbPostId) {
+    try {
+      await callFacebookDeleteApi(deleteOldFbPostId);
+      await client.from('hr_job_posts')
+        .update({ trang_thai: 'cancelled', ghi_chu: 'Gỡ tự động khi đặt lịch bài mới' })
+        .eq('id', deleteOldPostId);
+      await client.from('run_log').insert({ task: 'hr.delete_old_post', status: 'ok', detail: { oldPostId: deleteOldPostId, oldFbPostId: deleteOldFbPostId, when: 'schedule' } });
+    } catch (delErr) {
+      await client.from('run_log').insert({ task: 'hr.delete_old_post', status: 'error', detail: { error: String(delErr), when: 'schedule' } });
+    }
+  }
 
   revalidatePath('/');
   revalidatePath('/dang-tin');

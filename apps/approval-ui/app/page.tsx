@@ -184,7 +184,16 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                 ) : null
               )}
 
-              <DecideActions id={item.id} title={item.title} kind={item.kind} postId={postId} />
+              <DecideActions
+                id={item.id}
+                title={item.title}
+                kind={item.kind}
+                postId={postId}
+                oldPostId={(payload?.old_post_id as string) || null}
+                oldFbPostId={(payload?.old_fb_post_id as string) || null}
+                oldPostTitle={(payload?.old_post_title as string) || null}
+                oldPostedAt={(payload?.old_posted_at as string) || null}
+              />
             </li>
           );
         })}

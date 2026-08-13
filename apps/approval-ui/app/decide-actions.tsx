@@ -8,6 +8,10 @@ type Props = {
   title: string;
   kind: string;
   postId?: string | null;
+  oldPostId?: string | null;
+  oldFbPostId?: string | null;
+  oldPostTitle?: string | null;
+  oldPostedAt?: string | null;
 };
 
 const QUICK_SLOTS = [
@@ -17,24 +21,74 @@ const QUICK_SLOTS = [
   { label: 'Ngày mai', minutes: 1440 },
 ];
 
-// Bộ nút quyết. Với tin tuyển dụng Facebook (hr_job_post) có thêm tuỳ chọn
-// đặt lịch ngay tại trang Duyệt — không phải chuyển sang trang khác.
-// Điều cấm 1: người bấm là cổng kiểm soát, không có nút nào tự động bỏ qua người.
-export default function DecideActions({ id, title, kind, postId }: Props) {
+// Tính chuỗi datetime-local cho lần tiếp theo của giờ VN (UTC+7).
+// Trả về "YYYY-MM-DDTHH:00" ở múi giờ Việt Nam để parseVNTime xử lý đúng phía server.
+function nextVNPeak(hourVN: number): string {
+  const nowUtcMs = Date.now();
+  const vnMs = nowUtcMs + 7 * 3600 * 1000; // UTC+7
+  const vnDate = new Date(vnMs);
+
+  const candidate = new Date(vnMs);
+  candidate.setUTCHours(hourVN, 0, 0, 0);
+  if (candidate <= vnDate) candidate.setUTCDate(candidate.getUTCDate() + 1);
+
+  const y = candidate.getUTCFullYear();
+  const m = String(candidate.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(candidate.getUTCDate()).padStart(2, '0');
+  const h = String(hourVN).padStart(2, '0');
+  return `${y}-${m}-${d}T${h}:00`;
+}
+
+const PEAK_SLOTS = [
+  { label: '7h sáng', hourVN: 7 },
+  { label: '12h trưa', hourVN: 12 },
+  { label: '7h tối', hourVN: 19 },
+];
+
+// Bộ nút quyết. Với tin tuyển dụng Facebook (hr_job_post) có thêm tuỳ chọn đặt lịch giờ vàng
+// và gỡ bài cũ khi có bài cần refresh. Điều cấm 1: người bấm là cổng kiểm soát.
+export default function DecideActions({ id, title, kind, postId, oldPostId, oldFbPostId, oldPostTitle, oldPostedAt }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [customAt, setCustomAt] = useState('');
+  const [deleteOld, setDeleteOld] = useState(false);
 
+  const hasOldPost = Boolean(oldPostId && oldFbPostId);
   const isJobPost = kind === 'hr_job_post' && postId;
 
   if (isJobPost) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+
+        {/* Thông tin bài cũ cần gỡ — hiện chỉ khi đây là bài refresh */}
+        {hasOldPost ? (
+          <div className="old-post-warning">
+            <strong>Bài đang chạy:</strong>{' '}
+            {oldPostTitle || 'Bài cũ'}
+            {oldPostedAt ? ` — đăng ${new Date(oldPostedAt).toLocaleDateString('vi-VN')}` : ''}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={deleteOld}
+                onChange={(e) => setDeleteOld(e.target.checked)}
+              />
+              Gỡ bài cũ khỏi Facebook khi duyệt đăng bài này
+            </label>
+          </div>
+        ) : null}
+
         <div className="row" style={{ flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           {/* Đăng ngay */}
           <form action={approveAndPublish} onSubmit={() => setBusy('publish')}>
             <input type="hidden" name="queue_id" value={id} />
             <input type="hidden" name="post_id" value={postId} />
+            {deleteOld && oldPostId && oldFbPostId ? (
+              <>
+                <input type="hidden" name="delete_old_post" value="yes" />
+                <input type="hidden" name="delete_old_post_id" value={oldPostId} />
+                <input type="hidden" name="delete_old_fb_post_id" value={oldFbPostId} />
+              </>
+            ) : null}
             <button className="btn ok" disabled={busy !== null}>
               {busy === 'publish' ? 'Đang đăng...' : 'Duyệt và đăng ngay'}
             </button>
@@ -62,7 +116,7 @@ export default function DecideActions({ id, title, kind, postId }: Props) {
             </button>
           </form>
 
-          {/* Xóa khỏi hàng đợi — hủy bản nháp để worker soạn lại */}
+          {/* Xóa khỏi hàng đợi */}
           <form
             action={dismissQueueItem}
             onSubmit={(e) => {
@@ -83,18 +137,53 @@ export default function DecideActions({ id, title, kind, postId }: Props) {
             <span style={{ fontSize: '0.88em', fontWeight: 600 }}>
               Duyệt và đặt lịch — worker tự đăng khi đến giờ
             </span>
+
+            {/* Giờ vàng VN */}
+            <div>
+              <p style={{ fontSize: '0.8em', color: 'var(--ink-2)', margin: '0 0 4px' }}>Giờ vàng (lần tiếp theo):</p>
+              <div className="peak-slots">
+                {PEAK_SLOTS.map((s) => (
+                  <form key={s.hourVN} action={approveAndSchedule} onSubmit={() => setBusy('schedule')}>
+                    <input type="hidden" name="queue_id" value={id} />
+                    <input type="hidden" name="post_id" value={postId} />
+                    <input type="hidden" name="scheduled_at" value={nextVNPeak(s.hourVN)} />
+                    {hasOldPost && deleteOld ? (
+                      <>
+                        <input type="hidden" name="delete_old_post" value="yes" />
+                        <input type="hidden" name="delete_old_post_id" value={oldPostId!} />
+                        <input type="hidden" name="delete_old_fb_post_id" value={oldFbPostId!} />
+                      </>
+                    ) : null}
+                    <button type="submit" className="peak-slot" disabled={busy !== null}>
+                      {s.label}
+                    </button>
+                  </form>
+                ))}
+              </div>
+            </div>
+
+            {/* Slot cách X phút */}
             <div className="row" style={{ flexWrap: 'wrap', gap: 5 }}>
               {QUICK_SLOTS.map((s) => (
                 <form key={s.minutes} action={approveAndSchedule} onSubmit={() => setBusy('schedule')}>
                   <input type="hidden" name="queue_id" value={id} />
                   <input type="hidden" name="post_id" value={postId} />
                   <input type="hidden" name="minutes" value={s.minutes} />
+                  {hasOldPost && deleteOld ? (
+                    <>
+                      <input type="hidden" name="delete_old_post" value="yes" />
+                      <input type="hidden" name="delete_old_post_id" value={oldPostId!} />
+                      <input type="hidden" name="delete_old_fb_post_id" value={oldFbPostId!} />
+                    </>
+                  ) : null}
                   <button className="btn ghost" disabled={busy !== null} style={{ fontSize: '0.85em' }}>
                     {busy === 'schedule' ? 'Đang đặt...' : s.label}
                   </button>
                 </form>
               ))}
             </div>
+
+            {/* Giờ tùy chọn */}
             <div className="row" style={{ gap: 5 }}>
               <input
                 className="note"
@@ -109,6 +198,13 @@ export default function DecideActions({ id, title, kind, postId }: Props) {
                   <input type="hidden" name="queue_id" value={id} />
                   <input type="hidden" name="post_id" value={postId} />
                   <input type="hidden" name="scheduled_at" value={customAt} />
+                  {hasOldPost && deleteOld ? (
+                    <>
+                      <input type="hidden" name="delete_old_post" value="yes" />
+                      <input type="hidden" name="delete_old_post_id" value={oldPostId!} />
+                      <input type="hidden" name="delete_old_fb_post_id" value={oldFbPostId!} />
+                    </>
+                  ) : null}
                   <button className="btn ghost" disabled={busy !== null} style={{ fontSize: '0.85em' }}>
                     {busy === 'schedule' ? 'Đang đặt...' : 'Đặt giờ này'}
                   </button>

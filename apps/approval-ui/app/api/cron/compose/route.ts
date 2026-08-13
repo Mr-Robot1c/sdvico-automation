@@ -1,6 +1,6 @@
-// Vercel Cron: soạn bài Facebook cho vị trí đang tuyển chưa có bài.
+// Vercel Cron: soạn bài Facebook cho vị trí có auto_post=true và chưa có bài mới.
 // Máy soạn, người bấm Duyệt (điều cấm 1). Không đăng ở đây.
-// Chạy mỗi 5 phút qua vercel.json, thay thế và bổ sung cho hr-compose.yml.
+// Chạy qua GitHub Actions (cron-compose.yml) vì Vercel Hobby không hỗ trợ cron < 1 ngày.
 
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../../lib/supabase-server';
@@ -23,31 +23,46 @@ export async function GET(req: Request) {
   const client = getServerClient();
   const queued: string[] = [];
   const skipped: string[] = [];
+  const refreshed: string[] = [];
   let firstError: string | null = null;
 
   try {
-    // Vị trí đang tuyển.
-    const { data: openJobs, error: e0 } = await client
+    // Chỉ xử lý vị trí có auto_post=true và đang tuyển.
+    const { data: autoJobs, error: e0 } = await client
       .from('hr_jobs')
-      .select('id, title, department, location, short_desc, requirements, jd_versions, image_hint, status')
+      .select('id, title, department, location, short_desc, requirements, jd_versions, image_hint, status, refresh_after_days')
       .eq('status', 'open')
+      .eq('auto_post', true)
       .order('created_at', { ascending: false });
     if (e0) throw new Error('Đọc hr_jobs: ' + e0.message);
 
-    if (!openJobs || openJobs.length === 0) {
-      await client.from('run_log').insert({ task: 'hr.queue_facebook', status: 'ok', detail: { queued: 0, reason: 'no_open_jobs' } });
-      return NextResponse.json({ queued: 0, skipped: 0 });
+    if (!autoJobs || autoJobs.length === 0) {
+      await client.from('run_log').insert({ task: 'hr.queue_facebook', status: 'ok', detail: { queued: 0, reason: 'no_auto_jobs' } });
+      return NextResponse.json({ queued: 0, refreshed: 0, skipped: 0 });
     }
 
-    // Bài Facebook đang hoạt động: draft / scheduled / posted.
-    const jobIds = openJobs.map((j: { id: string }) => j.id);
-    const { data: existingPosts } = await client
+    const jobIds = autoJobs.map((j: { id: string }) => j.id);
+
+    // Lấy tất cả bài Facebook theo các job: draft/scheduled/posted.
+    const { data: allPosts } = await client
       .from('hr_job_posts')
-      .select('job_id')
+      .select('id, job_id, trang_thai, posted_at, fb_post_id, tieu_de')
       .in('job_id', jobIds)
       .eq('kenh', 'facebook')
-      .in('trang_thai', ['draft', 'scheduled', 'posted']);
-    const alreadyQueued = new Set((existingPosts || []).map((p: { job_id: string }) => p.job_id));
+      .in('trang_thai', ['draft', 'scheduled', 'posted'])
+      .order('created_at', { ascending: false });
+
+    // Phân loại: bài draft/scheduled (đang chờ) và bài posted (đã đăng).
+    const waitingByJob = new Map<string, boolean>();    // job đã có bài đang chờ
+    const postedByJob = new Map<string, { id: string; posted_at: string | null; fb_post_id: string | null; tieu_de: string }>();
+
+    for (const p of allPosts || []) {
+      if (p.trang_thai === 'draft' || p.trang_thai === 'scheduled') {
+        waitingByJob.set(p.job_id, true);
+      } else if (p.trang_thai === 'posted' && !postedByJob.has(p.job_id)) {
+        postedByJob.set(p.job_id, { id: p.id, posted_at: p.posted_at, fb_post_id: p.fb_post_id, tieu_de: p.tieu_de });
+      }
+    }
 
     // Cài đặt thương hiệu (logo, hotline, email, website).
     const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
@@ -56,10 +71,28 @@ export async function GET(req: Request) {
     const contactEmail = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
     const hotline = brand.hotline || '1900 23 23 49';
 
-    for (const job of (openJobs as Record<string, unknown>[]) || []) {
-      if (alreadyQueued.has(job.id as string)) {
+    for (const job of (autoJobs as Record<string, unknown>[]) || []) {
+      const jobId = String(job.id);
+
+      // Đã có bài đang chờ duyệt / đặt lịch → bỏ qua, không soạn trùng.
+      if (waitingByJob.has(jobId)) {
         skipped.push(String(job.title));
         continue;
+      }
+
+      const refreshDays = Number(job.refresh_after_days) || 4;
+      const existingPost = postedByJob.get(jobId);
+
+      let isRefresh = false;
+      if (existingPost) {
+        // Bài đã đăng: kiểm tra có cần refresh không.
+        if (!existingPost.posted_at) { skipped.push(String(job.title)); continue; }
+        const daysSincePost = (Date.now() - new Date(existingPost.posted_at).getTime()) / 86400000;
+        if (daysSincePost < refreshDays) {
+          skipped.push(String(job.title));
+          continue;
+        }
+        isRefresh = true;
       }
 
       const versions = ((job.jd_versions as Record<string, string>) || {});
@@ -75,30 +108,31 @@ export async function GET(req: Request) {
         `Ứng tuyển: gửi CV về ${contactEmail}. Hotline ${hotline}.`,
       ].filter((l) => l !== null).join('\n');
 
+      const systemPrompt = [
+        'Bạn là chuyên gia viết tuyển dụng cho Facebook của ngành biển và thủy sản Việt Nam.',
+        isRefresh
+          ? 'Nhiệm vụ: viết LẠI bài tuyển dụng cho một vị trí đã đăng trước đó — cần bố cục và cách diễn đạt khác để tránh trùng lặp trên newsfeed.'
+          : 'Nhiệm vụ: viết bài tuyển dụng đầy đủ thông tin, người đọc hiểu rõ vị trí ngay trên newsfeed.',
+        '',
+        'Cấu trúc bài (theo đúng thứ tự, không thêm tiêu đề phần):',
+        '1. Hook 1-2 câu ngắn khơi gợi cảm xúc hoặc tò mò',
+        '2. Vị trí tuyển và địa điểm',
+        '3. Yêu cầu chính: 3-5 gạch đầu dòng "-", lấy từ bản gốc, ngắn gọn',
+        '4. Quyền lợi hoặc điểm nổi bật nếu có trong bản gốc — bỏ qua nếu không có',
+        `5. Cách ứng tuyển: gửi CV về ${contactEmail} hoặc gọi ${hotline}`,
+        '6. 2-3 hashtag tiếng Việt phù hợp ngành',
+        '',
+        'Quy tắc cứng:',
+        '- Không bịa lương, thưởng, phúc lợi, số liệu không có trong bản gốc (điều cấm 5)',
+        '- Không mô tả phần mềm đối tác như năng lực của SDVICO (điều cấm 4)',
+        '- Câu ngắn, xuống dòng nhiều, viết như người thật nói chuyện',
+        '- 1-2 emoji tự nhiên nếu hợp. Độ dài 150-220 từ',
+        '- Trả về nội dung bài đăng, không kèm giải thích',
+      ].join('\n');
+
       const [noi_dung_raw, unsplash_url] = await Promise.all([
-        groqChat(
-          [
-            'Bạn là chuyên gia viết tuyển dụng cho Facebook của ngành biển và thủy sản Việt Nam.',
-            'Nhiệm vụ: viết bài tuyển dụng đầy đủ thông tin, người đọc hiểu rõ vị trí ngay trên newsfeed.',
-            '',
-            'Cấu trúc bài (theo đúng thứ tự, không thêm tiêu đề phần):',
-            '1. Hook 1-2 câu ngắn khơi gợi cảm xúc hoặc tò mò',
-            '2. Vị trí tuyển và địa điểm (ví dụ: Kỹ sư điện — Vũng Tàu)',
-            '3. Yêu cầu chính: 3-5 gạch đầu dòng "-", lấy từ bản gốc, ngắn gọn',
-            '4. Quyền lợi hoặc điểm nổi bật nếu có trong bản gốc — bỏ qua nếu không có',
-            `5. Cách ứng tuyển: gửi CV về ${contactEmail} hoặc gọi ${hotline}`,
-            '6. 2-3 hashtag tiếng Việt phù hợp ngành',
-            '',
-            'Quy tắc cứng:',
-            '- Không bịa lương, thưởng, phúc lợi, số liệu không có trong bản gốc (điều cấm 5)',
-            '- Không mô tả phần mềm đối tác như năng lực của SDVICO (điều cấm 4)',
-            '- Câu ngắn, xuống dòng nhiều, viết như người thật nói chuyện',
-            '- 1-2 emoji tự nhiên nếu hợp. Độ dài 150-220 từ',
-            '- Trả về nội dung bài đăng, không kèm giải thích',
-          ].join('\n'),
-          richInput,
-          { temperature: 0.75, maxTokens: 600 }
-        ).then((r) => r?.trim() || fallbackContent).catch(() => fallbackContent),
+        groqChat(systemPrompt, richInput, { temperature: 0.75, maxTokens: 600 })
+          .then((r) => r?.trim() || fallbackContent).catch(() => fallbackContent),
         fetchUnsplashPhoto(
           String(job.title),
           job.location ? String(job.location) : undefined,
@@ -118,7 +152,7 @@ export async function GET(req: Request) {
       if (unsplash_url && brand.logo_url) {
         try {
           const composited = await overlayLogo(unsplash_url, brand.logo_url, 'southeast');
-          const imgPath = `posts/${job.id}/fb-${Date.now()}.jpg`;
+          const imgPath = `posts/${jobId}/fb-${Date.now()}.jpg`;
           const { error: upErr } = await client.storage
             .from('post-images')
             .upload(imgPath, composited, { contentType: 'image/jpeg', upsert: true });
@@ -130,25 +164,44 @@ export async function GET(req: Request) {
         image_url = unsplash_url || brand.logo_url || null;
       }
 
-      const tieu_de = `Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`;
+      const tieu_de = isRefresh
+        ? `[Refresh] Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`
+        : `Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`;
 
       const { data: post, error: e1 } = await client
         .from('hr_job_posts')
-        .insert({ job_id: job.id, kenh: 'facebook', tieu_de, noi_dung, image_url, trang_thai: 'draft' })
+        .insert({ job_id: jobId, kenh: 'facebook', tieu_de, noi_dung, image_url, trang_thai: 'draft' })
         .select('id').single();
       if (e1) { firstError = firstError || e1.message; continue; }
+
+      // Payload: nếu refresh thì đính kèm thông tin bài cũ để trang Duyệt hiển thị và người có thể chọn gỡ.
+      const payload: Record<string, unknown> = {
+        post_id: post.id,
+        job_id: jobId,
+        kenh: 'facebook',
+        dia_diem: job.location || null,
+        body: noi_dung,
+        is_refresh: isRefresh,
+      };
+      if (isRefresh && existingPost) {
+        payload.old_post_id = existingPost.id;
+        payload.old_fb_post_id = existingPost.fb_post_id;
+        payload.old_post_title = existingPost.tieu_de;
+        payload.old_posted_at = existingPost.posted_at;
+      }
 
       const { error: e2 } = await client.from('approval_queue').insert({
         kind: 'hr_job_post',
         title: tieu_de,
-        payload: { post_id: post.id, job_id: job.id, kenh: 'facebook', dia_diem: job.location || null, body: noi_dung },
+        payload,
         ref_table: 'hr_job_posts',
         ref_id: post.id,
         status: 'pending',
       });
       if (e2) { firstError = firstError || e2.message; continue; }
 
-      queued.push(String(job.title));
+      if (isRefresh) refreshed.push(String(job.title));
+      else queued.push(String(job.title));
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -160,9 +213,9 @@ export async function GET(req: Request) {
     await client.from('run_log').insert({
       task: 'hr.queue_facebook',
       status: firstError ? 'error' : 'ok',
-      detail: { queued: queued.length, skipped: skipped.length, items: queued, error: firstError },
+      detail: { queued: queued.length, refreshed: refreshed.length, skipped: skipped.length, items: queued, refreshItems: refreshed, error: firstError },
     });
   } catch {}
 
-  return NextResponse.json({ queued: queued.length, skipped: skipped.length, items: queued });
+  return NextResponse.json({ queued: queued.length, refreshed: refreshed.length, skipped: skipped.length, items: queued, refreshItems: refreshed });
 }
