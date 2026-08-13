@@ -1,21 +1,37 @@
 // Ghép logo công ty vào góc ảnh nền. Chạy server-side bằng sharp.
-// Logo PNG có nền trong suốt sẽ ghép đúng. Logo JPG/PNG nền trắng cũng ổn.
+// Tự động xóa nền trắng/gần trắng của logo trước khi ghép.
 // Thất bại (mạng, định dạng lạ) thì ném lỗi — bên gọi tự quyết định fallback.
 
 import sharp from 'sharp';
 
 export type LogoGravity = 'southeast' | 'southwest' | 'northeast' | 'northwest';
 
-// Tải buffer từ URL. Throw nếu HTTP lỗi.
 async function fetchBuffer(url: string): Promise<Buffer> {
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`HTTP ${res.status} khi tải ${url}`);
   return Buffer.from(await res.arrayBuffer());
 }
 
-// Ghép logo vào góc ảnh nền.
-// gravity: vị trí logo — mặc định góc dưới phải (southeast).
-// logoScale: logo chiếm bao nhiêu % chiều rộng ảnh nền (mặc định 18%).
+// Pixel nào có R,G,B đều >= threshold thì đổi alpha = 0 (trong suốt).
+// Loại bỏ nền trắng/gần trắng của logo JPG hoặc PNG không có alpha.
+async function removeWhiteBackground(buf: Buffer, threshold = 240): Promise<Buffer> {
+  const { data, info } = await sharp(buf)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const pixels = Buffer.from(data);
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (pixels[i] >= threshold && pixels[i + 1] >= threshold && pixels[i + 2] >= threshold) {
+      pixels[i + 3] = 0;
+    }
+  }
+
+  return sharp(pixels, { raw: { width: info.width, height: info.height, channels: 4 } })
+    .png()
+    .toBuffer();
+}
+
 export async function overlayLogo(
   backgroundUrl: string,
   logoUrl: string,
@@ -30,18 +46,17 @@ export async function overlayLogo(
   const bg = sharp(bgBuf);
   const { width: bgW = 1080, height: bgH = 720 } = await bg.metadata();
 
-  // Tính kích thước logo: tối thiểu 80px, tối đa 240px.
   const logoW = Math.min(Math.max(Math.round(bgW * logoScale), 80), 240);
 
-  // Resize logo giữ tỷ lệ, chuyển sang PNG để giữ kênh alpha.
-  const logoResized = await sharp(logoBuf)
+  const logoNoBg = await removeWhiteBackground(logoBuf);
+  const logoResized = await sharp(logoNoBg)
     .resize(logoW, null, { fit: 'inside', withoutEnlargement: true })
     .png()
     .toBuffer();
 
   const { width: lW = logoW, height: lH = 60 } = await sharp(logoResized).metadata();
 
-  const pad = 20; // khoảng cách cạnh ảnh
+  const pad = 8;
   const positions: Record<LogoGravity, { left: number; top: number }> = {
     southeast: { left: bgW - lW - pad, top: bgH - lH - pad },
     southwest: { left: pad,            top: bgH - lH - pad },
