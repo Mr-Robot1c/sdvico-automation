@@ -45,7 +45,7 @@ export default function PostListClient({
     if (openId === id && openMode === m) { setOpenId(null); } else { setOpenId(id); setOpenMode(m); }
   };
 
-  if (posts.length === 0 && trash.length === 0) {
+  if (posts.length === 0) {
     return <p className="muted">Chưa có tin đăng nào. Vào tab Vị trí, bấm &quot;Soạn bài Facebook&quot; để tạo bài.</p>;
   }
 
