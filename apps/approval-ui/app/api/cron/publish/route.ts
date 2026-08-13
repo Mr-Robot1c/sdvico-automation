@@ -77,7 +77,7 @@ export async function GET(req: Request) {
     const postIds = items.map((j) => j.postId as string);
     const { data: posts, error: e2 } = await client
       .from('hr_job_posts')
-      .select('id, tieu_de, noi_dung, trang_thai, image_url, scheduled_at')
+      .select('id, tieu_de, noi_dung, trang_thai, image_url, scheduled_at, fb_post_id')
       .in('id', postIds);
     if (e2) throw new Error('Đọc hr_job_posts: ' + e2.message);
 
@@ -87,11 +87,13 @@ export async function GET(req: Request) {
     for (const item of items) {
       const p = byId.get(item.postId as string) as {
         id: string; tieu_de: string; noi_dung: string; trang_thai: string;
-        image_url: string | null; scheduled_at: string | null;
+        image_url: string | null; scheduled_at: string | null; fb_post_id: string | null;
       } | undefined;
       if (!p) continue;
       if (p.trang_thai === 'posted' || p.trang_thai === 'cancelled') continue;
       if (!p.noi_dung?.trim()) continue;
+      // Đã có fb_post_id + scheduled = đã hẹn giờ qua Facebook API, FB tự đăng — bỏ qua.
+      if (p.fb_post_id && p.trang_thai === 'scheduled') continue;
       // Chưa đến giờ thì bỏ qua, chờ lần tiếp theo.
       if (p.scheduled_at && p.scheduled_at > now) continue;
 
