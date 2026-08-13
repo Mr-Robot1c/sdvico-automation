@@ -22,6 +22,9 @@ export function middleware(req: NextRequest) {
   // API nội bộ (Vercel Cron gọi /api/rotate) không dùng basic-auth — tự bảo vệ bằng CRON_SECRET.
   if (req.nextUrl.pathname.startsWith('/api/')) return NextResponse.next();
 
+  // Trang chính sách và điều khoản phải CÔNG KHAI (TikTok/Facebook review + người dùng xem yêu cầu URL mở).
+  if (/^\/(privacy|terms)(\/|$)/.test(req.nextUrl.pathname)) return NextResponse.next();
+
   if (process.env.NODE_ENV !== 'production') return NextResponse.next();
 
   // .trim() phòng khi giá trị biến môi trường dính ký tự xuống dòng hoặc khoảng trắng thừa.
