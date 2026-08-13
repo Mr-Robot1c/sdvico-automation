@@ -1,5 +1,6 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
+import { formatRelative } from '../labels';
 import { addJobPost, queueFacebookPost } from '../actions';
 import DangTinSections from '../dang-tin-sections';
 import { SubmitButton } from '../submit-button';
