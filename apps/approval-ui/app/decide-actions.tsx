@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { decideForm, approveAndPublish, approveAndSchedule } from './actions';
+import { decideForm, approveAndPublish, approveAndSchedule, dismissQueueItem } from './actions';
 
 type Props = {
   id: string;
@@ -61,6 +61,21 @@ export default function DecideActions({ id, title, kind, postId }: Props) {
               {busy === 'reject' ? 'Đang từ chối...' : 'Từ chối'}
             </button>
           </form>
+
+          {/* Xóa khỏi hàng đợi — hủy bản nháp để worker soạn lại */}
+          <form
+            action={dismissQueueItem}
+            onSubmit={(e) => {
+              if (!window.confirm(`Xóa mục này khỏi hàng đợi?\n\n"${title}"\n\nBài nháp sẽ bị hủy và worker sẽ soạn lại.`)) { e.preventDefault(); return; }
+              setBusy('dismiss');
+            }}
+          >
+            <input type="hidden" name="id" value={id} />
+            <input type="hidden" name="post_id" value={postId || ''} />
+            <button className="btn ghost" disabled={busy !== null} style={{ fontSize: '0.85em', color: 'var(--ink-2)' }}>
+              {busy === 'dismiss' ? 'Đang xóa...' : 'Xóa'}
+            </button>
+          </form>
         </div>
 
         {showSchedule ? (
@@ -113,27 +128,41 @@ export default function DecideActions({ id, title, kind, postId }: Props) {
     );
   }
 
-  // Các loại khác: nút Duyệt/Từ chối đơn giản.
+  // Các loại khác: nút Duyệt/Từ chối/Xóa.
   return (
-    <form
-      className="row"
-      action={decideForm}
-      onSubmit={(e) => {
-        const action = (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value');
-        if (action === 'reject') {
-          if (!window.confirm(`Từ chối mục này?\n\n"${title}"`)) { e.preventDefault(); return; }
-        }
-        setBusy(action as string);
-      }}
-    >
-      <input type="hidden" name="id" value={id} />
-      <input className="note" name="note" placeholder="Ghi chú (không bắt buộc)" aria-label="Ghi chú" />
-      <button className="btn ok" name="action" value="approve" disabled={busy !== null}>
-        {busy === 'approve' ? 'Đang duyệt...' : 'Duyệt'}
-      </button>
-      <button className="btn no" name="action" value="reject" disabled={busy !== null}>
-        {busy === 'reject' ? 'Đang từ chối...' : 'Từ chối'}
-      </button>
-    </form>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+      <form
+        className="row"
+        action={decideForm}
+        onSubmit={(e) => {
+          const action = (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value');
+          if (action === 'reject') {
+            if (!window.confirm(`Từ chối mục này?\n\n"${title}"`)) { e.preventDefault(); return; }
+          }
+          setBusy(action as string);
+        }}
+      >
+        <input type="hidden" name="id" value={id} />
+        <input className="note" name="note" placeholder="Ghi chú (không bắt buộc)" aria-label="Ghi chú" />
+        <button className="btn ok" name="action" value="approve" disabled={busy !== null}>
+          {busy === 'approve' ? 'Đang duyệt...' : 'Duyệt'}
+        </button>
+        <button className="btn no" name="action" value="reject" disabled={busy !== null}>
+          {busy === 'reject' ? 'Đang từ chối...' : 'Từ chối'}
+        </button>
+      </form>
+      <form
+        action={dismissQueueItem}
+        onSubmit={(e) => {
+          if (!window.confirm(`Xóa mục này khỏi hàng đợi?\n\n"${title}"`)) { e.preventDefault(); return; }
+          setBusy('dismiss');
+        }}
+      >
+        <input type="hidden" name="id" value={id} />
+        <button className="btn ghost" disabled={busy !== null} style={{ fontSize: '0.85em', color: 'var(--ink-2)' }}>
+          {busy === 'dismiss' ? 'Đang xóa...' : 'Xóa khỏi hàng đợi'}
+        </button>
+      </form>
+    </div>
   );
 }

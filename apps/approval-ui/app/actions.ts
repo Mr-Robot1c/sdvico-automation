@@ -27,6 +27,32 @@ export async function decideForm(formData: FormData) {
   revalidatePath('/');
 }
 
+// Xóa mục khỏi hàng đợi và hủy bản nháp đính kèm (nếu có).
+// Dùng khi muốn bỏ qua một mục mà không duyệt hay từ chối — ví dụ bài soạn lại tốt hơn.
+// Nếu có post_id: đặt hr_job_posts.trang_thai = 'cancelled' để worker có thể soạn lại.
+export async function dismissQueueItem(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  const postId = String(formData.get('post_id') || '');
+  if (!id) return;
+
+  const client = getServerClient();
+  await client
+    .from('approval_queue')
+    .update({ status: 'dismissed', decided_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'pending');
+
+  if (postId) {
+    await client
+      .from('hr_job_posts')
+      .update({ trang_thai: 'cancelled', ghi_chu: 'Người dùng xóa khỏi hàng đợi' })
+      .eq('id', postId)
+      .eq('trang_thai', 'draft');
+  }
+
+  revalidatePath('/');
+}
+
 // Người quyết đưa một hồ sơ vào phỏng vấn. Điều cấm 2: máy chấm và xếp, người chọn ai đi tiếp.
 // Chỉ chuyển được hồ sơ đang ở bước 'review' (đã chấm xong), tránh nhảy bước.
 // Sau đó tác vụ hr-interview sẽ soạn câu hỏi và thư mời cho hồ sơ này.
