@@ -8,6 +8,15 @@ import { groqChat } from '../lib/groq';
 import { fetchUnsplashPhoto } from '../lib/unsplash';
 import { overlayLogo } from '../lib/image-composite';
 
+// datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
+// Server Vercel chạy UTC nên phải gắn +07:00 để parse đúng giờ Việt Nam.
+function parseVNTime(s: string): string {
+  if (!s) return new Date().toISOString();
+  // Nếu đã có timezone (Z hoặc +xx:xx) thì parse thẳng.
+  if (s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s)) return new Date(s).toISOString();
+  return new Date(s + '+07:00').toISOString();
+}
+
 // Người quyết. Đọc từ form, cập nhật trạng thái, chỉ đổi mục còn pending.
 export async function decideForm(formData: FormData) {
   const id = String(formData.get('id') || '');
@@ -205,7 +214,7 @@ export async function addJobPost(formData: FormData) {
   const platform_id = String(formData.get('platform_id') || '') || null;
   const scheduledRaw = String(formData.get('scheduled_at') || '').trim();
   if (!tieu_de) return;
-  const scheduled_at = scheduledRaw ? new Date(scheduledRaw).toISOString() : null;
+  const scheduled_at = scheduledRaw ? parseVNTime(scheduledRaw) : null;
   const trang_thai = scheduled_at ? 'scheduled' : 'draft';
   const client = getServerClient();
   const { error } = await client.from('hr_job_posts').insert({ tieu_de, platform_id, scheduled_at, trang_thai });
@@ -391,7 +400,7 @@ export async function editJobPostDraft(formData: FormData) {
   const parsedFbPostId = parseFbPostId(fbPostLink);
   if (!postId) return;
 
-  const scheduled_at = scheduledRaw ? new Date(scheduledRaw).toISOString() : null;
+  const scheduled_at = scheduledRaw ? parseVNTime(scheduledRaw) : null;
   const trang_thai = scheduled_at ? 'scheduled' : 'draft';
 
   const client = getServerClient();
@@ -815,7 +824,9 @@ export async function approveAndSchedule(formData: FormData) {
 
   let scheduled_at: string;
   if (scheduledRaw) {
-    scheduled_at = new Date(scheduledRaw).toISOString();
+    // datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
+    // Server Vercel chạy UTC nên phải thêm +07:00 để parse đúng giờ Việt Nam.
+    scheduled_at = parseVNTime(scheduledRaw);
   } else {
     const minutes = Math.max(1, parseInt(minutesStr, 10) || 30);
     scheduled_at = new Date(Date.now() + minutes * 60 * 1000).toISOString();
