@@ -1,9 +1,6 @@
 name: HR — Soạn bài tuyển dụng Facebook
 
 on:
-  schedule:
-    # Mỗi 5 phút: quét vị trí đang tuyển chưa có bài, soạn và đẩy vào hàng đợi duyệt.
-    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       job_id:

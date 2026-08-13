@@ -1,9 +1,6 @@
 name: HR — Đăng tin tuyển dụng Facebook
 
 on:
-  schedule:
-    # Mỗi 5 phút, mọi giờ (cho phép test ban đêm).
-    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
