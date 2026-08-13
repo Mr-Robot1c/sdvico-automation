@@ -17,7 +17,17 @@ function fmt(ms: number): { text: string; urgent: boolean } {
   return { text: `${sec}s`, urgent: true };
 }
 
-export function Countdown({ target, className }: { target: string; className?: string }) {
+export function Countdown({
+  target,
+  prefix = '',
+  pastLabel = 'Đã đến giờ',
+  className,
+}: {
+  target: string;
+  prefix?: string;
+  pastLabel?: string;
+  className?: string;
+}) {
   const [ms, setMs] = useState(() => new Date(target).getTime() - Date.now());
 
   useEffect(() => {
@@ -25,14 +35,24 @@ export function Countdown({ target, className }: { target: string; className?: s
     return () => clearInterval(id);
   }, [target]);
 
+  const title = new Date(target).toLocaleString('vi-VN');
+
+  if (ms <= 0) {
+    return (
+      <span className={className} style={{ fontVariantNumeric: 'tabular-nums' }} title={title}>
+        {pastLabel}
+      </span>
+    );
+  }
+
   const { text, urgent } = fmt(ms);
   return (
     <span
       className={className}
       style={{ color: urgent ? 'var(--ok)' : undefined, fontVariantNumeric: 'tabular-nums' }}
-      title={new Date(target).toLocaleString('vi-VN')}
+      title={title}
     >
-      {text}
+      {prefix}{text}
     </span>
   );
 }

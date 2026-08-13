@@ -13,7 +13,7 @@ const GROUPS: NavGroup[] = [
     label: 'Tuyển dụng',
     items: [
       { href: '/tao-jd', label: 'Tạo JD' },
-      { href: '/dang-tin', label: 'Vị trí & Đăng tin' },
+      { href: '/dang-tin', label: 'Vị trí' },
       { href: '/ho-so', label: 'Hồ sơ ứng viên' },
       { href: '/lich', label: 'Lịch phỏng vấn' },
     ],

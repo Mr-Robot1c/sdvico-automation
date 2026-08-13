@@ -73,7 +73,9 @@ export default function PostListClient({
                 <span className="pt-title">{p.tieu_de}</span>
                 <span className="pt-kenh">{KENH[p.kenh || ''] || p.kenh || '—'}</span>
                 {p.trang_thai === 'scheduled' && p.scheduled_at ? (
-                  <span className="pt-time" style={{ color: 'var(--ok)', fontWeight: 600 }}>còn <Countdown target={p.scheduled_at} /></span>
+                  <span className="pt-time" style={{ color: 'var(--ok)', fontWeight: 600 }}>
+                    <Countdown target={p.scheduled_at} prefix="còn " pastLabel="Đến giờ — chờ worker" />
+                  </span>
                 ) : (
                   <time className="pt-time">{formatRelative(p.created_at)}</time>
                 )}

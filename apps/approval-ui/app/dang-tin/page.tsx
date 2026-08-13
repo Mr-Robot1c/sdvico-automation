@@ -26,7 +26,7 @@ function runAge(entry: RunEntry | undefined): { label: string; tone: string } {
 export default async function Page() {
   const client = getServerClient();
 
-  const [jRes, aqRes, logRes] = await Promise.all([
+  const [jRes, aqRes, logRes, jobsRes] = await Promise.all([
     client
       .from('hr_job_posts')
       .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, fb_post_id, created_at')
@@ -43,6 +43,10 @@ export default async function Page() {
       .in('task', ['hr.queue_facebook', 'hr.publish_facebook'])
       .order('created_at', { ascending: false })
       .limit(20),
+    client
+      .from('hr_jobs')
+      .select('id, title, status')
+      .in('status', ['open', 'draft']),
   ]);
 
   const posts = (jRes.data || []) as Post[];
@@ -53,6 +57,14 @@ export default async function Page() {
   const lastPublish  = logs.find((l) => l.task === 'hr.publish_facebook');
   const compose  = runAge(lastCompose);
   const publish  = runAge(lastPublish);
+
+  const allJobs = (jobsRes.data || []) as { id: string; title: string; status: string }[];
+  const openJobs = allJobs.filter((j) => j.status === 'open');
+  const draftJobs = allJobs.filter((j) => j.status === 'draft');
+  const activePostJobIds = new Set(
+    posts.filter((p) => p.job_id && ['draft', 'scheduled', 'posted'].includes(p.trang_thai)).map((p) => p.job_id as string)
+  );
+  const openNeedingPost = openJobs.filter((j) => !activePostJobIds.has(j.id));
 
   const missing = (code?: string) => code === 'PGRST205' || code === '42P01' || code === '42703';
   const needMigration = missing(jRes.error?.code);
@@ -80,6 +92,25 @@ export default async function Page() {
         </span>
         <span className="sys-hint">Cập nhật mỗi 30s · Cron chạy mỗi 5 phút</span>
       </div>
+
+      {/* Chẩn đoán: worker chưa chạy + có vị trí chờ soạn */}
+      {!lastCompose && openNeedingPost.length > 0 && (
+        <div className="err" role="alert" style={{ marginBottom: 12 }}>
+          Worker soạn bài chưa chạy lần nào. Có {openNeedingPost.length} vị trí đang tuyển chờ soạn bài:
+          {' '}{openNeedingPost.map((j) => j.title).join(', ')}.
+          Kiểm tra GitHub → Settings → Secrets → Actions: phải có <code>SUPABASE_URL</code> và <code>SUPABASE_SERVICE_ROLE_KEY</code> (ngoài <code>GROQ_API_KEY</code>). Xem Actions logs để biết workflow có chạy không.
+        </div>
+      )}
+      {!lastCompose && openNeedingPost.length === 0 && openJobs.length === 0 && draftJobs.length > 0 && (
+        <div className="info" role="status" style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(25,118,210,0.08)', borderRadius: 8, fontSize: '13px' }}>
+          Worker chưa chạy. Có {draftJobs.length} vị trí còn nháp (chưa mở tuyển) — vào Tạo JD, bấm &quot;Mở tuyển&quot; để worker tự soạn bài.
+        </div>
+      )}
+      {openNeedingPost.length > 0 && lastCompose && lastCompose.status === 'ok' && (
+        <div className="info" role="status" style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(25,118,210,0.08)', borderRadius: 8, fontSize: '13px' }}>
+          Có {openNeedingPost.length} vị trí đang tuyển chưa có bài Facebook. Worker sẽ soạn trong lần chạy tiếp theo (tối đa 5 phút).
+        </div>
+      )}
 
       {needMigration ? (
         <div className="err" role="alert">
