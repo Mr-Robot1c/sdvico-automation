@@ -3,21 +3,20 @@ import type { ReactNode } from 'react';
 import Nav from './nav';
 
 export const metadata = {
-  title: 'Duyệt và Hồ sơ SDVICO',
-  description: 'Hàng đợi duyệt và hồ sơ ứng viên. Máy soạn, người bấm.'
+  title: 'SDVICO · Quản lý tuyển dụng',
+  description: 'Hệ thống tuyển dụng SDVICO — soạn, duyệt, đăng tin và quản lý hồ sơ ứng viên.'
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="vi">
       <body>
-        <header className="topbar">
-          <div className="topbar-inner">
-            <div className="brand">SDVICO · Duyệt và Hồ sơ</div>
-            <Nav />
+        <div className="app-shell">
+          <Nav />
+          <div className="app-main">
+            {children}
           </div>
-        </header>
-        {children}
+        </div>
       </body>
     </html>
   );

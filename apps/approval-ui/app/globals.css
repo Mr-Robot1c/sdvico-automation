@@ -54,25 +54,105 @@ body {
   line-height: 1.5;
 }
 
-/* Thanh trên cùng, thương hiệu và điều hướng */
-.topbar {
-  position: sticky; top: 0; z-index: 10;
-  background: var(--surface); border-bottom: 1px solid var(--line);
-}
-.topbar-inner {
-  max-width: 860px; margin: 0 auto; padding: 10px 20px;
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-}
-.brand { font-weight: 700; font-size: 15px; color: var(--accent); }
-.tabs { display: flex; gap: 6px; }
-.tab {
-  text-decoration: none; color: var(--ink-2); font-size: 14px; font-weight: 500;
-  padding: 6px 12px; border-radius: 8px;
-}
-.tab:hover { background: var(--chip); color: var(--ink); }
-.tab.on { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+/* Khung ứng dụng — sidebar trái + nội dung phải */
+.app-shell { display: flex; min-height: 100vh; }
 
-main { max-width: 860px; margin: 0 auto; padding: 24px 20px 64px; }
+.sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+  background: var(--surface); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; overflow-y: auto; z-index: 20;
+}
+
+.app-main { margin-left: 220px; flex: 1; min-width: 0; }
+
+main { max-width: 860px; margin: 0 auto; padding: 28px 24px 72px; }
+
+/* Thương hiệu trong sidebar */
+.nav-brand {
+  padding: 20px 18px 16px; border-bottom: 1px solid var(--line); flex-shrink: 0;
+}
+.nav-brand-name {
+  display: block; font-size: 17px; font-weight: 800; color: var(--accent); letter-spacing: 0.04em;
+}
+.nav-brand-sub { display: block; font-size: 11px; color: var(--ink-2); margin-top: 3px; }
+
+/* Phần thân sidebar */
+.nav-body {
+  padding: 10px 8px 12px; display: flex; flex-direction: column; flex: 1;
+}
+
+/* Mục đơn (Duyệt & gửi, Cài đặt) */
+.nav-solo {
+  display: flex; align-items: center; gap: 9px;
+  text-decoration: none; color: var(--ink-2); font-size: 13.5px; font-weight: 500;
+  padding: 8px 10px; border-radius: 8px; transition: background 0.1s, color 0.1s;
+}
+.nav-solo:hover { background: var(--chip); color: var(--ink); }
+.nav-solo.on { background: var(--accent-bg); color: var(--accent); font-weight: 700; }
+.nav-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; opacity: 0.75; }
+.nav-solo.on .nav-icon { opacity: 1; }
+
+/* Đường phân cách */
+.nav-sep { height: 1px; background: var(--line); margin: 8px 4px; }
+.nav-spacer { flex: 1; min-height: 16px; }
+
+/* Nhóm có thể mở/đóng */
+.nav-group-head {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; background: none; border: none; font: inherit;
+  font-size: 11px; font-weight: 700; color: var(--ink-2);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 8px 10px 6px; border-radius: 6px; cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.nav-group-head:hover { background: var(--chip); }
+.nav-group-head.has-active .nav-group-label { color: var(--accent); }
+
+.nav-chevron {
+  font-size: 16px; line-height: 1; display: inline-block;
+  transition: transform 0.18s ease; transform: rotate(0deg);
+}
+.nav-chevron.open { transform: rotate(90deg); }
+
+/* Mục bên trong nhóm */
+.nav-group-items { display: flex; flex-direction: column; padding: 2px 0 4px; }
+.nav-item {
+  position: relative; text-decoration: none;
+  color: var(--ink-2); font-size: 13px; font-weight: 500;
+  padding: 7px 10px 7px 26px; border-radius: 7px;
+  transition: background 0.1s, color 0.1s;
+}
+.nav-item::before {
+  content: ''; position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: var(--line);
+  transition: background 0.1s;
+}
+.nav-item:hover { background: var(--chip); color: var(--ink); }
+.nav-item.on { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.nav-item.on::before { background: var(--accent); }
+
+/* Nút hamburger — chỉ hiện trên điện thoại */
+.mobile-toggle {
+  display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+  background: var(--surface); border: none; border-bottom: 1px solid var(--line);
+  font: inherit; font-size: 15px; font-weight: 700; color: var(--accent);
+  padding: 13px 16px; cursor: pointer; text-align: left;
+  align-items: center; gap: 10px;
+}
+.toggle-icon { font-size: 18px; line-height: 1; }
+.toggle-brand { font-size: 15px; }
+.sidebar-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 19; background: rgba(0,0,0,0.32);
+}
+
+@media (max-width: 720px) {
+  .mobile-toggle { display: flex; }
+  .sidebar { transform: translateX(-100%); top: 46px; transition: transform 0.22s ease; }
+  .sidebar.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,0.12); }
+  .sidebar-backdrop { display: block; }
+  .app-main { margin-left: 0; padding-top: 46px; }
+  main { padding: 20px 14px 56px; }
+}
 
 .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 h1 { font-size: 22px; margin: 0 0 4px; }
@@ -268,13 +348,6 @@ select.note { cursor: pointer; }
 .pt-btn.del:hover { border-color: var(--no); color: var(--no); background: var(--no-bg); }
 .pt-detail, .pt-edit { padding: 12px 14px; border-top: 1px solid var(--line); background: var(--surface-2); }
 
-/* Thùng rác */
-.trash-box { margin-top: 16px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.trash-box > summary { padding: 10px 14px; cursor: pointer; font-size: 13px; color: var(--ink-2); display: block; }
-.trash-box > summary:hover { background: var(--chip); }
-.trash-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
-.trash-row { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--line); }
-
 /* Modal xác nhận xoá */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 200;
@@ -302,9 +375,8 @@ select.note { cursor: pointer; }
 @keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-slide { from { opacity: 0; transform: scale(0.95) translateY(-6px); } to { opacity: 1; transform: none; } }
 
-/* Điện thoại */
-@media (max-width: 560px) {
-  main { padding: 20px 14px 48px; }
+/* Điện thoại nhỏ */
+@media (max-width: 480px) {
   .head-row { flex-direction: column; }
   .field { grid-template-columns: 1fr; gap: 2px; }
   .field dt { font-weight: 600; }
