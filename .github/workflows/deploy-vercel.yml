@@ -30,7 +30,6 @@ jobs:
 
       - name: Deploy lên Vercel
         run: npx vercel --prod --yes --token "$VERCEL_TOKEN"
-        working-directory: apps/approval-ui
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
