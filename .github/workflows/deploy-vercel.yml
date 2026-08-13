@@ -20,13 +20,18 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Deploy lên Vercel
+      - name: Lấy Vercel Org ID từ token
         run: |
-          cd apps/approval-ui
-          npx vercel --prod --yes \
-            --token "$VERCEL_TOKEN" \
-            --cwd .
+          ORG_ID=$(curl -sf -H "Authorization: Bearer $VERCEL_TOKEN" \
+            https://api.vercel.com/v2/user | jq -r '.user.id')
+          echo "VERCEL_ORG_ID=$ORG_ID" >> "$GITHUB_ENV"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+
+      - name: Deploy lên Vercel
+        run: npx vercel --prod --yes --token "$VERCEL_TOKEN"
+        working-directory: apps/approval-ui
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
