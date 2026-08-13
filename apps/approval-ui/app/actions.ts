@@ -3,7 +3,73 @@
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../lib/supabase-server';
 
+// Đăng một bài marketing đã duyệt lên Facebook Page qua Graph API. CHỈ đăng nội dung SDVICO
+// lên Page của SDVICO (API chính thức). Máy soạn, người bấm Duyệt (điều cấm 1) — hàm này chạy
+// SAU khi người đã bấm Duyệt. Chưa cấu hình token thì bỏ qua, không lỗi.
+async function publishContentToFacebook(
+  client: ReturnType<typeof getServerClient>,
+  contentId: string
+): Promise<{ ok: boolean; error?: string; url?: string }> {
+  const PAGE_ID = process.env.FACEBOOK_PAGE_ID;
+  const TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+  if (!PAGE_ID || !TOKEN) return { ok: false, error: 'chưa cấu hình Facebook token' };
+
+  // Không đăng lại bài đã đăng thành công.
+  const { data: posted } = await client
+    .from('mkt_posts')
+    .select('id')
+    .eq('channel', 'facebook')
+    .eq('content_id', contentId)
+    .eq('status', 'published')
+    .limit(1);
+  if (posted && posted.length) return { ok: true, url: undefined };
+
+  const { data: c } = await client
+    .from('mkt_content')
+    .select('id, title, draft, brief')
+    .eq('id', contentId)
+    .single();
+  if (!c) return { ok: false, error: 'không tìm thấy nội dung' };
+  const message = [(c as any).title, '', (c as any).draft || ''].join('\n').trim();
+
+  let imageUrl: string | null = null;
+  const imgAssetId = (c as any).brief?.assets?.image;
+  if (imgAssetId) {
+    const { data: a } = await client.from('brand_assets').select('storage_path').eq('id', imgAssetId).single();
+    const sp = (a as { storage_path?: string } | null)?.storage_path;
+    if (sp) imageUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  }
+
+  try {
+    const endpoint = imageUrl
+      ? `https://graph.facebook.com/${VERSION}/${PAGE_ID}/photos`
+      : `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
+    const body = imageUrl
+      ? new URLSearchParams({ url: imageUrl, caption: message, access_token: TOKEN })
+      : new URLSearchParams({ message, access_token: TOKEN });
+    const res = await fetch(endpoint, { method: 'POST', body });
+    const json: any = await res.json();
+    if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
+    const postId = json.post_id || json.id;
+    const externalUrl = `https://www.facebook.com/${postId}`;
+    await client.from('mkt_posts').insert({
+      content_id: contentId,
+      channel: 'facebook',
+      status: 'published',
+      external_url: externalUrl,
+      published_at: new Date().toISOString()
+    });
+    await client.from('mkt_content').update({ status: 'published' }).eq('id', contentId);
+    return { ok: true, url: externalUrl };
+  } catch (e: any) {
+    await client.from('mkt_posts').insert({ content_id: contentId, channel: 'facebook', status: 'failed' });
+    return { ok: false, error: String(e?.message || e) };
+  }
+}
+
 // Người quyết. Đọc từ form, cập nhật trạng thái, chỉ đổi mục còn pending.
+// Duyệt bài marketing thì đăng NGAY lên Facebook (nếu đã cấu hình token).
 export async function decideForm(formData: FormData) {
   const id = String(formData.get('id') || '');
   const action = String(formData.get('action') || '');
@@ -13,15 +79,26 @@ export async function decideForm(formData: FormData) {
   if (!id || !decision) return;
 
   const client = getServerClient();
-  const { error } = await client
+  // Lấy loại + payload để biết có phải bài marketing không.
+  const { data: row } = await client.from('approval_queue').select('kind, payload').eq('id', id).single();
+  const { data: updated, error } = await client
     .from('approval_queue')
     .update({ status: decision, decided_at: new Date().toISOString(), note: note || null })
     .eq('id', id)
-    .eq('status', 'pending');
+    .eq('status', 'pending')
+    .select('id');
   if (error) throw new Error(error.message);
+
+  // Chỉ đăng khi vừa chuyển pending -> approved lần đầu, và đúng là bài marketing.
+  const justApproved = decision === 'approved' && (updated?.length || 0) > 0;
+  if (justApproved && (row as any)?.kind === 'mkt_publish_content') {
+    const contentId = (row as any)?.payload?.content_id as string | undefined;
+    if (contentId) await publishContentToFacebook(client, contentId);
+  }
 
   revalidatePath('/');
   revalidatePath('/noi-dung');
+  revalidatePath('/da-dang');
 }
 
 // Thêm một từ khóa vào kho.
