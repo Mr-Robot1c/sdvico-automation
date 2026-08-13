@@ -17,7 +17,7 @@ type Post = {
   id: string; tieu_de: string; trang_thai: string; scheduled_at: string | null;
   posted_at: string | null; noi_dung: string | null; job_id: string | null;
   kenh: string | null; url: string | null; image_url: string | null; ghi_chu: string | null;
-  created_at: string; deleted_at: string | null;
+  fb_post_id: string | null; created_at: string; deleted_at: string | null;
 };
 type TrashPost = {
   id: string; tieu_de: string; kenh: string | null;
@@ -42,7 +42,7 @@ export default async function Page() {
     .order('created_at', { ascending: false }).limit(100);
   const jRes = await client
     .from('hr_job_posts')
-    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, created_at, deleted_at')
+    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, fb_post_id, created_at, deleted_at')
     .is('deleted_at', null)
     .order('created_at', { ascending: false }).limit(100);
   const trashRes = await client

@@ -10,7 +10,7 @@ type Post = {
   scheduled_at: string | null; posted_at: string | null;
   noi_dung: string | null; job_id: string | null; kenh: string | null;
   url: string | null; image_url: string | null; ghi_chu: string | null;
-  created_at: string; deleted_at: string | null;
+  fb_post_id: string | null; created_at: string; deleted_at: string | null;
 };
 
 type TrashPost = {
@@ -87,7 +87,10 @@ export default function PostListClient({
                     </button>
                   ) : null}
                   <form action={updateJobPost} onSubmit={(e) => {
-                    if (!window.confirm('Chuyển bài này vào thùng rác?')) e.preventDefault();
+                    const msg = p.fb_post_id && p.trang_thai === 'posted'
+                      ? 'Bài này đã đăng lên Facebook. Xoá sẽ GỠ BÀI khỏi Facebook luôn. Tiếp tục?'
+                      : 'Chuyển bài này vào thùng rác?';
+                    if (!window.confirm(msg)) e.preventDefault();
                   }}>
                     <input type="hidden" name="id" value={p.id} />
                     <input type="hidden" name="action" value="delete" />

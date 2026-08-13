@@ -142,7 +142,19 @@ export async function updateJobPost(formData: FormData) {
   if (!id) return;
   const client = getServerClient();
   if (action === 'delete') {
-    // Soft delete: lưu vào thùng rác, tự xoá sau 7 ngày. Không xoá cứng.
+    // Nếu bài đã đăng lên Facebook, gỡ bài khỏi Facebook trước.
+    // Lỗi gỡ Facebook thì ghi log và vẫn soft-delete khỏi hệ thống.
+    const { data: existing } = await client
+      .from('hr_job_posts').select('fb_post_id, trang_thai').eq('id', id).maybeSingle();
+    if (existing?.fb_post_id && existing.trang_thai === 'posted') {
+      try {
+        await callFacebookDeleteApi(existing.fb_post_id);
+        await client.from('run_log').insert({ task: 'hr.delete_facebook_post', status: 'ok', detail: { postId: id, fbPostId: existing.fb_post_id } });
+      } catch (err) {
+        await client.from('run_log').insert({ task: 'hr.delete_facebook_post', status: 'error', detail: { postId: id, error: String(err) } });
+      }
+    }
+    // Soft delete: lưu vào thùng rác, tự xoá sau 7 ngày.
     const { error } = await client.from('hr_job_posts').update({ deleted_at: new Date().toISOString() }).eq('id', id);
     if (error) throw new Error(error.message);
   } else if (action === 'posted') {
@@ -366,6 +378,23 @@ export async function editJobPostDraft(formData: FormData) {
   revalidatePath('/');
 }
 
+// Helper nội bộ: gỡ một bài đã đăng khỏi Facebook qua Graph API.
+// Ném lỗi nếu thất bại — người gọi tự quyết có tiếp tục không.
+async function callFacebookDeleteApi(fbPostId: string): Promise<void> {
+  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const version = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+  if (!token) throw new Error('Thiếu FACEBOOK_PAGE_ACCESS_TOKEN trong biến môi trường.');
+  const res = await fetch(`https://graph.facebook.com/${version}/${fbPostId}`, {
+    method: 'DELETE',
+    body: new URLSearchParams({ access_token: token }),
+    cache: 'no-store',
+  });
+  const json = await res.json();
+  if (!res.ok || json.error) {
+    throw new Error(json.error?.message || `HTTP ${res.status}`);
+  }
+}
+
 // Helper nội bộ: gọi Facebook Graph API để đăng bài. Ném lỗi nếu thất bại.
 // Trả về fbPostId (string). Không ghi DB, không revalidate — người gọi chịu.
 async function callFacebookApi(post: { tieu_de: string; noi_dung: string; image_url: string | null }): Promise<string> {
@@ -437,7 +466,7 @@ export async function publishJobPost(formData: FormData) {
     const fbPostId = await callFacebookApi(post);
     const externalUrl = `https://www.facebook.com/${fbPostId}`;
     await client.from('hr_job_posts')
-      .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), url: externalUrl, ghi_chu: null })
+      .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), url: externalUrl, fb_post_id: fbPostId, ghi_chu: null })
       .eq('id', postId);
     await client.from('run_log').insert({ task: 'hr.publish_facebook_ui', status: 'ok', detail: { postId, fbPostId, externalUrl } });
   } catch (err: unknown) {
