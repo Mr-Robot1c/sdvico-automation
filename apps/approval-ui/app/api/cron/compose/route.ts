@@ -26,7 +26,20 @@ export async function GET(req: Request) {
   const refreshed: string[] = [];
   let firstError: string | null = null;
 
+  const MAX_PENDING = 10;
+
   try {
+    // Dừng sớm nếu hàng đợi đã có đủ bài chờ duyệt — tránh soạn thừa.
+    const { count: pendingCount } = await client
+      .from('approval_queue')
+      .select('id', { count: 'exact', head: true })
+      .eq('kind', 'hr_job_post')
+      .eq('status', 'pending');
+    if ((pendingCount ?? 0) >= MAX_PENDING) {
+      await client.from('run_log').insert({ task: 'hr.queue_facebook', status: 'ok', detail: { queued: 0, reason: 'queue_full', pending: pendingCount } });
+      return NextResponse.json({ queued: 0, refreshed: 0, skipped: 0, reason: 'queue_full', pending: pendingCount });
+    }
+
     // Chỉ xử lý vị trí có auto_post=true và đang tuyển.
     const { data: autoJobs, error: e0 } = await client
       .from('hr_jobs')
