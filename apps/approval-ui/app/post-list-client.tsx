@@ -32,6 +32,7 @@ const KENH: Record<string, string> = {
 };
 
 type Mode = 'view' | 'edit';
+type DeleteTarget = { id: string; tieu_de: string; trang_thai: string; fbLinked: boolean };
 
 export default function PostListClient({
   posts,
@@ -44,6 +45,7 @@ export default function PostListClient({
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [openMode, setOpenMode] = useState<Mode>('view');
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const approved = new Set(approvedPostIds);
 
   const toggle = (id: string, m: Mode) => {
@@ -86,16 +88,13 @@ export default function PostListClient({
                       {isEdit ? 'Đóng' : 'Sửa'}
                     </button>
                   ) : null}
-                  <form action={updateJobPost} onSubmit={(e) => {
-                    const msg = p.fb_post_id && p.trang_thai === 'posted'
-                      ? 'Bài này đã đăng lên Facebook. Xoá sẽ GỠ BÀI khỏi Facebook luôn. Tiếp tục?'
-                      : 'Chuyển bài này vào thùng rác?';
-                    if (!window.confirm(msg)) e.preventDefault();
-                  }}>
-                    <input type="hidden" name="id" value={p.id} />
-                    <input type="hidden" name="action" value="delete" />
-                    <button type="submit" className="pt-btn del">Xoá</button>
-                  </form>
+                  <button
+                    type="button"
+                    className="pt-btn del"
+                    onClick={() => setDeleteTarget({ id: p.id, tieu_de: p.tieu_de, trang_thai: p.trang_thai, fbLinked: !!(p.fb_post_id && p.trang_thai === 'posted') })}
+                  >
+                    Xoá
+                  </button>
                 </div>
               </div>
 
@@ -206,6 +205,36 @@ export default function PostListClient({
           );
         })}
       </ul>
+
+      {deleteTarget ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteTarget(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-title">Xoá bài đăng?</p>
+            <div className="modal-body">
+              <strong style={{ display: 'block', marginBottom: 8 }}>{deleteTarget.tieu_de}</strong>
+              {deleteTarget.fbLinked ? (
+                <span className="modal-warn">Bài đang trên Facebook. Xoá ở đây sẽ gỡ bài khỏi Facebook luôn.</span>
+              ) : deleteTarget.trang_thai === 'posted' ? (
+                <span className="modal-info">Bài đã đăng trên Facebook nhưng chưa lưu link trong hệ thống. Xoá sẽ chỉ xoá khỏi danh sách quản lý, bài trên Facebook vẫn còn. Vào <strong>Sửa</strong> để paste link Facebook trước nếu muốn gỡ luôn.</span>
+              ) : (
+                <span className="modal-info">Bài sẽ vào thùng rác và tự xoá vĩnh viễn sau 7 ngày.</span>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn ghost" onClick={() => setDeleteTarget(null)}>Giữ lại</button>
+              <form action={updateJobPost} onSubmit={() => setDeleteTarget(null)}>
+                <input type="hidden" name="id" value={deleteTarget.id} />
+                <input type="hidden" name="action" value="delete" />
+                <SubmitButton
+                  label={deleteTarget.fbLinked ? 'Xoá và gỡ Facebook' : 'Xoá khỏi danh sách'}
+                  pendingLabel="Đang xoá..."
+                  className="btn del"
+                />
+              </form>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {trash.length > 0 ? (
         <details className="trash-box">
