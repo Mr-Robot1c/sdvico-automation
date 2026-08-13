@@ -5,6 +5,7 @@ Thư mục này chứa lược đồ cơ sở dữ liệu và chính sách bảo
 - `migrations/20260810090000_init.sql`: tạo mười bảng tối thiểu.
 - `migrations/20260810090100_rls.sql`: bật RLS và chính sách v1.
 - `migrations/20260810140000_core.sql`: bảng app_config cho công tắc dừng khẩn và daily_counters cho bộ đếm hạn mức, kèm RLS.
+- `migrations/20260813000000_mkt_oauth_tokens.sql`: bảng lưu token OAuth (TikTok) cần refresh, RLS bật không policy nên chỉ service_role (backend) đọc ghi.
 
 ## Cách áp dụng
 

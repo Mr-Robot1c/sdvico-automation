@@ -4,5 +4,6 @@
 | Doc | Trang thai | Ly do |
 |---|---|---|
 | docs/app-map/README.md | VERIFIED | ok |
+| docs/app-map/database.md | VERIFIED | ok |
 | docs/app-map/marketing.md | VERIFIED | ok |
 | docs/app-map/tuyen-dung.md | VERIFIED | ok |

@@ -31,6 +31,10 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
             { href: '/du-kien', label: 'Nguồn dữ kiện', icon: '📊' },
             { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' }
           ]
+        },
+        {
+          title: 'Kết nối',
+          items: [{ href: '/tiktok', label: 'Kết nối TikTok', icon: '🎵' }]
         }
       ]
     : [
@@ -57,6 +61,10 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
             { href: '/du-kien', label: 'Nguồn dữ kiện', icon: '📊' },
             { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' }
           ]
+        },
+        {
+          title: 'Kết nối',
+          items: [{ href: '/tiktok', label: 'Kết nối TikTok', icon: '🎵' }]
         }
       ];
 
