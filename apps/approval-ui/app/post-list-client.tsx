@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { updateJobPost, editJobPostDraft, publishJobPost, restoreJobPost, purgeJobPost } from './actions';
+import { updateJobPost, editJobPostDraft, publishJobPost } from './actions';
 import { SubmitButton } from './submit-button';
 import { formatRelative } from './labels';
 
@@ -10,12 +10,7 @@ type Post = {
   scheduled_at: string | null; posted_at: string | null;
   noi_dung: string | null; job_id: string | null; kenh: string | null;
   url: string | null; image_url: string | null; ghi_chu: string | null;
-  fb_post_id: string | null; created_at: string; deleted_at: string | null;
-};
-
-type TrashPost = {
-  id: string; tieu_de: string; kenh: string | null;
-  trang_thai: string; deleted_at: string; created_at: string;
+  fb_post_id: string | null; created_at: string;
 };
 
 const TT: Record<string, { label: string; tone: string }> = {
@@ -37,11 +32,9 @@ type DeleteTarget = { id: string; tieu_de: string; trang_thai: string; fbLinked:
 export default function PostListClient({
   posts,
   approvedPostIds,
-  trash,
 }: {
   posts: Post[];
   approvedPostIds: string[];
-  trash: TrashPost[];
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [openMode, setOpenMode] = useState<Mode>('view');
@@ -213,11 +206,11 @@ export default function PostListClient({
             <div className="modal-body">
               <strong style={{ display: 'block', marginBottom: 8 }}>{deleteTarget.tieu_de}</strong>
               {deleteTarget.fbLinked ? (
-                <span className="modal-warn">Bài đang trên Facebook. Xoá ở đây sẽ gỡ bài khỏi Facebook luôn.</span>
+                <span className="modal-warn">Bài đang trên Facebook. Xoá ở đây sẽ gỡ bài khỏi Facebook và xoá vĩnh viễn khỏi hệ thống.</span>
               ) : deleteTarget.trang_thai === 'posted' ? (
-                <span className="modal-info">Bài đã đăng trên Facebook nhưng chưa lưu link trong hệ thống. Xoá sẽ chỉ xoá khỏi danh sách quản lý, bài trên Facebook vẫn còn. Vào <strong>Sửa</strong> để paste link Facebook trước nếu muốn gỡ luôn.</span>
+                <span className="modal-info">Bài đã đăng trên Facebook nhưng chưa lưu link. Hệ thống không thể tự gỡ khỏi Facebook — bạn cần vào Facebook xoá thủ công. Bài sẽ xoá vĩnh viễn khỏi hệ thống quản lý.</span>
               ) : (
-                <span className="modal-info">Bài sẽ vào thùng rác và tự xoá vĩnh viễn sau 7 ngày.</span>
+                <span className="modal-info">Xoá vĩnh viễn. Không thể khôi phục.</span>
               )}
             </div>
             <div className="modal-footer">
@@ -226,7 +219,7 @@ export default function PostListClient({
                 <input type="hidden" name="id" value={deleteTarget.id} />
                 <input type="hidden" name="action" value="delete" />
                 <SubmitButton
-                  label={deleteTarget.fbLinked ? 'Xoá và gỡ Facebook' : 'Xoá khỏi danh sách'}
+                  label={deleteTarget.fbLinked ? 'Xoá và gỡ Facebook' : 'Xoá vĩnh viễn'}
                   pendingLabel="Đang xoá..."
                   className="btn del"
                 />
@@ -236,36 +229,6 @@ export default function PostListClient({
         </div>
       ) : null}
 
-      {trash.length > 0 ? (
-        <details className="trash-box">
-          <summary>Thùng rác — {trash.length} bài, tự xoá sau 7 ngày</summary>
-          <ul className="trash-list">
-            {trash.map((p) => (
-              <li key={p.id} className="trash-row">
-                <span className="stage tone-default" style={{ fontSize: '11px', flexShrink: 0 }}>
-                  {KENH[p.kenh || ''] || p.kenh}
-                </span>
-                <span className="pt-title" style={{ fontSize: '13px' }}>{p.tieu_de}</span>
-                <time style={{ fontSize: '12px', color: 'var(--ink-2)', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                  Xoá {formatRelative(p.deleted_at)}
-                </time>
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  <form action={restoreJobPost}>
-                    <input type="hidden" name="id" value={p.id} />
-                    <button type="submit" className="pt-btn">Khôi phục</button>
-                  </form>
-                  <form action={purgeJobPost} onSubmit={(e) => {
-                    if (!window.confirm('Xoá vĩnh viễn? Không thể khôi phục.')) e.preventDefault();
-                  }}>
-                    <input type="hidden" name="id" value={p.id} />
-                    <button type="submit" className="pt-btn del">Xoá hẳn</button>
-                  </form>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
     </>
   );
 }

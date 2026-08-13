@@ -142,8 +142,8 @@ export async function updateJobPost(formData: FormData) {
   if (!id) return;
   const client = getServerClient();
   if (action === 'delete') {
-    // Nếu bài đã đăng lên Facebook, gỡ bài khỏi Facebook trước.
-    // Lỗi gỡ Facebook thì ghi log và vẫn soft-delete khỏi hệ thống.
+    // Gỡ bài khỏi Facebook trước (nếu đã đăng và có fb_post_id).
+    // Lỗi Facebook thì ghi log và vẫn xoá cứng khỏi DB.
     const { data: existing } = await client
       .from('hr_job_posts').select('fb_post_id, trang_thai').eq('id', id).maybeSingle();
     if (existing?.fb_post_id && existing.trang_thai === 'posted') {
@@ -154,8 +154,8 @@ export async function updateJobPost(formData: FormData) {
         await client.from('run_log').insert({ task: 'hr.delete_facebook_post', status: 'error', detail: { postId: id, error: String(err) } });
       }
     }
-    // Soft delete: lưu vào thùng rác, tự xoá sau 7 ngày.
-    const { error } = await client.from('hr_job_posts').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+    // Xoá cứng — không còn thùng rác.
+    const { error } = await client.from('hr_job_posts').delete().eq('id', id);
     if (error) throw new Error(error.message);
   } else if (action === 'posted') {
     const { error } = await client.from('hr_job_posts').update({ trang_thai: 'posted', posted_at: new Date().toISOString() }).eq('id', id);
@@ -167,25 +167,6 @@ export async function updateJobPost(formData: FormData) {
   revalidatePath('/dang-tin');
 }
 
-// Khôi phục bài từ thùng rác.
-export async function restoreJobPost(formData: FormData) {
-  const id = String(formData.get('id') || '');
-  if (!id) return;
-  const client = getServerClient();
-  const { error } = await client.from('hr_job_posts').update({ deleted_at: null }).eq('id', id);
-  if (error) throw new Error(error.message);
-  revalidatePath('/dang-tin');
-}
-
-// Xoá vĩnh viễn khỏi thùng rác. Chỉ xoá bài đã soft-delete, không đụng bài còn sống.
-export async function purgeJobPost(formData: FormData) {
-  const id = String(formData.get('id') || '');
-  if (!id) return;
-  const client = getServerClient();
-  const { error } = await client.from('hr_job_posts').delete().eq('id', id).not('deleted_at', 'is', null);
-  if (error) throw new Error(error.message);
-  revalidatePath('/dang-tin');
-}
 
 // Đưa một vị trí vào hàng đợi đăng Facebook: soạn nháp từ bản JD sẵn có rồi đẩy vào hàng đợi duyệt.
 // Máy soạn, người bấm Duyệt (điều cấm 1). KHÔNG đăng gì ở đây. Worker publish-facebook mới đăng.

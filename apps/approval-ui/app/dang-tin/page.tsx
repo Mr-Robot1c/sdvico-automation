@@ -17,11 +17,7 @@ type Post = {
   id: string; tieu_de: string; trang_thai: string; scheduled_at: string | null;
   posted_at: string | null; noi_dung: string | null; job_id: string | null;
   kenh: string | null; url: string | null; image_url: string | null; ghi_chu: string | null;
-  fb_post_id: string | null; created_at: string; deleted_at: string | null;
-};
-type TrashPost = {
-  id: string; tieu_de: string; kenh: string | null;
-  trang_thai: string; deleted_at: string; created_at: string;
+  fb_post_id: string | null; created_at: string;
 };
 
 const JD_LABELS: Record<string, string> = { website: 'Website công ty', job_board: 'Trang tuyển dụng', facebook: 'Facebook', zalo_sms: 'Zalo / SMS' };
@@ -42,15 +38,9 @@ export default async function Page() {
     .order('created_at', { ascending: false }).limit(100);
   const jRes = await client
     .from('hr_job_posts')
-    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, fb_post_id, created_at, deleted_at')
+    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, fb_post_id, created_at')
     .is('deleted_at', null)
     .order('created_at', { ascending: false }).limit(100);
-  const trashRes = await client
-    .from('hr_job_posts')
-    .select('id, tieu_de, kenh, trang_thai, deleted_at, created_at')
-    .not('deleted_at', 'is', null)
-    .gte('deleted_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-    .order('deleted_at', { ascending: false });
   const aqRes = await client
     .from('approval_queue')
     .select('ref_id')
@@ -61,7 +51,6 @@ export default async function Page() {
   const missing = (code?: string) => code === 'PGRST205' || code === '42P01' || code === '42703';
   const needMigration = missing(jRes.error?.code);
   const posts = (jRes.data || []) as Post[];
-  const trash = (trashRes.data || []) as TrashPost[];
   const approvedPostIds = new Set((aqRes.data || []).map((r) => r.ref_id as string));
 
   // Ánh xạ job_id → bài đăng Facebook gần nhất (ưu tiên: posted > scheduled > draft > failed).
@@ -153,7 +142,6 @@ export default async function Page() {
       <PostListClient
         posts={posts}
         approvedPostIds={[...approvedPostIds]}
-        trash={trash}
       />
       <form action={addJobPost} className="settings-box" style={{ marginTop: 16 }}>
         <b>Thêm tin đăng thủ công</b>
