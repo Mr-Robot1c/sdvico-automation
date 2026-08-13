@@ -93,10 +93,20 @@ export async function postVideoToTikTok(
     // Chưa audit: chỉ SELF_ONLY. Ưu tiên SELF_ONLY cho an toàn.
     const privacy = options.includes('SELF_ONLY') ? 'SELF_ONLY' : options[0] || 'SELF_ONLY';
 
-    // 2. Tải video về (từ Supabase) để lấy kích thước + đẩy theo chunk.
+    // 2. Tải video về (từ Supabase). Chuẩn hóa bằng ffmpeg (nướng chiều xoay + H.264/AAC) để TikTok
+    //    không hiển thị nghiêng 90 độ; lỗi/thiếu ffmpeg thì dùng file gốc, KHÔNG chặn đăng.
     const vRes = await fetch(opts.videoUrl);
     if (!vRes.ok) return { ok: false, steps, error: 'tải video lỗi HTTP ' + vRes.status };
-    const buf = Buffer.from(await vRes.arrayBuffer());
+    let buf = Buffer.from(await vRes.arrayBuffer());
+    steps.originalSize = buf.length;
+    try {
+      const { normalizeVideo } = await import('./video-normalize');
+      buf = await normalizeVideo(buf);
+      steps.normalized = true;
+      steps.normalizedSize = buf.length;
+    } catch (e: any) {
+      steps.normalizeError = String(e?.message || e);
+    }
     const videoSize = buf.length;
     steps.videoSize = videoSize;
 
