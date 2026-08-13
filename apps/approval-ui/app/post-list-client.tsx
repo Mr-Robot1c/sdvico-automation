@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { updateJobPost, editJobPostDraft, publishJobPost } from './actions';
+import { updateJobPost, editJobPostDraft, publishJobPost, recomposeDraft } from './actions';
 import { SubmitButton } from './submit-button';
 import { formatRelative } from './labels';
+import { Countdown } from './countdown';
 
 type Post = {
   id: string; tieu_de: string; trang_thai: string;
@@ -71,7 +72,11 @@ export default function PostListClient({
                 <span className={`stage tone-${tt.tone}`} style={{ fontSize: '11px', flexShrink: 0 }}>{tt.label}</span>
                 <span className="pt-title">{p.tieu_de}</span>
                 <span className="pt-kenh">{KENH[p.kenh || ''] || p.kenh || '—'}</span>
-                <time className="pt-time">{formatRelative(p.created_at)}</time>
+                {p.trang_thai === 'scheduled' && p.scheduled_at ? (
+                  <span className="pt-time" style={{ color: 'var(--ok)', fontWeight: 600 }}>còn <Countdown target={p.scheduled_at} /></span>
+                ) : (
+                  <time className="pt-time">{formatRelative(p.created_at)}</time>
+                )}
                 <div className="pt-actions" onClick={(e) => e.stopPropagation()}>
                   <button className="pt-btn" onClick={() => toggle(p.id, 'view')}>
                     {isView ? 'Đóng' : 'Xem'}
@@ -105,7 +110,7 @@ export default function PostListClient({
                     </div>
                     <div className="field">
                       <dt>Giờ đặt đăng</dt>
-                      <dd>{p.scheduled_at ? new Date(p.scheduled_at).toLocaleString('vi-VN') : '—'}</dd>
+                      <dd>{p.scheduled_at ? <><Countdown target={p.scheduled_at} /> ({new Date(p.scheduled_at).toLocaleString('vi-VN')})</> : '—'}</dd>
                     </div>
                     {p.posted_at ? (
                       <div className="field">
@@ -185,6 +190,25 @@ export default function PostListClient({
                       pendingLabel={p.trang_thai === 'posted' ? 'Đang cập nhật...' : 'Đang lưu...'}
                     />
                   </form>
+                  {p.trang_thai !== 'posted' ? (
+                    <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 2 }}>
+                      <p style={{ margin: '0 0 6px', fontSize: '0.82em', color: 'var(--ink-2)' }}>Viết lại bằng AI:</p>
+                      <div className="row" style={{ flexWrap: 'wrap', gap: 5 }}>
+                        {[
+                          { style: 'professional', label: 'Chuyên nghiệp' },
+                          { style: 'friendly', label: 'Thân thiện' },
+                          { style: 'concise', label: 'Ngắn gọn' },
+                          { style: 'formal', label: 'Trang trọng' },
+                        ].map((s) => (
+                          <form key={s.style} action={recomposeDraft}>
+                            <input type="hidden" name="post_id" value={p.id} />
+                            <input type="hidden" name="style" value={s.style} />
+                            <SubmitButton label={s.label} pendingLabel="Đang viết..." className="btn ghost" style={{ fontSize: '0.82em', padding: '3px 10px' }} />
+                          </form>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </li>

@@ -53,6 +53,57 @@ export async function dismissQueueItem(formData: FormData) {
   revalidatePath('/');
 }
 
+// Viết lại bài nháp với giọng văn theo yêu cầu. Máy viết lại, người vẫn phải duyệt (điều cấm 1).
+export async function recomposeDraft(formData: FormData) {
+  const postId = String(formData.get('post_id') || '');
+  const style = String(formData.get('style') || 'default');
+  if (!postId) return;
+
+  const client = getServerClient();
+  const { data: post } = await client
+    .from('hr_job_posts')
+    .select('id, job_id, kenh, trang_thai')
+    .eq('id', postId).single();
+  if (!post || post.trang_thai === 'posted' || post.trang_thai === 'cancelled') return;
+
+  const { data: job } = await client
+    .from('hr_jobs')
+    .select('title, department, location, short_desc, requirements, jd_versions')
+    .eq('id', post.job_id).single();
+  if (!job) return;
+
+  const styleMap: Record<string, string> = {
+    professional: 'Giọng chuyên nghiệp, súc tích, phù hợp doanh nghiệp. Không dùng emoji. Câu ngắn gọn, trọng tâm.',
+    friendly: 'Giọng thân thiện, gần gũi, dùng 2-3 emoji phù hợp ngành biển. Đọc tự nhiên như người viết cho bạn bè.',
+    concise: 'Tối đa 5 câu. Vị trí, một điểm hấp dẫn nhất, nơi làm việc, cách ứng tuyển. Không thêm gì khác.',
+    formal: 'Giọng trang trọng, đúng văn phong thông báo tuyển dụng doanh nghiệp. Xưng "Quý ứng viên".',
+    default: 'Viết lại với bố cục rõ ràng hơn và điểm hấp dẫn được đưa lên đầu.',
+  };
+
+  const contactEmail = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
+  const system = `Bạn viết lại bài đăng tuyển dụng Facebook cho SDVICO, ngành thiết bị biển và thủy sản, trụ sở Vũng Tàu.
+${styleMap[style] || styleMap.default}
+Kết bài: kêu gọi gửi CV về ${contactEmail} hoặc gọi 1900 23 23 49. Có thể thêm hashtag ngành biển.
+Quy tắc: không bịa lương hay con số (điều cấm 5). Không mô tả phần mềm đối tác như năng lực SDVICO (điều cấm 4).
+Chỉ trả về nội dung bài đăng, không kèm giải thích hay tiêu đề.`;
+
+  const v = (job.jd_versions as Record<string, string>) || {};
+  const user = [
+    `Vị trí: ${job.title}.`,
+    job.department ? `Phòng ban: ${job.department}.` : '',
+    job.location ? `Nơi làm: ${job.location}.` : '',
+    job.short_desc ? `Mô tả: ${job.short_desc}.` : '',
+    job.requirements ? `Yêu cầu: ${job.requirements}.` : '',
+    v.facebook ? `Bản cũ để tham khảo: ${v.facebook}` : '',
+  ].filter(Boolean).join('\n');
+
+  const noi_dung = await groqChat(system, user, { maxTokens: 700, temperature: 0.75 });
+  if (!noi_dung) return;
+
+  await client.from('hr_job_posts').update({ noi_dung }).eq('id', postId);
+  revalidatePath('/dang-tin');
+}
+
 // Người quyết đưa một hồ sơ vào phỏng vấn. Điều cấm 2: máy chấm và xếp, người chọn ai đi tiếp.
 // Chỉ chuyển được hồ sơ đang ở bước 'review' (đã chấm xong), tránh nhảy bước.
 // Sau đó tác vụ hr-interview sẽ soạn câu hỏi và thư mời cho hồ sơ này.

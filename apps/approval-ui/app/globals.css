@@ -400,6 +400,31 @@ select.note { cursor: pointer; }
 }
 .toolbar .search:focus { outline: none; border-color: var(--accent); }
 
+/* Thanh trạng thái hệ thống tự động */
+.sys-status {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 8px 12px; margin: 0 0 16px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  font-size: 12.5px;
+}
+.sys-label { font-weight: 600; color: var(--ink-2); flex-shrink: 0; }
+.sys-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 10px; border-radius: 20px; font-weight: 500; border: 1px solid transparent;
+}
+.sys-chip.tone-ok      { background: var(--ok-bg);  border-color: var(--ok);  color: var(--ok); }
+.sys-chip.tone-mkt     { background: #fef6da; border-color: #e5c060; color: #8a6000; }
+.sys-chip.tone-no      { background: var(--no-bg);  border-color: var(--no);  color: var(--no); }
+.sys-chip.tone-default { background: var(--chip); border-color: var(--line); color: var(--ink-2); }
+.sys-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  background: currentColor;
+}
+.sys-hint { margin-left: auto; color: var(--ink-2); font-size: 11.5px; }
+@media (prefers-color-scheme: dark) {
+  .sys-chip.tone-mkt { background: #2a2010; border-color: #6a5010; color: #f0c040; }
+}
+
 /* Điện thoại nhỏ */
 @media (max-width: 480px) {
   .head-row { flex-direction: column; }

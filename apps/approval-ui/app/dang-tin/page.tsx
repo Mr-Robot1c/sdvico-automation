@@ -1,10 +1,8 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { addJobPost } from '../actions';
-import DangTinSections from '../dang-tin-sections';
 import { SubmitButton } from '../submit-button';
 import PostListClient from '../post-list-client';
-import ViTriList from '../vi-tri-list';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,53 +13,82 @@ type Post = {
   fb_post_id: string | null; created_at: string;
 };
 
+type RunEntry = { task: string; status: string; created_at: string };
+
+function runAge(entry: RunEntry | undefined): { label: string; tone: string } {
+  if (!entry) return { label: 'Chưa có dữ liệu', tone: 'default' };
+  const mins = Math.round((Date.now() - new Date(entry.created_at).getTime()) / 60000);
+  const label = mins < 1 ? 'Vừa xong' : mins < 60 ? `${mins} phút trước` : `${Math.round(mins / 60)}g trước`;
+  const tone = entry.status === 'error' ? 'no' : mins > 20 ? 'default' : mins > 8 ? 'mkt' : 'ok';
+  return { label: entry.status === 'error' ? `Lỗi · ${label}` : label, tone };
+}
+
 export default async function Page() {
   const client = getServerClient();
-  const jobsRes = await client
-    .from('hr_jobs')
-    .select('id, title, department, location, short_desc, requirements, jd_versions, status, created_at')
-    .order('created_at', { ascending: false }).limit(100);
-  const jRes = await client
-    .from('hr_job_posts')
-    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, fb_post_id, created_at')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false }).limit(100);
-  const aqRes = await client
-    .from('approval_queue')
-    .select('ref_id')
-    .eq('kind', 'hr_job_post')
-    .eq('status', 'approved');
 
-  const jobs = (jobsRes.data || []) as {
-    id: string; title: string; department: string | null; location: string | null;
-    short_desc: string | null; jd_versions: Record<string, string> | null;
-    status: string; created_at: string;
-  }[];
-  const missing = (code?: string) => code === 'PGRST205' || code === '42P01' || code === '42703';
-  const needMigration = missing(jRes.error?.code);
+  const [jRes, aqRes, logRes] = await Promise.all([
+    client
+      .from('hr_job_posts')
+      .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, fb_post_id, created_at')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false }).limit(100),
+    client
+      .from('approval_queue')
+      .select('ref_id')
+      .eq('kind', 'hr_job_post')
+      .eq('status', 'approved'),
+    client
+      .from('run_log')
+      .select('task, status, created_at')
+      .in('task', ['hr.queue_facebook', 'hr.publish_facebook'])
+      .order('created_at', { ascending: false })
+      .limit(20),
+  ]);
+
   const posts = (jRes.data || []) as Post[];
   const approvedPostIds = new Set((aqRes.data || []).map((r) => r.ref_id as string));
+  const logs = (logRes.data || []) as RunEntry[];
 
-  const migrationNote = (
-    <div className="err" role="alert">
-      Chưa bật đủ tính năng này. Chạy các migration còn thiếu trong <code>supabase/migrations/</code> (mới nhất: <code>20260812090000_hr_social_posts.sql</code>) ở Supabase SQL editor, rồi tải lại trang.
-    </div>
-  );
+  const lastCompose  = logs.find((l) => l.task === 'hr.queue_facebook');
+  const lastPublish  = logs.find((l) => l.task === 'hr.publish_facebook');
+  const compose  = runAge(lastCompose);
+  const publish  = runAge(lastPublish);
 
-  const viTri = (
-    <ViTriList
-      jobs={jobs}
-      posts={posts}
-      approvedPostIds={[...approvedPostIds]}
-    />
-  );
+  const missing = (code?: string) => code === 'PGRST205' || code === '42P01' || code === '42703';
+  const needMigration = missing(jRes.error?.code);
 
-  const tinDang = needMigration ? migrationNote : (
-    <>
-      <PostListClient
-        posts={posts}
-        approvedPostIds={[...approvedPostIds]}
-      />
+  return (
+    <main>
+      <header className="head-row">
+        <div>
+          <h1>Tin đăng tuyển dụng</h1>
+          <p className="sub">Máy soạn bài, đẩy vào hàng đợi. Bấm Duyệt ở trang Duyệt để mở khoá đăng.</p>
+        </div>
+        <AutoRefresh seconds={30} />
+      </header>
+
+      {/* Trạng thái hệ thống tự động */}
+      <div className="sys-status">
+        <span className="sys-label">Hệ thống tự động:</span>
+        <span className={`sys-chip tone-${compose.tone}`}>
+          <span className="sys-dot" />
+          Soạn bài: {compose.label}
+        </span>
+        <span className={`sys-chip tone-${publish.tone}`}>
+          <span className="sys-dot" />
+          Đăng bài: {publish.label}
+        </span>
+        <span className="sys-hint">Cập nhật mỗi 30s · Cron chạy mỗi 5 phút</span>
+      </div>
+
+      {needMigration ? (
+        <div className="err" role="alert">
+          Chưa bật đủ tính năng. Chạy migration <code>20260812090000_hr_social_posts.sql</code> trong Supabase rồi tải lại.
+        </div>
+      ) : (
+        <PostListClient posts={posts} approvedPostIds={[...approvedPostIds]} />
+      )}
+
       <form action={addJobPost} className="settings-box" style={{ marginTop: 16 }}>
         <b>Thêm tin đăng thủ công</b>
         <div className="row" style={{ marginTop: 8 }}>
@@ -72,24 +99,6 @@ export default async function Page() {
           <SubmitButton label="Thêm" />
         </div>
       </form>
-    </>
-  );
-
-  return (
-    <main>
-      <header className="head-row">
-        <div>
-          <h1>Vị trí &amp; Đăng tin</h1>
-          <p className="sub">Soạn bài từ vị trí tuyển dụng, duyệt rồi đăng Facebook.</p>
-        </div>
-        <AutoRefresh seconds={30} />
-      </header>
-
-      <DangTinSections
-        viTri={viTri}
-        tinDang={tinDang}
-        counts={{ vitri: jobs.length, tindang: posts.length }}
-      />
     </main>
   );
 }
