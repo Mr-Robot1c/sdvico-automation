@@ -507,10 +507,13 @@ export async function publishJobPost(formData: FormData) {
   try {
     const fbPostId = await callFacebookApi(post);
     const externalUrl = `https://www.facebook.com/${fbPostId}`;
-    const { error: updateErr } = await client.from('hr_job_posts')
+    const { data: saved, error: updateErr } = await client.from('hr_job_posts')
       .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), url: externalUrl, fb_post_id: fbPostId, ghi_chu: null })
-      .eq('id', postId);
+      .eq('id', postId)
+      .select('id, trang_thai, fb_post_id')
+      .single();
     if (updateErr) throw new Error(`Lưu DB thất bại: ${updateErr.message}`);
+    if (!saved?.fb_post_id) throw new Error(`Cột fb_post_id không được ghi — FB trả: ${fbPostId}. Cần chạy migration 20260813010000_hr_job_posts_fb_post_id.sql trong Supabase.`);
     await client.from('run_log').insert({ task: 'hr.publish_facebook_ui', status: 'ok', detail: { postId, fbPostId, externalUrl } });
   } catch (err: unknown) {
     const errStr = err instanceof Error ? err.message : String(err);
