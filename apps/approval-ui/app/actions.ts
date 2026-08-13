@@ -507,9 +507,10 @@ export async function publishJobPost(formData: FormData) {
   try {
     const fbPostId = await callFacebookApi(post);
     const externalUrl = `https://www.facebook.com/${fbPostId}`;
-    await client.from('hr_job_posts')
+    const { error: updateErr } = await client.from('hr_job_posts')
       .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), url: externalUrl, fb_post_id: fbPostId, ghi_chu: null })
       .eq('id', postId);
+    if (updateErr) throw new Error(`Lưu DB thất bại: ${updateErr.message}`);
     await client.from('run_log').insert({ task: 'hr.publish_facebook_ui', status: 'ok', detail: { postId, fbPostId, externalUrl } });
   } catch (err: unknown) {
     const errStr = err instanceof Error ? err.message : String(err);
