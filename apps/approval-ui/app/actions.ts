@@ -781,6 +781,20 @@ export async function removeJob(formData: FormData) {
   revalidatePath('/tao-jd');
 }
 
+// Thêm vị trí vào hàng đợi tự động: draft → open + auto_post=true.
+// Cron sẽ tự soạn bài khi tìm thấy vị trí này. Người vẫn phải duyệt trước khi đăng (điều cấm 1).
+export async function addToAutoQueue(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  if (!jobId) return;
+  const client = getServerClient();
+  const { error } = await client.from('hr_jobs')
+    .update({ status: 'open', auto_post: true })
+    .eq('id', jobId);
+  if (error) throw new Error(error.message);
+  revalidatePath('/tao-jd');
+  redirect('/tao-jd');
+}
+
 // Bật/tắt chế độ tự động đăng bài định kỳ cho một vị trí. Người bật, worker thực hiện (điều cấm 1).
 export async function toggleAutoPost(formData: FormData) {
   const jobId = String(formData.get('job_id') || '');

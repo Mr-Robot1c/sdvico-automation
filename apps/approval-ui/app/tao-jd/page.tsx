@@ -21,12 +21,23 @@ type PostRow = {
   posted_at: string | null; created_at: string; fb_post_id: string | null;
 };
 
+type PostStatus = {
+  text: string;
+  tone: string;
+  composeLabel: string;
+  composeDisabled: boolean;
+  needsRefresh: boolean;
+};
+
 function postStatusLabel(
   post: PostRow | undefined,
   pendingPostIds: Set<string>,
   refreshAfterDays: number
-): { text: string; tone: string; canCompose: boolean; needsRefresh: boolean } {
-  if (!post) return { text: 'Chưa có bài đăng', tone: 'muted', canCompose: true, needsRefresh: false };
+): PostStatus {
+  if (!post) return {
+    text: 'Chưa có bài đăng', tone: 'muted',
+    composeLabel: 'Soạn bài Facebook', composeDisabled: false, needsRefresh: false,
+  };
   if (post.trang_thai === 'posted') {
     const daysAgo = post.posted_at
       ? Math.floor((Date.now() - new Date(post.posted_at).getTime()) / 86400000)
@@ -36,18 +47,28 @@ function postStatusLabel(
     return {
       text: `Đã đăng Facebook${daysStr}`,
       tone: stale ? 'mkt' : 'ok',
-      canCompose: stale,
+      composeLabel: stale ? 'Soạn bài mới (refresh)' : 'Soạn thêm bài',
+      composeDisabled: false,
       needsRefresh: stale,
     };
   }
   if (post.trang_thai === 'scheduled') {
     const t = post.scheduled_at ? new Date(post.scheduled_at).toLocaleString('vi-VN') : '?';
-    return { text: `Hẹn đăng lúc ${t}`, tone: 'mkt', canCompose: false, needsRefresh: false };
+    return {
+      text: `Hẹn đăng lúc ${t}`, tone: 'mkt',
+      composeLabel: 'Đã lên lịch', composeDisabled: true, needsRefresh: false,
+    };
   }
   if (post.trang_thai === 'draft' && pendingPostIds.has(post.id)) {
-    return { text: 'Bài đang chờ duyệt', tone: 'mkt', canCompose: false, needsRefresh: false };
+    return {
+      text: 'Bài đang chờ duyệt', tone: 'mkt',
+      composeLabel: 'Đang chờ duyệt', composeDisabled: true, needsRefresh: false,
+    };
   }
-  return { text: 'Có bản nháp (chưa đưa duyệt)', tone: 'muted', canCompose: true, needsRefresh: false };
+  return {
+    text: 'Có bản nháp (chưa đưa duyệt)', tone: 'muted',
+    composeLabel: 'Soạn bài Facebook', composeDisabled: false, needsRefresh: false,
+  };
 }
 
 const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
@@ -128,7 +149,7 @@ export default async function Page() {
           {autoQueue.map((j) => {
             const post = latestPostByJob[j.id];
             const refreshDays = j.refresh_after_days ?? 4;
-            const { text: statusText, tone: statusTone, canCompose, needsRefresh } = postStatusLabel(post, pendingPostIds, refreshDays);
+            const { text: statusText, tone: statusTone, composeLabel, composeDisabled, needsRefresh } = postStatusLabel(post, pendingPostIds, refreshDays);
             const g = j.nhom ? GROUP_BY_KEY[j.nhom] : null;
             return (
               <li key={j.id} className="queue-card">
@@ -148,12 +169,16 @@ export default async function Page() {
                   ) : null}
                 </div>
                 <div className="queue-card-actions">
-                  {canCompose ? (
+                  {composeDisabled ? (
+                    <span className="btn ghost" style={{ opacity: 0.45, cursor: 'default', fontSize: '0.85em' }}>
+                      {composeLabel}
+                    </span>
+                  ) : (
                     <form action={openAndQueueFbPost}>
                       <input type="hidden" name="job_id" value={j.id} />
-                      <SubmitButton label="Soạn bài ngay" pendingLabel="AI đang soạn..." className="btn ok" />
+                      <SubmitButton label={composeLabel} pendingLabel="AI đang soạn..." className="btn ok" />
                     </form>
-                  ) : null}
+                  )}
                   <span style={{ fontSize: 12, color: 'var(--ink-2)', alignSelf: 'center' }}>
                     Refresh mỗi {refreshDays} ngày
                   </span>
@@ -172,7 +197,7 @@ export default async function Page() {
           <ul className="list">
             {openOther.map((j) => {
               const post = latestPostByJob[j.id];
-              const { text: statusText, tone: statusTone, canCompose } = postStatusLabel(post, pendingPostIds, 4);
+              const { text: statusText, tone: statusTone, composeLabel, composeDisabled } = postStatusLabel(post, pendingPostIds, 4);
               const g = j.nhom ? GROUP_BY_KEY[j.nhom] : null;
               return (
                 <li key={j.id} className="card tone-hr">
@@ -190,12 +215,16 @@ export default async function Page() {
                   </div>
                   <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                     <AutoPostToggle jobId={j.id} isOn={false} />
-                    {canCompose ? (
+                    {composeDisabled ? (
+                      <span className="btn ghost" style={{ opacity: 0.45, cursor: 'default', fontSize: '0.85em' }}>
+                        {composeLabel}
+                      </span>
+                    ) : (
                       <form action={openAndQueueFbPost}>
                         <input type="hidden" name="job_id" value={j.id} />
-                        <SubmitButton label="Soạn bài Facebook" pendingLabel="AI đang soạn, chờ 10-20 giây..." />
+                        <SubmitButton label={composeLabel} pendingLabel="AI đang soạn, chờ 10-20 giây..." />
                       </form>
-                    ) : null}
+                    )}
                     <RemoveJobButton jobId={j.id} jobTitle={j.title} />
                   </div>
                 </li>

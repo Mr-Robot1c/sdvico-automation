@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import { useFormState } from 'react-dom';
-import { createJdDraftForPanel, openAndQueueFbPost } from '../actions';
+import { createJdDraftForPanel, openAndQueueFbPost, addToAutoQueue } from '../actions';
 import { SubmitButton } from '../submit-button';
 import { JOB_GROUPS, JD_CHANNELS } from '../../lib/jd-groups';
 
@@ -87,23 +87,32 @@ export default function AddJobPanel() {
                   </details>
                 ))}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
+                  <form action={addToAutoQueue}>
+                    <input type="hidden" name="job_id" value={result.jobId} />
+                    <SubmitButton
+                      label="Thêm vào hàng đợi tự động"
+                      pendingLabel="Đang lưu..."
+                      className="btn ok"
+                    />
+                  </form>
                   <form action={openAndQueueFbPost}>
                     <input type="hidden" name="job_id" value={result.jobId} />
                     <SubmitButton
                       label="Soạn bài Facebook và đưa vào Duyệt"
                       pendingLabel="AI đang soạn bài, chờ 10-20 giây..."
+                      className="btn ghost"
                     />
                   </form>
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <p className="muted" style={{ marginTop: 6, fontSize: '0.85em' }}>
+                  Hàng đợi tự động: cron soạn bài, bạn duyệt trước khi đăng. Soạn ngay: AI soạn luôn bài Facebook vào Duyệt.
+                </p>
+                <div style={{ marginTop: 4 }}>
                   <button type="button" className="btn ghost" style={{ fontSize: '0.85em' }}
                     onClick={() => { window.location.href = '/tao-jd'; }}>
-                    Tạo vị trí khác
+                    Xong, đóng lại
                   </button>
                 </div>
-                <p className="muted" style={{ marginTop: 6, fontSize: '0.85em' }}>
-                  Vị trí đã được lưu. Bạn có thể đóng panel và soạn bài sau từ danh sách.
-                </p>
               </>
             )}
           </div>
