@@ -142,7 +142,8 @@ export async function updateJobPost(formData: FormData) {
   if (!id) return;
   const client = getServerClient();
   if (action === 'delete') {
-    const { error } = await client.from('hr_job_posts').delete().eq('id', id);
+    // Soft delete: lưu vào thùng rác, tự xoá sau 7 ngày. Không xoá cứng.
+    const { error } = await client.from('hr_job_posts').update({ deleted_at: new Date().toISOString() }).eq('id', id);
     if (error) throw new Error(error.message);
   } else if (action === 'posted') {
     const { error } = await client.from('hr_job_posts').update({ trang_thai: 'posted', posted_at: new Date().toISOString() }).eq('id', id);
@@ -151,6 +152,26 @@ export async function updateJobPost(formData: FormData) {
     const { error } = await client.from('hr_job_posts').update({ trang_thai: 'cancelled' }).eq('id', id);
     if (error) throw new Error(error.message);
   }
+  revalidatePath('/dang-tin');
+}
+
+// Khôi phục bài từ thùng rác.
+export async function restoreJobPost(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  if (!id) return;
+  const client = getServerClient();
+  const { error } = await client.from('hr_job_posts').update({ deleted_at: null }).eq('id', id);
+  if (error) throw new Error(error.message);
+  revalidatePath('/dang-tin');
+}
+
+// Xoá vĩnh viễn khỏi thùng rác. Chỉ xoá bài đã soft-delete, không đụng bài còn sống.
+export async function purgeJobPost(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  if (!id) return;
+  const client = getServerClient();
+  const { error } = await client.from('hr_job_posts').delete().eq('id', id).not('deleted_at', 'is', null);
+  if (error) throw new Error(error.message);
   revalidatePath('/dang-tin');
 }
 
@@ -195,30 +216,37 @@ export async function queueFacebookPost(formData: FormData) {
   const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
   const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; email?: string; website?: string; company_desc?: string };
 
-  // Rewrite bằng Groq để thêm cảm xúc và hook — chạy song song với Unsplash.
+  // Rewrite bằng Groq để ra bài tuyển dụng đầy đủ — chạy song song với Unsplash.
+  // Dùng bản JD chi tiết nhất (website > job_board > facebook) làm đầu vào.
   // Thất bại thì dùng bản gốc, không làm hỏng luồng.
+  const richInput = [versions.website, versions.job_board, versions.facebook]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)[0] || fallbackContent;
+
   const [noi_dung_raw, unsplash_url] = await Promise.all([
     groqChat(
       [
-        'Bạn là chuyên gia viết content tuyển dụng viral cho Facebook Việt Nam, ngành biển và thủy sản.',
-        'Nhiệm vụ: viết lại bài tuyển dụng sao cho người lướt Facebook phải dừng lại đọc.',
+        'Bạn là chuyên gia viết tuyển dụng cho Facebook của ngành biển và thủy sản Việt Nam.',
+        'Nhiệm vụ: viết bài tuyển dụng đầy đủ thông tin, người đọc hiểu rõ vị trí ngay trên newsfeed.',
+        '',
+        'Cấu trúc bài (theo đúng thứ tự, không thêm tiêu đề phần):',
+        '1. Hook 1-2 câu ngắn khơi gợi cảm xúc hoặc tò mò',
+        '2. Vị trí tuyển và địa điểm (ví dụ: Kỹ sư điện — Vũng Tàu)',
+        '3. Yêu cầu chính: 3-5 gạch đầu dòng "-", lấy từ bản gốc, ngắn gọn',
+        '4. Quyền lợi hoặc điểm nổi bật nếu có trong bản gốc — bỏ qua nếu không có',
+        '5. Cách ứng tuyển: gửi CV về email hoặc hotline (lấy từ bản gốc nếu có)',
+        '6. 2-3 hashtag tiếng Việt phù hợp ngành',
         '',
         'Quy tắc cứng:',
-        '- Không bịa lương, thưởng, phúc lợi, giải thưởng hay con số nào không có trong bản gốc.',
-        '- Không bắt đầu bằng tên công ty, "SDVICO tuyển", hay "Công ty cần tuyển".',
-        '- Câu ngắn. Xuống dòng nhiều. Viết như người thật nói chuyện, không như thông báo HR.',
-        '- Dùng 1-2 emoji nếu tự nhiên. Kết bằng CTA rõ và 2-3 hashtag tiếng Việt.',
-        '- Độ dài 80-130 từ. Trả về nội dung bài đăng, không kèm giải thích hay tiêu đề.',
-        '',
-        'Phong cách: hook chạm cảm xúc hoặc khơi tò mò → thông tin ngắn gọn → kêu gọi hành động.',
-        '',
-        'Ví dụ hook tốt:',
-        '"Ra khơi không chỉ có ngư dân — còn có người đứng sau đảm bảo mỗi con tàu về bờ an toàn."',
-        '"Bạn có muốn làm việc mà mỗi ngày nhìn ra biển không?"',
-        '"Ngành thủy sản Việt Nam đang lớn. SDVICO cần người đi cùng."',
+        '- Không bịa lương, thưởng, phúc lợi, số liệu không có trong bản gốc',
+        '- Không bắt đầu bằng tên công ty hay "SDVICO tuyển"',
+        '- Câu ngắn, xuống dòng nhiều, viết như người thật nói chuyện',
+        '- 1-2 emoji tự nhiên nếu hợp',
+        '- Độ dài 150-220 từ',
+        '- Trả về nội dung bài đăng, không kèm giải thích',
       ].join('\n'),
-      baseFb || fallbackContent,
-      { temperature: 0.8, maxTokens: 400 }
+      richInput,
+      { temperature: 0.75, maxTokens: 600 }
     ).then((r) => r?.trim() || baseFb || fallbackContent),
     fetchUnsplashPhoto(job.title, job.location || undefined, (job as Record<string, unknown>).image_hint as string | null),
   ]);

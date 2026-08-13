@@ -1,0 +1,220 @@
+'use client';
+
+import { useState } from 'react';
+import { updateJobPost, editJobPostDraft, publishJobPost, restoreJobPost, purgeJobPost } from './actions';
+import { SubmitButton } from './submit-button';
+import { formatRelative } from './labels';
+
+type Post = {
+  id: string; tieu_de: string; trang_thai: string;
+  scheduled_at: string | null; posted_at: string | null;
+  noi_dung: string | null; job_id: string | null; kenh: string | null;
+  url: string | null; image_url: string | null; ghi_chu: string | null;
+  created_at: string; deleted_at: string | null;
+};
+
+type TrashPost = {
+  id: string; tieu_de: string; kenh: string | null;
+  trang_thai: string; deleted_at: string; created_at: string;
+};
+
+const TT: Record<string, { label: string; tone: string }> = {
+  draft: { label: 'Nháp', tone: 'default' },
+  scheduled: { label: 'Đặt lịch', tone: 'mkt' },
+  posted: { label: 'Đã đăng', tone: 'ok' },
+  failed: { label: 'Lỗi', tone: 'no' },
+  cancelled: { label: 'Đã huỷ', tone: 'no' },
+};
+
+const KENH: Record<string, string> = {
+  facebook: 'Facebook', zalo: 'Zalo',
+  job_board: 'Trang tuyển dụng', website: 'Website', other: 'Khác',
+};
+
+type Mode = 'view' | 'edit';
+
+export default function PostListClient({
+  posts,
+  approvedPostIds,
+  trash,
+}: {
+  posts: Post[];
+  approvedPostIds: string[];
+  trash: TrashPost[];
+}) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [openMode, setOpenMode] = useState<Mode>('view');
+  const approved = new Set(approvedPostIds);
+
+  const toggle = (id: string, m: Mode) => {
+    if (openId === id && openMode === m) { setOpenId(null); } else { setOpenId(id); setOpenMode(m); }
+  };
+
+  if (posts.length === 0 && trash.length === 0) {
+    return <p className="muted">Chưa có tin đăng nào. Vào tab Vị trí, bấm &quot;Soạn bài Facebook&quot; để tạo bài.</p>;
+  }
+
+  return (
+    <>
+      <p className="muted" style={{ margin: '0 0 10px', fontSize: '13px' }}>
+        Máy soạn bài, đẩy vào hàng đợi. Xem và sửa ở đây, bấm Duyệt ở trang Duyệt, rồi worker mới đăng lên. Máy soạn, người bấm (điều cấm 1).
+      </p>
+
+      <ul className="post-table">
+        {posts.map((p) => {
+          const tt = TT[p.trang_thai] || { label: p.trang_thai, tone: 'default' };
+          const isApproved = approved.has(p.id);
+          const canEdit = p.trang_thai !== 'posted' && p.trang_thai !== 'cancelled';
+          const canPost = (isApproved || p.trang_thai === 'failed') && canEdit;
+          const isView = openId === p.id && openMode === 'view';
+          const isEdit = openId === p.id && openMode === 'edit';
+          const scheduledDefault = p.scheduled_at ? new Date(p.scheduled_at).toISOString().slice(0, 16) : '';
+
+          return (
+            <li key={p.id} className={`pt-row${isView || isEdit ? ' is-open' : ''}`}>
+              <div className="pt-head" onClick={() => toggle(p.id, 'view')}>
+                <span className={`stage tone-${tt.tone}`} style={{ fontSize: '11px', flexShrink: 0 }}>{tt.label}</span>
+                <span className="pt-title">{p.tieu_de}</span>
+                <span className="pt-kenh">{KENH[p.kenh || ''] || p.kenh || '—'}</span>
+                <time className="pt-time">{formatRelative(p.created_at)}</time>
+                <div className="pt-actions" onClick={(e) => e.stopPropagation()}>
+                  <button className="pt-btn" onClick={() => toggle(p.id, 'view')}>
+                    {isView ? 'Đóng' : 'Xem'}
+                  </button>
+                  {canEdit ? (
+                    <button className="pt-btn" onClick={() => toggle(p.id, 'edit')}>
+                      {isEdit ? 'Đóng' : 'Sửa'}
+                    </button>
+                  ) : null}
+                  <form action={updateJobPost} onSubmit={(e) => {
+                    if (!window.confirm('Chuyển bài này vào thùng rác?')) e.preventDefault();
+                  }}>
+                    <input type="hidden" name="id" value={p.id} />
+                    <input type="hidden" name="action" value="delete" />
+                    <button type="submit" className="pt-btn del">Xoá</button>
+                  </form>
+                </div>
+              </div>
+
+              {isView && (
+                <div className="pt-detail">
+                  {p.trang_thai === 'failed' && p.ghi_chu ? (
+                    <div className="err" role="alert" style={{ marginBottom: 10, fontSize: '0.9em' }}>
+                      Lỗi khi đăng: {p.ghi_chu}
+                    </div>
+                  ) : null}
+                  <div className="fields" style={{ marginBottom: 10 }}>
+                    <div className="field">
+                      <dt>Kênh</dt>
+                      <dd>{KENH[p.kenh || ''] || p.kenh || '—'}</dd>
+                    </div>
+                    <div className="field">
+                      <dt>Giờ đặt đăng</dt>
+                      <dd>{p.scheduled_at ? new Date(p.scheduled_at).toLocaleString('vi-VN') : '—'}</dd>
+                    </div>
+                    {p.posted_at ? (
+                      <div className="field">
+                        <dt>Đã đăng lúc</dt>
+                        <dd>{new Date(p.posted_at).toLocaleString('vi-VN')}</dd>
+                      </div>
+                    ) : null}
+                    {p.url ? (
+                      <div className="field">
+                        <dt>Đường dẫn</dt>
+                        <dd><a href={p.url} target="_blank" rel="noreferrer">{KENH[p.kenh || ''] || 'Xem bài đã đăng'}</a></dd>
+                      </div>
+                    ) : null}
+                  </div>
+                  {p.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.image_url} alt="Ảnh đính kèm" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginBottom: 10, objectFit: 'cover', display: 'block' }} />
+                  ) : null}
+                  {p.noi_dung ? (
+                    <pre style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 12px', fontSize: '13px', whiteSpace: 'pre-wrap', margin: '0 0 10px', overflowX: 'auto', lineHeight: 1.6 }}>
+                      {p.noi_dung}
+                    </pre>
+                  ) : null}
+                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    {canPost ? (
+                      <form action={publishJobPost}>
+                        <input type="hidden" name="post_id" value={p.id} />
+                        <SubmitButton label={p.trang_thai === 'failed' ? 'Thử đăng lại' : 'Đăng ngay'} pendingLabel="Đang đăng..." />
+                      </form>
+                    ) : null}
+                    {!isApproved && canEdit ? (
+                      <span className="muted" style={{ fontSize: '0.85em', alignSelf: 'center' }}>Duyệt trên trang Duyệt để mở khoá Đăng</span>
+                    ) : null}
+                    {p.trang_thai !== 'posted' && p.trang_thai !== 'cancelled' ? (
+                      <form action={updateJobPost}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <input type="hidden" name="action" value="posted" />
+                        <SubmitButton label="Đánh dấu đã đăng" className="btn ghost" />
+                      </form>
+                    ) : null}
+                    {p.trang_thai !== 'cancelled' ? (
+                      <form action={updateJobPost}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <input type="hidden" name="action" value="cancel" />
+                        <SubmitButton label="Huỷ bài" className="btn ghost" />
+                      </form>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+
+              {isEdit && canEdit ? (
+                <div className="pt-edit">
+                  <form action={editJobPostDraft} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input type="hidden" name="post_id" value={p.id} />
+                    <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>Nội dung bài đăng</label>
+                    <textarea name="noi_dung" defaultValue={p.noi_dung || ''} rows={12} aria-label="Nội dung bài đăng" style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: '13.5px', lineHeight: 1.6 }} />
+                    <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>Ảnh đính kèm</label>
+                    <input className="note" type="url" name="image_url" defaultValue={p.image_url || ''} placeholder="https://... (để trống nếu không cần)" aria-label="URL hình ảnh" />
+                    <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: 'var(--ink-2)', flexShrink: 0 }}>Hoặc chọn từ máy:</span>
+                      <input type="file" name="image_file" accept="image/*" style={{ fontSize: '0.85em' }} />
+                    </label>
+                    <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>Giờ đặt đăng (bỏ trống = lưu nháp)</label>
+                    <input className="note" type="datetime-local" name="scheduled_at" defaultValue={scheduledDefault} aria-label="Giờ đặt đăng" />
+                    <SubmitButton label="Lưu chỉnh sửa" pendingLabel="Đang lưu..." />
+                  </form>
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+
+      {trash.length > 0 ? (
+        <details className="trash-box">
+          <summary>Thùng rác — {trash.length} bài, tự xoá sau 7 ngày</summary>
+          <ul className="trash-list">
+            {trash.map((p) => (
+              <li key={p.id} className="trash-row">
+                <span className="stage tone-default" style={{ fontSize: '11px', flexShrink: 0 }}>
+                  {KENH[p.kenh || ''] || p.kenh}
+                </span>
+                <span className="pt-title" style={{ fontSize: '13px' }}>{p.tieu_de}</span>
+                <time style={{ fontSize: '12px', color: 'var(--ink-2)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  Xoá {formatRelative(p.deleted_at)}
+                </time>
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <form action={restoreJobPost}>
+                    <input type="hidden" name="id" value={p.id} />
+                    <button type="submit" className="pt-btn">Khôi phục</button>
+                  </form>
+                  <form action={purgeJobPost} onSubmit={(e) => {
+                    if (!window.confirm('Xoá vĩnh viễn? Không thể khôi phục.')) e.preventDefault();
+                  }}>
+                    <input type="hidden" name="id" value={p.id} />
+                    <button type="submit" className="pt-btn del">Xoá hẳn</button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </>
+  );
+}

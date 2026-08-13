@@ -1,9 +1,9 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
-import { formatRelative } from '../labels';
-import { addJobPost, updateJobPost, queueFacebookPost, editJobPostDraft, publishJobPost } from '../actions';
+import { addJobPost, queueFacebookPost } from '../actions';
 import DangTinSections from '../dang-tin-sections';
 import { SubmitButton } from '../submit-button';
+import PostListClient from '../post-list-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,17 +15,18 @@ type Job = {
 type Post = {
   id: string; tieu_de: string; trang_thai: string; scheduled_at: string | null;
   posted_at: string | null; noi_dung: string | null; job_id: string | null;
-  kenh: string | null; url: string | null; image_url: string | null; ghi_chu: string | null; created_at: string;
+  kenh: string | null; url: string | null; image_url: string | null; ghi_chu: string | null;
+  created_at: string; deleted_at: string | null;
+};
+type TrashPost = {
+  id: string; tieu_de: string; kenh: string | null;
+  trang_thai: string; deleted_at: string; created_at: string;
 };
 
 const JD_LABELS: Record<string, string> = { website: 'Website công ty', job_board: 'Trang tuyển dụng', facebook: 'Facebook', zalo_sms: 'Zalo / SMS' };
 const JD_ORDER = ['website', 'job_board', 'facebook', 'zalo_sms'];
 const JOB_STATUS: Record<string, { label: string; tone: string }> = {
   draft: { label: 'Nháp', tone: 'demo' }, open: { label: 'Đang tuyển', tone: 'ok' }, closed: { label: 'Đã đóng', tone: 'no' }
-};
-const TT_LABEL: Record<string, { label: string; tone: string }> = {
-  draft: { label: 'Nháp, chờ duyệt', tone: 'default' }, scheduled: { label: 'Đặt lịch', tone: 'mkt' },
-  posted: { label: 'Đã đăng', tone: 'ok' }, failed: { label: 'Đăng lỗi', tone: 'no' }, cancelled: { label: 'Đã huỷ', tone: 'no' }
 };
 
 export default async function Page() {
@@ -36,8 +37,15 @@ export default async function Page() {
     .order('created_at', { ascending: false }).limit(100);
   const jRes = await client
     .from('hr_job_posts')
-    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, created_at')
+    .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, created_at, deleted_at')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false }).limit(100);
+  const trashRes = await client
+    .from('hr_job_posts')
+    .select('id, tieu_de, kenh, trang_thai, deleted_at, created_at')
+    .not('deleted_at', 'is', null)
+    .gte('deleted_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+    .order('deleted_at', { ascending: false });
   const aqRes = await client
     .from('approval_queue')
     .select('ref_id')
@@ -48,6 +56,7 @@ export default async function Page() {
   const missing = (code?: string) => code === 'PGRST205' || code === '42P01' || code === '42703';
   const needMigration = missing(jRes.error?.code);
   const posts = (jRes.data || []) as Post[];
+  const trash = (trashRes.data || []) as TrashPost[];
   const approvedPostIds = new Set((aqRes.data || []).map((r) => r.ref_id as string));
 
   // Ánh xạ job_id → bài đăng Facebook gần nhất (ưu tiên: posted > scheduled > draft > failed).
@@ -136,105 +145,12 @@ export default async function Page() {
 
   const tinDang = needMigration ? migrationNote : (
     <>
-      <p className="muted" style={{ margin: '0 0 10px' }}>Máy soạn bài, đẩy vào hàng đợi. Bạn xem và sửa ở đây, bấm Duyệt ở trang Duyệt, rồi worker mới đăng lên Facebook. Máy soạn, người bấm (điều cấm 1).</p>
-      <ul className="list">
-        {posts.map((j) => {
-          const tt = TT_LABEL[j.trang_thai] || { label: j.trang_thai, tone: 'default' };
-          const isApproved = approvedPostIds.has(j.id);
-          const canEdit = j.trang_thai !== 'posted' && j.trang_thai !== 'cancelled';
-          const canRetry = j.trang_thai === 'failed';
-          const scheduledDefault = j.scheduled_at
-            ? new Date(j.scheduled_at).toISOString().slice(0, 16)
-            : '';
-          return (
-            <li key={j.id} className="card tone-hr">
-              <div className="head">
-                <span className="cand-name">{j.tieu_de}</span>
-                <span className="row-right">
-                  {isApproved && canEdit ? <span className="stage tone-ok">Đã duyệt</span> : null}
-                  <span className={`stage tone-${tt.tone}`}>{tt.label}</span>
-                  <time className="time" dateTime={j.created_at}>{formatRelative(j.created_at)}</time>
-                </span>
-              </div>
-              <dl className="fields">
-                <div className="field"><dt>Kênh</dt><dd>{j.kenh === 'facebook' ? 'Facebook' : (j.kenh || '—')}</dd></div>
-                <div className="field"><dt>Giờ đặt đăng</dt><dd>{j.scheduled_at ? new Date(j.scheduled_at).toLocaleString('vi-VN') : '—'}</dd></div>
-                {j.posted_at ? <div className="field"><dt>Đã đăng lúc</dt><dd>{new Date(j.posted_at).toLocaleString('vi-VN')}</dd></div> : null}
-              </dl>
-              {j.trang_thai === 'failed' && j.ghi_chu ? (
-                <div className="err" role="alert" style={{ margin: '6px 0', fontSize: '0.9em' }}>
-                  Lỗi khi đăng: {j.ghi_chu}
-                </div>
-              ) : null}
-              {j.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={j.image_url} alt="Ảnh đính kèm" style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 6, margin: '4px 0 6px', objectFit: 'cover' }} />
-              ) : null}
-              {j.url ? <p className="muted" style={{ margin: '2px 0 6px' }}><a href={j.url} target="_blank" rel="noreferrer">Xem bài đã đăng</a></p> : null}
-              {j.noi_dung ? (
-                <details className="raw">
-                  <summary>Xem nội dung ({j.noi_dung.trim().split(/\s+/).length} từ)</summary>
-                  <pre>{j.noi_dung}</pre>
-                </details>
-              ) : null}
-              {canEdit ? (
-                <details className="raw">
-                  <summary>Chỉnh sửa nội dung, ảnh và giờ đặt đăng</summary>
-                  <form action={editJobPostDraft} style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <input type="hidden" name="post_id" value={j.id} />
-                    <textarea name="noi_dung" defaultValue={j.noi_dung || ''} rows={8} aria-label="Nội dung bài đăng" style={{ width: '100%', boxSizing: 'border-box' }} />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <label style={{ fontSize: '0.82em', color: 'var(--muted)' }}>Ảnh đính kèm — dán URL hoặc chọn file từ máy (file ưu tiên hơn URL)</label>
-                      <input className="note" type="url" name="image_url" defaultValue={j.image_url || ''} placeholder="https://... (để trống nếu không cần)" aria-label="URL hình ảnh" />
-                      <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                        <span style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>Hoặc chọn từ máy:</span>
-                        <input type="file" name="image_file" accept="image/*" style={{ fontSize: '0.85em' }} />
-                      </label>
-                    </div>
-                    <input className="note" type="datetime-local" name="scheduled_at" defaultValue={scheduledDefault} aria-label="Giờ đặt đăng" />
-                    <SubmitButton label="Lưu chỉnh sửa" pendingLabel="Đang lưu..." />
-                  </form>
-                </details>
-              ) : null}
-              <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
-                {(isApproved || canRetry) && canEdit ? (
-                  <form action={publishJobPost}>
-                    <input type="hidden" name="post_id" value={j.id} />
-                    <SubmitButton
-                      label={canRetry ? 'Thử đăng lại' : 'Đăng ngay lên Facebook'}
-                      pendingLabel="Đang đăng lên Facebook..."
-                    />
-                  </form>
-                ) : null}
-                {!isApproved && !canRetry && canEdit ? (
-                  <span className="muted" style={{ fontSize: '0.85em', alignSelf: 'center' }}>Duyệt trên trang Duyệt để mở khoá Đăng ngay</span>
-                ) : null}
-                {j.trang_thai !== 'posted' && j.trang_thai !== 'cancelled' ? (
-                  <form action={updateJobPost}>
-                    <input type="hidden" name="id" value={j.id} />
-                    <input type="hidden" name="action" value="posted" />
-                    <SubmitButton label="Đánh dấu đã đăng (thủ công)" className="btn ghost" />
-                  </form>
-                ) : null}
-                {j.trang_thai !== 'cancelled' ? (
-                  <form action={updateJobPost}>
-                    <input type="hidden" name="id" value={j.id} />
-                    <input type="hidden" name="action" value="cancel" />
-                    <SubmitButton label="Huỷ" className="btn ghost" />
-                  </form>
-                ) : null}
-                <form action={updateJobPost}>
-                  <input type="hidden" name="id" value={j.id} />
-                  <input type="hidden" name="action" value="delete" />
-                  <SubmitButton label="Xoá" className="btn no" />
-                </form>
-              </div>
-            </li>
-          );
-        })}
-        {posts.length === 0 ? <p className="muted">Chưa có tin đăng nào. Vào tab Vị trí, bấm "Soạn bài Facebook" để tạo bài.</p> : null}
-      </ul>
-      <form action={addJobPost} className="settings-box">
+      <PostListClient
+        posts={posts}
+        approvedPostIds={[...approvedPostIds]}
+        trash={trash}
+      />
+      <form action={addJobPost} className="settings-box" style={{ marginTop: 16 }}>
         <b>Thêm tin đăng thủ công</b>
         <div className="row" style={{ marginTop: 8 }}>
           <input className="note" name="tieu_de" placeholder="Tiêu đề tin" required />
