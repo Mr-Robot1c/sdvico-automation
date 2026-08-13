@@ -13,7 +13,7 @@
 //  - Gặp lỗi thì DỪNG ngay, ghi run_log, không thử lại vòng lặp (Phần 6 nguyên lý 7).
 //  - Không đăng lại bài đã đăng (kiểm mkt_posts theo content_id + channel facebook).
 
-import { getServiceClient, logRun } from '@sdvico/core';
+import { getServiceClient, logRun, isStopped, incrementDailyCounter } from '@sdvico/core';
 
 const LIVE = process.argv.includes('--live');
 const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
@@ -111,6 +111,14 @@ if (LIVE && (!PAGE_ID || !TOKEN)) {
   process.exit(1);
 }
 
+// Cổng an toàn Phần 5.4: dừng khẩn thì không đăng bài nào.
+if (LIVE && (await isStopped(client))) {
+  console.error('Công tắc dừng khẩn đang bật. Không đăng bài nào.');
+  await logRun(client, { task: 'mkt.publish_facebook', status: 'skipped', detail: { reason: 'emergency_stop' } });
+  process.exit(0);
+}
+const DAILY_LIMIT = Number(process.env.MKT_MAX_POSTS_PER_DAY) || 3;
+
 let publishedCount = 0;
 for (const j of queue) {
   const c = byId.get(j.contentId);
@@ -126,6 +134,14 @@ for (const j of queue) {
     if (videoUrl) console.log('    [video] ' + videoUrl);
     if (imageUrl) console.log('    [ảnh]' + (videoUrl ? ' (thả vào bình luận đầu)' : '') + ' ' + imageUrl);
     console.log('');
+    continue;
+  }
+
+  // Hạn mức ngày (chung bộ đếm với luồng Duyệt): chạm trần Facebook thì bỏ qua.
+  const q = await incrementDailyCounter(client, { account: 'facebook', kind: 'post', limit: DAILY_LIMIT });
+  if (!q.allowed) {
+    console.error(`  Bỏ qua: đã đạt hạn mức ngày (${q.count}/${DAILY_LIMIT}) cho Facebook.`);
+    await logRun(client, { task: 'mkt.publish_blocked', status: 'skipped', detail: { contentId: j.contentId, channel: 'facebook', reason: 'quota', count: q.count, limit: DAILY_LIMIT } });
     continue;
   }
 

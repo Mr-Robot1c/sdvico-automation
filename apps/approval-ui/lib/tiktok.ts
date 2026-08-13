@@ -1,4 +1,5 @@
 import { getServerClient } from './supabase-server';
+import { fetchWithRetry } from './retry';
 
 // Đăng video lên TikTok qua Content Posting API (Direct Post). Token lưu ở mkt_oauth_tokens,
 // tự refresh khi gần hết hạn (access_token 24h). Chưa qua audit thì video ép về SELF_ONLY (riêng tư).
@@ -130,7 +131,7 @@ export async function postVideoToTikTok(
         total_chunk_count: totalChunks
       }
     };
-    const initRes = await fetch(`${TT}/v2/post/publish/video/init/`, {
+    const initRes = await fetchWithRetry(`${TT}/v2/post/publish/video/init/`, {
       method: 'POST',
       headers: authJson,
       body: JSON.stringify(initBody)
@@ -149,7 +150,7 @@ export async function postVideoToTikTok(
       const start = i * chunkSize;
       const end = Math.min(start + chunkSize, videoSize) - 1;
       const chunk = buf.subarray(start, end + 1);
-      const upRes = await fetch(uploadUrl, {
+      const upRes = await fetchWithRetry(uploadUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': 'video/mp4',

@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../lib/supabase-server';
 import { postVideoToTikTok } from '../lib/tiktok';
 import { isEmergencyStopped, reservePostQuota, setEmergencyStop } from '../lib/safety';
+import { fetchWithRetry } from '../lib/retry';
 
 // Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment ngay lúc video còn
 // đang xử lý sẽ lỗi → ảnh bị bỏ). Hỏi trạng thái qua /{videoId}?fields=status. Trả true khi sẵn sàng.
@@ -92,7 +93,7 @@ async function publishContentToFacebook(
       endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
       body = new URLSearchParams({ message, access_token: TOKEN });
     }
-    const res = await fetch(endpoint, { method: 'POST', body });
+    const res = await fetchWithRetry(endpoint, { method: 'POST', body });
     const json: any = await res.json();
     if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
     // /videos trả {id: videoId}; /feed và /photos trả post_id.

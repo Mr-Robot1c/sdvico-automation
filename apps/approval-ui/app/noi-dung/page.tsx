@@ -128,6 +128,25 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     }
   }
 
+  // Lý do bị chặn khi đăng (vượt hạn mức ngày / dừng khẩn) — hiện ở cột Trạng thái.
+  const blockedReason = new Map<string, string>();
+  if (itemIds.length) {
+    const { data: blk } = await client
+      .from('run_log')
+      .select('detail')
+      .eq('task', 'mkt.publish_blocked')
+      .order('created_at', { ascending: false })
+      .limit(300);
+    for (const b of blk || []) {
+      const d = ((b as any).detail || {}) as any;
+      const cid = d.contentId as string | undefined;
+      if (!cid || !itemIds.includes(cid) || blockedReason.has(cid)) continue;
+      const base = d.reason === 'quota' ? 'Vượt giới hạn ngày' : d.reason === 'emergency_stop' ? 'Đang dừng khẩn' : 'Bị chặn';
+      const chan = d.channel === 'facebook' ? 'Facebook' : d.channel === 'tiktok' ? 'TikTok' : '';
+      blockedReason.set(cid, chan ? `${base} (${chan})` : base);
+    }
+  }
+
   const [{ count: cBai }, { count: cVid }] = await Promise.all([
     client.from('mkt_content').select('*', { count: 'exact', head: true }).in('kind', ['article', 'social']),
     client.from('mkt_content').select('*', { count: 'exact', head: true }).eq('kind', 'video')
@@ -238,6 +257,11 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                     <td>{formatDate(c.created_at)}</td>
                     <td>
                       <span className={`badge tone-${st.tone}`}>{st.label}</span>
+                      {blockedReason.get(c.id) ? (
+                        <div style={{ marginTop: 4 }}>
+                          <span className="badge tone-no">⛔ {blockedReason.get(c.id)}</span>
+                        </div>
+                      ) : null}
                     </td>
                     <td className="col-actions">
                       <ViewModal title={c.title} label="Xem bài viết">

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../lib/supabase-server';
+import { isEmergencyStopped } from '../../../lib/safety';
 
 // Lịch hàng ngày: sinh 1-2 bài từ ảnh/video trong kho theo VÒNG XOAY (mỗi tài sản dùng 1 lần
 // mỗi vòng, hết thì sang vòng mới), đẩy vào approval_queue trạng thái pending.
@@ -27,6 +28,11 @@ export async function GET(req: Request) {
   }
 
   const client = getServerClient();
+
+  // Dừng khẩn: không sinh bài mới khi công tắc bật (cổng an toàn Phần 5.4).
+  if (await isEmergencyStopped(client)) {
+    return NextResponse.json({ ok: true, created: 0, note: 'emergency_stop' });
+  }
 
   // 1. Tài sản đủ điều kiện (ảnh + video), có tên, sắp theo thời gian tạo = số thứ tự.
   const { data: assetsRaw } = await client
