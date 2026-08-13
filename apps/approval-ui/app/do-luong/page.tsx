@@ -1,6 +1,6 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { contentTypeLabel } from '../labels';
-import { refreshFacebookMetrics } from '../actions';
+import { refreshFacebookMetrics, setConversions } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,13 +23,14 @@ export default async function Page() {
   }
 
   const cids = [...latest.keys()];
-  const contents = new Map<string, { title: string; type: string }>();
+  const contents = new Map<string, { title: string; type: string; conversions: number }>();
   if (cids.length) {
     const { data: cs } = await client.from('mkt_content').select('id, title, brief').in('id', cids);
     for (const c of cs || []) {
       contents.set((c as any).id, {
         title: (c as any).title || '(không tên)',
-        type: (c as any).brief?.content_type || 'other'
+        type: (c as any).brief?.content_type || 'other',
+        conversions: Number((c as any).brief?.conversions) || 0
       });
     }
   }
@@ -37,34 +38,39 @@ export default async function Page() {
   const rows = cids
     .map((cid) => {
       const m = latest.get(cid) || {};
-      const c = contents.get(cid) || { title: '(không rõ)', type: 'other' };
+      const c = contents.get(cid) || { title: '(không rõ)', type: 'other', conversions: 0 };
       const reactions = m.reactions || 0;
       const comments = m.comments || 0;
       const shares = m.shares || 0;
-      return { cid, title: c.title, type: c.type, reactions, comments, shares, engagement: reactions + comments + shares };
+      return { cid, title: c.title, type: c.type, reactions, comments, shares, engagement: reactions + comments + shares, conversions: c.conversions };
     })
     .sort((a, b) => b.engagement - a.engagement);
 
-  const byType = new Map<string, { count: number; reactions: number; comments: number; shares: number; engagement: number }>();
+  const byType = new Map<string, { count: number; engagement: number; conversions: number }>();
   for (const r of rows) {
-    const g = byType.get(r.type) || { count: 0, reactions: 0, comments: 0, shares: 0, engagement: 0 };
+    const g = byType.get(r.type) || { count: 0, engagement: 0, conversions: 0 };
     g.count += 1;
-    g.reactions += r.reactions;
-    g.comments += r.comments;
-    g.shares += r.shares;
     g.engagement += r.engagement;
+    g.conversions += r.conversions;
     byType.set(r.type, g);
   }
   const typeRows = [...byType.entries()]
-    .map(([type, g]) => ({ type, ...g, avg: g.count ? Math.round(g.engagement / g.count) : 0 }))
-    .sort((a, b) => b.avg - a.avg);
+    .map(([type, g]) => ({
+      type,
+      count: g.count,
+      engagement: g.engagement,
+      conversions: g.conversions,
+      avgEng: g.count ? Math.round(g.engagement / g.count) : 0,
+      avgConv: g.count ? Math.round((g.conversions / g.count) * 10) / 10 : 0
+    }))
+    .sort((a, b) => b.avgConv - a.avgConv || b.avgEng - a.avgEng);
 
   return (
     <main>
       <header className="head-row">
         <div>
           <h1>Đo lường</h1>
-          <p className="sub">So sánh tương tác Facebook theo bài và theo loại content (A/B). Loại nào cao thì giữ hướng đó.</p>
+          <p className="sub">So sánh tương tác + đơn/lead theo bài và theo loại content (A/B). Loại nào cao thì giữ hướng đó.</p>
         </div>
         <div className="head-actions">
           <form action={refreshFacebookMetrics}>
@@ -81,33 +87,32 @@ export default async function Page() {
         </div>
       ) : (
         <>
-          <h2>Theo loại content — trung bình tương tác mỗi bài</h2>
+          <h2>Theo loại content — xếp theo đơn/lead trung bình mỗi bài</h2>
           <div className="tablewrap">
             <table className="datatable">
               <thead>
-                <tr><th>Loại content</th><th>Số bài</th><th>TB/bài</th><th>Tổng tương tác</th><th>Reactions</th><th>Comment</th><th>Share</th></tr>
+                <tr><th>Loại content</th><th>Số bài</th><th>TB đơn/bài</th><th>Tổng đơn</th><th>TB tương tác/bài</th><th>Tổng tương tác</th></tr>
               </thead>
               <tbody>
                 {typeRows.map((t, i) => (
                   <tr key={t.type}>
                     <td>{i === 0 ? '🏆 ' : ''}{contentTypeLabel(t.type)}</td>
                     <td>{t.count}</td>
-                    <td><b>{t.avg}</b></td>
+                    <td><b>{t.avgConv}</b></td>
+                    <td>{t.conversions}</td>
+                    <td>{t.avgEng}</td>
                     <td>{t.engagement}</td>
-                    <td>{t.reactions}</td>
-                    <td>{t.comments}</td>
-                    <td>{t.shares}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <h2 style={{ marginTop: 24 }}>Từng bài — xếp theo tương tác</h2>
+          <h2 style={{ marginTop: 24 }}>Từng bài — nhập số đơn/lead vào đây</h2>
           <div className="tablewrap">
             <table className="datatable">
               <thead>
-                <tr><th>Tên bài</th><th>Loại</th><th>Tương tác</th><th>Reactions</th><th>Comment</th><th>Share</th></tr>
+                <tr><th>Tên bài</th><th>Loại</th><th>Tương tác</th><th>Reactions</th><th>Comment</th><th>Share</th><th>Đơn/Lead</th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
@@ -118,6 +123,21 @@ export default async function Page() {
                     <td>{r.reactions}</td>
                     <td>{r.comments}</td>
                     <td>{r.shares}</td>
+                    <td>
+                      <form action={setConversions} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input type="hidden" name="content_id" value={r.cid} />
+                        <input
+                          type="number"
+                          name="conversions"
+                          min={0}
+                          defaultValue={r.conversions}
+                          className="note"
+                          style={{ width: 64 }}
+                          aria-label={`Số đơn/lead cho ${r.title}`}
+                        />
+                        <button className="btn ghost sm" type="submit">Lưu</button>
+                      </form>
+                    </td>
                   </tr>
                 ))}
               </tbody>

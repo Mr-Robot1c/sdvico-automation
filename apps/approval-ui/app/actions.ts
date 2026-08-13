@@ -328,6 +328,19 @@ export async function toggleQuotaDisabled(formData: FormData) {
   revalidatePath('/van-hanh');
 }
 
+// Ghi tay số đơn/lead cho một bài (conversion). Lưu vào mkt_content.brief.conversions.
+export async function setConversions(formData: FormData) {
+  const contentId = String(formData.get('content_id') || '');
+  const n = Math.max(0, Math.floor(Number(formData.get('conversions')) || 0));
+  if (!contentId) return;
+  const client = getServerClient();
+  const { data: c } = await client.from('mkt_content').select('brief').eq('id', contentId).single();
+  const brief = (((c as any)?.brief as Record<string, unknown>) || {}) as Record<string, unknown>;
+  brief.conversions = n;
+  await client.from('mkt_content').update({ brief }).eq('id', contentId);
+  revalidatePath('/do-luong');
+}
+
 // Cập nhật số liệu Facebook thủ công (nút trên trang Đo lường).
 export async function refreshFacebookMetrics() {
   const client = getServerClient();
