@@ -14,7 +14,7 @@ export type JobInput = {
   nhom?: string;
 };
 
-const EMAIL = 'tuyendung@sdvico.vn';
+const EMAIL = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
 const HOTLINE = '1900 23 23 49';
 const KEYS = ['website', 'job_board', 'facebook', 'zalo_sms'] as const;
 

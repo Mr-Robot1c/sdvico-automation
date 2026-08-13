@@ -2,8 +2,8 @@ name: HR — Đăng tin tuyển dụng Facebook
 
 on:
   schedule:
-    # Mỗi 5 phút, 6h–22h giờ Hà Nội (ICT = UTC+7): 23:00–15:00 UTC
-    - cron: '*/5 23-15 * * *'
+    # Mỗi 5 phút, mọi giờ (cho phép test ban đêm).
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -12,9 +12,30 @@ on:
         default: 'false'
 
 jobs:
+  cleanup:
+    name: Dọn bài cũ vi phạm giới hạn
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Dọn bài Facebook vượt giới hạn
+        run: node packages/hr/src/post/cleanup-facebook.mjs --live
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+          FACEBOOK_GRAPH_VERSION: v21.0
+          HR_FB_MAX_POSTS: 20
+
   publish:
     name: Đăng tin Facebook
     runs-on: ubuntu-latest
+    needs: cleanup
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,4 +56,4 @@ jobs:
           FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
           FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
           FACEBOOK_GRAPH_VERSION: v21.0
-          HR_FB_MAX_PER_DAY: 3
+          HR_FB_MAX_PER_DAY: 50

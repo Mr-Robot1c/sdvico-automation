@@ -1,0 +1,35 @@
+name: HR — Soạn bài tuyển dụng Facebook
+
+on:
+  schedule:
+    # Mỗi 5 phút: quét vị trí đang tuyển chưa có bài, soạn và đẩy vào hàng đợi duyệt.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 'UUID vị trí cụ thể (để trống = tất cả vị trí chưa có bài)'
+        required: false
+
+jobs:
+  compose:
+    name: Soạn bài Facebook
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Soạn và đẩy hàng đợi duyệt
+        run: |
+          if [ -n "${{ github.event.inputs.job_id }}" ]; then
+            node packages/hr/src/post/queue-facebook.mjs --job "${{ github.event.inputs.job_id }}"
+          else
+            node packages/hr/src/post/queue-facebook.mjs
+          fi
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          HR_POST_MODEL: ${{ secrets.HR_POST_MODEL }}

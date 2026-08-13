@@ -118,9 +118,10 @@ for (const j of queue) {
     }
 
     const externalUrl = `https://www.facebook.com/${fbPostId}`;
-    await client.from('hr_job_posts')
-      .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), url: externalUrl })
+    const { error: updateErr } = await client.from('hr_job_posts')
+      .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), url: externalUrl, fb_post_id: fbPostId })
       .eq('id', p.id);
+    if (updateErr) throw new Error(`Lưu DB thất bại: ${updateErr.message}`);
     await logRun(client, { task: 'hr.publish_facebook', status: 'ok', detail: { postId: p.id, fbPostId, externalUrl } });
 
     published++;

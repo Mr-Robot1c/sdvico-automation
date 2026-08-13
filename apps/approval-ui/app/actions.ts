@@ -201,7 +201,8 @@ export async function queueFacebookPost(formData: FormData) {
   const fallbackContent = (() => {
     const dong = [`Công ty SDVICO tuyển ${job.title}${job.location ? ' tại ' + job.location : ''}.`];
     if (job.short_desc) dong.push('', String(job.short_desc).trim());
-    dong.push('', 'Ứng tuyển: gửi CV về tuyendung@sdvico.vn. Hotline 1900 23 23 49.');
+    const contactEmail = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
+    dong.push('', `Ứng tuyển: gửi CV về ${contactEmail}. Hotline 1900 23 23 49.`);
     return dong.join('\n');
   })();
 
