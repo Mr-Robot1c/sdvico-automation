@@ -1,5 +1,6 @@
 'use server';
 
+// Bật đăng Facebook khi Duyệt: đã cấu hình FACEBOOK_PAGE_ID + FACEBOOK_PAGE_ACCESS_TOKEN (2026-08-12).
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../lib/supabase-server';
 
