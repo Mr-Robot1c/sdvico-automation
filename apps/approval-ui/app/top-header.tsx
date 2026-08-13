@@ -35,6 +35,7 @@ export default function TopHeader({ marketingOnly = false }: { marketingOnly?: b
 function crumbFor(path: string): string {
   const map: Record<string, string> = {
     '/': 'Hàng đợi duyệt',
+    '/van-hanh': 'Vận hành',
     '/noi-dung': 'Quản lý bài viết',
     '/san-xuat': 'Xưởng sản xuất',
     '/tu-khoa': 'Kho từ khóa',

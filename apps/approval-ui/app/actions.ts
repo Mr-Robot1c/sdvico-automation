@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../lib/supabase-server';
 import { postVideoToTikTok } from '../lib/tiktok';
+import { isEmergencyStopped, reservePostQuota, setEmergencyStop } from '../lib/safety';
 
 // Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment ngay lúc video còn
 // đang xử lý sẽ lỗi → ảnh bị bỏ). Hỏi trạng thái qua /{videoId}?fields=status. Trả true khi sẵn sàng.
@@ -261,16 +262,55 @@ export async function decideForm(formData: FormData) {
     // Kênh đăng lấy từ payload.channels; bài cũ không có thì mặc định Facebook (giữ nguyên hành vi).
     const channels: string[] = Array.isArray(payload.channels) && payload.channels.length ? payload.channels : ['facebook'];
     if (contentId) {
-      // Đăng SONG SONG để không cộng dồn thời gian (tránh timeout serverless khi chọn cả 2 nền tảng).
-      const jobs: Promise<unknown>[] = [];
-      if (channels.includes('facebook')) jobs.push(publishContentToFacebook(client, contentId));
-      if (channels.includes('tiktok')) jobs.push(publishContentToTikTok(client, contentId));
-      await Promise.allSettled(jobs);
+      const LIMIT = Number(process.env.MKT_MAX_POSTS_PER_DAY) || 3;
+      if (await isEmergencyStopped(client)) {
+        // Công tắc dừng khẩn đang bật: KHÔNG đăng (bài vẫn ở trạng thái đã duyệt). Ghi log.
+        await client.from('run_log').insert({
+          task: 'mkt.publish_blocked',
+          actor: 'decideForm',
+          status: 'skipped',
+          detail: { contentId, reason: 'emergency_stop', channels }
+        });
+      } else {
+        // Đăng SONG SONG các kênh còn trong hạn mức ngày (mỗi kênh tối đa LIMIT bài/ngày).
+        const jobs: Promise<unknown>[] = [];
+        for (const ch of ['facebook', 'tiktok']) {
+          if (!channels.includes(ch)) continue;
+          const q = await reservePostQuota(client, ch, LIMIT);
+          if (!q.allowed) {
+            await client.from('run_log').insert({
+              task: 'mkt.publish_blocked',
+              actor: 'decideForm',
+              status: 'skipped',
+              detail: { contentId, channel: ch, reason: 'quota', count: q.count, limit: LIMIT }
+            });
+            continue;
+          }
+          if (ch === 'facebook') jobs.push(publishContentToFacebook(client, contentId));
+          if (ch === 'tiktok') jobs.push(publishContentToTikTok(client, contentId));
+        }
+        await Promise.allSettled(jobs);
+      }
     }
   }
 
   revalidatePath('/');
   revalidatePath('/noi-dung');
+}
+
+// Người vận hành bật/tắt công tắc dừng khẩn. Bật thì mọi thao tác đăng bị chặn (kiểm trước khi đăng).
+export async function toggleEmergencyStop(formData: FormData) {
+  const on = String(formData.get('on') || '') === '1';
+  const client = getServerClient();
+  await setEmergencyStop(client, on);
+  await client.from('run_log').insert({
+    task: 'ops.emergency_stop',
+    actor: 'ui',
+    status: 'ok',
+    detail: { stopped: on }
+  });
+  revalidatePath('/van-hanh');
+  revalidatePath('/');
 }
 
 // Thêm một từ khóa vào kho.

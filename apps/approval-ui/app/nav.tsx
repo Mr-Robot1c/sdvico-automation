@@ -39,7 +39,13 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' }
     ]
   };
-  const hangDoi: Group = { title: 'Hàng đợi', items: [{ href: '/', label: 'Hàng đợi duyệt', icon: '📥' }] };
+  const hangDoi: Group = {
+    title: 'Hàng đợi',
+    items: [
+      { href: '/', label: 'Hàng đợi duyệt', icon: '📥' },
+      { href: '/van-hanh', label: 'Vận hành', icon: '🛑' }
+    ]
+  };
 
   const groups: Group[] = marketingOnly
     ? [hangDoi, quanLySanXuat, tuLieu, ketNoi, quyTac]
