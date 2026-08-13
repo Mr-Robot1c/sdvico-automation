@@ -606,12 +606,12 @@ export async function publishJobPost(formData: FormData) {
   revalidatePath('/');
 }
 
-// Tạo bản nháp JD từ thông tin người dùng nhập. AI viết bốn phiên bản, lưu nháp để duyệt.
-// Máy soạn, người xác nhận (điều cấm 1). Không đăng, không tự mở tuyển.
-// Sau khi tạo xong → đẩy vào hàng đợi duyệt và chuyển sang trang Duyệt để người xét duyệt.
+// Tạo bản nháp JD từ thông tin người dùng nhập. AI viết bốn phiên bản, lưu nháp.
+// Người xem, sửa rồi bấm "Soạn bài và đưa vào Duyệt" — không tự đăng (điều cấm 1).
 export async function createJdDraft(formData: FormData) {
   const title = String(formData.get('title') || '').trim();
   if (!title) return;
+  const headcount = Math.max(1, parseInt(String(formData.get('headcount') || '1'), 10) || 1);
   const job = {
     title,
     department: String(formData.get('department') || '').trim() || undefined,
@@ -625,7 +625,7 @@ export async function createJdDraft(formData: FormData) {
   const { versions } = await composeJdVersions(job);
 
   const client = getServerClient();
-  const { data: newJob, error } = await client.from('hr_jobs').insert({
+  const { error } = await client.from('hr_jobs').insert({
     title: job.title,
     department: job.department || null,
     location: job.location || null,
@@ -634,51 +634,31 @@ export async function createJdDraft(formData: FormData) {
     jd_versions: versions,
     nhom: job.nhom || null,
     image_hint,
-    status: 'draft'
+    headcount,
+    status: 'draft',
   }).select('id').single();
   if (error) throw new Error(error.message);
 
-  // Đẩy vào hàng đợi duyệt — người duyệt bấm "Mở tuyển" thì job mới thành open.
-  // Cron soạn bài Facebook chỉ chạy với job open (điều cấm 1).
-  const queueTitle = `${job.title}${job.location ? ' – ' + job.location : ''}`;
-  await client.from('approval_queue').insert({
-    kind: 'hr_jd',
-    title: queueTitle,
-    payload: {
-      job_id: newJob.id,
-      title: job.title,
-      department: job.department || null,
-      location: job.location || null,
-      short_desc: job.short_desc || null,
-      requirements: job.requirements || null,
-    },
-    ref_table: 'hr_jobs',
-    ref_id: newJob.id,
-    status: 'pending',
-  });
-
-  redirect('/');
+  // Không đẩy vào approval_queue ở đây — chỉ lưu nháp để người xem/sửa JD.
+  // Bước tiếp: người bấm "Soạn bài và đưa vào Duyệt" để AI soạn bài Facebook rồi mới đưa duyệt.
+  redirect('/tao-jd');
 }
 
-// Duyệt vị trí tuyển dụng: chuyển job từ draft → open để cron soạn bài Facebook.
-// Điều cấm 1: người bấm Mở tuyển là cổng kiểm soát.
-export async function approveJobDraft(formData: FormData) {
-  const queueId = String(formData.get('queue_id') || '');
+// Mở vị trí (draft → open) và soạn bài Facebook ngay — dùng từ trang Tạo JD khi người dùng
+// đã xem xong 4 phiên bản JD và muốn đưa bài vào hàng đợi duyệt.
+// Điều cấm 1: soạn xong đẩy vào hàng đợi, người duyệt mới quyết đăng hay không.
+export async function openAndQueueFbPost(formData: FormData) {
   const jobId = String(formData.get('job_id') || '');
-  if (!queueId || !jobId) return;
+  if (!jobId) return;
 
   const client = getServerClient();
-  await client.from('approval_queue')
-    .update({ status: 'approved', decided_at: new Date().toISOString() })
-    .eq('id', queueId).eq('status', 'pending');
-
   await client.from('hr_jobs')
     .update({ status: 'open' })
-    .eq('id', jobId).eq('status', 'draft');
+    .eq('id', jobId)
+    .eq('status', 'draft');
 
-  revalidatePath('/');
-  revalidatePath('/dang-tin');
-  revalidatePath('/tao-jd');
+  await queueFacebookPost(formData);
+  redirect('/');
 }
 
 // Lưu cài đặt thương hiệu công ty: logo, hotline, email, website, mô tả ngắn.
