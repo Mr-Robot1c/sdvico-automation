@@ -1,0 +1,22 @@
+name: Cron — Đăng bài đã duyệt
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Gọi endpoint đăng bài
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gọi /api/cron/publish
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" -X GET \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$VERCEL_URL/api/cron/publish")
+          echo "HTTP $STATUS"
+          [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
