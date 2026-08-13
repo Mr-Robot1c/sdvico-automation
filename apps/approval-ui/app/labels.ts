@@ -63,6 +63,22 @@ export function formatLabel(f?: string): string {
   }
 }
 
+// Nhãn độ dài text (loại theo độ dài nội dung, KHÔNG phải kênh đăng).
+export function lengthLabel(f?: string): string {
+  switch (f) {
+    case 'article': return 'Bài dài';
+    case 'social': return 'Bài ngắn';
+    case 'video': return 'Kịch bản video';
+    default: return f || 'Bài viết';
+  }
+}
+
+// Nhãn kênh đăng thật, lấy từ brief.channels (facebook, tiktok). Trống thì mặc định Facebook.
+export function channelsLabel(channels?: string[] | null): string {
+  const arr = Array.isArray(channels) && channels.length ? channels : ['facebook'];
+  return arr.map((c) => (c === 'facebook' ? 'Facebook' : c === 'tiktok' ? 'TikTok' : c)).join(', ');
+}
+
 // Nhãn ý định tìm kiếm.
 export function intentLabel(i?: string): string {
   switch (i) {

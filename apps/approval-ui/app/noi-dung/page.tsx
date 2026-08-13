@@ -2,7 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
-import { formatLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
+import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,16 +21,6 @@ const STATUS_TABS: { key: string; label: string }[] = [
   { key: 'rejected', label: 'Đã từ chối' }
 ];
 
-// Kênh đăng suy từ loại nội dung (kind): article → Website, social → Facebook, video → YouTube.
-function channelOf(kind: string): string {
-  switch (kind) {
-    case 'article': return 'Website';
-    case 'social': return 'Facebook';
-    case 'video': return 'YouTube';
-    default: return '—';
-  }
-}
-
 // Mã bài viết ngắn cho cột đầu: 6 ký tự đầu của UUID viết hoa, dễ đọc trên bảng.
 function shortCode(id: string): string {
   return (id || '').replace(/-/g, '').slice(0, 6).toUpperCase();
@@ -44,7 +34,7 @@ function formatDate(iso: string): string {
 
 type Flags = Record<string, string[] | undefined>;
 type Assets = { image?: string | null; video?: string | null } | null;
-type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets } | null;
+type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[] } | null;
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
 export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
@@ -243,8 +233,8 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                         <div className="cell-title-sub">từ khóa: {c.brief.keyword}</div>
                       ) : null}
                     </td>
-                    <td>{formatLabel(c.kind)}</td>
-                    <td>{channelOf(c.kind)}</td>
+                    <td>{lengthLabel(c.kind)}</td>
+                    <td>{channelsLabel(c.brief?.channels)}</td>
                     <td>{formatDate(c.created_at)}</td>
                     <td>
                       <span className={`badge tone-${st.tone}`}>{st.label}</span>
@@ -252,7 +242,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                     <td className="col-actions">
                       <ViewModal title={c.title} label="Xem bài viết">
                         <div className="badges">
-                          <span className="badge badge-format">{formatLabel(c.kind)}</span>
+                          <span className="badge badge-format">{lengthLabel(c.kind)}</span>
                           <span className={`badge tone-${risk.tone}`}>{risk.label}</span>
                           <span className={`badge tone-${st.tone}`}>{st.label}</span>
                           {c.brief?.intent ? <span className="badge">{intentLabel(c.brief.intent)}</span> : null}
