@@ -168,7 +168,7 @@ export async function postVideoToTikTok(
 
     // 5. Kiểm tra trạng thái xử lý.
     let status = 'PROCESSING';
-    for (let k = 0; k < 8; k++) {
+    for (let k = 0; k < 6; k++) {
       const stRes = await fetch(`${TT}/v2/post/publish/status/fetch/`, {
         method: 'POST',
         headers: authJson,

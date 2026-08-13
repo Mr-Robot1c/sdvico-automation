@@ -261,8 +261,11 @@ export async function decideForm(formData: FormData) {
     // Kênh đăng lấy từ payload.channels; bài cũ không có thì mặc định Facebook (giữ nguyên hành vi).
     const channels: string[] = Array.isArray(payload.channels) && payload.channels.length ? payload.channels : ['facebook'];
     if (contentId) {
-      if (channels.includes('facebook')) await publishContentToFacebook(client, contentId);
-      if (channels.includes('tiktok')) await publishContentToTikTok(client, contentId);
+      // Đăng SONG SONG để không cộng dồn thời gian (tránh timeout serverless khi chọn cả 2 nền tảng).
+      const jobs: Promise<unknown>[] = [];
+      if (channels.includes('facebook')) jobs.push(publishContentToFacebook(client, contentId));
+      if (channels.includes('tiktok')) jobs.push(publishContentToTikTok(client, contentId));
+      await Promise.allSettled(jobs);
     }
   }
 
