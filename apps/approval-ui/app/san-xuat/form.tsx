@@ -340,11 +340,11 @@ export default function SanXuatForm({
           </label>
 
           <label className="sx-field">
-            <span>Kênh đăng</span>
+            <span>Độ dài text</span>
             <select value={kind} onChange={(e) => setKind(e.target.value as any)} className="note">
-              <option value="social">Facebook (bài ngắn)</option>
-              <option value="article">Website (bài dài)</option>
-              <option value="video">YouTube (kịch bản video)</option>
+              <option value="social">Bài ngắn</option>
+              <option value="article">Bài dài</option>
+              <option value="video">Kịch bản video</option>
             </select>
           </label>
 
