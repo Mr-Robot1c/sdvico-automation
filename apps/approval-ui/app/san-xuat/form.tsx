@@ -374,28 +374,26 @@ export default function SanXuatForm({
             />
           </label>
 
-          {kind === 'social' ? (
-            <label className="sx-field">
-              <span>Đăng lên</span>
-              <span style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-                <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                  <input type="checkbox" checked={postFb} onChange={(e) => setPostFb(e.target.checked)} /> Facebook
-                </label>
-                <label
-                  style={{ display: 'inline-flex', gap: 6, alignItems: 'center', opacity: vidId ? 1 : 0.5 }}
-                  title={vidId ? '' : 'TikTok cần một video'}
-                >
-                  <input
-                    type="checkbox"
-                    checked={postTt && !!vidId}
-                    disabled={!vidId}
-                    onChange={(e) => setPostTt(e.target.checked)}
-                  />{' '}
-                  TikTok {vidId ? '' : '(cần video)'}
-                </label>
-              </span>
-            </label>
-          ) : null}
+          <label className="sx-field">
+            <span>Đăng lên</span>
+            <span style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                <input type="checkbox" checked={postFb} onChange={(e) => setPostFb(e.target.checked)} /> Facebook
+              </label>
+              <label
+                style={{ display: 'inline-flex', gap: 6, alignItems: 'center', opacity: vidId ? 1 : 0.5 }}
+                title={vidId ? '' : 'TikTok cần một video'}
+              >
+                <input
+                  type="checkbox"
+                  checked={postTt && !!vidId}
+                  disabled={!vidId}
+                  onChange={(e) => setPostTt(e.target.checked)}
+                />{' '}
+                TikTok {vidId ? '' : '(cần video)'}
+              </label>
+            </span>
+          </label>
 
           <div className="sx-actions">
             <button

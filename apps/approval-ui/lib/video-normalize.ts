@@ -1,16 +1,28 @@
-import ffmpegPath from 'ffmpeg-static';
+// @ts-ignore: @ffmpeg-installer/ffmpeg không kèm type declaration
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { spawn } from 'node:child_process';
-import { writeFile, readFile, unlink } from 'node:fs/promises';
+import { writeFile, readFile, unlink, readdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+// Đường dẫn binary ffmpeg — đến từ @ffmpeg-installer (đóng gói sẵn trong npm, không tải runtime).
+const FFMPEG: string | undefined = (ffmpegInstaller as any)?.path;
+
 // Chuẩn hóa video cho TikTok: re-encode để NƯỚNG chiều xoay (ffmpeg autorotate mặc định bật) +
-// H.264 + AAC + faststart. Sửa lỗi video bị quay 90 độ khi TikTok xử lý (bỏ qua cờ rotate),
-// đồng thời bảo đảm codec TikTok nhận. Cần ffmpeg-static (binary tải lúc npm install trên Vercel).
-// Chạy trong /tmp (serverless chỉ ghi được /tmp). Lỗi thì ném ra để caller fallback file gốc.
+// H.264 + AAC + faststart. Sửa lỗi video quay 90 độ khi TikTok bỏ qua cờ rotate. Chạy trong /tmp.
+// Lỗi thì ném ra kèm chẩn đoán để caller fallback file gốc.
 export async function normalizeVideo(input: Buffer): Promise<Buffer> {
-  if (!ffmpegPath) throw new Error('ffmpeg-static không có đường dẫn binary');
+  if (!FFMPEG || !existsSync(FFMPEG)) {
+    let dirInfo = '';
+    try {
+      if (FFMPEG) dirInfo = ' | dir=' + (await readdir(dirname(FFMPEG))).join(',');
+    } catch {
+      /* bỏ qua */
+    }
+    throw new Error(`ffmpeg binary khong co (path=${FFMPEG} exists=${FFMPEG ? existsSync(FFMPEG) : false})${dirInfo}`);
+  }
   const base = join(tmpdir(), `tt-${randomUUID()}`);
   const inPath = `${base}.in`;
   const outPath = `${base}.out.mp4`;
@@ -24,7 +36,7 @@ export async function normalizeVideo(input: Buffer): Promise<Buffer> {
         '-movflags', '+faststart',
         '-y', outPath
       ];
-      const proc = spawn(ffmpegPath as unknown as string, args);
+      const proc = spawn(FFMPEG, args);
       let err = '';
       proc.stderr.on('data', (d) => {
         err += d.toString();
