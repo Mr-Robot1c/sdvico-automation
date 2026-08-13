@@ -6,6 +6,11 @@ import { SubmitButton } from './submit-button';
 import { formatRelative } from './labels';
 import { Countdown } from './countdown';
 
+function isPast(iso: string | null): boolean {
+  if (!iso) return false;
+  return new Date(iso).getTime() <= Date.now();
+}
+
 type Post = {
   id: string; tieu_de: string; trang_thai: string;
   scheduled_at: string | null; posted_at: string | null;
@@ -80,6 +85,12 @@ export default function PostListClient({
                   <time className="pt-time">{formatRelative(p.created_at)}</time>
                 )}
                 <div className="pt-actions" onClick={(e) => e.stopPropagation()}>
+                  {canPost && isPast(p.scheduled_at) && p.trang_thai === 'scheduled' ? (
+                    <form action={publishJobPost}>
+                      <input type="hidden" name="post_id" value={p.id} />
+                      <SubmitButton label="Đăng ngay" pendingLabel="Đang đăng..." className="pt-btn ok" />
+                    </form>
+                  ) : null}
                   <button className="pt-btn" onClick={() => toggle(p.id, 'view')}>
                     {isView ? 'Đóng' : 'Xem'}
                   </button>

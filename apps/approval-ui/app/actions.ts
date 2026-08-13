@@ -801,7 +801,15 @@ export async function toggleAutoPost(formData: FormData) {
   const current = formData.get('current') === 'true';
   if (!jobId) return;
   const client = getServerClient();
-  await client.from('hr_jobs').update({ auto_post: !current }).eq('id', jobId);
+  const { error } = await client.from('hr_jobs').update({ auto_post: !current }).eq('id', jobId);
+  if (error) {
+    // Lỗi 42703 = cột auto_post chưa tồn tại, migration chưa chạy.
+    throw new Error(
+      error.code === '42703'
+        ? 'Cột auto_post chưa có trong database. Chạy file supabase/migrations/20260813040000_hr_jobs_auto_post.sql trong Supabase SQL editor rồi thử lại.'
+        : error.message
+    );
+  }
   revalidatePath('/tao-jd');
 }
 

@@ -346,6 +346,8 @@ select.note { cursor: pointer; }
 }
 .pt-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
 .pt-btn.del:hover { border-color: var(--no); color: var(--no); background: var(--no-bg); }
+.pt-btn.ok { border-color: var(--ok); color: var(--ok); background: var(--ok-bg); font-weight: 600; }
+.pt-btn.ok:hover { filter: brightness(0.92); }
 .pt-detail, .pt-edit { padding: 12px 14px; border-top: 1px solid var(--line); background: var(--surface-2); }
 
 /* Modal xác nhận xoá */
