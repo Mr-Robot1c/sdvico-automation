@@ -127,11 +127,6 @@ export default async function Page() {
         <AddJobPanel />
       </header>
 
-      {colMissing ? (
-        <div className="err" role="alert">
-          Chưa áp migration <code>auto_post</code>. Chạy file <code>supabase/migrations/20260813040000_hr_jobs_auto_post.sql</code> trong Supabase SQL editor rồi tải lại trang.
-        </div>
-      ) : null}
       {jobsRes.error && !colMissing ? <p className="err" role="alert">Lỗi tải: {jobsRes.error.message}</p> : null}
 
       {/* === Danh sách tự động đăng bài === */}
