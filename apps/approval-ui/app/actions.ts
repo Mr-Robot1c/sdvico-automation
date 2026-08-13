@@ -34,26 +34,39 @@ async function publishContentToFacebook(
   if (!c) return { ok: false, error: 'không tìm thấy nội dung' };
   const message = [(c as any).title, '', (c as any).draft || ''].join('\n').trim();
 
-  let imageUrl: string | null = null;
-  const imgAssetId = (c as any).brief?.assets?.image;
-  if (imgAssetId) {
-    const { data: a } = await client.from('brand_assets').select('storage_path').eq('id', imgAssetId).single();
+  // Đổi id ảnh/video đã gắn ra link công khai.
+  const assetUrlOf = async (assetId?: string): Promise<string | null> => {
+    if (!assetId) return null;
+    const { data: a } = await client.from('brand_assets').select('storage_path').eq('id', assetId).single();
     const sp = (a as { storage_path?: string } | null)?.storage_path;
-    if (sp) imageUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
-  }
+    return sp ? client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl : null;
+  };
+  const assets = (c as any).brief?.assets || {};
+  const imageUrl = await assetUrlOf(assets.image);
+  const videoUrl = await assetUrlOf(assets.video);
 
   try {
-    const endpoint = imageUrl
-      ? `https://graph.facebook.com/${VERSION}/${PAGE_ID}/photos`
-      : `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
-    const body = imageUrl
-      ? new URLSearchParams({ url: imageUrl, caption: message, access_token: TOKEN })
-      : new URLSearchParams({ message, access_token: TOKEN });
+    // Ưu tiên video (đăng qua /videos), rồi ảnh (/photos), không thì chữ (/feed).
+    let endpoint: string;
+    let body: URLSearchParams;
+    if (videoUrl) {
+      endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/videos`;
+      body = new URLSearchParams({ file_url: videoUrl, description: message, access_token: TOKEN });
+    } else if (imageUrl) {
+      endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/photos`;
+      body = new URLSearchParams({ url: imageUrl, caption: message, access_token: TOKEN });
+    } else {
+      endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
+      body = new URLSearchParams({ message, access_token: TOKEN });
+    }
     const res = await fetch(endpoint, { method: 'POST', body });
     const json: any = await res.json();
     if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
+    // /videos trả {id: videoId}; /feed và /photos trả post_id.
     const postId = json.post_id || json.id;
-    const externalUrl = `https://www.facebook.com/${postId}`;
+    const externalUrl = videoUrl
+      ? `https://www.facebook.com/${PAGE_ID}/videos/${json.id}`
+      : `https://www.facebook.com/${postId}`;
     await client.from('mkt_posts').insert({
       content_id: contentId,
       channel: 'facebook',

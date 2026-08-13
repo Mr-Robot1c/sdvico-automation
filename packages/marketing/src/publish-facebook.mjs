@@ -58,20 +58,20 @@ const { data: contents } = await client
   .in('id', contentIds);
 const byId = new Map((contents || []).map((c) => [c.id, c]));
 
-// 3b. Đổi id ảnh đã gắn (brief.assets.image) ra link công khai để đăng kèm bài.
-const imageAssetIds = [
+// 3b. Đổi id ảnh/video đã gắn (brief.assets) ra link công khai để đăng kèm bài.
+const assetIds = [
   ...new Set(
     (contents || [])
-      .map((c) => c?.brief?.assets?.image)
+      .flatMap((c) => [c?.brief?.assets?.image, c?.brief?.assets?.video])
       .filter((x) => typeof x === 'string')
   ),
 ];
 const imageUrlById = new Map();
-if (imageAssetIds.length) {
+if (assetIds.length) {
   const { data: assets } = await client
     .from('brand_assets')
     .select('id, storage_path')
-    .in('id', imageAssetIds);
+    .in('id', assetIds);
   for (const a of assets || []) {
     imageUrlById.set(a.id, client.storage.from('brand-assets').getPublicUrl(a.storage_path).data.publicUrl);
   }
@@ -96,22 +96,28 @@ for (const j of queue) {
   const c = byId.get(j.contentId);
   const message = [c?.title || j.title, '', c?.draft || ''].join('\n').trim();
   const imageUrl = c?.brief?.assets?.image ? imageUrlById.get(c.brief.assets.image) : null;
+  const videoUrl = c?.brief?.assets?.video ? imageUrlById.get(c.brief.assets.video) : null;
 
-  console.log(`- ${j.title}${imageUrl ? ' (kèm ảnh)' : ''}`);
+  console.log(`- ${j.title}${videoUrl ? ' (kèm video)' : imageUrl ? ' (kèm ảnh)' : ''}`);
   if (!LIVE) {
     console.log('  (chạy thử, chưa đăng) nội dung:');
     for (const line of message.split('\n')) console.log('    ' + line);
-    if (imageUrl) console.log('    [ảnh] ' + imageUrl);
+    if (videoUrl) console.log('    [video] ' + videoUrl);
+    else if (imageUrl) console.log('    [ảnh] ' + imageUrl);
     console.log('');
     continue;
   }
 
   try {
-    // Có ảnh thì đăng qua /photos (ảnh + chú thích); không thì đăng chữ qua /feed.
-    const url = imageUrl
-      ? `https://graph.facebook.com/${VERSION}/${PAGE_ID}/photos`
-      : `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
-    const body = imageUrl
+    // Ưu tiên video (/videos), rồi ảnh (/photos), không thì chữ (/feed).
+    const url = videoUrl
+      ? `https://graph.facebook.com/${VERSION}/${PAGE_ID}/videos`
+      : imageUrl
+        ? `https://graph.facebook.com/${VERSION}/${PAGE_ID}/photos`
+        : `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
+    const body = videoUrl
+      ? new URLSearchParams({ file_url: videoUrl, description: message, access_token: TOKEN })
+      : imageUrl
       ? new URLSearchParams({ url: imageUrl, caption: message, access_token: TOKEN })
       : new URLSearchParams({ message, access_token: TOKEN });
     const res = await fetch(url, { method: 'POST', body });
