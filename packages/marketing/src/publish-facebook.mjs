@@ -94,7 +94,8 @@ if (LIVE && (!PAGE_ID || !TOKEN)) {
 let publishedCount = 0;
 for (const j of queue) {
   const c = byId.get(j.contentId);
-  const message = [c?.title || j.title, '', c?.draft || ''].join('\n').trim();
+  // Chỉ đăng nội dung, không ghép tiêu đề vào đầu để tránh lặp tên sản phẩm.
+  const message = String(c?.draft || c?.title || j.title || '').trim();
   const imageUrl = c?.brief?.assets?.image ? imageUrlById.get(c.brief.assets.image) : null;
   const videoUrl = c?.brief?.assets?.video ? imageUrlById.get(c.brief.assets.video) : null;
 

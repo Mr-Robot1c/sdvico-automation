@@ -32,7 +32,8 @@ async function publishContentToFacebook(
     .eq('id', contentId)
     .single();
   if (!c) return { ok: false, error: 'không tìm thấy nội dung' };
-  const message = [(c as any).title, '', (c as any).draft || ''].join('\n').trim();
+  // Chỉ đăng nội dung (bản nháp) — không ghép tiêu đề vào đầu để tránh lặp tên sản phẩm.
+  const message = String((c as any).draft || (c as any).title || '').trim();
 
   // Đổi id ảnh/video đã gắn ra link công khai.
   const assetUrlOf = async (assetId?: string): Promise<string | null> => {

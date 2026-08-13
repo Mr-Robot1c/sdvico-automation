@@ -179,7 +179,12 @@ export default function SanXuatForm({
         </div>
 
         {selectedImg ? (
-          <p className="muted sx-selected-name">Ảnh đang chọn: <b>{selectedImg.title}</b></p>
+          <p className="muted sx-selected-name">
+            Ảnh đang chọn: <b>{selectedImg.title}</b>{' '}
+            <button type="button" className="btn ghost sm" onClick={() => setImgId('')}>
+              ✕ Bỏ ảnh
+            </button>
+          </p>
         ) : null}
 
         {images.length > 0 ? (
@@ -222,7 +227,12 @@ export default function SanXuatForm({
         </div>
 
         {selectedVid ? (
-          <p className="muted sx-selected-name">Video đang chọn: <b>{selectedVid.title}</b></p>
+          <p className="muted sx-selected-name">
+            Video đang chọn: <b>{selectedVid.title}</b>{' '}
+            <button type="button" className="btn ghost sm" onClick={() => setVidId('')}>
+              ✕ Bỏ video
+            </button>
+          </p>
         ) : null}
 
         {videos.length > 0 ? (
