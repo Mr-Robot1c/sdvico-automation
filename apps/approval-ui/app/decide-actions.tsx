@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { decideForm, approveAndPublish, approveAndSchedule, dismissQueueItem } from './actions';
+import { decideForm, approveAndPublish, approveAndSchedule, dismissQueueItem, approveJobDraft } from './actions';
 
 type Props = {
   id: string;
   title: string;
   kind: string;
   postId?: string | null;
+  jobId?: string | null;
 };
 
 const QUICK_SLOTS = [
@@ -20,12 +21,40 @@ const QUICK_SLOTS = [
 // Bộ nút quyết. Với tin tuyển dụng Facebook (hr_job_post) có thêm tuỳ chọn
 // đặt lịch ngay tại trang Duyệt — không phải chuyển sang trang khác.
 // Điều cấm 1: người bấm là cổng kiểm soát, không có nút nào tự động bỏ qua người.
-export default function DecideActions({ id, title, kind, postId }: Props) {
+export default function DecideActions({ id, title, kind, postId, jobId }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [customAt, setCustomAt] = useState('');
 
+  const isJobDraft = kind === 'hr_jd' && jobId;
   const isJobPost = kind === 'hr_job_post' && postId;
+
+  if (isJobDraft) {
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+        <form action={approveJobDraft} onSubmit={() => setBusy('open')}>
+          <input type="hidden" name="queue_id" value={id} />
+          <input type="hidden" name="job_id" value={jobId} />
+          <button className="btn ok" disabled={busy !== null}>
+            {busy === 'open' ? 'Đang mở tuyển...' : 'Mở tuyển — cron sẽ tự soạn bài'}
+          </button>
+        </form>
+        <form
+          action={decideForm}
+          onSubmit={(e) => {
+            if (!window.confirm(`Từ chối vị trí này?\n\n"${title}"`)) { e.preventDefault(); return; }
+            setBusy('reject');
+          }}
+        >
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="action" value="reject" />
+          <button className="btn no" disabled={busy !== null}>
+            {busy === 'reject' ? 'Đang từ chối...' : 'Từ chối'}
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   if (isJobPost) {
     return (

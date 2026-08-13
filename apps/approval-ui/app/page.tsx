@@ -111,6 +111,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
           const rows = payloadRows(item.payload);
           const payload = item.payload as Record<string, unknown>;
           const postId = item.kind === 'hr_job_post' ? (payload?.post_id as string) : null;
+          const jobId = item.kind === 'hr_jd' ? (payload?.job_id as string) : null;
           const hrPost = postId ? hrPostMap[postId] : null;
 
           return (
@@ -123,6 +124,16 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
               </div>
 
               <div className="title">{item.title}</div>
+
+              {/* Vị trí tuyển dụng: hiện thông tin ngắn để người duyệt xem nhanh */}
+              {item.kind === 'hr_jd' ? (
+                <dl className="fields" style={{ margin: '8px 0 2px' }}>
+                  {payload?.location ? <div className="field"><dt>Địa điểm</dt><dd>{String(payload.location)}</dd></div> : null}
+                  {payload?.department ? <div className="field"><dt>Phòng ban</dt><dd>{String(payload.department)}</dd></div> : null}
+                  {payload?.short_desc ? <div className="field field-long"><dt>Mô tả</dt><dd><pre style={{ margin: 0, fontSize: '0.88em' }}>{String(payload.short_desc)}</pre></dd></div> : null}
+                  {payload?.requirements ? <div className="field field-long"><dt>Yêu cầu</dt><dd><pre style={{ margin: 0, fontSize: '0.88em' }}>{String(payload.requirements)}</pre></dd></div> : null}
+                </dl>
+              ) : null}
 
               {/* Bài đăng Facebook: hiển thị nội dung có thể sửa ngay tại đây */}
               {hrPost ? (
@@ -184,7 +195,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                 ) : null
               )}
 
-              <DecideActions id={item.id} title={item.title} kind={item.kind} postId={postId} />
+              <DecideActions id={item.id} title={item.title} kind={item.kind} postId={postId} jobId={jobId} />
             </li>
           );
         })}

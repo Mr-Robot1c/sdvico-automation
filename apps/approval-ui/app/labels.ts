@@ -12,6 +12,8 @@ export function kindMeta(kind: string): KindMeta {
       return { label: 'Thư tuyển dụng', icon: '✉️', tone: 'hr' };
     case 'hr_interview':
       return { label: 'Thư mời phỏng vấn', icon: '📅', tone: 'hr' };
+    case 'hr_jd':
+      return { label: 'Vị trí tuyển dụng', icon: '💼', tone: 'hr' };
     case 'hr_job_post':
       return { label: 'Tin tuyển dụng (Facebook)', icon: '📣', tone: 'hr' };
     case 'mkt_post':

@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { getServerClient } from '../lib/supabase-server';
 import { composeJdVersions } from '../lib/jd-compose';
 import { groqChat } from '../lib/groq';
@@ -607,6 +608,7 @@ export async function publishJobPost(formData: FormData) {
 
 // Tạo bản nháp JD từ thông tin người dùng nhập. AI viết bốn phiên bản, lưu nháp để duyệt.
 // Máy soạn, người xác nhận (điều cấm 1). Không đăng, không tự mở tuyển.
+// Sau khi tạo xong → đẩy vào hàng đợi duyệt và chuyển sang trang Duyệt để người xét duyệt.
 export async function createJdDraft(formData: FormData) {
   const title = String(formData.get('title') || '').trim();
   if (!title) return;
@@ -623,7 +625,7 @@ export async function createJdDraft(formData: FormData) {
   const { versions } = await composeJdVersions(job);
 
   const client = getServerClient();
-  const { error } = await client.from('hr_jobs').insert({
+  const { data: newJob, error } = await client.from('hr_jobs').insert({
     title: job.title,
     department: job.department || null,
     location: job.location || null,
@@ -633,10 +635,50 @@ export async function createJdDraft(formData: FormData) {
     nhom: job.nhom || null,
     image_hint,
     status: 'draft'
-  });
+  }).select('id').single();
   if (error) throw new Error(error.message);
-  revalidatePath('/tao-jd');
+
+  // Đẩy vào hàng đợi duyệt — người duyệt bấm "Mở tuyển" thì job mới thành open.
+  // Cron soạn bài Facebook chỉ chạy với job open (điều cấm 1).
+  const queueTitle = `${job.title}${job.location ? ' – ' + job.location : ''}`;
+  await client.from('approval_queue').insert({
+    kind: 'hr_jd',
+    title: queueTitle,
+    payload: {
+      job_id: newJob.id,
+      title: job.title,
+      department: job.department || null,
+      location: job.location || null,
+      short_desc: job.short_desc || null,
+      requirements: job.requirements || null,
+    },
+    ref_table: 'hr_jobs',
+    ref_id: newJob.id,
+    status: 'pending',
+  });
+
+  redirect('/');
+}
+
+// Duyệt vị trí tuyển dụng: chuyển job từ draft → open để cron soạn bài Facebook.
+// Điều cấm 1: người bấm Mở tuyển là cổng kiểm soát.
+export async function approveJobDraft(formData: FormData) {
+  const queueId = String(formData.get('queue_id') || '');
+  const jobId = String(formData.get('job_id') || '');
+  if (!queueId || !jobId) return;
+
+  const client = getServerClient();
+  await client.from('approval_queue')
+    .update({ status: 'approved', decided_at: new Date().toISOString() })
+    .eq('id', queueId).eq('status', 'pending');
+
+  await client.from('hr_jobs')
+    .update({ status: 'open' })
+    .eq('id', jobId).eq('status', 'draft');
+
+  revalidatePath('/');
   revalidatePath('/dang-tin');
+  revalidatePath('/tao-jd');
 }
 
 // Lưu cài đặt thương hiệu công ty: logo, hotline, email, website, mô tả ngắn.
