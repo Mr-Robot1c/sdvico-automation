@@ -99,18 +99,19 @@ for (const j of queue) {
   const imageUrl = c?.brief?.assets?.image ? imageUrlById.get(c.brief.assets.image) : null;
   const videoUrl = c?.brief?.assets?.video ? imageUrlById.get(c.brief.assets.video) : null;
 
-  console.log(`- ${j.title}${videoUrl ? ' (kèm video)' : imageUrl ? ' (kèm ảnh)' : ''}`);
+  console.log(`- ${j.title}${videoUrl && imageUrl ? ' (video + ảnh ở bình luận)' : videoUrl ? ' (kèm video)' : imageUrl ? ' (kèm ảnh)' : ''}`);
   if (!LIVE) {
     console.log('  (chạy thử, chưa đăng) nội dung:');
     for (const line of message.split('\n')) console.log('    ' + line);
     if (videoUrl) console.log('    [video] ' + videoUrl);
-    else if (imageUrl) console.log('    [ảnh] ' + imageUrl);
+    if (imageUrl) console.log('    [ảnh]' + (videoUrl ? ' (thả vào bình luận đầu)' : '') + ' ' + imageUrl);
     console.log('');
     continue;
   }
 
   try {
-    // Ưu tiên video (/videos), rồi ảnh (/photos), không thì chữ (/feed).
+    // FB không cho gộp video + ảnh vào chung 1 post. Có video thì đăng video (/videos) kèm caption,
+    // rồi thả ảnh vào bình luận đầu. Chỉ ảnh: /photos. Không có gì: /feed chữ.
     const url = videoUrl
       ? `https://graph.facebook.com/${VERSION}/${PAGE_ID}/videos`
       : imageUrl
@@ -125,9 +126,28 @@ for (const j of queue) {
     const json = await res.json();
     if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
 
-    // /feed trả {id: pageId_postId}; /photos trả {id: photoId, post_id: pageId_postId}.
+    // /feed trả {id: pageId_postId}; /photos trả {id: photoId, post_id: pageId_postId}; /videos trả {id: videoId}.
     const postId = json.post_id || json.id;
     const externalUrl = `https://www.facebook.com/${postId}`;
+
+    // Bài có CẢ video lẫn ảnh: thả ảnh vào bình luận đầu của bài video (FB chặn gộp chung).
+    // Video lên là chính; thả ảnh lỗi thì chỉ cảnh báo, KHÔNG dừng cả vòng (tránh đăng lại video).
+    let photoComment = null;
+    if (videoUrl && imageUrl) {
+      try {
+        const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${json.id}/comments`, {
+          method: 'POST',
+          body: new URLSearchParams({ attachment_url: imageUrl, access_token: TOKEN }),
+        });
+        const cJson = await cRes.json();
+        if (!cRes.ok || cJson.error) throw new Error(cJson.error?.message || `HTTP ${cRes.status}`);
+        photoComment = 'ok';
+        console.log('  Đã thả ảnh vào bình luận đầu.');
+      } catch (ce) {
+        photoComment = `lỗi: ${String(ce.message || ce)}`;
+        console.error(`  Đăng video xong nhưng chưa thả được ảnh vào bình luận: ${ce.message || ce}`);
+      }
+    }
 
     await client.from('mkt_posts').insert({
       content_id: j.contentId,
@@ -137,7 +157,7 @@ for (const j of queue) {
       published_at: new Date().toISOString(),
     });
     await client.from('mkt_content').update({ status: 'published' }).eq('id', j.contentId);
-    await logRun(client, { task: 'mkt.publish_facebook', status: 'ok', detail: { contentId: j.contentId, postId, externalUrl } });
+    await logRun(client, { task: 'mkt.publish_facebook', status: 'ok', detail: { contentId: j.contentId, postId, externalUrl, photoComment } });
 
     publishedCount++;
     console.log(`  Đã đăng: ${externalUrl}`);

@@ -11,7 +11,7 @@ import { getServerClient } from '../lib/supabase-server';
 async function publishContentToFacebook(
   client: ReturnType<typeof getServerClient>,
   contentId: string
-): Promise<{ ok: boolean; error?: string; url?: string }> {
+): Promise<{ ok: boolean; error?: string; url?: string; warn?: string }> {
   const PAGE_ID = process.env.FACEBOOK_PAGE_ID;
   const TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
   const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
@@ -48,7 +48,9 @@ async function publishContentToFacebook(
   const videoUrl = await assetUrlOf(assets.video);
 
   try {
-    // Ưu tiên video (đăng qua /videos), rồi ảnh (/photos), không thì chữ (/feed).
+    // Facebook không cho gộp video và ảnh vào CHUNG một post. Nên:
+    //  - Có video: đăng video (/videos) kèm caption; nếu kèm cả ảnh thì thả ảnh vào BÌNH LUẬN đầu.
+    //  - Chỉ ảnh: đăng ảnh (/photos). Không có gì: đăng chữ (/feed).
     let endpoint: string;
     let body: URLSearchParams;
     if (videoUrl) {
@@ -69,6 +71,24 @@ async function publishContentToFacebook(
     const externalUrl = videoUrl
       ? `https://www.facebook.com/${PAGE_ID}/videos/${json.id}`
       : `https://www.facebook.com/${postId}`;
+
+    // Bài có CẢ video lẫn ảnh: thả ảnh vào bình luận đầu của bài video (FB chặn gộp chung).
+    // Video đã lên là chính; nếu thả ảnh lỗi thì chỉ cảnh báo, KHÔNG đánh hỏng cả bài (tránh đăng lại video).
+    let warn: string | undefined;
+    if (videoUrl && imageUrl) {
+      try {
+        const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${json.id}/comments`, {
+          method: 'POST',
+          body: new URLSearchParams({ attachment_url: imageUrl, access_token: TOKEN })
+        });
+        const cJson: any = await cRes.json();
+        if (!cRes.ok || cJson.error) throw new Error(cJson.error?.message || `HTTP ${cRes.status}`);
+      } catch (ce: any) {
+        warn = `Đăng video xong nhưng chưa thả được ảnh vào bình luận: ${String(ce?.message || ce)}`;
+        console.error('[facebook] ' + warn);
+      }
+    }
+
     await client.from('mkt_posts').insert({
       content_id: contentId,
       channel: 'facebook',
@@ -77,7 +97,7 @@ async function publishContentToFacebook(
       published_at: new Date().toISOString()
     });
     await client.from('mkt_content').update({ status: 'published' }).eq('id', contentId);
-    return { ok: true, url: externalUrl };
+    return { ok: true, url: externalUrl, warn };
   } catch (e: any) {
     await client.from('mkt_posts').insert({ content_id: contentId, channel: 'facebook', status: 'failed' });
     return { ok: false, error: String(e?.message || e) };

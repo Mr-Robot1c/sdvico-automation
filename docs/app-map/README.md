@@ -3,7 +3,7 @@
 > Đọc khi cần biết luồng chạy và thành phần của một mảng. Đây là trang chỉ mục.
 > Nguồn sự thật khác: `CLAUDE.md` cho bảy điều cấm và giọng văn, `supabase/migrations` cho lược đồ, `docs/ke-hoach-7-ngay.md` cho kế hoạch gốc.
 covers: packages/core, apps/approval-ui, supabase/migrations
-last_verified: 2026-08-12
+last_verified: 2026-08-13
 ttl_days: 180
 <!-- re-verified: 2026-08-12 - approval-ui UI redesign (sidebar chia 5 nhom, eye modal, /san-xuat moi). Luong approval_queue va cac bang du lieu KHONG doi. Nut Xong o /san-xuat van di qua approval_queue kind=mkt_publish_content dung dieu cam 1. -->
 <!-- re-verified: 2026-08-12 - Hang doi duyet gio resolve payload.assets (id) ra public URL, hien anh/video tren card va modal. /san-xuat upload doi tu server action sang browser PUT thang len Storage qua signed URL (vuot gioi han 4,5MB Vercel). Them action createAssetUploadUrl + registerAsset. Luong approval_queue, kind=mkt_publish_content, va cac bang du lieu KHONG doi. -->
@@ -79,3 +79,5 @@ Cập nhật lần cuối: 10/8/2026.
 <!-- re-verified: 2026-08-12 - Them nut "Bo anh"/"Bo video" o Xuong san xuat (setImgId/setVidId rong). Dang Facebook: chi dang draft (bo dong tieu de dau) de khong lap ten san pham (decideForm + publish-facebook.mjs). Khong doi luong. -->
 <!-- re-verified: 2026-08-12 - Tu dong sinh bai hang ngay (Vercel Cron): app/api/rotate/route.ts sinh 1-2 bai tu brand_assets theo vong xoay (rotation_cycle trong mkt_content.brief, khong lap trong vong, het thi cycle+1), day vao approval_queue pending (KHONG tu dang - dung dieu cam 1). vercel.json crons 0 1 * * *. middleware mien basic-auth cho /api/ (route tu bao ve bang CRON_SECRET). Kho tu lieu hien STT. Can env CRON_SECRET, ROTATE_PER_RUN (mac dinh 2). -->
 <!-- re-verified: 2026-08-12 - Dat lai CRON_SECRET ro rang cho cron xoay vong, redeploy de app nhan. Khong doi logic. -->
+<!-- re-verified: 2026-08-13 - decideForm/publishContentToFacebook (actions.ts) + publish-facebook.mjs: bai co CA anh lan video thi dang VIDEO kem caption roi THA ANH VAO BINH LUAN DAU cua bai video (POST /{videoId}/comments attachment_url). FB chan gop video+anh trong 1 post. Tha anh loi thi chi canh bao, KHONG danh hong bai (tranh dang lai video). Chi anh -> /photos, chi video -> /videos, khong co -> /feed: giu nguyen. -->
+<!-- re-verified: 2026-08-13 - noi-dung/page.tsx (Quan ly bai viet): sap xep theo approval_queue.decided_at (fallback created_at) giam dan, bai vua duyet/xu ly nhay len dau. Lay them cot decided_at tu approval_queue. Khong doi luong duyet. -->

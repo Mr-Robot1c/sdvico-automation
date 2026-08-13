@@ -66,12 +66,16 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
   // thực của mỗi bài: đã duyệt, đã từ chối, hay còn chờ.
   const { data: qRows } = await client
     .from('approval_queue')
-    .select('payload, status')
+    .select('payload, status, decided_at')
     .eq('kind', 'mkt_publish_content');
   const queueStatus = new Map<string, string>();
+  const decidedAt = new Map<string, string>();
   for (const q of qRows || []) {
     const cid = (q.payload && typeof q.payload === 'object' ? (q.payload as any).content_id : null) as string | null;
-    if (cid) queueStatus.set(cid, q.status as string);
+    if (cid) {
+      queueStatus.set(cid, q.status as string);
+      if ((q as any).decided_at) decidedAt.set(cid, (q as any).decided_at as string);
+    }
   }
   const effStatus = (c: Content): string => {
     const qs = queueStatus.get(c.id);
@@ -85,7 +89,15 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
   const statusCount = new Map<string, number>();
   for (const c of rawItems) statusCount.set(effStatus(c), (statusCount.get(effStatus(c)) || 0) + 1);
 
-  const items = statusFilter ? rawItems.filter((c) => effStatus(c) === statusFilter) : rawItems;
+  // Sắp xếp: bài vừa có thao tác nổi lên đầu. Mốc = thời điểm duyệt/từ chối (decided_at) nếu đã xử lý,
+  // không thì thời điểm tạo. Ví dụ bài tạo 10h trước, nay mới duyệt sẽ nhảy lên đầu danh sách.
+  const activityTime = (c: Content): number => {
+    const t = new Date(decidedAt.get(c.id) || c.created_at).getTime();
+    return Number.isNaN(t) ? 0 : t;
+  };
+  const items = (statusFilter ? rawItems.filter((c) => effStatus(c) === statusFilter) : rawItems)
+    .slice()
+    .sort((a, b) => activityTime(b) - activityTime(a));
 
   // Đổi id ảnh/video đã gắn (brief.assets) ra link công khai để hiện trong modal.
   const assetIds = new Set<string>();

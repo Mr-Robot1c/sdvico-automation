@@ -2,11 +2,13 @@
 
 > Đọc khi làm phần Marketing. Phụ trách Bạn B. Nền chung ở [README.md](README.md), điều cấm và giọng văn ở CLAUDE.md.
 covers: packages/marketing
-last_verified: 2026-08-12
+last_verified: 2026-08-13
 ttl_days: 180
 <!-- re-verified: 2026-08-12 - publish-facebook.mjs: them dang anh (brief.assets.image qua /photos), lay post_id dung. Van chi dang approval_queue status=approved, tran MKT_MAX_POSTS_PER_RUN. Them workflow mkt-publish.yml chay --live moi 30 phut. Luong may soan nguoi bam KHONG doi. -->
 <!-- re-verified: 2026-08-12 - publish-facebook.mjs: chi dang draft (bo dong tieu de) de khong lap ten SP. -->
 <!-- re-verified: 2026-08-12 - publish-facebook.mjs + decideForm: them dang VIDEO qua /videos (file_url) khi bai co brief.assets.video. Uu tien video > anh > chu. -->
+<!-- re-verified: 2026-08-13 - publish-facebook.mjs + decideForm (actions.ts): bai co CA anh lan video thi dang VIDEO kem caption roi tha ANH vao binh luan dau (POST /{videoId}/comments attachment_url) - FB chan gop video+anh chung 1 post. Tha anh loi thi chi canh bao, khong danh hong bai (tranh dang lai video). Chi anh -> /photos, chi video -> /videos, khong co -> /feed (khong doi). -->
+<!-- re-verified: 2026-08-13 - noi-dung/page.tsx: sap xep theo thoi diem duyet (approval_queue.decided_at) fallback created_at, giam dan - bai vua duyet nhay len dau. -->
 
 ## 1. Workflow marketing, từ đầu tới cuối
 
