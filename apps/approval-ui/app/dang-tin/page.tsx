@@ -1,7 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { formatRelative } from '../labels';
-import { addJobPost, queueFacebookPost } from '../actions';
+import { addJobPost, queueFacebookPost, publishJobPost } from '../actions';
 import DangTinSections from '../dang-tin-sections';
 import { SubmitButton } from '../submit-button';
 import PostListClient from '../post-list-client';
@@ -28,6 +28,10 @@ const JD_LABELS: Record<string, string> = { website: 'Website công ty', job_boa
 const JD_ORDER = ['website', 'job_board', 'facebook', 'zalo_sms'];
 const JOB_STATUS: Record<string, { label: string; tone: string }> = {
   draft: { label: 'Nháp', tone: 'demo' }, open: { label: 'Đang tuyển', tone: 'ok' }, closed: { label: 'Đã đóng', tone: 'no' }
+};
+const TT_LABEL: Record<string, { label: string; tone: string }> = {
+  draft: { label: 'Nháp, chờ duyệt', tone: 'default' }, scheduled: { label: 'Đặt lịch', tone: 'mkt' },
+  posted: { label: 'Đã đăng', tone: 'ok' }, failed: { label: 'Đăng lỗi', tone: 'no' }, cancelled: { label: 'Đã huỷ', tone: 'no' }
 };
 
 export default async function Page() {
