@@ -101,12 +101,14 @@ async function publishContentToFacebook(
 
     // Bài có CẢ video lẫn ảnh: thả ảnh vào bình luận đầu của bài video (FB chặn gộp chung).
     // Phải CHỜ video xử lý xong mới thả được ảnh. Video đã lên là chính; thả ảnh lỗi thì chỉ
-    // cảnh báo, KHÔNG đánh hỏng cả bài (tránh đăng lại video).
+    // cảnh báo, KHÔNG đánh hỏng cả bài (tránh đăng lại video). Ghi lại phản hồi THÔ của FB để soi lỗi.
     let warn: string | undefined;
+    let commentDebug: any = null;
     if (videoUrl && imageUrl) {
       const ready = await waitFacebookVideoReady(json.id, VERSION, TOKEN);
       if (!ready) {
-        warn = 'Đăng video xong nhưng video chưa xử lý kịp nên chưa thả được ảnh vào bình luận.';
+        warn = 'Video chưa xử lý kịp nên chưa thả được ảnh vào bình luận.';
+        commentDebug = { step: 'wait_video', ready: false };
         console.error('[facebook] ' + warn);
       } else {
         try {
@@ -115,9 +117,10 @@ async function publishContentToFacebook(
             body: new URLSearchParams({ attachment_url: imageUrl, access_token: TOKEN })
           });
           const cJson: any = await cRes.json();
+          commentDebug = { step: 'comment', httpStatus: cRes.status, response: cJson };
           if (!cRes.ok || cJson.error) throw new Error(cJson.error?.message || `HTTP ${cRes.status}`);
         } catch (ce: any) {
-          warn = `Đăng video xong nhưng chưa thả được ảnh vào bình luận: ${String(ce?.message || ce)}`;
+          warn = `Chưa thả được ảnh vào bình luận: ${String(ce?.message || ce)}`;
           console.error('[facebook] ' + warn);
         }
       }
@@ -131,6 +134,26 @@ async function publishContentToFacebook(
       published_at: new Date().toISOString()
     });
     await client.from('mkt_content').update({ status: 'published' }).eq('id', contentId);
+    // Nhật ký để soi vì sao ảnh không vào bình luận (đọc qua /api/fb-diag). Không để lỗi ghi log làm hỏng đăng.
+    try {
+      await client.from('run_log').insert({
+        task: 'mkt.publish_facebook_ui',
+        actor: 'decideForm',
+        status: warn ? 'error' : 'ok',
+        detail: {
+          contentId,
+          videoId: videoUrl ? json.id : null,
+          externalUrl,
+          hasImage: !!imageUrl,
+          hasVideo: !!videoUrl,
+          imageUrl: imageUrl || null,
+          warn: warn || null,
+          commentDebug
+        }
+      });
+    } catch {
+      /* bỏ qua lỗi ghi log */
+    }
     return { ok: true, url: externalUrl, warn };
   } catch (e: any) {
     await client.from('mkt_posts').insert({ content_id: contentId, channel: 'facebook', status: 'failed' });
