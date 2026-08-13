@@ -356,22 +356,44 @@ export async function editJobPostDraft(formData: FormData) {
       try { await client.from('run_log').insert({ task: 'upload_post_image', status: 'error', detail: { postId, error: String(err) } }); } catch {}
     }
   }
-  const { error } = await client
-    .from('hr_job_posts')
-    .update({ noi_dung, image_url, scheduled_at, trang_thai })
-    .eq('id', postId)
-    .neq('trang_thai', 'posted');
+  // Lấy trạng thái và fb_post_id hiện tại để xử lý bài đã đăng khác với nháp.
+  const { data: cur } = await client.from('hr_job_posts')
+    .select('trang_thai, fb_post_id').eq('id', postId).maybeSingle();
+
+  let updateData: Record<string, unknown>;
+  if (cur?.trang_thai === 'posted') {
+    // Bài đã đăng: chỉ cập nhật nội dung và hình ảnh, giữ nguyên trạng thái và lịch.
+    updateData = { noi_dung, image_url };
+  } else {
+    updateData = { noi_dung, image_url, scheduled_at, trang_thai };
+  }
+
+  const { error } = await client.from('hr_job_posts').update(updateData).eq('id', postId);
   if (error) throw new Error(error.message);
 
-  const { data: rows } = await client
-    .from('approval_queue')
-    .select('id, payload')
-    .eq('ref_id', postId)
-    .eq('kind', 'hr_job_post')
-    .eq('status', 'pending');
-  for (const row of rows || []) {
-    const payload = { ...((row.payload || {}) as Record<string, unknown>), body: noi_dung, image_url };
-    await client.from('approval_queue').update({ payload }).eq('id', row.id);
+  // Đồng bộ lên Facebook nếu bài đã đăng và có fb_post_id.
+  // Lỗi thì ghi log nhưng không throw — DB đã cập nhật rồi.
+  if (cur?.trang_thai === 'posted' && cur.fb_post_id) {
+    try {
+      await callFacebookEditApi(cur.fb_post_id, noi_dung);
+      await client.from('run_log').insert({ task: 'hr.edit_facebook_post', status: 'ok', detail: { postId, fbPostId: cur.fb_post_id } });
+    } catch (err) {
+      await client.from('run_log').insert({ task: 'hr.edit_facebook_post', status: 'error', detail: { postId, error: String(err) } });
+    }
+  }
+
+  // Đồng bộ bản xem trong hàng đợi duyệt — chỉ khi bài chưa đăng (bài đã đăng không cần duyệt lại).
+  if (!cur || cur.trang_thai !== 'posted') {
+    const { data: rows } = await client
+      .from('approval_queue')
+      .select('id, payload')
+      .eq('ref_id', postId)
+      .eq('kind', 'hr_job_post')
+      .eq('status', 'pending');
+    for (const row of rows || []) {
+      const payload = { ...((row.payload || {}) as Record<string, unknown>), body: noi_dung, image_url };
+      await client.from('approval_queue').update({ payload }).eq('id', row.id);
+    }
   }
 
   revalidatePath('/dang-tin');
@@ -384,9 +406,23 @@ async function callFacebookDeleteApi(fbPostId: string): Promise<void> {
   const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
   const version = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
   if (!token) throw new Error('Thiếu FACEBOOK_PAGE_ACCESS_TOKEN trong biến môi trường.');
+  const url = `https://graph.facebook.com/${version}/${fbPostId}?access_token=${encodeURIComponent(token)}`;
+  const res = await fetch(url, { method: 'DELETE', cache: 'no-store' });
+  const json = await res.json();
+  if (!res.ok || json.error) {
+    throw new Error(json.error?.message || `HTTP ${res.status}`);
+  }
+}
+
+// Helper nội bộ: cập nhật nội dung (message) bài đã đăng trên Facebook.
+// Chỉ sửa được text — ảnh đã đăng không thay được qua API. Ném lỗi nếu thất bại.
+async function callFacebookEditApi(fbPostId: string, message: string): Promise<void> {
+  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const version = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+  if (!token) throw new Error('Thiếu FACEBOOK_PAGE_ACCESS_TOKEN trong biến môi trường.');
   const res = await fetch(`https://graph.facebook.com/${version}/${fbPostId}`, {
-    method: 'DELETE',
-    body: new URLSearchParams({ access_token: token }),
+    method: 'POST',
+    body: new URLSearchParams({ message, access_token: token }),
     cache: 'no-store',
   });
   const json = await res.json();

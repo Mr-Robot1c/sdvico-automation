@@ -81,7 +81,7 @@ export default function PostListClient({
                   <button className="pt-btn" onClick={() => toggle(p.id, 'view')}>
                     {isView ? 'Đóng' : 'Xem'}
                   </button>
-                  {canEdit ? (
+                  {p.trang_thai !== 'cancelled' ? (
                     <button className="pt-btn" onClick={() => toggle(p.id, 'edit')}>
                       {isEdit ? 'Đóng' : 'Sửa'}
                     </button>
@@ -154,21 +154,19 @@ export default function PostListClient({
                         <SubmitButton label="Đánh dấu đã đăng" className="btn ghost" />
                       </form>
                     ) : null}
-                    {p.trang_thai !== 'cancelled' ? (
-                      <form action={updateJobPost}>
-                        <input type="hidden" name="id" value={p.id} />
-                        <input type="hidden" name="action" value="cancel" />
-                        <SubmitButton label="Huỷ bài" className="btn ghost" />
-                      </form>
-                    ) : null}
                   </div>
                 </div>
               )}
 
-              {isEdit && canEdit ? (
+              {isEdit && p.trang_thai !== 'cancelled' ? (
                 <div className="pt-edit">
                   <form action={editJobPostDraft} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input type="hidden" name="post_id" value={p.id} />
+                    {p.trang_thai === 'posted' ? (
+                      <p style={{ margin: 0, fontSize: '0.82em', padding: '6px 10px', background: 'rgba(25,118,210,0.08)', borderRadius: 6, color: 'var(--ink-1, #333)' }}>
+                        Bài đã đăng — Lưu sẽ cập nhật nội dung trực tiếp lên Facebook{p.fb_post_id ? '' : ' (lưu nội bộ, chưa có ID bài Facebook)'}.
+                      </p>
+                    ) : null}
                     <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>Nội dung bài đăng</label>
                     <textarea name="noi_dung" defaultValue={p.noi_dung || ''} rows={12} aria-label="Nội dung bài đăng" style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: '13.5px', lineHeight: 1.6 }} />
                     <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>Ảnh đính kèm</label>
@@ -177,9 +175,16 @@ export default function PostListClient({
                       <span style={{ color: 'var(--ink-2)', flexShrink: 0 }}>Hoặc chọn từ máy:</span>
                       <input type="file" name="image_file" accept="image/*" style={{ fontSize: '0.85em' }} />
                     </label>
-                    <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>Giờ đặt đăng (bỏ trống = lưu nháp)</label>
-                    <input className="note" type="datetime-local" name="scheduled_at" defaultValue={scheduledDefault} aria-label="Giờ đặt đăng" />
-                    <SubmitButton label="Lưu chỉnh sửa" pendingLabel="Đang lưu..." />
+                    {p.trang_thai !== 'posted' ? (
+                      <>
+                        <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>Giờ đặt đăng (bỏ trống = lưu nháp)</label>
+                        <input className="note" type="datetime-local" name="scheduled_at" defaultValue={scheduledDefault} aria-label="Giờ đặt đăng" />
+                      </>
+                    ) : null}
+                    <SubmitButton
+                      label={p.trang_thai === 'posted' ? 'Lưu và cập nhật Facebook' : 'Lưu chỉnh sửa'}
+                      pendingLabel={p.trang_thai === 'posted' ? 'Đang cập nhật...' : 'Đang lưu...'}
+                    />
                   </form>
                 </div>
               ) : null}
