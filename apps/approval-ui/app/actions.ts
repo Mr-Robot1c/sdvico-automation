@@ -4,6 +4,7 @@
 // Cron xoay vòng: CRON_SECRET đã đặt (2026-08-12).
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../lib/supabase-server';
+import { postVideoToTikTok } from '../lib/tiktok';
 
 // Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment ngay lúc video còn
 // đang xử lý sẽ lỗi → ảnh bị bỏ). Hỏi trạng thái qua /{videoId}?fields=status. Trả true khi sẵn sàng.
@@ -161,8 +162,78 @@ async function publishContentToFacebook(
   }
 }
 
+// Đăng một bài đã duyệt lên TikTok (Direct Post). Cần có video. Máy soạn, người bấm Duyệt —
+// hàm này chạy SAU khi người đã bấm Duyệt. Chưa kết nối TikTok thì báo lỗi, không chặn việc duyệt.
+async function publishContentToTikTok(
+  client: ReturnType<typeof getServerClient>,
+  contentId: string
+): Promise<{ ok: boolean; error?: string; publishId?: string }> {
+  // Không đăng lại bài đã đăng thành công.
+  const { data: posted } = await client
+    .from('mkt_posts')
+    .select('id')
+    .eq('channel', 'tiktok')
+    .eq('content_id', contentId)
+    .eq('status', 'published')
+    .limit(1);
+  if (posted && posted.length) return { ok: true };
+
+  const { data: c } = await client
+    .from('mkt_content')
+    .select('id, title, draft, brief')
+    .eq('id', contentId)
+    .single();
+  if (!c) return { ok: false, error: 'không tìm thấy nội dung' };
+  const videoId = (c as any).brief?.assets?.video as string | undefined;
+  if (!videoId) {
+    // TikTok bắt buộc có video.
+    await client.from('mkt_posts').insert({ content_id: contentId, channel: 'tiktok', status: 'failed' });
+    return { ok: false, error: 'bài không có video nên TikTok bỏ qua' };
+  }
+  const { data: a } = await client.from('brand_assets').select('storage_path').eq('id', videoId).single();
+  const sp = (a as { storage_path?: string } | null)?.storage_path;
+  if (!sp) {
+    await client.from('mkt_posts').insert({ content_id: contentId, channel: 'tiktok', status: 'failed' });
+    return { ok: false, error: 'không thấy file video trong kho' };
+  }
+  const videoUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  const caption = String((c as any).draft || (c as any).title || '').trim();
+
+  const result = await postVideoToTikTok(client, { videoUrl, caption });
+  try {
+    await client.from('run_log').insert({
+      task: 'mkt.publish_tiktok',
+      actor: 'decideForm',
+      status: result.ok ? 'ok' : 'error',
+      detail: {
+        contentId,
+        publishId: result.publishId || null,
+        status: result.status || null,
+        privacy: result.privacy || null,
+        error: result.error || null,
+        steps: result.steps
+      }
+    });
+  } catch {
+    /* bỏ qua lỗi ghi log */
+  }
+  if (result.ok) {
+    await client.from('mkt_posts').insert({
+      content_id: contentId,
+      channel: 'tiktok',
+      status: 'published',
+      external_url: result.publishId ? `tiktok:${result.publishId}` : null,
+      published_at: new Date().toISOString()
+    });
+    await client.from('mkt_content').update({ status: 'published' }).eq('id', contentId);
+    return { ok: true, publishId: result.publishId };
+  }
+  await client.from('mkt_posts').insert({ content_id: contentId, channel: 'tiktok', status: 'failed' });
+  return { ok: false, error: result.error };
+}
+
 // Người quyết. Đọc từ form, cập nhật trạng thái, chỉ đổi mục còn pending.
-// Duyệt bài marketing thì đăng NGAY lên Facebook (nếu đã cấu hình token).
+// Duyệt bài marketing thì đăng NGAY lên các kênh đã chọn (Facebook, TikTok — nếu đã cấu hình).
 export async function decideForm(formData: FormData) {
   const id = String(formData.get('id') || '');
   const action = String(formData.get('action') || '');
@@ -185,8 +256,14 @@ export async function decideForm(formData: FormData) {
   // Chỉ đăng khi vừa chuyển pending -> approved lần đầu, và đúng là bài marketing.
   const justApproved = decision === 'approved' && (updated?.length || 0) > 0;
   if (justApproved && (row as any)?.kind === 'mkt_publish_content') {
-    const contentId = (row as any)?.payload?.content_id as string | undefined;
-    if (contentId) await publishContentToFacebook(client, contentId);
+    const payload = (row as any)?.payload || {};
+    const contentId = payload.content_id as string | undefined;
+    // Kênh đăng lấy từ payload.channels; bài cũ không có thì mặc định Facebook (giữ nguyên hành vi).
+    const channels: string[] = Array.isArray(payload.channels) && payload.channels.length ? payload.channels : ['facebook'];
+    if (contentId) {
+      if (channels.includes('facebook')) await publishContentToFacebook(client, contentId);
+      if (channels.includes('tiktok')) await publishContentToTikTok(client, contentId);
+    }
   }
 
   revalidatePath('/');
@@ -536,6 +613,12 @@ export async function createContent(formData: FormData) {
   const keyword = String(formData.get('keyword') || '').trim() || title;
   const intent = String(formData.get('intent') || 'giao_dich').trim() || 'giao_dich';
   const landingUrl = String(formData.get('landing_url') || '').trim() || null;
+  // Kênh đăng do người soạn chọn (facebook, tiktok). Trống thì mặc định Facebook.
+  let channels = String(formData.get('channels') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!channels.length) channels = ['facebook'];
   if (!title || !draft) return;
 
   const client = getServerClient();
@@ -545,6 +628,7 @@ export async function createContent(formData: FormData) {
     landing_url: landingUrl,
     keyword_id: keywordId,
     generator: 'xuong-san-xuat',
+    channels,
     assets: { image: imageAssetId, video: videoAssetId }
   };
   const { data: inserted, error } = await client
@@ -565,6 +649,7 @@ export async function createContent(formData: FormData) {
       intent,
       landing_url: landingUrl,
       risk: 'amber',
+      channels,
       assets: { image: imageAssetId, video: videoAssetId }
     },
     status: 'pending'

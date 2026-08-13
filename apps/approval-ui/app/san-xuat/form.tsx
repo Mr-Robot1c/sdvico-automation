@@ -49,6 +49,9 @@ export default function SanXuatForm({
   const [kind, setKind] = useState<'social' | 'article' | 'video'>('social');
   const [imgId, setImgId] = useState<string>('');
   const [vidId, setVidId] = useState<string>('');
+  // Kênh đăng: Facebook mặc định; TikTok tùy chọn (cần video).
+  const [postFb, setPostFb] = useState(true);
+  const [postTt, setPostTt] = useState(false);
   const [genBusy, setGenBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [pending, startTransition] = useTransition();
@@ -110,6 +113,11 @@ export default function SanXuatForm({
     formData.set('title', title);
     formData.set('draft', draft);
     formData.set('kind', kind);
+    // Kênh đăng: TikTok chỉ khi có video được chọn.
+    const chans: string[] = [];
+    if (postFb) chans.push('facebook');
+    if (postTt && vidId) chans.push('tiktok');
+    formData.set('channels', chans.join(','));
     if (imgId) formData.set('image_asset_id', imgId);
     if (vidId) formData.set('video_asset_id', vidId);
     if (keywordId) formData.set('keyword_id', keywordId);
@@ -127,6 +135,8 @@ export default function SanXuatForm({
         setDraft('');
         setImgId('');
         setVidId('');
+        setPostFb(true);
+        setPostTt(false);
       } catch (e: any) {
         setMsg('Lỗi tạo: ' + (e?.message || e));
       }
@@ -363,6 +373,29 @@ export default function SanXuatForm({
               required
             />
           </label>
+
+          {kind === 'social' ? (
+            <label className="sx-field">
+              <span>Đăng lên</span>
+              <span style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+                <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <input type="checkbox" checked={postFb} onChange={(e) => setPostFb(e.target.checked)} /> Facebook
+                </label>
+                <label
+                  style={{ display: 'inline-flex', gap: 6, alignItems: 'center', opacity: vidId ? 1 : 0.5 }}
+                  title={vidId ? '' : 'TikTok cần một video'}
+                >
+                  <input
+                    type="checkbox"
+                    checked={postTt && !!vidId}
+                    disabled={!vidId}
+                    onChange={(e) => setPostTt(e.target.checked)}
+                  />{' '}
+                  TikTok {vidId ? '' : '(cần video)'}
+                </label>
+              </span>
+            </label>
+          ) : null}
 
           <div className="sx-actions">
             <button
