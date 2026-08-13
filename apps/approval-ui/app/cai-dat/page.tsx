@@ -17,80 +17,78 @@ export default async function Page() {
   const { data } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
   const brand: BrandConfig = (data?.value || {}) as BrandConfig;
 
+  const footerParts = [
+    brand.hotline ? `Hotline: ${brand.hotline}` : null,
+    brand.email ? `Email: ${brand.email}` : null,
+    brand.website || null,
+  ].filter(Boolean);
+
   return (
     <main>
       <header className="head-row">
         <div>
           <h1>Cài đặt thương hiệu</h1>
-          <p className="sub">Thông tin công ty tự động gắn vào bài đăng Facebook. Logo dùng làm ảnh mặc định khi không có ảnh khác.</p>
+          <p className="sub">Thông tin công ty tự động gắn vào bài đăng Facebook. Logo dùng làm ảnh đính kèm khi không có ảnh nào khác.</p>
         </div>
       </header>
 
       <form action={saveBrandConfig} className="settings-box">
-        <b>Thông tin công ty</b>
+        <b>Logo công ty</b>
 
-        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '0.85em', color: 'var(--muted)' }}>URL logo công ty</span>
-            <input
-              className="note"
-              name="logo_url"
-              type="url"
-              defaultValue={brand.logo_url || ''}
-              placeholder="https://sdvico.vn/logo.png"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-            <span style={{ fontSize: '0.78em', color: 'var(--muted)' }}>
-              Dùng làm ảnh đính kèm bài Facebook khi vị trí không có ảnh Unsplash hay ảnh tải lên.
-              Có thể dùng link ảnh từ Google Drive, Imgur, hoặc bất kỳ URL ảnh công khai nào.
-            </span>
-          </label>
-
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {brand.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={brand.logo_url}
-              alt="Logo hiện tại"
-              style={{ maxHeight: 80, maxWidth: 200, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 6, padding: 8 }}
-            />
-          ) : null}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={brand.logo_url}
+                alt="Logo hiện tại"
+                style={{ maxHeight: 64, maxWidth: 160, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 6, padding: 6, background: '#fff' }}
+              />
+              <span style={{ fontSize: '0.82em', color: 'var(--muted)' }}>Logo đang dùng</span>
+            </div>
+          ) : (
+            <p className="muted" style={{ margin: 0, fontSize: '0.85em' }}>Chưa có logo. Chọn file từ máy hoặc dán URL bên dưới.</p>
+          )}
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '0.85em', color: 'var(--muted)' }}>Hotline</span>
-            <input
-              className="note"
-              name="hotline"
-              defaultValue={brand.hotline || ''}
-              placeholder="1900 23 23 49"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
+          <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <span style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>Chọn file logo từ máy:</span>
+            <input type="file" name="logo_file" accept="image/*" style={{ fontSize: '0.85em' }} />
           </label>
+          <span style={{ fontSize: '0.78em', color: 'var(--muted)' }}>
+            Hoặc dán URL logo công khai (ưu tiên chọn file từ máy, tránh dùng link Google Drive vì hay bị chặn):
+          </span>
+          <input
+            className="note"
+            name="logo_url"
+            type="url"
+            defaultValue={brand.logo_url || ''}
+            placeholder="https://... (URL ảnh công khai)"
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
+        </div>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '0.85em', color: 'var(--muted)' }}>Email tuyển dụng</span>
-            <input
-              className="note"
-              name="email"
-              type="email"
-              defaultValue={brand.email || ''}
-              placeholder="tuyendung@sdvico.vn"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-          </label>
+        <b style={{ display: 'block', marginTop: 16 }}>Thông tin liên hệ</b>
+        <p style={{ fontSize: '0.82em', color: 'var(--muted)', margin: '4px 0 10px' }}>
+          Tự động gắn vào cuối mỗi bài đăng tuyển dụng Facebook mới soạn.
+        </p>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '0.85em', color: 'var(--muted)' }}>Website</span>
-            <input
-              className="note"
-              name="website"
-              defaultValue={brand.website || ''}
-              placeholder="sdvico.vn"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-          </label>
-
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '0.85em', color: 'var(--muted)' }}>Mô tả ngắn công ty (không bắt buộc)</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="row">
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '0.82em', color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Hotline</label>
+              <input className="note" name="hotline" defaultValue={brand.hotline || ''} placeholder="1900 23 23 49" style={{ width: '100%', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '0.82em', color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Website</label>
+              <input className="note" name="website" defaultValue={brand.website || ''} placeholder="sdvico.vn" style={{ width: '100%', boxSizing: 'border-box' }} />
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: '0.82em', color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Email tuyển dụng</label>
+            <input className="note" name="email" type="email" defaultValue={brand.email || ''} placeholder="tuyendung@sdvico.vn" style={{ width: '100%', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '0.82em', color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Mô tả ngắn công ty (không bắt buộc)</label>
             <textarea
               name="company_desc"
               rows={2}
@@ -99,7 +97,7 @@ export default async function Page() {
               style={{ width: '100%', boxSizing: 'border-box' }}
               aria-label="Mô tả công ty"
             />
-          </label>
+          </div>
         </div>
 
         <div className="row" style={{ marginTop: 12 }}>
@@ -107,24 +105,18 @@ export default async function Page() {
         </div>
       </form>
 
-      {(brand.hotline || brand.email || brand.website) ? (
+      {footerParts.length > 0 ? (
         <div className="settings-box" style={{ marginTop: 12 }}>
-          <b>Xem trước footer bài đăng Facebook</b>
-          <p style={{ marginTop: 8, fontSize: '0.9em', color: 'var(--muted)', fontStyle: 'italic' }}>
-            Đoạn sau sẽ tự động gắn vào cuối mỗi bài tuyển dụng mới soạn:
-          </p>
-          <pre style={{ marginTop: 6, fontSize: '0.88em' }}>
-            {[
-              brand.hotline ? `Hotline: ${brand.hotline}` : null,
-              brand.email ? `Email: ${brand.email}` : null,
-              brand.website || null,
-            ].filter(Boolean).join('  |  ')}
+          <b>Xem trước footer bài Facebook</b>
+          <p style={{ marginTop: 6, fontSize: '0.85em', color: 'var(--muted)' }}>Đoạn này tự gắn vào cuối bài tuyển dụng mới:</p>
+          <pre style={{ marginTop: 4, fontSize: '0.88em', background: 'var(--surface)', padding: '8px 12px', borderRadius: 6 }}>
+            {footerParts.join('  |  ')}
           </pre>
         </div>
       ) : (
         <div className="settings-box" style={{ marginTop: 12 }}>
           <p className="muted" style={{ margin: 0 }}>
-            Chưa có thông tin liên hệ. Điền hotline, email hoặc website ở trên để hệ thống tự gắn vào cuối bài đăng Facebook.
+            Chưa có thông tin liên hệ. Điền hotline, email hoặc website ở trên rồi Lưu để hệ thống gắn vào cuối bài đăng.
           </p>
         </div>
       )}

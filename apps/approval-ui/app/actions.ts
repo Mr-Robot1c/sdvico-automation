@@ -439,15 +439,35 @@ export async function createJdDraft(formData: FormData) {
 
 // Lưu cài đặt thương hiệu công ty: logo, hotline, email, website, mô tả ngắn.
 // Dùng để gắn footer liên hệ vào bài đăng Facebook và làm ảnh mặc định khi không có ảnh khác.
+// Logo: file từ máy ưu tiên hơn URL nhập tay (upload vào post-images/brand/).
 export async function saveBrandConfig(formData: FormData) {
+  const logoFile = formData.get('logo_file') as File | null;
+  let logo_url = String(formData.get('logo_url') || '').trim() || null;
+
+  const client = getServerClient();
+
+  if (logoFile && logoFile.size > 0) {
+    try {
+      const bytes = await logoFile.arrayBuffer();
+      const rawExt = logoFile.name.split('.').pop() || 'png';
+      const ext = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'png';
+      const { error: uploadErr } = await client.storage
+        .from('post-images')
+        .upload(`brand/logo.${ext}`, bytes, { contentType: logoFile.type, upsert: true });
+      if (!uploadErr) {
+        const { data: { publicUrl } } = client.storage.from('post-images').getPublicUrl(`brand/logo.${ext}`);
+        logo_url = publicUrl;
+      }
+    } catch {}
+  }
+
   const config = {
-    logo_url: String(formData.get('logo_url') || '').trim() || null,
+    logo_url,
     hotline: String(formData.get('hotline') || '').trim() || null,
     email: String(formData.get('email') || '').trim() || null,
     website: String(formData.get('website') || '').trim() || null,
     company_desc: String(formData.get('company_desc') || '').trim() || null,
   };
-  const client = getServerClient();
   const { error } = await client.from('app_config').upsert(
     { key: 'brand_config', value: config, updated_at: new Date().toISOString() },
     { onConflict: 'key' }
