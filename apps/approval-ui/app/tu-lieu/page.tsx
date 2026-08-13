@@ -58,15 +58,16 @@ export default async function Page() {
       ) : null}
 
       <ul className="assetgrid">
-        {rows.map((a) => {
+        {rows.map((a, i) => {
           const url = urlOf(a.storage_path);
+          const stt = rows.length - i; // STT theo thứ tự thêm vào (dùng cho vòng xoay tự đăng)
           return (
             <li key={a.id} className="assetcard">
               <div className="asset-preview">
                 <AssetViewer url={url} kind={a.kind} title={a.title} />
               </div>
               <div className="asset-meta">
-                <span className="badge badge-format">{KIND_LABEL[a.kind] || a.kind}</span>
+                <span className="badge badge-format">STT {stt} · {KIND_LABEL[a.kind] || a.kind}</span>
                 <form action={renameAsset} className="rename-form">
                   <input type="hidden" name="id" value={a.id} />
                   <input name="title" defaultValue={a.title} aria-label="Tên tư liệu" title="Đặt tên mô tả rõ để AI sinh text bám theo" />

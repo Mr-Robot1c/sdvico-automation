@@ -19,6 +19,9 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/', req.url));
   }
 
+  // API nội bộ (Vercel Cron gọi /api/rotate) không dùng basic-auth — tự bảo vệ bằng CRON_SECRET.
+  if (req.nextUrl.pathname.startsWith('/api/')) return NextResponse.next();
+
   if (process.env.NODE_ENV !== 'production') return NextResponse.next();
 
   // .trim() phòng khi giá trị biến môi trường dính ký tự xuống dòng hoặc khoảng trắng thừa.
