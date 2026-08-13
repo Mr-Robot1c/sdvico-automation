@@ -268,7 +268,6 @@ export async function decideForm(formData: FormData) {
 
   revalidatePath('/');
   revalidatePath('/noi-dung');
-  revalidatePath('/da-dang');
 }
 
 // Thêm một từ khóa vào kho.

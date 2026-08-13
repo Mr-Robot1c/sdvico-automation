@@ -118,6 +118,26 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     }
   }
 
+  // Bài đã đăng thật: link "Xem bài" (external_url) theo content — thay cho trang Lịch sử xuất bản đã bỏ.
+  // Chỉ nhận link http (Facebook). TikTok lưu 'tiktok:publishId' không mở được nên bỏ qua.
+  const publishedByContent = new Map<string, { channel: string; url: string }[]>();
+  const itemIds = items.map((c) => c.id);
+  if (itemIds.length) {
+    const { data: posts } = await client
+      .from('mkt_posts')
+      .select('content_id, channel, external_url')
+      .eq('status', 'published')
+      .in('content_id', itemIds);
+    for (const p of posts || []) {
+      const cid = (p as any).content_id as string | null;
+      const ext = (p as any).external_url as string | null;
+      if (cid && ext && /^https?:\/\//.test(ext)) {
+        if (!publishedByContent.has(cid)) publishedByContent.set(cid, []);
+        publishedByContent.get(cid)!.push({ channel: (p as any).channel || '', url: ext });
+      }
+    }
+  }
+
   const [{ count: cBai }, { count: cVid }] = await Promise.all([
     client.from('mkt_content').select('*', { count: 'exact', head: true }).in('kind', ['article', 'social']),
     client.from('mkt_content').select('*', { count: 'exact', head: true }).eq('kind', 'video')
@@ -269,6 +289,18 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                           </div>
                         ) : null}
                       </ViewModal>
+                      {(publishedByContent.get(c.id) || []).map((p, i) => (
+                        <a
+                          key={i}
+                          className="src"
+                          href={p.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ marginLeft: 8, whiteSpace: 'nowrap' }}
+                        >
+                          ↗ Xem bài{p.channel === 'facebook' ? ' (FB)' : p.channel ? ` (${p.channel})` : ''}
+                        </a>
+                      ))}
                     </td>
                   </tr>
                 );

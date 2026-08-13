@@ -36,7 +36,6 @@ function crumbFor(path: string): string {
   const map: Record<string, string> = {
     '/': 'Hàng đợi duyệt',
     '/noi-dung': 'Quản lý bài viết',
-    '/da-dang': 'Lịch sử xuất bản',
     '/san-xuat': 'Xưởng sản xuất',
     '/tu-khoa': 'Kho từ khóa',
     '/du-kien': 'Nguồn dữ kiện',

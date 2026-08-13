@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 type Tab = { href: string; label: string; icon: string };
 type Group = { title: string; items: Tab[] };
 
-// Sidebar chia nhóm theo dòng chảy công việc: hàng đợi → nội dung → sản xuất → tư liệu → (tuyển dụng).
+// Sidebar chia nhóm theo dòng chảy công việc: hàng đợi → quản lí và sản xuất → (tuyển dụng) → tư liệu → kết nối.
 export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean }) {
   const path = usePathname();
 
@@ -14,15 +14,11 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
     ? [
         { title: 'Hàng đợi', items: [{ href: '/', label: 'Hàng đợi duyệt', icon: '📥' }] },
         {
-          title: 'Nội dung',
+          title: 'Quản lí và Sản xuất',
           items: [
             { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
-            { href: '/da-dang', label: 'Lịch sử xuất bản', icon: '🌐' }
+            { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' }
           ]
-        },
-        {
-          title: 'Sản xuất',
-          items: [{ href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' }]
         },
         {
           title: 'Tư liệu',
@@ -40,13 +36,12 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
     : [
         { title: 'Hàng đợi', items: [{ href: '/', label: 'Hàng đợi duyệt', icon: '📥' }] },
         {
-          title: 'Nội dung',
+          title: 'Quản lí và Sản xuất',
           items: [
             { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
-            { href: '/da-dang', label: 'Lịch sử xuất bản', icon: '🌐' }
+            { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' }
           ]
         },
-        { title: 'Sản xuất', items: [{ href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' }] },
         {
           title: 'Tuyển dụng',
           items: [
