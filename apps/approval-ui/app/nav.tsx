@@ -6,42 +6,46 @@ import { usePathname } from 'next/navigation';
 type Tab = { href: string; label: string; icon: string };
 type Group = { title: string; items: Tab[] };
 
-// Sidebar chia nhóm theo dòng chảy công việc: hàng đợi → quản lí và sản xuất → (tuyển dụng) → tư liệu → kết nối.
+// Sidebar chia nhóm theo dòng chảy công việc: hàng đợi → quản lí và sản xuất → (tuyển dụng) → tư liệu → kết nối → quy tắc.
 export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean }) {
   const path = usePathname();
 
+  const ketNoi: Group = {
+    title: 'Kết nối',
+    items: [
+      { href: '/facebook', label: 'Kết nối Facebook', icon: '📘' },
+      { href: '/tiktok', label: 'Kết nối TikTok', icon: '🎵' }
+    ]
+  };
+  const quyTac: Group = {
+    title: 'Quy tắc',
+    items: [
+      { href: '/privacy', label: 'Chính sách quyền riêng tư', icon: '🔒' },
+      { href: '/terms', label: 'Điều khoản', icon: '📄' }
+    ]
+  };
+  const tuLieu: Group = {
+    title: 'Tư liệu',
+    items: [
+      { href: '/tu-khoa', label: 'Kho từ khóa', icon: '🔑' },
+      { href: '/du-kien', label: 'Nguồn dữ kiện', icon: '📊' },
+      { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' }
+    ]
+  };
+  const quanLySanXuat: Group = {
+    title: 'Quản lí và Sản xuất',
+    items: [
+      { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
+      { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' }
+    ]
+  };
+  const hangDoi: Group = { title: 'Hàng đợi', items: [{ href: '/', label: 'Hàng đợi duyệt', icon: '📥' }] };
+
   const groups: Group[] = marketingOnly
-    ? [
-        { title: 'Hàng đợi', items: [{ href: '/', label: 'Hàng đợi duyệt', icon: '📥' }] },
-        {
-          title: 'Quản lí và Sản xuất',
-          items: [
-            { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
-            { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' }
-          ]
-        },
-        {
-          title: 'Tư liệu',
-          items: [
-            { href: '/tu-khoa', label: 'Kho từ khóa', icon: '🔑' },
-            { href: '/du-kien', label: 'Nguồn dữ kiện', icon: '📊' },
-            { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' }
-          ]
-        },
-        {
-          title: 'Kết nối',
-          items: [{ href: '/tiktok', label: 'Kết nối TikTok', icon: '🎵' }]
-        }
-      ]
+    ? [hangDoi, quanLySanXuat, tuLieu, ketNoi, quyTac]
     : [
-        { title: 'Hàng đợi', items: [{ href: '/', label: 'Hàng đợi duyệt', icon: '📥' }] },
-        {
-          title: 'Quản lí và Sản xuất',
-          items: [
-            { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
-            { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' }
-          ]
-        },
+        hangDoi,
+        quanLySanXuat,
         {
           title: 'Tuyển dụng',
           items: [
@@ -49,18 +53,9 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
             { href: '/vi-tri', label: 'Vị trí tuyển dụng', icon: '📋' }
           ]
         },
-        {
-          title: 'Tư liệu',
-          items: [
-            { href: '/tu-khoa', label: 'Kho từ khóa', icon: '🔑' },
-            { href: '/du-kien', label: 'Nguồn dữ kiện', icon: '📊' },
-            { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' }
-          ]
-        },
-        {
-          title: 'Kết nối',
-          items: [{ href: '/tiktok', label: 'Kết nối TikTok', icon: '🎵' }]
-        }
+        tuLieu,
+        ketNoi,
+        quyTac
       ];
 
   return (

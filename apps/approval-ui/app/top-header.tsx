@@ -40,6 +40,10 @@ function crumbFor(path: string): string {
     '/tu-khoa': 'Kho từ khóa',
     '/du-kien': 'Nguồn dữ kiện',
     '/tu-lieu': 'Kho tư liệu',
+    '/facebook': 'Kết nối Facebook',
+    '/tiktok': 'Kết nối TikTok',
+    '/privacy': 'Chính sách quyền riêng tư',
+    '/terms': 'Điều khoản',
     '/ho-so': 'Hồ sơ ứng viên',
     '/vi-tri': 'Vị trí tuyển dụng'
   };
