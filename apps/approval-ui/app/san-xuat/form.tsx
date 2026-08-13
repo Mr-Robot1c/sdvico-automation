@@ -52,6 +52,8 @@ export default function SanXuatForm({
   // Kênh đăng: Facebook mặc định; TikTok tùy chọn (cần video).
   const [postFb, setPostFb] = useState(true);
   const [postTt, setPostTt] = useState(false);
+  // Loại content để so sánh A/B (tips/bán hàng/review/UGC).
+  const [contentType, setContentType] = useState<string>('tips');
   const [genBusy, setGenBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [pending, startTransition] = useTransition();
@@ -118,6 +120,7 @@ export default function SanXuatForm({
     if (postFb) chans.push('facebook');
     if (postTt && vidId) chans.push('tiktok');
     formData.set('channels', chans.join(','));
+    formData.set('content_type', contentType);
     if (imgId) formData.set('image_asset_id', imgId);
     if (vidId) formData.set('video_asset_id', vidId);
     if (keywordId) formData.set('keyword_id', keywordId);
@@ -137,6 +140,7 @@ export default function SanXuatForm({
         setVidId('');
         setPostFb(true);
         setPostTt(false);
+        setContentType('tips');
       } catch (e: any) {
         setMsg('Lỗi tạo: ' + (e?.message || e));
       }
@@ -345,6 +349,17 @@ export default function SanXuatForm({
               <option value="social">Bài ngắn</option>
               <option value="article">Bài dài</option>
               <option value="video">Kịch bản video</option>
+            </select>
+          </label>
+
+          <label className="sx-field">
+            <span>Loại content (để so sánh hiệu quả)</span>
+            <select value={contentType} onChange={(e) => setContentType(e.target.value)} className="note">
+              <option value="tips">Tips / Giáo dục</option>
+              <option value="sales">Bán hàng trực tiếp</option>
+              <option value="review">Review</option>
+              <option value="ugc">UGC (khách hàng)</option>
+              <option value="other">Khác</option>
             </select>
           </label>
 

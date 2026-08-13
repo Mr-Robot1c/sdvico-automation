@@ -36,7 +36,8 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
     title: 'Quản lí và Sản xuất',
     items: [
       { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
-      { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' }
+      { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
+      { href: '/do-luong', label: 'Đo lường', icon: '📈' }
     ]
   };
   const hangDoi: Group = {

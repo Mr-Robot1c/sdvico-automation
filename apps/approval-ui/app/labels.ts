@@ -73,6 +73,18 @@ export function lengthLabel(f?: string): string {
   }
 }
 
+// Nhãn loại content (để so sánh hiệu quả A/B).
+export function contentTypeLabel(t?: string | null): string {
+  switch (t) {
+    case 'tips': return 'Tips / Giáo dục';
+    case 'sales': return 'Bán hàng';
+    case 'review': return 'Review';
+    case 'ugc': return 'UGC';
+    case 'other': return 'Khác';
+    default: return t || 'Chưa phân loại';
+  }
+}
+
 // Nhãn kênh đăng thật, lấy từ brief.channels (facebook, tiktok). Trống thì mặc định Facebook.
 export function channelsLabel(channels?: string[] | null): string {
   const arr = Array.isArray(channels) && channels.length ? channels : ['facebook'];

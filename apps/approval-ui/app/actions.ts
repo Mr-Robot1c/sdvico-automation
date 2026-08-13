@@ -7,6 +7,7 @@ import { getServerClient } from '../lib/supabase-server';
 import { postVideoToTikTok } from '../lib/tiktok';
 import { isEmergencyStopped, reservePostQuota, setEmergencyStop } from '../lib/safety';
 import { fetchWithRetry } from '../lib/retry';
+import { pullFacebookMetrics } from '../lib/fb-metrics';
 
 // Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment ngay lúc video còn
 // đang xử lý sẽ lỗi → ảnh bị bỏ). Hỏi trạng thái qua /{videoId}?fields=status. Trả true khi sẵn sàng.
@@ -312,6 +313,13 @@ export async function toggleEmergencyStop(formData: FormData) {
   });
   revalidatePath('/van-hanh');
   revalidatePath('/');
+}
+
+// Cập nhật số liệu Facebook thủ công (nút trên trang Đo lường).
+export async function refreshFacebookMetrics() {
+  const client = getServerClient();
+  await pullFacebookMetrics(client);
+  revalidatePath('/do-luong');
 }
 
 // Thêm một từ khóa vào kho.
@@ -662,6 +670,7 @@ export async function createContent(formData: FormData) {
     .map((s) => s.trim())
     .filter(Boolean);
   if (!channels.length) channels = ['facebook'];
+  const contentType = String(formData.get('content_type') || 'other').trim() || 'other';
   if (!title || !draft) return;
 
   const client = getServerClient();
@@ -672,6 +681,7 @@ export async function createContent(formData: FormData) {
     keyword_id: keywordId,
     generator: 'xuong-san-xuat',
     channels,
+    content_type: contentType,
     assets: { image: imageAssetId, video: videoAssetId }
   };
   const { data: inserted, error } = await client
