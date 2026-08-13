@@ -5,7 +5,7 @@
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../lib/supabase-server';
 import { postVideoToTikTok } from '../lib/tiktok';
-import { isEmergencyStopped, reservePostQuota, setEmergencyStop } from '../lib/safety';
+import { isEmergencyStopped, reservePostQuota, setEmergencyStop, isQuotaDisabled, setQuotaDisabled } from '../lib/safety';
 import { fetchWithRetry } from '../lib/retry';
 import { pullFacebookMetrics } from '../lib/fb-metrics';
 
@@ -275,18 +275,22 @@ export async function decideForm(formData: FormData) {
         });
       } else {
         // Đăng SONG SONG các kênh còn trong hạn mức ngày (mỗi kênh tối đa LIMIT bài/ngày).
+        // Nếu bật "bỏ hạn mức" (để test) thì đăng thẳng, không kiểm trần.
+        const quotaOff = await isQuotaDisabled(client);
         const jobs: Promise<unknown>[] = [];
         for (const ch of ['facebook', 'tiktok']) {
           if (!channels.includes(ch)) continue;
-          const q = await reservePostQuota(client, ch, LIMIT);
-          if (!q.allowed) {
-            await client.from('run_log').insert({
-              task: 'mkt.publish_blocked',
-              actor: 'decideForm',
-              status: 'skipped',
-              detail: { contentId, channel: ch, reason: 'quota', count: q.count, limit: LIMIT }
-            });
-            continue;
+          if (!quotaOff) {
+            const q = await reservePostQuota(client, ch, LIMIT);
+            if (!q.allowed) {
+              await client.from('run_log').insert({
+                task: 'mkt.publish_blocked',
+                actor: 'decideForm',
+                status: 'skipped',
+                detail: { contentId, channel: ch, reason: 'quota', count: q.count, limit: LIMIT }
+              });
+              continue;
+            }
           }
           if (ch === 'facebook') jobs.push(publishContentToFacebook(client, contentId));
           if (ch === 'tiktok') jobs.push(publishContentToTikTok(client, contentId));
@@ -313,6 +317,15 @@ export async function toggleEmergencyStop(formData: FormData) {
   });
   revalidatePath('/van-hanh');
   revalidatePath('/');
+}
+
+// Bật/tắt "bỏ hạn mức" — khi bật thì đăng không kiểm trần ngày (dùng để test).
+export async function toggleQuotaDisabled(formData: FormData) {
+  const off = String(formData.get('off') || '') === '1';
+  const client = getServerClient();
+  await setQuotaDisabled(client, off);
+  await client.from('run_log').insert({ task: 'ops.quota_disabled', actor: 'ui', status: 'ok', detail: { disabled: off } });
+  revalidatePath('/van-hanh');
 }
 
 // Cập nhật số liệu Facebook thủ công (nút trên trang Đo lường).

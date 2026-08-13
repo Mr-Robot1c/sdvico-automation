@@ -17,6 +17,18 @@ export async function setEmergencyStop(client: Client, stopped: boolean): Promis
     .upsert({ key: 'emergency_stop', value: stopped, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 }
 
+// --- Bỏ hạn mức (tắt trần đăng ngày, dùng khi cần test) ---
+export async function isQuotaDisabled(client: Client): Promise<boolean> {
+  const { data } = await client.from('app_config').select('value').eq('key', 'quota_disabled').maybeSingle();
+  return Boolean(data && (data as any).value === true);
+}
+
+export async function setQuotaDisabled(client: Client, disabled: boolean): Promise<void> {
+  await client
+    .from('app_config')
+    .upsert({ key: 'quota_disabled', value: disabled, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+}
+
 // --- Hạn mức đăng ngày (mỗi kênh) ---
 // Ngày theo giờ Việt Nam (UTC+7), dạng YYYY-MM-DD.
 export function todayVN(): string {
