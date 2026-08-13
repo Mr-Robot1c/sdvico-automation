@@ -5,6 +5,7 @@ import { getServerClient } from '../lib/supabase-server';
 import { composeJdVersions } from '../lib/jd-compose';
 import { groqChat } from '../lib/groq';
 import { fetchUnsplashPhoto } from '../lib/unsplash';
+import { overlayLogo } from '../lib/image-composite';
 
 // Người quyết. Đọc từ form, cập nhật trạng thái, chỉ đổi mục còn pending.
 export async function decideForm(formData: FormData) {
@@ -231,8 +232,28 @@ export async function queueFacebookPost(formData: FormData) {
   const footer = footerParts.length ? '\n\n' + footerParts.join('  |  ') : '';
   const noi_dung = noi_dung_raw + footer;
 
-  // Ảnh: dùng Unsplash nếu có, không thì dùng logo công ty nếu đã cài đặt.
-  const image_url = unsplash_url || brand.logo_url || null;
+  // Ghép logo lên ảnh Unsplash nếu cả hai đều có, upload kết quả lên Storage.
+  // Không có Unsplash thì dùng logo đơn thuần. Không có logo thì dùng Unsplash gốc.
+  let image_url: string | null = null;
+  if (unsplash_url && brand.logo_url) {
+    try {
+      const composited = await overlayLogo(unsplash_url, brand.logo_url, 'southeast');
+      const imgPath = `posts/${jobId}/fb-${Date.now()}.jpg`;
+      const { error: upErr } = await client.storage
+        .from('post-images')
+        .upload(imgPath, composited, { contentType: 'image/jpeg', upsert: true });
+      if (!upErr) {
+        const { data: { publicUrl } } = client.storage.from('post-images').getPublicUrl(imgPath);
+        image_url = publicUrl;
+      } else {
+        image_url = unsplash_url; // fallback: ảnh gốc không có logo
+      }
+    } catch {
+      image_url = unsplash_url; // fallback khi ghép thất bại
+    }
+  } else {
+    image_url = unsplash_url || brand.logo_url || null;
+  }
 
   const tieu_de = `Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`;
 
