@@ -9,6 +9,7 @@ ttl_days: 180
 <!-- re-verified: 2026-08-12 - publish-facebook.mjs + decideForm: them dang VIDEO qua /videos (file_url) khi bai co brief.assets.video. Uu tien video > anh > chu. -->
 <!-- re-verified: 2026-08-13 - publish-facebook.mjs + decideForm (actions.ts): bai co CA anh lan video thi dang VIDEO kem caption roi tha ANH vao binh luan dau (POST /{videoId}/comments attachment_url) - FB chan gop video+anh chung 1 post. Tha anh loi thi chi canh bao, khong danh hong bai (tranh dang lai video). Chi anh -> /photos, chi video -> /videos, khong co -> /feed (khong doi). -->
 <!-- re-verified: 2026-08-13 - noi-dung/page.tsx: sap xep theo thoi diem duyet (approval_queue.decided_at) fallback created_at, giam dan - bai vua duyet nhay len dau. -->
+<!-- re-verified: 2026-08-13 - publish-facebook.mjs: truoc khi tha anh vao binh luan bai video, CHO video xu ly xong (waitVideoReady poll /{id}?fields=status toi 90s, Authorization Bearer) roi moi comment - fix anh khong hien do comment luc video con dang xu ly. -->
 
 ## 1. Workflow marketing, từ đầu tới cuối
 

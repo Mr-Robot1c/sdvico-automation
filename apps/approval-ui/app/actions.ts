@@ -5,6 +5,33 @@
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../lib/supabase-server';
 
+// Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment ngay lúc video còn
+// đang xử lý sẽ lỗi → ảnh bị bỏ). Hỏi trạng thái qua /{videoId}?fields=status. Trả true khi sẵn sàng.
+async function waitFacebookVideoReady(
+  videoId: string,
+  version: string,
+  token: string,
+  maxWaitMs = 24000,
+  intervalMs = 3000
+): Promise<boolean> {
+  const started = Date.now();
+  while (Date.now() - started < maxWaitMs) {
+    try {
+      const r = await fetch(`https://graph.facebook.com/${version}/${videoId}?fields=status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const j: any = await r.json();
+      const vs = j?.status?.video_status;
+      if (vs === 'ready') return true;
+      if (vs === 'error') return false;
+    } catch {
+      // lỗi tạm thời, thử lại nhịp sau
+    }
+    await new Promise((res) => setTimeout(res, intervalMs));
+  }
+  return false;
+}
+
 // Đăng một bài marketing đã duyệt lên Facebook Page qua Graph API. CHỈ đăng nội dung SDVICO
 // lên Page của SDVICO (API chính thức). Máy soạn, người bấm Duyệt (điều cấm 1) — hàm này chạy
 // SAU khi người đã bấm Duyệt. Chưa cấu hình token thì bỏ qua, không lỗi.
@@ -73,19 +100,26 @@ async function publishContentToFacebook(
       : `https://www.facebook.com/${postId}`;
 
     // Bài có CẢ video lẫn ảnh: thả ảnh vào bình luận đầu của bài video (FB chặn gộp chung).
-    // Video đã lên là chính; nếu thả ảnh lỗi thì chỉ cảnh báo, KHÔNG đánh hỏng cả bài (tránh đăng lại video).
+    // Phải CHỜ video xử lý xong mới thả được ảnh. Video đã lên là chính; thả ảnh lỗi thì chỉ
+    // cảnh báo, KHÔNG đánh hỏng cả bài (tránh đăng lại video).
     let warn: string | undefined;
     if (videoUrl && imageUrl) {
-      try {
-        const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${json.id}/comments`, {
-          method: 'POST',
-          body: new URLSearchParams({ attachment_url: imageUrl, access_token: TOKEN })
-        });
-        const cJson: any = await cRes.json();
-        if (!cRes.ok || cJson.error) throw new Error(cJson.error?.message || `HTTP ${cRes.status}`);
-      } catch (ce: any) {
-        warn = `Đăng video xong nhưng chưa thả được ảnh vào bình luận: ${String(ce?.message || ce)}`;
+      const ready = await waitFacebookVideoReady(json.id, VERSION, TOKEN);
+      if (!ready) {
+        warn = 'Đăng video xong nhưng video chưa xử lý kịp nên chưa thả được ảnh vào bình luận.';
         console.error('[facebook] ' + warn);
+      } else {
+        try {
+          const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${json.id}/comments`, {
+            method: 'POST',
+            body: new URLSearchParams({ attachment_url: imageUrl, access_token: TOKEN })
+          });
+          const cJson: any = await cRes.json();
+          if (!cRes.ok || cJson.error) throw new Error(cJson.error?.message || `HTTP ${cRes.status}`);
+        } catch (ce: any) {
+          warn = `Đăng video xong nhưng chưa thả được ảnh vào bình luận: ${String(ce?.message || ce)}`;
+          console.error('[facebook] ' + warn);
+        }
       }
     }
 

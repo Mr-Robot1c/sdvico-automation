@@ -23,6 +23,26 @@ const CAP = Number(process.env.MKT_MAX_POSTS_PER_RUN) || 3;
 
 const client = getServiceClient();
 
+// Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment lúc video còn xử lý sẽ lỗi).
+async function waitVideoReady(videoId, version, token, maxWaitMs = 90000, intervalMs = 4000) {
+  const started = Date.now();
+  while (Date.now() - started < maxWaitMs) {
+    try {
+      const r = await fetch(`https://graph.facebook.com/${version}/${videoId}?fields=status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = await r.json();
+      const vs = j?.status?.video_status;
+      if (vs === 'ready') return true;
+      if (vs === 'error') return false;
+    } catch {
+      // lỗi tạm thời, thử lại nhịp sau
+    }
+    await new Promise((res) => setTimeout(res, intervalMs));
+  }
+  return false;
+}
+
 // 1. Lấy các bài ĐÃ DUYỆT trong hàng đợi.
 const { data: approved, error: e1 } = await client
   .from('approval_queue')
@@ -134,18 +154,24 @@ for (const j of queue) {
     // Video lên là chính; thả ảnh lỗi thì chỉ cảnh báo, KHÔNG dừng cả vòng (tránh đăng lại video).
     let photoComment = null;
     if (videoUrl && imageUrl) {
-      try {
-        const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${json.id}/comments`, {
-          method: 'POST',
-          body: new URLSearchParams({ attachment_url: imageUrl, access_token: TOKEN }),
-        });
-        const cJson = await cRes.json();
-        if (!cRes.ok || cJson.error) throw new Error(cJson.error?.message || `HTTP ${cRes.status}`);
-        photoComment = 'ok';
-        console.log('  Đã thả ảnh vào bình luận đầu.');
-      } catch (ce) {
-        photoComment = `lỗi: ${String(ce.message || ce)}`;
-        console.error(`  Đăng video xong nhưng chưa thả được ảnh vào bình luận: ${ce.message || ce}`);
+      const ready = await waitVideoReady(json.id, VERSION, TOKEN);
+      if (!ready) {
+        photoComment = 'video chưa xử lý xong, chưa thả ảnh';
+        console.error('  Video chưa xử lý xong nên chưa thả được ảnh vào bình luận.');
+      } else {
+        try {
+          const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${json.id}/comments`, {
+            method: 'POST',
+            body: new URLSearchParams({ attachment_url: imageUrl, access_token: TOKEN }),
+          });
+          const cJson = await cRes.json();
+          if (!cRes.ok || cJson.error) throw new Error(cJson.error?.message || `HTTP ${cRes.status}`);
+          photoComment = 'ok';
+          console.log('  Đã thả ảnh vào bình luận đầu.');
+        } catch (ce) {
+          photoComment = `lỗi: ${String(ce.message || ce)}`;
+          console.error(`  Đăng video xong nhưng chưa thả được ảnh vào bình luận: ${ce.message || ce}`);
+        }
       }
     }
 

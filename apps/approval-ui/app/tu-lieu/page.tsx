@@ -32,6 +32,14 @@ export default async function Page() {
   const rows = (data || []) as Asset[];
   const urlOf = (p: string) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
 
+  // STT đánh số RIÊNG theo loại (Ảnh riêng, Clip riêng, Logo riêng...) — không trộn chung.
+  // Dùng cho vòng xoay tự đăng. Đếm tổng mỗi loại trước, rồi khi duyệt danh sách (mới nhất
+  // trước) trừ dần để cũ nhất = 1 trong từng loại.
+  const kindLabelOf = (kind: string) => KIND_LABEL[kind] || kind;
+  const kindTotals = new Map<string, number>();
+  for (const a of rows) kindTotals.set(kindLabelOf(a.kind), (kindTotals.get(kindLabelOf(a.kind)) || 0) + 1);
+  const kindSeen = new Map<string, number>();
+
   return (
     <main>
       <header className="head-row">
@@ -58,16 +66,19 @@ export default async function Page() {
       ) : null}
 
       <ul className="assetgrid">
-        {rows.map((a, i) => {
+        {rows.map((a) => {
           const url = urlOf(a.storage_path);
-          const stt = rows.length - i; // STT theo thứ tự thêm vào (dùng cho vòng xoay tự đăng)
+          const label = kindLabelOf(a.kind);
+          const seen = kindSeen.get(label) || 0;
+          const stt = (kindTotals.get(label) || 0) - seen; // riêng từng loại: mới nhất cao nhất, cũ nhất = 1
+          kindSeen.set(label, seen + 1);
           return (
             <li key={a.id} className="assetcard">
               <div className="asset-preview">
                 <AssetViewer url={url} kind={a.kind} title={a.title} />
               </div>
               <div className="asset-meta">
-                <span className="badge badge-format">STT {stt} · {KIND_LABEL[a.kind] || a.kind}</span>
+                <span className="badge badge-format">STT {stt} · {label}</span>
                 <form action={renameAsset} className="rename-form">
                   <input type="hidden" name="id" value={a.id} />
                   <input name="title" defaultValue={a.title} aria-label="Tên tư liệu" title="Đặt tên mô tả rõ để AI sinh text bám theo" />
