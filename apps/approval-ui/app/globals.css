@@ -434,18 +434,22 @@ select.note { cursor: pointer; }
   .btn { flex: 1; }
 }
 
-/* === Panel / Drawer slide-in từ phải === */
+/* === Panel / Dialog căn giữa màn hình === */
 .panel-drawer {
-  position: fixed; right: 0; top: 0; bottom: 0; margin: 0;
-  width: min(540px, 100vw); max-height: 100vh;
-  border: none; border-left: 1px solid var(--line);
+  position: fixed; left: 50%; top: 50%; margin: 0;
+  transform: translate(-50%, -50%);
+  width: min(560px, 95vw); max-height: 90vh;
+  border: 1px solid var(--line); border-radius: 16px;
   background: var(--surface); padding: 0; overflow-y: auto;
-  box-shadow: -6px 0 32px rgba(0,0,0,0.14);
-  animation: panelSlideIn 0.22s ease;
+  box-shadow: 0 8px 48px rgba(0,0,0,0.18);
+  animation: panelFadeIn 0.18s ease;
   z-index: 100;
 }
-.panel-drawer::backdrop { background: rgba(0,0,0,0.36); }
-@keyframes panelSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.panel-drawer::backdrop { background: rgba(0,0,0,0.4); }
+@keyframes panelFadeIn {
+  from { opacity: 0; transform: translate(-50%, -47%); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
+}
 
 .panel-inner { display: flex; flex-direction: column; min-height: 100%; }
 .panel-head {
@@ -471,16 +475,6 @@ select.note { cursor: pointer; }
   border-radius: 20px; padding: 4px 12px 4px 6px;
   border: 1.5px solid var(--line); background: var(--chip); color: var(--ink-2);
   cursor: pointer; user-select: none; transition: all 0.16s ease; white-space: nowrap;
-}
-.toggle-pill::before {
-  content: ''; display: block; width: 28px; height: 16px; border-radius: 10px;
-  background: var(--line); position: relative; flex-shrink: 0;
-  transition: background 0.16s ease;
-}
-.toggle-pill::after {
-  content: ''; position: absolute; left: 3px; top: 50%; transform: translateY(-50%);
-  width: 12px; height: 12px; border-radius: 50%; background: #fff;
-  transition: left 0.16s ease;
 }
 .toggle-pill { position: relative; }
 .toggle-knob {

@@ -771,6 +771,16 @@ export async function deleteJd(formData: FormData) {
   revalidatePath('/tao-jd');
 }
 
+// Xóa vị trí ở bất kỳ trạng thái nào (kể cả open). Dùng để loại bỏ vị trí test hoặc không còn cần.
+export async function removeJob(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  if (!jobId) return;
+  const client = getServerClient();
+  const { error } = await client.from('hr_jobs').delete().eq('id', jobId);
+  if (error) throw new Error(error.message);
+  revalidatePath('/tao-jd');
+}
+
 // Bật/tắt chế độ tự động đăng bài định kỳ cho một vị trí. Người bật, worker thực hiện (điều cấm 1).
 export async function toggleAutoPost(formData: FormData) {
   const jobId = String(formData.get('job_id') || '');

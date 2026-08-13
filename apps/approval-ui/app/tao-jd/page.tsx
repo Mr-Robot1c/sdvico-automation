@@ -1,7 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { formatRelative } from '../labels';
 import { JOB_GROUPS, JD_CHANNELS, GROUP_BY_KEY } from '../../lib/jd-groups';
-import { editJdVersion, regenerateJd, deleteJd, openAndQueueFbPost, finalizeJd } from '../actions';
+import { editJdVersion, regenerateJd, deleteJd, openAndQueueFbPost, finalizeJd, removeJob } from '../actions';
 import { SubmitButton } from '../submit-button';
 import AutoPostToggle from './auto-post-toggle';
 import AddJobPanel from './add-job-panel';
@@ -156,6 +156,12 @@ export default async function Page() {
                   <span style={{ fontSize: 12, color: 'var(--ink-2)', alignSelf: 'center' }}>
                     Refresh mỗi {refreshDays} ngày
                   </span>
+                  <form action={removeJob} onSubmit={(e) => {
+                    if (!window.confirm(`Xoá vị trí "${j.title}"?\nThao tác này không thể hoàn tác.`)) e.preventDefault();
+                  }}>
+                    <input type="hidden" name="job_id" value={j.id} />
+                    <SubmitButton label="Xoá vị trí" pendingLabel="Đang xoá..." className="btn no" style={{ fontSize: '0.8em' }} />
+                  </form>
                 </div>
               </li>
             );
@@ -194,6 +200,12 @@ export default async function Page() {
                         <SubmitButton label="Soạn bài Facebook" pendingLabel="AI đang soạn, chờ 10-20 giây..." />
                       </form>
                     ) : null}
+                    <form action={removeJob} onSubmit={(e) => {
+                      if (!window.confirm(`Xoá vị trí "${j.title}"?\nThao tác này không thể hoàn tác.`)) e.preventDefault();
+                    }}>
+                      <input type="hidden" name="job_id" value={j.id} />
+                      <SubmitButton label="Xoá" pendingLabel="Đang xoá..." className="btn no" style={{ fontSize: '0.8em' }} />
+                    </form>
                   </div>
                 </li>
               );
