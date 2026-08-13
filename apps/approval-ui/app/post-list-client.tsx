@@ -164,7 +164,7 @@ export default function PostListClient({
                     <input type="hidden" name="post_id" value={p.id} />
                     {p.trang_thai === 'posted' ? (
                       <p style={{ margin: 0, fontSize: '0.82em', padding: '6px 10px', background: 'rgba(25,118,210,0.08)', borderRadius: 6, color: 'var(--ink-1, #333)' }}>
-                        Bài đã đăng — Lưu sẽ cập nhật nội dung trực tiếp lên Facebook{p.fb_post_id ? '' : ' (lưu nội bộ, chưa có ID bài Facebook)'}.
+                        Bài đã đăng — Lưu sẽ cập nhật nội dung trực tiếp lên Facebook{p.fb_post_id ? ` (ID: ...${p.fb_post_id.slice(-8)})` : '. Paste link bài Facebook bên dưới để bật xoá và sửa tự động.'}.
                       </p>
                     ) : null}
                     <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>Nội dung bài đăng</label>
@@ -175,12 +175,26 @@ export default function PostListClient({
                       <span style={{ color: 'var(--ink-2)', flexShrink: 0 }}>Hoặc chọn từ máy:</span>
                       <input type="file" name="image_file" accept="image/*" style={{ fontSize: '0.85em' }} />
                     </label>
-                    {p.trang_thai !== 'posted' ? (
+                    {p.trang_thai === 'posted' ? (
+                      <>
+                        <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>
+                          Link bài Facebook{p.fb_post_id ? ' (để trống = giữ nguyên ID đã lưu)' : ' — paste để bật xoá/sửa tự động'}
+                        </label>
+                        <input
+                          className="note"
+                          type="text"
+                          name="fb_post_link"
+                          defaultValue=""
+                          placeholder="https://www.facebook.com/sdvico/posts/... hoặc ID dạng 123_456"
+                          aria-label="Link hoặc ID bài Facebook"
+                        />
+                      </>
+                    ) : (
                       <>
                         <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>Giờ đặt đăng (bỏ trống = lưu nháp)</label>
                         <input className="note" type="datetime-local" name="scheduled_at" defaultValue={scheduledDefault} aria-label="Giờ đặt đăng" />
                       </>
-                    ) : null}
+                    )}
                     <SubmitButton
                       label={p.trang_thai === 'posted' ? 'Lưu và cập nhật Facebook' : 'Lưu chỉnh sửa'}
                       pendingLabel={p.trang_thai === 'posted' ? 'Đang cập nhật...' : 'Đang lưu...'}

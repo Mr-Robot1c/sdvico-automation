@@ -327,6 +327,8 @@ export async function editJobPostDraft(formData: FormData) {
   const imageUrlInput = String(formData.get('image_url') || '').trim() || null;
   const imageFile = formData.get('image_file') as File | null;
   const scheduledRaw = String(formData.get('scheduled_at') || '').trim();
+  const fbPostLink = String(formData.get('fb_post_link') || '').trim();
+  const parsedFbPostId = parseFbPostId(fbPostLink);
   if (!postId) return;
 
   const scheduled_at = scheduledRaw ? new Date(scheduledRaw).toISOString() : null;
@@ -364,6 +366,7 @@ export async function editJobPostDraft(formData: FormData) {
   if (cur?.trang_thai === 'posted') {
     // Bài đã đăng: chỉ cập nhật nội dung và hình ảnh, giữ nguyên trạng thái và lịch.
     updateData = { noi_dung, image_url };
+    if (parsedFbPostId) updateData.fb_post_id = parsedFbPostId;
   } else {
     updateData = { noi_dung, image_url, scheduled_at, trang_thai };
   }
@@ -371,12 +374,13 @@ export async function editJobPostDraft(formData: FormData) {
   const { error } = await client.from('hr_job_posts').update(updateData).eq('id', postId);
   if (error) throw new Error(error.message);
 
-  // Đồng bộ lên Facebook nếu bài đã đăng và có fb_post_id.
+  // Đồng bộ lên Facebook nếu bài đã đăng và có fb_post_id (mới nhập hoặc đã có từ trước).
   // Lỗi thì ghi log nhưng không throw — DB đã cập nhật rồi.
-  if (cur?.trang_thai === 'posted' && cur.fb_post_id) {
+  const activeFbPostId = parsedFbPostId || cur?.fb_post_id;
+  if (cur?.trang_thai === 'posted' && activeFbPostId) {
     try {
-      await callFacebookEditApi(cur.fb_post_id, noi_dung);
-      await client.from('run_log').insert({ task: 'hr.edit_facebook_post', status: 'ok', detail: { postId, fbPostId: cur.fb_post_id } });
+      await callFacebookEditApi(activeFbPostId, noi_dung);
+      await client.from('run_log').insert({ task: 'hr.edit_facebook_post', status: 'ok', detail: { postId, fbPostId: activeFbPostId } });
     } catch (err) {
       await client.from('run_log').insert({ task: 'hr.edit_facebook_post', status: 'error', detail: { postId, error: String(err) } });
     }
@@ -429,6 +433,27 @@ async function callFacebookEditApi(fbPostId: string, message: string): Promise<v
   if (!res.ok || json.error) {
     throw new Error(json.error?.message || `HTTP ${res.status}`);
   }
+}
+
+// Parse URL bài Facebook hoặc ID thô. Hỗ trợ các định dạng link phổ biến.
+// Trả về ID dạng {page_id}_{post_id}, post_id, hoặc photo_id — tuỳ link.
+function parseFbPostId(input: string): string | null {
+  const s = input.trim();
+  if (!s) return null;
+  if (/^\d+_\d+$/.test(s)) return s;   // page_id_post_id — dùng nguyên
+  if (/^\d+$/.test(s)) return s;        // chỉ số — dùng nguyên
+  try {
+    const url = new URL(s);
+    const story = url.searchParams.get('story_fbid');
+    const page  = url.searchParams.get('id');
+    if (story && page) return `${page}_${story}`;
+    if (story) return story;
+    const fbid = url.searchParams.get('fbid');
+    if (fbid) return fbid;
+    const m = url.pathname.match(/\/(?:posts|permalink)\/(\d+)/);
+    if (m) return m[1];
+  } catch {}
+  return null;
 }
 
 // Helper nội bộ: gọi Facebook Graph API để đăng bài. Ném lỗi nếu thất bại.
