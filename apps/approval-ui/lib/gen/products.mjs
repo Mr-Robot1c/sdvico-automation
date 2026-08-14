@@ -98,10 +98,11 @@ export const CONTENT_TOPICS = [
   'câu chuyện gắn bó của SDVICO với bà con ngành biển',
 ];
 
-// Hashtag mặc định gắn MỌI bài: chỉ thẻ CHUNG về thương hiệu và bà con, hợp mọi sản phẩm
-// (không để thẻ theo loại thiết bị ở đây, kẻo bài sơn/dầu lại dính thẻ thiết bị liên lạc).
+// Hashtag mặc định gắn MỌI bài (4 thẻ chung, do Phòng chốt). KHÔNG để thẻ theo loại thiết bị
+// cụ thể (liên lạc, tàu cá...) ở đây kẻo bài sơn/dầu dính oan. Thẻ riêng đúng loại nằm ở
+// từng sản phẩm bên trên (productHashtags), mỗi bài được cộng thêm nhiều thẻ đúng sản phẩm.
 export const DEFAULT_HASHTAGS = [
-  '#SDVico', '#Đồng_hành_cùng_ngư_dân', '#hỗ_trợ_ngư_dân', '#ngư_dân', '#tàu_cá',
+  '#SDVICO', '#Đồng_hành_cùng_ngư_dân', '#Thiết_bị_tàu_biển', '#hỗ_trợ_ngư_dân',
 ];
 
 // Bỏ dấu tiếng Việt để so khớp không phân biệt dấu.
