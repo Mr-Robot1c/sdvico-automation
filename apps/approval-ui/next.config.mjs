@@ -4,6 +4,7 @@ const nextConfig = {
   outputFileTracingIncludes: {
     '/api/cron/compose': ['./assets/fonts/**'],
     '/api/cron/publish': ['./assets/fonts/**'],
+    '/api/poster-preview': ['./assets/fonts/**'],
     '/tao-jd': ['./assets/fonts/**'],
     '/dang-tin': ['./assets/fonts/**'],
     '/': ['./assets/fonts/**'],

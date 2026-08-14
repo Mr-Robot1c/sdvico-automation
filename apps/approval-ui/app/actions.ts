@@ -375,6 +375,7 @@ export async function queueFacebookPost(formData: FormData) {
     website: brand.website,
     hotline: brand.hotline || hotline,
     photoUrl: unsplash_url,
+    logoUrl: brand.logo_url,
     theme: brand.poster,
   });
   if (posterBuf) {
@@ -718,12 +719,40 @@ export async function saveBrandConfig(formData: FormData) {
     } catch {}
   }
 
+  // Gộp với cấu hình cũ để không xoá mất các field khác (ví dụ cấu hình poster).
+  const { data: prevRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
+  const prev = (prevRow?.value || {}) as Record<string, unknown>;
   const config = {
+    ...prev,
     logo_url,
     hotline: String(formData.get('hotline') || '').trim() || null,
     email: String(formData.get('email') || '').trim() || null,
     website: String(formData.get('website') || '').trim() || null,
     company_desc: String(formData.get('company_desc') || '').trim() || null,
+  };
+  const { error } = await client.from('app_config').upsert(
+    { key: 'brand_config', value: config, updated_at: new Date().toISOString() },
+    { onConflict: 'key' }
+  );
+  if (error) throw new Error(error.message);
+  revalidatePath('/cai-dat');
+}
+
+// Lưu cấu hình poster (tên hiển thị, tagline, màu). Gộp vào brand_config.
+export async function savePosterConfig(formData: FormData) {
+  const client = getServerClient();
+  const { data: prevRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
+  const prev = (prevRow?.value || {}) as Record<string, unknown>;
+  const clean = (k: string) => String(formData.get(k) || '').trim() || null;
+  const config = {
+    ...prev,
+    company_name: clean('company_name'),
+    tagline: clean('tagline'),
+    poster: {
+      navy: clean('poster_navy'),
+      red: clean('poster_red'),
+      accent: clean('poster_accent'),
+    },
   };
   const { error } = await client.from('app_config').upsert(
     { key: 'brand_config', value: config, updated_at: new Date().toISOString() },

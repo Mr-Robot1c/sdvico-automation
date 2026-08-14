@@ -24,6 +24,7 @@ export type PosterInput = {
   website?: string;
   hotline?: string;
   photoUrl?: string | null;
+  logoUrl?: string | null;
   theme?: PosterTheme;
 };
 
@@ -63,6 +64,21 @@ async function photoDataUri(url: string, w: number, h: number): Promise<string |
   }
 }
 
+// Logo → data URI PNG + chiều rộng theo tỉ lệ (đặt trên chip trắng ở header).
+async function logoData(url: string, h: number): Promise<{ uri: string; w: number } | null> {
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const png = await sharp(buf).resize(null, h, { fit: 'inside' }).png().toBuffer();
+    const meta = await sharp(png).metadata();
+    const w = Math.round(h * ((meta.width || h) / (meta.height || h)));
+    return { uri: `data:image/png;base64,${png.toString('base64')}`, w: Math.min(w, 320) };
+  } catch {
+    return null;
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const div = (style: any, children: any): any => ({ type: 'div', props: { style, children } });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,14 +96,21 @@ const PHONE = 'M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2
 
 export async function buildRecruitmentPoster(input: PosterInput): Promise<Buffer | null> {
   try {
-    const t = { ...DEFAULT_THEME, ...(input.theme || {}) };
+    const th = input.theme || {};
+    const t = {
+      navy: th.navy || DEFAULT_THEME.navy,
+      red: th.red || DEFAULT_THEME.red,
+      accent: th.accent || DEFAULT_THEME.accent,
+    };
     const brandName = input.brandName || 'SDVICO';
+    const tagline = (input.tagline || '').trim();
     const website = input.website || 'sdvico.vn';
     const hotline = input.hotline || '1900 23 23 49';
     const reqs = input.requirements.length ? input.requirements : ['Xem chi tiết trong bài đăng'];
     const bens = input.benefits.length ? input.benefits : ['Xem chi tiết trong bài đăng'];
 
     const photo = input.photoUrl ? await photoDataUri(input.photoUrl, 1080, 560) : null;
+    const logo = input.logoUrl ? await logoData(input.logoUrl, 58) : null;
 
     const bullet = (text: string) =>
       div({ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }, [
@@ -108,9 +131,12 @@ export async function buildRecruitmentPoster(input: PosterInput): Promise<Buffer
         backgroundImage: `linear-gradient(to bottom, rgba(6,38,77,0.92) 0%, rgba(6,38,77,0.35) 45%, rgba(6,38,77,0.7) 100%)` },
       [
         div({ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }, [
-          txt({ color: '#fff', fontSize: 40, fontWeight: 700, letterSpacing: 2 }, brandName),
+          logo
+            ? div({ display: 'flex', background: '#fff', borderRadius: 12, padding: '8px 16px', alignItems: 'center' }, [imgEl(logo.uri, { height: 58, width: logo.w })])
+            : txt({ color: '#fff', fontSize: 40, fontWeight: 700, letterSpacing: 2 }, brandName),
           txt({ color: '#cfe0f5', fontSize: 20 }, website),
         ]),
+        ...(tagline ? [txt({ color: '#cfe0f5', fontSize: 22, marginTop: 6 }, tagline)] : []),
         div({ display: 'flex', flexGrow: 1 }, []),
         txt({ color: '#fff', background: t.red, alignSelf: 'flex-start', padding: '6px 24px', borderRadius: 10, fontSize: 46, fontWeight: 700, letterSpacing: 2 }, 'TUYỂN DỤNG'),
         div({ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', borderRadius: 14, padding: '12px 22px', alignSelf: 'flex-start', marginTop: 10, maxWidth: 980 }, [

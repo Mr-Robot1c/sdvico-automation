@@ -187,6 +187,7 @@ export async function GET(req: Request) {
         website: brand.website,
         hotline: brand.hotline || hotline,
         photoUrl: unsplash_url,
+        logoUrl: brand.logo_url,
         theme: brand.poster,
       });
       if (posterBuf) {

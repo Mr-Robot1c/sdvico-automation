@@ -1,6 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { saveBrandConfig } from '../actions';
 import { SubmitButton } from '../submit-button';
+import PosterSettings from '../poster-settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,18 +11,15 @@ type BrandConfig = {
   email?: string;
   website?: string;
   company_desc?: string;
+  company_name?: string;
+  tagline?: string;
+  poster?: { navy?: string; red?: string; accent?: string };
 };
 
 export default async function Page() {
   const client = getServerClient();
   const { data } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
   const brand: BrandConfig = (data?.value || {}) as BrandConfig;
-
-  const footerParts = [
-    brand.hotline ? `Hotline: ${brand.hotline}` : null,
-    brand.email ? `Email: ${brand.email}` : null,
-    brand.website || null,
-  ].filter(Boolean);
 
   return (
     <main>
@@ -104,21 +102,16 @@ export default async function Page() {
         </div>
       </form>
 
-      {footerParts.length > 0 ? (
-        <div className="settings-box" style={{ marginTop: 12 }}>
-          <b>Xem trước footer bài Facebook</b>
-          <p style={{ marginTop: 6, fontSize: '0.85em', color: 'var(--muted)' }}>Đoạn này tự gắn vào cuối bài tuyển dụng mới:</p>
-          <pre style={{ marginTop: 4, fontSize: '0.88em', background: 'var(--surface)', padding: '8px 12px', borderRadius: 6 }}>
-            {footerParts.join('  |  ')}
-          </pre>
-        </div>
-      ) : (
-        <div className="settings-box" style={{ marginTop: 12 }}>
-          <p className="muted" style={{ margin: 0 }}>
-            Chưa có thông tin liên hệ. Điền hotline, email hoặc website ở trên rồi Lưu để hệ thống gắn vào cuối bài đăng.
-          </p>
-        </div>
-      )}
+      <PosterSettings
+        companyName={brand.company_name || 'SDVICO'}
+        tagline={brand.tagline || ''}
+        navy={brand.poster?.navy || '#06264d'}
+        red={brand.poster?.red || '#e4322b'}
+        accent={brand.poster?.accent || '#ffd24a'}
+        hotline={brand.hotline || '1900 23 23 49'}
+        website={brand.website || 'sdvico.vn'}
+        logoUrl={brand.logo_url || ''}
+      />
     </main>
   );
 }
