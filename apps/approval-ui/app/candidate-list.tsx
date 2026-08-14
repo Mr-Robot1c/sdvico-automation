@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatRelative, stageMeta, sourceLabel } from './labels';
-import { advanceToInterview, saveNote, rejectSourced } from './actions';
+import { advanceToInterview, saveNote, rejectSourced, decideCandidate } from './actions';
 
 export type CandView = {
   id: string;
@@ -147,7 +147,29 @@ function CandidateCard({ c }: { c: CandView }) {
             <button className="btn ok" type="submit">Xét duyệt vào phỏng vấn</button>
           </form>
         ) : null}
-        {c.appStage === 'interview' ? <span className="muted">Đã vào phỏng vấn</span> : null}
+        {c.appStage === 'interview' && c.appId ? (
+          <>
+            <span className="muted" style={{ alignSelf: 'center', marginRight: 2 }}>Sau phỏng vấn:</span>
+            <form
+              action={decideCandidate}
+              onSubmit={(e) => { if (!window.confirm(`Nhận ứng viên này?\n\n${c.name}\n\nMáy soạn thư mời nhận việc, bạn duyệt trên trang Duyệt rồi mới gửi.`)) e.preventDefault(); }}
+            >
+              <input type="hidden" name="appId" value={c.appId} />
+              <input type="hidden" name="decision" value="offer" />
+              <button className="btn ok" type="submit">Nhận</button>
+            </form>
+            <form
+              action={decideCandidate}
+              onSubmit={(e) => { if (!window.confirm(`Không nhận ứng viên này?\n\n${c.name}\n\nMáy soạn thư từ chối, bạn duyệt trên trang Duyệt rồi mới gửi.`)) e.preventDefault(); }}
+            >
+              <input type="hidden" name="appId" value={c.appId} />
+              <input type="hidden" name="decision" value="reject" />
+              <button className="btn no" type="submit">Không nhận</button>
+            </form>
+          </>
+        ) : null}
+        {c.appStage === 'offer' ? <span className="stage tone-ok">Đã nhận — thư chờ duyệt</span> : null}
+        {c.appStage === 'rejected' ? <span className="muted">Đã từ chối</span> : null}
         {c.sourced ? (
           <form
             action={rejectSourced}

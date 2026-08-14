@@ -6,9 +6,12 @@ import { getServerClient } from '../lib/supabase-server';
 import { composeJdVersions } from '../lib/jd-compose';
 import { groqChat } from '../lib/groq';
 import { randomBytes } from 'node:crypto';
+import { headers } from 'next/headers';
 import { fetchUnsplashPhoto } from '../lib/unsplash';
 import { buildJobDetailSection } from '../lib/job-detail';
 import { buildRecruitmentPoster, toBullets } from '../lib/poster';
+import { sendEmail } from '../lib/mailer';
+import { composeOfferLetter, composeRejectLetter } from '../lib/hr-letters';
 
 // datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
 // Server Vercel chạy UTC nên phải gắn +07:00 để parse đúng giờ Việt Nam.
@@ -20,6 +23,51 @@ function parseVNTime(s: string): string {
 }
 
 // Người quyết. Đọc từ form, cập nhật trạng thái, chỉ đổi mục còn pending.
+// URL gốc của app (để chèn link tự chọn giờ vào thư mời).
+function appBaseUrl(): string {
+  const h = headers();
+  const host = h.get('x-forwarded-host') || h.get('host') || '';
+  return host ? `${h.get('x-forwarded-proto') || 'https'}://${host}` : '';
+}
+
+type QueueItem = { id: string; kind: string; ref_id: string | null; payload: Record<string, unknown> | null };
+
+// Gửi thư cho ứng viên khi người dùng bấm Duyệt (người bấm = người gửi, điều cấm 1).
+// Chỉ áp dụng cho các loại thư gửi ứng viên. Lỗi gửi được ghi note + run_log, không chặn duyệt.
+async function sendCandidateEmail(client: ReturnType<typeof getServerClient>, item: QueueItem): Promise<void> {
+  if (!['hr_interview', 'hr_offer', 'hr_reject'].includes(item.kind)) return;
+  const p = (item.payload || {}) as { email?: string; thu_moi?: string; thu?: string; vi_tri?: string };
+  const to = p.email || '';
+
+  let subject = 'Thông báo tuyển dụng - SDVICO';
+  let body = p.thu_moi || p.thu || '';
+  if (item.kind === 'hr_interview') {
+    subject = `Thư mời phỏng vấn${p.vi_tri ? ` vị trí ${p.vi_tri}` : ''} - SDVICO`;
+    if (item.ref_id) {
+      const { data: app } = await client.from('hr_applications').select('schedule_token').eq('id', item.ref_id).maybeSingle();
+      const token = (app as { schedule_token?: string } | null)?.schedule_token;
+      if (token) {
+        const base = appBaseUrl();
+        if (base) body += `\n\nHoặc bấm link sau để tự chọn nhanh khung giờ phỏng vấn:\n${base}/phong-van/${token}`;
+      }
+    }
+  } else if (item.kind === 'hr_offer') {
+    subject = 'Thư mời nhận việc - SDVICO';
+  } else if (item.kind === 'hr_reject') {
+    subject = `Kết quả ứng tuyển${p.vi_tri ? ` vị trí ${p.vi_tri}` : ''} - SDVICO`;
+  }
+
+  try {
+    await sendEmail({ to, subject, text: body });
+    await client.from('run_log').insert({ task: 'hr.send_email', status: 'ok', detail: { kind: item.kind, to } });
+    await client.from('approval_queue').update({ note: `Đã gửi email tới ${to}` }).eq('id', item.id);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await client.from('run_log').insert({ task: 'hr.send_email', status: 'error', detail: { kind: item.kind, to, error: msg } });
+    await client.from('approval_queue').update({ note: `GỬI MAIL LỖI: ${msg}` }).eq('id', item.id);
+  }
+}
+
 export async function decideForm(formData: FormData) {
   const id = String(formData.get('id') || '');
   const action = String(formData.get('action') || '');
@@ -29,6 +77,12 @@ export async function decideForm(formData: FormData) {
   if (!id || !decision) return;
 
   const client = getServerClient();
+  // Lấy mục trước khi đổi trạng thái để biết loại + payload (gửi mail nếu là thư ứng viên).
+  const { data: item } = await client
+    .from('approval_queue')
+    .select('id, kind, ref_id, payload')
+    .eq('id', id).eq('status', 'pending').maybeSingle();
+
   const { error } = await client
     .from('approval_queue')
     .update({ status: decision, decided_at: new Date().toISOString(), note: note || null })
@@ -36,6 +90,57 @@ export async function decideForm(formData: FormData) {
     .eq('status', 'pending');
   if (error) throw new Error(error.message);
 
+  // Người bấm Duyệt = người bấm gửi (điều cấm 1): gửi thư cho ứng viên.
+  if (decision === 'approved' && item) {
+    await sendCandidateEmail(client, item as QueueItem);
+  }
+
+  revalidatePath('/');
+  revalidatePath('/lich');
+  revalidatePath('/ho-so');
+}
+
+// Quyết định cuối sau phỏng vấn: Nhận (offer) hoặc Không nhận (reject).
+// Đổi stage và soạn thư kết quả vào hàng đợi. Người bấm Duyệt mới gửi (điều cấm 1).
+export async function decideCandidate(formData: FormData) {
+  const appId = String(formData.get('appId') || '');
+  const decision = String(formData.get('decision') || '');
+  if (!appId || !['offer', 'reject'].includes(decision)) return;
+
+  const client = getServerClient();
+  const { data: app } = await client
+    .from('hr_applications')
+    .select('id, stage, candidate_id, job_id')
+    .eq('id', appId).maybeSingle();
+  if (!app || app.stage !== 'interview') return;
+
+  const { data: cand } = await client.from('hr_candidates').select('full_name, email').eq('id', app.candidate_id).maybeSingle();
+  let position = 'đã ứng tuyển';
+  if (app.job_id) {
+    const { data: job } = await client.from('hr_jobs').select('title').eq('id', app.job_id).maybeSingle();
+    if (job?.title) position = job.title;
+  }
+
+  const name = (cand?.full_name as string) || null;
+  const email = (cand?.email as string) || '';
+  const newStage = decision === 'offer' ? 'offer' : 'rejected';
+  const kind = decision === 'offer' ? 'hr_offer' : 'hr_reject';
+  const thu = decision === 'offer'
+    ? composeOfferLetter({ name, position })
+    : composeRejectLetter({ name, position });
+
+  await client.from('hr_applications').update({ stage: newStage }).eq('id', appId).eq('stage', 'interview');
+
+  await client.from('approval_queue').insert({
+    kind,
+    title: `Thư ${decision === 'offer' ? 'mời nhận việc' : 'từ chối'}: ${name || email || appId}`,
+    payload: { ung_vien: name, vi_tri: position, email, thu },
+    ref_table: 'hr_applications',
+    ref_id: appId,
+    status: 'pending',
+  });
+
+  revalidatePath('/ho-so');
   revalidatePath('/');
 }
 

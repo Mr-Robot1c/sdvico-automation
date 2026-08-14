@@ -12,6 +12,10 @@ export function kindMeta(kind: string): KindMeta {
       return { label: 'Thư tuyển dụng', icon: '✉️', tone: 'hr' };
     case 'hr_interview':
       return { label: 'Thư mời phỏng vấn', icon: '📅', tone: 'hr' };
+    case 'hr_offer':
+      return { label: 'Thư mời nhận việc', icon: '🎉', tone: 'hr' };
+    case 'hr_reject':
+      return { label: 'Thư từ chối', icon: '✉️', tone: 'hr' };
     case 'hr_jd':
       return { label: 'Vị trí tuyển dụng', icon: '💼', tone: 'hr' };
     case 'hr_job_post':
@@ -55,6 +59,7 @@ const FIELD_LABELS: Record<string, string> = {
   vi_tri: 'Vị trí',
   email: 'Email',
   thu_moi: 'Thư mời (máy soạn)',
+  thu: 'Nội dung thư (máy soạn)',
   cau_hoi_ky_thuat: 'Câu hỏi kỹ thuật',
   cau_hoi_hanh_vi: 'Câu hỏi hành vi',
   bai_ve_nha: 'Bài về nhà',
