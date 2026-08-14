@@ -4,14 +4,23 @@
 
 import nodemailer from 'nodemailer';
 
+// Dùng SMTP_* nếu có; nếu không, tái dùng chính Gmail + app password của IMAP
+// (MAIL_IMAP_USER/MAIL_IMAP_PASSWORD) vì Gmail dùng chung app password cho cả đọc và gửi.
+function creds(): { user?: string; pass?: string } {
+  return {
+    user: process.env.SMTP_USER || process.env.MAIL_IMAP_USER,
+    pass: process.env.SMTP_PASS || process.env.MAIL_IMAP_PASSWORD,
+  };
+}
+
 export function mailerConfigured(): boolean {
-  return Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
+  const { user, pass } = creds();
+  return Boolean(user && pass);
 }
 
 export async function sendEmail(opts: { to: string; subject: string; text: string }): Promise<void> {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!user || !pass) throw new Error('Chưa cấu hình SMTP_USER/SMTP_PASS để gửi mail.');
+  const { user, pass } = creds();
+  if (!user || !pass) throw new Error('Chưa cấu hình SMTP_USER/SMTP_PASS (hoặc MAIL_IMAP_USER/MAIL_IMAP_PASSWORD) để gửi mail.');
   if (!opts.to || !opts.to.includes('@')) throw new Error('Địa chỉ email người nhận không hợp lệ.');
 
   const from = process.env.SMTP_FROM || `SDVICO Tuyển dụng <${user}>`;
