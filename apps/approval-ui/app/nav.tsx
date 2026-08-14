@@ -24,19 +24,12 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/terms', label: 'Điều khoản', icon: '📄' }
     ]
   };
-  const tuLieu: Group = {
-    title: 'Tư liệu',
-    items: [
-      { href: '/tu-khoa', label: 'Kho từ khóa', icon: '🔑' },
-      { href: '/du-kien', label: 'Nguồn dữ kiện', icon: '📊' },
-      { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' }
-    ]
-  };
   const quanLySanXuat: Group = {
     title: 'Quản lí và Sản xuất',
     items: [
       { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
+      { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
       { href: '/do-luong', label: 'Đo lường', icon: '📈' }
     ]
   };
@@ -49,7 +42,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   };
 
   const groups: Group[] = marketingOnly
-    ? [hangDoi, quanLySanXuat, tuLieu, ketNoi, quyTac]
+    ? [hangDoi, quanLySanXuat, ketNoi, quyTac]
     : [
         hangDoi,
         quanLySanXuat,
@@ -60,7 +53,6 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
             { href: '/vi-tri', label: 'Vị trí tuyển dụng', icon: '📋' }
           ]
         },
-        tuLieu,
         ketNoi,
         quyTac
       ];
