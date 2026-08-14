@@ -24,7 +24,16 @@ if (ref && !url.includes(ref) && !force) {
   process.exit(2);
 }
 
-const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+// Tự tách connection string (né parser URL của pg vốn kén ký tự đặc biệt trong mật khẩu:
+// # ? / % ... mà mật khẩu Supabase hay có). Lấy @ CUỐI làm ranh giới mật khẩu | host.
+function parsePg(u) {
+  const m = u.match(/^postgres(?:ql)?:\/\/([^:@/]+):(.*)@([^:/]+):(\d+)\/(.+?)(?:\?.*)?$/);
+  if (!m) return null;
+  return { user: m[1], password: m[2], host: m[3], port: Number(m[4]), database: m[5] };
+}
+const parsed = parsePg(url);
+if (!parsed) { console.error('DATABASE_URL không đúng dạng postgres://user:pass@host:port/db.'); process.exit(1); }
+const client = new pg.Client({ ...parsed, ssl: { rejectUnauthorized: false } });
 await client.connect();
 try {
   for (const f of files) {
