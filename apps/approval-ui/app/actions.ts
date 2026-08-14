@@ -642,6 +642,21 @@ export async function renameAsset(formData: FormData) {
   revalidatePath('/san-xuat');
 }
 
+// Gán tư liệu vào folder sản phẩm (product_group) cho vòng xoay đăng bài hằng ngày.
+// Rỗng = bỏ gán (vòng xoay sẽ không chọn tư liệu chưa gán).
+export async function setAssetProductGroup(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  if (!id) return;
+  const group = String(formData.get('product_group') || '').trim();
+  const client = getServerClient();
+  const { error } = await client
+    .from('brand_assets')
+    .update({ product_group: group || null })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+  revalidatePath('/tu-lieu');
+}
+
 // Xóa một tư liệu, gỡ cả file trên Storage.
 export async function deleteAsset(formData: FormData) {
   const id = String(formData.get('id') || '');

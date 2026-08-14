@@ -1,7 +1,12 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { deleteAsset, renameAsset } from '../actions';
+import { deleteAsset, renameAsset, setAssetProductGroup } from '../actions';
 import AssetViewer from './asset-viewer';
 import LibUploader from './lib-uploader';
+import ProductGroupSelect from './product-group-select';
+// @ts-ignore — module JS thuần
+import { PRODUCTS } from '../../lib/gen/products.mjs';
+
+const PRODUCT_GROUPS: string[] = (PRODUCTS as { group: string }[]).map((p) => p.group);
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -18,6 +23,7 @@ type Asset = {
   license: string | null;
   license_note: string | null;
   source: string | null;
+  product_group: string | null;
   created_at: string;
 };
 
@@ -25,7 +31,7 @@ export default async function Page() {
   const client = getServerClient();
   const { data, error } = await client
     .from('brand_assets')
-    .select('id, kind, title, storage_path, license, license_note, source, created_at')
+    .select('id, kind, title, storage_path, license, license_note, source, product_group, created_at')
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -84,6 +90,12 @@ export default async function Page() {
                   <input name="title" defaultValue={a.title} aria-label="Tên tư liệu" title="Đặt tên mô tả rõ để AI sinh text bám theo" />
                   <button className="btn ghost sm" type="submit">Đổi tên</button>
                 </form>
+                <ProductGroupSelect
+                  id={a.id}
+                  value={a.product_group || ''}
+                  options={PRODUCT_GROUPS}
+                  action={setAssetProductGroup}
+                />
                 {a.source ? <div className="metaline">Nguồn: {a.source}</div> : null}
                 <div className="metaline">{a.license === 'licensed' ? 'Có giấy phép' : 'Công ty sở hữu'}</div>
                 <form action={deleteAsset}>
