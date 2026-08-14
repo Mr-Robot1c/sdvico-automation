@@ -713,7 +713,8 @@ export async function generateTextForTitle(
   intent: string = 'giao_dich',
   landing_url: string | null = null,
   assetHint: string = '',
-  format: string = 'social'
+  format: string = 'social',
+  contentType: string = 'tips'
 ): Promise<string> {
   const clean = (keyword || '').trim();
   if (!clean) return '';
@@ -722,7 +723,7 @@ export async function generateTextForTitle(
   try {
     const r = await generateContentAsync(
       { keyword: clean, intent, landing_url },
-      { assetHint: (assetHint || '').trim(), format }
+      { assetHint: (assetHint || '').trim(), format, contentType }
     );
     return (r?.draft as string) || '';
   } catch (e: any) {

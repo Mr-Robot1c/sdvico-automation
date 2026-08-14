@@ -65,7 +65,7 @@ export default function SanXuatForm({
     setGenBusy(true);
     setMsg('Đang sinh text theo từ khóa...');
     try {
-      const t = await generateTextForTitle(kw, intent, landingUrl, assetHint, format);
+      const t = await generateTextForTitle(kw, intent, landingUrl, assetHint, format, contentType);
       setDraft(t);
       setMsg(t ? 'Đã sinh xong. Sửa lại rồi bấm Xong để đẩy vào hàng đợi.' : 'Sinh xong nhưng không có text — thử từ khóa khác.');
     } catch (e: any) {

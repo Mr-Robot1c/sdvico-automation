@@ -9,7 +9,45 @@
 // hình như phần chấm CV của HR (packages/hr/src/screen/score.js dùng gemini-2.0-flash).
 // Dù sinh bằng mô hình hay bản mẫu, bản nháp vẫn qua compliance và hàng đợi duyệt.
 
+import { DEFAULT_HASHTAGS, productHashtags, guessGroup } from './products.mjs';
+
 const TONGDAI = '1900 23 23 49';
+
+// Kiểu viết theo LOẠI CONTENT (tips/sales/review/ugc) — mỗi loại một cấu trúc và giọng riêng,
+// để bài không bị giống nhau. Truyền từ Xưởng sản xuất (dropdown "Loại content").
+function contentTypeInstruction(t) {
+  switch (t) {
+    case 'sales':
+      return 'KIỂU BÀI: BÁN HÀNG. Nêu bật 1-2 lợi ích thiết thực giải quyết đúng nỗi lo của bà con, rồi mời gọi tổng đài rõ ràng. Tự tin nhưng không nói quá, không hứa suông.';
+    case 'review':
+      return 'KIỂU BÀI: ĐÁNH GIÁ/TRẢI NGHIỆM. Viết như người đã dùng thật: cảm nhận trước và sau, điểm được, thêm một lưu ý nhỏ cho khách quan. Chân thật, tránh giọng quảng cáo.';
+    case 'ugc':
+      return 'KIỂU BÀI: LỜI KHÁCH HÀNG (UGC). Viết ở NGÔI THỨ NHẤT như bà con tự kể (tôi, nhà tôi, tàu tôi), mộc mạc đời thường, kể một tình huống thật rồi cảm ơn nhẹ. Không như quảng cáo.';
+    case 'tips':
+      return 'KIỂU BÀI: MẸO/GIÁO DỤC. Mở bằng một vấn đề bà con hay gặp, đưa 2-3 mẹo ngắn dễ làm ngay theo gạch đầu dòng, giọng chia sẻ giúp đỡ. Không nặng bán hàng, cuối bài mới nhắc SDVICO nhẹ nhàng.';
+    default:
+      return 'KIỂU BÀI: CHIA SẺ CHUNG. Viết hữu ích, gần gũi bà con.';
+  }
+}
+
+// Vài góc tiếp cận để mỗi lần sinh ra một kiểu mở bài khác nhau (chống trùng lặp).
+const DRAFT_ANGLES = [
+  'mở bằng một tình huống thực tế khi ra khơi',
+  'mở bằng một câu hỏi cho bà con rồi trả lời gọn',
+  'nhấn mạnh lợi ích thiết thực và tiết kiệm chi phí',
+  'chia sẻ như một người trong nghề nói với nhau',
+  'so sánh cảm nhận trước và sau khi dùng',
+  'kể một chi tiết nhỏ đời thường rồi dẫn vào nội dung',
+];
+
+// Bộ hashtag ĐÚNG theo hình: đoán sản phẩm từ tên ảnh/video + tiêu đề (guessGroup) rồi lấy thẻ
+// riêng của đúng sản phẩm đó, cộng thẻ thương hiệu chung. Ảnh sơn ra thẻ sơn, không dính thẻ
+// thiết bị liên lạc. Không đoán được sản phẩm thì chỉ gắn thẻ chung.
+function hashtagBlockFor(hintText) {
+  const group = guessGroup(hintText || '');
+  const tags = [...DEFAULT_HASHTAGS, ...(group ? productHashtags(group) : [])];
+  return [...new Set(tags)].join(' ');
+}
 
 // Nhãn ý định để đọc cho người.
 export const INTENT_LABEL = {
@@ -372,7 +410,7 @@ function formatInstruction(format) {
   return 'ĐỊNH DẠNG: BÀI FACEBOOK NGẮN. Chỉ hai tới bốn câu: một câu hook mở đầu bắt trúng vấn đề, một hai câu lợi ích, một lời kêu gọi gọi tổng đài. Không tiêu đề riêng, không dài dòng.';
 }
 
-export async function generateDraftLLM(brief, facts = [], assetHint = '', format = 'social') {
+export async function generateDraftLLM(brief, facts = [], assetHint = '', format = 'social', contentType = 'tips') {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -388,16 +426,21 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '', format
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO, chỉ nói tương thích.',
     'Không hứa pháp lý tuyệt đối. Nội dung chạm quy định nhà nước thì nói trung thực, sẽ có người duyệt.',
     'Kết bài bằng lời mời gọi tổng đài 1900 23 23 49.',
+    'Chèn vài emoji hợp cảnh biển và nghề cá (⚓ 🚢 🌊 🐟 🎣 ☀️ 🔧) cho sinh động, vừa phải, không lạm dụng.',
+    'KHÔNG tự viết hashtag, hệ thống sẽ tự thêm thẻ đúng theo hình.',
     '',
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số nào được duyệt, viết chung chung, không nêu số cụ thể.',
   ].join('\n');
 
+  const angle = DRAFT_ANGLES[Math.floor(Math.random() * DRAFT_ANGLES.length)];
   const user = [
-    `Viết nội dung cho từ khóa: "${brief.keyword}".`,
+    `Viết nội dung cho chủ đề/tiêu đề: "${brief.keyword}".`,
     `Ý định tìm kiếm: ${brief.intent}.`,
+    contentTypeInstruction(contentType),
     formatInstruction(format),
+    `Góc tiếp cận lần này: ${angle}. Viết khác các bài trước, đừng lặp mô típ cũ.`,
     assetHint
-      ? `Bài này đăng kèm ảnh hoặc video tên tệp: "${assetHint}". Viết nội dung ăn khớp với hình đó, mô tả đúng thứ trong hình, không bịa chi tiết ngoài tên tệp và từ khóa.`
+      ? `Bài này đăng kèm ảnh hoặc video tên tệp: "${assetHint}". Viết bám đúng thứ trong hình, mô tả đúng sản phẩm đó, không bịa chi tiết ngoài tên tệp và tiêu đề.`
       : '',
     'Viết tiếng Việt, sẵn sàng cho người duyệt.',
   ].filter(Boolean).join('\n');
@@ -405,7 +448,7 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '', format
   const res = await genOnce(ai, {
     model: MKT_MODEL,
     contents: user,
-    config: { systemInstruction: system },
+    config: { systemInstruction: system, temperature: 1.0 },
   });
   const text = (res.text || '').trim();
   if (!text) throw new Error('Gemini trả về rỗng.');
@@ -413,12 +456,19 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '', format
 }
 
 // Sinh nội dung, ưu tiên Gemini khi có khóa, không thì lùi về bản mẫu. Luôn trả draft dùng được.
-export async function generateContentAsync(kw, { facts = [], assetHint = '', format = 'social' } = {}) {
+export async function generateContentAsync(kw, { facts = [], assetHint = '', format = 'social', contentType = 'tips' } = {}) {
   const brief = buildBrief(kw);
+  // Gắn hashtag ĐÚNG theo hình + tiêu đề, chỉ cho bài mạng xã hội (bài dài/kịch bản không dùng thẻ).
+  const withTags = (draft) => {
+    const body = String(draft || '').trim();
+    if (format !== 'social') return body;
+    const tags = hashtagBlockFor(`${assetHint} ${brief.keyword || ''}`);
+    return tags ? `${body}\n\n${tags}` : body;
+  };
   if (process.env.GEMINI_API_KEY) {
     try {
-      const draft = await generateDraftLLM(brief, facts, assetHint, format);
-      return { title: draftTitle(brief), brief: { ...brief, generator: 'gemini' }, draft };
+      const draft = await generateDraftLLM(brief, facts, assetHint, format, contentType);
+      return { title: draftTitle(brief), brief: { ...brief, generator: 'gemini' }, draft: withTags(draft) };
     } catch (e) {
       console.warn('Gemini lỗi, lùi về bản mẫu:', e.message);
     }
@@ -430,7 +480,7 @@ export async function generateContentAsync(kw, { facts = [], assetHint = '', for
   }
   if (format === 'social') {
     const s = buildSocial(brief);
-    return { title: s.title, brief, draft: s.draft };
+    return { title: s.title, brief, draft: withTags(s.draft) };
   }
   const { title, body } = buildDraft(brief);
   return { title, brief, draft: body };
