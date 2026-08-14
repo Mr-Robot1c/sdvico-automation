@@ -2,6 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import { refreshFacebookMetrics, setConversions, deleteContent } from '../actions';
 import BarChart from './bar-chart';
 import PostTitle from './post-title';
+import MetricsAuto from './metrics-auto';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,7 +88,8 @@ export default async function Page() {
           <h1>Đo lường</h1>
           <p className="sub">So sánh tương tác + đơn/lead theo bài và theo sản phẩm. Sản phẩm nào cao thì đẩy mạnh hướng đó.</p>
         </div>
-        <div className="head-actions">
+        <div className="head-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <MetricsAuto action={refreshFacebookMetrics} minutes={30} />
           <form action={refreshFacebookMetrics}>
             <button className="btn ok" type="submit">↻ Cập nhật số liệu</button>
           </form>

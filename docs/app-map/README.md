@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - /do-luong MetricsAuto (client): tu goi refreshFacebookMetrics moi 30 phut khi trang mo + router.refresh (Vercel Hobby khong chay cron duoi 1 ngay nen lam moi phia trang). Cho true 24/7 co the them GitHub Actions cron sau. -->
 <!-- re-verified: 2026-08-14 - Chong trung: social.mjs xoay 8 ANGLES + temperature 1.05 + xuat JSON {headline,body}; rotate dung headline lam tieu de bai (title rieng thay vi ten SP trung nhau). /do-luong: ten bai bam duoc (PostTitle client -> dialog xem draft; them draft vao fetch; .linklike CSS). -->
 <!-- re-verified: 2026-08-14 - Co tac gia bai: payload.authored='human' (createContent/Xuong san xuat) vs 'ai' (rotate). Hang doi (page.tsx) hien badge 'Nguoi viet' (do) hoac 'May viet'. Loai content dropdown GIU NGUYEN (user se dung khi tu viet content). -->
 <!-- re-verified: 2026-08-14 - /do-luong doi so sanh tu 'loai content' sang 'SAN PHAM' (productOf: brief.rotation_group bo STT, fallback keyword/title). Bieu do + 2 bang theo san pham. Bo import contentTypeLabel. Phu hop luong xoay folder theo san pham. -->
