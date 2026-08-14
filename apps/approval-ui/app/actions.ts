@@ -12,6 +12,7 @@ import { buildJobDetailSection } from '../lib/job-detail';
 import { buildRecruitmentPoster, toBullets } from '../lib/poster';
 import { sendEmail } from '../lib/mailer';
 import { composeOfferLetter, composeRejectLetter } from '../lib/hr-letters';
+import { allocateInterviewSlots, composeInterviewLetter, generateInterviewQuestions } from '../lib/interview';
 
 // datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
 // Server Vercel chạy UTC nên phải gắn +07:00 để parse đúng giờ Việt Nam.
@@ -257,19 +258,74 @@ export async function advanceToInterview(formData: FormData) {
   if (!appId) return;
 
   const client = getServerClient();
+  const { data: app } = await client
+    .from('hr_applications')
+    .select('id, stage, candidate_id, job_id')
+    .eq('id', appId).maybeSingle();
+  if (!app || app.stage !== 'review') { revalidatePath('/ho-so'); return; }
+
+  // Đổi stage + cấp token (nếu cột schedule_token chưa migrate thì đổi stage không kèm token).
+  const token = randomBytes(18).toString('hex');
   const { error } = await client
     .from('hr_applications')
-    .update({ stage: 'interview' })
-    .eq('id', appId)
-    .eq('stage', 'review');
-  if (error) throw new Error(error.message);
+    .update({ stage: 'interview', schedule_token: token })
+    .eq('id', appId).eq('stage', 'review');
+  if (error) {
+    await client.from('hr_applications').update({ stage: 'interview' }).eq('id', appId).eq('stage', 'review');
+  }
 
-  // Cấp token để ứng viên tự chọn giờ qua link công khai (cột có thể chưa migrate — bỏ qua nếu lỗi).
-  const token = randomBytes(18).toString('hex');
-  await client.from('hr_applications').update({ schedule_token: token }).eq('id', appId).is('schedule_token', null);
+  // Soạn thư mời NGAY trong app (không chờ worker hr-interview), nếu chưa có.
+  const { data: existingIv } = await client.from('approval_queue').select('id').eq('kind', 'hr_interview').eq('ref_id', appId).maybeSingle();
+  if (!existingIv) {
+    const { data: cand } = await client.from('hr_candidates').select('full_name, email, cv_json').eq('id', app.candidate_id).maybeSingle();
+    let position = 'vị trí đã ứng tuyển';
+    if (app.job_id) {
+      const { data: job } = await client.from('hr_jobs').select('title').eq('id', app.job_id).maybeSingle();
+      if (job?.title) position = job.title;
+    }
+    const name = (cand?.full_name as string) || null;
+    const email = (cand?.email as string) || '';
+    const cvText = ((cand?.cv_json as { raw_text?: string } | null)?.raw_text) || '';
+
+    const slots = await allocateInterviewSlots(client, 3);
+    const q = await generateInterviewQuestions(cvText, position);
+    const thu_moi = composeInterviewLetter({ name, position, slots });
+
+    await client.from('approval_queue').insert({
+      kind: 'hr_interview',
+      title: `Thư mời phỏng vấn: ${name || email || appId}`,
+      payload: {
+        ung_vien: name, vi_tri: position, email,
+        khung_gio: slots, thu_moi,
+        cau_hoi_ky_thuat: q.cau_hoi_ky_thuat, cau_hoi_hanh_vi: q.cau_hoi_hanh_vi, bai_ve_nha: q.bai_ve_nha,
+        luu_y: 'Máy soạn. Người bấm Duyệt = gửi cho ứng viên (điều cấm 1).',
+      },
+      ref_table: 'hr_applications', ref_id: appId, status: 'pending',
+    });
+  }
 
   revalidatePath('/ho-so');
   revalidatePath('/lich');
+  revalidatePath('/');
+}
+
+// Xóa vĩnh viễn một hồ sơ ứng viên (và các hồ sơ ứng tuyển + mục trong hàng đợi liên quan).
+// Dùng để dọn hồ sơ test hoặc hồ sơ đã xong. Không đụng ứng viên khác.
+export async function deleteCandidate(formData: FormData) {
+  const candidateId = String(formData.get('candidateId') || '');
+  if (!candidateId) return;
+  const client = getServerClient();
+
+  const { data: apps } = await client.from('hr_applications').select('id').eq('candidate_id', candidateId);
+  const appIds = ((apps || []) as Array<{ id: string }>).map((a) => a.id);
+  if (appIds.length) {
+    await client.from('approval_queue').delete().in('ref_id', appIds);
+    await client.from('hr_applications').delete().eq('candidate_id', candidateId);
+  }
+  await client.from('hr_candidates').delete().eq('id', candidateId);
+
+  revalidatePath('/ho-so');
+  revalidatePath('/');
 }
 
 // Ứng viên tự chọn khung giờ phỏng vấn qua link công khai (không cần đăng nhập, xác thực bằng token).

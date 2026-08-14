@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatRelative, stageMeta, sourceLabel } from './labels';
-import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed } from './actions';
+import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate } from './actions';
 
 export type CandView = {
   id: string;
@@ -193,6 +193,15 @@ function CandidateCard({ c }: { c: CandView }) {
           >
             <input type="hidden" name="candidateId" value={c.id} />
             <button className="btn no" type="submit">Từ chối &amp; xoá</button>
+          </form>
+        ) : null}
+        {!c.sourced && c.id ? (
+          <form
+            action={deleteCandidate}
+            onSubmit={(e) => { if (!window.confirm(`XÓA VĨNH VIỄN hồ sơ này?\n\n${c.name}\n\nXóa cả điểm, thư mời và dữ liệu liên quan. Không khôi phục được.`)) e.preventDefault(); }}
+          >
+            <input type="hidden" name="candidateId" value={c.id} />
+            <button className="btn del" type="submit" style={{ fontSize: '0.85em' }}>Xóa hồ sơ</button>
           </form>
         ) : null}
       </div>
