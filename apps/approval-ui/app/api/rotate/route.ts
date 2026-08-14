@@ -148,7 +148,7 @@ export async function GET(req: Request) {
     await client.from('approval_queue').insert({
       kind: 'mkt_publish_content',
       title: `${label} ${name}`,
-      payload: { content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich', risk, assets, channels },
+      payload: { content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich', risk, assets, channels, authored: 'ai' },
       status: 'pending',
     });
     results.push({ group, channels, contentId, risk });

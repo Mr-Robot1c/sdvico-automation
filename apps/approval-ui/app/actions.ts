@@ -759,6 +759,7 @@ export async function createContent(formData: FormData) {
       landing_url: landingUrl,
       risk: 'amber',
       channels,
+      authored: 'human', // người tự soạn -> cờ đỏ, phân biệt với AI tự sinh
       assets: { image: imageAssetId, video: videoAssetId }
     },
     status: 'pending'

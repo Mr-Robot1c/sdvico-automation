@@ -55,6 +55,7 @@ function mktInfo(payload: unknown) {
     format: p.format as string | undefined,
     intent: p.intent as string | undefined,
     risk: p.risk as string | undefined,
+    authored: p.authored as string | undefined,
     keyword: p.keyword as string | undefined,
     landingUrl: p.landing_url as string | undefined,
     flags
@@ -222,6 +223,9 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                 <div className="title">{cleanTitle}</div>
 
                 <div className="badges">
+                  {info.authored === 'human'
+                    ? <span className="badge tone-no" title="Bài do người tự soạn">🚩 Người viết</span>
+                    : <span className="badge" title="Bài do máy tự sinh, chờ người duyệt">🤖 Máy viết</span>}
                   <span className="badge badge-format">{formatLabel(info.format)}</span>
                   {info.intent ? <span className="badge">{intentLabel(info.intent)}</span> : null}
                   <span className={`badge tone-${rk.tone}`}>{rk.label}</span>

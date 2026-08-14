@@ -59,7 +59,7 @@ for (const group of picked) {
   const label = channels.length > 1 ? '[FB + TikTok]' : '[Facebook]';
   await client.from('approval_queue').insert({
     kind: 'mkt_publish_content', title: `${label} ${name}`,
-    payload: { content_id: ins.id, format: 'social', keyword: name, intent: 'giao_dich', risk, assets, channels }, status: 'pending',
+    payload: { content_id: ins.id, format: 'social', keyword: name, intent: 'giao_dich', risk, assets, channels, authored: 'ai' }, status: 'pending',
   });
   console.log(`Cycle ${cycle} | ${label} ${name} | ${ins.id.slice(0, 8)} | risk=${risk}`);
 }
