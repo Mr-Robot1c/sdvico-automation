@@ -102,10 +102,34 @@ export default async function Page() {
               {latest.applied ? <span className="badge tone-ok">✓ Đang áp dụng</span> : null}
             </div>
 
-            <div className="plan-narrative">
-              {(latest.data.narrative || []).map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
+            <div className="plan-top">
+              <div className="plan-narrative">
+                {(latest.data.narrative || []).map((p, i) => (
+                  <p key={i}>{p}</p>
+                ))}
+              </div>
+              <aside className="plan-stats" aria-label="Tóm tắt số liệu">
+                <div className="stat-tile">
+                  <div className="stat-num">{vnInt(latest.data.summary?.totalPosts || 0)}</div>
+                  <div className="stat-lbl">Bài có số liệu</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="stat-num">{vnInt(latest.data.summary?.totalEngagement || 0)}</div>
+                  <div className="stat-lbl">Lượt tương tác</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="stat-num">{vnInt(latest.data.summary?.totalConversions || 0)}</div>
+                  <div className="stat-lbl">Đơn hoặc lead</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="stat-num">{vnInt(latest.data.summary?.ranked || 0)}<span className="stat-sub">/{vnInt(latest.data.summary?.totalProducts || 0)}</span></div>
+                  <div className="stat-lbl">Sản phẩm đủ mẫu</div>
+                </div>
+                <div className="stat-tile wide">
+                  <div className="stat-num">{vnInt(latest.data.weeklyBudget || 0)} <span className="stat-sub">bài/tuần</span></div>
+                  <div className="stat-lbl">{latest.data.summary?.topProduct ? `Dẫn đầu: ${latest.data.summary.topProduct}` : 'Ngân sách gợi ý tuần tới'}</div>
+                </div>
+              </aside>
             </div>
 
             <div className="plan-actions" style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
