@@ -440,7 +440,7 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '', format
     formatInstruction(format),
     `Góc tiếp cận lần này: ${angle}. Viết khác các bài trước, đừng lặp mô típ cũ.`,
     assetHint
-      ? `Bài này đăng kèm ảnh hoặc video tên tệp: "${assetHint}". Viết bám đúng thứ trong hình, mô tả đúng sản phẩm đó, không bịa chi tiết ngoài tên tệp và tiêu đề.`
+      ? `Bài đăng kèm tư liệu (ảnh và/hoặc video) tên tệp: "${assetHint}". ĐÂY LÀ TƯ LIỆU CỦA CÙNG MỘT BÀI, thường mô tả CÙNG MỘT sản phẩm hoặc chủ đề dù tên tệp khác nhau. Hãy hiểu chung rồi viết MỘT bài hoàn chỉnh, mạch lạc về sản phẩm/chủ đề đó. ĐỪNG liệt kê các tên tệp như thể chúng là những sản phẩm riêng biệt. Bám đúng thứ có trong tư liệu, không bịa chi tiết ngoài tên tệp và tiêu đề.`
       : '',
     'Viết tiếng Việt, sẵn sàng cho người duyệt.',
   ].filter(Boolean).join('\n');

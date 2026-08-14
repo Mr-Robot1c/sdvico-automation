@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateTextForTitle, createContent } from '../actions';
+// @ts-ignore — module JS thuần, không có .d.ts
+import { guessGroup } from '../../lib/gen/products.mjs';
 import AssetUploader from './asset-uploader';
 import ImageStudio from './image-studio';
 
@@ -22,6 +24,24 @@ function cleanAssetName(s: string): string {
 function combineNames(...titles: (string | undefined)[]): string {
   const parts = titles.map((t) => cleanAssetName(t || '')).filter(Boolean);
   return [...new Set(parts)].join(' + ');
+}
+
+// Tên sản phẩm gọn từ nhãn folder ("6. Thiết bị lọc dầu SF-50" -> "Thiết bị lọc dầu SF-50").
+function productNameOf(group: string): string {
+  return (group || '').replace(/^\s*\d+\.\s*/, '').trim();
+}
+
+// Tiêu đề khi có cả ảnh và video: nếu cả hai cùng chỉ về MỘT sản phẩm (đoán qua tên tệp) thì dùng
+// TÊN SẢN PHẨM gọn (một chủ đề) để AI viết một bài hoàn chỉnh, thay vì ghép "A + B" khiến AI tưởng
+// hai sản phẩm khác nhau. Khác sản phẩm thật, hoặc chỉ một media, thì giữ như cũ.
+function unifiedTitle(imgTitle?: string, vidTitle?: string): string {
+  if (imgTitle && vidTitle) {
+    const g1 = (guessGroup as (s: string) => string | null)(imgTitle);
+    const g2 = (guessGroup as (s: string) => string | null)(vidTitle);
+    const g = g1 && (g1 === g2 || !g2) ? g1 : (!g1 && g2 ? g2 : null);
+    if (g) return productNameOf(g);
+  }
+  return combineNames(imgTitle, vidTitle);
 }
 
 export default function SanXuatForm({
@@ -76,8 +96,8 @@ export default function SanXuatForm({
   };
 
   const onGenerate = () => {
-    // Tiêu đề do người gõ; nếu chưa có thì gộp tên ảnh + video làm nguồn để AI viết theo hình.
-    const nameKw = combineNames(selectedImg?.title, selectedVid?.title);
+    // Tiêu đề do người gõ; nếu chưa có thì hợp nhất tên ảnh + video (cùng sản phẩm -> một chủ đề).
+    const nameKw = unifiedTitle(selectedImg?.title, selectedVid?.title);
     const kw = title.trim() || nameKw;
     if (kw && !title.trim()) setTitle(kw);
     // Gợi ý cho AI kèm cả tên ảnh và tên video (nếu có cả hai).
@@ -122,7 +142,7 @@ export default function SanXuatForm({
     const newId = a.id === imgId ? '' : a.id;
     setImgId(newId);
     if (titleAuto || !title.trim()) {
-      const t = combineNames(newId ? a.title : '', selectedVid?.title);
+      const t = unifiedTitle(newId ? a.title : '', selectedVid?.title);
       if (t) {
         setTitle(t);
         setTitleAuto(true);
@@ -135,7 +155,7 @@ export default function SanXuatForm({
     const newId = a.id === vidId ? '' : a.id;
     setVidId(newId);
     if (titleAuto || !title.trim()) {
-      const t = combineNames(selectedImg?.title, newId ? a.title : '');
+      const t = unifiedTitle(selectedImg?.title, newId ? a.title : '');
       if (t) {
         setTitle(t);
         setTitleAuto(true);
