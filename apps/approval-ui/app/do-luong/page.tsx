@@ -3,6 +3,7 @@ import { refreshFacebookMetrics, setConversions, deleteContent } from '../action
 import BarChart from './bar-chart';
 import PostTitle from './post-title';
 import MetricsAuto from './metrics-auto';
+import RefreshButton from './refresh-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,29 @@ export default async function Page() {
     }
   }
 
+  // Link bài đã đăng thật (mkt_posts.external_url): ưu tiên Facebook (link xem được), rồi kênh khác.
+  // Bấm tên bài sẽ mở đúng bài này. Bài chưa đăng hoặc không có link thì xem nội dung nháp.
+  const postUrl = new Map<string, string>();
+  if (cids.length) {
+    const { data: ps } = await client
+      .from('mkt_posts')
+      .select('content_id, channel, external_url, published_at, status')
+      .in('content_id', cids)
+      .eq('status', 'published')
+      .order('published_at', { ascending: false });
+    const byId = new Map<string, { fb?: string; other?: string }>();
+    for (const p of ps || []) {
+      const id = (p as any).content_id as string | null;
+      const url = (p as any).external_url as string | null;
+      if (!id || !url) continue;
+      const e = byId.get(id) || {};
+      if ((p as any).channel === 'facebook') e.fb = e.fb || url;
+      else e.other = e.other || url;
+      byId.set(id, e);
+    }
+    for (const [id, e] of byId) postUrl.set(id, e.fb || e.other || '');
+  }
+
   const rows = cids
     .map((cid) => {
       const m = latest.get(cid) || {};
@@ -53,7 +77,7 @@ export default async function Page() {
       const reactions = m.reactions || 0;
       const comments = m.comments || 0;
       const shares = m.shares || 0;
-      return { cid, title: c.title, product: c.product, draft: c.draft, reactions, comments, shares, engagement: reactions + comments + shares, conversions: c.conversions };
+      return { cid, title: c.title, product: c.product, draft: c.draft, url: postUrl.get(cid) || '', reactions, comments, shares, engagement: reactions + comments + shares, conversions: c.conversions };
     })
     .sort((a, b) => b.engagement - a.engagement);
 
@@ -97,9 +121,7 @@ export default async function Page() {
         </div>
         <div className="head-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <MetricsAuto action={refreshFacebookMetrics} minutes={30} />
-          <form action={refreshFacebookMetrics}>
-            <button className="btn ok" type="submit">↻ Cập nhật số liệu</button>
-          </form>
+          <RefreshButton action={refreshFacebookMetrics} />
         </div>
       </header>
 
@@ -151,7 +173,7 @@ export default async function Page() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.cid}>
-                    <td className="cell-title"><PostTitle title={r.title} product={r.product} draft={r.draft} /></td>
+                    <td className="cell-title"><PostTitle title={r.title} product={r.product} draft={r.draft} url={r.url} /></td>
                     <td>{r.product}</td>
                     <td><b>{r.engagement}</b></td>
                     <td>{r.reactions}</td>

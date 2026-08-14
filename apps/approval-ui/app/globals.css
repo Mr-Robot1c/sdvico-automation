@@ -691,11 +691,30 @@ a.chip:hover { filter: brightness(0.98); }
   --cat-1: #3987e5; --cat-2: #d95926; --cat-3: #199e70; --cat-4: #c98500;
   --cat-5: #d55181; --cat-6: #008300; --cat-7: #9085e9; --cat-8: #e66767;
 }
-.chart-fill.cat-1 { background: var(--cat-1); }
-.chart-fill.cat-2 { background: var(--cat-2); }
-.chart-fill.cat-3 { background: var(--cat-3); }
-.chart-fill.cat-4 { background: var(--cat-4); }
-.chart-fill.cat-5 { background: var(--cat-5); }
-.chart-fill.cat-6 { background: var(--cat-6); }
-.chart-fill.cat-7 { background: var(--cat-7); }
-.chart-fill.cat-8 { background: var(--cat-8); }
+.cat-1 { background: var(--cat-1); }
+.cat-2 { background: var(--cat-2); }
+.cat-3 { background: var(--cat-3); }
+.cat-4 { background: var(--cat-4); }
+.cat-5 { background: var(--cat-5); }
+.cat-6 { background: var(--cat-6); }
+.cat-7 { background: var(--cat-7); }
+.cat-8 { background: var(--cat-8); }
+
+/* Biểu đồ cột dọc (Đo lường). Cột cao theo giá trị, số trên đỉnh, tên dưới chân. */
+.colchart {
+  display: flex; align-items: flex-end; gap: 12px;
+  padding: 8px 4px 0; margin-top: 6px; overflow-x: auto;
+}
+.col { flex: 1 1 0; min-width: 44px; display: flex; flex-direction: column; align-items: center; }
+.col-plot { height: 178px; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; }
+.col-val { font-size: .8rem; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.col-bar { width: 72%; max-width: 54px; min-height: 4px; border-radius: 6px 6px 0 0; }
+.col-lbl {
+  margin-top: 8px; font-size: .74rem; text-align: center; color: var(--ink-2);
+  width: 100%; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* Ghi chú nhỏ cạnh nút: đã xong / lỗi. */
+.save-note { color: var(--ok); font-size: .82rem; font-weight: 600; white-space: nowrap; }
+.err-note { color: var(--no); font-size: .82rem; font-weight: 600; white-space: nowrap; }

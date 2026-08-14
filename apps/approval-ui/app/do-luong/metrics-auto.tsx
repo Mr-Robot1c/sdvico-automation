@@ -17,11 +17,13 @@ export default function MetricsAuto({ action, minutes = 30 }: { action: () => Pr
       try {
         await action();
         router.refresh();
+        setStatus('✓ vừa cập nhật');
+        setTimeout(() => setStatus(''), 4000);
       } catch {
         /* bỏ qua lỗi mạng tạm thời */
+        setStatus('');
       } finally {
         busy.current = false;
-        setStatus('');
       }
     };
     const id = setInterval(tick, Math.max(1, minutes) * 60 * 1000);
