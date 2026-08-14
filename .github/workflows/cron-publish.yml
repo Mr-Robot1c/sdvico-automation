@@ -2,6 +2,8 @@ name: Cron — Đăng bài đã duyệt
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
 
 jobs:
   publish:
