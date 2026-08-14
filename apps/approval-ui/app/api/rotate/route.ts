@@ -14,6 +14,8 @@ export const maxDuration = 60;
 const FOLDERS_PER_RUN = Number(process.env.ROTATE_FOLDERS_PER_RUN) || 2;
 // Bật/tắt bài content mỗi lần chạy.
 const CONTENT_PER_RUN = process.env.ROTATE_CONTENT === '0' ? 0 : 1;
+// Tự đóng logo SDVICO lên ảnh của bài (kiểm tra ảnh đã có logo chưa rồi mới đóng). Tắt: ROTATE_AUTO_LOGO=0.
+const AUTO_LOGO = process.env.ROTATE_AUTO_LOGO !== '0';
 
 // Bỏ tiền tố STT "5. " khỏi nhãn folder để lấy tên sản phẩm.
 function productName(group: string): string {
@@ -124,9 +126,12 @@ export async function GET(req: Request) {
 
   // @ts-ignore — module JS thuần
   const { generateSocialPost, generateContentPost } = await import('../../../lib/gen/social.mjs');
+  // @ts-ignore — module JS thuần
+  const { ensureLogoForPost } = await import('../../../lib/gen/ensure-logo.mjs');
 
   const results: any[] = [];
   const skipped: any[] = [];
+  const logoActions: any[] = []; // nhật ký auto-logo cho mỗi ảnh (stamped/kept/already/skip)
 
   for (const group of pickedFolders) {
     const f = folders.get(group)!;
@@ -139,6 +144,11 @@ export async function GET(req: Request) {
     if (!img && !vid) {
       skipped.push({ group, reason: 'folder rong' });
       continue;
+    }
+    // Auto-logo: bảo đảm ảnh có logo SDVICO trước khi gắn (in-place, giữ nguyên id). Không chặn sinh bài nếu lỗi.
+    if (AUTO_LOGO && img) {
+      try { logoActions.push({ group, ...(await ensureLogoForPost(client, img.id)) }); }
+      catch (e) { logoActions.push({ group, action: 'error', reason: String((e as any)?.message || e) }); }
     }
     const channels = vid ? ['facebook', 'tiktok'] : ['facebook'];
     const assets = { image: img?.id || null, video: vid?.id || null };
@@ -194,6 +204,11 @@ export async function GET(req: Request) {
     const allImgs = [...folders.values()].flatMap((f) => f.images);
     const media = allImgs.length ? pickRandom(allImgs) : null;
     if (!media) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
+    // Auto-logo cho ảnh bài content (in-place, giữ nguyên id).
+    if (AUTO_LOGO && media) {
+      try { logoActions.push({ group: 'Bài content', ...(await ensureLogoForPost(client, media.id)) }); }
+      catch (e) { logoActions.push({ group: 'Bài content', action: 'error', reason: String((e as any)?.message || e) }); }
+    }
     let gen: any;
     try {
       gen = await generateContentPost({});
@@ -238,5 +253,5 @@ export async function GET(req: Request) {
     results.push({ group: 'Bài content', channels, contentId: (ins as { id: string }).id, risk });
   }
 
-  return NextResponse.json({ ok: true, cycle, folders: pickedFolders, created: results.length, results, skipped });
+  return NextResponse.json({ ok: true, cycle, folders: pickedFolders, created: results.length, results, skipped, logoActions });
 }

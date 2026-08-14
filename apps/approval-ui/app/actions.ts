@@ -669,36 +669,24 @@ export async function deleteAsset(formData: FormData) {
   revalidatePath('/tu-lieu');
 }
 
-// Ghép logo SDVICO vào một ảnh trong kho (góc dưới phải, cỡ vừa). Tải xuống -> composite bằng sharp
-// -> upload path mới -> cập nhật storage_path -> gỡ file cũ. Chỉ áp cho kind='image'.
+// Ghép logo SDVICO vào một ảnh trong kho (góc dưới phải, cỡ vừa). Nút THỦ CÔNG: người chủ động
+// bấm nên đóng logo luôn, không cần kiểm tra ảnh đã có logo chưa. Chỉ áp cho kind='image'.
+// Lõi xử lý dùng chung với auto-logo lúc sinh bài (stampLogoInPlace ở ensure-logo.mjs).
 export async function applyLogoToAsset(formData: FormData) {
   const id = String(formData.get('id') || '');
   if (!id) return;
   const client = getServerClient();
   const { data: a } = await client
     .from('brand_assets')
-    .select('id, kind, title, storage_path')
+    .select('id, kind, storage_path')
     .eq('id', id)
     .single();
-  const asset = a as { id: string; kind: string; title: string; storage_path: string } | null;
+  const asset = a as { id: string; kind: string; storage_path: string } | null;
   if (!asset || asset.kind !== 'image') throw new Error('Chỉ ghép logo cho ảnh (kind=image).');
 
-  const dl = await client.storage.from('brand-assets').download(asset.storage_path);
-  if (dl.error || !dl.data) throw new Error('Không tải được ảnh gốc: ' + dl.error?.message);
-  const buf = Buffer.from(await dl.data.arrayBuffer());
-
   // @ts-ignore — module JS thuần
-  const { overlayLogo } = await import('../lib/gen/logo-overlay.mjs');
-  const outBuf: Buffer = await overlayLogo(buf, { position: 'br', scale: 0.14, format: 'jpeg' });
-
-  const stamp = Date.now();
-  const newPath = asset.storage_path.replace(/(\.[a-z0-9]+)?$/i, `-logo-${stamp}.jpg`);
-  const up = await client.storage.from('brand-assets').upload(newPath, outBuf, { contentType: 'image/jpeg', upsert: false });
-  if (up.error) throw new Error('Không tải ảnh mới lên được: ' + up.error.message);
-
-  const upd = await client.from('brand_assets').update({ storage_path: newPath }).eq('id', id);
-  if (upd.error) throw new Error(upd.error.message);
-  await client.storage.from('brand-assets').remove([asset.storage_path]).catch(() => undefined);
+  const { stampLogoInPlace } = await import('../lib/gen/ensure-logo.mjs');
+  await stampLogoInPlace(client, asset);
   revalidatePath('/tu-lieu');
 }
 
