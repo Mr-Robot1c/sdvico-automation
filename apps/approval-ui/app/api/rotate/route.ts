@@ -9,8 +9,9 @@ import { isEmergencyStopped } from '../../../lib/safety';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// Số folder mỗi lần chạy (mặc định 1 folder mỗi ngày).
-const FOLDERS_PER_RUN = Number(process.env.ROTATE_FOLDERS_PER_RUN) || 1;
+// Số folder mỗi lần chạy. Mặc định 3: sinh sẵn 3 sản phẩm/ngày để đăng ở 3 khung giờ
+// (sáng/trưa/tối) bằng cách bấm Duyệt lúc đó (điều cấm 1: máy soạn, người bấm).
+const FOLDERS_PER_RUN = Number(process.env.ROTATE_FOLDERS_PER_RUN) || 3;
 
 // Bỏ tiền tố STT "5. " khỏi nhãn folder để lấy tên sản phẩm.
 function productName(group: string): string {
