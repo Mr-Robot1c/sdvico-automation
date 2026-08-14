@@ -10,6 +10,13 @@ export const config = {
 };
 
 export function middleware(req: NextRequest) {
+  // Endpoint cron do GitHub Actions gọi (compose/publish). Bảo vệ bằng CRON_SECRET
+  // trong chính route, không qua cổng Basic Auth — nếu không sẽ bị chặn 401 trước khi
+  // route chạy. Điều cấm 6 vẫn giữ: các route này không trả dữ liệu ứng viên ra ngoài.
+  if (req.nextUrl.pathname.startsWith('/api/cron/')) {
+    return NextResponse.next();
+  }
+
   const pass = process.env.APP_PASSWORD;
   const user = process.env.APP_USER || 'sdvico';
 

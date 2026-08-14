@@ -13,7 +13,9 @@ export const maxDuration = 60;
 
 function verifyAuth(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  // Production bắt buộc có CRON_SECRET (route này đã đi vòng qua cổng Basic Auth).
+  // Thiếu secret ở production thì chặn, tránh mở endpoint ra ngoài.
+  if (!secret) return process.env.NODE_ENV !== 'production';
   return req.headers.get('authorization') === `Bearer ${secret}`;
 }
 
