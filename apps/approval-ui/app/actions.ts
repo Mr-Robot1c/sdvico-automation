@@ -550,54 +550,6 @@ function parseFbPostId(input: string): string | null {
   return null;
 }
 
-// Tạo bài hẹn giờ trên Facebook. Facebook sẽ tự đăng khi đến giờ — không cần cron.
-// scheduledUnix là Unix timestamp (giây). FB yêu cầu ít nhất 10 phút từ bây giờ, tối đa 30 ngày.
-async function callFacebookScheduledApi(
-  post: { tieu_de: string; noi_dung: string; image_url: string | null },
-  scheduledUnix: number
-): Promise<string> {
-  const pageId = process.env.FACEBOOK_PAGE_ID;
-  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
-  const version = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
-  if (!pageId || !token) throw new Error('Thiếu FACEBOOK_PAGE_ID hoặc FACEBOOK_PAGE_ACCESS_TOKEN.');
-  if (!post.noi_dung) throw new Error('Bài chưa có nội dung.');
-
-  const message = [post.tieu_de, '', post.noi_dung].join('\n').trim();
-
-  // Tải ảnh lên FB (unpublished) để đính vào bài hẹn giờ.
-  let attachedMediaFbid: string | null = null;
-  if (post.image_url) {
-    try {
-      const photoRes = await fetch(`https://graph.facebook.com/${version}/${pageId}/photos`, {
-        method: 'POST',
-        body: new URLSearchParams({ url: post.image_url, published: 'false', access_token: token }),
-        cache: 'no-store',
-      });
-      const photoJson = await photoRes.json();
-      if (photoRes.ok && !photoJson.error && photoJson.id) attachedMediaFbid = photoJson.id;
-    } catch {}
-  }
-
-  const params = new URLSearchParams({
-    message,
-    published: 'false',
-    scheduled_publish_time: String(scheduledUnix),
-    access_token: token,
-  });
-  if (attachedMediaFbid) {
-    params.set('attached_media', JSON.stringify([{ media_fbid: attachedMediaFbid }]));
-  }
-
-  const res = await fetch(`https://graph.facebook.com/${version}/${pageId}/feed`, {
-    method: 'POST', body: params, cache: 'no-store',
-  });
-  const json = await res.json();
-  if (!res.ok || json.error) {
-    throw new Error((json.error?.message || `HTTP ${res.status}`) + (json.error?.code ? ` (mã ${json.error.code})` : ''));
-  }
-  return json.id;
-}
-
 // Helper nội bộ: gọi Facebook Graph API để đăng bài. Ném lỗi nếu thất bại.
 // Trả về fbPostId (string). Không ghi DB, không revalidate — người gọi chịu.
 async function callFacebookApi(post: { tieu_de: string; noi_dung: string; image_url: string | null }): Promise<string> {
@@ -875,7 +827,11 @@ export async function toggleAutoPost(formData: FormData) {
   const current = formData.get('current') === 'true';
   if (!jobId) return;
   const client = getServerClient();
-  const { error } = await client.from('hr_jobs').update({ auto_post: !current }).eq('id', jobId);
+  const next = !current;
+  // Bật tự động thì đặt luôn status='open' để cron soạn được (cron chỉ soạn vị trí open + auto_post).
+  const { error } = await client.from('hr_jobs')
+    .update(next ? { auto_post: true, status: 'open' } : { auto_post: false })
+    .eq('id', jobId);
   if (error) {
     // Lỗi 42703 = cột auto_post chưa tồn tại, migration chưa chạy.
     throw new Error(
@@ -1016,40 +972,11 @@ export async function approveAndSchedule(formData: FormData) {
     .update({ status: 'approved', decided_at: new Date().toISOString() })
     .eq('id', queueId).eq('status', 'pending');
 
-  // Thử tạo bài hẹn giờ trực tiếp trên Facebook — FB tự đăng đúng giờ, không cần cron.
-  // FB yêu cầu ít nhất 10 phút từ bây giờ. Nếu thất bại → vẫn lưu scheduled_at để cron backup.
-  let fbScheduledId: string | null = null;
-  const scheduledUnix = Math.floor(new Date(scheduled_at).getTime() / 1000);
-  const minFbSchedule = Math.floor(Date.now() / 1000) + 11 * 60;
-  if (scheduledUnix >= minFbSchedule) {
-    try {
-      const { data: postContent } = await client
-        .from('hr_job_posts')
-        .select('tieu_de, noi_dung, image_url')
-        .eq('id', postId).single();
-      if (postContent) {
-        fbScheduledId = await callFacebookScheduledApi(
-          postContent as { tieu_de: string; noi_dung: string; image_url: string | null },
-          scheduledUnix
-        );
-      }
-    } catch (fbErr) {
-      try {
-        await client.from('run_log').insert({
-          task: 'hr.schedule_facebook',
-          status: 'error',
-          detail: { postId, scheduled_at, error: String(fbErr) },
-        });
-      } catch {}
-    }
-  }
-
+  // Đặt lịch: worker cron (chạy mỗi 5 phút qua cron-job.org) sẽ đăng khi đến giờ.
+  // Không dùng Facebook native scheduling nữa — thực tế nó không đăng được, làm bài kẹt.
+  // Worker là đường tin cậy: đăng bài scheduled khi scheduled_at đã tới.
   await client.from('hr_job_posts')
-    .update({
-      scheduled_at,
-      trang_thai: 'scheduled',
-      ...(fbScheduledId ? { fb_post_id: fbScheduledId } : {}),
-    })
+    .update({ scheduled_at, trang_thai: 'scheduled' })
     .eq('id', postId).neq('trang_thai', 'posted');
 
   // Gỡ bài cũ ngay khi đặt lịch (bài cũ đã xong vai trò, bài mới sẽ lên theo lịch).
