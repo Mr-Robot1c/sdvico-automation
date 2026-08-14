@@ -31,6 +31,9 @@ const SOLO_BOTTOM: (NavItem & { icon: string })[] = [
 export default function Nav({ pendingCount = 0 }: { pendingCount?: number }) {
   const path = usePathname();
 
+  // Trang công khai cho ứng viên (chọn giờ phỏng vấn) không hiện điều hướng nội bộ.
+  if (path?.startsWith('/phong-van')) return null;
+
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     const s = new Set<string>();
     GROUPS.forEach((g) => { if (g.items.some((i) => i.href === path)) s.add(g.id); });

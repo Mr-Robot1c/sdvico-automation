@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { formatRelative } from '../labels';
@@ -10,6 +11,7 @@ type Row = {
   status: string;
   title: string;
   created_at: string;
+  ref_id: string | null;
   payload: { ung_vien?: string; vi_tri?: string; email?: string; khung_gio?: string[] } | null;
 };
 
@@ -33,11 +35,24 @@ export default async function Page() {
   const client = getServerClient();
   const { data, error } = await client
     .from('approval_queue')
-    .select('status, title, created_at, payload')
+    .select('status, title, created_at, ref_id, payload')
     .eq('kind', 'hr_interview')
     .limit(100);
 
   const rows = (data || []) as Row[];
+
+  // Token + giờ ứng viên đã chọn (cột có thể chưa migrate — đọc an toàn).
+  const appMap = new Map<string, { schedule_token: string | null; chosen_slot: string | null }>();
+  const refIds = rows.map((r) => r.ref_id).filter(Boolean) as string[];
+  if (refIds.length) {
+    const { data: apps } = await client.from('hr_applications').select('id, schedule_token, chosen_slot').in('id', refIds);
+    for (const a of (apps || []) as Array<{ id: string; schedule_token: string | null; chosen_slot: string | null }>) {
+      appMap.set(a.id, { schedule_token: a.schedule_token, chosen_slot: a.chosen_slot });
+    }
+  }
+  const h = headers();
+  const host = h.get('x-forwarded-host') || h.get('host') || '';
+  const baseUrl = host ? `${h.get('x-forwarded-proto') || 'https'}://${host}` : '';
   // Sắp theo khung giờ gần nhất, người sắp đến phỏng vấn lên đầu.
   const active = rows
     .filter((r) => r.status !== 'rejected')
@@ -99,6 +114,18 @@ export default async function Page() {
                   ) : '—'}
                 </dd>
               </div>
+              <div className="field">
+                <dt>Ứng viên đã chọn</dt>
+                <dd>{r.ref_id && appMap.get(r.ref_id)?.chosen_slot
+                  ? <b style={{ color: 'var(--ok)' }}>{appMap.get(r.ref_id)!.chosen_slot}</b>
+                  : <span className="muted">Chưa chọn</span>}</dd>
+              </div>
+              {r.ref_id && appMap.get(r.ref_id)?.schedule_token ? (
+                <div className="field field-long">
+                  <dt>Link gửi ứng viên tự chọn giờ</dt>
+                  <dd><code style={{ fontSize: '0.8em', wordBreak: 'break-all' }}>{baseUrl}/phong-van/{appMap.get(r.ref_id)!.schedule_token}</code></dd>
+                </div>
+              ) : null}
             </dl>
           </li>
         ))}

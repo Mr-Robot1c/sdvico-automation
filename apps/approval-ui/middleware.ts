@@ -17,6 +17,12 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Trang công khai cho ứng viên tự chọn giờ phỏng vấn — xác thực bằng token trong link,
+  // không qua cổng mật khẩu nội bộ. Chỉ hiện khung giờ + nhận lựa chọn, không lộ dữ liệu khác.
+  if (req.nextUrl.pathname.startsWith('/phong-van/')) {
+    return NextResponse.next();
+  }
+
   const pass = process.env.APP_PASSWORD;
   const user = process.env.APP_USER || 'sdvico';
 

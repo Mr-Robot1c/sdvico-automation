@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { getServerClient } from '../lib/supabase-server';
 import { composeJdVersions } from '../lib/jd-compose';
 import { groqChat } from '../lib/groq';
+import { randomBytes } from 'node:crypto';
 import { fetchUnsplashPhoto } from '../lib/unsplash';
 import { buildJobDetailSection } from '../lib/job-detail';
 import { buildRecruitmentPoster, toBullets } from '../lib/poster';
@@ -143,7 +144,45 @@ export async function advanceToInterview(formData: FormData) {
     .eq('stage', 'review');
   if (error) throw new Error(error.message);
 
+  // Cấp token để ứng viên tự chọn giờ qua link công khai (cột có thể chưa migrate — bỏ qua nếu lỗi).
+  const token = randomBytes(18).toString('hex');
+  await client.from('hr_applications').update({ schedule_token: token }).eq('id', appId).is('schedule_token', null);
+
   revalidatePath('/ho-so');
+  revalidatePath('/lich');
+}
+
+// Ứng viên tự chọn khung giờ phỏng vấn qua link công khai (không cần đăng nhập, xác thực bằng token).
+// Chỉ lưu giờ đã chọn, không đụng dữ liệu khác. Không tự gửi mail.
+export async function chooseInterviewSlot(formData: FormData) {
+  const token = String(formData.get('token') || '').trim();
+  const slot = String(formData.get('slot') || '').trim();
+  if (!token || !slot) return;
+
+  const client = getServerClient();
+  const { data: app } = await client
+    .from('hr_applications')
+    .select('id, chosen_slot')
+    .eq('schedule_token', token)
+    .maybeSingle();
+  if (!app) return;
+
+  // Chỉ chấp nhận khung giờ nằm trong danh sách đề xuất (đọc từ thư mời trong hàng đợi).
+  const { data: iv } = await client
+    .from('approval_queue')
+    .select('payload')
+    .eq('kind', 'hr_interview')
+    .eq('ref_id', app.id)
+    .maybeSingle();
+  const slots = ((iv?.payload as { khung_gio?: string[] } | null)?.khung_gio) || [];
+  if (!slots.includes(slot)) return;
+
+  await client.from('hr_applications')
+    .update({ chosen_slot: slot, slot_chosen_at: new Date().toISOString() })
+    .eq('id', app.id);
+
+  revalidatePath(`/phong-van/${token}`);
+  revalidatePath('/lich');
 }
 
 // Từ chối một ứng viên nguồn ngoài và XOÁ khỏi cơ sở dữ liệu.
