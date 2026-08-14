@@ -8,8 +8,10 @@ name: hr-intake
 # chỉ nổ mỗi 40-50 phút), vừa tiêu vượt hạn mức. Lịch 30 phút được honor đáng tin
 # cậy hơn và nằm gọn trong mức miễn phí. concurrency chặn chạy chồng lượt.
 on:
-  schedule:
-    - cron: '*/30 * * * *'   # 30 phút một lần
+  # LICH TU CHAY DA TAT (14/8/2026): repo dang tap trung Marketing, khong de HR an ke phut Actions.
+  # Van chay tay duoc bang "Run workflow". Muon bat lai thi bo dau '#' 2 dong cron duoi.
+  # schedule:
+  #   - cron: '*/30 * * * *'   # 30 phút một lần
   workflow_dispatch: {}
 
 # Không chạy chồng lượt, tránh nạp trùng một thư khi lượt trước chưa xong.
