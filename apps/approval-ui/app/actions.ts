@@ -38,9 +38,10 @@ export async function decideForm(formData: FormData) {
   revalidatePath('/');
 }
 
-// Xóa mục khỏi hàng đợi và hủy bản nháp đính kèm (nếu có).
-// Dùng khi muốn bỏ qua một mục mà không duyệt hay từ chối — ví dụ bài soạn lại tốt hơn.
-// Nếu có post_id: đặt hr_job_posts.trang_thai = 'cancelled' để worker có thể soạn lại.
+// Xóa mục khỏi hàng đợi và XÓA HẲN bản nháp đính kèm (nếu có).
+// Dùng khi muốn bỏ một mục mà không duyệt — bản nháp biến mất khỏi cả trang Đăng tin,
+// không để lại rác phải xóa tay. Chỉ xóa bản nháp (draft), không đụng bài đã đăng.
+// Worker vẫn được phép soạn bài mới cho vị trí này vòng sau.
 export async function dismissQueueItem(formData: FormData) {
   const id = String(formData.get('id') || '');
   const postId = String(formData.get('post_id') || '');
@@ -56,12 +57,14 @@ export async function dismissQueueItem(formData: FormData) {
   if (postId) {
     await client
       .from('hr_job_posts')
-      .update({ trang_thai: 'cancelled', ghi_chu: 'Người dùng xóa khỏi hàng đợi' })
+      .delete()
       .eq('id', postId)
       .eq('trang_thai', 'draft');
   }
 
   revalidatePath('/');
+  revalidatePath('/dang-tin');
+  revalidatePath('/tao-jd');
 }
 
 // Viết lại bài nháp với giọng văn theo yêu cầu. Máy viết lại, người vẫn phải duyệt (điều cấm 1).
@@ -287,13 +290,14 @@ export async function queueFacebookPost(formData: FormData) {
     benefits = (benRow?.benefits as string | undefined) || null;
   }
 
-  // Vị trí đã có bài Facebook đang chờ hoặc đã đăng thì thôi, tránh trùng.
+  // Chỉ chặn khi vị trí đang có bài CHỜ DUYỆT hoặc ĐÃ ĐẶT LỊCH (tránh trùng bản nháp).
+  // Nếu vị trí chỉ có bài đã đăng (posted) thì vẫn cho soạn thêm bài mới ("Soạn thêm bài").
   const { data: existing } = await client
     .from('hr_job_posts')
     .select('id')
     .eq('job_id', jobId)
     .eq('kenh', 'facebook')
-    .in('trang_thai', ['draft', 'scheduled', 'posted']);
+    .in('trang_thai', ['draft', 'scheduled']);
   if (existing && existing.length) {
     revalidatePath('/dang-tin');
     return;

@@ -42,27 +42,11 @@ export default function AddJobPanel() {
               <>
                 <p className="panel-step">Bước 1 — Nhập thông tin vị trí</p>
                 <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div className="row">
-                    <select className="note" name="nhom" defaultValue="">
-                      <option value="">Chọn nhóm ngành</option>
-                      {JOB_GROUPS.map((g) => (
-                        <option key={g.key} value={g.key}>{g.key}. {g.ten}</option>
-                      ))}
-                    </select>
-                    <input className="note" name="title" placeholder="Tên vị trí" list="panel-positions" required />
-                  </div>
+                  <input className="note" name="title" placeholder="Tên vị trí" list="panel-positions" required />
                   <datalist id="panel-positions">
                     {allPositions.map((p) => <option key={p} value={p} />)}
                   </datalist>
-                  <div className="row">
-                    <input className="note" name="department" placeholder="Phòng ban" />
-                    <input className="note" name="location" placeholder="Nơi làm việc, ví dụ Vũng Tàu" />
-                    <input
-                      className="note" name="headcount" type="number" min="1" max="99"
-                      defaultValue="1" placeholder="Số lượng" style={{ width: 80 }}
-                      aria-label="Số lượng cần tuyển"
-                    />
-                  </div>
+                  <input className="note" name="location" placeholder="Nơi làm việc, ví dụ Vũng Tàu" />
                   <textarea name="short_desc" rows={3} placeholder="Mô tả công việc"
                     style={{ width: '100%', boxSizing: 'border-box' }} aria-label="Mô tả công việc" />
                   <textarea name="requirements" rows={3} placeholder="Yêu cầu ứng viên"
