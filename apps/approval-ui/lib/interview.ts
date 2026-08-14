@@ -16,6 +16,36 @@ function slotLabel(day: Date, time: string): string {
   return `${wd}, ${dd}/${mm}/${day.getFullYear()}, ${time}`;
 }
 
+// Định dạng khung giờ do người duyệt chọn: dateStr 'YYYY-MM-DD' + time 'HH:MM'.
+export function formatSlot(dateStr: string, time: string): string {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return slotLabel(new Date(y, m - 1, d), time);
+}
+
+// Đoán giới tính để xưng hô đúng (anh/chị). Cục bộ, không đưa lên mô hình.
+// Ưu tiên thông tin ghi trong CV, sau đó suy từ tên. Không chắc thì 'anh/chị'.
+const FEMALE_MID = ['thị'];
+const MALE_MID = ['văn'];
+const FEMALE_NAMES = new Set(['hoa', 'mai', 'lan', 'hồng', 'hương', 'thu', 'trang', 'linh', 'ngọc', 'hà', 'yến', 'nhung', 'thảo', 'vân', 'my', 'hằng', 'oanh', 'loan', 'diệu', 'phượng', 'nga', 'hạnh', 'thúy', 'tuyết', 'quỳnh', 'nhi', 'châu']);
+const MALE_NAMES = new Set(['sơn', 'nam', 'quân', 'hải', 'huy', 'tùng', 'đức', 'minh', 'tuấn', 'hùng', 'dũng', 'long', 'phong', 'cường', 'thành', 'lợi', 'khoa', 'bình', 'phúc', 'thắng', 'trung', 'kiên', 'hoàng', 'vũ', 'lâm', 'đạt', 'tài']);
+
+function xungHoFor(name?: string | null, text = ''): string {
+  const t = (text || '').toLowerCase();
+  if (/giới tính\s*[:\-]?\s*nữ|gender\s*[:\-]?\s*female/.test(t)) return 'chị';
+  if (/giới tính\s*[:\-]?\s*nam|gender\s*[:\-]?\s*male/.test(t)) return 'anh';
+
+  const parts = (name || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    if (FEMALE_MID.includes(parts[1])) return 'chị';
+    if (MALE_MID.includes(parts[1])) return 'anh';
+  }
+  const given = parts[parts.length - 1];
+  if (given && FEMALE_NAMES.has(given)) return 'chị';
+  if (given && MALE_NAMES.has(given)) return 'anh';
+  return 'anh/chị';
+}
+
 // Lưới khung giờ các ngày làm việc, bắt đầu từ ngày mai.
 function buildGrid(times: string[], days = 40): string[] {
   const useTimes = times.length ? times : WORK_TIMES;
@@ -54,8 +84,8 @@ export async function allocateInterviewSlots(client: DbClient, n = 3): Promise<s
 }
 
 // Thư mời phỏng vấn. name có thể null.
-export function composeInterviewLetter({ name, position, slots }: { name?: string | null; position: string; slots: string[] }): string {
-  const xh = 'anh/chị';
+export function composeInterviewLetter({ name, position, slots, cvText = '' }: { name?: string | null; position: string; slots: string[]; cvText?: string }): string {
+  const xh = xungHoFor(name, cvText);
   const hasName = name && name.trim() && name.trim() !== 'anh/chị';
   const greeting = hasName ? `Kính gửi ${xh} ${name!.trim()},` : `Kính gửi ${xh},`;
   return [

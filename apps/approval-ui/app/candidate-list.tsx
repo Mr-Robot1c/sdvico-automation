@@ -32,8 +32,52 @@ export type CandView = {
   cvUrl: string | null;
 };
 
+// Bộ chọn khung giờ phỏng vấn: người duyệt chọn ngày + giờ (gợi ý theo khung đã lưu),
+// hoặc để trống cho hệ thống tự chọn. Bấm xác nhận là soạn thư mời ngay.
+function InterviewApprove({ appId, name, windows }: { appId: string; name: string; windows: string[] }) {
+  const times = windows.length ? windows : ['09:00', '10:30', '14:00', '15:30'];
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<{ date: string; time: string }[]>([
+    { date: '', time: times[0] },
+    { date: '', time: times[0] },
+    { date: '', time: times[0] },
+  ]);
+
+  if (!open) {
+    return <button className="btn ok" type="button" onClick={() => setOpen(true)}>Xét duyệt vào phỏng vấn</button>;
+  }
+
+  const setRow = (i: number, patch: Partial<{ date: string; time: string }>) =>
+    setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const chosen = rows.filter((r) => r.date);
+
+  return (
+    <div className="settings-box" style={{ margin: 0, padding: 12, width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <span style={{ fontSize: '0.9em', fontWeight: 600 }}>Chọn khung giờ đề xuất cho {name}</span>
+      <span className="muted" style={{ fontSize: '0.82em' }}>Chọn ngày + giờ cho từng khung. Để trống hết thì hệ thống tự chọn.</span>
+      {rows.map((r, i) => (
+        <div key={i} className="row" style={{ gap: 6, alignItems: 'center' }}>
+          <input className="note" type="date" value={r.date} onChange={(e) => setRow(i, { date: e.target.value })} style={{ flex: 1 }} />
+          <select className="note" value={r.time} onChange={(e) => setRow(i, { time: e.target.value })}>
+            {times.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+      ))}
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="btn ghost" style={{ fontSize: '0.85em' }} onClick={() => setRows((rs) => [...rs, { date: '', time: times[0] }])}>+ Thêm khung</button>
+        <form action={advanceToInterview} style={{ display: 'inline' }}>
+          <input type="hidden" name="appId" value={appId} />
+          {chosen.map((r, i) => <input key={i} type="hidden" name="slot" value={`${r.date}|${r.time}`} />)}
+          <button className="btn ok" type="submit">{chosen.length ? `Soạn thư mời (${chosen.length} khung)` : 'Soạn thư mời (tự chọn giờ)'}</button>
+        </form>
+        <button type="button" className="btn ghost" style={{ fontSize: '0.85em' }} onClick={() => setOpen(false)}>Đóng</button>
+      </div>
+    </div>
+  );
+}
+
 // Một thẻ hồ sơ, có tab chi tiết mở khi bấm để giao diện gọn gàng.
-function CandidateCard({ c }: { c: CandView }) {
+function CandidateCard({ c, windows }: { c: CandView; windows: string[] }) {
   const [tab, setTab] = useState<string | null>(null);
   const toggle = (t: string) => setTab((cur) => (cur === t ? null : t));
 
@@ -137,16 +181,7 @@ function CandidateCard({ c }: { c: CandView }) {
           <a className="btn ghost" href={c.cvUrl} target="_blank" rel="noopener noreferrer">Tải CV gốc</a>
         ) : null}
         {c.appStage === 'review' && c.appId ? (
-          <form
-            action={advanceToInterview}
-            onSubmit={(e) => {
-              const ok = window.confirm(`Xét duyệt và đưa hồ sơ này vào phỏng vấn?\n\n${c.name}\n\nMáy sẽ soạn câu hỏi và tự sắp lịch, thư mời chờ bạn duyệt.`);
-              if (!ok) e.preventDefault();
-            }}
-          >
-            <input type="hidden" name="appId" value={c.appId} />
-            <button className="btn ok" type="submit">Xét duyệt vào phỏng vấn</button>
-          </form>
+          <InterviewApprove appId={c.appId} name={c.name} windows={windows} />
         ) : null}
         {c.appStage === 'interview' && c.appId && !c.interviewedAt ? (
           <>
@@ -210,7 +245,7 @@ function CandidateCard({ c }: { c: CandView }) {
 }
 
 // Danh sách hồ sơ: tìm kiếm, lọc theo trạng thái, sắp xếp theo mới nhất hoặc điểm.
-export default function CandidateList({ candidates }: { candidates: CandView[] }) {
+export default function CandidateList({ candidates, windows }: { candidates: CandView[]; windows: string[] }) {
   const [q, setQ] = useState('');
   const [stage, setStage] = useState<string | null>(null);
   const [sort, setSort] = useState<'moi' | 'diem'>('moi');
@@ -274,7 +309,7 @@ export default function CandidateList({ candidates }: { candidates: CandView[] }
       <p className="sub">Hiện {filtered.length} trên {candidates.length} hồ sơ.</p>
 
       <ul className="list">
-        {filtered.map((c) => <CandidateCard key={c.id} c={c} />)}
+        {filtered.map((c) => <CandidateCard key={c.id} c={c} windows={windows} />)}
       </ul>
 
       {filtered.length === 0 ? <p className="muted">Không có hồ sơ khớp bộ lọc.</p> : null}

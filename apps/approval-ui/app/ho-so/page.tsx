@@ -69,6 +69,10 @@ export default async function Page() {
   const { data: nrows } = await client.from('hr_applications').select('id, note');
   for (const r of nrows || []) if (r.note) notes.set(r.id as string, r.note as string);
 
+  // Khung giờ phỏng vấn mong muốn (gợi ý cho người duyệt chọn).
+  const { data: winCfg } = await client.from('app_config').select('value').eq('key', 'interview_windows').maybeSingle();
+  const windows: string[] = Array.isArray(winCfg?.value) && winCfg!.value.length ? (winCfg!.value as string[]) : ['09:00', '10:30', '14:00', '15:30'];
+
   // Mốc đã phỏng vấn (cột có thể chưa migrate — đọc an toàn).
   const interviewedAt = new Map<string, string>();
   const { data: irows } = await client.from('hr_applications').select('id, interviewed_at');
@@ -152,7 +156,7 @@ export default async function Page() {
         </div>
       ) : null}
 
-      {!error && candidates.length > 0 ? <CandidateList candidates={candidates} /> : null}
+      {!error && candidates.length > 0 ? <CandidateList candidates={candidates} windows={windows} /> : null}
     </main>
   );
 }

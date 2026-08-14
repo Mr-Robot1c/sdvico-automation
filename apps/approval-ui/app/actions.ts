@@ -12,7 +12,7 @@ import { buildJobDetailSection } from '../lib/job-detail';
 import { buildRecruitmentPoster, toBullets } from '../lib/poster';
 import { sendEmail } from '../lib/mailer';
 import { composeOfferLetter, composeRejectLetter } from '../lib/hr-letters';
-import { allocateInterviewSlots, composeInterviewLetter, generateInterviewQuestions } from '../lib/interview';
+import { allocateInterviewSlots, composeInterviewLetter, generateInterviewQuestions, formatSlot } from '../lib/interview';
 
 // datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
 // Server Vercel chạy UTC nên phải gắn +07:00 để parse đúng giờ Việt Nam.
@@ -287,9 +287,13 @@ export async function advanceToInterview(formData: FormData) {
     const email = (cand?.email as string) || '';
     const cvText = ((cand?.cv_json as { raw_text?: string } | null)?.raw_text) || '';
 
-    const slots = await allocateInterviewSlots(client, 3);
+    // Khung giờ do người duyệt chọn (dạng "YYYY-MM-DD|HH:MM"); trống thì hệ thống tự chọn.
+    const chosen = formData.getAll('slot').map(String).filter(Boolean)
+      .map((rs) => { const [d, t] = rs.split('|'); return formatSlot(d, t); })
+      .filter(Boolean);
+    const slots = chosen.length ? chosen : await allocateInterviewSlots(client, 3);
     const q = await generateInterviewQuestions(cvText, position);
-    const thu_moi = composeInterviewLetter({ name, position, slots });
+    const thu_moi = composeInterviewLetter({ name, position, slots, cvText });
 
     await client.from('approval_queue').insert({
       kind: 'hr_interview',
