@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { updateJobPost, editJobPostDraft, publishJobPost, recomposeDraft } from './actions';
 import { SubmitButton } from './submit-button';
 import { formatRelative } from './labels';
@@ -45,6 +45,10 @@ export default function PostListClient({
   const [openId, setOpenId] = useState<string | null>(null);
   const [openMode, setOpenMode] = useState<Mode>('view');
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  // Chỉ tính các điều kiện theo thời gian (isPast, giờ tương đối) sau khi mount,
+  // để render đầu tiên ở client khớp với server (tránh lỗi hydrate #418/#425).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const approved = new Set(approvedPostIds);
 
   const toggle = (id: string, m: Mode) => {
@@ -80,10 +84,10 @@ export default function PostListClient({
                     <Countdown target={p.scheduled_at} prefix="còn " pastLabel="Đến giờ, đang đăng..." />
                   </span>
                 ) : (
-                  <time className="pt-time">{formatRelative(p.created_at)}</time>
+                  <time className="pt-time" suppressHydrationWarning>{formatRelative(p.created_at)}</time>
                 )}
                 <div className="pt-actions" onClick={(e) => e.stopPropagation()}>
-                  {canPost && isPast(p.scheduled_at) && p.trang_thai === 'scheduled' ? (
+                  {mounted && canPost && isPast(p.scheduled_at) && p.trang_thai === 'scheduled' ? (
                     <form action={publishJobPost}>
                       <input type="hidden" name="post_id" value={p.id} />
                       <SubmitButton label="Đăng ngay" pendingLabel="Đang đăng..." className="pt-btn ok" />

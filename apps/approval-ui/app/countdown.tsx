@@ -28,14 +28,23 @@ export function Countdown({
   pastLabel?: string;
   className?: string;
 }) {
-  const [ms, setMs] = useState(() => new Date(target).getTime() - Date.now());
+  // Bắt đầu null: server và lần render client đầu tiên giống nhau (tránh lỗi hydrate mismatch).
+  // Chỉ tính theo Date.now() SAU khi mount, rồi cập nhật mỗi giây.
+  const [ms, setMs] = useState<number | null>(null);
 
   useEffect(() => {
-    const id = setInterval(() => setMs(new Date(target).getTime() - Date.now()), 1000);
+    const update = () => setMs(new Date(target).getTime() - Date.now());
+    update();
+    const id = setInterval(update, 1000);
     return () => clearInterval(id);
   }, [target]);
 
   const title = new Date(target).toLocaleString('vi-VN');
+
+  if (ms === null) {
+    // Chưa mount: chừa chỗ trống ổn định, không phụ thuộc thời gian.
+    return <span className={className} title={title} suppressHydrationWarning />;
+  }
 
   if (ms <= 0) {
     return (
