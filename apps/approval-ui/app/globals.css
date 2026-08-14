@@ -670,3 +670,32 @@ a.chip:hover { filter: brightness(0.98); }
 .plan-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
 .plan-narrative { max-width: 72ch; }
 .plan-narrative p { margin: 10px 0; line-height: 1.65; }
+
+/* Cột số trong bảng: canh giữa, số cân đều (tabular-nums). Dùng cho Kế hoạch cho đều mắt. */
+.datatable th.num, .datatable td.num { text-align: center; font-variant-numeric: tabular-nums; }
+.datatable th.center, .datatable td.center { text-align: center; }
+
+/* Bảng màu phân loại cho biểu đồ Đo lường — 8 slot đã kiểm định (dataviz), hợp cả sáng và tối.
+   Gán theo SẢN PHẨM (không theo thứ hạng) để mỗi sản phẩm giữ một màu xuyên suốt các biểu đồ. */
+:root {
+  --cat-1: #2a78d6; --cat-2: #eb6834; --cat-3: #1baf7a; --cat-4: #eda100;
+  --cat-5: #e87ba4; --cat-6: #008300; --cat-7: #4a3aa7; --cat-8: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --cat-1: #3987e5; --cat-2: #d95926; --cat-3: #199e70; --cat-4: #c98500;
+    --cat-5: #d55181; --cat-6: #008300; --cat-7: #9085e9; --cat-8: #e66767;
+  }
+}
+:root[data-theme='dark'] {
+  --cat-1: #3987e5; --cat-2: #d95926; --cat-3: #199e70; --cat-4: #c98500;
+  --cat-5: #d55181; --cat-6: #008300; --cat-7: #9085e9; --cat-8: #e66767;
+}
+.chart-fill.cat-1 { background: var(--cat-1); }
+.chart-fill.cat-2 { background: var(--cat-2); }
+.chart-fill.cat-3 { background: var(--cat-3); }
+.chart-fill.cat-4 { background: var(--cat-4); }
+.chart-fill.cat-5 { background: var(--cat-5); }
+.chart-fill.cat-6 { background: var(--cat-6); }
+.chart-fill.cat-7 { background: var(--cat-7); }
+.chart-fill.cat-8 { background: var(--cat-8); }

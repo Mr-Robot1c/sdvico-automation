@@ -129,11 +129,11 @@ export default async function Page() {
                   <thead>
                     <tr>
                       <th>Sản phẩm</th>
-                      <th>Hướng</th>
-                      <th>Số bài</th>
-                      <th>TB tương tác/bài</th>
-                      <th>TB đơn/bài</th>
-                      <th>Bài/tuần gợi ý</th>
+                      <th className="center">Hướng</th>
+                      <th className="num">Số bài</th>
+                      <th className="num">Tương tác/bài</th>
+                      <th className="num">Đơn/bài</th>
+                      <th className="num">Bài/tuần</th>
                       <th>Ghi chú</th>
                     </tr>
                   </thead>
@@ -143,11 +143,11 @@ export default async function Page() {
                       return (
                         <tr key={p.product}>
                           <td>{p.product}</td>
-                          <td><span className={`badge ${t.cls}`}>{t.icon} {t.text}</span></td>
-                          <td>{vnInt(p.count)}</td>
-                          <td>{vnInt(p.avgEng)}</td>
-                          <td>{p.avgConv > 0 ? vnDec1(p.avgConv) : '—'}</td>
-                          <td><b>{vnInt(p.postsPerWeek)}</b></td>
+                          <td className="center"><span className={`badge ${t.cls}`}>{t.icon} {t.text}</span></td>
+                          <td className="num">{vnInt(p.count)}</td>
+                          <td className="num">{vnInt(p.avgEng)}</td>
+                          <td className="num">{p.avgConv > 0 ? vnDec1(p.avgConv) : '—'}</td>
+                          <td className="num"><b>{vnInt(p.postsPerWeek)}</b></td>
                           <td className="sub">{p.note}</td>
                         </tr>
                       );
@@ -166,7 +166,7 @@ export default async function Page() {
               <div className="tablewrap">
                 <table className="datatable">
                   <thead>
-                    <tr><th>Sinh lúc</th><th>Loại</th><th>Tuần</th><th>Dẫn đầu</th><th>Đủ mẫu</th><th></th></tr>
+                    <tr><th>Sinh lúc</th><th>Loại</th><th>Tuần</th><th>Dẫn đầu</th><th className="num">Đủ mẫu</th><th className="center"></th></tr>
                   </thead>
                   <tbody>
                     {history.map((r) => (
@@ -175,8 +175,8 @@ export default async function Page() {
                         <td>{r.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}{r.applied ? ' · đang áp' : ''}</td>
                         <td className="sub">{r.period_start ? `${fmtDate(r.period_start)}–${fmtDate(r.period_end)}` : '—'}</td>
                         <td>{r.data?.summary?.topProduct || '—'}</td>
-                        <td>{vnInt(r.data?.summary?.ranked || 0)}</td>
-                        <td>
+                        <td className="num">{vnInt(r.data?.summary?.ranked || 0)}</td>
+                        <td className="center">
                           <form action={deletePlan}>
                             <input type="hidden" name="plan_id" value={r.id} />
                             <button className="btn no sm" type="submit" aria-label="Xóa kế hoạch">Xóa</button>

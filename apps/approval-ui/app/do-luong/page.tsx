@@ -76,10 +76,17 @@ export default async function Page() {
     }))
     .sort((a, b) => b.avgConv - a.avgConv || b.avgEng - a.avgEng);
 
+  // Màu cố định theo SẢN PHẨM (không theo thứ hạng): mỗi sản phẩm giữ một màu xuyên suốt cả ba
+  // biểu đồ, bài top thừa hưởng màu của sản phẩm nó. 8 slot màu phân loại đã kiểm định (dataviz).
+  // Sản phẩm thứ 9 trở đi dùng màu xám trung tính (slot 0).
+  const productColor = new Map<string, number>();
+  productRows.forEach((t, i) => productColor.set(t.product, i < 8 ? i + 1 : 0));
+  const colorOf = (product: string) => productColor.get(product) || 0;
+
   // Dữ liệu cho biểu đồ.
-  const engByProduct = productRows.map((t) => ({ label: t.product, value: t.avgEng }));
-  const convByProduct = productRows.filter((t) => t.conversions > 0).map((t) => ({ label: t.product, value: t.avgConv }));
-  const topPosts = rows.slice(0, 8).map((r) => ({ label: r.title, value: r.engagement }));
+  const engByProduct = productRows.map((t) => ({ label: t.product, value: t.avgEng, color: colorOf(t.product) }));
+  const convByProduct = productRows.filter((t) => t.conversions > 0).map((t) => ({ label: t.product, value: t.avgConv, color: colorOf(t.product) }));
+  const topPosts = rows.slice(0, 8).map((r) => ({ label: r.title, value: r.engagement, color: colorOf(r.product) }));
 
   return (
     <main>
