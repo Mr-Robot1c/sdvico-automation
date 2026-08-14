@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - social.mjs: them 8 ANGLES (xoay ngau nhien) + temperature 1.05 + xuat JSON {headline, body} de moi bai khac nhau va co tieu de rieng. rotate + rotate-run dung gen.headline lam title (brief.keyword van = ten SP de gom). Da kiem chung 2 lan cung SP ra 2 tieu de + noi dung khac. -->
 <!-- re-verified: 2026-08-14 - rotate-run.mjs + rotate route: payload them authored:'ai' (phan biet voi bai nguoi tu soan authored:'human'). -->
 <!-- re-verified: 2026-08-14 - rotate-run.mjs: chay 1 luot xoay vong tren may noi bo (giong route /api/rotate), tao bai pending, dung de test/chay tay. -->
 <!-- re-verified: 2026-08-14 - products.mjs them FEATURES (tinh nang that tung san pham tu file "tinh nang N.txt"); social.mjs dua FEATURES vao prompt -> text neu dung thong so (220VAC, inox 316, phan xa 95%...), khong bia. upload-folders.mjs: tai anh/video tu C:\Users\ADMIN\Pictures\SDViCo\<N. ...> len brand_assets, gan product_group theo STT, mac dinh chi folder trong (--force de ep). Da tai folder 7,8. -->

@@ -627,6 +627,11 @@ a.chip:hover { filter: brightness(0.98); }
 .chart-fill.tone-accent { background: var(--accent, #4f7cff); }
 .chart-fill.tone-ok { background: var(--ok, #22c07a); }
 .chart-val { font-size: .82rem; text-align: right; font-variant-numeric: tabular-nums; }
+.linklike {
+  background: none; border: none; padding: 0; margin: 0; font: inherit; text-align: left;
+  color: var(--accent, #4f7cff); cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.linklike:hover { opacity: .78; }
 
 /* ===== Section folder sản phẩm ===== */
 .folder-section { margin-top: 22px; }

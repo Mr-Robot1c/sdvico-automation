@@ -50,15 +50,16 @@ for (const group of picked) {
   try { gen = await generateSocialPost({ productGroup: group, productName: name, channel: 'facebook', hasVideo: !!vid }); }
   catch (e) { console.log(`  Loi gen ${name}: ${e.message}`); continue; }
   const risk = gen.assessment?.risk || 'none';
+  const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : name;
   const { data: ins } = await client.from('mkt_content').insert({
-    kind: 'social', title: name,
+    kind: 'social', title: displayTitle,
     brief: { keyword: name, intent: 'giao_dich', assets, channels, generator: 'rotation', rotation: true, rotation_cycle: cycle, rotation_group: group },
     draft: gen.text, status: 'review', needs_gov_review: risk === 'red',
   }).select('id').single();
   if (!ins) continue;
   const label = channels.length > 1 ? '[FB + TikTok]' : '[Facebook]';
   await client.from('approval_queue').insert({
-    kind: 'mkt_publish_content', title: `${label} ${name}`,
+    kind: 'mkt_publish_content', title: `${label} ${displayTitle}`,
     payload: { content_id: ins.id, format: 'social', keyword: name, intent: 'giao_dich', risk, assets, channels, authored: 'ai' }, status: 'pending',
   });
   console.log(`Cycle ${cycle} | ${label} ${name} | ${ins.id.slice(0, 8)} | risk=${risk}`);

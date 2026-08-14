@@ -118,11 +118,12 @@ export async function GET(req: Request) {
       continue;
     }
     const risk = gen.assessment?.risk || 'none';
+    const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : name;
     const { data: inserted, error: e1 } = await client
       .from('mkt_content')
       .insert({
         kind: 'social',
-        title: name,
+        title: displayTitle,
         brief: {
           keyword: name,
           intent: 'giao_dich',
@@ -147,7 +148,7 @@ export async function GET(req: Request) {
     const label = channels.length > 1 ? '[FB + TikTok]' : '[Facebook]';
     await client.from('approval_queue').insert({
       kind: 'mkt_publish_content',
-      title: `${label} ${name}`,
+      title: `${label} ${displayTitle}`,
       payload: { content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich', risk, assets, channels, authored: 'ai' },
       status: 'pending',
     });

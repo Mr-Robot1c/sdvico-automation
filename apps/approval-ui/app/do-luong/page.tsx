@@ -1,6 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { refreshFacebookMetrics, setConversions, deleteContent } from '../actions';
 import BarChart from './bar-chart';
+import PostTitle from './post-title';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,15 +31,16 @@ export default async function Page() {
   };
 
   const cids = [...latest.keys()];
-  const contents = new Map<string, { title: string; product: string; conversions: number }>();
+  const contents = new Map<string, { title: string; product: string; conversions: number; draft: string }>();
   if (cids.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, title, brief').in('id', cids);
+    const { data: cs } = await client.from('mkt_content').select('id, title, brief, draft').in('id', cids);
     for (const c of cs || []) {
       const brief = (c as any).brief || {};
       contents.set((c as any).id, {
         title: (c as any).title || '(không tên)',
         product: productOf(brief, (c as any).title),
-        conversions: Number(brief.conversions) || 0
+        conversions: Number(brief.conversions) || 0,
+        draft: String((c as any).draft || '')
       });
     }
   }
@@ -46,11 +48,11 @@ export default async function Page() {
   const rows = cids
     .map((cid) => {
       const m = latest.get(cid) || {};
-      const c = contents.get(cid) || { title: '(không rõ)', product: 'Khác', conversions: 0 };
+      const c = contents.get(cid) || { title: '(không rõ)', product: 'Khác', conversions: 0, draft: '' };
       const reactions = m.reactions || 0;
       const comments = m.comments || 0;
       const shares = m.shares || 0;
-      return { cid, title: c.title, product: c.product, reactions, comments, shares, engagement: reactions + comments + shares, conversions: c.conversions };
+      return { cid, title: c.title, product: c.product, draft: c.draft, reactions, comments, shares, engagement: reactions + comments + shares, conversions: c.conversions };
     })
     .sort((a, b) => b.engagement - a.engagement);
 
@@ -140,7 +142,7 @@ export default async function Page() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.cid}>
-                    <td className="cell-title">{r.title}</td>
+                    <td className="cell-title"><PostTitle title={r.title} product={r.product} draft={r.draft} /></td>
                     <td>{r.product}</td>
                     <td><b>{r.engagement}</b></td>
                     <td>{r.reactions}</td>
