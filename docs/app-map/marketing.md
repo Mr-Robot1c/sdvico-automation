@@ -10,7 +10,7 @@ ttl_days: 180
 <!-- re-verified: 2026-08-14 - rotate-run.mjs: chay 1 luot xoay vong tren may noi bo (giong route /api/rotate), tao bai pending, dung de test/chay tay. -->
 <!-- re-verified: 2026-08-14 - products.mjs them FEATURES (tinh nang that tung san pham tu file "tinh nang N.txt"); social.mjs dua FEATURES vao prompt -> text neu dung thong so (220VAC, inox 316, phan xa 95%...), khong bia. upload-folders.mjs: tai anh/video tu C:\Users\ADMIN\Pictures\SDViCo\<N. ...> len brand_assets, gan product_group theo STT, mac dinh chi folder trong (--force de ep). Da tai folder 7,8. -->
 <!-- re-verified: 2026-08-14 - db-apply.mjs: tu tach connection string thu cong (ne URL parser cua pg voi mat khau co ky tu dac biet # ? / %). Da ap 2 migration len live jwisiccphcepgpabyyco thanh cong. -->
-<!-- re-verified: 2026-08-14 - Xoay folder san pham hang ngay: products.mjs (8 folder STT + hashtag + guessGroup), social.mjs (sinh text co emoji + hashtag qua brand-voice/product-boundary), assign-product-groups.mjs (tu gan brand_assets vao folder theo ten), db-apply.mjs (ap migration local qua DATABASE_URL, co chot chan sai project). Ban sao cho app o apps/approval-ui/lib/gen/{products,social}.mjs. rotate route doi sang xoay theo product_group (FB anh/+video, TikTok video), khong lap folder trong vong. -->
+<!-- re-verified: 2026-08-14 - Con bot dinh huong ke hoach (apps/approval-ui): bang mkt_plans + lib/plan.ts (buildPlan xep hang san pham theo don+tuong tac TB, nguong >=3 bai; doan dinh huong van mau brand-voice tu chinh cac con so). Trang /ke-hoach + cron /api/plan (T4 & CN). rotate uu tien folder theo trong so ke hoach da AP (nguoi bam Ap dung moi tac dong - dieu cam 1 & 2). Dong bo bang du lieu + workflow buoc 9 + lich chay ben duoi. -->
 <!-- re-verified: 2026-08-14 - Them day chuyen video (Ngay 5) o packages/marketing/src/video: build-video.mjs dieu phoi kich ban (Gemini, script.mjs) -> TTS tung canh (edge-tts, tts.py) -> phu de tu kich ban + Whisper artifact (subtitle.py, faster-whisper) -> ghep ban doc 9:16 va ngang 16:9 (assemble.mjs, ffmpeg) -> 3 tieu de + 3 thumbnail. Chay may noi bo, KHONG serverless. Chi dung brand_assets (dieu cam 5), quet compliance.assessDraft (dieu cam 3,4,5). Chua noi vao approval_queue/dang - dau ra o out/video de nguoi duyet. Chi tiet: packages/marketing/src/video/README.md. -->
 <!-- re-verified: 2026-08-12 - publish-facebook.mjs: them dang anh (brief.assets.image qua /photos), lay post_id dung. Van chi dang approval_queue status=approved, tran MKT_MAX_POSTS_PER_RUN. Them workflow mkt-publish.yml chay --live moi 30 phut. Luong may soan nguoi bam KHONG doi. -->
 <!-- re-verified: 2026-08-12 - publish-facebook.mjs: chi dang draft (bo dong tieu de) de khong lap ten SP. -->
@@ -34,6 +34,7 @@ Cỗ máy nội dung bốn bước
 Sau khi đăng
   7. Dây chuyền video từ bài đã đăng
   8. Kéo số liệu về, đo lường
+  9. Con bot định hướng: từ số liệu ra kế hoạch tuần tới (thứ 4 và chủ nhật)
 ```
 
 Diễn giải từng bước:
@@ -52,7 +53,9 @@ Diễn giải từng bước:
 
 7. Video. Sinh kịch bản từ bài đã đăng, ghép hình từ kho tư liệu, phụ đề bằng Whisper có từ điển thuật ngữ chuyên ngành, chèn nhận diện, xuất bản dọc 60 giây và bản ngang ba tới năm phút. Chỉ dùng tư liệu công ty sở hữu hoặc có giấy phép ghi trong `brand_assets`.
 
-8. Đo lường. Kéo số liệu Google Search Console, Analytics, Facebook Insights, YouTube về `mkt_metrics`.
+8. Đo lường. Kéo số liệu Google Search Console, Analytics, Facebook Insights, YouTube về `mkt_metrics`. Trang `/do-luong` so sánh tương tác và đơn theo sản phẩm.
+
+9. Con bot định hướng. Cron `/api/plan` chạy thứ 4 và chủ nhật, đọc số liệu Đo lường rồi sinh một bản kế hoạch ở `mkt_plans`: xếp hạng sản phẩm theo đơn/lead và tương tác trung bình mỗi bài (ngưỡng ít nhất 3 bài mới xếp thắng thua), kèm đoạn định hướng và trọng số phân bổ bài tuần tới. Trang `/ke-hoach` để người đọc. Bot đề xuất, người quyết. Bấm "Áp dụng trọng số" thì vòng xoay sinh bài mới ưu tiên sản phẩm đang thắng. Điều cấm 1 và 2.
 
 ## 2. App map marketing
 
@@ -64,6 +67,7 @@ Diễn giải từng bước:
 | mkt_content | Nội dung và trạng thái | Có cờ needs_gov_review |
 | mkt_posts | Bài đăng và lịch đăng | Kênh website, facebook, youtube |
 | mkt_metrics | Số liệu đo lường | Nguồn gsc, ga4, facebook, youtube |
+| mkt_plans | Kế hoạch định hướng | Bot sinh từ số liệu (T4 & CN), có trọng số sản phẩm, applied bật thì vòng xoay ưu tiên |
 | brand_assets | Tư liệu | Chỉ owned hoặc licensed |
 | approval_queue | Nội dung chờ duyệt | Cổng của điều cấm 1 và 3 |
 | run_log | Nhật ký đăng và rà soát | Kèm ảnh chụp khi lỗi |
@@ -103,6 +107,7 @@ Diễn giải từng bước:
 
 - Lịch nội dung tuần sinh tự động, người duyệt theo lô.
 - Kéo số liệu về `mkt_metrics` theo ngày.
+- Con bot định hướng `/api/plan` sinh kế hoạch thứ 4 và chủ nhật (`0 2 * * 0,3`). Lưu ý Vercel Hobby giới hạn 2 cron, nếu deploy báo vượt hạn mức thì gộp vào cron `mkt-metrics-pull` (kiểm tra hôm nay là thứ 4 hoặc chủ nhật).
 
 ### Chỉ tiêu nghiệm thu liên quan
 

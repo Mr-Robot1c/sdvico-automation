@@ -7,6 +7,7 @@ ttl_days: 180
 <!-- re-verified: 2026-08-13 - Lap doc luoc do lan dau: liet ke 14 bang tu supabase/migrations. Them mkt_oauth_tokens (token OAuth TikTok, RLS khong policy = chi service_role doc/ghi). -->
 <!-- re-verified: 2026-08-14 - Migration 20260813150000 noi CHECK: mkt_posts.channel them 'tiktok', mkt_metrics.source them 'manual'. Cap nhat 2 hang bang tuong ung. -->
 <!-- re-verified: 2026-08-14 - Migration 20260814100000: them cot brand_assets.product_group (folder san pham theo STT) + index. Phuc vu vong xoay dang bai hang ngay theo folder. -->
+<!-- re-verified: 2026-08-14 - Migration 20260814120000: them bang mkt_plans (con bot dinh huong ke hoach tu so lieu Do luong, cron T4 & CN). RLS bat, policy staff. Them 1 hang bang. -->
 <!-- LUU Y: DATABASE_URL trong .env tro NHAM project cu (schema khac). Migration phai ap len project live jwisiccphcepgpabyyco qua SQL Editor hoac sau khi sua DATABASE_URL. db-apply.mjs da co chot chan ap nham DB. -->
 
 Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp dụng: `supabase/README.md`.
@@ -23,6 +24,7 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 | mkt_posts | Marketing | Bài đã đăng + kênh (facebook/website/youtube/tiktok), external_url | Bật, staff |
 | mkt_metrics | Marketing | Số liệu đo lường (gsc/ga4/facebook/youtube/manual) | Bật, staff |
 | mkt_oauth_tokens | Marketing | Token OAuth cần refresh (TikTok): access/refresh token, hạn. **RLS không policy = chỉ service_role đọc/ghi, không lộ ra giao diện** | Bật, service_role only |
+| mkt_plans | Marketing | Kế hoạch định hướng do bot sinh từ số liệu Đo lường (cron T4 & CN hoặc bấm tay). data jsonb chứa xếp hạng + trọng số + đoạn định hướng; `applied` bật thì vòng xoay ưu tiên theo | Bật, staff |
 | hr_jobs | Tuyển dụng | Vị trí tuyển dụng | Bật, staff |
 | hr_candidates | Tuyển dụng | Ứng viên, dữ liệu cá nhân (consent_at, retention_until, dedup_key) | Bật, dữ liệu cá nhân |
 | hr_applications | Tuyển dụng | Hồ sơ ứng tuyển, dữ liệu cá nhân | Bật, dữ liệu cá nhân |

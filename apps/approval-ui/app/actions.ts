@@ -8,6 +8,7 @@ import { postVideoToTikTok } from '../lib/tiktok';
 import { isEmergencyStopped, reservePostQuota, setEmergencyStop, isQuotaDisabled, setQuotaDisabled } from '../lib/safety';
 import { fetchWithRetry } from '../lib/retry';
 import { pullFacebookMetrics } from '../lib/fb-metrics';
+import { loadMeasurement, buildPlan, weekWindowVN } from '../lib/plan';
 
 // Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment ngay lúc video còn
 // đang xử lý sẽ lỗi → ảnh bị bỏ). Hỏi trạng thái qua /{videoId}?fields=status. Trả true khi sẵn sàng.
@@ -815,3 +816,57 @@ export async function editDraft(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/noi-dung');
 }
+
+// Tạo kế hoạch ngay (nút trên trang Kế hoạch). Đọc số liệu Đo lường rồi sinh 1 bản 'manual'.
+// Bot ĐỀ XUẤT, người quyết (điều cấm 1 và 2). Bản mới applied = false, chưa tác động vòng xoay.
+export async function generatePlanNow() {
+  const client = getServerClient();
+  const now = new Date();
+  const measurement = await loadMeasurement(client);
+  const plan = buildPlan(measurement, { generatedAt: now.toISOString() });
+  const win = weekWindowVN(now);
+  const { error } = await client.from('mkt_plans').insert({
+    period_start: win.start,
+    period_end: win.end,
+    generated_by: 'manual',
+    data: plan,
+    applied: false
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath('/ke-hoach');
+}
+
+// Áp dụng trọng số của một bản kế hoạch: đánh dấu bản đó applied, gỡ áp các bản còn lại.
+// SAU khi áp, /api/rotate mới ưu tiên folder theo trọng số. Người bấm mới áp (điều cấm 2).
+export async function applyPlanWeights(formData: FormData) {
+  const planId = String(formData.get('plan_id') || '');
+  if (!planId) return;
+  const client = getServerClient();
+  // Chỉ một bản được áp tại một thời điểm: gỡ hết rồi áp bản được chọn.
+  await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
+  const { error } = await client
+    .from('mkt_plans')
+    .update({ applied: true, applied_at: new Date().toISOString() })
+    .eq('id', planId);
+  if (error) throw new Error(error.message);
+  revalidatePath('/ke-hoach');
+}
+
+// Gỡ áp dụng: vòng xoay quay lại chọn ngẫu nhiên đều như trước.
+export async function clearPlanWeights() {
+  const client = getServerClient();
+  const { error } = await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
+  if (error) throw new Error(error.message);
+  revalidatePath('/ke-hoach');
+}
+
+// Xóa một bản kế hoạch khỏi lịch sử.
+export async function deletePlan(formData: FormData) {
+  const planId = String(formData.get('plan_id') || '');
+  if (!planId) return;
+  const client = getServerClient();
+  const { error } = await client.from('mkt_plans').delete().eq('id', planId);
+  if (error) throw new Error(error.message);
+  revalidatePath('/ke-hoach');
+}
+

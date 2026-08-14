@@ -27,6 +27,26 @@ function shuffle<T>(arr: T[]): T[] {
   return [...arr].sort(() => Math.random() - 0.5);
 }
 
+// Rút ngẫu nhiên có TRỌNG SỐ, không lặp lại. Folder trọng số cao dễ được chọn hơn.
+// Dùng khi có kế hoạch đã áp: sản phẩm đang thắng được ưu tiên sinh bài (điều cấm 2: người bấm mới áp).
+function weightedSample<T>(items: T[], weightOf: (x: T) => number, n: number): T[] {
+  const pool = items.map((x) => ({ x, w: Math.max(0.0001, weightOf(x)) }));
+  const out: T[] = [];
+  while (out.length < n && pool.length) {
+    let total = 0;
+    for (const p of pool) total += p.w;
+    let r = Math.random() * total;
+    let idx = 0;
+    for (let i = 0; i < pool.length; i++) {
+      r -= pool[i].w;
+      if (r <= 0) { idx = i; break; }
+    }
+    out.push(pool[idx].x);
+    pool.splice(idx, 1);
+  }
+  return out;
+}
+
 export async function GET(req: Request) {
   // Vercel Cron gửi Authorization: Bearer <CRON_SECRET>. Chặn gọi trái phép.
   const secret = process.env.CRON_SECRET;
@@ -87,8 +107,20 @@ export async function GET(req: Request) {
     unused = [...eligible];
   }
 
-  // 3. Chọn ngẫu nhiên FOLDERS_PER_RUN folder chưa dùng.
-  const pickedFolders = shuffle(unused).slice(0, FOLDERS_PER_RUN);
+  // 3. Chọn FOLDERS_PER_RUN folder chưa dùng. Nếu có kế hoạch đã áp (trang Kế hoạch bấm
+  //    "Áp dụng trọng số"), ưu tiên folder theo trọng số sản phẩm. Chưa áp thì chọn đều như cũ.
+  const { data: appliedPlan } = await client
+    .from('mkt_plans')
+    .select('data')
+    .eq('applied', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const weights = (((appliedPlan as any)?.data?.weights) || {}) as Record<string, number>;
+  const hasWeights = Object.keys(weights).length > 0;
+  const pickedFolders = hasWeights
+    ? weightedSample(unused, (g) => weights[productName(g)] ?? 1, FOLDERS_PER_RUN)
+    : shuffle(unused).slice(0, FOLDERS_PER_RUN);
 
   // @ts-ignore — module JS thuần
   const { generateSocialPost, generateContentPost } = await import('../../../lib/gen/social.mjs');
