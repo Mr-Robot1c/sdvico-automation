@@ -46,7 +46,7 @@ function CandidateCard({ c }: { c: CandView }) {
         <span className="cand-name">{c.name}</span>
         <span className="row-right">
           {hasScore ? <span className="score" title="Điểm chấm tự động">{c.score}/100</span> : null}
-          <time className="time" dateTime={c.createdAt}>{formatRelative(c.createdAt)}</time>
+          <time className="time" dateTime={c.createdAt} suppressHydrationWarning>{formatRelative(c.createdAt)}</time>
         </span>
       </div>
 

@@ -141,7 +141,7 @@ export default function ViTriList({
               <li key={j.id} className="card tone-mkt">
                 <div className="head">
                   <span className="cand-name">{j.title}</span>
-                  <time className="time" dateTime={j.created_at}>{formatRelative(j.created_at)}</time>
+                  <time className="time" dateTime={j.created_at} suppressHydrationWarning>{formatRelative(j.created_at)}</time>
                 </div>
                 <div className="stages">
                   <span className={`stage tone-${st.tone}`}>{st.label}</span>
