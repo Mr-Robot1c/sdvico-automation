@@ -7,6 +7,7 @@ import { getServerClient } from '../../../../lib/supabase-server';
 import { groqChat } from '../../../../lib/groq';
 import { fetchUnsplashPhoto } from '../../../../lib/unsplash';
 import { overlayLogo } from '../../../../lib/image-composite';
+import { buildJobDetailSection } from '../../../../lib/job-detail';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -57,6 +58,15 @@ export async function GET(req: Request) {
     }
 
     const jobIds = autoJobs.map((j: { id: string }) => j.id);
+
+    // Quyền lợi lưu ở cột benefits (có thể chưa migrate trên DB cũ — đọc an toàn, thiếu thì bỏ qua).
+    const benefitsById = new Map<string, string>();
+    {
+      const { data: benRows } = await client.from('hr_jobs').select('id, benefits').in('id', jobIds);
+      for (const r of (benRows || []) as Array<{ id: string; benefits: string | null }>) {
+        if (r.benefits) benefitsById.set(r.id, r.benefits);
+      }
+    }
 
     // Lấy tất cả bài Facebook theo các job: draft/scheduled/posted.
     const { data: allPosts } = await client
@@ -126,22 +136,23 @@ export async function GET(req: Request) {
       const systemPrompt = [
         'Bạn là chuyên gia viết tuyển dụng cho Facebook của ngành biển và thủy sản Việt Nam.',
         isRefresh
-          ? 'Nhiệm vụ: viết LẠI bài tuyển dụng cho một vị trí đã đăng trước đó — cần bố cục và cách diễn đạt khác để tránh trùng lặp trên newsfeed.'
-          : 'Nhiệm vụ: viết bài tuyển dụng đầy đủ thông tin, người đọc hiểu rõ vị trí ngay trên newsfeed.',
+          ? 'Nhiệm vụ: viết LẠI PHẦN MỞ ĐẦU cho một vị trí đã đăng trước đó — cần cách diễn đạt khác để tránh trùng lặp trên newsfeed.'
+          : 'Nhiệm vụ: viết PHẦN MỞ ĐẦU hấp dẫn cho bài tuyển dụng, để người đọc dừng lại và muốn đọc tiếp.',
+        'Phần chi tiết (công việc, yêu cầu, quyền lợi) sẽ được ghép nguyên văn ngay bên dưới,',
+        'nên KHÔNG liệt kê lại yêu cầu hay quyền lợi ở đây — tránh trùng lặp.',
         '',
-        'Cấu trúc bài (theo đúng thứ tự, không thêm tiêu đề phần):',
+        'Cấu trúc phần mở đầu (theo đúng thứ tự, không thêm tiêu đề phần):',
         '1. Hook 1-2 câu ngắn khơi gợi cảm xúc hoặc tò mò',
         '2. Vị trí tuyển và địa điểm',
-        '3. Yêu cầu chính: 3-5 gạch đầu dòng "-", lấy từ bản gốc, ngắn gọn',
-        '4. Quyền lợi hoặc điểm nổi bật nếu có trong bản gốc — bỏ qua nếu không có',
-        `5. Cách ứng tuyển: gửi CV về ${contactEmail} hoặc gọi ${hotline}`,
-        '6. 2-3 hashtag tiếng Việt phù hợp ngành',
+        '3. 1-2 câu vì sao vị trí này đáng làm (dựa trên bản gốc, không bịa)',
+        `4. Cách ứng tuyển: gửi CV về ${contactEmail} hoặc gọi ${hotline}`,
+        '5. 2-3 hashtag tiếng Việt phù hợp ngành',
         '',
         'Quy tắc cứng:',
         '- Không bịa lương, thưởng, phúc lợi, số liệu không có trong bản gốc (điều cấm 5)',
         '- Không mô tả phần mềm đối tác như năng lực của SDVICO (điều cấm 4)',
         '- Câu ngắn, xuống dòng nhiều, viết như người thật nói chuyện',
-        '- 1-2 emoji tự nhiên nếu hợp. Độ dài 150-220 từ',
+        '- 1-2 emoji tự nhiên nếu hợp. Độ dài 80-140 từ (chỉ phần mở đầu)',
         '- Trả về nội dung bài đăng, không kèm giải thích',
       ].join('\n');
 
@@ -161,7 +172,13 @@ export async function GET(req: Request) {
         brand.website ? brand.website : null,
       ].filter(Boolean);
       const footer = footerParts.length ? '\n\n' + footerParts.join('  |  ') : '';
-      const noi_dung = noi_dung_raw + footer;
+      // Phần AI viết (mở đầu) + khối chi tiết gốc (mô tả, yêu cầu, quyền lợi nguyên văn) + footer liên hệ.
+      const detail = buildJobDetailSection({
+        short_desc: job.short_desc as string | null,
+        requirements: job.requirements as string | null,
+        benefits: benefitsById.get(jobId) || null,
+      });
+      const noi_dung = noi_dung_raw + detail + footer;
 
       let image_url: string | null = null;
       if (unsplash_url && brand.logo_url) {

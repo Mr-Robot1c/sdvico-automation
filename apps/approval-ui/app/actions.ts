@@ -7,6 +7,7 @@ import { composeJdVersions } from '../lib/jd-compose';
 import { groqChat } from '../lib/groq';
 import { fetchUnsplashPhoto } from '../lib/unsplash';
 import { overlayLogo } from '../lib/image-composite';
+import { buildJobDetailSection } from '../lib/job-detail';
 
 // datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
 // Server Vercel chạy UTC nên phải gắn +07:00 để parse đúng giờ Việt Nam.
@@ -91,9 +92,10 @@ export async function recomposeDraft(formData: FormData) {
   };
 
   const contactEmail = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
-  const system = `Bạn viết lại bài đăng tuyển dụng Facebook cho SDVICO, ngành thiết bị biển và thủy sản, trụ sở Vũng Tàu.
+  const system = `Bạn viết lại PHẦN MỞ ĐẦU bài đăng tuyển dụng Facebook cho SDVICO, ngành thiết bị biển và thủy sản, trụ sở Vũng Tàu.
 ${styleMap[style] || styleMap.default}
-Kết bài: kêu gọi gửi CV về ${contactEmail} hoặc gọi 1900 23 23 49. Có thể thêm hashtag ngành biển.
+Phần chi tiết (công việc, yêu cầu, quyền lợi) sẽ được ghép nguyên văn ngay bên dưới, nên KHÔNG liệt kê lại yêu cầu hay quyền lợi ở đây, tránh trùng lặp.
+Kết phần mở đầu: kêu gọi gửi CV về ${contactEmail} hoặc gọi 1900 23 23 49. Có thể thêm hashtag ngành biển.
 Quy tắc: không bịa lương hay con số (điều cấm 5). Không mô tả phần mềm đối tác như năng lực SDVICO (điều cấm 4).
 Chỉ trả về nội dung bài đăng, không kèm giải thích hay tiêu đề.`;
 
@@ -107,8 +109,17 @@ Chỉ trả về nội dung bài đăng, không kèm giải thích hay tiêu đ�
     v.facebook ? `Bản cũ để tham khảo: ${v.facebook}` : '',
   ].filter(Boolean).join('\n');
 
-  const noi_dung = await groqChat(system, user, { maxTokens: 700, temperature: 0.75 });
-  if (!noi_dung) return;
+  const aiPart = await groqChat(system, user, { maxTokens: 700, temperature: 0.75 });
+  if (!aiPart) return;
+
+  // Quyền lợi lưu ở cột benefits (có thể chưa migrate — đọc an toàn).
+  let benefits: string | null = null;
+  {
+    const { data: benRow } = await client.from('hr_jobs').select('benefits').eq('id', post.job_id).maybeSingle();
+    benefits = (benRow?.benefits as string | undefined) || null;
+  }
+  // Giữ phần chi tiết gốc bên dưới phần AI viết lại.
+  const noi_dung = aiPart + buildJobDetailSection({ short_desc: job.short_desc, requirements: job.requirements, benefits });
 
   await client.from('hr_job_posts').update({ noi_dung }).eq('id', postId);
   revalidatePath('/dang-tin');
@@ -264,10 +275,17 @@ export async function queueFacebookPost(formData: FormData) {
   const client = getServerClient();
   const { data: job, error: e0 } = await client
     .from('hr_jobs')
-    .select('id, title, location, short_desc, jd_versions, image_hint')
+    .select('id, title, location, short_desc, requirements, jd_versions, image_hint')
     .eq('id', jobId)
     .single();
   if (e0) throw new Error(e0.message);
+
+  // Quyền lợi lưu ở cột benefits (có thể chưa migrate trên DB cũ — đọc an toàn, thiếu thì bỏ qua).
+  let benefits: string | null = null;
+  {
+    const { data: benRow } = await client.from('hr_jobs').select('benefits').eq('id', jobId).maybeSingle();
+    benefits = (benRow?.benefits as string | undefined) || null;
+  }
 
   // Vị trí đã có bài Facebook đang chờ hoặc đã đăng thì thôi, tránh trùng.
   const { data: existing } = await client
@@ -308,22 +326,23 @@ export async function queueFacebookPost(formData: FormData) {
     groqChat(
       [
         'Bạn là chuyên gia viết tuyển dụng cho Facebook của ngành biển và thủy sản Việt Nam.',
-        'Nhiệm vụ: viết bài tuyển dụng đầy đủ thông tin, người đọc hiểu rõ vị trí ngay trên newsfeed.',
+        'Nhiệm vụ: viết PHẦN MỞ ĐẦU hấp dẫn cho bài tuyển dụng, để người đọc dừng lại và muốn đọc tiếp.',
+        'Phần chi tiết (công việc, yêu cầu, quyền lợi) sẽ được ghép nguyên văn ngay bên dưới,',
+        'nên KHÔNG liệt kê lại yêu cầu hay quyền lợi ở đây — tránh trùng lặp.',
         '',
-        'Cấu trúc bài (theo đúng thứ tự, không thêm tiêu đề phần):',
+        'Cấu trúc phần mở đầu (theo đúng thứ tự, không thêm tiêu đề phần):',
         '1. Hook 1-2 câu ngắn khơi gợi cảm xúc hoặc tò mò',
-        '2. Vị trí tuyển và địa điểm (ví dụ: Kỹ sư điện — Vũng Tàu)',
-        '3. Yêu cầu chính: 3-5 gạch đầu dòng "-", lấy từ bản gốc, ngắn gọn',
-        '4. Quyền lợi hoặc điểm nổi bật nếu có trong bản gốc — bỏ qua nếu không có',
-        '5. Cách ứng tuyển: gửi CV về email hoặc hotline (lấy từ bản gốc nếu có)',
-        '6. 2-3 hashtag tiếng Việt phù hợp ngành',
+        '2. Vị trí tuyển và địa điểm',
+        '3. 1-2 câu vì sao vị trí này đáng làm (dựa trên bản gốc, không bịa)',
+        '4. Cách ứng tuyển: gửi CV về email hoặc hotline (lấy từ bản gốc nếu có)',
+        '5. 2-3 hashtag tiếng Việt phù hợp ngành',
         '',
         'Quy tắc cứng:',
         '- Không bịa lương, thưởng, phúc lợi, số liệu không có trong bản gốc',
         '- Không bắt đầu bằng tên công ty hay "SDVICO tuyển"',
         '- Câu ngắn, xuống dòng nhiều, viết như người thật nói chuyện',
         '- 1-2 emoji tự nhiên nếu hợp',
-        '- Độ dài 150-220 từ',
+        '- Độ dài 80-140 từ (chỉ phần mở đầu)',
         '- Trả về nội dung bài đăng, không kèm giải thích',
       ].join('\n'),
       richInput,
@@ -339,7 +358,9 @@ export async function queueFacebookPost(formData: FormData) {
     brand.website ? brand.website : null,
   ].filter(Boolean);
   const footer = footerParts.length ? '\n\n' + footerParts.join('  |  ') : '';
-  const noi_dung = noi_dung_raw + footer;
+  // Phần AI viết (mở đầu) + khối chi tiết gốc (mô tả, yêu cầu, quyền lợi nguyên văn) + footer liên hệ.
+  const detail = buildJobDetailSection({ short_desc: job.short_desc, requirements: (job as Record<string, unknown>).requirements as string | null, benefits });
+  const noi_dung = noi_dung_raw + detail + footer;
 
   // Ghép logo lên ảnh Unsplash nếu cả hai đều có, upload kết quả lên Storage.
   // Không có Unsplash thì dùng logo đơn thuần. Không có logo thì dùng Unsplash gốc.
@@ -688,6 +709,7 @@ export async function createJdDraft(formData: FormData) {
     location: job.location || null,
     short_desc: job.short_desc || null,
     requirements: job.requirements || null,
+    benefits: job.benefits || null,
     jd_versions: versions,
     nhom: job.nhom || null,
     image_hint,
@@ -889,6 +911,7 @@ export async function createJdDraftForPanel(
     location: job.location || null,
     short_desc: job.short_desc || null,
     requirements: job.requirements || null,
+    benefits: job.benefits || null,
     jd_versions: versions,
     nhom: job.nhom || null,
     image_hint,
