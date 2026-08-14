@@ -5,10 +5,8 @@ name: hr-screen
 # Điều cấm 2: không tự loại ứng viên. Hồ sơ chấm xong chuyển sang bước review cho người xem.
 # Có thể chạy tay bằng workflow_dispatch để kiểm.
 on:
-  # LICH TU CHAY DA TAT (14/8/2026): repo dang tap trung Marketing, khong de HR an ke phut Actions.
-  # Van chay tay duoc bang "Run workflow". Muon bat lai thi bo dau '#' 2 dong cron duoi.
-  # schedule:
-  #   - cron: '15,45 * * * *'   # phút 15 và 45 mỗi giờ, lệch với hr-intake chạy phút 0 và 30
+  schedule:
+    - cron: '15,45 * * * *'   # phút 15 và 45 mỗi giờ, lệch với hr-intake chạy phút 0 và 30
   workflow_dispatch: {}
 
 # Không chạy chồng lượt, tránh chấm trùng một hồ sơ.
