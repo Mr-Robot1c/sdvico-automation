@@ -85,6 +85,17 @@ export function getFeatures(group) {
   return FEATURES[group] || [];
 }
 
+// Chủ đề cho bài content (không bán trực tiếp, để lấy tương tác + nuôi trang).
+// AI tự nghĩ nội dung theo chủ đề. Không bịa số liệu/tin tức cụ thể (điều cấm 5).
+export const CONTENT_TOPICS = [
+  'đời sống và chuyện nghề của bà con ngư dân ngày ra khơi',
+  'mẹo chuẩn bị và giữ an toàn cho chuyến biển dài ngày',
+  'kinh nghiệm bảo dưỡng tàu và thiết bị đi biển',
+  'vai trò của thiết bị công nghệ giúp ngư dân yên tâm bám biển',
+  'nhắc nhở tuân thủ quy định khi đánh bắt và ra khơi',
+  'câu chuyện gắn bó của SDVICO với bà con ngành biển',
+];
+
 // Hashtag mặc định gắn mọi bài (theo yêu cầu). Có thể ghi đè bằng app_config key 'mkt_hashtags'.
 export const DEFAULT_HASHTAGS = [
   '#SDVico', '#thiết_bị_tàu_cá', '#thiết_bị_liên_lạc',

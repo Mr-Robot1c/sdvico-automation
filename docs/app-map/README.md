@@ -5,6 +5,9 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Bai content (khong ban): social.mjs them generateContentPost (topic random tu CONTENT_TOPICS trong products.mjs). rotate + rotate-run sinh them 1 bai content moi lan (chi FB, dung 1 anh bat ky). Nhan hang doi: [Facebook] 📰 <tieu de>. brief.post_kind='content'. -->
+<!-- re-verified: 2026-08-14 - Ghep logo SDVICO: apps/approval-ui/lib/gen/assets/logo-sdvico.jpg + logo-overlay.mjs (sharp; cat nen trang thanh trong suot); action applyLogoToAsset (tai anh -> composite -> upload path moi -> update storage_path -> xoa cu). Nut '🏷️ Ghep logo' o /tu-lieu chi cho anh (kind=image). next.config: sharp trong serverComponentsExternalPackages + outputFileTracingIncludes cho /tu-lieu. Da test local: logo goc duoi phai cor vua. -->
+<!-- re-verified: 2026-08-14 - GitHub Actions cron 30 phut goi /api/mkt-metrics-pull (workflows/mkt-metrics-pull.yml) - true 24/7, khong can mo trang. CRON_SECRET dat khop tren GitHub Secret va Vercel env production. Bo sung cho MetricsAuto (client, chi khi mo trang). -->
 <!-- re-verified: 2026-08-14 - /do-luong MetricsAuto (client): tu goi refreshFacebookMetrics moi 30 phut khi trang mo + router.refresh (Vercel Hobby khong chay cron duoi 1 ngay nen lam moi phia trang). Cho true 24/7 co the them GitHub Actions cron sau. -->
 <!-- re-verified: 2026-08-14 - Chong trung: social.mjs xoay 8 ANGLES + temperature 1.05 + xuat JSON {headline,body}; rotate dung headline lam tieu de bai (title rieng thay vi ten SP trung nhau). /do-luong: ten bai bam duoc (PostTitle client -> dialog xem draft; them draft vao fetch; .linklike CSS). -->
 <!-- re-verified: 2026-08-14 - Co tac gia bai: payload.authored='human' (createContent/Xuong san xuat) vs 'ai' (rotate). Hang doi (page.tsx) hien badge 'Nguoi viet' (do) hoac 'May viet'. Loai content dropdown GIU NGUYEN (user se dung khi tu viet content). -->

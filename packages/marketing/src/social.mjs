@@ -2,7 +2,7 @@
 // Giọng brand-voice, hàng rào product-boundary (không bịa thông số, không nhận vơ phần mềm đối tác).
 import { assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
-import { DEFAULT_HASHTAGS, productHashtag, getFeatures } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtag, getFeatures, CONTENT_TOPICS } from './products.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -105,4 +105,47 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     testFactValues: testFactValues(facts),
   });
   return { text, body, headline, hashtags: tags, assessment };
+}
+
+// Bài CONTENT (không bán trực tiếp): viết theo một chủ đề để nuôi trang, lấy tương tác.
+// AI tự nghĩ nội dung theo chủ đề, KHÔNG bịa tin tức/số liệu cụ thể (điều cấm 5).
+export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {}) {
+  const { GoogleGenAI } = await import('@google/genai');
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const chosen = topic || CONTENT_TOPICS[Math.floor(Math.random() * CONTENT_TOPICS.length)];
+
+  const system = [
+    'Bạn viết bài cộng đồng cho trang của Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
+    'Đây KHÔNG phải bài bán hàng. Mục tiêu là gần gũi, hữu ích, lấy tương tác từ bà con ngư dân.',
+    'Giọng ấm áp, gần gũi, câu ngắn, đọc trên điện thoại. Chèn vài emoji hợp cảnh biển (⚓ 🚢 🌊 🐟 🎣), đừng lạm dụng.',
+    'Số theo chuẩn Việt Nam. KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
+    'KHÔNG bịa tin tức, số liệu, sự kiện, quy định cụ thể. Nói chung, đúng, không phịa chi tiết.',
+    'KHÔNG mô tả phần mềm đối tác như của SDVICO. Có thể nhắc SDVICO đồng hành cùng bà con một cách nhẹ nhàng ở cuối.',
+    '4 tới 6 câu. Có thể kết bằng một câu hỏi mở để bà con bình luận, hoặc lời chúc ra khơi bình an.',
+    'KHÔNG tự viết hashtag, hệ thống tự thêm.',
+  ].join('\n');
+
+  const user = [
+    `Chủ đề: ${chosen}.`,
+    'Trả về JSON đúng dạng, không thêm chữ ngoài JSON:',
+    '{"headline": "tiêu đề ngắn 6 tới 12 từ, cuốn, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag)"}',
+  ].join('\n');
+
+  const res = await genWithRetry(ai, {
+    model: MKT_MODEL,
+    contents: user,
+    config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.1 },
+  });
+  const parsed = parseJson(res.text || '');
+  const body = String(parsed.body || '').trim();
+  const headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
+  if (!body) throw new Error('Gemini trả rỗng.');
+
+  const tags = hashtagBlock(null); // chỉ hashtag mặc định, không thẻ sản phẩm
+  const text = `${body}\n\n${tags}`;
+  const assessment = assessDraft(text, {
+    knownFactValues: knownFactValues(facts),
+    testFactValues: testFactValues(facts),
+  });
+  return { text, body, headline, topic: chosen, hashtags: tags, assessment };
 }

@@ -9,9 +9,11 @@ import { isEmergencyStopped } from '../../../lib/safety';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// Số folder mỗi lần chạy. Mặc định 3: sinh sẵn 3 sản phẩm/ngày để đăng ở 3 khung giờ
-// (sáng/trưa/tối) bằng cách bấm Duyệt lúc đó (điều cấm 1: máy soạn, người bấm).
-const FOLDERS_PER_RUN = Number(process.env.ROTATE_FOLDERS_PER_RUN) || 3;
+// Số bài BÁN (theo folder sản phẩm) mỗi lần chạy. Mặc định 2. Ngoài ra mỗi lần còn sinh
+// thêm 1 bài CONTENT (không bán, nuôi trang) -> tổng 2 bán + 1 content.
+const FOLDERS_PER_RUN = Number(process.env.ROTATE_FOLDERS_PER_RUN) || 2;
+// Bật/tắt bài content mỗi lần chạy.
+const CONTENT_PER_RUN = process.env.ROTATE_CONTENT === '0' ? 0 : 1;
 
 // Bỏ tiền tố STT "5. " khỏi nhãn folder để lấy tên sản phẩm.
 function productName(group: string): string {
@@ -89,7 +91,7 @@ export async function GET(req: Request) {
   const pickedFolders = shuffle(unused).slice(0, FOLDERS_PER_RUN);
 
   // @ts-ignore — module JS thuần
-  const { generateSocialPost } = await import('../../../lib/gen/social.mjs');
+  const { generateSocialPost, generateContentPost } = await import('../../../lib/gen/social.mjs');
 
   const results: any[] = [];
   const skipped: any[] = [];
@@ -153,6 +155,55 @@ export async function GET(req: Request) {
       status: 'pending',
     });
     results.push({ group, channels, contentId, risk });
+  }
+
+  // Bài CONTENT (không bán): 1 bài mỗi lần chạy, dùng 1 ảnh bất kỳ trong kho.
+  for (let i = 0; i < CONTENT_PER_RUN; i++) {
+    const allImgs = [...folders.values()].flatMap((f) => f.images);
+    const media = allImgs.length ? pickRandom(allImgs) : null;
+    if (!media) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
+    let gen: any;
+    try {
+      gen = await generateContentPost({});
+    } catch (e) {
+      skipped.push({ group: 'Bài content', reason: 'gen loi: ' + (e as any)?.message });
+      break;
+    }
+    const risk = gen.assessment?.risk || 'none';
+    const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';
+    const assets = { image: media.id, video: null };
+    const channels = ['facebook'];
+    const { data: ins, error: ce } = await client
+      .from('mkt_content')
+      .insert({
+        kind: 'social',
+        title: displayTitle,
+        brief: {
+          keyword: 'Bài content',
+          intent: 'thong_tin',
+          assets,
+          channels,
+          generator: 'rotation',
+          rotation: true,
+          rotation_group: 'Bài content',
+          post_kind: 'content',
+          topic: gen.topic,
+          content_type: 'tips',
+        },
+        draft: gen.text,
+        status: 'review',
+        needs_gov_review: risk === 'red',
+      })
+      .select('id')
+      .single();
+    if (ce || !ins) { skipped.push({ group: 'Bài content', reason: 'insert loi' }); break; }
+    await client.from('approval_queue').insert({
+      kind: 'mkt_publish_content',
+      title: `[Facebook] 📰 ${displayTitle}`,
+      payload: { content_id: (ins as { id: string }).id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels, authored: 'ai', post_kind: 'content' },
+      status: 'pending',
+    });
+    results.push({ group: 'Bài content', channels, contentId: (ins as { id: string }).id, risk });
   }
 
   return NextResponse.json({ ok: true, cycle, folders: pickedFolders, created: results.length, results, skipped });

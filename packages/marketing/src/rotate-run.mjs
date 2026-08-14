@@ -7,7 +7,7 @@ import { loadRealEnv } from './video/env.mjs';
 const N = Number(process.argv[2]) || 1;
 const env = loadRealEnv();
 const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-const { generateSocialPost } = await import('./social.mjs');
+const { generateSocialPost, generateContentPost } = await import('./social.mjs');
 
 const productName = (g) => g.replace(/^\s*\d+\.\s*/, '').trim();
 const rnd = (a) => a[Math.floor(Math.random() * a.length)];
@@ -62,6 +62,32 @@ for (const group of picked) {
     kind: 'mkt_publish_content', title: `${label} ${displayTitle}`,
     payload: { content_id: ins.id, format: 'social', keyword: name, intent: 'giao_dich', risk, assets, channels, authored: 'ai' }, status: 'pending',
   });
-  console.log(`Cycle ${cycle} | ${label} ${name} | ${ins.id.slice(0, 8)} | risk=${risk}`);
+  console.log(`Cycle ${cycle} | ${label} ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk}`);
+}
+
+// 1 bài content mỗi lượt (không bán).
+if (process.env.ROTATE_CONTENT !== '0') {
+  const allImgs = [...folders.values()].flatMap((f) => f.images);
+  const media = allImgs.length ? rnd(allImgs) : null;
+  if (media) {
+    try {
+      const gen = await generateContentPost({});
+      const risk = gen.assessment?.risk || 'none';
+      const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';
+      const assets = { image: media.id, video: null };
+      const { data: ins } = await client.from('mkt_content').insert({
+        kind: 'social', title: displayTitle,
+        brief: { keyword: 'Bài content', intent: 'thong_tin', assets, channels: ['facebook'], generator: 'rotation', rotation: true, rotation_group: 'Bài content', post_kind: 'content', topic: gen.topic, content_type: 'tips' },
+        draft: gen.text, status: 'review', needs_gov_review: risk === 'red',
+      }).select('id').single();
+      if (ins) {
+        await client.from('approval_queue').insert({
+          kind: 'mkt_publish_content', title: `[Facebook] 📰 ${displayTitle}`,
+          payload: { content_id: ins.id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels: ['facebook'], authored: 'ai', post_kind: 'content' }, status: 'pending',
+        });
+        console.log(`Cycle ${cycle} | [Facebook] 📰 ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk} | chu de: ${gen.topic}`);
+      }
+    } catch (e) { console.log('  Loi bai content:', e.message); }
+  }
 }
 process.exit(0);
