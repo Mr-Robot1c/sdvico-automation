@@ -9,7 +9,7 @@ name: Đăng Facebook bài đã duyệt
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # mỗi 30 phút; giãn/tắt tùy nhu cầu để tiết kiệm phút Actions
+    - cron: '0 * * * *' # mỗi giờ 1 lần (giãn từ */30 để tiết kiệm phút Actions). Bài đã duyệt lên trong vòng 1 giờ; cần lên ngay thì bấm Duyệt ở trang web (đăng thẳng) hoặc "Run workflow"
   workflow_dispatch:
 
 concurrency:

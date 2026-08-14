@@ -3,13 +3,13 @@ name: Sinh nội dung marketing
 # Bốc từ khóa, sinh 3 định dạng (website, Facebook, video), đẩy vào hàng đợi duyệt.
 # KHÔNG đăng gì. Người duyệt bấm Duyệt thì worker mới đăng.
 #
-# LỊCH THỬ: mỗi 5 phút. Đây là quá dày cho hạn mức GitHub Actions miễn phí của repo
-# private (mỗi tháng 2.000 phút). Sau khi thử xong nên giãn ra, ví dụ mỗi ngày một lần
-# ('0 1 * * *'), hoặc tắt lịch và chỉ chạy tay bằng "Run workflow".
+# LỊCH: mỗi ngày 1 lần lúc 1h UTC (8h VN). Đã giãn từ '*/5' (thử nghiệm, quá dày, mỗi lần còn
+# npm install nên tốn nhiều phút Actions của repo private, mỗi tháng chỉ 2.000 phút). Cần thêm
+# bài thì bấm "Run workflow" chạy tay, hoặc tăng tần suất lại ở dòng cron dưới.
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '0 1 * * *'
   workflow_dispatch:
 
 # Không chạy chồng nếu lần trước chưa xong.
