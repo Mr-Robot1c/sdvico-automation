@@ -554,33 +554,47 @@ export async function queueFacebookPost(formData: FormData) {
 
   const contactLine = `Hotline/Zalo ${hotline}, gửi CV về ${contactEmail}`;
 
-  const [noi_dung, unsplash_url] = await Promise.all([
+  const [composed, unsplash_url] = await Promise.all([
     groqChat(
       [
         'Bạn là chuyên gia viết bài tuyển dụng cho Facebook, ngành biển và thủy sản Việt Nam.',
-        'Viết một bài tuyển dụng HOÀN CHỈNH, hấp dẫn, dễ đọc trên điện thoại.',
+        'Viết một bài tuyển dụng HOÀN CHỈNH, DÙNG ĐẦY ĐỦ mọi thông tin được cung cấp (gồm cả phần Mô tả công việc, mức lương, giờ làm nếu có nêu trong đó).',
         '',
-        'Định dạng bài (dùng emoji đầu mục, xuống dòng rõ ràng, đúng thứ tự):',
+        'Trường "bai" theo định dạng (emoji đầu mục, xuống dòng rõ ràng):',
         '- Dòng đầu: 🔥 SDVICO TUYỂN DỤNG: [tên vị trí] 📣',
-        '- 1-2 câu hook gần gũi, kêu gọi',
-        '- 📍 Nơi làm việc: ... (nếu có địa điểm)',
-        '- ✅ Yêu cầu: mỗi ý một dòng bắt đầu bằng "-", LẤY ĐÚNG từ phần Yêu cầu được cung cấp',
-        '- 🎁 Quyền lợi: mỗi ý một dòng bắt đầu bằng "-", LẤY ĐÚNG từ phần Quyền lợi được cung cấp',
+        '- 1-2 câu hook gần gũi',
+        '- 📍 Nơi làm việc (nếu có)',
+        '- 💰 Mức lương (nếu Mô tả hoặc Quyền lợi có nêu)',
+        '- 🕐 Giờ làm việc (nếu có nêu)',
+        '- 📋 Công việc: tóm tắt từ phần Mô tả',
+        '- ✅ Yêu cầu (từ phần Yêu cầu)',
+        '- 🎁 Quyền lợi (từ phần Quyền lợi)',
         `- 📞 Liên hệ: ${contactLine}`,
-        '- Một câu chốt kêu gọi ngắn (ví dụ: Anh em quan tâm nhắn ngay để nhận việc sớm nhé!)',
-        '- 3-4 hashtag tiếng Việt phù hợp ngành',
+        '- Câu chốt kêu gọi ngắn + 3-4 hashtag tiếng Việt',
         '',
-        'Quy tắc cứng:',
-        '- CHỈ dùng thông tin được cung cấp. KHÔNG bịa lương, thưởng, số liệu nếu không có (điều cấm 5)',
-        '- Không mô tả phần mềm đối tác như năng lực của SDVICO (điều cấm 4)',
-        '- Giọng gần gũi với thợ và ngư dân, câu ngắn. Độ dài 130-230 từ',
-        '- Trả về nội dung bài đăng, không kèm giải thích',
+        'Quy tắc: CHỈ dùng thông tin được cung cấp, KHÔNG bịa (điều cấm 5). Không mô tả phần mềm đối tác như năng lực SDVICO (điều cấm 4).',
+        '',
+        'Chỉ trả về JSON đúng dạng: {"bai": "<nội dung bài>", "luong": "<mức lương nếu có, để trống nếu không>", "gio_lam": "<giờ làm nếu có, để trống nếu không>"}',
       ].join('\n'),
       sourceInfo,
-      { temperature: 0.75, maxTokens: 700 }
-    ).then((r) => r?.trim() || baseFb || fallbackContent),
+      { json: true, temperature: 0.7, maxTokens: 900 }
+    ).catch(() => null),
     fetchUnsplashPhoto(job.title, job.location || undefined, (job as Record<string, unknown>).image_hint as string | null),
   ]);
+
+  let noi_dung = baseFb || fallbackContent;
+  let salary = '';
+  let workingHours = '';
+  if (composed) {
+    try {
+      const obj = JSON.parse(composed) as { bai?: string; luong?: string; gio_lam?: string };
+      noi_dung = (obj.bai || '').trim() || baseFb || fallbackContent;
+      salary = (obj.luong || '').trim();
+      workingHours = (obj.gio_lam || '').trim();
+    } catch {
+      noi_dung = composed.trim() || baseFb || fallbackContent;
+    }
+  }
 
   // Ảnh = poster tuyển dụng (satori). Lỗi thì lùi về ảnh Unsplash/logo.
   let image_url: string | null = null;
@@ -589,6 +603,8 @@ export async function queueFacebookPost(formData: FormData) {
     location: job.location || null,
     requirements: toBullets(reqText),
     benefits: toBullets(benefits),
+    salary,
+    workingHours,
     brandName: brand.company_name || 'SDVICO',
     tagline: brand.tagline,
     website: brand.website,

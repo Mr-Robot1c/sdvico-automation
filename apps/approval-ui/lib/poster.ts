@@ -19,6 +19,8 @@ export type PosterInput = {
   location?: string | null;
   requirements: string[];
   benefits: string[];
+  salary?: string | null;
+  workingHours?: string | null;
   brandName?: string;
   tagline?: string;
   website?: string;
@@ -93,6 +95,8 @@ function icon(pathD: string) {
 const CHECK = 'M9 16.2l-3.5-3.5L4 14.2 9 19l11-11-1.5-1.5z';
 const PIN = 'M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1112 6.5a2.5 2.5 0 010 5z';
 const PHONE = 'M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.4 0 .7-.2 1l-2.3 2.2z';
+const MONEY = 'M3 6h18v12H3zm2 2v8h14V8zm7 1a3 3 0 100 6 3 3 0 000-6z';
+const CLOCK = 'M12 2a10 10 0 100 20 10 10 0 000-20zm1 10V6h-2v8h6v-2z';
 
 export async function buildRecruitmentPoster(input: PosterInput): Promise<Buffer | null> {
   try {
@@ -106,8 +110,10 @@ export async function buildRecruitmentPoster(input: PosterInput): Promise<Buffer
     const tagline = (input.tagline || '').trim() || 'Công nghệ số cho ngành biển và thủy sản';
     const website = input.website || 'sdvico.vn';
     const hotline = input.hotline || '1900 23 23 49';
-    const reqs = input.requirements.length ? input.requirements : ['Xem chi tiết trong bài đăng'];
     const bens = input.benefits.length ? input.benefits : ['Xem chi tiết trong bài đăng'];
+    const salary = (input.salary || '').trim();
+    const hours = (input.workingHours || '').trim();
+    void input.requirements; // Yêu cầu không lên poster nữa (đưa vào bài viết), giữ tham số để không vỡ caller.
 
     const photo = input.photoUrl ? await photoDataUri(input.photoUrl, 1080, 560) : null;
     const logo = input.logoUrl ? await logoData(input.logoUrl) : null;
@@ -121,10 +127,13 @@ export async function buildRecruitmentPoster(input: PosterInput): Promise<Buffer
         txt({ color: '#fff', fontSize: 30, lineHeight: 1.2 }, text),
       ]);
 
-    const column = (title: string, items: string[]) =>
-      div({ display: 'flex', flexDirection: 'column', flex: 1 }, [
-        txt({ color: t.accent, fontSize: 34, fontWeight: 700, marginBottom: 22, letterSpacing: 1 }, title),
-        ...items.map(bullet),
+    const highlightCard = (iconPath: string, label: string, value: string) =>
+      div({ display: 'flex', flexDirection: 'column', flex: 1, background: 'rgba(255,255,255,0.10)', borderRadius: 18, padding: '22px 26px', gap: 8 }, [
+        div({ display: 'flex', alignItems: 'center', gap: 12 }, [
+          div({ display: 'flex', width: 46, height: 46, borderRadius: 12, background: t.red, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, [imgEl(icon(iconPath), { width: 28, height: 28 })]),
+          txt({ color: t.accent, fontSize: 27, fontWeight: 700 }, label),
+        ]),
+        txt({ color: '#fff', fontSize: 36, fontWeight: 700, lineHeight: 1.15 }, value),
       ]);
 
     // Header overlay (trên dải ảnh)
@@ -157,8 +166,16 @@ export async function buildRecruitmentPoster(input: PosterInput): Promise<Buffer
     const topBand = div({ display: 'flex', flexDirection: 'column', height: 560, position: 'relative' },
       [...(photo ? [imgEl(photo, { position: 'absolute', top: 0, left: 0, width: 1080, height: 560, objectFit: 'cover' })] : []), header]);
 
-    const body = div({ display: 'flex', flexDirection: 'column', flexGrow: 1, justifyContent: 'center', padding: '40px 50px' }, [
-      div({ display: 'flex', gap: 40 }, [column('YÊU CẦU', reqs), column('QUYỀN LỢI', bens)]),
+    const highlights = [];
+    if (salary) highlights.push(highlightCard(MONEY, 'MỨC LƯƠNG', salary));
+    if (hours) highlights.push(highlightCard(CLOCK, 'GIỜ LÀM VIỆC', hours));
+
+    const body = div({ display: 'flex', flexDirection: 'column', flexGrow: 1, justifyContent: 'center', padding: '40px 50px', gap: 34 }, [
+      ...(highlights.length ? [div({ display: 'flex', gap: 22 }, highlights)] : []),
+      div({ display: 'flex', flexDirection: 'column' }, [
+        txt({ color: t.accent, fontSize: 34, fontWeight: 700, marginBottom: 22, letterSpacing: 1 }, 'QUYỀN LỢI'),
+        ...bens.map(bullet),
+      ]),
     ]);
 
     const footer = div({ display: 'flex', alignItems: 'center', gap: 14, background: t.red, padding: '22px 50px' }, [

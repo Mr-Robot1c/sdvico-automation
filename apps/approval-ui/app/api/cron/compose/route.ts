@@ -144,36 +144,49 @@ export async function GET(req: Request) {
 
       const systemPrompt = [
         'Bạn là chuyên gia viết bài tuyển dụng cho Facebook, ngành biển và thủy sản Việt Nam.',
-        isRefresh
-          ? 'Viết LẠI bài cho một vị trí đã đăng trước đó — diễn đạt khác đi để tránh trùng trên newsfeed.'
-          : 'Viết một bài tuyển dụng HOÀN CHỈNH, hấp dẫn, dễ đọc trên điện thoại.',
+        isRefresh ? 'Viết LẠI bài cho một vị trí đã đăng trước — diễn đạt khác đi để tránh trùng.' : '',
+        'Viết một bài tuyển dụng HOÀN CHỈNH, DÙNG ĐẦY ĐỦ mọi thông tin được cung cấp (gồm cả phần Mô tả công việc, mức lương, giờ làm nếu có nêu trong đó).',
         '',
-        'Định dạng bài (dùng emoji đầu mục, xuống dòng rõ ràng, đúng thứ tự):',
+        'Trường "bai" theo định dạng (emoji đầu mục, xuống dòng rõ ràng):',
         '- Dòng đầu: 🔥 SDVICO TUYỂN DỤNG: [tên vị trí] 📣',
-        '- 1-2 câu hook gần gũi, kêu gọi',
-        '- 📍 Nơi làm việc: ... (nếu có địa điểm)',
-        '- ✅ Yêu cầu: mỗi ý một dòng bắt đầu bằng "-", LẤY ĐÚNG từ phần Yêu cầu được cung cấp',
-        '- 🎁 Quyền lợi: mỗi ý một dòng bắt đầu bằng "-", LẤY ĐÚNG từ phần Quyền lợi được cung cấp',
+        '- 1-2 câu hook gần gũi',
+        '- 📍 Nơi làm việc (nếu có)',
+        '- 💰 Mức lương (nếu Mô tả hoặc Quyền lợi có nêu)',
+        '- 🕐 Giờ làm việc (nếu có nêu)',
+        '- 📋 Công việc: tóm tắt từ phần Mô tả',
+        '- ✅ Yêu cầu (từ phần Yêu cầu)',
+        '- 🎁 Quyền lợi (từ phần Quyền lợi)',
         `- 📞 Liên hệ: ${contactLine}`,
-        '- Một câu chốt kêu gọi ngắn (ví dụ: Anh em quan tâm nhắn ngay để nhận việc sớm nhé!)',
-        '- 3-4 hashtag tiếng Việt phù hợp ngành',
+        '- Câu chốt kêu gọi ngắn + 3-4 hashtag tiếng Việt',
         '',
-        'Quy tắc cứng:',
-        '- CHỈ dùng thông tin được cung cấp. KHÔNG bịa lương, thưởng, số liệu nếu không có (điều cấm 5)',
-        '- Không mô tả phần mềm đối tác như năng lực của SDVICO (điều cấm 4)',
-        '- Giọng gần gũi với thợ và ngư dân, câu ngắn. Độ dài 130-230 từ',
-        '- Trả về nội dung bài đăng, không kèm giải thích',
-      ].join('\n');
+        'Quy tắc: CHỈ dùng thông tin được cung cấp, KHÔNG bịa (điều cấm 5). Không mô tả phần mềm đối tác như năng lực SDVICO (điều cấm 4). Giọng gần gũi với thợ và ngư dân.',
+        '',
+        'Chỉ trả về JSON đúng dạng sau, không kèm chữ nào khác:',
+        '{"bai": "<toàn bộ nội dung bài đăng>", "luong": "<mức lương ngắn gọn nếu có, vd 8-12 triệu; để trống nếu không nêu>", "gio_lam": "<giờ làm việc nếu có; để trống nếu không nêu>"}',
+      ].filter(Boolean).join('\n');
 
-      const [noi_dung, unsplash_url] = await Promise.all([
-        groqChat(systemPrompt, sourceInfo, { temperature: 0.75, maxTokens: 700 })
-          .then((r) => r?.trim() || fallbackContent).catch(() => fallbackContent),
+      const [composed, unsplash_url] = await Promise.all([
+        groqChat(systemPrompt, sourceInfo, { json: true, temperature: 0.7, maxTokens: 900 }).catch(() => null),
         fetchUnsplashPhoto(
           String(job.title),
           job.location ? String(job.location) : undefined,
           job.image_hint ? String(job.image_hint) : null
         ).catch(() => null),
       ]);
+
+      let noi_dung = fallbackContent;
+      let salary = '';
+      let workingHours = '';
+      if (composed) {
+        try {
+          const obj = JSON.parse(composed) as { bai?: string; luong?: string; gio_lam?: string };
+          noi_dung = (obj.bai || '').trim() || fallbackContent;
+          salary = (obj.luong || '').trim();
+          workingHours = (obj.gio_lam || '').trim();
+        } catch {
+          noi_dung = composed.trim() || fallbackContent;
+        }
+      }
 
       // Ảnh = poster tuyển dụng (satori). Lỗi thì lùi về ảnh Unsplash/logo.
       let image_url: string | null = null;
@@ -182,6 +195,8 @@ export async function GET(req: Request) {
         location: job.location ? String(job.location) : null,
         requirements: reqBullets,
         benefits: benBullets,
+        salary,
+        workingHours,
         brandName: brand.company_name || 'SDVICO',
         tagline: brand.tagline,
         website: brand.website,
