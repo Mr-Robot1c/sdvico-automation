@@ -101,22 +101,8 @@ export default function DecideActions({ id, title, kind, postId, oldPostId, oldF
             </button>
           ) : null}
 
-          {/* Từ chối */}
-          <form
-            action={decideForm}
-            onSubmit={(e) => {
-              if (!window.confirm(`Từ chối mục này?\n\n"${title}"`)) { e.preventDefault(); return; }
-              setBusy('reject');
-            }}
-          >
-            <input type="hidden" name="id" value={id} />
-            <input type="hidden" name="action" value="reject" />
-            <button className="btn no" disabled={busy !== null}>
-              {busy === 'reject' ? 'Đang từ chối...' : 'Từ chối'}
-            </button>
-          </form>
-
-          {/* Xóa khỏi hàng đợi */}
+          {/* Xóa khỏi hàng đợi (đã bỏ "Từ chối" cho tin tuyển dụng: với bài máy tự soạn
+              chỉ cần Duyệt hoặc Xóa; "Từ chối" giữ nguyên bản nháp làm kẹt vị trí) */}
           <form
             action={dismissQueueItem}
             onSubmit={(e) => {
