@@ -5,6 +5,8 @@
   "type": "module",
   "main": "src/keywords.mjs",
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@google/genai": "^1.52.0",
     "@sdvico/core": "*",
     "chrome-launcher": "^1.2.1",

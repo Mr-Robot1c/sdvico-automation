@@ -2,8 +2,9 @@
 
 > Đọc khi làm phần Marketing. Phụ trách Bạn B. Nền chung ở [README.md](README.md), điều cấm và giọng văn ở CLAUDE.md.
 covers: packages/marketing
-last_verified: 2026-08-13
+last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Them day chuyen video (Ngay 5) o packages/marketing/src/video: build-video.mjs dieu phoi kich ban (Gemini, script.mjs) -> TTS tung canh (edge-tts, tts.py) -> phu de tu kich ban + Whisper artifact (subtitle.py, faster-whisper) -> ghep ban doc 9:16 va ngang 16:9 (assemble.mjs, ffmpeg) -> 3 tieu de + 3 thumbnail. Chay may noi bo, KHONG serverless. Chi dung brand_assets (dieu cam 5), quet compliance.assessDraft (dieu cam 3,4,5). Chua noi vao approval_queue/dang - dau ra o out/video de nguoi duyet. Chi tiet: packages/marketing/src/video/README.md. -->
 <!-- re-verified: 2026-08-12 - publish-facebook.mjs: them dang anh (brief.assets.image qua /photos), lay post_id dung. Van chi dang approval_queue status=approved, tran MKT_MAX_POSTS_PER_RUN. Them workflow mkt-publish.yml chay --live moi 30 phut. Luong may soan nguoi bam KHONG doi. -->
 <!-- re-verified: 2026-08-12 - publish-facebook.mjs: chi dang draft (bo dong tieu de) de khong lap ten SP. -->
 <!-- re-verified: 2026-08-12 - publish-facebook.mjs + decideForm: them dang VIDEO qua /videos (file_url) khi bai co brief.assets.video. Uu tien video > anh > chu. -->
