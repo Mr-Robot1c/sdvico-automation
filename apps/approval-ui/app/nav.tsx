@@ -28,7 +28,7 @@ const SOLO_BOTTOM: (NavItem & { icon: string })[] = [
   { href: '/cai-dat', label: 'Cài đặt', icon: '⚙' },
 ];
 
-export default function Nav() {
+export default function Nav({ pendingCount = 0 }: { pendingCount?: number }) {
   const path = usePathname();
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
@@ -55,6 +55,9 @@ export default function Nav() {
           <Link key={item.href} href={item.href} className={`nav-solo${path === item.href ? ' on' : ''}`} onClick={close}>
             <span className="nav-icon" aria-hidden="true">{item.icon}</span>
             {item.label}
+            {item.href === '/' && pendingCount > 0 ? (
+              <span className="nav-badge" aria-label={`${pendingCount} mục chờ duyệt`}>{pendingCount}</span>
+            ) : null}
           </Link>
         ))}
 

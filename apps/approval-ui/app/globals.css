@@ -92,6 +92,17 @@ main { max-width: 860px; margin: 0 auto; padding: 28px 24px 72px; }
 .nav-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; opacity: 0.75; }
 .nav-solo.on .nav-icon { opacity: 1; }
 
+/* Badge đỏ báo số mục chờ duyệt trên tab "Duyệt & gửi" */
+.nav-badge {
+  margin-left: auto;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 10px;
+  background: #e5484d; color: #fff;
+  font-size: 12px; font-weight: 700; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
 /* Đường phân cách */
 .nav-sep { height: 1px; background: var(--line); margin: 8px 4px; }
 .nav-spacer { flex: 1; min-height: 16px; }

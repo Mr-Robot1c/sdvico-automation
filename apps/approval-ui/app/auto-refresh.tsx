@@ -22,7 +22,7 @@ export default function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
     return () => clearInterval(tick);
   }, [router, seconds]);
 
-  return (
-    <span className="refresh">Tự làm mới sau {left} giây</span>
-  );
+  // Tự làm mới ngầm, không hiện chữ đếm ngược cho gọn giao diện.
+  void left;
+  return null;
 }
