@@ -64,16 +64,16 @@ async function photoDataUri(url: string, w: number, h: number): Promise<string |
   }
 }
 
-// Logo → data URI PNG + chiều rộng theo tỉ lệ (đặt trên chip trắng ở header).
-async function logoData(url: string, h: number): Promise<{ uri: string; w: number } | null> {
+// Logo → data URI PNG + tỉ lệ khung (để đặt trên chip trắng ở header).
+async function logoData(url: string): Promise<{ uri: string; aspect: number } | null> {
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
     const buf = Buffer.from(await res.arrayBuffer());
-    const png = await sharp(buf).resize(null, h, { fit: 'inside' }).png().toBuffer();
+    const png = await sharp(buf).resize(null, 200, { fit: 'inside' }).png().toBuffer();
     const meta = await sharp(png).metadata();
-    const w = Math.round(h * ((meta.width || h) / (meta.height || h)));
-    return { uri: `data:image/png;base64,${png.toString('base64')}`, w: Math.min(w, 320) };
+    const aspect = (meta.width || 1) / (meta.height || 1);
+    return { uri: `data:image/png;base64,${png.toString('base64')}`, aspect };
   } catch {
     return null;
   }
@@ -103,14 +103,16 @@ export async function buildRecruitmentPoster(input: PosterInput): Promise<Buffer
       accent: th.accent || DEFAULT_THEME.accent,
     };
     const brandName = input.brandName || 'SDVICO';
-    const tagline = (input.tagline || '').trim();
+    const tagline = (input.tagline || '').trim() || 'Công nghệ số cho ngành biển và thủy sản';
     const website = input.website || 'sdvico.vn';
     const hotline = input.hotline || '1900 23 23 49';
     const reqs = input.requirements.length ? input.requirements : ['Xem chi tiết trong bài đăng'];
     const bens = input.benefits.length ? input.benefits : ['Xem chi tiết trong bài đăng'];
 
     const photo = input.photoUrl ? await photoDataUri(input.photoUrl, 1080, 560) : null;
-    const logo = input.logoUrl ? await logoData(input.logoUrl, 58) : null;
+    const logo = input.logoUrl ? await logoData(input.logoUrl) : null;
+    const logoH = 84;
+    const logoW = logo ? Math.min(Math.round(logoH * logo.aspect), 320) : 0;
 
     const bullet = (text: string) =>
       div({ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }, [
@@ -130,13 +132,15 @@ export async function buildRecruitmentPoster(input: PosterInput): Promise<Buffer
       { display: 'flex', flexDirection: 'column', flexGrow: 1, padding: '34px 44px',
         backgroundImage: `linear-gradient(to bottom, rgba(6,38,77,0.92) 0%, rgba(6,38,77,0.35) 45%, rgba(6,38,77,0.7) 100%)` },
       [
-        div({ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }, [
-          logo
-            ? div({ display: 'flex', background: '#fff', borderRadius: 12, padding: '8px 16px', alignItems: 'center' }, [imgEl(logo.uri, { height: 58, width: logo.w })])
-            : txt({ color: '#fff', fontSize: 40, fontWeight: 700, letterSpacing: 2 }, brandName),
-          txt({ color: '#cfe0f5', fontSize: 20 }, website),
+        div({ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }, [
+          div({ display: 'flex', flexDirection: 'column', gap: 10 }, [
+            logo
+              ? div({ display: 'flex', background: '#fff', borderRadius: 14, padding: '10px 20px', alignItems: 'center', alignSelf: 'flex-start' }, [imgEl(logo.uri, { height: logoH, width: logoW })])
+              : txt({ color: '#fff', fontSize: 46, fontWeight: 700, letterSpacing: 2 }, brandName),
+            ...(tagline ? [txt({ color: '#dbe9fb', fontSize: 25, fontWeight: 700, maxWidth: 620 }, tagline)] : []),
+          ]),
+          txt({ color: '#cfe0f5', fontSize: 22 }, website),
         ]),
-        ...(tagline ? [txt({ color: '#cfe0f5', fontSize: 22, marginTop: 6 }, tagline)] : []),
         div({ display: 'flex', flexGrow: 1 }, []),
         txt({ color: '#fff', background: t.red, alignSelf: 'flex-start', padding: '6px 24px', borderRadius: 10, fontSize: 46, fontWeight: 700, letterSpacing: 2 }, 'TUYỂN DỤNG'),
         div({ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', borderRadius: 14, padding: '12px 22px', alignSelf: 'flex-start', marginTop: 10, maxWidth: 980 }, [
