@@ -2,6 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import type { Plan, Tier } from '../../lib/plan';
 import { vnInt, vnDec1 } from '../../lib/plan';
 import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
+import GenerateButton from './generate-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,9 +69,7 @@ export default async function Page() {
           </p>
         </div>
         <div className="head-actions">
-          <form action={generatePlanNow}>
-            <button className="btn ok" type="submit">✨ Tạo kế hoạch ngay</button>
-          </form>
+          <GenerateButton action={generatePlanNow} />
         </div>
       </header>
 
@@ -121,9 +120,9 @@ export default async function Page() {
                   <div className="stat-num">{vnInt(latest.data.summary?.totalConversions || 0)}</div>
                   <div className="stat-lbl">Đơn hoặc lead</div>
                 </div>
-                <div className="stat-tile">
+                <div className="stat-tile" title="Sản phẩm phải có từ 3 bài trở lên (có số liệu) mới đủ để xếp thắng/thua. Số dưới ngưỡng đang gom thêm dữ liệu.">
                   <div className="stat-num">{vnInt(latest.data.summary?.ranked || 0)}<span className="stat-sub">/{vnInt(latest.data.summary?.totalProducts || 0)}</span></div>
-                  <div className="stat-lbl">Sản phẩm đủ mẫu</div>
+                  <div className="stat-lbl">Sản phẩm đủ số liệu để xếp hạng</div>
                 </div>
                 <div className="stat-tile wide">
                   <div className="stat-num">{vnInt(latest.data.weeklyBudget || 0)} <span className="stat-sub">bài/tuần</span></div>
