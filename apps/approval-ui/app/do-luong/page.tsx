@@ -1,6 +1,6 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { contentTypeLabel } from '../labels';
-import { refreshFacebookMetrics, setConversions } from '../actions';
+import { refreshFacebookMetrics, setConversions, deleteContent } from '../actions';
 import BarChart from './bar-chart';
 
 export const dynamic = 'force-dynamic';
@@ -128,7 +128,7 @@ export default async function Page() {
           <div className="tablewrap">
             <table className="datatable">
               <thead>
-                <tr><th>Tên bài</th><th>Loại</th><th>Tương tác</th><th>Reactions</th><th>Comment</th><th>Share</th><th>Đơn/Lead</th></tr>
+                <tr><th>Tên bài</th><th>Loại</th><th>Tương tác</th><th>Reactions</th><th>Comment</th><th>Share</th><th>Đơn/Lead</th><th></th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
@@ -152,6 +152,12 @@ export default async function Page() {
                           aria-label={`Số đơn/lead cho ${r.title}`}
                         />
                         <button className="btn ghost sm" type="submit">Lưu</button>
+                      </form>
+                    </td>
+                    <td>
+                      <form action={deleteContent}>
+                        <input type="hidden" name="content_id" value={r.cid} />
+                        <button className="btn no sm" type="submit" aria-label={`Xóa bài ${r.title}`} title="Xóa bài khỏi hệ thống (không gỡ bài đã đăng trên FB/TikTok)">Xóa</button>
                       </form>
                     </td>
                   </tr>

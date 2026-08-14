@@ -668,6 +668,21 @@ export async function deleteAsset(formData: FormData) {
   revalidatePath('/tu-lieu');
 }
 
+// Xóa một BÀI (nội dung) khỏi hệ thống: gỡ bản ghi mkt_content + mục hàng đợi + bài đăng + số liệu.
+// LƯU Ý: chỉ xóa dữ liệu trong hệ thống, KHÔNG gỡ bài đã đăng thật trên Facebook/TikTok.
+export async function deleteContent(formData: FormData) {
+  const id = String(formData.get('content_id') || '');
+  if (!id) return;
+  const client = getServerClient();
+  await client.from('approval_queue').delete().eq('payload->>content_id', id);
+  await client.from('mkt_posts').delete().eq('content_id', id);
+  await client.from('mkt_metrics').delete().eq('entity_ref', id);
+  await client.from('mkt_content').delete().eq('id', id);
+  revalidatePath('/do-luong');
+  revalidatePath('/noi-dung');
+  revalidatePath('/');
+}
+
 // Sinh text cho khung sản xuất: nhập từ khóa (kèm intent/landing_url tùy chọn), trả bản nháp
 // qua bản mẫu (hoặc Gemini nếu có khóa). Trả string, gọi từ client component qua await.
 // Không đụng DB, không tạo hàng đợi.

@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - /do-luong them nut Xoa moi bai (action deleteContent: go mkt_content + approval_queue [loc payload->>content_id, da test khop] + mkt_posts + mkt_metrics; KHONG go bai da dang that tren FB/TikTok). -->
 <!-- re-verified: 2026-08-14 - /san-xuat form.tsx: bo gioi han hien thi anh (12->het) va video (8->het), .sx-thumbs them max-height+scroll. /do-luong: them BarChart (CSS thuan, theme-aware) - tuong tac TB & don/lead TB theo loai content + top bai theo tuong tac; globals.css them .chart-*. tsc sach. -->
 <!-- re-verified: 2026-08-14 - nav.tsx: bo nhom 'Tu lieu'; chuyen Kho tu lieu (/tu-lieu) vao nhom 'Quan li va San xuat'; bo Kho tu khoa (/tu-khoa) + Nguon du kien (/du-kien) khoi menu (trang van con, chi an nav) vi luong social khong dung. -->
 <!-- re-verified: 2026-08-14 - rotate: MOI folder sinh 1 bai dang CA HAI nen tang (channels=[facebook,tiktok] khi co video, else facebook), duyet 1 lan. /tu-lieu doi sang gom theo folder san pham (section moi folder + so anh/video + nhac folder chua co video/trong). globals.css them .folder-section. tsc sach. -->
