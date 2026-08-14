@@ -55,7 +55,7 @@ Diễn giải từng bước:
 
 8. Đo lường. Kéo số liệu Google Search Console, Analytics, Facebook Insights, YouTube về `mkt_metrics`. Trang `/do-luong` so sánh tương tác và đơn theo sản phẩm.
 
-9. Con bot định hướng. Cron `/api/plan` chạy thứ 4 và chủ nhật, đọc số liệu Đo lường rồi sinh một bản kế hoạch ở `mkt_plans`: xếp hạng sản phẩm theo đơn/lead và tương tác trung bình mỗi bài (ngưỡng ít nhất 3 bài mới xếp thắng thua), kèm đoạn định hướng và trọng số phân bổ bài tuần tới. Trang `/ke-hoach` để người đọc. Bot đề xuất, người quyết. Bấm "Áp dụng trọng số" thì vòng xoay sinh bài mới ưu tiên sản phẩm đang thắng. Điều cấm 1 và 2.
+9. Con bot định hướng. Vào thứ 4 và chủ nhật, cron `mkt-metrics-pull` sau khi kéo số liệu mới sẽ sinh một bản kế hoạch ở `mkt_plans` (gộp ở đây vì Vercel Hobby chỉ cho 2 cron). Kế hoạch xếp hạng sản phẩm theo đơn/lead và tương tác trung bình mỗi bài (ngưỡng ít nhất 3 bài mới xếp thắng thua), kèm đoạn định hướng và trọng số phân bổ bài tuần tới. Endpoint `/api/plan` cũng có để chạy tay hoặc test. Trang `/ke-hoach` để người đọc. Bot đề xuất, người quyết. Bấm "Áp dụng trọng số" thì vòng xoay sinh bài mới ưu tiên sản phẩm đang thắng. Điều cấm 1 và 2.
 
 ## 2. App map marketing
 
@@ -107,7 +107,7 @@ Diễn giải từng bước:
 
 - Lịch nội dung tuần sinh tự động, người duyệt theo lô.
 - Kéo số liệu về `mkt_metrics` theo ngày.
-- Con bot định hướng `/api/plan` sinh kế hoạch thứ 4 và chủ nhật (`0 2 * * 0,3`). Lưu ý Vercel Hobby giới hạn 2 cron, nếu deploy báo vượt hạn mức thì gộp vào cron `mkt-metrics-pull` (kiểm tra hôm nay là thứ 4 hoặc chủ nhật).
+- Con bot định hướng sinh kế hoạch thứ 4 và chủ nhật, GỘP trong cron `mkt-metrics-pull` (isPlanDayVN kiểm tra hôm nay là thứ 4 hoặc chủ nhật). Không thêm cron riêng vì Vercel Hobby giới hạn 2 cron. Endpoint `/api/plan` vẫn có để chạy tay.
 
 ### Chỉ tiêu nghiệm thu liên quan
 

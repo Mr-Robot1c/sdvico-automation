@@ -8,7 +8,7 @@ import { postVideoToTikTok } from '../lib/tiktok';
 import { isEmergencyStopped, reservePostQuota, setEmergencyStop, isQuotaDisabled, setQuotaDisabled } from '../lib/safety';
 import { fetchWithRetry } from '../lib/retry';
 import { pullFacebookMetrics } from '../lib/fb-metrics';
-import { loadMeasurement, buildPlan, weekWindowVN } from '../lib/plan';
+import { generateAndStorePlan } from '../lib/plan';
 
 // Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment ngay lúc video còn
 // đang xử lý sẽ lỗi → ảnh bị bỏ). Hỏi trạng thái qua /{videoId}?fields=status. Trả true khi sẵn sàng.
@@ -821,18 +821,7 @@ export async function editDraft(formData: FormData) {
 // Bot ĐỀ XUẤT, người quyết (điều cấm 1 và 2). Bản mới applied = false, chưa tác động vòng xoay.
 export async function generatePlanNow() {
   const client = getServerClient();
-  const now = new Date();
-  const measurement = await loadMeasurement(client);
-  const plan = buildPlan(measurement, { generatedAt: now.toISOString() });
-  const win = weekWindowVN(now);
-  const { error } = await client.from('mkt_plans').insert({
-    period_start: win.start,
-    period_end: win.end,
-    generated_by: 'manual',
-    data: plan,
-    applied: false
-  });
-  if (error) throw new Error(error.message);
+  await generateAndStorePlan(client, 'manual');
   revalidatePath('/ke-hoach');
 }
 

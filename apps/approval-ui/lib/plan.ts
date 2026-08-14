@@ -168,6 +168,39 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
   return { products, totals, topPosts };
 }
 
+// Thứ 4 (3) hoặc chủ nhật (0) theo giờ Việt Nam. Dùng để cron metrics-pull hàng ngày biết
+// hôm nay có sinh kế hoạch không (Vercel Hobby chỉ 2 cron nên gộp thay vì thêm cron thứ 3).
+export function isPlanDayVN(now: Date): boolean {
+  const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const dow = vn.getUTCDay();
+  return dow === 3 || dow === 0;
+}
+
+// Sinh 1 bản kế hoạch từ số liệu hiện tại rồi lưu vào mkt_plans (applied = false).
+// Bot ĐỀ XUẤT, người quyết (điều cấm 1 và 2). Dùng chung cho cron, action tạo tay, và cron metrics-pull.
+export async function generateAndStorePlan(
+  client: Client,
+  generatedBy: 'cron' | 'manual'
+): Promise<{ id: string | null; plan: Plan }> {
+  const now = new Date();
+  const measurement = await loadMeasurement(client);
+  const plan = buildPlan(measurement, { generatedAt: now.toISOString() });
+  const win = weekWindowVN(now);
+  const { data, error } = await client
+    .from('mkt_plans')
+    .insert({
+      period_start: win.start,
+      period_end: win.end,
+      generated_by: generatedBy,
+      data: plan,
+      applied: false
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(error.message);
+  return { id: ((data as any)?.id as string) || null, plan };
+}
+
 const WEIGHT_BY_TIER: Record<Tier, number> = {
   winner: 3,
   watch: 2,

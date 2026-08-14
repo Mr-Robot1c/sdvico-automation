@@ -5,5 +5,5 @@
 |---|---|---|
 | docs/app-map/README.md | VERIFIED | ok |
 | docs/app-map/database.md | VERIFIED | ok |
-| docs/app-map/marketing.md | VERIFIED | ok |
+| docs/app-map/marketing.md | SUSPECT | code 'packages/marketing' doi sau last_verified |
 | docs/app-map/tuyen-dung.md | VERIFIED | ok |
