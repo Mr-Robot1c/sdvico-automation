@@ -1,0 +1,30 @@
+name: Kéo số liệu Facebook 30 phút/lần
+
+# GỌI endpoint /api/mkt-metrics-pull trên Vercel để cập nhật mkt_metrics.
+# Vercel Cron gói Hobby không chạy được lịch dưới 1 ngày; workflow này lấp chỗ đó.
+# Endpoint bảo vệ bằng CRON_SECRET (đặt cùng giá trị trên GitHub secret + Vercel env production).
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # mỗi 30 phút
+  workflow_dispatch:
+
+concurrency:
+  group: mkt-metrics-pull
+  cancel-in-progress: false
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kéo số liệu Facebook
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "Thieu CRON_SECRET"; exit 1; fi
+          code=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://sdvico-mktit.vercel.app/api/mkt-metrics-pull")
+          echo "HTTP $code"
+          head -c 800 /tmp/resp.json; echo
+          test "$code" = "200"
