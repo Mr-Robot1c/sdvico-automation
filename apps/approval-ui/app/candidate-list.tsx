@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatRelative, stageMeta, sourceLabel } from './labels';
-import { advanceToInterview, saveNote, rejectSourced, decideCandidate } from './actions';
+import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed } from './actions';
 
 export type CandView = {
   id: string;
@@ -18,6 +18,7 @@ export type CandView = {
   stages: string[];
   appId: string | null;
   appStage: string | null;
+  interviewedAt: string | null;
   sourced: boolean;
   note: string;
   score: number | null;
@@ -147,9 +148,21 @@ function CandidateCard({ c }: { c: CandView }) {
             <button className="btn ok" type="submit">Xét duyệt vào phỏng vấn</button>
           </form>
         ) : null}
-        {c.appStage === 'interview' && c.appId ? (
+        {c.appStage === 'interview' && c.appId && !c.interviewedAt ? (
           <>
-            <span className="muted" style={{ alignSelf: 'center', marginRight: 2 }}>Sau phỏng vấn:</span>
+            <span className="muted" style={{ alignSelf: 'center' }}>Đã đưa vào phỏng vấn — thư mời ở tab Duyệt</span>
+            <form
+              action={markInterviewed}
+              onSubmit={(e) => { if (!window.confirm(`Đánh dấu ĐÃ PHỎNG VẤN XONG cho:\n\n${c.name}\n\nSau bước này mới hiện nút Nhận / Không nhận.`)) e.preventDefault(); }}
+            >
+              <input type="hidden" name="appId" value={c.appId} />
+              <button className="btn ghost" type="submit">Đánh dấu đã phỏng vấn xong</button>
+            </form>
+          </>
+        ) : null}
+        {c.appStage === 'interview' && c.appId && c.interviewedAt ? (
+          <>
+            <span className="muted" style={{ alignSelf: 'center', marginRight: 2 }}>Đã phỏng vấn — quyết định:</span>
             <form
               action={decideCandidate}
               onSubmit={(e) => { if (!window.confirm(`Nhận ứng viên này?\n\n${c.name}\n\nMáy soạn thư mời nhận việc, bạn duyệt trên trang Duyệt rồi mới gửi.`)) e.preventDefault(); }}
@@ -168,7 +181,7 @@ function CandidateCard({ c }: { c: CandView }) {
             </form>
           </>
         ) : null}
-        {c.appStage === 'offer' ? <span className="stage tone-ok">Đã nhận — thư chờ duyệt</span> : null}
+        {c.appStage === 'offer' ? <span className="stage tone-ok">Đã nhận</span> : null}
         {c.appStage === 'rejected' ? <span className="muted">Đã từ chối</span> : null}
         {c.sourced ? (
           <form
@@ -199,10 +212,14 @@ export default function CandidateList({ candidates }: { candidates: CandView[] }
     return [...m.entries()];
   }, [candidates]);
 
+  const FINISHED = ['offer', 'rejected', 'pool'];
+  const activeCount = useMemo(() => candidates.filter((c) => !(c.appStage && FINISHED.includes(c.appStage))).length, [candidates]);
+
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     const list = candidates.filter((c) => {
-      const okStage = !stage || c.stages.includes(stage);
+      // Mặc định (chưa chọn trạng thái): chỉ hồ sơ đang xử lý, ẩn "đã nhận/từ chối/lưu nguồn".
+      const okStage = stage ? c.stages.includes(stage) : !(c.appStage && FINISHED.includes(c.appStage));
       const okText = !t || [c.name, c.email, c.phone, c.dedupKey, c.subject].some((v) => (v || '').toLowerCase().includes(t));
       return okStage && okText;
     });
@@ -233,7 +250,7 @@ export default function CandidateList({ candidates }: { candidates: CandView[] }
 
       <nav className="filters" aria-label="Lọc theo trạng thái">
         <button className={`chip ${!stage ? 'on' : ''}`} onClick={() => setStage(null)}>
-          Tất cả <span className="n">{candidates.length}</span>
+          Đang xử lý <span className="n">{activeCount}</span>
         </button>
         {stageCounts.map(([s, n]) => {
           const m = stageMeta(s);

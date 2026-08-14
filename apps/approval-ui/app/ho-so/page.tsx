@@ -69,6 +69,13 @@ export default async function Page() {
   const { data: nrows } = await client.from('hr_applications').select('id, note');
   for (const r of nrows || []) if (r.note) notes.set(r.id as string, r.note as string);
 
+  // Mốc đã phỏng vấn (cột có thể chưa migrate — đọc an toàn).
+  const interviewedAt = new Map<string, string>();
+  const { data: irows } = await client.from('hr_applications').select('id, interviewed_at');
+  for (const r of (irows || []) as Array<{ id: string; interviewed_at: string | null }>) {
+    if (r.interviewed_at) interviewedAt.set(r.id, r.interviewed_at);
+  }
+
   // Đường tải CV có ký, hết hạn sau một giờ. Bucket riêng tư nên phải ký mới tải được.
   const signed = new Map<string, string>();
   await Promise.all(
@@ -104,6 +111,7 @@ export default async function Page() {
       stages: (c.hr_applications || []).map((a) => a.stage),
       appId: app?.id || null,
       appStage: app?.stage || null,
+      interviewedAt: (app?.id && interviewedAt.get(app.id)) || null,
       sourced: (c.source || '').startsWith('sourced'),
       note: (app?.id && notes.get(app.id)) || '',
       score: typeof app?.score_json?.diem_tong === 'number' ? app.score_json!.diem_tong! : null,

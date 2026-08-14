@@ -114,6 +114,10 @@ export async function decideCandidate(formData: FormData) {
     .eq('id', appId).maybeSingle();
   if (!app || app.stage !== 'interview') return;
 
+  // Chỉ cho quyết định sau khi đã đánh dấu "đã phỏng vấn xong" (nếu cột đã migrate).
+  const { data: iv2 } = await client.from('hr_applications').select('interviewed_at').eq('id', appId).maybeSingle();
+  if (iv2 && (iv2 as { interviewed_at: string | null }).interviewed_at == null) return;
+
   const { data: cand } = await client.from('hr_candidates').select('full_name, email').eq('id', app.candidate_id).maybeSingle();
   let position = 'đã ứng tuyển';
   if (app.job_id) {
@@ -142,6 +146,17 @@ export async function decideCandidate(formData: FormData) {
 
   revalidatePath('/ho-so');
   revalidatePath('/');
+}
+
+// Đánh dấu ứng viên đã phỏng vấn xong. Chỉ khi có mốc này mới hiện nút Nhận/Không nhận.
+export async function markInterviewed(formData: FormData) {
+  const appId = String(formData.get('appId') || '');
+  if (!appId) return;
+  const client = getServerClient();
+  await client.from('hr_applications')
+    .update({ interviewed_at: new Date().toISOString() })
+    .eq('id', appId).eq('stage', 'interview');
+  revalidatePath('/ho-so');
 }
 
 // Xóa mục khỏi hàng đợi và XÓA HẲN bản nháp đính kèm (nếu có).
