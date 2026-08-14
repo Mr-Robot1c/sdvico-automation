@@ -85,10 +85,19 @@ export function contentTypeLabel(t?: string | null): string {
   }
 }
 
-// Nhãn kênh đăng thật, lấy từ brief.channels (facebook, tiktok). Trống thì mặc định Facebook.
+// Nhãn kênh đăng THẬT, lấy từ brief.channels (facebook, tiktok, website). Đăng ở đâu ghi ở đó.
+// Trống thì mặc định Facebook.
 export function channelsLabel(channels?: string[] | null): string {
+  const map: Record<string, string> = { facebook: 'Facebook', tiktok: 'TikTok', website: 'Website', youtube: 'YouTube' };
   const arr = Array.isArray(channels) && channels.length ? channels : ['facebook'];
-  return arr.map((c) => (c === 'facebook' ? 'Facebook' : c === 'tiktok' ? 'TikTok' : c)).join(', ');
+  return arr.map((c) => map[c] || c).join(' + ');
+}
+
+// Nhãn mục đích bài: bán hàng hay nội dung nuôi trang. Rõ hơn nhãn "ý định" SEO.
+export function purposeLabel(postKind?: string, format?: string): string {
+  if (postKind === 'content') return 'Nội dung';
+  if (format === 'social') return 'Bán hàng';
+  return '';
 }
 
 // Nhãn ý định tìm kiếm.

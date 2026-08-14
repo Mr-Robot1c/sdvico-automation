@@ -2,7 +2,7 @@
 // Giọng brand-voice, hàng rào product-boundary (không bịa thông số, không nhận vơ phần mềm đối tác).
 import { assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
-import { DEFAULT_HASHTAGS, productHashtag, getFeatures, CONTENT_TOPICS } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS } from './products.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -20,16 +20,15 @@ async function genWithRetry(ai, params, tries = 4) {
   throw last;
 }
 
-// Các góc tiếp cận để mỗi bài khác nhau (chống trùng lặp nội dung).
+// Các góc tiếp cận BÁN HÀNG để mỗi bài khác nhau (chống trùng), nhưng góc nào cũng
+// xoay quanh sản phẩm và kết bằng mời mua/liên hệ (không lạc thành bài tâm sự chung chung).
 const ANGLES = [
-  'kể một tình huống thực tế khi ra khơi rồi sản phẩm giúp giải quyết',
-  'nhấn mạnh tiết kiệm chi phí cụ thể cho mỗi chuyến biển',
-  'đặt một câu hỏi cho bà con rồi trả lời ngắn gọn',
-  'nhấn an toàn và tuân thủ quy định khi vươn khơi',
-  'làm nổi bật một đặc điểm và lợi ích thiết thực của nó',
-  'so sánh cảm nhận trước và sau khi dùng',
-  'lời khuyên chuẩn bị cho chuyến biển dài ngày',
-  'nhắn nhủ gần gũi như người trong nghề chia sẻ',
+  'mở bằng một nỗi lo thật khi đi biển rồi giới thiệu sản phẩm giải quyết, mời bà con sắm',
+  'nhấn tiết kiệm chi phí cụ thể mỗi chuyến biển nhờ sản phẩm rồi mời liên hệ mua',
+  'làm nổi bật một đặc điểm mạnh của sản phẩm và lợi ích thiết thực rồi mời đặt hàng',
+  'nhấn ra khơi an toàn và đúng quy định nhờ sản phẩm rồi mời lắp đặt',
+  'so sánh nhẹ trước và sau khi trang bị sản phẩm rồi mời bà con liên hệ',
+  'nhấn SDVICO phân phối chính hãng, lắp đặt tận bến, bảo hành, rồi mời bà con đặt ngay',
 ];
 
 function parseJson(t) {
@@ -42,11 +41,9 @@ function parseJson(t) {
   return JSON.parse(s);
 }
 
-// Khối hashtag: mặc định + thẻ riêng sản phẩm, khử trùng.
+// Khối hashtag: thẻ chung mặc định + BỘ thẻ riêng đúng sản phẩm, khử trùng.
 export function hashtagBlock(productGroup, extra = []) {
-  const tags = [...DEFAULT_HASHTAGS];
-  const ph = productHashtag(productGroup);
-  if (ph) tags.push(ph);
+  const tags = [...DEFAULT_HASHTAGS, ...productHashtags(productGroup)];
   for (const t of extra) if (t) tags.push(t.startsWith('#') ? t : `#${t}`);
   return [...new Set(tags)].join(' ');
 }
@@ -64,6 +61,7 @@ export async function generateSocialPost({ productGroup, productName, channel, h
   const angle = ANGLES[Math.floor(Math.random() * ANGLES.length)];
   const system = [
     'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
+    `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${productName}". Bắt buộc: nêu rõ tên sản phẩm này, 1 tới 2 lợi ích thật của nó, và MỜI bà con liên hệ SDVICO để mua hoặc lắp đặt (SDVICO phân phối chính hãng, lắp đặt tận bến, bảo hành). Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
     'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích cụ thể: ra khơi an toàn, tuân thủ quy định, tiết kiệm nhiên liệu và nước ngọt.',
     'Chèn vài emoji hợp cảnh biển và thiết bị cho sinh động (ví dụ ⚓ 🚢 🌊 📡 💧 🛟 📞), đừng lạm dụng.',
     'Số theo chuẩn Việt Nam (dấu chấm ngăn hàng nghìn). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
@@ -72,7 +70,7 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     isTikTok
       ? 'Đây là chú thích cho video TikTok: 2 tới 4 câu thật ngắn, cuốn, kết bằng mời gọi.'
       : 'Đây là bài Facebook: 4 tới 6 câu, có thể có 2 tới 3 dòng gạch đầu lợi ích (dùng emoji làm đầu dòng, không dùng dấu chấm tròn).',
-    'Kết bằng lời mời gọi tổng đài 1900 23 23 49. KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.',
+    'Kết bằng lời mời rõ ràng, đúng kiểu bán hàng: liên hệ SDVICO hoặc gọi tổng đài 1900 23 23 49 để được tư vấn, báo giá và lắp đặt. KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.',
     'Mỗi bài phải KHÁC các bài trước: khác câu mở đầu, khác cách triển khai, khác tiêu đề.',
     '',
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số được duyệt: nói chung chung, không nêu số cụ thể.',

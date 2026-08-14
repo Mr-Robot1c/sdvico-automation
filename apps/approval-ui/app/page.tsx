@@ -3,7 +3,7 @@ import AutoRefresh from './auto-refresh';
 import DecideActions from './decide-actions';
 import ViewModal from './view-modal';
 import { editDraft } from './actions';
-import { kindMeta, formatRelative, payloadRows, formatLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from './labels';
+import { kindMeta, formatRelative, payloadRows, intentLabel, channelsLabel, purposeLabel, riskMeta, COMPLIANCE_LABELS } from './labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 // (Hàng đợi duyệt hiện ảnh/video đã gắn từ payload.assets — build 2026-08-12.)
@@ -58,6 +58,8 @@ function mktInfo(payload: unknown) {
     authored: p.authored as string | undefined,
     keyword: p.keyword as string | undefined,
     landingUrl: p.landing_url as string | undefined,
+    channels: Array.isArray(p.channels) ? (p.channels as string[]) : [],
+    postKind: p.post_kind as string | undefined,
     flags
   };
 }
@@ -226,8 +228,10 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   {info.authored === 'human'
                     ? <span className="badge tone-no" title="Bài do người tự soạn">🚩 Người viết</span>
                     : <span className="badge" title="Bài do máy tự sinh, chờ người duyệt">🤖 Máy viết</span>}
-                  <span className="badge badge-format">{formatLabel(info.format)}</span>
-                  {info.intent ? <span className="badge">{intentLabel(info.intent)}</span> : null}
+                  <span className="badge badge-format" title="Nơi bài sẽ được đăng">📍 {channelsLabel(info.channels)}</span>
+                  {purposeLabel(info.postKind, info.format)
+                    ? <span className="badge" title="Bài bán sản phẩm hay bài nội dung nuôi trang">{purposeLabel(info.postKind, info.format)}</span>
+                    : (info.intent ? <span className="badge">{intentLabel(info.intent)}</span> : null)}
                   <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
                   {info.keyword ? <span className="src">từ khóa: {info.keyword}</span> : null}
                 </div>
