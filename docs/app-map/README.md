@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - /do-luong doi so sanh tu 'loai content' sang 'SAN PHAM' (productOf: brief.rotation_group bo STT, fallback keyword/title). Bieu do + 2 bang theo san pham. Bo import contentTypeLabel. Phu hop luong xoay folder theo san pham. -->
 <!-- re-verified: 2026-08-14 - /do-luong them nut Xoa moi bai (action deleteContent: go mkt_content + approval_queue [loc payload->>content_id, da test khop] + mkt_posts + mkt_metrics; KHONG go bai da dang that tren FB/TikTok). -->
 <!-- re-verified: 2026-08-14 - /san-xuat form.tsx: bo gioi han hien thi anh (12->het) va video (8->het), .sx-thumbs them max-height+scroll. /do-luong: them BarChart (CSS thuan, theme-aware) - tuong tac TB & don/lead TB theo loai content + top bai theo tuong tac; globals.css them .chart-*. tsc sach. -->
 <!-- re-verified: 2026-08-14 - nav.tsx: bo nhom 'Tu lieu'; chuyen Kho tu lieu (/tu-lieu) vao nhom 'Quan li va San xuat'; bo Kho tu khoa (/tu-khoa) + Nguon du kien (/du-kien) khoi menu (trang van con, chi an nav) vi luong social khong dung. -->

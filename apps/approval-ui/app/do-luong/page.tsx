@@ -1,5 +1,4 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { contentTypeLabel } from '../labels';
 import { refreshFacebookMetrics, setConversions, deleteContent } from '../actions';
 import BarChart from './bar-chart';
 
@@ -23,15 +22,23 @@ export default async function Page() {
     if (cid && !latest.has(cid)) latest.set(cid, ((r as any).metrics || {}) as M);
   }
 
+  // Tên sản phẩm của một bài: ưu tiên folder xoay vòng (rotation_group), rồi keyword, rồi tiêu đề.
+  const productOf = (brief: any, title: string): string => {
+    const g = brief?.rotation_group as string | undefined;
+    const name = (g ? g.replace(/^\s*\d+\.\s*/, '').trim() : '') || brief?.keyword || title || 'Khác';
+    return String(name).trim() || 'Khác';
+  };
+
   const cids = [...latest.keys()];
-  const contents = new Map<string, { title: string; type: string; conversions: number }>();
+  const contents = new Map<string, { title: string; product: string; conversions: number }>();
   if (cids.length) {
     const { data: cs } = await client.from('mkt_content').select('id, title, brief').in('id', cids);
     for (const c of cs || []) {
+      const brief = (c as any).brief || {};
       contents.set((c as any).id, {
         title: (c as any).title || '(không tên)',
-        type: (c as any).brief?.content_type || 'other',
-        conversions: Number((c as any).brief?.conversions) || 0
+        product: productOf(brief, (c as any).title),
+        conversions: Number(brief.conversions) || 0
       });
     }
   }
@@ -39,25 +46,25 @@ export default async function Page() {
   const rows = cids
     .map((cid) => {
       const m = latest.get(cid) || {};
-      const c = contents.get(cid) || { title: '(không rõ)', type: 'other', conversions: 0 };
+      const c = contents.get(cid) || { title: '(không rõ)', product: 'Khác', conversions: 0 };
       const reactions = m.reactions || 0;
       const comments = m.comments || 0;
       const shares = m.shares || 0;
-      return { cid, title: c.title, type: c.type, reactions, comments, shares, engagement: reactions + comments + shares, conversions: c.conversions };
+      return { cid, title: c.title, product: c.product, reactions, comments, shares, engagement: reactions + comments + shares, conversions: c.conversions };
     })
     .sort((a, b) => b.engagement - a.engagement);
 
-  const byType = new Map<string, { count: number; engagement: number; conversions: number }>();
+  const byProduct = new Map<string, { count: number; engagement: number; conversions: number }>();
   for (const r of rows) {
-    const g = byType.get(r.type) || { count: 0, engagement: 0, conversions: 0 };
+    const g = byProduct.get(r.product) || { count: 0, engagement: 0, conversions: 0 };
     g.count += 1;
     g.engagement += r.engagement;
     g.conversions += r.conversions;
-    byType.set(r.type, g);
+    byProduct.set(r.product, g);
   }
-  const typeRows = [...byType.entries()]
-    .map(([type, g]) => ({
-      type,
+  const productRows = [...byProduct.entries()]
+    .map(([product, g]) => ({
+      product,
       count: g.count,
       engagement: g.engagement,
       conversions: g.conversions,
@@ -67,8 +74,8 @@ export default async function Page() {
     .sort((a, b) => b.avgConv - a.avgConv || b.avgEng - a.avgEng);
 
   // Dữ liệu cho biểu đồ.
-  const engByType = typeRows.map((t) => ({ label: contentTypeLabel(t.type), value: t.avgEng }));
-  const convByType = typeRows.filter((t) => t.conversions > 0).map((t) => ({ label: contentTypeLabel(t.type), value: t.avgConv }));
+  const engByProduct = productRows.map((t) => ({ label: t.product, value: t.avgEng }));
+  const convByProduct = productRows.filter((t) => t.conversions > 0).map((t) => ({ label: t.product, value: t.avgConv }));
   const topPosts = rows.slice(0, 8).map((r) => ({ label: r.title, value: r.engagement }));
 
   return (
@@ -76,7 +83,7 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Đo lường</h1>
-          <p className="sub">So sánh tương tác + đơn/lead theo bài và theo loại content (A/B). Loại nào cao thì giữ hướng đó.</p>
+          <p className="sub">So sánh tương tác + đơn/lead theo bài và theo sản phẩm. Sản phẩm nào cao thì đẩy mạnh hướng đó.</p>
         </div>
         <div className="head-actions">
           <form action={refreshFacebookMetrics}>
@@ -94,25 +101,25 @@ export default async function Page() {
       ) : (
         <>
           <div className="chart-grid">
-            <BarChart title="Tương tác trung bình mỗi bài theo loại content" items={engByType} tone="accent" />
-            {convByType.length ? (
-              <BarChart title="Đơn/Lead trung bình mỗi bài theo loại content" items={convByType} tone="ok" />
+            <BarChart title="Tương tác trung bình mỗi bài theo sản phẩm" items={engByProduct} tone="accent" />
+            {convByProduct.length ? (
+              <BarChart title="Đơn/Lead trung bình mỗi bài theo sản phẩm" items={convByProduct} tone="ok" />
             ) : null}
           </div>
           {topPosts.length ? (
             <BarChart title="Top bài theo tương tác" items={topPosts} tone="accent" />
           ) : null}
 
-          <h2 style={{ marginTop: 24 }}>Theo loại content — xếp theo đơn/lead trung bình mỗi bài</h2>
+          <h2 style={{ marginTop: 24 }}>Theo sản phẩm — xếp theo đơn/lead trung bình mỗi bài</h2>
           <div className="tablewrap">
             <table className="datatable">
               <thead>
-                <tr><th>Loại content</th><th>Số bài</th><th>TB đơn/bài</th><th>Tổng đơn</th><th>TB tương tác/bài</th><th>Tổng tương tác</th></tr>
+                <tr><th>Sản phẩm</th><th>Số bài</th><th>TB đơn/bài</th><th>Tổng đơn</th><th>TB tương tác/bài</th><th>Tổng tương tác</th></tr>
               </thead>
               <tbody>
-                {typeRows.map((t, i) => (
-                  <tr key={t.type}>
-                    <td>{i === 0 ? '🏆 ' : ''}{contentTypeLabel(t.type)}</td>
+                {productRows.map((t, i) => (
+                  <tr key={t.product}>
+                    <td>{i === 0 ? '🏆 ' : ''}{t.product}</td>
                     <td>{t.count}</td>
                     <td><b>{t.avgConv}</b></td>
                     <td>{t.conversions}</td>
@@ -128,13 +135,13 @@ export default async function Page() {
           <div className="tablewrap">
             <table className="datatable">
               <thead>
-                <tr><th>Tên bài</th><th>Loại</th><th>Tương tác</th><th>Reactions</th><th>Comment</th><th>Share</th><th>Đơn/Lead</th><th></th></tr>
+                <tr><th>Tên bài</th><th>Sản phẩm</th><th>Tương tác</th><th>Reactions</th><th>Comment</th><th>Share</th><th>Đơn/Lead</th><th></th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.cid}>
                     <td className="cell-title">{r.title}</td>
-                    <td>{contentTypeLabel(r.type)}</td>
+                    <td>{r.product}</td>
                     <td><b>{r.engagement}</b></td>
                     <td>{r.reactions}</td>
                     <td>{r.comments}</td>
