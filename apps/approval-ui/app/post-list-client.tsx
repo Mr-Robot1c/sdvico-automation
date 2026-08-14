@@ -57,10 +57,6 @@ export default function PostListClient({
 
   return (
     <>
-      <p className="muted" style={{ margin: '0 0 10px', fontSize: '13px' }}>
-        Máy soạn bài, đẩy vào hàng đợi. Xem và sửa ở đây, bấm Duyệt ở trang Duyệt, rồi worker mới đăng lên. Máy soạn, người bấm (điều cấm 1).
-      </p>
-
       <ul className="post-table">
         {posts.map((p) => {
           const tt = TT[p.trang_thai] || { label: p.trang_thai, tone: 'default' };
@@ -69,7 +65,9 @@ export default function PostListClient({
           const canPost = (isApproved || p.trang_thai === 'failed') && canEdit;
           const isView = openId === p.id && openMode === 'view';
           const isEdit = openId === p.id && openMode === 'edit';
-          const scheduledDefault = p.scheduled_at ? new Date(p.scheduled_at).toISOString().slice(0, 16) : '';
+          const schedDate = p.scheduled_at ? new Date(p.scheduled_at) : null;
+          const scheduledDefault = schedDate && !isNaN(schedDate.getTime())
+            ? schedDate.toISOString().slice(0, 16) : '';
 
           return (
             <li key={p.id} className={`pt-row${isView || isEdit ? ' is-open' : ''}`}>

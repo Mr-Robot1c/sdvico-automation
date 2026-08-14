@@ -52,7 +52,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Lịch phỏng vấn</h1>
-          <p className="sub">Mỗi hồ sơ vào phỏng vấn được cấp ba khung giờ không trùng ai. Danh sách sắp theo người gần đến giờ nhất.</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>

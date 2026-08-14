@@ -28,7 +28,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Cài đặt thương hiệu</h1>
-          <p className="sub">Thông tin công ty tự động gắn vào bài đăng Facebook. Logo dùng làm ảnh đính kèm khi không có ảnh nào khác.</p>
         </div>
       </header>
 

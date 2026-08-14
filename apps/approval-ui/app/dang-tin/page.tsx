@@ -74,7 +74,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Tin đăng tuyển dụng</h1>
-          <p className="sub">Máy soạn bài, đẩy vào hàng đợi. Bấm Duyệt ở trang Duyệt để mở khoá đăng.</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>
@@ -90,7 +89,6 @@ export default async function Page() {
           <span className="sys-dot" />
           Đăng bài: {publish.label}
         </span>
-        <span className="sys-hint">Cron chạy mỗi 15 phút</span>
       </div>
 
       {needMigration ? (

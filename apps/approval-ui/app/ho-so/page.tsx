@@ -130,7 +130,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Hồ sơ ứng viên</h1>
-          <p className="sub">CV nạp tự động từ hộp thư. Máy xếp, người quyết, không tự loại ai.</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>
