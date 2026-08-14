@@ -32,6 +32,30 @@ const KENH: Record<string, string> = {
   job_board: 'Trang tuyển dụng', website: 'Website', other: 'Khác',
 };
 
+// Nút copy nội dung bài để dán tay vào Nhóm Facebook (FB đã chặn API đăng Nhóm).
+function CopyButton({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      className="btn ghost"
+      style={{ fontSize: '0.85em' }}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setDone(true);
+          setTimeout(() => setDone(false), 2000);
+        } catch {
+          // Trình duyệt chặn clipboard: người dùng bôi đen phần nội dung để copy tay.
+          alert('Không copy tự động được. Bạn bôi đen phần nội dung bài rồi copy nhé.');
+        }
+      }}
+    >
+      {done ? '✓ Đã copy' : 'Copy nội dung (dán vào Nhóm)'}
+    </button>
+  );
+}
+
 type Mode = 'view' | 'edit';
 type DeleteTarget = { id: string; tieu_de: string; trang_thai: string; fbLinked: boolean };
 
@@ -158,6 +182,13 @@ export default function PostListClient({
                     ) : null}
                     {!isApproved && canEdit ? (
                       <span className="muted" style={{ fontSize: '0.85em', alignSelf: 'center' }}>Duyệt trên trang Duyệt để mở khoá Đăng</span>
+                    ) : null}
+                    {/* Đăng tay vào Nhóm Facebook (FB đã chặn API đăng Nhóm từ 2024): copy rồi dán */}
+                    {p.noi_dung ? <CopyButton text={p.noi_dung} /> : null}
+                    {p.image_url ? (
+                      <a className="btn ghost" href={p.image_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.85em', textDecoration: 'none', alignSelf: 'center' }}>
+                        Mở ảnh để lưu
+                      </a>
                     ) : null}
                   </div>
                 </div>
