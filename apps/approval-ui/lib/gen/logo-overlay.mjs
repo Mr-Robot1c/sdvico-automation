@@ -1,49 +1,49 @@
-// Ghép logo SDVICO vào góc dưới phải một ảnh. Nếu logo nền trắng thì tự cắt nền
-// (threshold trắng ~245+) trước khi phủ. Cỡ vừa (~14% chiều rộng ảnh), có padding.
-import sharp from 'sharp';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { join, dirname } from 'node:path';
+// Ghép logo SDVICO vào góc dưới phải một ảnh. Dùng @napi-rs/canvas (đã chạy ổn trên Vercel,
+// giống banner.mjs) và logo NHÚNG base64 (logo-data.mjs) — KHÔNG dùng sharp, KHÔNG đọc file lúc
+// chạy, để tránh vỡ trên serverless. Logo nền trắng thì tự cắt gần trắng thành trong suốt.
+// Cỡ vừa (~14% chiều rộng ảnh), có padding.
+import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { LOGO_B64 } from './logo-data.mjs';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const LOGO_PATH = join(HERE, 'assets', 'logo-sdvico.jpg');
-
-let cachedLogo = null;
-async function getLogoPng() {
-  if (cachedLogo) return cachedLogo;
-  const raw = readFileSync(LOGO_PATH);
-  const img = sharp(raw).ensureAlpha();
-  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
-  const out = Buffer.from(data);
-  const { width, height, channels } = info;
-  // Cắt gần trắng thành trong suốt.
-  for (let i = 0; i < out.length; i += channels) {
-    const r = out[i], g = out[i + 1], b = out[i + 2];
-    if (r > 240 && g > 240 && b > 240) out[i + 3] = 0;
-    else if (r > 220 && g > 220 && b > 220) out[i + 3] = Math.max(0, out[i + 3] - 120);
+// Cache logo đã cắt nền (canvas trong suốt) trong vòng đời tiến trình.
+let cachedCutout = null;
+async function getLogoCutout() {
+  if (cachedCutout) return cachedCutout;
+  const img = await loadImage(Buffer.from(LOGO_B64, 'base64'));
+  const w = img.width, h = img.height;
+  const cv = createCanvas(w, h);
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+  // Cắt gần trắng thành trong suốt để logo nằm gọn trên ảnh, không còn khung trắng.
+  const data = ctx.getImageData(0, 0, w, h);
+  const d = data.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    if (r > 240 && g > 240 && b > 240) d[i + 3] = 0;
+    else if (r > 220 && g > 220 && b > 220) d[i + 3] = Math.max(0, d[i + 3] - 120);
   }
-  cachedLogo = await sharp(out, { raw: { width, height, channels } }).png().toBuffer();
-  return cachedLogo;
+  ctx.putImageData(data, 0, 0);
+  cachedCutout = { canvas: cv, w, h };
+  return cachedCutout;
 }
 
-// Ghép logo vào ảnh; trả buffer PNG/JPEG cùng loại đầu vào.
+// Ghép logo vào ảnh; trả buffer JPEG (mặc định) hoặc PNG.
 // opts.position: 'br' (mặc định, góc dưới phải), 'bl', 'tr', 'tl'.
 // opts.scale: tỉ lệ chiều rộng logo so với ảnh (mặc định 0.14).
 // opts.padding: khoảng cách mép (mặc định 3% chiều nhỏ hơn).
 export async function overlayLogo(input, opts = {}) {
   const { position = 'br', scale = 0.14, padding: padRatio = 0.03, format = 'jpeg' } = opts;
-  const base = sharp(input);
-  const meta = await base.metadata();
-  const W = meta.width || 0, H = meta.height || 0;
+  const base = await loadImage(input);
+  const W = base.width || 0, H = base.height || 0;
   if (!W || !H) throw new Error('Khong doc duoc anh nen');
 
-  const logoRaw = await getLogoPng();
-  const targetW = Math.max(64, Math.round(W * scale));
-  const logoResized = await sharp(logoRaw).resize({ width: targetW }).toBuffer();
-  const logoMeta = await sharp(logoResized).metadata();
-  const lw = logoMeta.width || targetW;
-  const lh = logoMeta.height || targetW;
+  const cv = createCanvas(W, H);
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(base, 0, 0, W, H);
 
+  const logo = await getLogoCutout();
+  const lw = Math.max(64, Math.round(W * scale));
+  const lh = Math.round(logo.h * (lw / logo.w));
   const pad = Math.round(Math.min(W, H) * padRatio);
   let left = W - lw - pad;
   let top = H - lh - pad;
@@ -51,7 +51,8 @@ export async function overlayLogo(input, opts = {}) {
   if (position === 'tr') { left = W - lw - pad; top = pad; }
   if (position === 'tl') { left = pad; top = pad; }
 
-  const out = base.composite([{ input: logoResized, left, top }]);
-  if (format === 'png') return out.png().toBuffer();
-  return out.jpeg({ quality: 92 }).toBuffer();
+  ctx.drawImage(logo.canvas, left, top, lw, lh);
+
+  if (format === 'png') return cv.toBuffer('image/png');
+  return cv.toBuffer('image/jpeg', 92);
 }

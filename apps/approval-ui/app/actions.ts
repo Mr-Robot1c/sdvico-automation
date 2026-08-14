@@ -680,22 +680,28 @@ export async function deleteAsset(formData: FormData) {
 // Ghép logo SDVICO vào một ảnh trong kho (góc dưới phải, cỡ vừa). Nút THỦ CÔNG: người chủ động
 // bấm nên đóng logo luôn, không cần kiểm tra ảnh đã có logo chưa. Chỉ áp cho kind='image'.
 // Lõi xử lý dùng chung với auto-logo lúc sinh bài (stampLogoInPlace ở ensure-logo.mjs).
-export async function applyLogoToAsset(formData: FormData) {
-  const id = String(formData.get('id') || '');
-  if (!id) return;
-  const client = getServerClient();
-  const { data: a } = await client
-    .from('brand_assets')
-    .select('id, kind, storage_path')
-    .eq('id', id)
-    .single();
-  const asset = a as { id: string; kind: string; storage_path: string } | null;
-  if (!asset || asset.kind !== 'image') throw new Error('Chỉ ghép logo cho ảnh (kind=image).');
+export async function applyLogoToAsset(id: string): Promise<{ ok: boolean; error?: string }> {
+  if (!id) return { ok: false, error: 'thiếu id ảnh' };
+  try {
+    const client = getServerClient();
+    const { data: a } = await client
+      .from('brand_assets')
+      .select('id, kind, storage_path')
+      .eq('id', id)
+      .single();
+    const asset = a as { id: string; kind: string; storage_path: string } | null;
+    if (!asset || asset.kind !== 'image') return { ok: false, error: 'Chỉ ghép logo cho ảnh.' };
 
-  // @ts-ignore — module JS thuần
-  const { stampLogoInPlace } = await import('../lib/gen/ensure-logo.mjs');
-  await stampLogoInPlace(client, asset);
-  revalidatePath('/tu-lieu');
+    // @ts-ignore — module JS thuần
+    const { stampLogoInPlace } = await import('../lib/gen/ensure-logo.mjs');
+    await stampLogoInPlace(client, asset);
+    revalidatePath('/tu-lieu');
+    return { ok: true };
+  } catch (e: any) {
+    // Không ném lỗi ra ngoài (kẻo sập trang). Trả lỗi cho nút hiển thị.
+    console.error('[applyLogoToAsset]', e);
+    return { ok: false, error: String(e?.message || e) };
+  }
 }
 
 // Xóa một BÀI (nội dung) khỏi hệ thống: gỡ bản ghi mkt_content + mục hàng đợi + bài đăng + số liệu.

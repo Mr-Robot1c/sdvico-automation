@@ -1,6 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { deleteAsset, renameAsset, setAssetProductGroup, applyLogoToAsset } from '../actions';
+import { deleteAsset, renameAsset, setAssetProductGroup } from '../actions';
 import AssetViewer from './asset-viewer';
+import LogoButton from './logo-button';
 import LibUploader from './lib-uploader';
 import ProductGroupSelect from './product-group-select';
 // @ts-ignore — module JS thuần
@@ -70,12 +71,7 @@ export default async function Page() {
           <button className="btn ghost sm" type="submit">Đổi tên</button>
         </form>
         <ProductGroupSelect id={a.id} value={a.product_group || ''} options={PRODUCT_GROUPS} action={setAssetProductGroup} />
-        {a.kind === 'image' ? (
-          <form action={applyLogoToAsset}>
-            <input type="hidden" name="id" value={a.id} />
-            <button className="btn ghost sm" type="submit" title="Ghép logo SDVICO vào góc dưới phải">🏷️ Ghép logo</button>
-          </form>
-        ) : null}
+        {a.kind === 'image' ? <LogoButton id={a.id} /> : null}
         {a.source ? <div className="metaline">Nguồn: {a.source}</div> : null}
         <div className="metaline">{a.license === 'licensed' ? 'Có giấy phép' : 'Công ty sở hữu'}</div>
         <form action={deleteAsset}>
