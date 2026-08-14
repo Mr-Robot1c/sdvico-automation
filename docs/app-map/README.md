@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - rotate: MOI folder sinh 1 bai dang CA HAI nen tang (channels=[facebook,tiktok] khi co video, else facebook), duyet 1 lan. /tu-lieu doi sang gom theo folder san pham (section moi folder + so anh/video + nhac folder chua co video/trong). globals.css them .folder-section. tsc sach. -->
 <!-- re-verified: 2026-08-14 - rotate FOLDERS_PER_RUN mac dinh 3 (sinh 3 folder/ngay cho 3 khung gio dang 8h/11h30/19h; nguoi bam Duyet moi dang - dieu cam 1). Hobby chi 2 cron/ngay nen giu 1 cron sinh bai buoi sang. -->
 <!-- re-verified: 2026-08-14 - /tu-lieu them dropdown gan folder san pham cho tung tu lieu (ProductGroupSelect tu luu qua action setAssetProductGroup, options tu lib/gen/products.mjs). tsc --noEmit sach. Luong du lieu KHONG doi. -->
 <!-- re-verified: 2026-08-14 - Migration 20260814100000 them brand_assets.product_group; rotate route (apps/approval-ui/app/api/rotate) doi sang xoay theo folder san pham (FB anh/+video, TikTok video, khong lap folder trong vong), dung lib/gen/social.mjs (emoji+hashtag) + products.mjs. LUU Y: DATABASE_URL trong .env tro nham project cu, migration phai ap len live jwisiccphcepgpabyyco. Luong approval_queue KHONG doi (van pending -> nguoi duyet, dieu cam 1). -->

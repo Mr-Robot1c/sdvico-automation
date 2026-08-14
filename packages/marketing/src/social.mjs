@@ -2,7 +2,7 @@
 // Giọng brand-voice, hàng rào product-boundary (không bịa thông số, không nhận vơ phần mềm đối tác).
 import { assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
-import { DEFAULT_HASHTAGS, productHashtag } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtag, getFeatures } from './products.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -37,6 +37,7 @@ export async function generateSocialPost({ productGroup, productName, channel, h
   const allowed = facts.filter((f) => f.value)
     .map((f) => `${f.brand || ''} ${f.model || ''} ${f.attribute}: ${f.value}${f.verified ? '' : ' (CHƯA XÁC NHẬN)'}`.trim());
 
+  const features = getFeatures(productGroup);
   const isTikTok = channel === 'tiktok';
   const system = [
     'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
@@ -55,9 +56,10 @@ export async function generateSocialPost({ productGroup, productName, channel, h
 
   const user = [
     `Sản phẩm: "${productName}".`,
+    features.length ? 'Đặc điểm sản phẩm (nêu đúng, chọn vài ý nổi bật, không thêm thông số ngoài danh sách này):\n- ' + features.join('\n- ') : '',
     hasVideo ? 'Bài có kèm video minh họa.' : 'Bài dùng ảnh minh họa.',
     'Viết phần thân bài (chưa gồm hashtag).',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   const res = await genWithRetry(ai, {
     model: MKT_MODEL, contents: user, config: { systemInstruction: system },

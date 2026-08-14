@@ -98,75 +98,60 @@ export async function GET(req: Request) {
     const f = folders.get(group)!;
     const name = productName(group);
 
-    // Bài cho từng kênh: Facebook (ảnh, kèm video nếu có) và TikTok (video).
-    const plan: { channel: string; assets: { image: string | null; video: string | null }; hasVideo: boolean }[] = [];
+    // MỘT bài mỗi folder, đăng CẢ HAI nền tảng: Facebook (ảnh, kèm video nếu có) + TikTok (video).
+    // Folder không có video thì chỉ Facebook (TikTok bắt buộc video).
     const img = f.images.length ? pickRandom(f.images) : null;
     const vid = f.videos.length ? pickRandom(f.videos) : null;
-
-    if (img || vid) {
-      // Facebook: ưu tiên ảnh + video; không có ảnh thì dùng video.
-      plan.push({ channel: 'facebook', assets: { image: img?.id || null, video: vid?.id || null }, hasVideo: !!vid });
+    if (!img && !vid) {
+      skipped.push({ group, reason: 'folder rong' });
+      continue;
     }
-    if (vid) {
-      // TikTok: chỉ cần video (chọn riêng để đa dạng nếu folder nhiều video).
-      const tvid = pickRandom(f.videos);
-      plan.push({ channel: 'tiktok', assets: { image: null, video: tvid.id }, hasVideo: true });
-    } else {
-      skipped.push({ group, reason: 'folder khong co video cho TikTok' });
-    }
+    const channels = vid ? ['facebook', 'tiktok'] : ['facebook'];
+    const assets = { image: img?.id || null, video: vid?.id || null };
 
-    for (const p of plan) {
-      let gen: any;
-      try {
-        gen = await generateSocialPost({ productGroup: group, productName: name, channel: p.channel, hasVideo: p.hasVideo });
-      } catch (e) {
-        skipped.push({ group, channel: p.channel, reason: 'gen loi: ' + (e as any)?.message });
-        continue;
-      }
-      const risk = gen.assessment?.risk || 'none';
-      const { data: inserted, error: e1 } = await client
-        .from('mkt_content')
-        .insert({
-          kind: 'social',
-          title: name,
-          brief: {
-            keyword: name,
-            intent: 'giao_dich',
-            assets: p.assets,
-            channels: [p.channel],
-            generator: 'rotation',
-            rotation: true,
-            rotation_cycle: cycle,
-            rotation_group: group,
-          },
-          draft: gen.text,
-          status: 'review',
-          needs_gov_review: risk === 'red',
-        })
-        .select('id')
-        .single();
-      if (e1 || !inserted) {
-        skipped.push({ group, channel: p.channel, reason: 'insert content loi: ' + (e1 as any)?.message });
-        continue;
-      }
-      const contentId = (inserted as { id: string }).id;
-      const label = p.channel === 'tiktok' ? '[Bài TikTok]' : '[Bài Facebook]';
-      await client.from('approval_queue').insert({
-        kind: 'mkt_publish_content',
-        title: `${label} ${name}`,
-        payload: {
-          content_id: contentId,
-          format: 'social',
+    let gen: any;
+    try {
+      // Một text dùng cho cả hai kênh (kiểu Facebook, hợp cả TikTok).
+      gen = await generateSocialPost({ productGroup: group, productName: name, channel: 'facebook', hasVideo: !!vid });
+    } catch (e) {
+      skipped.push({ group, reason: 'gen loi: ' + (e as any)?.message });
+      continue;
+    }
+    const risk = gen.assessment?.risk || 'none';
+    const { data: inserted, error: e1 } = await client
+      .from('mkt_content')
+      .insert({
+        kind: 'social',
+        title: name,
+        brief: {
           keyword: name,
           intent: 'giao_dich',
-          risk,
-          assets: p.assets,
-          channels: [p.channel],
+          assets,
+          channels,
+          generator: 'rotation',
+          rotation: true,
+          rotation_cycle: cycle,
+          rotation_group: group,
         },
-        status: 'pending',
-      });
-      results.push({ group, channel: p.channel, contentId, risk });
+        draft: gen.text,
+        status: 'review',
+        needs_gov_review: risk === 'red',
+      })
+      .select('id')
+      .single();
+    if (e1 || !inserted) {
+      skipped.push({ group, reason: 'insert content loi: ' + (e1 as any)?.message });
+      continue;
     }
+    const contentId = (inserted as { id: string }).id;
+    const label = channels.length > 1 ? '[FB + TikTok]' : '[Facebook]';
+    await client.from('approval_queue').insert({
+      kind: 'mkt_publish_content',
+      title: `${label} ${name}`,
+      payload: { content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich', risk, assets, channels },
+      status: 'pending',
+    });
+    results.push({ group, channels, contentId, risk });
   }
 
   return NextResponse.json({ ok: true, cycle, folders: pickedFolders, created: results.length, results, skipped });
