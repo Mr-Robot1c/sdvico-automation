@@ -1,6 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { contentTypeLabel } from '../labels';
 import { refreshFacebookMetrics, setConversions } from '../actions';
+import BarChart from './bar-chart';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +66,11 @@ export default async function Page() {
     }))
     .sort((a, b) => b.avgConv - a.avgConv || b.avgEng - a.avgEng);
 
+  // Dữ liệu cho biểu đồ.
+  const engByType = typeRows.map((t) => ({ label: contentTypeLabel(t.type), value: t.avgEng }));
+  const convByType = typeRows.filter((t) => t.conversions > 0).map((t) => ({ label: contentTypeLabel(t.type), value: t.avgConv }));
+  const topPosts = rows.slice(0, 8).map((r) => ({ label: r.title, value: r.engagement }));
+
   return (
     <main>
       <header className="head-row">
@@ -87,7 +93,17 @@ export default async function Page() {
         </div>
       ) : (
         <>
-          <h2>Theo loại content — xếp theo đơn/lead trung bình mỗi bài</h2>
+          <div className="chart-grid">
+            <BarChart title="Tương tác trung bình mỗi bài theo loại content" items={engByType} tone="accent" />
+            {convByType.length ? (
+              <BarChart title="Đơn/Lead trung bình mỗi bài theo loại content" items={convByType} tone="ok" />
+            ) : null}
+          </div>
+          {topPosts.length ? (
+            <BarChart title="Top bài theo tương tác" items={topPosts} tone="accent" />
+          ) : null}
+
+          <h2 style={{ marginTop: 24 }}>Theo loại content — xếp theo đơn/lead trung bình mỗi bài</h2>
           <div className="tablewrap">
             <table className="datatable">
               <thead>

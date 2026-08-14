@@ -203,7 +203,7 @@ export default function SanXuatForm({
 
         {images.length > 0 ? (
           <div className="sx-thumbs" role="listbox" aria-label="Chọn ảnh từ kho">
-            {images.slice(0, 12).map((a) => (
+            {images.map((a) => (
               <button
                 key={a.id}
                 type="button"
@@ -251,7 +251,7 @@ export default function SanXuatForm({
 
         {videos.length > 0 ? (
           <div className="sx-thumbs" role="listbox" aria-label="Chọn video từ kho">
-            {videos.slice(0, 8).map((a) => (
+            {videos.map((a) => (
               <button
                 key={a.id}
                 type="button"

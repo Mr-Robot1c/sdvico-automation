@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - /san-xuat form.tsx: bo gioi han hien thi anh (12->het) va video (8->het), .sx-thumbs them max-height+scroll. /do-luong: them BarChart (CSS thuan, theme-aware) - tuong tac TB & don/lead TB theo loai content + top bai theo tuong tac; globals.css them .chart-*. tsc sach. -->
 <!-- re-verified: 2026-08-14 - nav.tsx: bo nhom 'Tu lieu'; chuyen Kho tu lieu (/tu-lieu) vao nhom 'Quan li va San xuat'; bo Kho tu khoa (/tu-khoa) + Nguon du kien (/du-kien) khoi menu (trang van con, chi an nav) vi luong social khong dung. -->
 <!-- re-verified: 2026-08-14 - rotate: MOI folder sinh 1 bai dang CA HAI nen tang (channels=[facebook,tiktok] khi co video, else facebook), duyet 1 lan. /tu-lieu doi sang gom theo folder san pham (section moi folder + so anh/video + nhac folder chua co video/trong). globals.css them .folder-section. tsc sach. -->
 <!-- re-verified: 2026-08-14 - rotate FOLDERS_PER_RUN mac dinh 3 (sinh 3 folder/ngay cho 3 khung gio dang 8h/11h30/19h; nguoi bam Duyet moi dang - dieu cam 1). Hobby chi 2 cron/ngay nen giu 1 cron sinh bai buoi sang. -->
