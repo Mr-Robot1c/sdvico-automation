@@ -3,6 +3,7 @@
 // Bật đăng Facebook khi Duyệt: đã cấu hình FACEBOOK_PAGE_ID + FACEBOOK_PAGE_ACCESS_TOKEN (2026-08-12).
 // Cron xoay vòng: CRON_SECRET đã đặt (2026-08-12).
 import { revalidatePath } from 'next/cache';
+import { waitUntil } from '@vercel/functions';
 import { getServerClient } from '../lib/supabase-server';
 import { postVideoToTikTok } from '../lib/tiktok';
 import { isEmergencyStopped, reservePostQuota, setEmergencyStop, isQuotaDisabled, setQuotaDisabled } from '../lib/safety';
@@ -258,6 +259,8 @@ export async function decideForm(formData: FormData) {
   if (error) throw new Error(error.message);
 
   // Chỉ đăng khi vừa chuyển pending -> approved lần đầu, và đúng là bài marketing.
+  // Chạy publish trong after(): response về UI NGAY (người dùng không phải chờ 20-40s cho FB
+  // xử lý video). Việc đăng thật lên FB/TikTok tiếp tục ở nền cùng invocation.
   const justApproved = decision === 'approved' && (updated?.length || 0) > 0;
   if (justApproved && (row as any)?.kind === 'mkt_publish_content') {
     const payload = (row as any)?.payload || {};
@@ -265,26 +268,26 @@ export async function decideForm(formData: FormData) {
     // Kênh đăng lấy từ payload.channels; bài cũ không có thì mặc định Facebook (giữ nguyên hành vi).
     const channels: string[] = Array.isArray(payload.channels) && payload.channels.length ? payload.channels : ['facebook'];
     if (contentId) {
-      const LIMIT = Number(process.env.MKT_MAX_POSTS_PER_DAY) || 3;
-      if (await isEmergencyStopped(client)) {
-        // Công tắc dừng khẩn đang bật: KHÔNG đăng (bài vẫn ở trạng thái đã duyệt). Ghi log.
-        await client.from('run_log').insert({
-          task: 'mkt.publish_blocked',
-          actor: 'decideForm',
-          status: 'skipped',
-          detail: { contentId, reason: 'emergency_stop', channels }
-        });
-      } else {
-        // Đăng SONG SONG các kênh còn trong hạn mức ngày (mỗi kênh tối đa LIMIT bài/ngày).
-        // Nếu bật "bỏ hạn mức" (để test) thì đăng thẳng, không kiểm trần.
-        const quotaOff = await isQuotaDisabled(client);
+      const bgClient = getServerClient();
+      const bgJob = (async () => {
+        const LIMIT = Number(process.env.MKT_MAX_POSTS_PER_DAY) || 3;
+        if (await isEmergencyStopped(bgClient)) {
+          await bgClient.from('run_log').insert({
+            task: 'mkt.publish_blocked',
+            actor: 'decideForm',
+            status: 'skipped',
+            detail: { contentId, reason: 'emergency_stop', channels }
+          });
+          return;
+        }
+        const quotaOff = await isQuotaDisabled(bgClient);
         const jobs: Promise<unknown>[] = [];
         for (const ch of ['facebook', 'tiktok']) {
           if (!channels.includes(ch)) continue;
           if (!quotaOff) {
-            const q = await reservePostQuota(client, ch, LIMIT);
+            const q = await reservePostQuota(bgClient, ch, LIMIT);
             if (!q.allowed) {
-              await client.from('run_log').insert({
+              await bgClient.from('run_log').insert({
                 task: 'mkt.publish_blocked',
                 actor: 'decideForm',
                 status: 'skipped',
@@ -293,11 +296,16 @@ export async function decideForm(formData: FormData) {
               continue;
             }
           }
-          if (ch === 'facebook') jobs.push(publishContentToFacebook(client, contentId));
-          if (ch === 'tiktok') jobs.push(publishContentToTikTok(client, contentId));
+          if (ch === 'facebook') jobs.push(publishContentToFacebook(bgClient, contentId));
+          if (ch === 'tiktok') jobs.push(publishContentToTikTok(bgClient, contentId));
         }
         await Promise.allSettled(jobs);
-      }
+        // Bài vừa đăng thật xong, cập nhật lại trang cho lần render kế tiếp.
+        revalidatePath('/');
+        revalidatePath('/noi-dung');
+      })();
+      // Vercel giữ function chạy tới khi bgJob xong, dù response về UI đã trả.
+      waitUntil(bgJob);
     }
   }
 

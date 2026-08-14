@@ -2,31 +2,33 @@
 // product_group trong brand_assets nhận đúng nhãn 'group' dưới đây.
 // 'match' = từ khóa để tự gán tư liệu cũ theo tên. 'hashtag' = thẻ riêng của sản phẩm.
 
+// hashtags: bộ thẻ RIÊNG đúng sản phẩm (đừng để lẫn thẻ sản phẩm khác). hashtag (số ít) giữ lại
+// cho tương thích code cũ = thẻ đầu tiên.
 export const PRODUCTS = [
   { no: 1, group: '1. PV Engine RMI Nano Graphene',
     match: ['pv engine', 'rmi', 'nano graphene', 'graphene', 'nano dung cho dong co', 'pvoil', 'dau nhot'],
-    hashtag: '#dầu_nhớt_Nano_Graphene' },
+    hashtags: ['#dầu_nhớt_Nano_Graphene', '#PVOil', '#tiết_kiệm_nhiên_liệu', '#bảo_vệ_động_cơ'] },
   { no: 2, group: '2. Máy lọc nước biển SEA-40',
     match: ['loc nuoc', 'sea-40', 'sea40', 'nuoc ngot', 'nuoc bien thanh nuoc ngot', 'mln'],
-    hashtag: '#máy_lọc_nước_biển' },
+    hashtags: ['#máy_lọc_nước_biển', '#nước_ngọt_trên_tàu', '#lọc_nước_RO', '#SEA40'] },
   { no: 3, group: '3. Thiết bị giám sát hành trình Viettel S-Tracking',
     match: ['giam sat hanh trinh', 's-tracking', 's tracking', 'stracking', 'gsht', 'viettel'],
-    hashtag: '#giám_sát_hành_trình' },
+    hashtags: ['#giám_sát_hành_trình', '#thiết_bị_VMS', '#S_Tracking', '#chống_khai_thác_IUU'] },
   { no: 4, group: '4. Thuraya Marine Star MNB-01',
     match: ['thuraya', 'marine star', 'marinestar', 'mnb-01', 'mnb01', 'mnb 01'],
-    hashtag: '#Thuraya_MarineStar' },
+    hashtags: ['#Thuraya_MarineStar', '#điện_thoại_vệ_tinh', '#liên_lạc_trên_biển', '#MNB01'] },
   { no: 5, group: '5. Điện thoại vệ tinh XT-Pro',
     match: ['xt-pro', 'xt pro', 'xtpro', 'dien thoai ve tinh'],
-    hashtag: '#điện_thoại_vệ_tinh' },
+    hashtags: ['#điện_thoại_vệ_tinh', '#liên_lạc_vệ_tinh', '#XT_Pro', '#gọi_về_bờ'] },
   { no: 6, group: '6. Thiết bị lọc dầu SF-50',
     match: ['loc dau', 'sf-50', 'sf50', 'may loc dau', 'xu ly dau', 'tiet kiem dau'],
-    hashtag: '#thiết_bị_lọc_dầu' },
+    hashtags: ['#thiết_bị_lọc_dầu', '#tiết_kiệm_dầu', '#lọc_dầu_diesel', '#SF50'] },
   { no: 7, group: '7. Ắc quy Accu Nano SDViCo',
     match: ['ac quy', 'accu', 'acquy', 'ac-quy'],
-    hashtag: '#ắc_quy_Nano' },
+    hashtags: ['#ắc_quy_Nano', '#ắc_quy_tàu_cá', '#Accu_Nano', '#ắc_quy_bền_bỉ'] },
   { no: 8, group: '8. Sơn RARE',
     match: ['son rare', 'son-rare', 'rare'],
-    hashtag: '#sơn_RARE' },
+    hashtags: ['#sơn_RARE', '#sơn_chống_nóng', '#chống_nóng_tàu', '#làm_mát_tàu'] },
 ];
 
 // Tính năng - thông số THẬT của từng sản phẩm (nguồn: file "tính năng N.txt" trong kho tư liệu).
@@ -96,10 +98,11 @@ export const CONTENT_TOPICS = [
   'câu chuyện gắn bó của SDVICO với bà con ngành biển',
 ];
 
-// Hashtag mặc định gắn mọi bài (theo yêu cầu). Có thể ghi đè bằng app_config key 'mkt_hashtags'.
+// Hashtag mặc định gắn MỌI bài (4 thẻ chung, do Phòng chốt). KHÔNG để thẻ theo loại thiết bị
+// cụ thể (liên lạc, tàu cá...) ở đây kẻo bài sơn/dầu dính oan. Thẻ riêng đúng loại nằm ở
+// từng sản phẩm bên trên (productHashtags), mỗi bài được cộng thêm nhiều thẻ đúng sản phẩm.
 export const DEFAULT_HASHTAGS = [
-  '#SDVico', '#thiết_bị_tàu_cá', '#thiết_bị_liên_lạc',
-  '#Đồng_hành_cùng_ngư_dân', '#thiết_bị_tàu_biển', '#hỗ_trợ_ngư_dân',
+  '#SDVICO', '#Đồng_hành_cùng_ngư_dân', '#Thiết_bị_tàu_biển', '#hỗ_trợ_ngư_dân',
 ];
 
 // Bỏ dấu tiếng Việt để so khớp không phân biệt dấu.
@@ -124,8 +127,14 @@ export function findProduct(group) {
   return PRODUCTS.find((p) => p.group === group) || null;
 }
 
-// Thẻ hashtag suy từ tên sản phẩm nếu chưa có thẻ riêng.
-export function productHashtag(group) {
+// Bộ hashtag RIÊNG của sản phẩm (đúng loại, không lẫn sản phẩm khác).
+export function productHashtags(group) {
   const p = findProduct(group);
-  return p?.hashtag || null;
+  return (p && p.hashtags) ? p.hashtags : [];
+}
+
+// Tương thích code cũ: trả về thẻ riêng đầu tiên.
+export function productHashtag(group) {
+  const tags = productHashtags(group);
+  return tags[0] || null;
 }
