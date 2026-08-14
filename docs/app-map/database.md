@@ -6,6 +6,8 @@ last_verified: 2026-08-14
 ttl_days: 180
 <!-- re-verified: 2026-08-13 - Lap doc luoc do lan dau: liet ke 14 bang tu supabase/migrations. Them mkt_oauth_tokens (token OAuth TikTok, RLS khong policy = chi service_role doc/ghi). -->
 <!-- re-verified: 2026-08-14 - Migration 20260813150000 noi CHECK: mkt_posts.channel them 'tiktok', mkt_metrics.source them 'manual'. Cap nhat 2 hang bang tuong ung. -->
+<!-- re-verified: 2026-08-14 - Migration 20260814100000: them cot brand_assets.product_group (folder san pham theo STT) + index. Phuc vu vong xoay dang bai hang ngay theo folder. -->
+<!-- LUU Y: DATABASE_URL trong .env tro NHAM project cu (schema khac). Migration phai ap len project live jwisiccphcepgpabyyco qua SQL Editor hoac sau khi sua DATABASE_URL. db-apply.mjs da co chot chan ap nham DB. -->
 
 Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp dụng: `supabase/README.md`.
 
@@ -15,7 +17,7 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 |---|---|---|---|
 | approval_queue | Chung | Hàng đợi duyệt, cổng điều cấm 1 (pending → approved mới đăng) | Bật, staff |
 | run_log | Chung | Nhật ký thao tác tự động, kèm ảnh chụp khi lỗi | Bật, staff |
-| brand_assets | Marketing | Kho tư liệu ảnh/clip thật (owned/licensed) | Bật, staff |
+| brand_assets | Marketing | Kho tư liệu ảnh/clip thật (owned/licensed), cột `product_group` = folder sản phẩm (STT) cho vòng xoay | Bật, staff |
 | mkt_keywords | Marketing | Kho từ khóa, phân loại theo ý định | Bật, staff |
 | mkt_content | Marketing | Nội dung + trạng thái, cờ needs_gov_review, brief.assets | Bật, staff |
 | mkt_posts | Marketing | Bài đã đăng + kênh (facebook/website/youtube/tiktok), external_url | Bật, staff |

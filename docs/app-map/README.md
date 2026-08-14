@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Migration 20260814100000 them brand_assets.product_group; rotate route (apps/approval-ui/app/api/rotate) doi sang xoay theo folder san pham (FB anh/+video, TikTok video, khong lap folder trong vong), dung lib/gen/social.mjs (emoji+hashtag) + products.mjs. LUU Y: DATABASE_URL trong .env tro nham project cu, migration phai ap len live jwisiccphcepgpabyyco. Luong approval_queue KHONG doi (van pending -> nguoi duyet, dieu cam 1). -->
 <!-- re-verified: 2026-08-14 - Them migration 20260813150000 (supabase/migrations): noi CHECK mkt_posts.channel (+tiktok) va mkt_metrics.source (+manual). Va loi ngam: insert channel='tiktok' o actions.ts truoc bi CHECK cu chan am tham. Luong approval_queue va cau truc bang KHONG doi (chi noi danh sach gia tri cho phep). Chi tiet: docs/app-map/database.md. -->
 <!-- re-verified: 2026-08-12 - approval-ui UI redesign (sidebar chia 5 nhom, eye modal, /san-xuat moi). Luong approval_queue va cac bang du lieu KHONG doi. Nut Xong o /san-xuat van di qua approval_queue kind=mkt_publish_content dung dieu cam 1. -->
 <!-- re-verified: 2026-08-12 - Hang doi duyet gio resolve payload.assets (id) ra public URL, hien anh/video tren card va modal. /san-xuat upload doi tu server action sang browser PUT thang len Storage qua signed URL (vuot gioi han 4,5MB Vercel). Them action createAssetUploadUrl + registerAsset. Luong approval_queue, kind=mkt_publish_content, va cac bang du lieu KHONG doi. -->

@@ -10,6 +10,7 @@
     "@google/genai": "^1.52.0",
     "@sdvico/core": "*",
     "chrome-launcher": "^1.2.1",
-    "lighthouse": "^13.4.1"
+    "lighthouse": "^13.4.1",
+    "pg": "^8.23.0"
   }
 }
