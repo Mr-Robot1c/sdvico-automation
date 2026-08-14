@@ -1,20 +1,12 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateTextForTitle, createContent } from '../actions';
 import AssetUploader from './asset-uploader';
 import ImageStudio from './image-studio';
 
 type Asset = { id: string; kind: string; title: string; storage_path: string; url: string };
-type Keyword = { id: string; keyword: string; intent: string | null; landing_url: string | null };
-
-const INTENT_LABEL: Record<string, string> = {
-  thong_tin: 'Thông tin',
-  thuong_mai: 'So sánh',
-  giao_dich: 'Giao dịch',
-  dieu_huong: 'Điều hướng'
-};
 
 // Làm sạch tên tệp thành cụm từ khóa: bỏ timestamp đầu, bỏ đuôi file, đổi gạch/underscore thành khoảng trắng.
 function cleanAssetName(s: string): string {
@@ -34,14 +26,11 @@ function combineNames(...titles: (string | undefined)[]): string {
 
 export default function SanXuatForm({
   images,
-  videos,
-  keywords
+  videos
 }: {
   images: Asset[];
   videos: Asset[];
-  keywords: Keyword[];
 }) {
-  const [keywordId, setKeywordId] = useState<string>('');
   const [title, setTitle] = useState('');
   // Tiêu đề đang tự động theo tên ảnh/video (true) hay do người tự gõ/chọn từ khóa (false).
   const [titleAuto, setTitleAuto] = useState(true);
@@ -61,20 +50,6 @@ export default function SanXuatForm({
 
   const selectedImg = images.find((a) => a.id === imgId);
   const selectedVid = videos.find((a) => a.id === vidId);
-  const selectedKw = useMemo(() => keywords.find((k) => k.id === keywordId), [keywords, keywordId]);
-
-  const onSelectKeyword = (id: string) => {
-    setKeywordId(id);
-    const kw = keywords.find((k) => k.id === id);
-    if (kw) {
-      // Chọn từ khóa thì tiêu đề theo từ khóa, không tự đổi theo ảnh nữa.
-      setTitle(kw.keyword);
-      setTitleAuto(false);
-    } else {
-      // Bỏ từ khóa thì cho tên ảnh điều khiển lại tiêu đề.
-      setTitleAuto(true);
-    }
-  };
 
   const runGenerate = async (
     kw: string,
@@ -101,14 +76,14 @@ export default function SanXuatForm({
   };
 
   const onGenerate = () => {
-    // Ưu tiên từ khóa/tiêu đề; nếu chưa có thì gộp tên ảnh + video làm nguồn để AI viết theo hình.
+    // Tiêu đề do người gõ; nếu chưa có thì gộp tên ảnh + video làm nguồn để AI viết theo hình.
     const nameKw = combineNames(selectedImg?.title, selectedVid?.title);
-    const kw = selectedKw?.keyword || title.trim() || nameKw;
-    if (kw && !title.trim() && !selectedKw) setTitle(kw);
+    const kw = title.trim() || nameKw;
+    if (kw && !title.trim()) setTitle(kw);
     // Gợi ý cho AI kèm cả tên ảnh và tên video (nếu có cả hai).
     const assetHint = [selectedImg?.title, selectedVid?.title].filter(Boolean).join(' / ');
     // kind là kênh đăng (social/article/video) — quyết định định dạng nội dung.
-    return runGenerate(kw, selectedKw?.intent || 'giao_dich', selectedKw?.landing_url || null, assetHint, kind);
+    return runGenerate(kw, 'giao_dich', null, assetHint, kind);
   };
 
   const onSubmit = (formData: FormData) => {
@@ -123,16 +98,11 @@ export default function SanXuatForm({
     formData.set('content_type', contentType);
     if (imgId) formData.set('image_asset_id', imgId);
     if (vidId) formData.set('video_asset_id', vidId);
-    if (keywordId) formData.set('keyword_id', keywordId);
-    if (selectedKw?.keyword) formData.set('keyword', selectedKw.keyword);
-    if (selectedKw?.intent) formData.set('intent', selectedKw.intent);
-    if (selectedKw?.landing_url) formData.set('landing_url', selectedKw.landing_url);
     startTransition(async () => {
       setMsg('Đang tạo khung sườn và đẩy vào hàng đợi duyệt...');
       try {
         await createContent(formData);
         setMsg('Xong. Nội dung đã ở Hàng đợi duyệt, chờ người bấm Duyệt để đăng.');
-        setKeywordId('');
         setTitle('');
         setTitleAuto(true);
         setDraft('');
@@ -151,7 +121,7 @@ export default function SanXuatForm({
   const onSelectImage = (a: Asset) => {
     const newId = a.id === imgId ? '' : a.id;
     setImgId(newId);
-    if (!selectedKw && (titleAuto || !title.trim())) {
+    if (titleAuto || !title.trim()) {
       const t = combineNames(newId ? a.title : '', selectedVid?.title);
       if (t) {
         setTitle(t);
@@ -164,7 +134,7 @@ export default function SanXuatForm({
   const onSelectVideo = (a: Asset) => {
     const newId = a.id === vidId ? '' : a.id;
     setVidId(newId);
-    if (!selectedKw && (titleAuto || !title.trim())) {
+    if (titleAuto || !title.trim()) {
       const t = combineNames(selectedImg?.title, newId ? a.title : '');
       if (t) {
         setTitle(t);
@@ -274,21 +244,21 @@ export default function SanXuatForm({
 
       <ImageStudio
         productId={imgId}
-        productTitle={title || selectedKw?.keyword || ''}
+        productTitle={title || ''}
         onAttach={(id, meta) => {
           const productName = selectedImg?.title || '';
           setImgId(id);
           router.refresh();
           if (meta?.banner) {
-            // Ghép xong thì tự sinh text luôn: ưu tiên từ khóa/tiêu đề, không thì lấy tên ảnh mô tả.
-            const kwText = (selectedKw?.keyword || title.trim() || cleanAssetName(productName)).trim();
+            // Ghép xong thì tự sinh text luôn: ưu tiên tiêu đề, không thì lấy tên ảnh mô tả.
+            const kwText = (title.trim() || cleanAssetName(productName)).trim();
             if (kwText && !genBusy) {
-              if (!title.trim() && !selectedKw) setTitle(cleanAssetName(productName));
+              if (!title.trim()) setTitle(cleanAssetName(productName));
               setMsg('Đã ghép xong. Đang tự sinh text theo hình...');
               runGenerate(
                 kwText,
-                selectedKw?.intent || 'giao_dich',
-                selectedKw?.landing_url || null,
+                'giao_dich',
+                null,
                 productName,
                 kind
               );
@@ -307,31 +277,6 @@ export default function SanXuatForm({
         </header>
 
         <form action={onSubmit} className="sx-form">
-          <label className="sx-field">
-            <span>Từ khóa trong kho</span>
-            <select
-              className="note"
-              value={keywordId}
-              onChange={(e) => onSelectKeyword(e.target.value)}
-              aria-label="Chọn từ khóa từ kho"
-            >
-              <option value="">— Chưa chọn từ khóa (có thể gõ tay tiêu đề bên dưới) —</option>
-              {keywords.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.keyword}
-                  {k.intent ? ` · ${INTENT_LABEL[k.intent] || k.intent}` : ''}
-                </option>
-              ))}
-            </select>
-            {selectedKw?.landing_url ? (
-              <span className="muted">Trang đích: {selectedKw.landing_url}</span>
-            ) : (
-              <span className="muted">
-                Thêm từ khóa mới ở <a className="src" href="/tu-khoa">Kho từ khóa</a>.
-              </span>
-            )}
-          </label>
-
           <label className="sx-field">
             <span>Tiêu đề</span>
             <input
@@ -368,7 +313,7 @@ export default function SanXuatForm({
               type="button"
               className="btn ghost"
               onClick={onGenerate}
-              disabled={genBusy || (!selectedKw && !title.trim() && !selectedImg && !selectedVid)}
+              disabled={genBusy || (!title.trim() && !selectedImg && !selectedVid)}
             >
               {genBusy ? 'Đang sinh...' : '✨ Sinh text bằng AI'}
             </button>

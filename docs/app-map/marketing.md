@@ -5,6 +5,7 @@ covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
 <!-- DOC-STATUS: SUSPECT (2026-08-14) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-14 - content.mjs: them genOnce boc ai.models.generateContent bang AbortSignal timeout (MKT_GEN_TIMEOUT_MS mac dinh 20s), qua han huy request va lui ve ban mau (khong de SDK tu retry timeout gay treo lau). generateFormatsLLM + generateDraftLLM deu dung genOnce. -->
 <!-- re-verified: 2026-08-14 - Bai content: products.mjs them CONTENT_TOPICS (6 chu de doi song/tin/san pham/quy dinh...). social.mjs them generateContentPost (JSON {headline, body}, temperature 1.1, CAM bia tin tuc/so lieu cu the). rotate + rotate-run tao them 1 bai/luot -> tong 2 ban + 1 content. Da kiem: 2 lan ra 2 bai khac. -->
 <!-- re-verified: 2026-08-14 - social.mjs: them 8 ANGLES (xoay ngau nhien) + temperature 1.05 + xuat JSON {headline, body} de moi bai khac nhau va co tieu de rieng. rotate + rotate-run dung gen.headline lam title (brief.keyword van = ten SP de gom). Da kiem chung 2 lan cung SP ra 2 tieu de + noi dung khac. -->
 <!-- re-verified: 2026-08-14 - rotate-run.mjs + rotate route: payload them authored:'ai' (phan biet voi bai nguoi tu soan authored:'human'). -->

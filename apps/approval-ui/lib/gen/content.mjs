@@ -295,7 +295,7 @@ export async function generateFormatsLLM(brief, facts = []) {
     `Các phần gợi ý cho bài dài: ${(brief.sections || []).join('; ')}.`,
   ].join('\n');
 
-  const res = await ai.models.generateContent({
+  const res = await genOnce(ai, {
     model: MKT_MODEL,
     contents: user,
     config: {
@@ -336,6 +336,20 @@ export async function generateAllFormats(kw, { facts = [] } = {}) {
 // Model marketing mặc định, đổi bằng biến MKT_MODEL. Dùng chung nhà Gemini với phần chấm CV.
 // Mặc định dùng flash-lite: quota free cao hơn nhiều so với gemini-flash-latest (chỉ 20 lượt/ngày).
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
+
+// Gọi Gemini có TIMEOUT cứng (hủy phía client bằng AbortSignal). SDK @google/genai mặc định TỰ
+// RETRY khi request quá hạn nên lần gọi chậm (vd dính quota) dễ treo rất lâu; ở đây quá hạn là
+// hủy và ném lỗi để chỗ gọi lùi về bản mẫu ngay. Chỉnh thời gian bằng MKT_GEN_TIMEOUT_MS.
+const GEN_TIMEOUT_MS = Number(process.env.MKT_GEN_TIMEOUT_MS) || 20000;
+async function genOnce(ai, params) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), GEN_TIMEOUT_MS);
+  try {
+    return await ai.models.generateContent({ ...params, config: { ...(params.config || {}), abortSignal: ac.signal } });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // Sinh draft bằng Gemini. CHỈ gọi khi có GEMINI_API_KEY. Import động để khi không có khóa,
 // gói @google/genai không cần cài và bản mẫu vẫn chạy. Trả về văn bản, hoặc ném lỗi để chỗ
@@ -388,7 +402,7 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '', format
     'Viết tiếng Việt, sẵn sàng cho người duyệt.',
   ].filter(Boolean).join('\n');
 
-  const res = await ai.models.generateContent({
+  const res = await genOnce(ai, {
     model: MKT_MODEL,
     contents: user,
     config: { systemInstruction: system },
