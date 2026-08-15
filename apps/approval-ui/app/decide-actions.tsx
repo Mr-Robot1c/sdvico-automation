@@ -8,6 +8,8 @@ type Props = {
   title: string;
   kind: string;
   postId?: string | null;
+  platform?: string | null;
+  linkedinReady?: boolean;
   oldPostId?: string | null;
   oldFbPostId?: string | null;
   oldPostTitle?: string | null;
@@ -47,7 +49,7 @@ const PEAK_SLOTS = [
 
 // Bộ nút quyết. Với tin tuyển dụng Facebook (hr_job_post) có thêm tuỳ chọn đặt lịch giờ vàng
 // và gỡ bài cũ khi có bài cần refresh. Điều cấm 1: người bấm là cổng kiểm soát.
-export default function DecideActions({ id, title, kind, postId, oldPostId, oldFbPostId, oldPostTitle, oldPostedAt }: Props) {
+export default function DecideActions({ id, title, kind, postId, platform, linkedinReady, oldPostId, oldFbPostId, oldPostTitle, oldPostedAt }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [customAt, setCustomAt] = useState('');
@@ -55,10 +57,16 @@ export default function DecideActions({ id, title, kind, postId, oldPostId, oldF
 
   const hasOldPost = Boolean(oldPostId && oldFbPostId);
   const isJobPost = kind === 'hr_job_post' && postId;
+  const isLinkedIn = platform === 'linkedin';
 
   if (isJobPost) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+        {isLinkedIn && !linkedinReady ? (
+          <div className="err" role="alert" style={{ fontSize: '0.85em' }}>
+            Chưa nối API LinkedIn (hoặc token hết hạn) — không thể tự đăng lên LinkedIn. Hãy Duyệt rồi dùng nút &quot;Copy nội dung&quot; để đăng tay lên Company Page.
+          </div>
+        ) : null}
 
         {/* Thông tin bài cũ cần gỡ — hiện chỉ khi đây là bài refresh */}
         {hasOldPost ? (
@@ -90,7 +98,7 @@ export default function DecideActions({ id, title, kind, postId, oldPostId, oldF
               </>
             ) : null}
             <button className="btn ok" disabled={busy !== null}>
-              {busy === 'publish' ? 'Đang đăng...' : 'Duyệt và đăng ngay'}
+              {busy === 'publish' ? 'Đang đăng...' : isLinkedIn ? 'Duyệt & đăng LinkedIn' : 'Duyệt và đăng ngay'}
             </button>
           </form>
 

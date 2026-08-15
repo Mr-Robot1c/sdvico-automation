@@ -1304,10 +1304,34 @@ export async function approveAndPublish(formData: FormData) {
 
   // Đọc bài đăng.
   const { data: post, error: e1 } = await client.from('hr_job_posts')
-    .select('id, tieu_de, noi_dung, trang_thai, image_url')
+    .select('id, tieu_de, noi_dung, trang_thai, image_url, kenh')
     .eq('id', postId).single();
   if (e1 || !post || post.trang_thai === 'posted') {
     revalidatePath('/'); revalidatePath('/dang-tin'); return;
+  }
+
+  // Bài LinkedIn: đăng qua LinkedIn API; chưa nối/hết hạn thì báo rõ, KHÔNG đăng lên Facebook.
+  if (post.kenh === 'linkedin') {
+    if (!linkedinConfigured()) {
+      await client.from('hr_job_posts')
+        .update({ trang_thai: 'failed', ghi_chu: 'Thiếu API LinkedIn (chưa nối hoặc hết hạn) — không thể đăng lên LinkedIn. Dùng nút "Copy nội dung" để đăng tay lên Company Page.' })
+        .eq('id', postId);
+      await client.from('run_log').insert({ task: 'hr.approve_and_publish', status: 'error', detail: { postId, error: 'linkedin_not_configured' } });
+    } else {
+      try {
+        const urn = await postToLinkedIn(post.noi_dung);
+        await client.from('hr_job_posts')
+          .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), fb_post_id: urn, ghi_chu: null })
+          .eq('id', postId);
+        await client.from('run_log').insert({ task: 'hr.approve_and_publish', status: 'ok', detail: { postId, urn, kenh: 'linkedin' } });
+      } catch (err: unknown) {
+        const errStr = err instanceof Error ? err.message : String(err);
+        await client.from('hr_job_posts').update({ trang_thai: 'failed', ghi_chu: errStr }).eq('id', postId);
+        await client.from('run_log').insert({ task: 'hr.approve_and_publish', status: 'error', detail: { postId, error: errStr, kenh: 'linkedin' } });
+      }
+    }
+    revalidatePath('/'); revalidatePath('/dang-tin');
+    return;
   }
 
   // Đăng lên Facebook và cập nhật trạng thái.

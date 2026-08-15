@@ -4,6 +4,7 @@ import DecideActions from './decide-actions';
 import { SubmitButton } from './submit-button';
 import { editJobPostDraft } from './actions';
 import { kindMeta, formatRelative, payloadRows } from './labels';
+import { linkedinConfigured } from '../lib/linkedin';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 export const dynamic = 'force-dynamic';
@@ -55,6 +56,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
     platformCounts.set(k, (platformCounts.get(k) || 0) + 1);
   }
 
+  const linkedinReady = linkedinConfigured();
   const selected = searchParams?.kind || null;
   const selectedPlatform = searchParams?.platform || null;
   let items = selected ? all.filter((it) => it.kind === selected) : all;
@@ -221,6 +223,8 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                 title={item.title}
                 kind={item.kind}
                 postId={postId}
+                platform={item.kind === 'hr_job_post' ? ((payload?.kenh as string) || 'facebook') : null}
+                linkedinReady={linkedinReady}
                 oldPostId={(payload?.old_post_id as string) || null}
                 oldFbPostId={(payload?.old_fb_post_id as string) || null}
                 oldPostTitle={(payload?.old_post_title as string) || null}
