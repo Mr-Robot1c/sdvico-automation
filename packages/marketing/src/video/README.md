@@ -19,10 +19,14 @@ xuất bản dọc 9:16 và ngang 16:9. Chạy trên máy nội bộ (ffmpeg + W
 
 ## Chạy
 ```
-node packages/marketing/src/video/build-video.mjs [contentId] [--voice vi-VN-NamMinhNeural] [--whisper-model small] [--out DIR]
+node packages/marketing/src/video/build-video.mjs [contentId] [--voice vi-VN-NamMinhNeural] [--whisper-model small] [--out DIR] [--no-queue]
 ```
 Không truyền `contentId` thì lấy bài `mkt_content` mới nhất có `draft`.
 Đầu ra ở `out/video/`: `*_vertical.mp4`, `*_horizontal.mp4`, `*_thumb{1..3}.jpg`, `*_summary.json`.
+
+Mặc định còn ĐẨY bản dọc vào Hàng đợi duyệt (upload Storage + `brand_assets` + `mkt_content` + `approval_queue` pending, kênh Facebook). Người bấm Duyệt mới đăng (điều cấm 1). Thêm `--no-queue` nếu chỉ muốn tạo file, không đẩy.
+
+Số tổng đài/điện thoại được đọc TỪNG chữ số trong lời thoại (1900 23 23 49 = "một chín không không, hai ba, hai ba, bốn chín"), phụ đề vẫn hiện số gốc. Một cảnh TTS lỗi sẽ dùng tiếng lặng dự phòng, không kéo sập cả dây chuyền.
 
 ## Thành phần
 | File | Việc |
@@ -38,6 +42,10 @@ Không truyền `contentId` thì lấy bài `mkt_content` mới nhất có `draf
 | terms.mjs | Từ điển thuật ngữ ngành cho Whisper |
 | env.mjs | Nạp .env thật (bỏ qua .env.local giả) |
 
-## Còn lại (chưa làm trong bản này)
-- Đẩy đầu ra lên Storage + `brand_assets` + tạo mục `approval_queue` để người duyệt rồi đăng
-  Facebook (chưa công khai) và TikTok private (tái dùng luồng đã có).
+## Đã nối Hàng đợi duyệt
+- Bản dọc tự đẩy lên Storage + `brand_assets` (kind=video) + `mkt_content` (status review) +
+  `approval_queue` (pending, kênh Facebook). Người bấm Duyệt thì tái dùng luồng đăng FB sẵn có.
+
+## Còn lại (tùy chọn)
+- Thêm kênh TikTok cho video pipeline (video dọc rất hợp TikTok, nhưng TikTok đang private vì chưa audit).
+- Đẩy bản ngang lên YouTube khi có luồng YouTube.

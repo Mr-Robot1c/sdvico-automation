@@ -52,8 +52,25 @@ async function silentAudio(outPath, sec) {
   return probeDuration(outPath);
 }
 
+// Bảng chữ số tiếng Việt để đọc số điện thoại/tổng đài TỪNG chữ số.
+const DIGIT_VN = { '0': 'không', '1': 'một', '2': 'hai', '3': 'ba', '4': 'bốn', '5': 'năm', '6': 'sáu', '7': 'bảy', '8': 'tám', '9': 'chín' };
+function digitsToWords(s) {
+  return String(s).split('').map((d) => DIGIT_VN[d]).filter(Boolean).join(' ');
+}
+// Đọc số tổng đài/điện thoại TỪNG chữ số cho GIỌNG ĐỌC (1900 23 23 49 -> "một chín không không, hai
+// ba, hai ba, bốn chín") thay vì đọc như số lượng (một nghìn chín trăm). GIỮ NGUYÊN số lượng
+// (80 lít, 15 mét, 3.000.000 đồng). Chỉ đổi cho audio; phụ đề vẫn hiện số gốc.
+function spellPhones(text) {
+  return String(text || '')
+    // Tổng đài 1900/1800 + 6 chữ số (có hoặc không có cách giữa các cụm).
+    .replace(/\b1(?:900|800)(?:[\s.]*\d){6}\b/g, (m) => m.split(/[\s.]+/).filter(Boolean).map(digitsToWords).join(', '))
+    // Di động 10 chữ số bắt đầu bằng 0 (vd 0987 654 321).
+    .replace(/\b0\d(?:[\s.]*\d){8}\b/g, (m) => m.split(/[\s.]+/).filter(Boolean).map(digitsToWords).join(', '));
+}
+
 async function tts(text, outPath, voice, workDir, tag) {
-  const clean = cleanNarration(text);
+  // Đọc số điện thoại/tổng đài từng chữ số (chỉ cho giọng đọc, phụ đề giữ số gốc).
+  const clean = spellPhones(cleanNarration(text));
   // Thời lượng dự phòng theo số ký tự (~14 ký tự/giây tiếng Việt), tối thiểu 2 giây.
   const estSec = Math.max(2, Math.round(clean.length / 14));
   if (!clean) return silentAudio(outPath, estSec);
@@ -109,6 +126,45 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
   await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out });
   const totalDur = await probeDuration(out);
   return { out, totalDur, scenes: built.length, whisper: wa?.info || null };
+}
+
+// Đẩy video (bản DỌC) vào Hàng đợi duyệt: upload Storage -> brand_assets -> mkt_content +
+// approval_queue (status pending). KHÔNG tự đăng — người bấm Duyệt mới đăng (điều cấm 1).
+// Bản ngang giữ ở out/video/ để dùng riêng (YouTube/website). Đăng FB; muốn TikTok thì thêm 'tiktok'.
+async function pushToApprovalQueue(client, { content, script, verticalPath }) {
+  const title = (script.titles && script.titles[0]) || content.title || 'Video SDVICO';
+  // 1. Upload video lên Storage.
+  const buf = await readFile(verticalPath);
+  const storagePath = `video/sdvico_${content.id.slice(0, 8)}_${Date.now()}.mp4`;
+  const up = await client.storage.from('brand-assets').upload(storagePath, buf, { contentType: 'video/mp4', upsert: false });
+  if (up.error) throw new Error('upload Storage: ' + up.error.message);
+  // 2. brand_assets (kind=video).
+  const { data: asset, error: ae } = await client.from('brand_assets')
+    .insert({ kind: 'video', title, storage_path: storagePath, source: 'video-pipeline' }).select('id').single();
+  if (ae || !asset) throw new Error('brand_assets: ' + (ae?.message || ''));
+  // 3. Caption ngắn + hashtag đúng sản phẩm (số tổng đài để dạng đọc được cho người xem).
+  const { guessGroup, productHashtags, DEFAULT_HASHTAGS } = await import('../products.mjs');
+  const grp = guessGroup(`${content.title || ''} ${title}`);
+  const tags = [...DEFAULT_HASHTAGS, ...(grp ? productHashtags(grp) : [])].join(' ');
+  const caption = `${title}\n\nGọi tổng đài 1900 23 23 49 để được tư vấn tận nơi.\n\n${tags}`;
+  const risk = script.assessment?.risk === 'red' ? 'red' : script.assessment?.risk === 'amber' ? 'amber' : 'none';
+  const assets = { image: null, video: asset.id };
+  // 4. mkt_content (status review; red thì cần cấp quản lý duyệt).
+  const { data: ins, error: ce } = await client.from('mkt_content').insert({
+    kind: 'social', title,
+    brief: { keyword: title, intent: 'giao_dich', assets, channels: ['facebook'], generator: 'video-pipeline', post_kind: 'video', source_content: content.id, risk, compliance: script.assessment?.flags || {} },
+    draft: caption, status: 'review', needs_gov_review: risk === 'red',
+  }).select('id').single();
+  if (ce || !ins) throw new Error('mkt_content: ' + (ce?.message || ''));
+  // 5. approval_queue (pending) -> hiện ở trang Duyệt.
+  const { error: qe } = await client.from('approval_queue').insert({
+    kind: 'mkt_publish_content', title: `[Facebook] 🎬 ${title}`,
+    payload: { content_id: ins.id, format: 'social', keyword: title, intent: 'giao_dich', risk, assets, channels: ['facebook'], authored: 'ai', post_kind: 'video', needs_manager_approval: risk === 'red' },
+    status: 'pending',
+  });
+  if (qe) throw new Error('approval_queue: ' + qe.message);
+  console.log(`\nĐã đẩy vào Hàng đợi duyệt: [Facebook] 🎬 ${title}`);
+  console.log(`  mkt_content=${ins.id.slice(0, 8)} | brand_assets(video)=${asset.id.slice(0, 8)} | risk=${risk}`);
 }
 
 async function main() {
@@ -186,6 +242,15 @@ async function main() {
   await writeFile(join(outDir, `sdvico_${contentId.slice(0, 8)}_summary.json`), JSON.stringify(summary, null, 2), 'utf8');
   console.log('\nXONG. Tóm tắt:', join(outDir, `sdvico_${contentId.slice(0, 8)}_summary.json`));
   console.log(JSON.stringify({ vertical: results.vertical.out, horizontal: results.horizontal.out, thumbs }, null, 2));
+
+  // Đẩy vào Hàng đợi duyệt (mặc định bật; thêm --no-queue để chỉ tạo file, không đẩy).
+  if (!process.argv.includes('--no-queue')) {
+    try {
+      await pushToApprovalQueue(client, { content, script, verticalPath: results.vertical.out });
+    } catch (e) {
+      console.warn('Không đẩy được vào Hàng đợi duyệt:', e.message, '(video vẫn có ở out/video/).');
+    }
+  }
 }
 
 main().catch((e) => { console.error('LỖI:', e.message); process.exit(1); });
