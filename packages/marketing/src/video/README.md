@@ -41,7 +41,12 @@ Dựng video cho các bài `mkt_content` có `draft` mà chưa có video (bỏ q
 ```
 node packages/marketing/src/video/build-video-all.mjs --requested --watch
 ```
-Cứ để cửa sổ này chạy; ai bấm "🎬 Làm video" trên web thì trong ~1 phút máy tự dựng (FB 16:9 + TikTok dọc) rồi đẩy vào Hàng đợi duyệt. Muốn hoàn toàn tự động thì đặt Windows Task Scheduler chạy dòng trên lúc khởi động máy.
+Cứ để cửa sổ này chạy; ai bấm "🎬 Làm video" trên web thì trong ~1 phút máy tự dựng (FB 16:9 + TikTok dọc) rồi đẩy vào Hàng đợi duyệt. **Vẫn phải người bấm Duyệt mới đăng lên trang (điều cấm 1).**
+
+Cho tiện, có sẵn file Windows trong `scripts/`:
+- `video-watch.bat` — bấm đúp để chạy watcher (tự khởi động lại nếu lỗi).
+- `cai-tu-dong-video.bat` — bấm đúp MỘT LẦN để watcher tự chạy mỗi khi đăng nhập Windows (Task Scheduler).
+- `go-tu-dong-video.bat` — gỡ tự chạy.
 
 ## Thành phần
 | File | Việc |

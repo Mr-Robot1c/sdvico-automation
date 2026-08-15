@@ -4,6 +4,8 @@
 covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Them file Windows scripts/video-watch.bat (chay watcher --requested --watch, tu restart neu loi) + cai-tu-dong-video.bat (schtasks onlogon "SDVICO Video Watcher") + go-tu-dong-video.bat. De "bam nut Lam video tren web -> may noi bo tu dung" chay khong can mo tay. Node o C:\Program Files\nodejs\node.exe. video/README.md co huong dan. -->
+
 <!-- re-verified: 2026-08-14 - build-video-all.mjs them --requested (chi dung bai co brief.video_requested = bai bam nut "Lam video" tren web /noi-dung; dung xong tu xoa co) + --watch [--interval 60] (quet lien tuc). "--requested --watch" chay tren may noi bo = bam nut tren web -> ~1 phut may tu dung (FB 16:9 + TikTok doc) -> Hang doi duyet. --limit N de chay theo me (161 bai ~13h neu lam het). -->
 
 <!-- re-verified: 2026-08-14 - Video pipeline dinh dang theo kenh + batch: pushToApprovalQueue nay upload CA HAI ban (ngang 16:9 + doc 9:16) -> brand_assets, gan brief.assets.video_h (FB) + video_v (TikTok) + video (fallback), channels ['facebook','tiktok']. Them build-video-all.mjs: batch dung video cho MOI bai mkt_content co draft chua co video (spawn build-video.mjs tung bai, isolate loi, bo qua bai da co video-pipeline output theo source_content) -> chay lai chi xu ly bai moi, hop hen gio dinh ky = "tu dong cho tat ca". Chi tiet video/README.md. -->
