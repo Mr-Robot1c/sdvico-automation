@@ -28,11 +28,20 @@ Mặc định còn ĐẨY vào Hàng đợi duyệt: upload CẢ HAI bản (ngan
 
 Số tổng đài/điện thoại được đọc TỪNG chữ số trong lời thoại (1900 23 23 49 = "một chín không không, hai ba, hai ba, bốn chín"), phụ đề vẫn hiện số gốc. Một cảnh TTS lỗi sẽ dùng tiếng lặng dự phòng, không kéo sập cả dây chuyền.
 
-### Chạy hàng loạt (tự động cho tất cả bài)
+### Chạy hàng loạt (tự động cho nhiều bài)
 ```
-node packages/marketing/src/video/build-video-all.mjs [--limit N] [--no-queue]
+node packages/marketing/src/video/build-video-all.mjs [--limit N] [--requested] [--watch] [--interval 60] [--no-queue]
 ```
-Dựng video cho MỌI bài `mkt_content` có `draft` mà chưa có video (bỏ qua bài đã dựng). Mỗi bài chạy một tiến trình riêng nên bài lỗi không kéo sập cả mẻ. Chạy lại nhiều lần chỉ xử lý bài MỚI, nên hợp để **hẹn giờ chạy định kỳ** (vd Windows Task Scheduler chạy đêm) — đó là cách "tự động cho tất cả". Nặng (ffmpeg/Whisper/TTS), nên chạy lúc máy rảnh.
+Dựng video cho các bài `mkt_content` có `draft` mà chưa có video (bỏ qua bài đã dựng). Mỗi bài chạy một tiến trình riêng nên bài lỗi không kéo sập cả mẻ. Cờ:
+- `--limit N`: chỉ làm N bài (chạy theo mẻ, tránh 13 tiếng liền).
+- `--requested`: CHỈ làm bài đã bấm nút **"🎬 Làm video"** ở trang **Nội dung** (web đặt cờ `brief.video_requested`; dựng xong tự xóa cờ).
+- `--watch [--interval 60]`: chạy liên tục, cứ 60 giây quét bài mới rồi dựng. Ctrl+C để dừng.
+
+**"Bấm nút trên web là tự làm video":** vì video dựng nặng (ffmpeg/Whisper/TTS) KHÔNG chạy trên web (Vercel) được, nút web chỉ ĐẶT YÊU CẦU. Để nó tự dựng, mở trên máy nội bộ:
+```
+node packages/marketing/src/video/build-video-all.mjs --requested --watch
+```
+Cứ để cửa sổ này chạy; ai bấm "🎬 Làm video" trên web thì trong ~1 phút máy tự dựng (FB 16:9 + TikTok dọc) rồi đẩy vào Hàng đợi duyệt. Muốn hoàn toàn tự động thì đặt Windows Task Scheduler chạy dòng trên lúc khởi động máy.
 
 ## Thành phần
 | File | Việc |

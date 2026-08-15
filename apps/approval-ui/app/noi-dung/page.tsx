@@ -1,7 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import ViewModal from '../view-modal';
-import { editDraft } from '../actions';
+import { editDraft, requestVideoForContent } from '../actions';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +34,7 @@ function formatDate(iso: string): string {
 
 type Flags = Record<string, string[] | undefined>;
 type Assets = { image?: string | null; video?: string | null } | null;
-type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[] } | null;
+type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[]; video_requested?: boolean } | null;
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
 export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
@@ -315,6 +315,16 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                           ↗ Xem bài{p.channel === 'facebook' ? ' (FB)' : p.channel ? ` (${p.channel})` : ''}
                         </a>
                       ))}
+                      {c.kind !== 'video' ? (
+                        c.brief?.video_requested ? (
+                          <span className="badge tone-demo" style={{ marginLeft: 8 }} title="Đã đánh dấu — máy nội bộ sẽ dựng video rồi đẩy vào Hàng đợi duyệt">🎬 Đã yêu cầu video</span>
+                        ) : (
+                          <form action={requestVideoForContent} style={{ display: 'inline' }}>
+                            <input type="hidden" name="content_id" value={c.id} />
+                            <button className="btn ghost sm" type="submit" style={{ marginLeft: 8 }} title="Đánh dấu để máy nội bộ dựng video từ bài này (FB 16:9 + TikTok dọc)">🎬 Làm video</button>
+                          </form>
+                        )
+                      ) : null}
                     </td>
                   </tr>
                 );

@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Nut "🎬 Lam video" o /noi-dung (moi bai viet kind!=video): action requestVideoForContent dat co brief.video_requested=true. Video dung NANG nen KHONG chay tren web (Vercel) - nut chi DAT YEU CAU; may noi bo chay build-video-all.mjs --requested (hoac --watch) moi dung that roi day Hang doi duyet + xoa co. Bai da bam hien badge "Da yeu cau video". Dung co trong brief, khong them cot DB. -->
+
 <!-- re-verified: 2026-08-14 - Dang video THEO KENH: publishContentToFacebook lay brief.assets.video_h (ngang 16:9) neu co, publishContentToTikTok lay video_v (doc 9:16); fallback assets.video (tuong thich bai cu, rotation/manual khong doi). Video pipeline gan ca video_h + video_v vao 1 mkt_content, channels ['facebook','tiktok'] -> 1 bai duyet, dang dung dinh dang moi kenh. -->
 
 <!-- re-verified: 2026-08-14 - GOP san pham trung ten o bang tong hop: productOf (do-luong/page.tsx + lib/plan.ts con bot) dung guessGroup quy cac BIEN THE ten ve 1 san pham chuan (vd "Thiet bi GSHT tau ca VIETTEL S Tracking" = "Thiet bi giam sat hanh trinh Viettel S-Tracking" -> deu group 3 -> gop 1 dong). Bai content (post_kind='content'/rotation_group='Bai content') giu nhom rieng, khong gop. Bai dang van giu ten goc, chi BANG TONG HOP gop lai. Da test guessGroup: 2 bien the -> cung group 3. -->

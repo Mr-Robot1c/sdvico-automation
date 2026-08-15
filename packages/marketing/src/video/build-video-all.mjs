@@ -36,11 +36,10 @@ function runChild(contentId, extra) {
   });
 }
 
-async function main() {
-  const env = loadRealEnv();
-  const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-  const limit = Number(arg('limit', '0')) || 0;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Một lượt quét + dựng. requested=true: chỉ bài đã bấm nút "Làm video" (brief.video_requested).
+async function runOnce(client, { requested, limit, extra }) {
   const { data: contents } = await client
     .from('mkt_content')
     .select('id, title, draft, brief')
@@ -51,22 +50,55 @@ async function main() {
   const doneSources = new Set(
     rows.filter((c) => c.brief?.generator === 'video-pipeline' && c.brief?.source_content).map((c) => c.brief.source_content)
   );
-  const todo = rows.filter((c) => c.brief?.generator !== 'video-pipeline' && !doneSources.has(c.id));
+  let todo = rows.filter((c) => c.brief?.generator !== 'video-pipeline' && !doneSources.has(c.id));
+  if (requested) todo = todo.filter((c) => c.brief?.video_requested === true);
   const picked = limit ? todo.slice(0, limit) : todo;
+  if (!picked.length) return { ok: 0, fail: 0, total: 0 };
 
-  console.log(`Tong bai co draft: ${rows.length}. Da co video: ${doneSources.size}. Se dung video: ${picked.length}${limit ? ` (gioi han ${limit})` : ''}.`);
-  if (!picked.length) { console.log('Khong co bai nao can dung video.'); return; }
-
-  const extra = passthrough();
+  console.log(`Se dung video: ${picked.length} bai${requested ? ' (da yeu cau)' : ''}${limit ? ` (gioi han ${limit})` : ''}.`);
   let ok = 0;
   let fail = 0;
   for (let i = 0; i < picked.length; i++) {
     const c = picked[i];
     console.log(`\n########## [${i + 1}/${picked.length}] ${c.title || c.id.slice(0, 8)} ##########`);
     const code = await runChild(c.id, extra);
-    if (code === 0) { ok++; } else { fail++; console.error(`  Bai ${c.id.slice(0, 8)} loi (exit ${code}), bo qua, chay tiep.`); }
+    if (code === 0) {
+      ok++;
+      // Dung xong: xoa co video_requested (neu co) de khong dung lai + UI het "Da yeu cau".
+      if (c.brief?.video_requested) {
+        try { await client.from('mkt_content').update({ brief: { ...c.brief, video_requested: false } }).eq('id', c.id); } catch { /* bo qua */ }
+      }
+    } else {
+      fail++;
+      console.error(`  Bai ${c.id.slice(0, 8)} loi (exit ${code}), bo qua, chay tiep.`);
+    }
   }
-  console.log(`\n=== BATCH XONG: ${ok} thanh cong, ${fail} loi / ${picked.length} bai ===`);
+  return { ok, fail, total: picked.length };
+}
+
+async function main() {
+  const env = loadRealEnv();
+  const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const limit = Number(arg('limit', '0')) || 0;
+  const requested = process.argv.includes('--requested');
+  const watch = process.argv.includes('--watch');
+  const interval = (Number(arg('interval', '60')) || 60) * 1000;
+  const extra = passthrough();
+
+  if (watch) {
+    console.log(`Che do WATCH: moi ${interval / 1000}s quet bai ${requested ? 'DA YEU CAU (bam nut Lam video)' : 'chua co video'} roi dung. Ctrl+C de dung.`);
+    for (;;) {
+      try {
+        const r = await runOnce(client, { requested, limit, extra });
+        if (r.total) console.log(`(watch) xong dot: ${r.ok} ok, ${r.fail} loi.`);
+      } catch (e) { console.error('(watch) loi dot:', e.message); }
+      await sleep(interval);
+    }
+  }
+
+  const r = await runOnce(client, { requested, limit, extra });
+  if (!r.total) console.log('Khong co bai nao can dung video.');
+  else console.log(`\n=== BATCH XONG: ${r.ok} thanh cong, ${r.fail} loi / ${r.total} bai ===`);
 }
 
 main().catch((e) => { console.error('LOI batch:', e.message); process.exit(1); });

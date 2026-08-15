@@ -4,6 +4,8 @@
 covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - build-video-all.mjs them --requested (chi dung bai co brief.video_requested = bai bam nut "Lam video" tren web /noi-dung; dung xong tu xoa co) + --watch [--interval 60] (quet lien tuc). "--requested --watch" chay tren may noi bo = bam nut tren web -> ~1 phut may tu dung (FB 16:9 + TikTok doc) -> Hang doi duyet. --limit N de chay theo me (161 bai ~13h neu lam het). -->
+
 <!-- re-verified: 2026-08-14 - Video pipeline dinh dang theo kenh + batch: pushToApprovalQueue nay upload CA HAI ban (ngang 16:9 + doc 9:16) -> brand_assets, gan brief.assets.video_h (FB) + video_v (TikTok) + video (fallback), channels ['facebook','tiktok']. Them build-video-all.mjs: batch dung video cho MOI bai mkt_content co draft chua co video (spawn build-video.mjs tung bai, isolate loi, bo qua bai da co video-pipeline output theo source_content) -> chay lai chi xu ly bai moi, hop hen gio dinh ky = "tu dong cho tat ca". Chi tiet video/README.md. -->
 
 <!-- re-verified: 2026-08-14 - Day chuyen video not 2 viec: (1) doc SO tong dai/dien thoai TUNG chu so cho GIONG DOC (spellPhones trong build-video.mjs: 1900 23 23 49 -> "mot chin khong khong, hai ba, hai ba, bon chin"; GIU NGUYEN so luong 80 lit/3.000.000 dong/15 met; phu de van hien so goc). (2) DAY vao Hang doi duyet: pushToApprovalQueue upload ban DOC len Storage + brand_assets(kind=video) + mkt_content(status review) + approval_queue(pending, kenh Facebook) -> nguoi bam Duyet moi dang (dieu cam 1). Mac dinh bat; --no-queue de chi tao file. Da chay end-to-end: video + day queue OK ([Facebook] 🎬 ..., risk amber). README video da cap nhat. -->

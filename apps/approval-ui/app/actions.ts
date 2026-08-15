@@ -735,6 +735,22 @@ export async function applyLogoToAsset(id: string): Promise<{ ok: boolean; error
   }
 }
 
+// Đánh dấu một BÀI cần dựng video (cờ brief.video_requested). Video dựng NẶNG (ffmpeg/Whisper/TTS)
+// nên KHÔNG chạy trên web được: nút này chỉ ĐẶT YÊU CẦU; máy nội bộ chạy build-video-all.mjs
+// --requested sẽ dựng rồi đẩy vào Hàng đợi duyệt. Dùng cờ trong brief, không thêm cột DB.
+export async function requestVideoForContent(formData: FormData) {
+  const id = String(formData.get('content_id') || '');
+  if (!id) return;
+  const client = getServerClient();
+  const { data: c } = await client.from('mkt_content').select('brief').eq('id', id).single();
+  const brief = (((c as any)?.brief) || {}) as Record<string, unknown>;
+  await client
+    .from('mkt_content')
+    .update({ brief: { ...brief, video_requested: true, video_requested_at: new Date().toISOString() } })
+    .eq('id', id);
+  revalidatePath('/noi-dung');
+}
+
 // Xóa một BÀI (nội dung) khỏi hệ thống: gỡ bản ghi mkt_content + mục hàng đợi + bài đăng + số liệu.
 // LƯU Ý: chỉ xóa dữ liệu trong hệ thống, KHÔNG gỡ bài đã đăng thật trên Facebook/TikTok.
 export async function deleteContent(formData: FormData) {
