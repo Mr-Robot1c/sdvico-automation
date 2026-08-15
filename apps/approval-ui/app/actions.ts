@@ -724,7 +724,12 @@ export async function queueLinkedInPost(formData: FormData) {
   const { data: post, error: e1 } = await client.from('hr_job_posts')
     .insert({ job_id: jobId, kenh: 'linkedin', tieu_de, noi_dung: aiText, image_url, trang_thai: 'draft' })
     .select('id').single();
-  if (e1) throw new Error(e1.message);
+  if (e1 || !post) {
+    // Không ném lỗi (tránh crash trang). Ghi run_log để biết nguyên nhân (vd chưa migrate kenh='linkedin').
+    try { await client.from('run_log').insert({ task: 'hr.queue_linkedin', status: 'error', detail: { jobId, error: e1?.message || 'no post' } }); } catch {}
+    revalidatePath('/dang-tin'); revalidatePath('/');
+    return;
+  }
 
   const { error: e2 } = await client.from('approval_queue').insert({
     kind: 'hr_job_post',
@@ -732,7 +737,7 @@ export async function queueLinkedInPost(formData: FormData) {
     payload: { post_id: post.id, job_id: jobId, kenh: 'linkedin', dia_diem: job.location || null, body: aiText },
     ref_table: 'hr_job_posts', ref_id: post.id, status: 'pending',
   });
-  if (e2) throw new Error(e2.message);
+  if (e2) { try { await client.from('run_log').insert({ task: 'hr.queue_linkedin', status: 'error', detail: { jobId, error: e2.message } }); } catch {} }
 
   revalidatePath('/dang-tin');
   revalidatePath('/');
