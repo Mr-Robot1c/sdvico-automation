@@ -33,10 +33,35 @@ curl -i -H "Authorization: Bearer DAN_CRON_SECRET_VAO_DAY" https://TEN-APP.verce
 | Mã | Nghĩa | Cách chữa |
 |---|---|---|
 | 200 | Chạy tốt | Dựng tiếp bên dưới |
+| 308 | Địa chỉ chưa chuẩn nên Vercel chuyển hướng | Bỏ dấu gạch chéo cuối, và phải ghi đủ `https://` ở đầu. Đừng chữa bằng cách cho curl đi theo chuyển hướng: nếu địa chỉ ghi `http://` thì lượt gọi đầu đã đẩy `CRON_SECRET` qua kết nối không mã hóa |
 | 401 | Sai hoặc thiếu `CRON_SECRET` | Đặt lại biến này trên Vercel, redeploy, rồi dùng đúng giá trị đó cho cron-job.org |
 | 503 | Thiếu `APP_PASSWORD` trên Vercel | Đặt biến đó rồi redeploy |
 | 404 | Sai địa chỉ app, hoặc bản deploy chưa có route này | Kiểm lại tên app và xem deploy mới nhất đã xanh chưa |
 | 500 | Endpoint chạy nhưng vấp lỗi bên trong | Đọc nội dung trả về, thường là thiếu biến Supabase hoặc Facebook |
+
+## Không nhớ CRON_SECRET thì làm sao
+
+Secret trên GitHub không xem lại được, đó là thiết kế cố ý. Còn hai đường:
+
+**Đường 1, đọc lại từ Vercel.** Vào Project Settings, Environment Variables, tìm dòng
+`CRON_SECRET` rồi bấm biểu tượng con mắt để hiện giá trị. Cách này chỉ dùng được khi lúc tạo
+không đánh dấu biến là Sensitive.
+
+**Đường 2, đặt khóa mới.** Nhanh và chắc hơn, vì đằng nào cũng phải dán khóa sang cron-job.org.
+Sinh một chuỗi ngẫu nhiên bằng lệnh dưới, chạy trong cửa sổ dòng lệnh của bạn:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
+```
+
+Lấy chuỗi in ra rồi đặt vào đúng ba chỗ, phải giống hệt nhau:
+
+1. Vercel, Project Settings, Environment Variables, sửa `CRON_SECRET`. Sửa xong phải
+   **redeploy** thì biến mới có hiệu lực, Vercel không nạp lại biến cho bản đang chạy.
+2. GitHub, Settings, Secrets and variables, Actions, sửa secret `CRON_SECRET`.
+3. Header `Authorization` của ba job bên cron-job.org.
+
+Đừng dán khóa vào chat, vào commit, hay vào issue. Điều cấm 7.
 
 ## Dựng ba job trên cron-job.org
 

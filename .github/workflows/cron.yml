@@ -28,20 +28,53 @@ jobs:
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
       VERCEL_URL: ${{ secrets.VERCEL_URL }}
     steps:
+      # Secret VERCEL_URL hay bị nhập sai dạng, và Vercel đáp lại bằng 308 Permanent Redirect
+      # nên nhìn log chỉ thấy job đỏ mà không rõ vì sao. Chuẩn hóa và chặn ngay tại đây.
+      #
+      # Không dùng curl -L để đi theo chuyển hướng: cách đó giấu mất lỗi cấu hình, và nếu
+      # địa chỉ ghi http:// thì lượt gọi đầu đã đẩy CRON_SECRET qua kết nối không mã hóa
+      # rồi mới bị chuyển sang https. Điều cấm 7 tính cả khóa đi trần trên đường truyền.
+      - name: Kiểm và chuẩn hóa VERCEL_URL
+        run: |
+          if [ -z "$VERCEL_URL" ]; then
+            echo "Thiếu secret VERCEL_URL. Đặt ở Settings, Secrets and variables, Actions."
+            exit 1
+          fi
+          # Cắt mọi dấu gạch chéo thừa ở cuối. Thừa một dấu là thành //api/cron/... và Vercel trả 308.
+          URL="${VERCEL_URL%"${VERCEL_URL##*[!/]}"}"
+          case "$URL" in
+            https://*) ;;
+            http://*)
+              echo "VERCEL_URL đang ghi http://. Phải là https:// để khóa không đi trần trên đường truyền."
+              exit 1;;
+            *)
+              echo "VERCEL_URL thiếu https:// ở đầu. Dạng đúng: https://ten-app.vercel.app"
+              exit 1;;
+          esac
+          echo "BASE_URL=$URL" >> "$GITHUB_ENV"
+          echo "Gọi tới $URL"
+
       - name: Soạn bài, /api/cron/compose
         run: |
           # Không dùng curl -f: cờ đó nuốt mất nội dung lỗi, chỉ còn con số, rất khó đoán bệnh.
           # Ở đây in cả thân phản hồi rồi mới xét mã HTTP.
-          BODY=$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer $CRON_SECRET" "$VERCEL_URL/api/cron/compose")
+          BODY=$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer $CRON_SECRET" "$BASE_URL/api/cron/compose")
           STATUS=$(printf '%s' "$BODY" | tail -n1)
           echo "HTTP $STATUS"
           printf '%s\n' "$BODY" | sed '$d'
-          case "$STATUS" in 2??) ;; *) echo "Lỗi. 401 là sai hoặc thiếu CRON_SECRET, 503 là thiếu APP_PASSWORD, 404 là sai VERCEL_URL."; exit 1;; esac
+          case "$STATUS" in
+            2??) ;;
+            3??) echo "Chuyển hướng. VERCEL_URL chưa đúng dạng, xem lại tên miền chính của app."; exit 1;;
+            401) echo "Sai hoặc thiếu CRON_SECRET. Giá trị trên Vercel và trên GitHub phải trùng nhau."; exit 1;;
+            404) echo "Không có route này. Kiểm tên app, và xem bản deploy mới nhất đã xanh chưa."; exit 1;;
+            503) echo "Thiếu APP_PASSWORD trên Vercel, app đang tự khóa."; exit 1;;
+            *) echo "Endpoint vấp lỗi, đọc nội dung ở trên."; exit 1;;
+          esac
 
       - name: Đăng bài Facebook đã duyệt, /api/cron/publish
         if: always()
         run: |
-          BODY=$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer $CRON_SECRET" "$VERCEL_URL/api/cron/publish")
+          BODY=$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer $CRON_SECRET" "$BASE_URL/api/cron/publish")
           STATUS=$(printf '%s' "$BODY" | tail -n1)
           echo "HTTP $STATUS"
           printf '%s\n' "$BODY" | sed '$d'
@@ -52,7 +85,7 @@ jobs:
       - name: Đăng bài LinkedIn đã duyệt, /api/cron/linkedin-publish
         if: always()
         run: |
-          BODY=$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer $CRON_SECRET" "$VERCEL_URL/api/cron/linkedin-publish")
+          BODY=$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer $CRON_SECRET" "$BASE_URL/api/cron/linkedin-publish")
           STATUS=$(printf '%s' "$BODY" | tail -n1)
           echo "HTTP $STATUS"
           printf '%s\n' "$BODY" | sed '$d'
