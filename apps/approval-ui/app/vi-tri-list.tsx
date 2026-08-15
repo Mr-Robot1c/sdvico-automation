@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { queueFacebookPost, publishJobPost } from './actions';
+import { queueFacebookPost, queueLinkedInPost, publishJobPost } from './actions';
 import { SubmitButton } from './submit-button';
 import { formatRelative } from './labels';
 
@@ -189,6 +189,10 @@ export default function ViTriList({
 
                 {/* Hành động chính */}
                 <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  <form action={queueLinkedInPost}>
+                    <input type="hidden" name="job_id" value={j.id} />
+                    <SubmitButton label="Soạn bài LinkedIn" pendingLabel="Đang soạn..." className="btn ghost" />
+                  </form>
                   {!fbPost ? (
                     <form action={queueFacebookPost}>
                       <input type="hidden" name="job_id" value={j.id} />

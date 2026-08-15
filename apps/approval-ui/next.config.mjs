@@ -7,6 +7,7 @@ const nextConfig = {
     '/api/poster-preview': ['./assets/fonts/**'],
     '/tao-jd': ['./assets/fonts/**'],
     '/dang-tin': ['./assets/fonts/**'],
+    '/vi-tri': ['./assets/fonts/**'],
     '/': ['./assets/fonts/**'],
   },
 };

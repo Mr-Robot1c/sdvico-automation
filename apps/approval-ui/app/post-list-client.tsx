@@ -28,7 +28,7 @@ const TT: Record<string, { label: string; tone: string }> = {
 };
 
 const KENH: Record<string, string> = {
-  facebook: 'Facebook', zalo: 'Zalo',
+  facebook: 'Facebook', linkedin: 'LinkedIn', zalo: 'Zalo',
   job_board: 'Trang tuyển dụng', website: 'Website', other: 'Khác',
 };
 

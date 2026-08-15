@@ -13,6 +13,7 @@ import { buildRecruitmentPoster, toBullets } from '../lib/poster';
 import { sendEmail } from '../lib/mailer';
 import { composeOfferLetter, composeRejectLetter } from '../lib/hr-letters';
 import { allocateInterviewSlots, composeInterviewLetter, generateInterviewQuestions, formatSlot } from '../lib/interview';
+import { linkedinConfigured, postToLinkedIn } from '../lib/linkedin';
 
 // datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
 // Server Vercel chạy UTC nên phải gắn +07:00 để parse đúng giờ Việt Nam.
@@ -647,6 +648,96 @@ export async function queueFacebookPost(formData: FormData) {
   revalidatePath('/');
 }
 
+// Soạn bài LinkedIn cho một vị trí (giọng chuyên nghiệp, hashtag EN+VN) và đưa vào hàng đợi Duyệt.
+// Máy soạn, người bấm Duyệt (điều cấm 1). Đăng thật: qua API khi có token, hoặc Copy đăng tay.
+export async function queueLinkedInPost(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  if (!jobId) return;
+
+  const client = getServerClient();
+  const { data: job, error: e0 } = await client
+    .from('hr_jobs')
+    .select('id, title, location, short_desc, requirements, jd_versions, image_hint')
+    .eq('id', jobId).single();
+  if (e0) throw new Error(e0.message);
+
+  // Đã có bài LinkedIn đang chờ/đặt lịch thì thôi, tránh trùng.
+  const { data: existing } = await client
+    .from('hr_job_posts').select('id')
+    .eq('job_id', jobId).eq('kenh', 'linkedin')
+    .in('trang_thai', ['draft', 'scheduled']);
+  if (existing && existing.length) { revalidatePath('/dang-tin'); return; }
+
+  let benefits: string | null = null;
+  {
+    const { data: benRow } = await client.from('hr_jobs').select('benefits').eq('id', jobId).maybeSingle();
+    benefits = (benRow?.benefits as string | undefined) || null;
+  }
+
+  const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
+  const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; website?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
+  const contactEmail = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
+  const hotline = brand.hotline || '1900 23 23 49';
+  const reqText = (job as Record<string, unknown>).requirements as string | null;
+
+  const sourceInfo = [
+    `Vị trí: ${job.title}`,
+    job.location ? `Địa điểm: ${job.location}` : '',
+    job.short_desc ? `Mô tả: ${job.short_desc}` : '',
+    reqText ? `Yêu cầu: ${reqText}` : '',
+    benefits ? `Quyền lợi: ${benefits}` : '',
+  ].filter(Boolean).join('\n');
+
+  const fallback = `SDVICO đang tuyển: ${job.title}${job.location ? ` (${job.location})` : ''}\n\nỨng tuyển: ${contactEmail} | ${hotline}\n#Hiring #Jobs #VungTau`;
+
+  const aiText = await groqChat(
+    [
+      'Bạn viết bài tuyển dụng chuyên nghiệp cho LinkedIn của SDVICO, công ty công nghệ ngành biển và thủy sản Việt Nam.',
+      'Viết MỘT bài LinkedIn hoàn chỉnh bằng tiếng Việt, giọng chuyên nghiệp nhưng thân thiện phù hợp LinkedIn.',
+      'Bố cục: câu hook ngắn; vị trí + địa điểm; công việc chính (từ Mô tả); yêu cầu chính; quyền lợi chính; lời kêu gọi kèm liên hệ; 4-6 hashtag phù hợp (trộn Anh + Việt, vd #Hiring #VungTau #MarineTech).',
+      'Yêu cầu và Quyền lợi: MỖI Ý MỘT DÒNG bắt đầu bằng "• ". Không gộp thành câu dài nhiều dấu phẩy.',
+      'CHỈ dùng thông tin được cung cấp, KHÔNG bịa lương hay số liệu (điều cấm 5). Không mô tả phần mềm đối tác như năng lực SDVICO (điều cấm 4).',
+      'Chỉ trả về nội dung bài, không kèm giải thích.',
+    ].join('\n'),
+    sourceInfo,
+    { temperature: 0.7, maxTokens: 700 }
+  ).then((r) => r?.trim() || fallback).catch(() => fallback);
+
+  const unsplash = await fetchUnsplashPhoto(job.title, job.location || undefined, (job as Record<string, unknown>).image_hint as string | null).catch(() => null);
+
+  let image_url: string | null = null;
+  const posterBuf = await buildRecruitmentPoster({
+    title: job.title, location: job.location || null,
+    requirements: toBullets(reqText), benefits: toBullets(benefits),
+    brandName: brand.company_name || 'SDVICO', tagline: brand.tagline, website: brand.website,
+    hotline, photoUrl: unsplash, logoUrl: brand.logo_url, theme: brand.poster,
+  });
+  if (posterBuf) {
+    const imgPath = `posts/${jobId}/linkedin-${Date.now()}.jpg`;
+    const { error: upErr } = await client.storage.from('post-images').upload(imgPath, posterBuf, { contentType: 'image/jpeg', upsert: true });
+    image_url = upErr ? (unsplash || null) : client.storage.from('post-images').getPublicUrl(imgPath).data.publicUrl;
+  } else {
+    image_url = unsplash || brand.logo_url || null;
+  }
+
+  const tieu_de = `[LinkedIn] Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`;
+  const { data: post, error: e1 } = await client.from('hr_job_posts')
+    .insert({ job_id: jobId, kenh: 'linkedin', tieu_de, noi_dung: aiText, image_url, trang_thai: 'draft' })
+    .select('id').single();
+  if (e1) throw new Error(e1.message);
+
+  const { error: e2 } = await client.from('approval_queue').insert({
+    kind: 'hr_job_post',
+    title: tieu_de,
+    payload: { post_id: post.id, job_id: jobId, kenh: 'linkedin', dia_diem: job.location || null, body: aiText },
+    ref_table: 'hr_job_posts', ref_id: post.id, status: 'pending',
+  });
+  if (e2) throw new Error(e2.message);
+
+  revalidatePath('/dang-tin');
+  revalidatePath('/');
+}
+
 // Sửa nội dung, hình ảnh, giờ đặt đăng trước khi duyệt. Người sửa là người kiểm soát (điều cấm 1).
 // Đồng bộ cả bản xem trong hàng đợi để trang Duyệt không lệch với nội dung sẽ đăng.
 // Ảnh: file từ máy ưu tiên hơn URL nhập tay. Cả hai đều tuỳ chọn.
@@ -846,11 +937,36 @@ export async function publishJobPost(formData: FormData) {
 
   const { data: post, error: e1 } = await client
     .from('hr_job_posts')
-    .select('id, tieu_de, noi_dung, trang_thai, image_url')
+    .select('id, tieu_de, noi_dung, trang_thai, image_url, kenh')
     .eq('id', postId)
     .single();
   if (e1 || !post) { revalidatePath('/dang-tin'); return; }
   if (post.trang_thai === 'posted') { revalidatePath('/dang-tin'); return; }
+
+  // Bài LinkedIn: đăng qua LinkedIn API nếu đã cấu hình, chưa thì báo dùng Copy đăng tay.
+  if (post.kenh === 'linkedin') {
+    if (!linkedinConfigured()) {
+      await client.from('hr_job_posts')
+        .update({ ghi_chu: 'Chưa nối API LinkedIn. Dùng nút "Copy nội dung" để đăng tay lên Company Page.' })
+        .eq('id', postId);
+      revalidatePath('/dang-tin');
+      return;
+    }
+    try {
+      const urn = await postToLinkedIn(post.noi_dung);
+      await client.from('hr_job_posts')
+        .update({ trang_thai: 'posted', posted_at: new Date().toISOString(), fb_post_id: urn, ghi_chu: null })
+        .eq('id', postId);
+      await client.from('run_log').insert({ task: 'hr.publish_linkedin_ui', status: 'ok', detail: { postId, urn } });
+    } catch (err: unknown) {
+      const errStr = err instanceof Error ? err.message : String(err);
+      await client.from('hr_job_posts').update({ trang_thai: 'failed', ghi_chu: errStr }).eq('id', postId);
+      await client.from('run_log').insert({ task: 'hr.publish_linkedin_ui', status: 'error', detail: { postId, error: errStr } });
+    }
+    revalidatePath('/dang-tin');
+    revalidatePath('/');
+    return;
+  }
 
   try {
     const fbPostId = await callFacebookApi(post);
