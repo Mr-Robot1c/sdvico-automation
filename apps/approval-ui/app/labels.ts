@@ -19,7 +19,7 @@ export function kindMeta(kind: string): KindMeta {
     case 'hr_jd':
       return { label: 'Vị trí tuyển dụng', icon: '💼', tone: 'hr' };
     case 'hr_job_post':
-      return { label: 'Tin tuyển dụng (Facebook)', icon: '📣', tone: 'hr' };
+      return { label: 'Tin tuyển dụng', icon: '📣', tone: 'hr' };
     case 'mkt_post':
       return { label: 'Bài marketing', icon: '📣', tone: 'mkt' };
     case 'mkt_publish':

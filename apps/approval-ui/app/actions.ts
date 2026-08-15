@@ -675,50 +675,49 @@ export async function queueLinkedInPost(formData: FormData) {
   }
 
   const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
-  const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; website?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
+  const brand = (brandRow?.value || {}) as { hotline?: string; website?: string; company_name?: string; company_desc?: string };
   const contactEmail = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
   const hotline = brand.hotline || '1900 23 23 49';
   const reqText = (job as Record<string, unknown>).requirements as string | null;
+  const companyDesc = brand.company_desc || 'SDVICO cung cấp thiết bị và giải pháp công nghệ cho ngành biển và thủy sản, trụ sở tại Vũng Tàu.';
 
   const sourceInfo = [
+    `Giới thiệu công ty: ${companyDesc}`,
     `Vị trí: ${job.title}`,
     job.location ? `Địa điểm: ${job.location}` : '',
-    job.short_desc ? `Mô tả: ${job.short_desc}` : '',
+    job.short_desc ? `Mô tả công việc: ${job.short_desc}` : '',
     reqText ? `Yêu cầu: ${reqText}` : '',
     benefits ? `Quyền lợi: ${benefits}` : '',
+    `Liên hệ: ${contactEmail} | Hotline ${hotline}`,
   ].filter(Boolean).join('\n');
 
   const fallback = `SDVICO đang tuyển: ${job.title}${job.location ? ` (${job.location})` : ''}\n\nỨng tuyển: ${contactEmail} | ${hotline}\n#Hiring #Jobs #VungTau`;
 
   const aiText = await groqChat(
     [
-      'Bạn viết bài tuyển dụng chuyên nghiệp cho LinkedIn của SDVICO, công ty công nghệ ngành biển và thủy sản Việt Nam.',
-      'Viết MỘT bài LinkedIn hoàn chỉnh bằng tiếng Việt, giọng chuyên nghiệp nhưng thân thiện phù hợp LinkedIn.',
-      'Bố cục: câu hook ngắn; vị trí + địa điểm; công việc chính (từ Mô tả); yêu cầu chính; quyền lợi chính; lời kêu gọi kèm liên hệ; 4-6 hashtag phù hợp (trộn Anh + Việt, vd #Hiring #VungTau #MarineTech).',
-      'Yêu cầu và Quyền lợi: MỖI Ý MỘT DÒNG bắt đầu bằng "• ". Không gộp thành câu dài nhiều dấu phẩy.',
-      'CHỈ dùng thông tin được cung cấp, KHÔNG bịa lương hay số liệu (điều cấm 5). Không mô tả phần mềm đối tác như năng lực SDVICO (điều cấm 4).',
-      'Chỉ trả về nội dung bài, không kèm giải thích.',
+      'Bạn viết bài tuyển dụng CHUYÊN NGHIỆP cho LinkedIn của SDVICO (công ty công nghệ ngành biển và thủy sản Việt Nam).',
+      'Viết bằng tiếng Việt, giọng chuyên nghiệp, có cấu trúc rõ ràng theo tiêu đề mục (như bài tuyển dụng của công ty lớn trên LinkedIn).',
+      '',
+      'Cấu trúc, giữ đúng các tiêu đề mục (mỗi tiêu đề một dòng riêng):',
+      '1. Một câu hook mở đầu hấp dẫn về cơ hội (không dùng emoji rực rỡ, giữ chuyên nghiệp).',
+      '2. "Về công ty": 2-3 câu giới thiệu SDVICO, dựa trên phần Giới thiệu công ty được cung cấp.',
+      '3. "Vị trí: ' + job.title + '": 1-2 câu mô tả vai trò.',
+      '4. "Trách nhiệm chính:" — mỗi ý một dòng bắt đầu bằng "• ", lấy từ Mô tả công việc.',
+      '5. "Yêu cầu:" — mỗi ý một dòng bắt đầu bằng "• ", lấy từ phần Yêu cầu.',
+      '6. "Địa điểm & hình thức:" — nêu địa điểm làm việc (nếu có).',
+      '7. "Quyền lợi:" — mỗi ý một dòng bắt đầu bằng "• ", lấy từ phần Quyền lợi.',
+      '8. "Ứng tuyển:" — cách liên hệ (email/hotline được cung cấp).',
+      '9. 4-6 hashtag phù hợp (trộn tiếng Anh + Việt, vd #Hiring #VungTau #MarineTech).',
+      '',
+      'Quy tắc: các mục bullet MỖI Ý MỘT DÒNG bắt đầu bằng "• ", không gộp câu dài nhiều dấu phẩy. CHỈ dùng thông tin được cung cấp, KHÔNG bịa lương/số liệu (điều cấm 5). Không mô tả phần mềm đối tác như năng lực SDVICO (điều cấm 4).',
+      'Chỉ trả về nội dung bài đăng, không kèm giải thích.',
     ].join('\n'),
     sourceInfo,
-    { temperature: 0.7, maxTokens: 700 }
+    { temperature: 0.7, maxTokens: 900 }
   ).then((r) => r?.trim() || fallback).catch(() => fallback);
 
-  const unsplash = await fetchUnsplashPhoto(job.title, job.location || undefined, (job as Record<string, unknown>).image_hint as string | null).catch(() => null);
-
-  let image_url: string | null = null;
-  const posterBuf = await buildRecruitmentPoster({
-    title: job.title, location: job.location || null,
-    requirements: toBullets(reqText), benefits: toBullets(benefits),
-    brandName: brand.company_name || 'SDVICO', tagline: brand.tagline, website: brand.website,
-    hotline, photoUrl: unsplash, logoUrl: brand.logo_url, theme: brand.poster,
-  });
-  if (posterBuf) {
-    const imgPath = `posts/${jobId}/linkedin-${Date.now()}.jpg`;
-    const { error: upErr } = await client.storage.from('post-images').upload(imgPath, posterBuf, { contentType: 'image/jpeg', upsert: true });
-    image_url = upErr ? (unsplash || null) : client.storage.from('post-images').getPublicUrl(imgPath).data.publicUrl;
-  } else {
-    image_url = unsplash || brand.logo_url || null;
-  }
+  // LinkedIn: text-only, KHÔNG kèm poster (theo yêu cầu — bài LinkedIn không cần poster).
+  const image_url: string | null = null;
 
   const tieu_de = `[LinkedIn] Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`;
   const { data: post, error: e1 } = await client.from('hr_job_posts')

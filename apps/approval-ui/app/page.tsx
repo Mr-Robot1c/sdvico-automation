@@ -31,7 +31,9 @@ function hookPreview(text: string): { hook: string; hasMore: boolean } {
   return { hook: para, hasMore: rest.length > 0 };
 }
 
-export default async function Page({ searchParams }: { searchParams: { kind?: string } }) {
+const platformLabel = (k: string) => (k === 'linkedin' ? 'LinkedIn' : k === 'facebook' ? 'Facebook' : k);
+
+export default async function Page({ searchParams }: { searchParams: { kind?: string; platform?: string } }) {
   const client = getServerClient();
   const { data, error } = await client
     .from('approval_queue')
@@ -45,8 +47,20 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   const counts = new Map<string, number>();
   for (const it of all) counts.set(it.kind, (counts.get(it.kind) || 0) + 1);
 
+  // Đếm theo nền tảng (chỉ tin tuyển dụng) để lọc Facebook/LinkedIn.
+  const platformCounts = new Map<string, number>();
+  for (const it of all) {
+    if (it.kind !== 'hr_job_post') continue;
+    const k = ((it.payload as Record<string, unknown>)?.kenh as string) || 'facebook';
+    platformCounts.set(k, (platformCounts.get(k) || 0) + 1);
+  }
+
   const selected = searchParams?.kind || null;
-  const items = selected ? all.filter((it) => it.kind === selected) : all;
+  const selectedPlatform = searchParams?.platform || null;
+  let items = selected ? all.filter((it) => it.kind === selected) : all;
+  if (selectedPlatform) {
+    items = items.filter((it) => it.kind === 'hr_job_post' && (((it.payload as Record<string, unknown>)?.kenh as string) || 'facebook') === selectedPlatform);
+  }
 
   // Lấy nội dung thực tế của các bài đăng Facebook để hiển thị và sửa ngay tại đây.
   const jobPostIds = all
@@ -96,6 +110,22 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
         </nav>
       ) : null}
 
+      {!error && platformCounts.size > 0 ? (
+        <nav className="filters" aria-label="Lọc theo nền tảng">
+          <a className={`chip ${selectedPlatform ? '' : 'on'}`} href={selected ? `/?kind=${encodeURIComponent(selected)}` : '/'}>
+            Mọi nền tảng
+          </a>
+          {[...platformCounts.entries()].map(([plat, n]) => {
+            const href = `/?platform=${encodeURIComponent(plat)}` + (selected ? `&kind=${encodeURIComponent(selected)}` : '');
+            return (
+              <a key={plat} className={`chip ${selectedPlatform === plat ? 'on' : ''}`} href={href}>
+                {platformLabel(plat)} <span className="n">{n}</span>
+              </a>
+            );
+          })}
+        </nav>
+      ) : null}
+
       {!error && all.length === 0 ? (
         <div className="empty">
           <div className="empty-icon" aria-hidden="true">✓</div>
@@ -117,6 +147,9 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
               <div className="head">
                 <span className="kind">
                   <span aria-hidden="true">{meta.icon}</span> {meta.label}
+                  {item.kind === 'hr_job_post' ? (
+                    <span className="src" style={{ marginLeft: 8, fontSize: '0.78em' }}>{platformLabel((payload?.kenh as string) || 'facebook')}</span>
+                  ) : null}
                 </span>
                 <time className="time" dateTime={item.created_at}>{formatRelative(item.created_at)}</time>
               </div>
