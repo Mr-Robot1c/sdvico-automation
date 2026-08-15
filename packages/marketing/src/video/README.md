@@ -24,9 +24,15 @@ node packages/marketing/src/video/build-video.mjs [contentId] [--voice vi-VN-Nam
 Không truyền `contentId` thì lấy bài `mkt_content` mới nhất có `draft`.
 Đầu ra ở `out/video/`: `*_vertical.mp4`, `*_horizontal.mp4`, `*_thumb{1..3}.jpg`, `*_summary.json`.
 
-Mặc định còn ĐẨY bản dọc vào Hàng đợi duyệt (upload Storage + `brand_assets` + `mkt_content` + `approval_queue` pending, kênh Facebook). Người bấm Duyệt mới đăng (điều cấm 1). Thêm `--no-queue` nếu chỉ muốn tạo file, không đẩy.
+Mặc định còn ĐẨY vào Hàng đợi duyệt: upload CẢ HAI bản (ngang 16:9 + dọc 9:16) + `brand_assets` + `mkt_content` (review) + `approval_queue` (pending, kênh Facebook + TikTok). Người bấm Duyệt mới đăng (điều cấm 1). Lúc đăng: **Facebook lấy bản ngang 16:9, TikTok lấy bản dọc 9:16** (`brief.assets.video_h` / `video_v`). Thêm `--no-queue` nếu chỉ muốn tạo file.
 
 Số tổng đài/điện thoại được đọc TỪNG chữ số trong lời thoại (1900 23 23 49 = "một chín không không, hai ba, hai ba, bốn chín"), phụ đề vẫn hiện số gốc. Một cảnh TTS lỗi sẽ dùng tiếng lặng dự phòng, không kéo sập cả dây chuyền.
+
+### Chạy hàng loạt (tự động cho tất cả bài)
+```
+node packages/marketing/src/video/build-video-all.mjs [--limit N] [--no-queue]
+```
+Dựng video cho MỌI bài `mkt_content` có `draft` mà chưa có video (bỏ qua bài đã dựng). Mỗi bài chạy một tiến trình riêng nên bài lỗi không kéo sập cả mẻ. Chạy lại nhiều lần chỉ xử lý bài MỚI, nên hợp để **hẹn giờ chạy định kỳ** (vd Windows Task Scheduler chạy đêm) — đó là cách "tự động cho tất cả". Nặng (ffmpeg/Whisper/TTS), nên chạy lúc máy rảnh.
 
 ## Thành phần
 | File | Việc |
@@ -43,9 +49,10 @@ Số tổng đài/điện thoại được đọc TỪNG chữ số trong lời 
 | env.mjs | Nạp .env thật (bỏ qua .env.local giả) |
 
 ## Đã nối Hàng đợi duyệt
-- Bản dọc tự đẩy lên Storage + `brand_assets` (kind=video) + `mkt_content` (status review) +
-  `approval_queue` (pending, kênh Facebook). Người bấm Duyệt thì tái dùng luồng đăng FB sẵn có.
+- Cả hai bản (ngang 16:9 + dọc 9:16) tự đẩy lên Storage + `brand_assets` (kind=video) +
+  `mkt_content` (review) + `approval_queue` (pending, kênh Facebook + TikTok). Người bấm Duyệt thì
+  tái dùng luồng đăng sẵn có: **FB đăng bản ngang, TikTok đăng bản dọc**.
+- TikTok đang chế độ private (chưa audit) nên chỉ tài khoản thấy; qua audit là công khai được.
 
 ## Còn lại (tùy chọn)
-- Thêm kênh TikTok cho video pipeline (video dọc rất hợp TikTok, nhưng TikTok đang private vì chưa audit).
 - Đẩy bản ngang lên YouTube khi có luồng YouTube.

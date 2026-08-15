@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Dang video THEO KENH: publishContentToFacebook lay brief.assets.video_h (ngang 16:9) neu co, publishContentToTikTok lay video_v (doc 9:16); fallback assets.video (tuong thich bai cu, rotation/manual khong doi). Video pipeline gan ca video_h + video_v vao 1 mkt_content, channels ['facebook','tiktok'] -> 1 bai duyet, dang dung dinh dang moi kenh. -->
+
 <!-- re-verified: 2026-08-14 - GOP san pham trung ten o bang tong hop: productOf (do-luong/page.tsx + lib/plan.ts con bot) dung guessGroup quy cac BIEN THE ten ve 1 san pham chuan (vd "Thiet bi GSHT tau ca VIETTEL S Tracking" = "Thiet bi giam sat hanh trinh Viettel S-Tracking" -> deu group 3 -> gop 1 dong). Bai content (post_kind='content'/rotation_group='Bai content') giu nhom rieng, khong gop. Bai dang van giu ten goc, chi BANG TONG HOP gop lai. Da test guessGroup: 2 bien the -> cung group 3. -->
 
 <!-- re-verified: 2026-08-14 - Do luong them FOLLOWER + REACH (yeu cau sep "4000 follower nhung bai chi 200-300 nguoi xem"): fb-metrics.ts lay so nguoi theo doi Trang (/me?fields=followers_count,fan_count -> luu 1 dong mkt_metrics entity_ref='__page__'; field co ban, khong can read_insights) + reach tung bai (post_impressions_unique cho bai; total_video_views_unique cho video; CAN read_insights). do-luong/page.tsx: doc pageMetrics tu dong __page__ (bo qua khi dung rows), header hien "Trang co X nguoi theo doi", them cot "Nguoi xem" = reach kem % so voi follower (vd 250 (6%)). tsc + build OK. -->

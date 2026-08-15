@@ -78,7 +78,8 @@ async function publishContentToFacebook(
   };
   const assets = (c as any).brief?.assets || {};
   const imageUrl = await assetUrlOf(assets.image);
-  const videoUrl = await assetUrlOf(assets.video);
+  // Facebook ưu tiên bản NGANG 16:9 (video_h) nếu có, không thì dùng video chung.
+  const videoUrl = await assetUrlOf(assets.video_h || assets.video);
 
   try {
     // Facebook không cho gộp video và ảnh vào CHUNG một post. Cách chọn:
@@ -216,7 +217,9 @@ async function publishContentToTikTok(
     .eq('id', contentId)
     .single();
   if (!c) return { ok: false, error: 'không tìm thấy nội dung' };
-  const videoId = (c as any).brief?.assets?.video as string | undefined;
+  // TikTok ưu tiên bản DỌC 9:16 (video_v) nếu có, không thì dùng video chung.
+  const ttAssets = (c as any).brief?.assets || {};
+  const videoId = (ttAssets.video_v || ttAssets.video) as string | undefined;
   if (!videoId) {
     // TikTok bắt buộc có video.
     await client.from('mkt_posts').insert({ content_id: contentId, channel: 'tiktok', status: 'failed' });
