@@ -4,7 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
-<!-- DOC-STATUS: SUSPECT (2026-08-14) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-14 - Day chuyen video (build-video.mjs) HOAN THIEN + chay end-to-end: TTS resilient - cleanNarration (bo emoji/ky hieu la de edge-tts khong tra "No audio") + neu edge-tts van loi sau retry thi dung TIENG LANG (silentAudio, do dai uoc theo so ky tu) de MOT canh TTS hong khong keo sap CA day chuyen (truoc day 1 canh loi -> crash het). Da chay: ban doc 29s 4 canh OK (kich ban Gemini + ghep clip ffmpeg + burn phu de srt.mjs + nhan dien SDVICO). Python edge-tts 7.2.8 + faster-whisper da cai. Con lai: day dau ra len Storage/brand_assets + approval_queue (chua lam). -->
 <!-- re-verified: 2026-08-14 - Go dependency sharp khoi packages/marketing/package.json (truoc chi de logo-overlay dung; nay logo-overlay o app chuyen sang @napi-rs/canvas). Package marketing khong con dung sharp. -->
 <!-- re-verified: 2026-08-14 - packages/marketing/src/{products,social}.mjs dong bo voi apps/approval-ui/lib/gen/. Ban CLI truoc do bi cu (hashtag va prompt), lam vong rotate-run sinh bai loi mac du app da fix. Nhac tro: ban copy CLI luon phai giu dong bo voi ban app. -->
 <!-- re-verified: 2026-08-14 - content.mjs: them genOnce boc ai.models.generateContent bang AbortSignal timeout (MKT_GEN_TIMEOUT_MS mac dinh 20s), qua han huy request va lui ve ban mau (khong de SDK tu retry timeout gay treo lau). generateFormatsLLM + generateDraftLLM deu dung genOnce. -->

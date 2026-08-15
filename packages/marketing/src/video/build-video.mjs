@@ -37,11 +37,36 @@ function python(script, args) {
   });
 }
 
-async function tts(text, outPath, voice, workDir, tag) {
-  const txt = join(workDir, `${tag}.txt`);
-  await writeFile(txt, text, 'utf8');
-  await python('tts.py', ['--text-file', txt, '--out', outPath, '--voice', voice]);
+// Làm sạch lời thoại trước khi đọc: bỏ emoji/ký hiệu lạ (edge-tts dễ trả "No audio"), gộp khoảng trắng.
+function cleanNarration(text) {
+  return String(text || '')
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Tạo mp3 LẶNG dài `sec` giây (dự phòng khi TTS lỗi: cảnh vẫn dựng, có phụ đề, chỉ mất tiếng cảnh đó).
+async function silentAudio(outPath, sec) {
+  const dur = Math.max(1, sec);
+  await ffmpeg(['-y', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-t', dur.toFixed(2), '-c:a', 'libmp3lame', '-q:a', '5', outPath]);
   return probeDuration(outPath);
+}
+
+async function tts(text, outPath, voice, workDir, tag) {
+  const clean = cleanNarration(text);
+  // Thời lượng dự phòng theo số ký tự (~14 ký tự/giây tiếng Việt), tối thiểu 2 giây.
+  const estSec = Math.max(2, Math.round(clean.length / 14));
+  if (!clean) return silentAudio(outPath, estSec);
+  const txt = join(workDir, `${tag}.txt`);
+  await writeFile(txt, clean, 'utf8');
+  try {
+    await python('tts.py', ['--text-file', txt, '--out', outPath, '--voice', voice]);
+    return probeDuration(outPath);
+  } catch (e) {
+    // edge-tts vẫn lỗi sau khi retry: KHÔNG kéo sập cả dây chuyền — dùng tiếng lặng để cảnh vẫn dựng.
+    console.warn(`TTS lỗi cảnh ${tag} (${e.message}). Dùng tiếng lặng ${estSec}s để cảnh vẫn dựng, xem lại lời thoại cảnh này.`);
+    return silentAudio(outPath, estSec);
+  }
 }
 
 // Ghép audio các cảnh thành 1 file rồi chạy Whisper (artifact/ghi nhận, không chặn).
