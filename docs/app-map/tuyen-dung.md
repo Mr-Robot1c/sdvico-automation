@@ -61,7 +61,7 @@ Diễn giải từng bước:
 | Quyết ai đi tiếp | | Có |
 | Soạn thư mời | Có | |
 | Gửi thư mời | | Có, bấm trong giao diện duyệt |
-| Đăng tin lên sàn thật | Soạn và diễn tập | Có, bấm nút gửi cuối |
+| Đăng tin lên Facebook | Soạn bài, sinh poster, đăng qua Graph API sau khi đã duyệt | Có, bấm Duyệt trước khi bài được đăng |
 
 ### Cổng an toàn của mảng
 
@@ -75,13 +75,27 @@ Diễn giải từng bước:
 
 - `hr-intake` chạy 30 phút một lần (phút 0 và 30) bằng GitHub Actions schedule.
 - `hr-screen` chấm CV chạy 30 phút một lần (phút 15 và 45), lệch sau đường nạp CV. Dùng Groq API miễn phí, cần `GROQ_API_KEY`.
+- `hr-interview` soạn câu hỏi và thư mời, chạy phút 25 mỗi giờ.
+- `cron.yml` chạy 15 phút một lần, gọi ba endpoint trên Vercel: soạn bài, đăng Facebook đã duyệt, đăng LinkedIn đã duyệt.
+
+Chi tiết từng workflow và secrets ở [.github/workflows/README.md](../../.github/workflows/README.md).
 
 ### Trạng thái xây dựng
 
-- Bước 1 sinh JD: có lệnh `/hr-jd`.
-- Bước 3 nạp CV: có, chạy tự động (`hr-intake`).
-- Bước 4 chấm CV: có, skill `cv-screening` và `packages/hr/src/screen`, chạy tự động (`hr-screen`).
-- Bước 2 đăng tin, bước 6 câu hỏi phỏng vấn và thư mời: chưa làm.
+- Bước 1 sinh JD: xong. Có lệnh `/hr-jd` và trang Tạo JD trong giao diện, sinh bốn phiên bản bằng Groq.
+- Bước 2 đăng tin: xong cho Facebook, đăng qua Graph API, có poster tự sinh (satori và sharp), hẹn giờ đăng, gỡ bài cũ khi vượt hạn mức. LinkedIn xong phần code, đang chờ token nên chưa bật.
+- Bước 3 nạp CV: xong, chạy tự động (`hr-intake`).
+- Bước 4 chấm CV: xong, skill `cv-screening` và `packages/hr/src/screen`, chạy tự động (`hr-screen`).
+- Bước 5 xếp hạng và quyết: xong, trang Hồ sơ ứng viên.
+- Bước 6 câu hỏi phỏng vấn và thư mời: xong. Có thêm trang công khai `/phong-van/[token]` để ứng viên tự chọn khung giờ.
+- Bước 7 gửi thư: xong, gửi qua Gmail SMTP khi người vận hành bấm Duyệt. Không có đường tự gửi, điều cấm 1.
+
+Còn thiếu, xếp theo mức cần kíp:
+
+1. Đăng nhập nội bộ cho giao diện duyệt. Hiện chỉ có HTTP Basic Auth qua middleware, app đọc ghi dữ liệu ứng viên bằng khóa service role. Điều cấm 6.
+2. Hộp thư nhận CV vẫn là hộp thư thử. Phải đổi sang hộp thư công ty trước khi có CV thật.
+3. Ghi consent và `retention_until` theo Nghị định 13/2023. Cột đã có trong lược đồ, chưa có chỗ nào điền thật.
+4. Trang báo cáo đọc từ `run_log` để đo bốn chỉ tiêu nghiệm thu bên dưới. Hiện chưa có số liệu.
 
 ### Chỉ tiêu nghiệm thu liên quan
 
@@ -90,4 +104,4 @@ Diễn giải từng bước:
 - Thời gian soạn một mô tả công việc dưới 20 phút.
 - Tin tuyển dụng đăng lên tài khoản thật một vị trí, có kiểm chứng bằng ảnh chụp.
 
-Cập nhật lần cuối: 10/8/2026.
+Cập nhật lần cuối: 15/8/2026.

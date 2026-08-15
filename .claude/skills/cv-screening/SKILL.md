@@ -6,7 +6,7 @@ description: Chấm CV theo thang điểm cố định cho SDVICO, ẩn danh tr�
 # cv-screening — chấm CV theo thang cố định
 
 > Nguồn sự thật cho con người. Thang điểm trong code ở `packages/hr/src/screen/rubric.js` phải khớp file này.
-> Đọc `CLAUDE.md` và `docs/app-map/tuyen-dung.md` trước. Điều cấm 2, 5, 6 áp dụng ở đây.
+> Đọc `CLAUDE.md` (hoặc `AGENTS.md`, cùng một nội dung) và `docs/app-map/tuyen-dung.md` trước. Điều cấm 2, 5, 6 áp dụng ở đây.
 
 ## Mục đích
 
