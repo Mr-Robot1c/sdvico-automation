@@ -1,18 +1,20 @@
-name: Cron — Chu kỳ 15 phút
+name: Cron — Chu kỳ 15 phút (chạy tay)
 
 # Gọi ba endpoint chạy nền trên Vercel: soạn bài, đăng bài Facebook, đăng bài LinkedIn.
 #
-# Vì sao gộp ba bước vào một job thay vì ba workflow riêng: GitHub tính tiền theo job và
-# làm tròn lên một phút. Ba workflow riêng chạy mỗi 15 phút tốn 288 phút một ngày, một job
-# gộp tốn 96 phút. Repo private chỉ có 2.000 phút miễn phí mỗi tháng.
+# ĐÃ TẮT LỊCH. Lịch 15 phút chuyển sang cron-job.org, hướng dẫn ở docs/cron-job-org.md.
+# Hai lý do bỏ lịch ở đây:
+#   1. Job hỏng là GitHub gửi mail, mỗi 15 phút một lần, rất phiền.
+#   2. Repo private chỉ có 2.000 phút Actions miễn phí mỗi tháng, mà GitHub làm tròn
+#      mỗi job lên một phút. Riêng workflow này đã ngốn khoảng 96 phút một ngày.
 #
-# Mỗi bước có if: always() nên một bước hỏng không chặn bước sau, giống như khi còn tách
-# thành các workflow riêng.
+# Giữ workflow_dispatch để chạy tay khi cần chẩn đoán hoặc muốn thúc worker chạy ngay,
+# không phải chờ lượt kế tiếp của cron-job.org.
+#
+# Mỗi bước có if: always() nên một bước hỏng không chặn bước sau.
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '*/15 * * * *'
 
 concurrency:
   group: cron-15p
@@ -28,28 +30,30 @@ jobs:
     steps:
       - name: Soạn bài, /api/cron/compose
         run: |
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" -X GET \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "$VERCEL_URL/api/cron/compose")
+          # Không dùng curl -f: cờ đó nuốt mất nội dung lỗi, chỉ còn con số, rất khó đoán bệnh.
+          # Ở đây in cả thân phản hồi rồi mới xét mã HTTP.
+          BODY=$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer $CRON_SECRET" "$VERCEL_URL/api/cron/compose")
+          STATUS=$(printf '%s' "$BODY" | tail -n1)
           echo "HTTP $STATUS"
-          [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]
+          printf '%s\n' "$BODY" | sed '$d'
+          case "$STATUS" in 2??) ;; *) echo "Lỗi. 401 là sai hoặc thiếu CRON_SECRET, 503 là thiếu APP_PASSWORD, 404 là sai VERCEL_URL."; exit 1;; esac
 
       - name: Đăng bài Facebook đã duyệt, /api/cron/publish
         if: always()
         run: |
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" -X GET \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "$VERCEL_URL/api/cron/publish")
+          BODY=$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer $CRON_SECRET" "$VERCEL_URL/api/cron/publish")
+          STATUS=$(printf '%s' "$BODY" | tail -n1)
           echo "HTTP $STATUS"
-          [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]
+          printf '%s\n' "$BODY" | sed '$d'
+          case "$STATUS" in 2??) ;; *) exit 1;; esac
 
       # Chưa đặt LINKEDIN_ACCESS_TOKEN và LINKEDIN_ORG_URN trên Vercel thì endpoint trả 200
       # kèm lý do linkedin_not_configured, không đăng gì. Đặt khóa vào là chạy, không cần sửa file này.
       - name: Đăng bài LinkedIn đã duyệt, /api/cron/linkedin-publish
         if: always()
         run: |
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" -X GET \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "$VERCEL_URL/api/cron/linkedin-publish")
+          BODY=$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer $CRON_SECRET" "$VERCEL_URL/api/cron/linkedin-publish")
+          STATUS=$(printf '%s' "$BODY" | tail -n1)
           echo "HTTP $STATUS"
-          [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]
+          printf '%s\n' "$BODY" | sed '$d'
+          case "$STATUS" in 2??) ;; *) exit 1;; esac

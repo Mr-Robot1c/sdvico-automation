@@ -8,7 +8,7 @@ Khóa và mật khẩu đặt trong GitHub Secrets, không viết thẳng vào f
 
 | File | Lịch | Việc |
 |---|---|---|
-| `cron.yml` | 15 phút một lần | Gọi ba endpoint trên Vercel: soạn bài, đăng Facebook đã duyệt, đăng LinkedIn đã duyệt |
+| `cron.yml` | Đã tắt lịch, chạy tay | Gọi ba endpoint trên Vercel: soạn bài, đăng Facebook đã duyệt, đăng LinkedIn đã duyệt. Lịch 15 phút đã chuyển sang cron-job.org, xem [docs/cron-job-org.md](../../docs/cron-job-org.md) |
 | `hr-intake.yml` | 30 phút một lần | Nạp CV từ hộp thư, trích, chuẩn hóa, khử trùng lặp |
 | `hr-screen.yml` | Phút 15 và 45 mỗi giờ | Chấm CV ẩn danh, xếp hạng. Không tự loại ai, điều cấm 2 |
 | `hr-interview.yml` | Phút 25 mỗi giờ | Soạn câu hỏi và thư mời cho hồ sơ đã đưa vào phỏng vấn |
@@ -35,10 +35,11 @@ Khóa và mật khẩu đặt trong GitHub Secrets, không viết thẳng vào f
 ## Hạn mức phút chạy, cần theo dõi
 
 Repo private chỉ có 2.000 phút Actions miễn phí mỗi tháng, và GitHub làm tròn mỗi job lên
-một phút. Đây là lý do `cron.yml` gộp ba lệnh gọi vào một job thay vì tách ba workflow.
+một phút dù lệnh chỉ chạy vài giây.
 
-Ước tính hiện tại: `cron.yml` khoảng 96 phút một ngày, `hr-intake` và `hr-screen` mỗi cái
-khoảng 48 lượt một ngày và có bước `npm ci` nên nặng hơn. Cộng lại vẫn vượt mức miễn phí.
-Nếu Actions báo hết phút thì có hai đường: giãn `cron.yml` xuống 30 phút một lần, hoặc
-chuyển phần gọi endpoint sang một dịch vụ ping bên ngoài như cron-job.org, giữ Actions cho
-các việc cần checkout code.
+Vì lý do đó, lịch 15 phút gọi ba endpoint đã chuyển sang cron-job.org, xem
+[docs/cron-job-org.md](../../docs/cron-job-org.md). Còn lại trên Actions là `hr-intake`,
+`hr-screen` và `hr-interview`, ba việc cần checkout code và chạy Node nên không chuyển đi
+được, khoảng 120 lượt một ngày cộng lại.
+
+Nếu vẫn chạm hạn mức thì giãn `hr-intake` và `hr-screen` từ 30 phút xuống một giờ một lần.

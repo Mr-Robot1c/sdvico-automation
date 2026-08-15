@@ -113,9 +113,15 @@ Các việc nền chạy theo lịch qua GitHub Actions. Cần nạp khóa vào 
    - `CRON_SECRET` và `VERCEL_URL` (địa chỉ đầy đủ của app, dạng https://ten-app.vercel.app, không có dấu gạch chéo cuối)
    - `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`
 2. Danh sách workflow, lịch chạy và secrets tương ứng ở `.github/workflows/README.md`.
-3. Kiểm nhanh: vào tab Actions, chọn `Cron — Chu kỳ 15 phút`, bấm Run workflow. Cả ba bước phải trả HTTP 200. Bước LinkedIn trả 200 kèm `linkedin_not_configured` là bình thường khi chưa đặt token.
+3. Kiểm nhanh: vào tab Actions, chọn `Cron — Chu kỳ 15 phút (chạy tay)`, bấm Run workflow. Cả ba bước phải trả HTTP 200. Bước LinkedIn trả 200 kèm `linkedin_not_configured` là bình thường khi chưa đặt token.
 
-Chú ý hạn mức: repo private chỉ có 2.000 phút Actions miễn phí mỗi tháng. Nếu Actions báo hết phút, giãn `cron.yml` xuống 30 phút một lần hoặc chuyển phần gọi endpoint sang dịch vụ ping bên ngoài.
+Chú ý hạn mức: repo private chỉ có 2.000 phút Actions miễn phí mỗi tháng, và GitHub làm tròn mỗi lượt chạy lên một phút.
+
+## 6b. Lịch gọi ba endpoint chạy nền, đặt ở cron-job.org
+
+Ba việc soạn bài, đăng Facebook và đăng LinkedIn chạy 15 phút một lần bằng cron-job.org, không phải GitHub Actions. Cách dựng ở [cron-job-org.md](cron-job-org.md).
+
+Lý do tách ra: mỗi lượt chỉ là một lệnh gọi HTTP mất vài giây, nhưng GitHub tính tròn một phút, và job hỏng thì gửi mail mỗi 15 phút. Ba việc còn lại (`hr-intake`, `hr-screen`, `hr-interview`) cần checkout code và chạy Node nên vẫn ở Actions.
 
 ## 7. Đăng tin Facebook
 
@@ -123,7 +129,7 @@ Chạy tự động qua giao diện, không cần gõ lệnh.
 
 1. Trang Vị trí, bấm Soạn bài. Máy viết nội dung và sinh poster, đẩy vào hàng đợi duyệt.
 2. Trang Duyệt và gửi, xem lại nội dung, sửa nếu cần, bấm Duyệt. Đây là cổng của điều cấm 1.
-3. Bài đã duyệt được worker `cron.yml` đăng lên Page trong vòng 15 phút. Đặt giờ hẹn thì Facebook tự đăng đúng giờ.
+3. Bài đã duyệt được worker đăng lên Page trong vòng 15 phút, lịch chạy đặt ở cron-job.org. Đặt giờ hẹn thì Facebook tự đăng đúng giờ.
 4. Bài đăng hỏng hoặc thừa thì xóa trong giao diện, hệ thống gỡ luôn khỏi Facebook.
 
 Vẫn giữ đường chạy tay trên máy khi cần chẩn đoán, cần `.env` đủ `SUPABASE_*`, `GROQ_API_KEY` và các khóa `FACEBOOK_*`:

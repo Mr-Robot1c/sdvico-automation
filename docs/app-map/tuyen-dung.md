@@ -76,7 +76,7 @@ Diễn giải từng bước:
 - `hr-intake` chạy 30 phút một lần (phút 0 và 30) bằng GitHub Actions schedule.
 - `hr-screen` chấm CV chạy 30 phút một lần (phút 15 và 45), lệch sau đường nạp CV. Dùng Groq API miễn phí, cần `GROQ_API_KEY`.
 - `hr-interview` soạn câu hỏi và thư mời, chạy phút 25 mỗi giờ.
-- `cron.yml` chạy 15 phút một lần, gọi ba endpoint trên Vercel: soạn bài, đăng Facebook đã duyệt, đăng LinkedIn đã duyệt.
+- Ba endpoint trên Vercel (soạn bài, đăng Facebook đã duyệt, đăng LinkedIn đã duyệt) chạy 15 phút một lần bằng cron-job.org, xem [docs/cron-job-org.md](../cron-job-org.md). Workflow `cron.yml` giữ lại để chạy tay.
 
 Chi tiết từng workflow và secrets ở [.github/workflows/README.md](../../.github/workflows/README.md).
 
