@@ -9,7 +9,7 @@ Vị trí cần tuyển
   1. Sinh mô tả công việc, lệnh hr-jd
   2. Đăng tin, bán tự động qua Playwright, dừng trước nút gửi
 Ứng viên nộp hồ sơ
-  3. Nạp CV từ hộp thư, lệnh hr-intake, chạy 30 phút một lần
+  3. Nạp CV từ hộp thư, lệnh hr-intake, chạy đầu mỗi giờ
   4. Chấm CV, skill cv-screening
   5. Xếp hạng, con người quyết, không tự động loại
   6. Sinh câu hỏi phỏng vấn và thư mời, đưa vào hàng đợi duyệt
@@ -73,9 +73,7 @@ Diễn giải từng bước:
 
 ### Lịch chạy
 
-- `hr-intake` chạy 30 phút một lần (phút 0 và 30) bằng GitHub Actions schedule.
-- `hr-screen` chấm CV chạy 30 phút một lần (phút 15 và 45), lệch sau đường nạp CV. Dùng Groq API miễn phí, cần `GROQ_API_KEY`.
-- `hr-interview` soạn câu hỏi và thư mời, chạy phút 25 mỗi giờ.
+- `hr.yml` chạy đầu mỗi giờ bằng GitHub Actions, làm ba việc nối nhau trong một lượt: nạp CV, chấm CV, soạn câu hỏi và thư mời. Chấm CV dùng Groq API miễn phí, cần `GROQ_API_KEY`.
 - Ba endpoint trên Vercel (soạn bài, đăng Facebook đã duyệt, đăng LinkedIn đã duyệt) chạy 15 phút một lần bằng cron-job.org, xem [docs/cron-job-org.md](../cron-job-org.md). Workflow `cron.yml` giữ lại để chạy tay.
 
 Chi tiết từng workflow và secrets ở [.github/workflows/README.md](../../.github/workflows/README.md).
@@ -84,8 +82,8 @@ Chi tiết từng workflow và secrets ở [.github/workflows/README.md](../../.
 
 - Bước 1 sinh JD: xong. Có lệnh `/hr-jd` và trang Tạo JD trong giao diện, sinh bốn phiên bản bằng Groq.
 - Bước 2 đăng tin: xong cho Facebook, đăng qua Graph API, có poster tự sinh (satori và sharp), hẹn giờ đăng, gỡ bài cũ khi vượt hạn mức. LinkedIn xong phần code, đang chờ token nên chưa bật.
-- Bước 3 nạp CV: xong, chạy tự động (`hr-intake`).
-- Bước 4 chấm CV: xong, skill `cv-screening` và `packages/hr/src/screen`, chạy tự động (`hr-screen`).
+- Bước 3 nạp CV: xong, chạy tự động, bước 1 của `hr.yml`.
+- Bước 4 chấm CV: xong, skill `cv-screening` và `packages/hr/src/screen`, chạy tự động, bước 2 của `hr.yml`.
 - Bước 5 xếp hạng và quyết: xong, trang Hồ sơ ứng viên.
 - Bước 6 câu hỏi phỏng vấn và thư mời: xong. Có thêm trang công khai `/phong-van/[token]` để ứng viên tự chọn khung giờ.
 - Bước 7 gửi thư: xong, gửi qua Gmail SMTP khi người vận hành bấm Duyệt. Không có đường tự gửi, điều cấm 1.

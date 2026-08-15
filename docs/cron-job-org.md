@@ -97,8 +97,8 @@ Lấy chuỗi in ra rồi đặt vào đúng ba chỗ, phải giống hệt nhau
 - Vào GitHub, tab Actions, xác nhận `Cron — Chu kỳ 15 phút (chạy tay)` không còn tự chạy nữa.
   Mail báo lỗi sẽ ngừng.
 - Hai secret `CRON_SECRET` và `VERCEL_URL` trên GitHub vẫn giữ, vì nút chạy tay còn dùng.
-- Đường nạp CV (`hr-intake`), chấm CV (`hr-screen`) và soạn thư phỏng vấn (`hr-interview`)
-  vẫn ở GitHub Actions. Ba việc đó cần checkout code và chạy Node nên không chuyển đi được,
+- Nạp CV, chấm CV và soạn thư phỏng vấn vẫn ở GitHub Actions, gộp trong `hr.yml` chạy
+  đầu mỗi giờ. Ba việc đó cần checkout code và chạy Node nên không chuyển đi được,
   và lịch của chúng thưa hơn nhiều.
 
 ## Nếu muốn quay lại GitHub Actions

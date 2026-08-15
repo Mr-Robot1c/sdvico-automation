@@ -1,0 +1,81 @@
+name: HR — Vòng chạy mỗi giờ
+
+# Ba việc nền của mảng Tuyển dụng, chạy nối nhau trong một lượt: nạp CV, chấm CV,
+# soạn câu hỏi và thư mời phỏng vấn. Thay cho hr-intake.yml, hr-screen.yml, hr-interview.yml.
+#
+# Vì sao gộp và vì sao một giờ một lần:
+# GitHub làm tròn mỗi lượt chạy job lên một phút, dù lệnh chỉ mất vài giây. Ba workflow
+# riêng chạy 120 lượt một ngày, tức là ít nhất 3.600 phút một tháng, vượt xa mức miễn phí
+# 2.000 phút của repo private. Chạy nhanh hơn cũng không cứu được, vì sàn một phút mỗi lượt
+# là cố định. Chỉ có giảm số lượt mới thoát. Gộp lại còn 24 lượt một ngày, tầm 1.440 phút
+# một tháng, nằm gọn trong mức miễn phí.
+#
+# Gộp còn nhanh hơn cho cả dây chuyền. Trước đây một CV về lúc 11 giờ 01 phải chờ nạp lúc
+# 11 giờ 30, chấm lúc 11 giờ 45, soạn thư lúc 12 giờ 25. Nay ba bước xong trong cùng một lượt.
+#
+# Điều cấm 1 và 2 giữ nguyên: máy nạp, máy chấm, máy soạn thư, không có nhánh nào tự loại
+# ứng viên hay tự gửi thư. Mọi thứ dừng ở approval_queue chờ người bấm.
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # đầu mỗi giờ
+  workflow_dispatch: {}
+
+# Không chạy chồng lượt, tránh nạp trùng một thư hoặc chấm trùng một hồ sơ.
+concurrency:
+  group: hr-vong-chay
+  cancel-in-progress: false
+
+jobs:
+  vong-chay:
+    name: Nạp CV, chấm CV, soạn thư mời
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Chỉ cài phụ thuộc của packages/hr, không kéo theo next, react, sharp, satori của
+      # apps/approval-ui. Ba script dưới đây không đụng tới trình duyệt nên bỏ luôn phần
+      # tải Chromium của Playwright.
+      - name: Cài phụ thuộc
+        run: npm ci --workspace packages/hr --include-workspace-root
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      # Ba bước dưới đều có if: always() nên một bước hỏng không chặn bước sau, giống hệt
+      # khi còn tách thành ba workflow riêng.
+      - name: 1. Nạp CV từ hộp thư
+        if: always()
+        run: node packages/hr/src/intake/run.mjs
+        env:
+          MAIL_IMAP_HOST: ${{ secrets.MAIL_IMAP_HOST }}
+          MAIL_IMAP_PORT: ${{ secrets.MAIL_IMAP_PORT }}
+          MAIL_IMAP_USER: ${{ secrets.MAIL_IMAP_USER }}
+          MAIL_IMAP_PASSWORD: ${{ secrets.MAIL_IMAP_PASSWORD }}
+          MAIL_IMAP_MAILBOX: ${{ secrets.MAIL_IMAP_MAILBOX }}
+          MAIL_INTAKE_ALLOWED_SENDERS: ${{ secrets.MAIL_INTAKE_ALLOWED_SENDERS }}
+          CV_BUCKET: ${{ secrets.CV_BUCKET }}
+          HR_RETENTION_MONTHS: ${{ secrets.HR_RETENTION_MONTHS }}
+
+      # Ẩn danh trường nhạy cảm trước khi chấm, chống thiên vị. Máy chấm và xếp, người quyết.
+      - name: 2. Chấm CV
+        if: always()
+        run: node packages/hr/src/screen/run.mjs
+        env:
+          HR_SCREEN_MODEL: ${{ secrets.HR_SCREEN_MODEL }}
+
+      # Chỉ soạn cho hồ sơ người vận hành đã chọn vào bước phỏng vấn. Thư mời vào
+      # approval_queue trạng thái pending, người bấm gửi.
+      - name: 3. Soạn câu hỏi phỏng vấn và thư mời
+        if: always()
+        run: node packages/hr/src/interview/run.mjs
+        env:
+          HR_INTERVIEW_MODEL: ${{ secrets.HR_INTERVIEW_MODEL }}

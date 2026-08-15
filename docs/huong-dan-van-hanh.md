@@ -121,7 +121,7 @@ Chú ý hạn mức: repo private chỉ có 2.000 phút Actions miễn phí mỗ
 
 Ba việc soạn bài, đăng Facebook và đăng LinkedIn chạy 15 phút một lần bằng cron-job.org, không phải GitHub Actions. Cách dựng ở [cron-job-org.md](cron-job-org.md).
 
-Lý do tách ra: mỗi lượt chỉ là một lệnh gọi HTTP mất vài giây, nhưng GitHub tính tròn một phút, và job hỏng thì gửi mail mỗi 15 phút. Ba việc còn lại (`hr-intake`, `hr-screen`, `hr-interview`) cần checkout code và chạy Node nên vẫn ở Actions.
+Lý do tách ra: mỗi lượt chỉ là một lệnh gọi HTTP mất vài giây, nhưng GitHub tính tròn một phút, và job hỏng thì gửi mail mỗi 15 phút. Ba việc nạp CV, chấm CV và soạn thư phỏng vấn cần checkout code và chạy Node nên vẫn ở Actions, gộp trong `hr.yml` chạy đầu mỗi giờ.
 
 ## 7. Đăng tin Facebook
 

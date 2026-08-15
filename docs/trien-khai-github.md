@@ -1,6 +1,6 @@
 # Triển khai lên GitHub để chạy tự động trên đám mây
 
-> Mục tiêu: đẩy repo lên GitHub và đặt Secrets, để lịch `hr-intake` tự chạy 30 phút một lần, gửi CV vào hộp thư là tự lên Supabase mà không cần bật máy.
+> Mục tiêu: đẩy repo lên GitHub và đặt Secrets, để workflow `hr.yml` tự chạy đầu mỗi giờ, gửi CV vào hộp thư là tự lên Supabase mà không cần bật máy.
 
 Trạng thái hiện tại: remote đã trỏ sẵn `https://github.com/ggakasr/sdvico-automation.git`, nhánh `main`. `.env` đã bị Git bỏ qua nên khóa không lên GitHub (điều cấm 7).
 
@@ -44,14 +44,14 @@ Ghi chú:
 
 ## Bước 3. Chạy thử và kiểm tra
 
-Không cần đợi 30 phút, chạy tay một lượt để kiểm:
+Không cần đợi hết giờ, chạy tay một lượt để kiểm:
 
-1. Tab **Actions**, chọn workflow **hr-intake**, bấm **Run workflow**, nhánh `main`.
-2. Mở lượt chạy, xem log bước "Nạp CV từ hộp thư". Thấy `ghi_ung_vien` lớn hơn 0 là nạp được.
+1. Tab **Actions**, chọn workflow **HR — Vòng chạy mỗi giờ**, bấm **Run workflow**, nhánh `main`.
+2. Mở lượt chạy, xem log bước "1. Nạp CV từ hộp thư". Thấy `ghi_ung_vien` lớn hơn 0 là nạp được. Hai bước sau chấm CV và soạn thư mời chạy tiếp trong cùng lượt.
 3. Kiểm Supabase: bảng `hr_candidates` có hồ sơ mới, bảng `run_log` có dòng `hr-intake`.
 4. Mở giao diện duyệt, tab Hồ sơ ứng viên, thấy hồ sơ mới.
 
-Sau đó lịch tự chạy 30 phút một lần. Gửi CV mới (từ chính `inoudead@gmail.com`) rồi đợi lượt kế là thấy trên Supabase.
+Sau đó lịch tự chạy đầu mỗi giờ. Gửi CV mới (từ chính `inoudead@gmail.com`) rồi đợi lượt kế là thấy trên Supabase.
 
 ## Lưu ý quan trọng
 

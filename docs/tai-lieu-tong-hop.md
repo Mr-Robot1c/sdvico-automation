@@ -273,7 +273,7 @@ flowchart TD
     V["Vị trí cần tuyển"] --> S1["1. Sinh JD, lệnh hr-jd"]
     S1 --> S2["2. Đăng tin, bán tự động, dừng trước nút gửi"]
     S2 --> U["Ứng viên nộp hồ sơ vào hộp thư"]
-    U --> S3["3. Nạp CV, lệnh hr-intake, 30 phút một lần"]
+    U --> S3["3. Nạp CV, lệnh hr-intake, đầu mỗi giờ"]
     S3 --> S4["4. Chấm CV, skill cv-screening"]
     S4 --> S5["5. Xếp hạng, con người quyết"]
     S5 --> S6["6. Sinh câu hỏi phỏng vấn và thư mời, chờ duyệt"]
@@ -331,9 +331,9 @@ Bước sinh nội dung do Claude Code làm theo hướng dẫn trong `hr-jd.md`
 
 ### 6.3. Đường nạp CV, lệnh /hr-intake
 
-**Trạng thái:** ✅ **Vị trí:** `.claude/commands/hr-intake.md`, `packages/hr/src/intake/`, `.github/workflows/hr-intake.yml`.
+**Trạng thái:** ✅ **Vị trí:** `.claude/commands/hr-intake.md`, `packages/hr/src/intake/`, bước 1 của `.github/workflows/hr.yml`.
 
-**Mục tiêu:** đọc hộp thư nhận hồ sơ, trích văn bản, chuẩn hóa JSON, khử trùng lặp, lưu tệp và ghi bản ghi. Chạy 30 phút một lần.
+**Mục tiêu:** đọc hộp thư nhận hồ sơ, trích văn bản, chuẩn hóa JSON, khử trùng lặp, lưu tệp và ghi bản ghi. Chạy đầu mỗi giờ.
 
 **Đầu vào cần cung cấp:**
 
@@ -605,4 +605,4 @@ Chạy giao diện duyệt ở máy phát triển:
 npm run ui:dev
 ```
 
-Tác vụ theo lịch: `.github/workflows/hr-intake.yml` chạy 30 phút một lần, `.github/workflows/daily-demo.yml` chạy mốc demo. Cả hai đọc khóa từ GitHub Secrets.
+Tác vụ theo lịch: `.github/workflows/hr.yml` chạy đầu mỗi giờ, gồm nạp CV, chấm CV và soạn thư mời nối nhau trong một lượt. `.github/workflows/daily-demo.yml` đã tắt lịch, giữ để diễn thử. Cả hai đọc khóa từ GitHub Secrets.
