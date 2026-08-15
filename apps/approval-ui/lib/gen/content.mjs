@@ -458,10 +458,9 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '', format
 // Sinh nội dung, ưu tiên Gemini khi có khóa, không thì lùi về bản mẫu. Luôn trả draft dùng được.
 export async function generateContentAsync(kw, { facts = [], assetHint = '', format = 'social', contentType = 'tips' } = {}) {
   const brief = buildBrief(kw);
-  // Gắn hashtag ĐÚNG theo hình + tiêu đề, chỉ cho bài mạng xã hội (bài dài/kịch bản không dùng thẻ).
+  // Gắn hashtag ĐÚNG theo hình + tiêu đề cho MỌI định dạng (bài ngắn, bài dài, kịch bản video).
   const withTags = (draft) => {
     const body = String(draft || '').trim();
-    if (format !== 'social') return body;
     const tags = hashtagBlockFor(`${assetHint} ${brief.keyword || ''}`);
     return tags ? `${body}\n\n${tags}` : body;
   };
@@ -473,15 +472,15 @@ export async function generateContentAsync(kw, { facts = [], assetHint = '', for
       console.warn('Gemini lỗi, lùi về bản mẫu:', e.message);
     }
   }
-  // Bản mẫu theo đúng định dạng kênh khi không có Gemini.
+  // Bản mẫu theo đúng định dạng kênh khi không có Gemini (đều gắn hashtag như bản LLM).
   if (format === 'video') {
     const v = buildVideoScript(brief);
-    return { title: v.title, brief, draft: v.draft };
+    return { title: v.title, brief, draft: withTags(v.draft) };
   }
   if (format === 'social') {
     const s = buildSocial(brief);
     return { title: s.title, brief, draft: withTags(s.draft) };
   }
   const { title, body } = buildDraft(brief);
-  return { title, brief, draft: body };
+  return { title, brief, draft: withTags(body) };
 }

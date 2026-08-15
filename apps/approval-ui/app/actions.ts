@@ -81,14 +81,25 @@ async function publishContentToFacebook(
   const videoUrl = await assetUrlOf(assets.video);
 
   try {
-    // Facebook không cho gộp video và ảnh vào CHUNG một post. Nên:
-    //  - Có video: đăng video (/videos) kèm caption; nếu kèm cả ảnh thì thả ảnh vào BÌNH LUẬN đầu.
-    //  - Chỉ ảnh: đăng ảnh (/photos). Không có gì: đăng chữ (/feed).
+    // Facebook không cho gộp video và ảnh vào CHUNG một post. Cách chọn:
+    //  - Có video: đăng video (/videos); kèm ảnh thì thả ảnh vào BÌNH LUẬN đầu (chờ video xử lý xong).
+    //  - Bài CHỮ DÀI + ảnh: đăng CHỮ (/feed) để hiện đủ nội dung, rồi thả ảnh vào bình luận đầu (thay
+    //    vì nhét chữ dài làm caption ảnh /photos bị gấp lại "Xem thêm").
+    //  - Bài NGẮN + ảnh: đăng ảnh (/photos) kèm caption (ảnh nổi bật, hợp bài quảng cáo ngắn).
+    //  - Không ảnh không video: đăng chữ (/feed).
+    const LONG_TEXT = 500; // ký tự: trên mức này coi là bài dài -> ưu tiên chữ làm bài chính
     let endpoint: string;
     let body: URLSearchParams;
+    let commentImage = false; // có thả ảnh vào bình luận đầu sau khi đăng không
+    let waitVideo = false;    // có phải chờ video xử lý xong trước khi thả ảnh không
     if (videoUrl) {
       endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/videos`;
       body = new URLSearchParams({ file_url: videoUrl, description: message, access_token: TOKEN });
+      if (imageUrl) { commentImage = true; waitVideo = true; }
+    } else if (imageUrl && message.length > LONG_TEXT) {
+      endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
+      body = new URLSearchParams({ message, access_token: TOKEN });
+      commentImage = true;
     } else if (imageUrl) {
       endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/photos`;
       body = new URLSearchParams({ url: imageUrl, caption: message, access_token: TOKEN });
@@ -99,26 +110,26 @@ async function publishContentToFacebook(
     const res = await fetchWithRetry(endpoint, { method: 'POST', body });
     const json: any = await res.json();
     if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
-    // /videos trả {id: videoId}; /feed và /photos trả post_id.
+    // /videos trả {id: videoId}; /feed và /photos trả {id} hoặc {post_id}.
     const postId = json.post_id || json.id;
     const externalUrl = videoUrl
       ? `https://www.facebook.com/${PAGE_ID}/videos/${json.id}`
       : `https://www.facebook.com/${postId}`;
 
-    // Bài có CẢ video lẫn ảnh: thả ảnh vào bình luận đầu của bài video (FB chặn gộp chung).
-    // Phải CHỜ video xử lý xong mới thả được ảnh. Video đã lên là chính; thả ảnh lỗi thì chỉ
-    // cảnh báo, KHÔNG đánh hỏng cả bài (tránh đăng lại video). Ghi lại phản hồi THÔ của FB để soi lỗi.
+    // Thả ảnh vào BÌNH LUẬN đầu khi cần (bài video+ảnh, hoặc bài chữ dài+ảnh). Video phải chờ xử lý
+    // xong mới thả được. Thả ảnh lỗi thì chỉ cảnh báo, KHÔNG đánh hỏng cả bài. Ghi phản hồi thô để soi.
     let warn: string | undefined;
     let commentDebug: any = null;
-    if (videoUrl && imageUrl) {
-      const ready = await waitFacebookVideoReady(json.id, VERSION, TOKEN);
+    if (commentImage && imageUrl) {
+      const targetId = json.id || postId; // video: id video; feed: id bài
+      const ready = waitVideo ? await waitFacebookVideoReady(json.id, VERSION, TOKEN) : true;
       if (!ready) {
         warn = 'Video chưa xử lý kịp nên chưa thả được ảnh vào bình luận.';
         commentDebug = { step: 'wait_video', ready: false };
         console.error('[facebook] ' + warn);
       } else {
         try {
-          const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${json.id}/comments`, {
+          const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${targetId}/comments`, {
             method: 'POST',
             body: new URLSearchParams({ attachment_url: imageUrl, access_token: TOKEN })
           });
@@ -169,6 +180,22 @@ async function publishContentToFacebook(
 
 // Đăng một bài đã duyệt lên TikTok (Direct Post). Cần có video. Máy soạn, người bấm Duyệt —
 // hàm này chạy SAU khi người đã bấm Duyệt. Chưa kết nối TikTok thì báo lỗi, không chặn việc duyệt.
+// TikTok là nền video, caption ngắn — bài dài để nguyên sẽ bị cắt cụt. Rút gọn: lấy đoạn đầu
+// (tối đa ~200 ký tự, cắt ở ranh giới từ) rồi giữ khối hashtag ở cuối (nếu có).
+function shortCaptionForTikTok(draft: string, maxLen = 200): string {
+  const lines = String(draft || '').trim().split('\n');
+  const tagParts: string[] = [];
+  while (lines.length && /^\s*#/.test(lines[lines.length - 1])) {
+    tagParts.unshift((lines.pop() as string).trim());
+  }
+  let bodyText = lines.join('\n').trim();
+  if (bodyText.length > maxLen) {
+    bodyText = bodyText.slice(0, maxLen).replace(/\s+\S*$/, '').trim() + '...';
+  }
+  const tags = tagParts.join(' ').trim();
+  return [bodyText, tags].filter(Boolean).join('\n\n');
+}
+
 async function publishContentToTikTok(
   client: ReturnType<typeof getServerClient>,
   contentId: string
@@ -202,7 +229,8 @@ async function publishContentToTikTok(
     return { ok: false, error: 'không thấy file video trong kho' };
   }
   const videoUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
-  const caption = String((c as any).draft || (c as any).title || '').trim();
+  // Rút gọn cho TikTok để bài dài không bị cắt cụt (giữ hashtag).
+  const caption = shortCaptionForTikTok(String((c as any).draft || (c as any).title || ''));
 
   const result = await postVideoToTikTok(client, { videoUrl, caption });
   try {

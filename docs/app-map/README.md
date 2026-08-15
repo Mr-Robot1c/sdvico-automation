@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - 3 fix Xuong san xuat + dang bai: (1) HASHTAG cho MOI dinh dang (content.mjs withTags bo chan social-only + gan cho ca ban mau video/article) - bai dai + kich ban video nay cung co hashtag dung san pham. (2) publishContentToFacebook: bai ANH + CHU DAI (>500 ky tu) dang CHU len /feed roi tha ANH vao binh luan dau (chu hien du, anh duoi), thay vi /photos nhet chu dai lam caption bi gap "Xem them"; bai NGAN + anh van /photos (anh noi bat). Gop logic comment anh (video-wait vs feed-no-wait) qua co commentImage/waitVideo. (3) publishContentToTikTok: caption qua shortCaptionForTikTok (doan dau ~200 ky tu cat o ranh gioi tu + giu khoi hashtag) de bai dai khong bi cat cut. Da test gen article+video co hashtag dung + rut gon caption; next build OK. -->
+
 <!-- re-verified: 2026-08-14 - FIX nut Ghep logo /tu-lieu CRASH tren Vercel: logo-overlay.mjs viet lai bang @napi-rs/canvas (da chay on nhu banner.mjs) + logo NHUNG base64 (logo-data.mjs) - BO sharp va BO doc file luc chay (2 nguyen nhan co the vo tren serverless: native binary khong trace + import.meta.url doc asset sai duong). Go sharp khoi package.json (app + packages/marketing) + next.config (canvas external tu trace, khong can trace sharp/@img/asset). applyLogoToAsset(id) TRA {ok,error} thay vi nem loi; nut -> client LogoButton hien loi tai cho, khong sap trang. Da test overlay canvas local (logo goc duoi phai, cat nen) + next build OK. -->
 <!-- re-verified: 2026-08-14 - Auto-logo (ensure-logo.mjs) van dung overlayLogo (nay la canvas), khong doi logic; stampLogoInPlace + imageHasLogo giu nguyen. -->
 
