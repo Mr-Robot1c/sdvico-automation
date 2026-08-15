@@ -15,6 +15,7 @@ type Item = {
   title: string;
   payload: unknown;
   created_at: string;
+  ref_id: string | null;
 };
 
 type HrPost = {
@@ -38,11 +39,32 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   const client = getServerClient();
   const { data, error } = await client
     .from('approval_queue')
-    .select('id, kind, title, payload, created_at')
+    .select('id, kind, title, payload, created_at, ref_id')
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
 
-  const all = (data || []) as Item[];
+  const raw = (data || []) as Item[];
+
+  // Lưới chắn: giấu thư mời phỏng vấn của hồ sơ đã rời bước phỏng vấn, tức đã nhận, đã từ
+  // chối, hoặc hồ sơ đã bị xóa. Bấm Duyệt một mục như vậy là gửi thư mời cho người không
+  // còn ở vòng phỏng vấn. decideCandidate đã tự dọn, đây là lớp phòng cho dữ liệu cũ.
+  const inviteRefs = raw
+    .filter((it) => it.kind === 'hr_interview' && it.ref_id)
+    .map((it) => it.ref_id as string);
+  let staleInvites = new Set<string>();
+  if (inviteRefs.length) {
+    const { data: apps } = await client
+      .from('hr_applications')
+      .select('id, stage')
+      .in('id', inviteRefs);
+    const stageById = new Map(
+      ((apps || []) as Array<{ id: string; stage: string }>).map((a) => [a.id, a.stage])
+    );
+    staleInvites = new Set(inviteRefs.filter((id) => stageById.get(id) !== 'interview'));
+  }
+  const all = raw.filter(
+    (it) => !(it.kind === 'hr_interview' && it.ref_id && staleInvites.has(it.ref_id))
+  );
 
   // Đếm theo loại để dựng thanh lọc.
   const counts = new Map<string, number>();

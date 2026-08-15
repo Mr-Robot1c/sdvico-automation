@@ -32,6 +32,71 @@ export type CandView = {
   cvUrl: string | null;
 };
 
+// Hộp xác nhận cho thao tác xóa ứng viên. Xóa là mất hẳn, không khôi phục được, nên không
+// để bấm một phát là xong. window.confirm cũ chỉ cần gõ Enter là qua, quá dễ lỡ tay.
+// Ở đây phải mở hộp, gõ đúng tên ứng viên, nút xóa mới bật. Gõ sai thì nút vẫn khóa.
+function DangerDelete({
+  action, candidateId, candidateName, buttonLabel, title, warning,
+}: {
+  action: (formData: FormData) => void | Promise<void>;
+  candidateId: string;
+  candidateName: string;
+  buttonLabel: string;
+  title: string;
+  warning: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
+
+  // Tên trống thì bắt gõ XOA, để luôn có một chuỗi phải gõ đúng.
+  const phrase = candidateName.trim() || 'XOA';
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+  const matched = norm(typed) === norm(phrase);
+
+  const close = () => { setOpen(false); setTyped(''); };
+
+  if (!open) {
+    return (
+      <button className="btn del" type="button" style={{ fontSize: '0.85em' }} onClick={() => setOpen(true)}>
+        {buttonLabel}
+      </button>
+    );
+  }
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={close}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+        <p className="modal-title">{title}</p>
+        <div className="modal-body">
+          <span className="modal-warn">{warning}</span>
+          <span className="modal-info">
+            Gõ đúng tên dưới đây để mở khóa nút xóa:
+          </span>
+          <code style={{ display: 'block', margin: '8px 0', fontWeight: 700 }}>{phrase}</code>
+          <input
+            className="note"
+            type="text"
+            value={typed}
+            autoFocus
+            placeholder="Gõ lại tên ở trên"
+            onChange={(e) => setTyped(e.target.value)}
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div className="modal-footer">
+          <button className="btn ghost" type="button" onClick={close}>Hủy</button>
+          <form action={action}>
+            <input type="hidden" name="candidateId" value={candidateId} />
+            <button className="btn del" type="submit" disabled={!matched} title={matched ? '' : 'Gõ đúng tên mới xóa được'}>
+              {buttonLabel}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Bộ chọn khung giờ phỏng vấn: người duyệt chọn ngày + giờ (gợi ý theo khung đã lưu),
 // hoặc để trống cho hệ thống tự chọn. Bấm xác nhận là soạn thư mời ngay.
 function InterviewApprove({ appId, name, windows }: { appId: string; name: string; windows: string[] }) {
@@ -219,25 +284,24 @@ function CandidateCard({ c, windows }: { c: CandView; windows: string[] }) {
         {c.appStage === 'offer' ? <span className="stage tone-ok">Đã nhận</span> : null}
         {c.appStage === 'rejected' ? <span className="muted">Đã từ chối</span> : null}
         {c.sourced ? (
-          <form
+          <DangerDelete
             action={rejectSourced}
-            onSubmit={(e) => {
-              const ok = window.confirm(`Từ chối và XOÁ khỏi cơ sở dữ liệu?\n\n${c.name}\n\nỨng viên nguồn ngoài chưa có consent, từ chối sẽ xoá hẳn thông tin (Nghị định 13).`);
-              if (!ok) e.preventDefault();
-            }}
-          >
-            <input type="hidden" name="candidateId" value={c.id} />
-            <button className="btn no" type="submit">Từ chối &amp; xoá</button>
-          </form>
+            candidateId={c.id}
+            candidateName={c.name}
+            buttonLabel="Từ chối và xoá"
+            title="Từ chối và xóa khỏi cơ sở dữ liệu?"
+            warning="Ứng viên nguồn ngoài chưa có consent, từ chối là xóa hẳn thông tin theo Nghị định 13. Không khôi phục được."
+          />
         ) : null}
         {!c.sourced && c.id ? (
-          <form
+          <DangerDelete
             action={deleteCandidate}
-            onSubmit={(e) => { if (!window.confirm(`XÓA VĨNH VIỄN hồ sơ này?\n\n${c.name}\n\nXóa cả điểm, thư mời và dữ liệu liên quan. Không khôi phục được.`)) e.preventDefault(); }}
-          >
-            <input type="hidden" name="candidateId" value={c.id} />
-            <button className="btn del" type="submit" style={{ fontSize: '0.85em' }}>Xóa hồ sơ</button>
-          </form>
+            candidateId={c.id}
+            candidateName={c.name}
+            buttonLabel="Xóa hồ sơ"
+            title="Xóa vĩnh viễn hồ sơ này?"
+            warning="Xóa cả điểm chấm, thư mời và mọi dữ liệu liên quan của ứng viên. Không khôi phục được."
+          />
         ) : null}
       </div>
     </li>

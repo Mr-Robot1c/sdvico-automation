@@ -137,6 +137,13 @@ export async function decideCandidate(formData: FormData) {
 
   await client.from('hr_applications').update({ stage: newStage }).eq('id', appId).eq('stage', 'interview');
 
+  // Dọn thư mời phỏng vấn còn treo của chính hồ sơ này. Đã quyết nhận hay không nhận thì
+  // thư mời hết nghĩa. Để nguyên là có ngày ai đó dọn hàng đợi, bấm Duyệt, và người vừa bị
+  // từ chối nhận được thư mời phỏng vấn. Dùng 'dismissed' chứ không xóa, để còn lưu vết.
+  await client.from('approval_queue')
+    .update({ status: 'dismissed', decided_at: new Date().toISOString(), note: 'Tự dọn: hồ sơ đã có quyết định cuối.' })
+    .eq('kind', 'hr_interview').eq('ref_id', appId).eq('status', 'pending');
+
   await client.from('approval_queue').insert({
     kind,
     title: `Thư ${decision === 'offer' ? 'mời nhận việc' : 'từ chối'}: ${name || email || appId}`,
