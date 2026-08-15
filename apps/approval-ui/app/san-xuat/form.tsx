@@ -373,6 +373,11 @@ export default function SanXuatForm({
                 TikTok {vidId ? '' : '(cần video)'}
               </label>
             </span>
+            {kind === 'article' && postTt && vidId ? (
+              <span style={{ color: '#d97706', fontSize: '.8rem' }}>
+                ⚠️ Bài dài không hợp TikTok, caption sẽ bị rút gọn. Nên chọn "Bài ngắn" hoặc "Kịch bản video" khi đăng TikTok.
+              </span>
+            ) : null}
           </label>
 
           <div className="sx-actions">
