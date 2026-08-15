@@ -106,15 +106,17 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
         }
       };
       if (isVideo) {
-        // Lượt xem video + tổng thời gian xem (ms -> giây).
+        // Lượt xem video + tổng thời gian xem (ms -> giây) + số NGƯỜI xem (unique = reach).
         await grab(`${objId}/video_insights?metric=total_video_views`, 'views', (r) => valOf(r, 'total_video_views'));
         await grab(`${objId}/video_insights?metric=total_video_view_total_time`, 'watchSec', (r) => {
           const ms = valOf(r, 'total_video_view_total_time');
           return ms == null ? null : Math.round(ms / 1000);
         });
+        await grab(`${objId}/video_insights?metric=total_video_views_unique`, 'reach', (r) => valOf(r, 'total_video_views_unique'));
       } else {
-        // Bài ảnh/chữ: lượt hiển thị (impressions) làm "lượt xem".
+        // Bài ảnh/chữ: lượt hiển thị (impressions) = "lượt xem"; số NGƯỜI thấy (unique) = "người xem" (reach).
         await grab(`${objId}/insights?metric=post_impressions`, 'views', (r) => valOf(r, 'post_impressions'));
+        await grab(`${objId}/insights?metric=post_impressions_unique`, 'reach', (r) => valOf(r, 'post_impressions_unique'));
       }
 
       return { contentId: cid, objId, metrics, insightErr: insightErr.length ? insightErr : undefined } as any;
@@ -128,6 +130,28 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
     .filter((r: any) => r && r.metrics)
     .map((r: any) => ({ source: 'facebook', entity_ref: r.contentId, metric_date: day, metrics: r.metrics }));
   if (rows.length) await client.from('mkt_metrics').insert(rows);
+
+  // Số NGƯỜI THEO DÕI Trang (page-level). Lưu 1 dòng entity_ref='__page__' để trang Đo lường hiện
+  // "X follower" làm mốc so với reach từng bài. followers_count/fan_count là field cơ bản của Page
+  // (không cần read_insights). Với Page token, /me chính là Trang.
+  try {
+    const pj = await fetchJsonWithTimeout(
+      `https://graph.facebook.com/${VERSION}/me?fields=followers_count,fan_count,name`,
+      TOKEN
+    );
+    if (pj && !pj.error) {
+      const followers = Number(pj.followers_count) || Number(pj.fan_count) || 0;
+      const fans = Number(pj.fan_count) || 0;
+      if (followers || fans) {
+        await client.from('mkt_metrics').insert({
+          source: 'facebook',
+          entity_ref: '__page__',
+          metric_date: day,
+          metrics: { followers, fans, name: pj.name || null }
+        });
+      }
+    }
+  } catch { /* bỏ qua lỗi lấy follower */ }
 
   return { pulled: rows.length, results };
 }

@@ -7,7 +7,7 @@ import RefreshButton from './refresh-button';
 
 export const dynamic = 'force-dynamic';
 
-type M = { reactions?: number; comments?: number; shares?: number; engagement?: number; views?: number; watchSec?: number };
+type M = { reactions?: number; comments?: number; shares?: number; engagement?: number; views?: number; watchSec?: number; reach?: number };
 
 export default async function Page() {
   const client = getServerClient();
@@ -20,10 +20,14 @@ export default async function Page() {
     .order('created_at', { ascending: false })
     .limit(500);
   const latest = new Map<string, M>();
+  let pageMetrics: any = null; // số liệu page-level (follower), entity_ref='__page__'
   for (const r of mrows || []) {
     const cid = (r as any).entity_ref as string | null;
-    if (cid && !latest.has(cid)) latest.set(cid, ((r as any).metrics || {}) as M);
+    if (!cid) continue;
+    if (cid === '__page__') { if (!pageMetrics) pageMetrics = (r as any).metrics || {}; continue; }
+    if (!latest.has(cid)) latest.set(cid, ((r as any).metrics || {}) as M);
   }
+  const pageFollowers = Number(pageMetrics?.followers) || 0;
 
   // Tên sản phẩm của một bài: ưu tiên folder xoay vòng (rotation_group), rồi keyword, rồi tiêu đề.
   const productOf = (brief: any, title: string): string => {
@@ -77,7 +81,7 @@ export default async function Page() {
       const reactions = m.reactions || 0;
       const comments = m.comments || 0;
       const shares = m.shares || 0;
-      return { cid, title: c.title, product: c.product, draft: c.draft, url: postUrl.get(cid) || '', reactions, comments, shares, engagement: reactions + comments + shares, views: m.views, watchSec: m.watchSec, conversions: c.conversions };
+      return { cid, title: c.title, product: c.product, draft: c.draft, url: postUrl.get(cid) || '', reactions, comments, shares, engagement: reactions + comments + shares, views: m.views, reach: m.reach, watchSec: m.watchSec, conversions: c.conversions };
     })
     .sort((a, b) => b.engagement - a.engagement);
 
@@ -123,6 +127,11 @@ export default async function Page() {
         <div>
           <h1>Đo lường</h1>
           <p className="sub">So sánh tương tác + đơn/lead theo bài và theo sản phẩm. Sản phẩm nào cao thì đẩy mạnh hướng đó.</p>
+          {pageFollowers ? (
+            <p className="sub" style={{ marginTop: 4 }}>
+              📣 Trang có <b>{fmt(pageFollowers)}</b> người theo dõi. Cột <b>Người xem</b> là số người thật sự thấy bài (kèm % so với người theo dõi).
+            </p>
+          ) : null}
         </div>
         <div className="head-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <MetricsAuto action={refreshFacebookMetrics} minutes={30} />
@@ -174,7 +183,7 @@ export default async function Page() {
           <div className="tablewrap">
             <table className="datatable">
               <thead>
-                <tr><th>Tên bài</th><th>Sản phẩm</th><th>Tương tác</th><th>Lượt xem</th><th>Like</th><th>Comment</th><th>Share</th><th>Giây xem</th><th>Đơn/Lead</th><th></th></tr>
+                <tr><th>Tên bài</th><th>Sản phẩm</th><th>Tương tác</th><th>Lượt xem</th><th>Người xem</th><th>Like</th><th>Comment</th><th>Share</th><th>Giây xem</th><th>Đơn/Lead</th><th></th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
@@ -183,6 +192,7 @@ export default async function Page() {
                     <td>{r.product}</td>
                     <td><b>{r.engagement}</b></td>
                     <td>{r.views == null ? '—' : fmt(r.views)}</td>
+                    <td>{r.reach == null ? '—' : (pageFollowers ? `${fmt(r.reach)} (${Math.round((r.reach / pageFollowers) * 100)}%)` : fmt(r.reach))}</td>
                     <td>{r.reactions}</td>
                     <td>{r.comments}</td>
                     <td>{r.shares}</td>
@@ -214,8 +224,8 @@ export default async function Page() {
             </table>
           </div>
           <p className="muted" style={{ marginTop: 10, fontSize: '.85rem' }}>
-            <b>Lượt xem</b> và <b>Giây xem</b> (video) cần cấp quyền <b>read_insights</b> cho trang Facebook. Chưa cấp thì
-            hai cột này để trống, còn Like/Comment/Share vẫn có. TikTok chưa lấy được số liệu vì app chưa qua audit.
+            <b>Lượt xem</b>, <b>Người xem</b> và <b>Giây xem</b> (video) cần quyền <b>read_insights</b> trên trang Facebook. Chưa cấp thì
+            các cột này để trống, còn Like/Comment/Share vẫn có. TikTok chưa lấy được số liệu vì app chưa qua audit.
           </p>
         </>
       )}
