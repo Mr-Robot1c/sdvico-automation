@@ -4,6 +4,8 @@ import BarChart from './bar-chart';
 import PostTitle from './post-title';
 import MetricsAuto from './metrics-auto';
 import RefreshButton from './refresh-button';
+// @ts-ignore — module JS thuần
+import { guessGroup } from '../../lib/gen/products.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +34,12 @@ export default async function Page() {
   // Tên sản phẩm của một bài: ưu tiên folder xoay vòng (rotation_group), rồi keyword, rồi tiêu đề.
   const productOf = (brief: any, title: string): string => {
     const g = brief?.rotation_group as string | undefined;
+    // Bài content (nuôi trang) giữ nhóm riêng, không gộp vào sản phẩm.
+    if (brief?.post_kind === 'content' || g === 'Bài content') return 'Bài content';
+    // Gộp các BIẾN THỂ tên về đúng MỘT sản phẩm (vd "GSHT tàu cá Viettel" và "giám sát hành trình
+    // Viettel S-Tracking" là một). guessGroup dò theo từ khóa sản phẩm; khớp thì dùng tên chuẩn.
+    const guess = (guessGroup as (s: string) => string | null)(`${g || ''} ${brief?.keyword || ''} ${title || ''}`);
+    if (guess) return guess.replace(/^\s*\d+\.\s*/, '').trim();
     const name = (g ? g.replace(/^\s*\d+\.\s*/, '').trim() : '') || brief?.keyword || title || 'Khác';
     return String(name).trim() || 'Khác';
   };

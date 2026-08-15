@@ -11,6 +11,8 @@
 // một bài may mắn. Dưới ngưỡng thì xếp vào "chưa đủ dữ liệu", vẫn giữ nhịp đăng để gom thêm.
 
 import type { getServerClient } from './supabase-server';
+// @ts-ignore — module JS thuần
+import { guessGroup } from './gen/products.mjs';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -58,9 +60,12 @@ export type Plan = {
   };
 };
 
-// Tên sản phẩm của một bài: ưu tiên folder xoay vòng, rồi từ khóa, rồi tiêu đề. Khớp trang Đo lường.
+// Tên sản phẩm của một bài: gộp biến thể tên về đúng MỘT sản phẩm (guessGroup), khớp trang Đo lường.
 function productOf(brief: any, title: string): string {
   const g = brief?.rotation_group as string | undefined;
+  if (brief?.post_kind === 'content' || g === 'Bài content') return 'Bài content';
+  const guess = (guessGroup as (s: string) => string | null)(`${g || ''} ${brief?.keyword || ''} ${title || ''}`);
+  if (guess) return guess.replace(/^\s*\d+\.\s*/, '').trim();
   const name = (g ? g.replace(/^\s*\d+\.\s*/, '').trim() : '') || brief?.keyword || title || 'Khác';
   return String(name).trim() || 'Khác';
 }
