@@ -1,7 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { formatRelative } from '../labels';
 import { JOB_GROUPS, JD_CHANNELS, GROUP_BY_KEY } from '../../lib/jd-groups';
-import { editJdVersion, regenerateJd, deleteJd, openAndQueueFbPost, finalizeJd } from '../actions';
+import { editJdVersion, regenerateJd, deleteJd, openAndQueueFbPost, openAndQueueLinkedInPost, finalizeJd } from '../actions';
 import { SubmitButton } from '../submit-button';
 import AutoPostToggle from './auto-post-toggle';
 import AddJobPanel from './add-job-panel';
@@ -174,6 +174,10 @@ export default async function Page() {
                       <SubmitButton label={composeLabel} pendingLabel="AI đang soạn..." className="btn ok" />
                     </form>
                   )}
+                  <form action={openAndQueueLinkedInPost}>
+                    <input type="hidden" name="job_id" value={j.id} />
+                    <SubmitButton label="Soạn LinkedIn" pendingLabel="Đang soạn..." className="btn ghost" />
+                  </form>
                   <span style={{ fontSize: 12, color: 'var(--ink-2)', alignSelf: 'center' }}>
                     Refresh mỗi {refreshDays} ngày
                   </span>
@@ -220,6 +224,10 @@ export default async function Page() {
                         <SubmitButton label={composeLabel} pendingLabel="AI đang soạn, chờ 10-20 giây..." />
                       </form>
                     )}
+                    <form action={openAndQueueLinkedInPost}>
+                      <input type="hidden" name="job_id" value={j.id} />
+                      <SubmitButton label="Soạn LinkedIn" pendingLabel="Đang soạn..." className="btn ghost" />
+                    </form>
                     <RemoveJobButton jobId={j.id} jobTitle={j.title} />
                   </div>
                 </li>
@@ -280,6 +288,10 @@ export default async function Page() {
                     <form action={openAndQueueFbPost}>
                       <input type="hidden" name="job_id" value={j.id} />
                       <SubmitButton label="Soạn bài Facebook và đưa vào Duyệt" pendingLabel="AI đang soạn bài, chờ 10-20 giây..." />
+                    </form>
+                    <form action={openAndQueueLinkedInPost}>
+                      <input type="hidden" name="job_id" value={j.id} />
+                      <SubmitButton label="Soạn bài LinkedIn và đưa vào Duyệt" pendingLabel="AI đang soạn bài, chờ 10-20 giây..." className="btn ghost" />
                     </form>
                     <form action={deleteJd}>
                       <input type="hidden" name="job_id" value={j.id} />

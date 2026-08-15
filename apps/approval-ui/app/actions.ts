@@ -1047,6 +1047,21 @@ export async function openAndQueueFbPost(formData: FormData) {
   redirect('/');
 }
 
+// Mở vị trí và soạn bài LinkedIn ngay, đưa vào Duyệt. Dùng từ trang Tạo JD.
+export async function openAndQueueLinkedInPost(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  if (!jobId) return;
+
+  const client = getServerClient();
+  await client.from('hr_jobs')
+    .update({ status: 'open' })
+    .eq('id', jobId)
+    .eq('status', 'draft');
+
+  await queueLinkedInPost(formData);
+  redirect('/');
+}
+
 // Lưu cài đặt thương hiệu công ty: logo, hotline, email, website, mô tả ngắn.
 // Dùng để gắn footer liên hệ vào bài đăng Facebook và làm ảnh mặc định khi không có ảnh khác.
 // Logo: file từ máy ưu tiên hơn URL nhập tay (upload vào post-images/brand/).

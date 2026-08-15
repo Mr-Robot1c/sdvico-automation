@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import { useFormState } from 'react-dom';
-import { createJdDraftForPanel, openAndQueueFbPost, addToAutoQueue, finalizeJd } from '../actions';
+import { createJdDraftForPanel, openAndQueueFbPost, openAndQueueLinkedInPost, addToAutoQueue, finalizeJd } from '../actions';
 import { SubmitButton } from '../submit-button';
 import { JOB_GROUPS, JD_CHANNELS } from '../../lib/jd-groups';
 
@@ -94,6 +94,14 @@ export default function AddJobPanel() {
                     <input type="hidden" name="job_id" value={result.jobId} />
                     <SubmitButton
                       label="Soạn bài Facebook ngay và đưa vào Duyệt"
+                      pendingLabel="AI đang soạn bài, chờ 10-20 giây..."
+                      className="btn ghost"
+                    />
+                  </form>
+                  <form action={openAndQueueLinkedInPost}>
+                    <input type="hidden" name="job_id" value={result.jobId} />
+                    <SubmitButton
+                      label="Soạn bài LinkedIn ngay và đưa vào Duyệt"
                       pendingLabel="AI đang soạn bài, chờ 10-20 giây..."
                       className="btn ghost"
                     />
