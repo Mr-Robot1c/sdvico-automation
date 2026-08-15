@@ -1,6 +1,7 @@
 // Vercel Cron: đăng bài tuyển dụng đã duyệt lên Facebook khi đến giờ đặt lịch.
 // Máy soạn, người bấm Duyệt, máy đăng khi đúng giờ (điều cấm 1: cổng duyệt đã qua).
-// Chạy mỗi 5 phút qua vercel.json, thay thế và bổ sung cho hr-post.yml.
+// Chạy 15 phút một lần qua GitHub Actions (cron.yml), thay thế và bổ sung cho hr-post.yml.
+// Vercel Hobby không cho đặt cron trong vercel.json nên file đó để rỗng.
 
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../../lib/supabase-server';

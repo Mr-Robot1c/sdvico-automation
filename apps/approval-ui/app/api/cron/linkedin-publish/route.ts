@@ -1,5 +1,6 @@
 // Worker đăng bài LinkedIn (kenh='linkedin') đã duyệt, khi tới giờ.
-// NGỦ khi chưa cấu hình LINKEDIN_ACCESS_TOKEN/ORG_URN. Cron-job.org gọi khi đã bật.
+// NGỦ khi chưa cấu hình LINKEDIN_ACCESS_TOKEN/ORG_URN.
+// Chạy 15 phút một lần qua GitHub Actions (cron.yml), cùng job với worker Facebook.
 // Máy soạn, người bấm Duyệt, máy đăng (điều cấm 1: cổng duyệt đã qua).
 
 import { NextResponse } from 'next/server';

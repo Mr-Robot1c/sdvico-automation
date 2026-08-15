@@ -1,0 +1,55 @@
+name: Cron — Chu kỳ 15 phút
+
+# Gọi ba endpoint chạy nền trên Vercel: soạn bài, đăng bài Facebook, đăng bài LinkedIn.
+#
+# Vì sao gộp ba bước vào một job thay vì ba workflow riêng: GitHub tính tiền theo job và
+# làm tròn lên một phút. Ba workflow riêng chạy mỗi 15 phút tốn 288 phút một ngày, một job
+# gộp tốn 96 phút. Repo private chỉ có 2.000 phút miễn phí mỗi tháng.
+#
+# Mỗi bước có if: always() nên một bước hỏng không chặn bước sau, giống như khi còn tách
+# thành các workflow riêng.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+concurrency:
+  group: cron-15p
+  cancel-in-progress: false
+
+jobs:
+  cron:
+    name: Gọi các endpoint chạy nền
+    runs-on: ubuntu-latest
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      VERCEL_URL: ${{ secrets.VERCEL_URL }}
+    steps:
+      - name: Soạn bài, /api/cron/compose
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" -X GET \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$VERCEL_URL/api/cron/compose")
+          echo "HTTP $STATUS"
+          [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]
+
+      - name: Đăng bài Facebook đã duyệt, /api/cron/publish
+        if: always()
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" -X GET \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$VERCEL_URL/api/cron/publish")
+          echo "HTTP $STATUS"
+          [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]
+
+      # Chưa đặt LINKEDIN_ACCESS_TOKEN và LINKEDIN_ORG_URN trên Vercel thì endpoint trả 200
+      # kèm lý do linkedin_not_configured, không đăng gì. Đặt khóa vào là chạy, không cần sửa file này.
+      - name: Đăng bài LinkedIn đã duyệt, /api/cron/linkedin-publish
+        if: always()
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" -X GET \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$VERCEL_URL/api/cron/linkedin-publish")
+          echo "HTTP $STATUS"
+          [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]

@@ -1,6 +1,6 @@
 // Vercel Cron: soạn bài Facebook cho vị trí có auto_post=true và chưa có bài mới.
 // Máy soạn, người bấm Duyệt (điều cấm 1). Không đăng ở đây.
-// Chạy qua GitHub Actions (cron-compose.yml) vì Vercel Hobby không hỗ trợ cron < 1 ngày.
+// Chạy qua GitHub Actions (cron.yml, 15 phút một lần) vì Vercel Hobby không hỗ trợ cron dưới 1 ngày.
 
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../../lib/supabase-server';
