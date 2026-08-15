@@ -1,7 +1,10 @@
 import { getServerClient } from './supabase-server';
 
-// Kéo số liệu tương tác từng bài Facebook (reactions/comments/shares) về mkt_metrics.
-// Token FB có pages_read_engagement là đủ (không cần read_insights cho mấy chỉ số này).
+// Kéo số liệu từng bài Facebook về mkt_metrics.
+// - Cơ bản (reactions/like, comments, shares): chỉ cần pages_read_engagement.
+// - Lượt xem (impressions / video views) + số giây xem (video): CẦN quyền read_insights trên
+//   token Page. Thiếu quyền thì các chỉ số này để trống, số cơ bản vẫn lấy được. Mỗi chỉ số
+//   insights gọi RIÊNG + try/catch để một metric lỗi không làm mất chỉ số khác.
 //
 // Hiệu năng: gọi Graph API SONG SONG (pool giới hạn) + timeout từng request + GỘP insert một
 // lần. Bản cũ gọi tuần tự từng bài rồi insert từng dòng nên tới 50 vòng chờ nối tiếp, dễ treo.
@@ -59,19 +62,20 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
 
   // Khử trùng theo bài (một bài có thể đăng nhiều lần) — chỉ lấy bản mới nhất, đỡ gọi thừa.
   const seen = new Set<string>();
-  const targets: { cid: string; objId: string }[] = [];
+  const targets: { cid: string; objId: string; isVideo: boolean }[] = [];
   for (const p of posts || []) {
     const cid = (p as any).content_id as string | null;
-    const objId = objectIdFromUrl((p as any).external_url as string | null);
+    const url = (p as any).external_url as string | null;
+    const objId = objectIdFromUrl(url);
     if (!cid || !objId || seen.has(cid)) continue;
     seen.add(cid);
-    targets.push({ cid, objId });
+    targets.push({ cid, objId, isVideo: /\/videos\//.test(url || '') });
   }
 
   const day = todayVN();
 
   // Gọi Graph API song song (tối đa 8 việc cùng lúc), mỗi request có timeout riêng.
-  const results = await mapPool(targets, 8, async ({ cid, objId }) => {
+  const results = await mapPool(targets, 8, async ({ cid, objId, isVideo }) => {
     try {
       const j = await fetchJsonWithTimeout(
         `https://graph.facebook.com/${VERSION}/${objId}?fields=reactions.summary(total_count),comments.summary(total_count),shares`,
@@ -81,7 +85,39 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
       const reactions = j?.reactions?.summary?.total_count ?? 0;
       const comments = j?.comments?.summary?.total_count ?? 0;
       const shares = j?.shares?.count ?? 0;
-      return { contentId: cid, objId, metrics: { reactions, comments, shares, engagement: reactions + comments + shares } } as any;
+      const metrics: any = { reactions, comments, shares, engagement: reactions + comments + shares };
+
+      // Chỉ số CẦN read_insights: lượt xem + số giây xem. Gọi RIÊNG + try/catch từng cái để một
+      // metric lỗi (thiếu quyền / sai tên) không làm mất chỉ số khác. Thiếu quyền -> để trống.
+      const insightErr: string[] = [];
+      const valOf = (r: any, name: string): number | null => {
+        const d = Array.isArray(r?.data) ? r.data.find((x: any) => x?.name === name) : null;
+        const v = d?.values?.[0]?.value;
+        return v == null ? null : Number(v);
+      };
+      const grab = async (path: string, key: string, pick: (r: any) => number | null) => {
+        try {
+          const r = await fetchJsonWithTimeout(`https://graph.facebook.com/${VERSION}/${path}`, TOKEN, 6000);
+          if (r?.error) { insightErr.push(`${key}: ${r.error.message}`); return; }
+          const v = pick(r);
+          if (v != null && !Number.isNaN(v)) metrics[key] = v;
+        } catch (e: any) {
+          insightErr.push(`${key}: ${String(e?.message || e)}`);
+        }
+      };
+      if (isVideo) {
+        // Lượt xem video + tổng thời gian xem (ms -> giây).
+        await grab(`${objId}/video_insights?metric=total_video_views`, 'views', (r) => valOf(r, 'total_video_views'));
+        await grab(`${objId}/video_insights?metric=total_video_view_total_time`, 'watchSec', (r) => {
+          const ms = valOf(r, 'total_video_view_total_time');
+          return ms == null ? null : Math.round(ms / 1000);
+        });
+      } else {
+        // Bài ảnh/chữ: lượt hiển thị (impressions) làm "lượt xem".
+        await grab(`${objId}/insights?metric=post_impressions`, 'views', (r) => valOf(r, 'post_impressions'));
+      }
+
+      return { contentId: cid, objId, metrics, insightErr: insightErr.length ? insightErr : undefined } as any;
     } catch (e: any) {
       return { contentId: cid, objId, error: String(e?.message || e) } as any;
     }

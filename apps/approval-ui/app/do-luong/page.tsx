@@ -7,7 +7,7 @@ import RefreshButton from './refresh-button';
 
 export const dynamic = 'force-dynamic';
 
-type M = { reactions?: number; comments?: number; shares?: number; engagement?: number };
+type M = { reactions?: number; comments?: number; shares?: number; engagement?: number; views?: number; watchSec?: number };
 
 export default async function Page() {
   const client = getServerClient();
@@ -77,16 +77,17 @@ export default async function Page() {
       const reactions = m.reactions || 0;
       const comments = m.comments || 0;
       const shares = m.shares || 0;
-      return { cid, title: c.title, product: c.product, draft: c.draft, url: postUrl.get(cid) || '', reactions, comments, shares, engagement: reactions + comments + shares, conversions: c.conversions };
+      return { cid, title: c.title, product: c.product, draft: c.draft, url: postUrl.get(cid) || '', reactions, comments, shares, engagement: reactions + comments + shares, views: m.views, watchSec: m.watchSec, conversions: c.conversions };
     })
     .sort((a, b) => b.engagement - a.engagement);
 
-  const byProduct = new Map<string, { count: number; engagement: number; conversions: number }>();
+  const byProduct = new Map<string, { count: number; engagement: number; conversions: number; views: number }>();
   for (const r of rows) {
-    const g = byProduct.get(r.product) || { count: 0, engagement: 0, conversions: 0 };
+    const g = byProduct.get(r.product) || { count: 0, engagement: 0, conversions: 0, views: 0 };
     g.count += 1;
     g.engagement += r.engagement;
     g.conversions += r.conversions;
+    g.views += r.views || 0;
     byProduct.set(r.product, g);
   }
   const productRows = [...byProduct.entries()]
@@ -95,10 +96,14 @@ export default async function Page() {
       count: g.count,
       engagement: g.engagement,
       conversions: g.conversions,
+      views: g.views,
       avgEng: g.count ? Math.round(g.engagement / g.count) : 0,
-      avgConv: g.count ? Math.round((g.conversions / g.count) * 10) / 10 : 0
+      avgConv: g.count ? Math.round((g.conversions / g.count) * 10) / 10 : 0,
+      avgViews: g.count ? Math.round(g.views / g.count) : 0
     }))
     .sort((a, b) => b.avgConv - a.avgConv || b.avgEng - a.avgEng);
+
+  const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 
   // Màu cố định theo SẢN PHẨM (không theo thứ hạng): mỗi sản phẩm giữ một màu xuyên suốt cả ba
   // biểu đồ, bài top thừa hưởng màu của sản phẩm nó. 8 slot màu phân loại đã kiểm định (dataviz).
@@ -147,7 +152,7 @@ export default async function Page() {
           <div className="tablewrap">
             <table className="datatable">
               <thead>
-                <tr><th>Sản phẩm</th><th>Số bài</th><th>TB đơn/bài</th><th>Tổng đơn</th><th>TB tương tác/bài</th><th>Tổng tương tác</th></tr>
+                <tr><th>Sản phẩm</th><th>Số bài</th><th>TB đơn/bài</th><th>Tổng đơn</th><th>TB tương tác/bài</th><th>TB lượt xem/bài</th><th>Tổng tương tác</th></tr>
               </thead>
               <tbody>
                 {productRows.map((t, i) => (
@@ -157,6 +162,7 @@ export default async function Page() {
                     <td><b>{t.avgConv}</b></td>
                     <td>{t.conversions}</td>
                     <td>{t.avgEng}</td>
+                    <td>{t.avgViews ? fmt(t.avgViews) : '—'}</td>
                     <td>{t.engagement}</td>
                   </tr>
                 ))}
@@ -168,7 +174,7 @@ export default async function Page() {
           <div className="tablewrap">
             <table className="datatable">
               <thead>
-                <tr><th>Tên bài</th><th>Sản phẩm</th><th>Tương tác</th><th>Reactions</th><th>Comment</th><th>Share</th><th>Đơn/Lead</th><th></th></tr>
+                <tr><th>Tên bài</th><th>Sản phẩm</th><th>Tương tác</th><th>Lượt xem</th><th>Like</th><th>Comment</th><th>Share</th><th>Giây xem</th><th>Đơn/Lead</th><th></th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
@@ -176,9 +182,11 @@ export default async function Page() {
                     <td className="cell-title"><PostTitle title={r.title} product={r.product} draft={r.draft} url={r.url} /></td>
                     <td>{r.product}</td>
                     <td><b>{r.engagement}</b></td>
+                    <td>{r.views == null ? '—' : fmt(r.views)}</td>
                     <td>{r.reactions}</td>
                     <td>{r.comments}</td>
                     <td>{r.shares}</td>
+                    <td>{r.watchSec == null ? '—' : fmt(r.watchSec)}</td>
                     <td>
                       <form action={setConversions} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <input type="hidden" name="content_id" value={r.cid} />
@@ -205,6 +213,10 @@ export default async function Page() {
               </tbody>
             </table>
           </div>
+          <p className="muted" style={{ marginTop: 10, fontSize: '.85rem' }}>
+            <b>Lượt xem</b> và <b>Giây xem</b> (video) cần cấp quyền <b>read_insights</b> cho trang Facebook. Chưa cấp thì
+            hai cột này để trống, còn Like/Comment/Share vẫn có. TikTok chưa lấy được số liệu vì app chưa qua audit.
+          </p>
         </>
       )}
     </main>
