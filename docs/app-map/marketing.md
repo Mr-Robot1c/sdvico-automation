@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - bumpers.mjs (intro/outro): (1) LOGO tu CAT NEN TRANG bang getImageData (cung thuat toan voi logo-overlay.mjs) -> khong con khoi trang xau tren nen xanh gradient. (2) Layout OUTRO tach theo dinh dang PORTRAIT vs LANDSCAPE (isPortrait): dat vi tri y va logoRatio khac nhau, cong voi font co theo H (doc) hoac min(W,H*1.6) (ngang) de khong bi chong "Goi ngay tong dai" len so 1900. Them auto-shrink neu so vuot 88% W. INTRO cung cap nhat theo. -->
 <!-- re-verified: 2026-08-14 - build-video.mjs: san pham cua bai FALLBACK guessGroup neu chua co brief.rotation_group (bai Xuong san xuat nguoi tu soan thuong khong co rotation). Truoc day strict throw "chua gan san pham" -> pipeline bo qua -> bai video_requested cho mai. -->
 <!-- re-verified: 2026-08-14 - CLI sync: packages/marketing/src/{products,social}.mjs dong bo tu apps/approval-ui/lib/gen/ (CONTENT_TOPICS moi 5 cum + generateContentPost siet theo type). rotate-run.mjs loai folder Content khoi vong xoay ban, bai content uu tien anh trong folder Content. -->
 <!-- re-verified: 2026-08-14 - pushToApprovalQueue chi day ban NGANG 16:9 (bo tham chieu results.vertical - session song song da bo dung vertical, chi 16:9 cho FB, Reel dung duong avatar rieng). brief.assets = {video, video_h}, channels ['facebook']. Nhan hang doi "[Facebook 16:9] 🎬 <title>". Fix "results is not defined" o cuoi pipeline (video van dung xong nhung crash luc day queue). -->
