@@ -145,20 +145,25 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
   return { out, totalDur, scenes: built.length, whisper: wa?.info || null };
 }
 
-// Đẩy video (bản NGANG 16:9) vào Hàng đợi duyệt: upload Storage + brand_assets + mkt_content +
-// approval_queue (pending, kênh Facebook). KHÔNG tự đăng — người bấm Duyệt (điều cấm 1).
-// (Reel/TikTok dùng đường avatar AI riêng theo phân công, không dựng ở đây.)
-async function pushToApprovalQueue(client, { content, script, horizontalPath }) {
+// Đẩy video (CẢ 2 bản ngang 16:9 + dọc 9:16) vào Hàng đợi duyệt: upload Storage + brand_assets +
+// mkt_content + approval_queue (pending, kênh Facebook + TikTok). Người bấm Duyệt (điều cấm 1).
+// Lúc đăng: FB dùng video_h (ngang), TikTok dùng video_v (dọc).
+async function pushToApprovalQueue(client, { content, script, horizontalPath, verticalPath }) {
   const title = (script.titles && script.titles[0]) || content.title || 'Video SDVICO';
-  // Upload video ngang lên Storage + brand_assets.
-  const buf = await readFile(horizontalPath);
-  const sp = `video/sdvico_${content.id.slice(0, 8)}_ngang_${Date.now()}.mp4`;
-  const up = await client.storage.from('brand-assets').upload(sp, buf, { contentType: 'video/mp4', upsert: false });
-  if (up.error) throw new Error('upload Storage: ' + up.error.message);
-  const { data: a, error: ae } = await client.from('brand_assets')
-    .insert({ kind: 'video', title: `${title} (ngang)`, storage_path: sp, source: 'video-pipeline' }).select('id').single();
-  if (ae || !a) throw new Error('brand_assets: ' + (ae?.message || ''));
-  const videoId = a.id;
+
+  // Helper upload 1 file mp4 -> brand_assets, trả về id.
+  const uploadVideo = async (path, tag) => {
+    const buf = await readFile(path);
+    const sp = `video/sdvico_${content.id.slice(0, 8)}_${tag}_${Date.now()}.mp4`;
+    const up = await client.storage.from('brand-assets').upload(sp, buf, { contentType: 'video/mp4', upsert: false });
+    if (up.error) throw new Error(`upload ${tag}: ` + up.error.message);
+    const { data: a, error } = await client.from('brand_assets')
+      .insert({ kind: 'video', title: `${title} (${tag})`, storage_path: sp, source: 'video-pipeline' }).select('id').single();
+    if (error || !a) throw new Error(`brand_assets ${tag}: ` + (error?.message || ''));
+    return a.id;
+  };
+  const videoH = await uploadVideo(horizontalPath, 'ngang'); // 16:9 -> FB
+  const videoV = verticalPath ? await uploadVideo(verticalPath, 'doc') : videoH; // 9:16 -> TikTok
 
   // Caption ngắn + hashtag đúng sản phẩm.
   const { guessGroup, productHashtags, DEFAULT_HASHTAGS } = await import('../products.mjs');
@@ -166,8 +171,9 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath }) 
   const tags = [...DEFAULT_HASHTAGS, ...(grp ? productHashtags(grp) : [])].join(' ');
   const caption = `${title}\n\nGọi tổng đài 1900 23 23 49 để được tư vấn tận nơi.\n\n${tags}`;
   const risk = script.assessment?.risk === 'red' ? 'red' : script.assessment?.risk === 'amber' ? 'amber' : 'none';
-  const assets = { image: null, video: videoId, video_h: videoId };
-  const channels = ['facebook'];
+  // video = fallback dùng ngang; video_h ngang cho FB; video_v dọc cho TikTok.
+  const assets = { image: null, video: videoH, video_h: videoH, video_v: videoV };
+  const channels = ['facebook', 'tiktok'];
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: 'social', title,
     brief: { keyword: title, intent: 'giao_dich', assets, channels, generator: 'video-pipeline', post_kind: 'video', source_content: content.id, risk, compliance: script.assessment?.flags || {} },
@@ -175,13 +181,13 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath }) 
   }).select('id').single();
   if (ce || !ins) throw new Error('mkt_content: ' + (ce?.message || ''));
   const { error: qe } = await client.from('approval_queue').insert({
-    kind: 'mkt_publish_content', title: `[Facebook 16:9] 🎬 ${title}`,
+    kind: 'mkt_publish_content', title: `[FB 16:9 + TikTok dọc] 🎬 ${title}`,
     payload: { content_id: ins.id, format: 'social', keyword: title, intent: 'giao_dich', risk, assets, channels, authored: 'ai', post_kind: 'video', needs_manager_approval: risk === 'red' },
     status: 'pending',
   });
   if (qe) throw new Error('approval_queue: ' + qe.message);
-  console.log(`\nĐã đẩy vào Hàng đợi duyệt: [Facebook 16:9] 🎬 ${title}`);
-  console.log(`  mkt_content=${ins.id.slice(0, 8)} | video=${videoId.slice(0, 8)} | risk=${risk}`);
+  console.log(`\nĐã đẩy vào Hàng đợi duyệt: [FB 16:9 + TikTok dọc] 🎬 ${title}`);
+  console.log(`  mkt_content=${ins.id.slice(0, 8)} | ngang(FB)=${videoH.slice(0, 8)} | doc(TikTok)=${videoV.slice(0, 8)} | risk=${risk}`);
 }
 
 async function main() {
@@ -240,8 +246,8 @@ async function main() {
   const workDir = join(HERE, '..', '..', '..', '..', 'out', 'video', `work_${contentId.slice(0, 8)}`);
   await mkdir(workDir, { recursive: true });
 
-  // Tải các asset được dùng. Chỉ dựng bản HORIZONTAL cho post FB (Reel dùng đường avatar AI riêng).
-  const usedIds = new Set(script.horizontal.map((s) => s.assetId));
+  // Tải các asset dùng cho CẢ 2 bản (ngang cho FB + dọc cho TikTok).
+  const usedIds = new Set([...script.horizontal, ...script.vertical].map((s) => s.assetId));
   const assetPaths = new Map();
   for (const id of usedIds) {
     const a = assets.find((x) => x.id === id);
@@ -253,9 +259,13 @@ async function main() {
   }
   console.log('Đã tải', assetPaths.size, 'tư liệu.');
 
-  console.log('\n== Dựng bản horizontal (16:9) cho post Facebook ==');
+  console.log('\n== Dựng bản horizontal (16:9) cho Facebook ==');
   const horizontal = await buildFormat('horizontal', script.horizontal, assetPaths, voice, workDir, outDir, contentId);
   console.log(`  -> ${horizontal.out} (${horizontal.totalDur.toFixed(1)}s, ${horizontal.scenes} cảnh)`);
+
+  console.log('\n== Dựng bản vertical (9:16) cho TikTok ==');
+  const vertical = await buildFormat('vertical', script.vertical, assetPaths, voice, workDir, outDir, contentId);
+  console.log(`  -> ${vertical.out} (${vertical.totalDur.toFixed(1)}s, ${vertical.scenes} cảnh)`);
 
   // 3 ảnh đại diện từ bản ngang.
   const thumbs = [];
@@ -269,17 +279,16 @@ async function main() {
   const summary = {
     contentId, title: content.title, titles: script.titles,
     compliance: script.assessment,
-    horizontal, thumbnails: thumbs,
+    horizontal, vertical, thumbnails: thumbs,
   };
   await writeFile(join(outDir, `sdvico_${contentId.slice(0, 8)}_summary.json`), JSON.stringify(summary, null, 2), 'utf8');
   console.log('\nXONG. Tóm tắt:', join(outDir, `sdvico_${contentId.slice(0, 8)}_summary.json`));
-  console.log(JSON.stringify({ horizontal: horizontal.out, thumbs }, null, 2));
+  console.log(JSON.stringify({ horizontal: horizontal.out, vertical: vertical.out, thumbs }, null, 2));
 
-  // Đẩy vào Hàng đợi duyệt (mặc định bật; thêm --no-queue để chỉ tạo file, không đẩy).
-  // Chỉ có bản ngang 16:9 cho Facebook (Reel/TikTok dùng đường avatar AI riêng theo phân công).
+  // Đẩy vào Hàng đợi duyệt (bản ngang cho FB + bản dọc cho TikTok, đăng cả 2 kênh).
   if (!process.argv.includes('--no-queue')) {
     try {
-      await pushToApprovalQueue(client, { content, script, horizontalPath: horizontal.out });
+      await pushToApprovalQueue(client, { content, script, horizontalPath: horizontal.out, verticalPath: vertical.out });
     } catch (e) {
       console.warn('Không đẩy được vào Hàng đợi duyệt:', e.message, '(video vẫn có ở out/video/).');
     }
