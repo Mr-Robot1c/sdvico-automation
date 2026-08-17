@@ -13,9 +13,9 @@ Ghi chú: đây là dự án riêng cho SDVICO, tách khỏi thử nghiệm `aut
 - Tên: Công ty TNHH Hiệp Lực Phát Triển Việt, viết tắt SDVICO.
 - Khẩu hiệu: "Công nghệ số cho ngành biển và thủy sản".
 - Lĩnh vực: cung cấp sản phẩm và giải pháp công nghệ cho ngành biển và thủy sản, phục vụ ngư dân, tàu cá và doanh nghiệp trong ngành, hướng tới nâng cao hiệu quả đánh bắt và giảm chi phí đầu vào.
-- Nguồn gốc: theo trang sdvico.vn, công ty khởi đầu từ sản phẩm máy lọc nước biển thành nước ngọt cho tàu cá, do một nhóm giảng viên Trường Đại học Bà Rịa Vũng Tàu phát triển, thành lập năm 2014. `[CẦN XÁC NHẬN với Phòng Kinh doanh: năm thành lập và pháp nhân chính xác]`
+- Nguồn gốc: thành lập năm 2014, khởi đầu từ sản phẩm máy lọc nước biển thành nước ngọt cho tàu cá, do một nhóm giảng viên Trường Đại học Bà Rịa Vũng Tàu phát triển.
 - Khách hàng mục tiêu: ngư dân, chủ tàu cá, doanh nghiệp ngành biển và thủy sản.
-- Địa chỉ: 283 Nguyễn Hữu Cảnh, Vũng Tàu. `[CẦN XÁC NHẬN: tên phường và đơn vị hành chính hiện hành, vì các nguồn ghi khác nhau]`
+- Địa chỉ: 283 Nguyễn Hữu Cảnh, Phường Rạch Dừa, TP. Hồ Chí Minh (đơn vị hành chính sau khi Bà Rịa Vũng Tàu sáp nhập vào TP. Hồ Chí Minh).
 - Liên hệ: website sdvico.vn, hotline 1900 23 23 49, hộp thư tuyển dụng tuyendung@sdvico.vn.
 - Vai trò trong chuỗi: SDVICO vừa phát triển một số sản phẩm, khởi đầu là máy lọc nước, vừa phân phối và lắp đặt thiết bị của các hãng. SDVICO không sở hữu phần mềm của các hãng đối tác, xem điều cấm 4.
 
@@ -31,7 +31,9 @@ Nhóm sản phẩm theo trang sdvico.vn:
 4. Thiết bị xử lý dầu, giúp tiết kiệm dầu diesel cho tàu cá.
 5. Dầu nhớt: PVOil Nano Graphene và PV Engine RMI Nano Graphene. SDVICO là nhà phân phối ủy quyền dầu nhớt PVOIL.
 
-Thương hiệu và hãng nhắc trên trang: Viettel, Thuraya, PVOIL. Văn bản giao việc còn nêu VNPT VSS và Vishipel. `[CẦN XÁC NHẬN với Phòng Kinh doanh: SDVICO có phân phối VNPT VSS và Vishipel không, và danh mục đầy đủ còn sản phẩm nào khác]`
+Thương hiệu và hãng nhắc trên trang: Viettel, Thuraya, PVOIL. Ngoài ra SDVICO hợp tác với VNPT và VISHIPEL trong lĩnh vực giải pháp kết nối, viễn thông và công nghệ hàng hải.
+
+Đây chưa phải danh sách đầy đủ. SDVICO hợp tác với nhiều đơn vị khác nữa. Trước khi viết bài nhắc tên một hãng cụ thể mà chưa liệt kê ở đây, tra lại trang sdvico.vn hoặc hỏi Phòng Kinh doanh. Không tự thêm đối tác chưa xác nhận, điều cấm 5.
 
 Ranh giới bắt buộc khi viết nội dung về sản phẩm:
 - Phân biệt rõ sản phẩm do SDVICO phát triển, như máy lọc nước, với thiết bị SDVICO phân phối và lắp đặt, như thiết bị định vị và dầu nhớt.
