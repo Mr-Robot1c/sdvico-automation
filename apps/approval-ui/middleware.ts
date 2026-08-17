@@ -1,45 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-// Cổng mật khẩu cho giao diện duyệt. Điều cấm 6: dữ liệu ứng viên không lộ ra ngoài.
-// Dùng HTTP Basic Auth, mật khẩu đặt ở biến môi trường APP_PASSWORD trên Vercel.
-// Chốt an toàn: ở môi trường thật mà chưa đặt mật khẩu thì chặn hết, không mở cửa nhầm.
+// Cổng đăng nhập cho giao diện duyệt. Điều cấm 6: dữ liệu ứng viên không lộ ra ngoài.
+//
+// Hai chế độ, chọn bằng biến môi trường AUTH_MODE:
+//   basic     (mặc định) — HTTP Basic Auth, một mật khẩu dùng chung.
+//   supabase  — magic link qua Supabase Auth, người dùng nhận link ở mail công ty.
+//               Chỉ email trong bảng hr_users được đi qua middleware này.
+//
+// Cách chuyển chế độ mà không sửa code: đặt AUTH_MODE=supabase trên Vercel rồi redeploy.
 
 export const config = {
   // Bảo vệ mọi đường dẫn trừ tài nguyên tĩnh của Next.js.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
 
-export function middleware(req: NextRequest) {
-  // Endpoint cron do GitHub Actions gọi (compose/publish). Bảo vệ bằng CRON_SECRET
-  // trong chính route, không qua cổng Basic Auth — nếu không sẽ bị chặn 401 trước khi
-  // route chạy. Điều cấm 6 vẫn giữ: các route này không trả dữ liệu ứng viên ra ngoài.
-  if (req.nextUrl.pathname.startsWith('/api/cron/')) {
-    return NextResponse.next();
+const AUTH_MODE = process.env.AUTH_MODE === 'supabase' ? 'supabase' : 'basic';
+
+export async function middleware(req: NextRequest) {
+  const path = req.nextUrl.pathname;
+
+  // Endpoint cron do GitHub Actions và cron-job.org gọi. Bảo vệ bằng CRON_SECRET
+  // trong chính route, không qua cổng đăng nhập nội bộ.
+  if (path.startsWith('/api/cron/')) return NextResponse.next();
+
+  // Callback và logout của Supabase Auth. Bản thân callback đã tự kiểm hr_users.
+  if (path.startsWith('/api/auth/')) return NextResponse.next();
+
+  // Trang công khai cho ứng viên tự chọn giờ phỏng vấn.
+  if (path.startsWith('/phong-van/')) return NextResponse.next();
+
+  if (AUTH_MODE === 'supabase') {
+    return handleSupabase(req, path);
+  }
+  return handleBasic(req);
+}
+
+// Chế độ magic link qua Supabase Auth.
+async function handleSupabase(req: NextRequest, path: string) {
+  const url = process.env.SUPABASE_URL;
+  const anon = process.env.SUPABASE_ANON_KEY;
+  if (!url || !anon) {
+    return new NextResponse(
+      'Chế độ AUTH_MODE=supabase nhưng thiếu SUPABASE_URL hoặc SUPABASE_ANON_KEY. Đặt biến trên Vercel rồi redeploy.',
+      { status: 503 }
+    );
   }
 
-  // Trang công khai cho ứng viên tự chọn giờ phỏng vấn — xác thực bằng token trong link,
-  // không qua cổng mật khẩu nội bộ. Chỉ hiện khung giờ + nhận lựa chọn, không lộ dữ liệu khác.
-  if (req.nextUrl.pathname.startsWith('/phong-van/')) {
-    return NextResponse.next();
-  }
+  // Cho phép trang đăng nhập đi qua để user nhập email.
+  if (path === '/dang-nhap' || path.startsWith('/dang-nhap/')) return NextResponse.next();
 
+  const res = NextResponse.next();
+  const supabase = createServerClient(url, anon, {
+    cookies: {
+      getAll: () => req.cookies.getAll(),
+      setAll: (list: { name: string; value: string; options: CookieOptions }[]) => {
+        for (const { name, value, options } of list) res.cookies.set(name, value, options);
+      },
+    },
+  });
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.redirect(new URL('/dang-nhap', req.url));
+  }
+  // Không tra hr_users ở middleware (Edge runtime, tránh đọc DB thêm mỗi request).
+  // getSessionUser() ở server component sẽ tra và trả null nếu bị vô hiệu — trong trường
+  // hợp đó user sẽ thấy trang đăng nhập với thông báo tương ứng.
+  return res;
+}
+
+// Chế độ HTTP Basic Auth cũ, giữ nguyên để không phá luồng đang chạy.
+function handleBasic(req: NextRequest) {
   const pass = process.env.APP_PASSWORD;
   const user = process.env.APP_USER || 'sdvico';
 
   if (!pass) {
-    // Chưa đặt mật khẩu. Ở môi trường thật thì đóng cửa, tránh lộ dữ liệu.
     if (process.env.NODE_ENV === 'production') {
-      return new NextResponse('Chưa đặt APP_PASSWORD. Đặt biến môi trường này trên Vercel để mở khóa.', {
-        status: 503
-      });
+      return new NextResponse(
+        'Chưa đặt APP_PASSWORD. Đặt biến này trên Vercel, hoặc chuyển AUTH_MODE=supabase để dùng magic link.',
+        { status: 503 }
+      );
     }
-    return NextResponse.next(); // Máy nội bộ khi phát triển, cho qua.
+    return NextResponse.next();
   }
 
   const header = req.headers.get('authorization') || '';
   const [scheme, encoded] = header.split(' ');
   if (scheme === 'Basic' && encoded) {
-    // Edge runtime dùng atob, không có Buffer. Mật khẩu nên là ký tự ASCII.
     const decoded = atob(encoded);
     const idx = decoded.indexOf(':');
     const u = decoded.slice(0, idx);
@@ -49,6 +97,6 @@ export function middleware(req: NextRequest) {
 
   return new NextResponse('Cần đăng nhập để xem trang duyệt.', {
     status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="SDVICO duyet", charset="UTF-8"' }
+    headers: { 'WWW-Authenticate': 'Basic realm="SDVICO duyet", charset="UTF-8"' },
   });
 }

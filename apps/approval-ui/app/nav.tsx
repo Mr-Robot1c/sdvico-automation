@@ -29,11 +29,15 @@ const SOLO_BOTTOM: (NavItem & { icon: string })[] = [
   { href: '/cai-dat', label: 'Cài đặt', icon: '⚙' },
 ];
 
-export default function Nav({ pendingCount = 0 }: { pendingCount?: number }) {
+type NavUser = { email: string; fullName: string | null; role: string } | null;
+
+export default function Nav({ pendingCount = 0, user = null }: { pendingCount?: number; user?: NavUser }) {
   const path = usePathname();
 
   // Trang công khai cho ứng viên (chọn giờ phỏng vấn) không hiện điều hướng nội bộ.
   if (path?.startsWith('/phong-van')) return null;
+  // Trang đăng nhập cũng không hiện sidebar cho gọn.
+  if (path === '/dang-nhap' || path?.startsWith('/dang-nhap/')) return null;
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     const s = new Set<string>();
@@ -101,6 +105,17 @@ export default function Nav({ pendingCount = 0 }: { pendingCount?: number }) {
             {item.label}
           </Link>
         ))}
+
+        {/* Người đang đăng nhập. Chỉ hiện khi chế độ magic link đang bật và có phiên hợp lệ. */}
+        {user ? (
+          <div className="who">
+            <span className="who-email">{user.fullName || user.email}</span>
+            <span className="who-role">{user.email}{user.role === 'admin' ? ' · quản trị' : ''}</span>
+            <form action="/api/auth/logout" method="post">
+              <button type="submit">Đăng xuất</button>
+            </form>
+          </div>
+        ) : null}
       </nav>
     </>
   );

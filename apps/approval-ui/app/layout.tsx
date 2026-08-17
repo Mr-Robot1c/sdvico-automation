@@ -2,6 +2,7 @@ import './globals.css';
 import type { ReactNode } from 'react';
 import Nav from './nav';
 import { getServerClient } from '../lib/supabase-server';
+import { getSessionUser } from '../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,12 +26,12 @@ async function getPendingCount(): Promise<number> {
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const pendingCount = await getPendingCount();
+  const [pendingCount, user] = await Promise.all([getPendingCount(), getSessionUser()]);
   return (
     <html lang="vi">
       <body>
         <div className="app-shell">
-          <Nav pendingCount={pendingCount} />
+          <Nav pendingCount={pendingCount} user={user} />
           <div className="app-main">
             {children}
           </div>
