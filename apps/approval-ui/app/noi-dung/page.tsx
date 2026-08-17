@@ -1,7 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import ViewModal from '../view-modal';
-import { editDraft, requestVideoForContent } from '../actions';
+import { editDraft } from '../actions';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
 
 export const dynamic = 'force-dynamic';
@@ -315,15 +315,9 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                           ↗ Xem bài{p.channel === 'facebook' ? ' (FB)' : p.channel ? ` (${p.channel})` : ''}
                         </a>
                       ))}
-                      {c.kind !== 'video' ? (
-                        c.brief?.video_requested ? (
-                          <span className="badge tone-demo" style={{ marginLeft: 8 }} title="Đã đánh dấu — máy nội bộ sẽ dựng video rồi đẩy vào Hàng đợi duyệt">🎬 Đã yêu cầu video</span>
-                        ) : (
-                          <form action={requestVideoForContent} style={{ display: 'inline' }}>
-                            <input type="hidden" name="content_id" value={c.id} />
-                            <button className="btn ghost sm" type="submit" style={{ marginLeft: 8 }} title="Đánh dấu để máy nội bộ dựng video từ bài này (FB 16:9 + TikTok dọc)">🎬 Làm video</button>
-                          </form>
-                        )
+                      {/* Nút "Làm video" đã chuyển sang trang /san-xuat (nút "Xong + Làm video"). */}
+                      {c.brief?.video_requested ? (
+                        <span className="badge tone-demo" style={{ marginLeft: 8 }} title="Đã đánh dấu — đang dựng video">🎬 Đã yêu cầu video</span>
                       ) : null}
                     </td>
                   </tr>

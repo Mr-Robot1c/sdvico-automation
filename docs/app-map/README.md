@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - /noi-dung: BO nut "🎬 Lam video" (trung voi nut "Xong + Lam video" o /san-xuat). Con badge "🎬 Da yeu cau video" hien khi brief.video_requested=true. Bo import requestVideoForContent khoi page.tsx (server action van con o actions.ts, chua go de tuong thich). -->
+
 <!-- re-verified: 2026-08-14 - /api/rotate bai CONTENT chon kind theo TY LE weighted (qa=2,checklist=2,glossary=1,tip=1,engage=1,portrait=1,news=1 - dung de xuat Phong KD 5 cum an toan + 2 cum can chuan bi that). kind=news hoac portrait TU dat needs_gov_review=true (dieu cam 3 + tranh AI bia ten). Nhan queue theo kind ("❓ Hoi-Dap", "📋 Checklist", "📖 Thuat ngu", "💡 Meo", "💬 Hoi ba con", "👤 Chan dung (dien tay)", "⚠️ Thoi su (cho duyet QL)"). payload approval_queue them content_type + needs_manager_approval de nguoi duyet biet ngay bai gi va co can quan ly duyet khong. -->
 
 <!-- re-verified: 2026-08-14 - Fix loi 413 upload video >50MB o /tu-lieu (Supabase Free tier hard limit 50MB per file, khong nang qua API duoc - phai upgrade Pro $25/thang moi len 5GB): (1) lib-uploader.tsx chan TRUOC upload neu file > 50MB + nhac dung scripts/nen-video.bat. (2) scripts/nen-video.bat + nen-video.mjs: bam dup, chon video, ffmpeg (co san @ffmpeg-installer) nen H.264 CRF 28 720p (fallback CRF 32 540p, CRF 34 720p) den khi < 45MB. Output *_nen.mp4 cung thu muc. -->
