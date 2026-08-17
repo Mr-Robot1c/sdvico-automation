@@ -4,7 +4,7 @@ import SanXuatForm from './form';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-type Asset = { id: string; kind: string; title: string; storage_path: string };
+type Asset = { id: string; kind: string; title: string; storage_path: string; product_group: string | null };
 
 // Trang xưởng sản xuất: chọn 1 ảnh + 1 video (từ kho hoặc tải mới), gõ tiêu đề, bấm Sinh text để
 // máy viết theo tiêu đề/ảnh, sửa lại rồi Xong để đẩy vào hàng đợi duyệt.
@@ -13,7 +13,7 @@ export default async function Page() {
   const client = getServerClient();
   const { data: assetRows } = await client
     .from('brand_assets')
-    .select('id, kind, title, storage_path')
+    .select('id, kind, title, storage_path, product_group')
     .in('kind', ['image', 'video', 'logo', 'clip'])
     .order('created_at', { ascending: false })
     .limit(40);

@@ -80,6 +80,15 @@ async function publishContentToFacebook(
   const imageUrl = await assetUrlOf(assets.image);
   // Facebook ưu tiên bản NGANG 16:9 (video_h) nếu có, không thì dùng video chung.
   const videoUrl = await assetUrlOf(assets.video_h || assets.video);
+  // Danh sách ẢNH DƯ (Xưởng sản xuất chọn nhiều ảnh): sẽ thả TỪNG cái vào bình luận sau khi đăng.
+  // Bỏ id đã dùng làm bài chính (assets.image) để không thả lại.
+  const extraImageIds = (Array.isArray(assets.images) ? assets.images : [])
+    .filter((id: string) => id && id !== assets.image);
+  const extraImageUrls: string[] = [];
+  for (const id of extraImageIds) {
+    const u = await assetUrlOf(id);
+    if (u) extraImageUrls.push(u);
+  }
 
   try {
     // Facebook không cho gộp video và ảnh vào CHUNG một post. Cách chọn:
@@ -117,29 +126,39 @@ async function publishContentToFacebook(
       ? `https://www.facebook.com/${PAGE_ID}/videos/${json.id}`
       : `https://www.facebook.com/${postId}`;
 
-    // Thả ảnh vào BÌNH LUẬN đầu khi cần (bài video+ảnh, hoặc bài chữ dài+ảnh). Video phải chờ xử lý
-    // xong mới thả được. Thả ảnh lỗi thì chỉ cảnh báo, KHÔNG đánh hỏng cả bài. Ghi phản hồi thô để soi.
+    // Thả ẢNH vào BÌNH LUẬN. Có 2 nguồn:
+    //  - ảnh CHÍNH (imageUrl) khi bài chính là video hoặc chữ dài (không nhét vào caption được).
+    //  - ẢNH DƯ (extraImageUrls): Xưởng sản xuất chọn nhiều ảnh -> ngoài ảnh chính, các ảnh khác
+    //    THẢ TỪNG cái xuống bình luận theo thứ tự.
+    // Bài chính là video -> phải chờ xử lý xong mới thả được. Thả ảnh lỗi -> chỉ cảnh báo.
+    const commentImageUrls: string[] = [];
+    if (commentImage && imageUrl) commentImageUrls.push(imageUrl);
+    commentImageUrls.push(...extraImageUrls);
     let warn: string | undefined;
-    let commentDebug: any = null;
-    if (commentImage && imageUrl) {
-      const targetId = json.id || postId; // video: id video; feed: id bài
+    const commentDebug: any[] = [];
+    if (commentImageUrls.length) {
+      const targetId = json.id || postId;
       const ready = waitVideo ? await waitFacebookVideoReady(json.id, VERSION, TOKEN) : true;
       if (!ready) {
         warn = 'Video chưa xử lý kịp nên chưa thả được ảnh vào bình luận.';
-        commentDebug = { step: 'wait_video', ready: false };
+        commentDebug.push({ step: 'wait_video', ready: false });
         console.error('[facebook] ' + warn);
       } else {
-        try {
-          const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${targetId}/comments`, {
-            method: 'POST',
-            body: new URLSearchParams({ attachment_url: imageUrl, access_token: TOKEN })
-          });
-          const cJson: any = await cRes.json();
-          commentDebug = { step: 'comment', httpStatus: cRes.status, response: cJson };
-          if (!cRes.ok || cJson.error) throw new Error(cJson.error?.message || `HTTP ${cRes.status}`);
-        } catch (ce: any) {
-          warn = `Chưa thả được ảnh vào bình luận: ${String(ce?.message || ce)}`;
-          console.error('[facebook] ' + warn);
+        for (let i = 0; i < commentImageUrls.length; i++) {
+          const u = commentImageUrls[i];
+          try {
+            const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${targetId}/comments`, {
+              method: 'POST',
+              body: new URLSearchParams({ attachment_url: u, access_token: TOKEN })
+            });
+            const cJson: any = await cRes.json();
+            commentDebug.push({ step: 'comment', idx: i, httpStatus: cRes.status, response: cJson });
+            if (!cRes.ok || cJson.error) throw new Error(cJson.error?.message || `HTTP ${cRes.status}`);
+          } catch (ce: any) {
+            const m = `Ảnh #${i + 1} chưa thả được vào bình luận: ${String(ce?.message || ce)}`;
+            warn = warn ? warn + '; ' + m : m;
+            console.error('[facebook] ' + m);
+          }
         }
       }
     }
@@ -807,6 +826,11 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
   const kind = (String(formData.get('kind') || 'social') as 'article' | 'social' | 'video');
   const imageAssetId = String(formData.get('image_asset_id') || '') || null;
   const videoAssetId = String(formData.get('video_asset_id') || '') || null;
+  // Multi-select ở Xưởng sản xuất: nhiều ảnh + nhiều video (CSV). Video đầu = bài chính, ảnh dư
+  // thả bình luận sau khi đăng.
+  const parseIds = (name: string) => String(formData.get(name) || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const imageAssetIds = parseIds('image_asset_ids');
+  const videoAssetIds = parseIds('video_asset_ids');
   const keywordId = String(formData.get('keyword_id') || '') || null;
   const keyword = String(formData.get('keyword') || '').trim() || title;
   const intent = String(formData.get('intent') || 'giao_dich').trim() || 'giao_dich';
@@ -830,7 +854,7 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
     generator: 'xuong-san-xuat',
     channels,
     content_type: contentType,
-    assets: { image: imageAssetId, video: videoAssetId }
+    assets: { image: imageAssetId, video: videoAssetId, images: imageAssetIds, videos: videoAssetIds }
   };
   if (requestVideo) {
     brief.video_requested = true;
@@ -856,7 +880,7 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
       risk: 'amber',
       channels,
       authored: 'human', // người tự soạn -> cờ đỏ, phân biệt với AI tự sinh
-      assets: { image: imageAssetId, video: videoAssetId }
+      assets: { image: imageAssetId, video: videoAssetId, images: imageAssetIds, videos: videoAssetIds }
     },
     status: 'pending'
   });

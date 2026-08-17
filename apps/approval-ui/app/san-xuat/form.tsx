@@ -8,7 +8,7 @@ import { guessGroup } from '../../lib/gen/products.mjs';
 import AssetUploader from './asset-uploader';
 import ImageStudio from './image-studio';
 
-type Asset = { id: string; kind: string; title: string; storage_path: string; url: string };
+type Asset = { id: string; kind: string; title: string; storage_path: string; url: string; product_group: string | null };
 
 // Làm sạch tên tệp thành cụm từ khóa: bỏ timestamp đầu, bỏ đuôi file, đổi gạch/underscore thành khoảng trắng.
 function cleanAssetName(s: string): string {
@@ -20,20 +20,16 @@ function cleanAssetName(s: string): string {
     .trim();
 }
 
-// Gộp tên nhiều tệp (ảnh + video) thành một tiêu đề, ngăn bằng dấu cộng, bỏ trùng và phần rỗng.
 function combineNames(...titles: (string | undefined)[]): string {
   const parts = titles.map((t) => cleanAssetName(t || '')).filter(Boolean);
   return [...new Set(parts)].join(' + ');
 }
 
-// Tên sản phẩm gọn từ nhãn folder ("6. Thiết bị lọc dầu SF-50" -> "Thiết bị lọc dầu SF-50").
 function productNameOf(group: string): string {
   return (group || '').replace(/^\s*\d+\.\s*/, '').trim();
 }
 
-// Tiêu đề khi có cả ảnh và video: nếu cả hai cùng chỉ về MỘT sản phẩm (đoán qua tên tệp) thì dùng
-// TÊN SẢN PHẨM gọn (một chủ đề) để AI viết một bài hoàn chỉnh, thay vì ghép "A + B" khiến AI tưởng
-// hai sản phẩm khác nhau. Khác sản phẩm thật, hoặc chỉ một media, thì giữ như cũ.
+// Tiêu đề khi có cả ảnh và video: cả hai cùng chỉ về MỘT sản phẩm -> dùng tên sản phẩm gọn.
 function unifiedTitle(imgTitle?: string, vidTitle?: string): string {
   if (imgTitle && vidTitle) {
     const g1 = (guessGroup as (s: string) => string | null)(imgTitle);
@@ -52,24 +48,23 @@ export default function SanXuatForm({
   videos: Asset[];
 }) {
   const [title, setTitle] = useState('');
-  // Tiêu đề đang tự động theo tên ảnh/video (true) hay do người tự gõ/chọn từ khóa (false).
   const [titleAuto, setTitleAuto] = useState(true);
   const [draft, setDraft] = useState('');
   const [kind, setKind] = useState<'social' | 'article' | 'video'>('social');
-  const [imgId, setImgId] = useState<string>('');
-  const [vidId, setVidId] = useState<string>('');
-  // Kênh đăng: Facebook mặc định; TikTok tùy chọn (cần video).
+  // Multi-select: chọn NHIỀU ảnh + NHIỀU video. Video đầu là bài chính, ảnh dư thả bình luận.
+  const [imgIds, setImgIds] = useState<string[]>([]);
+  const [vidIds, setVidIds] = useState<string[]>([]);
+  // Filter theo folder sản phẩm để khung ảnh/video không rối. '' = tất cả.
+  const [folder, setFolder] = useState<string>('');
   const [postFb, setPostFb] = useState(true);
   const [postTt, setPostTt] = useState(false);
-  // Loại content để so sánh A/B (tips/bán hàng/review/UGC).
   const [contentType, setContentType] = useState<string>('tips');
   const [genBusy, setGenBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
-  // Tiến trình dựng video sau khi bấm "Xong + Làm video". Client polling checkVideoDone mỗi 20s
-  // (máy nội bộ dựng ~5 phút). Xong -> hiện link + video xem tại chỗ. Quá lâu -> nhắc kiểm tra máy.
+  // Panel tiến trình sau khi "Xong + Làm video". Polling checkVideoDone mỗi 20s.
   const [videoJob, setVideoJob] = useState<{
     sourceId: string; status: 'waiting' | 'done' | 'timeout';
     startedAt: number; videoUrl?: string; queueUrl?: string; title?: string;
@@ -78,7 +73,6 @@ export default function SanXuatForm({
 
   useEffect(() => {
     if (!videoJob || videoJob.status !== 'waiting') return;
-    // Poll ngay + mỗi 20s. Máy nội bộ dựng ~5 phút; timeout 15 phút (~45 lượt) rồi nhắc.
     const tick = async () => {
       try {
         const r = await checkVideoDone(videoJob.sourceId);
@@ -96,8 +90,21 @@ export default function SanXuatForm({
     return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
   }, [videoJob?.sourceId, videoJob?.status]);
 
-  const selectedImg = images.find((a) => a.id === imgId);
-  const selectedVid = videos.find((a) => a.id === vidId);
+  // Danh sách asset đã chọn (giữ đúng thứ tự bấm).
+  const selectedImgs = imgIds.map((id) => images.find((a) => a.id === id)).filter(Boolean) as Asset[];
+  const selectedVids = vidIds.map((id) => videos.find((a) => a.id === id)).filter(Boolean) as Asset[];
+  const firstImg = selectedImgs[0];
+  const firstVid = selectedVids[0];
+  // Chip filter theo folder (chỉ folder thật sự có tư liệu).
+  const folderList = Array.from(new Set(
+    [...images, ...videos].map((a) => a.product_group).filter((g): g is string => Boolean(g))
+  )).sort();
+  const filterByFolder = <T extends { product_group: string | null }>(arr: T[]) =>
+    folder ? arr.filter((a) => a.product_group === folder) : arr;
+  const shownImages = filterByFolder(images);
+  const shownVideos = filterByFolder(videos);
+  const imgOrder = (id: string) => imgIds.indexOf(id) + 1;
+  const vidOrder = (id: string) => vidIds.indexOf(id) + 1;
 
   const runGenerate = async (
     kw: string,
@@ -124,13 +131,10 @@ export default function SanXuatForm({
   };
 
   const onGenerate = () => {
-    // Tiêu đề do người gõ; nếu chưa có thì hợp nhất tên ảnh + video (cùng sản phẩm -> một chủ đề).
-    const nameKw = unifiedTitle(selectedImg?.title, selectedVid?.title);
+    const nameKw = unifiedTitle(firstImg?.title, firstVid?.title);
     const kw = title.trim() || nameKw;
     if (kw && !title.trim()) setTitle(kw);
-    // Gợi ý cho AI kèm cả tên ảnh và tên video (nếu có cả hai).
-    const assetHint = [selectedImg?.title, selectedVid?.title].filter(Boolean).join(' / ');
-    // kind là kênh đăng (social/article/video) — quyết định định dạng nội dung.
+    const assetHint = [...selectedImgs.map((a) => a.title), ...selectedVids.map((a) => a.title)].filter(Boolean).join(' / ');
     return runGenerate(kw, 'giao_dich', null, assetHint, kind);
   };
 
@@ -141,18 +145,18 @@ export default function SanXuatForm({
     fd.set('kind', kind);
     const chans: string[] = [];
     if (postFb) chans.push('facebook');
-    if (postTt && vidId) chans.push('tiktok');
+    if (postTt && vidIds.length) chans.push('tiktok');
     fd.set('channels', chans.join(','));
     fd.set('content_type', contentType);
-    if (imgId) fd.set('image_asset_id', imgId);
-    if (vidId) fd.set('video_asset_id', vidId);
+    // Nhiều ảnh/video: id đầu tiên (backward compat) + toàn bộ dạng CSV.
+    if (imgIds.length) { fd.set('image_asset_id', imgIds[0]); fd.set('image_asset_ids', imgIds.join(',')); }
+    if (vidIds.length) { fd.set('video_asset_id', vidIds[0]); fd.set('video_asset_ids', vidIds.join(',')); }
     if (opts.requestVideo) fd.set('request_video', '1');
     startTransition(async () => {
       setMsg(opts.requestVideo ? 'Đang lưu bài + yêu cầu làm video...' : 'Đang tạo khung sườn và đẩy vào hàng đợi duyệt...');
       try {
         const res = await createContent(fd);
         if (opts.requestVideo && res?.contentId) {
-          // Bật panel tiến trình; các state khác reset để soạn bài tiếp.
           setVideoJob({ sourceId: res.contentId, status: 'waiting', startedAt: Date.now() });
           setMsg('');
         } else {
@@ -161,8 +165,8 @@ export default function SanXuatForm({
         setTitle('');
         setTitleAuto(true);
         setDraft('');
-        setImgId('');
-        setVidId('');
+        setImgIds([]);
+        setVidIds([]);
         setPostFb(true);
         setPostTt(false);
         setContentType('tips');
@@ -173,77 +177,104 @@ export default function SanXuatForm({
   };
   const onSubmit = () => submitCore({ requestVideo: false });
 
-  // Chọn ảnh: tiêu đề tự đổi, GỘP tên ảnh + video đang chọn (trừ khi người tự gõ tay hoặc đã chọn từ khóa).
+  // Toggle chọn/bỏ ảnh. Tiêu đề tự cập nhật theo mục ĐẦU TIÊN của mỗi loại.
   const onSelectImage = (a: Asset) => {
-    const newId = a.id === imgId ? '' : a.id;
-    setImgId(newId);
+    const has = imgIds.includes(a.id);
+    const newIds = has ? imgIds.filter((id) => id !== a.id) : [...imgIds, a.id];
+    setImgIds(newIds);
     if (titleAuto || !title.trim()) {
-      const t = unifiedTitle(newId ? a.title : '', selectedVid?.title);
-      if (t) {
-        setTitle(t);
-        setTitleAuto(true);
-      }
+      const firstImgTitle = images.find((x) => x.id === newIds[0])?.title;
+      const t = unifiedTitle(firstImgTitle, firstVid?.title);
+      if (t) { setTitle(t); setTitleAuto(true); }
     }
   };
 
-  // Chọn video: tương tự, gộp tên ảnh đang chọn + video này.
   const onSelectVideo = (a: Asset) => {
-    const newId = a.id === vidId ? '' : a.id;
-    setVidId(newId);
+    const has = vidIds.includes(a.id);
+    const newIds = has ? vidIds.filter((id) => id !== a.id) : [...vidIds, a.id];
+    setVidIds(newIds);
     if (titleAuto || !title.trim()) {
-      const t = unifiedTitle(selectedImg?.title, newId ? a.title : '');
-      if (t) {
-        setTitle(t);
-        setTitleAuto(true);
-      }
+      const firstVidTitle = videos.find((x) => x.id === newIds[0])?.title;
+      const t = unifiedTitle(firstImg?.title, firstVidTitle);
+      if (t) { setTitle(t); setTitleAuto(true); }
     }
   };
 
   return (
     <div className="sx-grid">
+      {/* Bộ lọc CHUNG theo folder sản phẩm — gọn khung ảnh/video, tránh rối. */}
+      {folderList.length > 1 ? (
+        <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', padding: '8px 0' }}>
+          <span className="muted" style={{ marginRight: 6 }}>📁 Lọc theo folder:</span>
+          <button type="button" className={`chip ${folder === '' ? 'on' : ''}`} onClick={() => setFolder('')}>
+            Tất cả <span className="n">{images.length + videos.length}</span>
+          </button>
+          {folderList.map((g) => {
+            const n = images.filter((a) => a.product_group === g).length + videos.filter((a) => a.product_group === g).length;
+            const short = g.replace(/^\s*\d+\.\s*/, '').replace(/^(.{22}).+/, '$1…');
+            return (
+              <button key={g} type="button" className={`chip ${folder === g ? 'on' : ''}`} onClick={() => setFolder(g)} title={g}>
+                {short} <span className="n">{n}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       <section className="sx-slot">
         <header className="sx-slot-head">
-          <span className="sx-slot-title">Khung ảnh</span>
-          <span className="muted">{images.length} ảnh trong kho</span>
+          <span className="sx-slot-title">Khung ảnh {imgIds.length ? `— đã chọn ${imgIds.length}` : ''}</span>
+          <span className="muted">{shownImages.length}/{images.length}</span>
         </header>
 
         <div className="sx-preview">
-          {selectedImg ? (
-            <img src={selectedImg.url} alt={selectedImg.title} />
+          {firstImg ? (
+            <img src={firstImg.url} alt={firstImg.title} />
           ) : (
             <div className="sx-preview-empty">
               <span aria-hidden="true">🖼️</span>
-              <p>Chưa chọn ảnh</p>
+              <p>Chưa chọn ảnh (chọn nhiều được — ảnh dư thả bình luận sau khi đăng)</p>
             </div>
           )}
         </div>
 
-        {selectedImg ? (
-          <p className="muted sx-selected-name">
-            Ảnh đang chọn: <b>{selectedImg.title}</b>{' '}
-            <button type="button" className="btn ghost sm" onClick={() => setImgId('')}>
-              ✕ Bỏ ảnh
-            </button>
+        {selectedImgs.length ? (
+          <p className="muted sx-selected-name" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <b>{selectedImgs.length} ảnh đã chọn:</b>{' '}
+            {selectedImgs.map((a) => (
+              <span key={a.id} className="chip on" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                <span style={{ fontSize: '.8em' }}>{a.title}</span>
+                <button type="button" onClick={() => onSelectImage(a)} title="Bỏ" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}>✕</button>
+              </span>
+            ))}
+            <button type="button" className="btn ghost sm" onClick={() => setImgIds([])}>✕ Bỏ hết</button>
           </p>
         ) : null}
 
-        {images.length > 0 ? (
-          <div className="sx-thumbs" role="listbox" aria-label="Chọn ảnh từ kho">
-            {images.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                className={`sx-thumb ${imgId === a.id ? 'on' : ''}`}
-                onClick={() => onSelectImage(a)}
-                aria-pressed={imgId === a.id}
-                title={a.title}
-              >
-                <img src={a.url} alt={a.title} loading="lazy" />
-              </button>
-            ))}
+        {shownImages.length > 0 ? (
+          <div className="sx-thumbs" role="listbox" aria-label="Chọn ảnh từ kho" aria-multiselectable="true">
+            {shownImages.map((a) => {
+              const on = imgIds.includes(a.id);
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`sx-thumb ${on ? 'on' : ''}`}
+                  onClick={() => onSelectImage(a)}
+                  aria-pressed={on}
+                  title={a.title}
+                  style={{ position: 'relative' }}
+                >
+                  <img src={a.url} alt={a.title} loading="lazy" />
+                  {on ? (
+                    <span style={{ position: 'absolute', top: 4, right: 4, background: '#16a34a', color: '#fff', width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{imgOrder(a.id)}</span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         ) : (
-          <p className="muted">Kho ảnh đang trống. Tải ảnh lên bên dưới.</p>
+          <p className="muted">{images.length ? 'Không có ảnh trong folder này. Bỏ lọc để xem tất cả.' : 'Kho ảnh đang trống. Tải ảnh lên bên dưới.'}</p>
         )}
 
         <AssetUploader kind="image" />
@@ -251,73 +282,77 @@ export default function SanXuatForm({
 
       <section className="sx-slot">
         <header className="sx-slot-head">
-          <span className="sx-slot-title">Khung video</span>
-          <span className="muted">{videos.length} clip trong kho</span>
+          <span className="sx-slot-title">Khung video {vidIds.length ? `— đã chọn ${vidIds.length}` : ''}</span>
+          <span className="muted">{shownVideos.length}/{videos.length}</span>
         </header>
 
         <div className="sx-preview">
-          {selectedVid ? (
-            <video src={selectedVid.url} controls preload="metadata" />
+          {firstVid ? (
+            <video src={firstVid.url} controls preload="metadata" />
           ) : (
             <div className="sx-preview-empty">
               <span aria-hidden="true">🎬</span>
-              <p>Chưa chọn video</p>
+              <p>Chưa chọn video (chọn nhiều được — video đầu là bài chính)</p>
             </div>
           )}
         </div>
 
-        {selectedVid ? (
-          <p className="muted sx-selected-name">
-            Video đang chọn: <b>{selectedVid.title}</b>{' '}
-            <button type="button" className="btn ghost sm" onClick={() => setVidId('')}>
-              ✕ Bỏ video
-            </button>
+        {selectedVids.length ? (
+          <p className="muted sx-selected-name" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <b>{selectedVids.length} video đã chọn:</b>{' '}
+            {selectedVids.map((a) => (
+              <span key={a.id} className="chip on" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                <span style={{ fontSize: '.8em' }}>{a.title}</span>
+                <button type="button" onClick={() => onSelectVideo(a)} title="Bỏ" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}>✕</button>
+              </span>
+            ))}
+            <button type="button" className="btn ghost sm" onClick={() => setVidIds([])}>✕ Bỏ hết</button>
           </p>
         ) : null}
 
-        {videos.length > 0 ? (
-          <div className="sx-thumbs" role="listbox" aria-label="Chọn video từ kho">
-            {videos.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                className={`sx-thumb sx-thumb-video ${vidId === a.id ? 'on' : ''}`}
-                onClick={() => onSelectVideo(a)}
-                aria-pressed={vidId === a.id}
-                title={a.title}
-              >
-                <video src={a.url} muted preload="metadata" />
-                <span className="sx-thumb-badge" aria-hidden="true">▶</span>
-              </button>
-            ))}
+        {shownVideos.length > 0 ? (
+          <div className="sx-thumbs" role="listbox" aria-label="Chọn video từ kho" aria-multiselectable="true">
+            {shownVideos.map((a) => {
+              const on = vidIds.includes(a.id);
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`sx-thumb sx-thumb-video ${on ? 'on' : ''}`}
+                  onClick={() => onSelectVideo(a)}
+                  aria-pressed={on}
+                  title={a.title}
+                  style={{ position: 'relative' }}
+                >
+                  <video src={a.url} muted preload="metadata" />
+                  <span className="sx-thumb-badge" aria-hidden="true">▶</span>
+                  {on ? (
+                    <span style={{ position: 'absolute', top: 4, right: 4, background: '#16a34a', color: '#fff', width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{vidOrder(a.id)}</span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         ) : (
-          <p className="muted">Kho video đang trống. Tải video lên bên dưới.</p>
+          <p className="muted">{videos.length ? 'Không có video trong folder này. Bỏ lọc để xem tất cả.' : 'Kho video đang trống. Tải video lên bên dưới.'}</p>
         )}
 
         <AssetUploader kind="video" />
       </section>
 
       <ImageStudio
-        productId={imgId}
+        productId={imgIds[0] || ''}
         productTitle={title || ''}
         onAttach={(id, meta) => {
-          const productName = selectedImg?.title || '';
-          setImgId(id);
+          const productName = firstImg?.title || '';
+          setImgIds((ids) => (ids.includes(id) ? ids : [...ids, id]));
           router.refresh();
           if (meta?.banner) {
-            // Ghép xong thì tự sinh text luôn: ưu tiên tiêu đề, không thì lấy tên ảnh mô tả.
             const kwText = (title.trim() || cleanAssetName(productName)).trim();
             if (kwText && !genBusy) {
               if (!title.trim()) setTitle(cleanAssetName(productName));
               setMsg('Đã ghép xong. Đang tự sinh text theo hình...');
-              runGenerate(
-                kwText,
-                'giao_dich',
-                null,
-                productName,
-                kind
-              );
+              runGenerate(kwText, 'giao_dich', null, productName, kind);
             } else {
               setMsg('Đã ghép xong và gắn vào bài.');
             }
@@ -369,12 +404,12 @@ export default function SanXuatForm({
               type="button"
               className="btn ghost"
               onClick={onGenerate}
-              disabled={genBusy || (!title.trim() && !selectedImg && !selectedVid)}
+              disabled={genBusy || (!title.trim() && !firstImg && !firstVid)}
             >
               {genBusy ? 'Đang sinh...' : '✨ Sinh text bằng AI'}
             </button>
             <span className="muted">
-              Máy soạn nháp theo từ khóa đã chọn (hoặc theo tiêu đề nếu chưa chọn từ khóa). Người sửa lại trước khi đẩy hàng đợi.
+              Máy soạn nháp theo tiêu đề (kèm gợi ý từ tên tất cả ảnh/video đã chọn). Người sửa lại trước khi đẩy hàng đợi.
             </span>
           </div>
 
@@ -397,19 +432,19 @@ export default function SanXuatForm({
                 <input type="checkbox" checked={postFb} onChange={(e) => setPostFb(e.target.checked)} /> Facebook
               </label>
               <label
-                style={{ display: 'inline-flex', gap: 6, alignItems: 'center', opacity: vidId ? 1 : 0.5 }}
-                title={vidId ? '' : 'TikTok cần một video'}
+                style={{ display: 'inline-flex', gap: 6, alignItems: 'center', opacity: vidIds.length ? 1 : 0.5 }}
+                title={vidIds.length ? '' : 'TikTok cần một video'}
               >
                 <input
                   type="checkbox"
-                  checked={postTt && !!vidId}
-                  disabled={!vidId}
+                  checked={postTt && !!vidIds.length}
+                  disabled={!vidIds.length}
                   onChange={(e) => setPostTt(e.target.checked)}
                 />{' '}
-                TikTok {vidId ? '' : '(cần video)'}
+                TikTok {vidIds.length ? '' : '(cần video)'}
               </label>
             </span>
-            {kind === 'article' && postTt && vidId ? (
+            {kind === 'article' && postTt && vidIds.length ? (
               <span style={{ color: '#d97706', fontSize: '.8rem' }}>
                 ⚠️ Bài dài không hợp TikTok, caption sẽ bị rút gọn. Nên chọn "Bài ngắn" hoặc "Kịch bản video" khi đăng TikTok.
               </span>
@@ -479,8 +514,7 @@ export default function SanXuatForm({
                     <button type="button" className="btn ghost sm" onClick={() => setVideoJob(null)}>✕ Đóng</button>
                   </div>
                   <p className="muted" style={{ marginTop: 6, fontSize: '.85rem' }}>
-                    GitHub Actions có thể đang xếp hàng (khi nhiều workflow chạy cùng lúc). Yêu cầu vẫn còn, sẽ tự dựng khi tới lượt.
-                    Xem tiến trình ở GitHub Actions tab của repo.
+                    GitHub Actions có thể đang xếp hàng. Yêu cầu vẫn còn, sẽ tự dựng khi tới lượt.
                   </p>
                 </>
               )}
