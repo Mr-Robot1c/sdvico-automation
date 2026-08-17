@@ -26,7 +26,7 @@ function registerFontsFromWorkdir(workDir) {
 let logoCut = null;
 async function getLogo() {
   if (logoCut) return logoCut;
-  const p = join(HERE, '..', '..', '..', '..', 'apps', 'approval-ui', 'lib', 'gen', 'assets', 'logo-sdvico.jpg');
+  const p = join(HERE, '..', '..', '..', '..', 'apps', 'approval-ui', 'lib', 'gen', 'assets', 'logo-sdvico.png');
   try {
     const img = await loadImage(readFileSync(p));
     const w = img.width, h = img.height;

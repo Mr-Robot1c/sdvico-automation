@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Logo replace: logo-sdvico.jpg (55KB, mo) -> logo-sdvico.png (89KB, 350x350, 56% pixel trong suot san). logo-data.mjs regen base64 tu PNG moi (b64 len 119732). bumpers.mjs bumped path tu .jpg sang .png. logo-overlay.mjs khong doi (dung base64 tu logo-data). Thuat toan cat trang van chay (khong hai neu da trong suot san). -->
+
 <!-- re-verified: 2026-08-14 - Xuong san xuat "Do dai text" BO option "Kich ban video" (AI dung video da doc loi thoai truc tiep, khong can format rieng). Chi con "Bai ngan" + "Bai dai". Canh bao TikTok cap nhat theo. -->
 
 <!-- re-verified: 2026-08-14 - Xuong san xuat chip + thumbnail 🔍 nay MO LIGHTBOX (full man hinh, dark overlay, Esc/click ngoai de dong) thay vi chi doi preview. Ten chip da chon click DUOC de chuyen preview khung sang anh do. Avatar mini trong chip cung click duoc. Nhat quan: click ten/avatar = doi preview KHUNG; click 🔍 = phong to LIGHTBOX. -->
