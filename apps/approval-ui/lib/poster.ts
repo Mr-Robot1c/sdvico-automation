@@ -66,13 +66,42 @@ async function photoDataUri(url: string, w: number, h: number): Promise<string |
   }
 }
 
-// Logo → data URI PNG + tỉ lệ khung (để đặt trên chip trắng ở header).
+// Logo → data URI PNG + tỉ lệ khung. Đặt thẳng lên nền navy (không chip trắng).
+// Nếu logo tải lên là ảnh có nền trắng cứng, tự cắt nền để không có mảng trắng lạc loài
+// trên nền tối. Cách dò: lấy màu ở bốn góc, nếu ít nhất ba góc sáng gần trắng thì coi
+// như nền trắng và cho sharp thay pixel gần trắng bằng trong suốt.
 async function logoData(url: string): Promise<{ uri: string; aspect: number } | null> {
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    const png = await sharp(buf).resize(null, 200, { fit: 'inside' }).png().toBuffer();
+    let img = sharp(Buffer.from(await res.arrayBuffer()));
+
+    // Dò nền trắng bằng bốn góc trên ảnh gốc, kích thước nhỏ để nhanh.
+    const probe = await img.clone().resize(60, 60, { fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { data, info } = probe;
+    const isWhitish = (x: number, y: number) => {
+      const i = (y * info.width + x) * info.channels;
+      const a = info.channels === 4 ? data[i + 3] : 255;
+      if (a < 200) return false;
+      return data[i] >= 240 && data[i + 1] >= 240 && data[i + 2] >= 240;
+    };
+    const corners = [
+      isWhitish(0, 0), isWhitish(info.width - 1, 0),
+      isWhitish(0, info.height - 1), isWhitish(info.width - 1, info.height - 1),
+    ].filter(Boolean).length;
+
+    // Ba trong bốn góc gần trắng thì cắt nền: mọi pixel gần trắng thành trong suốt.
+    // Ngưỡng 235 chấp nhận cả các phần trắng bị nén JPEG lệch một chút.
+    if (corners >= 3) {
+      const rgba = await img.clone().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      const { data: px, info: meta } = rgba;
+      for (let i = 0; i < px.length; i += 4) {
+        if (px[i] >= 235 && px[i + 1] >= 235 && px[i + 2] >= 235) px[i + 3] = 0;
+      }
+      img = sharp(px, { raw: { width: meta.width, height: meta.height, channels: 4 } });
+    }
+
+    const png = await img.resize(null, 200, { fit: 'inside' }).png().toBuffer();
     const meta = await sharp(png).metadata();
     const aspect = (meta.width || 1) / (meta.height || 1);
     return { uri: `data:image/png;base64,${png.toString('base64')}`, aspect };
@@ -139,7 +168,7 @@ export async function buildRecruitmentPoster(input: PosterInput): Promise<Buffer
         div({ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }, [
           div({ display: 'flex', flexDirection: 'column', gap: 10 }, [
             logo
-              ? div({ display: 'flex', background: '#fff', borderRadius: 14, padding: '10px 20px', alignItems: 'center', alignSelf: 'flex-start' }, [imgEl(logo.uri, { height: logoH, width: logoW })])
+              ? div({ display: 'flex', alignSelf: 'flex-start' }, [imgEl(logo.uri, { height: logoH, width: logoW })])
               : txt({ color: '#fff', fontSize: 46, fontWeight: 700, letterSpacing: 2 }, brandName),
             ...(tagline ? [txt({ color: '#dbe9fb', fontSize: 25, fontWeight: 700, maxWidth: 620 }, tagline)] : []),
           ]),
