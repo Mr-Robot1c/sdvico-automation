@@ -14,6 +14,32 @@ import { sendEmail } from '../lib/mailer';
 import { composeOfferLetter, composeRejectLetter } from '../lib/hr-letters';
 import { allocateInterviewSlots, composeInterviewLetter, generateInterviewQuestions, formatSlot } from '../lib/interview';
 import { linkedinConfigured, postToLinkedIn } from '../lib/linkedin';
+import { getSessionUser } from '../lib/auth';
+
+// Trả email người đang đăng nhập, hoặc null nếu chế độ basic. Bọc try để không rơi luồng cũ.
+async function currentEmail(): Promise<string | null> {
+  try {
+    const u = await getSessionUser();
+    return u?.email ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Ghi audit vào hr_applications theo cách best-effort: nếu cột chưa migrate (chế độ chưa
+// chạy 20260815010000_audit_columns.sql), lỗi được nuốt và luồng chính không bị ảnh hưởng.
+// Cam kết "chức năng như cũ": app phải chạy được kể cả khi migration mới chưa áp.
+async function auditApp(
+  client: ReturnType<typeof getServerClient>,
+  appId: string,
+  fields: { advanced_by?: string | null; interviewed_by?: string | null; decided_by?: string | null }
+): Promise<void> {
+  try {
+    await client.from('hr_applications').update(fields).eq('id', appId);
+  } catch {
+    // eo
+  }
+}
 
 // datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
 // Server Vercel chạy UTC nên phải gắn +07:00 để parse đúng giờ Việt Nam.
@@ -85,6 +111,7 @@ export async function decideForm(formData: FormData) {
   if (!id || !decision) return;
 
   const client = getServerClient();
+  const who = await currentEmail();
   // Lấy mục trước khi đổi trạng thái để biết loại + payload (gửi mail nếu là thư ứng viên).
   const { data: item } = await client
     .from('approval_queue')
@@ -93,7 +120,7 @@ export async function decideForm(formData: FormData) {
 
   const { error } = await client
     .from('approval_queue')
-    .update({ status: decision, decided_at: new Date().toISOString(), note: note || null })
+    .update({ status: decision, decided_at: new Date().toISOString(), note: note || null, decided_by: who })
     .eq('id', id)
     .eq('status', 'pending');
   if (error) throw new Error(error.message);
@@ -126,6 +153,7 @@ export async function decideCandidate(formData: FormData) {
   if (!appId || !['offer', 'reject'].includes(decision)) return;
 
   const client = getServerClient();
+  const who = await currentEmail();
   const { data: app } = await client
     .from('hr_applications')
     .select('id, stage, candidate_id, job_id')
@@ -152,12 +180,13 @@ export async function decideCandidate(formData: FormData) {
     : composeRejectLetter({ name, position });
 
   await client.from('hr_applications').update({ stage: newStage }).eq('id', appId).eq('stage', 'interview');
+  await auditApp(client, appId, { decided_by: who });
 
   // Dọn thư mời phỏng vấn còn treo của chính hồ sơ này. Đã quyết nhận hay không nhận thì
   // thư mời hết nghĩa. Để nguyên là có ngày ai đó dọn hàng đợi, bấm Duyệt, và người vừa bị
   // từ chối nhận được thư mời phỏng vấn. Dùng 'dismissed' chứ không xóa, để còn lưu vết.
   await client.from('approval_queue')
-    .update({ status: 'dismissed', decided_at: new Date().toISOString(), note: 'Tự dọn: hồ sơ đã có quyết định cuối.' })
+    .update({ status: 'dismissed', decided_at: new Date().toISOString(), decided_by: who, note: 'Tự dọn: hồ sơ đã có quyết định cuối.' })
     .eq('kind', 'hr_interview').eq('ref_id', appId).eq('status', 'pending');
 
   await client.from('approval_queue').insert({
@@ -178,9 +207,11 @@ export async function markInterviewed(formData: FormData) {
   const appId = String(formData.get('appId') || '');
   if (!appId) return;
   const client = getServerClient();
+  const who = await currentEmail();
   await client.from('hr_applications')
     .update({ interviewed_at: new Date().toISOString() })
     .eq('id', appId).eq('stage', 'interview');
+  await auditApp(client, appId, { interviewed_by: who });
   revalidatePath('/ho-so');
 }
 
@@ -194,9 +225,10 @@ export async function dismissQueueItem(formData: FormData) {
   if (!id) return;
 
   const client = getServerClient();
+  const who = await currentEmail();
   await client
     .from('approval_queue')
-    .update({ status: 'dismissed', decided_at: new Date().toISOString() })
+    .update({ status: 'dismissed', decided_at: new Date().toISOString(), decided_by: who })
     .eq('id', id)
     .eq('status', 'pending');
 
@@ -282,6 +314,7 @@ export async function advanceToInterview(formData: FormData) {
   if (!appId) return;
 
   const client = getServerClient();
+  const who = await currentEmail();
   const { data: app } = await client
     .from('hr_applications')
     .select('id, stage, candidate_id, job_id')
@@ -297,6 +330,7 @@ export async function advanceToInterview(formData: FormData) {
   if (error) {
     await client.from('hr_applications').update({ stage: 'interview' }).eq('id', appId).eq('stage', 'review');
   }
+  await auditApp(client, appId, { advanced_by: who });
 
   // Soạn thư mời NGAY trong app (không chờ worker hr-interview), nếu chưa có.
   const { data: existingIv } = await client.from('approval_queue').select('id').eq('kind', 'hr_interview').eq('ref_id', appId).maybeSingle();
@@ -1331,10 +1365,11 @@ export async function approveAndPublish(formData: FormData) {
   const deleteOldFbPostId = String(formData.get('delete_old_fb_post_id') || '');
 
   const client = getServerClient();
+  const who = await currentEmail();
 
   // Duyệt trong hàng đợi.
   const { error: approveErr } = await client.from('approval_queue')
-    .update({ status: 'approved', decided_at: new Date().toISOString() })
+    .update({ status: 'approved', decided_at: new Date().toISOString(), decided_by: who })
     .eq('id', queueId).eq('status', 'pending');
   if (approveErr) throw new Error(approveErr.message);
 
@@ -1425,9 +1460,10 @@ export async function approveAndSchedule(formData: FormData) {
   }
 
   const client = getServerClient();
+  const who = await currentEmail();
 
   await client.from('approval_queue')
-    .update({ status: 'approved', decided_at: new Date().toISOString() })
+    .update({ status: 'approved', decided_at: new Date().toISOString(), decided_by: who })
     .eq('id', queueId).eq('status', 'pending');
 
   // Đặt lịch: worker cron (chạy mỗi 5 phút qua cron-job.org) sẽ đăng khi đến giờ.

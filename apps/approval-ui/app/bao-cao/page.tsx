@@ -59,6 +59,20 @@ export default async function Page() {
     client.from('approval_queue').select('kind, status').eq('status', 'pending'),
   ]);
 
+  // Nhật ký duyệt gần đây: 20 mục approval_queue mới bấm nhất, có ghi decided_by (cột mới,
+  // ở chế độ AUTH_MODE=basic sẽ luôn là null nên cột "Người bấm" hiện dấu gạch).
+  const { data: decidedRows } = await client
+    .from('approval_queue')
+    .select('kind, status, decided_at, decided_by, title')
+    .neq('status', 'pending')
+    .not('decided_at', 'is', null)
+    .order('decided_at', { ascending: false })
+    .limit(20);
+  const decided = (decidedRows || []) as Array<{
+    kind: string; status: string; decided_at: string;
+    decided_by: string | null; title: string | null;
+  }>;
+
   const runs = (runsRes.data || []) as Row[];
   const cands = (candRes.data || []) as { id: string; created_at: string }[];
   const apps = (appsRes.data || []) as { id: string; stage: string }[];
@@ -168,6 +182,48 @@ export default async function Page() {
                     <span className={`stage tone-${r.status === 'ok' ? 'ok' : r.status === 'error' ? 'no' : 'mkt'}`}>
                       {r.status}
                     </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="settings-box">
+        <h2 style={{ margin: '0 0 10px', fontSize: '1.02rem' }}>Nhật ký duyệt gần đây</h2>
+        <p className="muted" style={{ margin: '0 0 8px', fontSize: '0.82em' }}>
+          20 mục hàng đợi mới được xử lý. Cột &quot;Người bấm&quot; chỉ có giá trị khi
+          đã bật <code>AUTH_MODE=supabase</code>; nếu còn dùng mật khẩu chung sẽ để trống.
+        </p>
+        {decided.length === 0 ? (
+          <p className="muted">Chưa có mục nào được xử lý.</p>
+        ) : (
+          <table className="run-log">
+            <thead>
+              <tr>
+                <th>Lúc</th>
+                <th>Loại</th>
+                <th>Kết quả</th>
+                <th>Người bấm</th>
+                <th>Tiêu đề</th>
+              </tr>
+            </thead>
+            <tbody>
+              {decided.map((r, i) => (
+                <tr key={i}>
+                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>
+                    {new Date(r.decided_at).toLocaleString('vi-VN', { hour12: false })}
+                  </td>
+                  <td><code>{r.kind}</code></td>
+                  <td>
+                    <span className={`stage tone-${r.status === 'approved' ? 'ok' : r.status === 'rejected' ? 'no' : 'mkt'}`}>
+                      {r.status}
+                    </span>
+                  </td>
+                  <td>{r.decided_by || <span className="muted">—</span>}</td>
+                  <td style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.title || ''}
                   </td>
                 </tr>
               ))}
