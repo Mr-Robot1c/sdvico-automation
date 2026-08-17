@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - publishContentToFacebook catch nay ghi run_log task=mkt.publish_facebook_ui status=error voi errMsg + hasImage/hasVideo. Truoc day catch nuot loi, mkt_posts.status=failed nhung khong co log de biet vi sao (token het, quota, videoUrl 404,...). Nay debug qua /api/fb-diag hoac SELECT run_log. -->
+
 <!-- re-verified: 2026-08-14 - /noi-dung: BO nut "🎬 Lam video" (trung voi nut "Xong + Lam video" o /san-xuat). Con badge "🎬 Da yeu cau video" hien khi brief.video_requested=true. Bo import requestVideoForContent khoi page.tsx (server action van con o actions.ts, chua go de tuong thich). -->
 
 <!-- re-verified: 2026-08-14 - /api/rotate bai CONTENT chon kind theo TY LE weighted (qa=2,checklist=2,glossary=1,tip=1,engage=1,portrait=1,news=1 - dung de xuat Phong KD 5 cum an toan + 2 cum can chuan bi that). kind=news hoac portrait TU dat needs_gov_review=true (dieu cam 3 + tranh AI bia ten). Nhan queue theo kind ("❓ Hoi-Dap", "📋 Checklist", "📖 Thuat ngu", "💡 Meo", "💬 Hoi ba con", "👤 Chan dung (dien tay)", "⚠️ Thoi su (cho duyet QL)"). payload approval_queue them content_type + needs_manager_approval de nguoi duyet biet ngay bai gi va co can quan ly duyet khong. -->

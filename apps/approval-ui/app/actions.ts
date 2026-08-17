@@ -193,8 +193,19 @@ async function publishContentToFacebook(
     }
     return { ok: true, url: externalUrl, warn };
   } catch (e: any) {
+    const errMsg = String(e?.message || e);
     await client.from('mkt_posts').insert({ content_id: contentId, channel: 'facebook', status: 'failed' });
-    return { ok: false, error: String(e?.message || e) };
+    // Ghi log de xem xet: TRUOC day catch nuot loi, khong biet vi sao fail (token het han, quota FB,
+    // videoUrl 404, ...). Log nay doc qua /api/fb-diag.
+    try {
+      await client.from('run_log').insert({
+        task: 'mkt.publish_facebook_ui',
+        actor: 'decideForm',
+        status: 'error',
+        detail: { contentId, error: errMsg, hasImage: !!imageUrl, hasVideo: !!videoUrl }
+      });
+    } catch { /* bo qua loi ghi log */ }
+    return { ok: false, error: errMsg };
   }
 }
 
