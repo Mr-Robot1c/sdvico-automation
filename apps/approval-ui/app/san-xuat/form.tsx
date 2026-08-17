@@ -79,7 +79,7 @@ export default function SanXuatForm({
         if (r.done) {
           setVideoJob((v) => v ? { ...v, status: 'done', videoUrl: r.videoUrl, queueUrl: r.url, title: r.title } : v);
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-        } else if (Date.now() - videoJob.startedAt > 15 * 60 * 1000) {
+        } else if (Date.now() - videoJob.startedAt > 30 * 60 * 1000) {
           setVideoJob((v) => v ? { ...v, status: 'timeout' } : v);
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
         }
@@ -510,7 +510,7 @@ export default function SanXuatForm({
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <span>⏱️</span>
-                    <b>Đã đợi hơn 15 phút mà chưa xong.</b>
+                    <b>Đã đợi hơn 30 phút mà chưa xong.</b>
                     <button type="button" className="btn ghost sm" onClick={() => setVideoJob(null)}>✕ Đóng</button>
                   </div>
                   <p className="muted" style={{ marginTop: 6, fontSize: '.85rem' }}>

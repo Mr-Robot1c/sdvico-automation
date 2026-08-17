@@ -868,7 +868,11 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
   if (error) throw new Error(error.message);
 
   const contentId = (inserted as { id: string })?.id;
-  const { error: qErr } = await client.from('approval_queue').insert({
+  // Khi user chọn "Xong + Làm video": bài gốc CHỈ là NGUỒN cho pipeline, KHÔNG đưa vào hàng đợi
+  // duyệt (nếu đưa thì user dễ nhầm bấm Duyệt bài gốc -> đăng clip gốc lên FB thay vì video AI).
+  // Pipeline sẽ tạo bài MỚI (kind='social', generator='video-pipeline', source_content=contentId)
+  // và đẩy bài đó vào hàng đợi.
+  const { error: qErr } = requestVideo ? { error: null } : await client.from('approval_queue').insert({
     kind: 'mkt_publish_content',
     title: `[${kind === 'video' ? 'Video' : kind === 'article' ? 'Bài website' : 'Bài Facebook'}] ${title}`,
     payload: {

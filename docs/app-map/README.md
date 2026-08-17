@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - FIX 2 bug "Xong + Lam video": (1) createContent khi request_video=1 KHONG dua bai goc vao approval_queue - bai goc CHI la NGUON cho pipeline, chi bai video-pipeline (bai moi) vao hang doi. Truoc: user nham bam Duyet bai goc -> dang clip goc len FB thay vi video AI. (2) Bai chua co product_group -> pipeline throw. Nay fallback guessGroup tu tieu de/tu khoa/draft. (3) Noi timeout client 15 -> 30 phut (GA cron 10ph + build 8ph co the >15ph). -->
+
 <!-- re-verified: 2026-08-14 - Xuong san xuat: MULTI-SELECT anh + video (imgIds[] + vidIds[], video dau = bai chinh, anh du tha binh luan sau khi dang). Chip filter theo folder san pham dung CHUNG cho ca 2 khung -> gon, khong roi. Thumbnail chon co so thu tu de biet mo thu ty. createContent nhan image_asset_ids/video_asset_ids (CSV) va luu vao brief.assets.{images,videos} (image/video giu id dau tien cho backward compat). publishContentToFacebook loop qua extra images tha vao binh luan sau khi dang bai chinh (video hoac chu dai). page.tsx query them product_group. -->
 
 <!-- re-verified: 2026-08-14 - Bai content chia 5 CUM co cau truc rieng: products.mjs CONTENT_TOPICS doi tu string sang {type,topic} 25 muc (5 checklist + 5 glossary + 5 tip + 5 qa + 5 engage). social.mjs generateContentPost siet prompt theo tung type (CHECKLIST danh so + emoji, QA co Hoi/Dap, ENGAGE ket cau hoi khong nhac thuong hieu...). Kho tu lieu them folder CONTENT (const CONTENT_GROUP) cho anh bai noi dung khong gan san pham. rotate + rotate-run: loai Content khoi vong xoay ban; bai content uu tien anh Content, trong thi fallback anh bat ky. Da test 3 dang ra dung cau truc. -->

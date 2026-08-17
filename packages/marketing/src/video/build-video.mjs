@@ -216,8 +216,13 @@ async function main() {
 
   // Tư liệu: CHỈ dùng asset đúng sản phẩm (product_group của bài). Bài SEA-40 chỉ được dùng ảnh/
   // video SEA-40, không lẫn S-Tracking hay sơn (điều cấm 5 - không nhận vơ, và tránh sai lệch nội dung).
-  const productGroup = content.brief?.rotation_group;
-  if (!productGroup) throw new Error('Bài chưa gán sản phẩm (brief.rotation_group). Cập nhật ở /tu-lieu rồi thử lại.');
+  // Sản phẩm: ưu tiên brief.rotation_group (rotation tự đặt), rồi guessGroup từ tiêu đề + từ khóa +
+  // draft (bài Xưởng sản xuất người tự soạn thường không có rotation_group).
+  const { guessGroup } = await import('../products.mjs');
+  const brief = content.brief || {};
+  const productGroup = brief.rotation_group
+    || guessGroup(`${content.title || ''} ${brief.keyword || ''} ${String(content.draft || '').slice(0, 300)}`);
+  if (!productGroup) throw new Error('Bài chưa gán sản phẩm (không đoán được từ tiêu đề/nội dung). Gán product_group ở /tu-lieu hoặc đặt tiêu đề rõ hơn.');
   const { data: assets } = await client.from('brand_assets')
     .select('id, kind, title, storage_path')
     .eq('product_group', productGroup)
