@@ -1,16 +1,17 @@
-// Tạo INTRO (2.5s) và OUTRO (4s) cho video SDVICO. Vẽ khung bằng @napi-rs/canvas (đã có sẵn cho
-// banner) rồi ffmpeg tạo mp4 tĩnh CÙNG CODEC với cảnh chính để nối bằng concat -c copy được.
-// Intro: logo SDVICO + slogan. Outro: tổng đài + slogan (đọc số từng chữ số qua TTS ngoài).
+// Tạo INTRO (2.5s) và OUTRO (đủ dài đọc hết TTS) cho video SDVICO.
+// KHÁC bản cũ: render SEQUENCE frames PNG (30fps) - mỗi frame khác nhau để có animation THẬT:
+// logo scale-in, text slide-up, số điện thoại pulse. ffmpeg concat sequence -> mp4.
+// Cùng codec cảnh chính (H.264 yuv420p 30fps AAC 44100 stereo) để concat -c copy.
 import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { ffmpeg, probeDuration } from './ffmpeg.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const FPS = 30;
 
-// Nạp font Be Vietnam Pro cho canvas. Font đã được ensureFonts.js xuất ra workDir dạng .ttf.
 let fontsReady = false;
 function registerFontsFromWorkdir(workDir) {
   if (fontsReady) return;
@@ -18,11 +19,10 @@ function registerFontsFromWorkdir(workDir) {
     GlobalFonts.registerFromPath(join(workDir, 'BeVietnamPro-Black.ttf'), 'BVP-Black');
     GlobalFonts.registerFromPath(join(workDir, 'BeVietnamPro-Regular.ttf'), 'BVP');
     fontsReady = true;
-  } catch { /* font thiếu -> canvas sẽ dùng font mặc định, không sập */ }
+  } catch { /* font thiếu -> canvas dùng font mặc định */ }
 }
 
-// Logo SDVICO đã CẮT NỀN TRẮNG (canvas trong suốt) — tránh khối trắng vuông xấu trên nền xanh.
-// Dùng cùng thuật toán với apps/approval-ui/lib/gen/logo-overlay.mjs.
+// Logo cắt nền trắng (nếu file PNG đã trong suốt sẵn thì thuật toán vẫn chạy - vô hại).
 let logoCut = null;
 async function getLogo() {
   if (logoCut) return logoCut;
@@ -33,7 +33,6 @@ async function getLogo() {
     const cv = createCanvas(w, h);
     const ctx = cv.getContext('2d');
     ctx.drawImage(img, 0, 0, w, h);
-    // Cắt gần trắng thành trong suốt (logo nền trắng -> chỉ còn chữ + biểu tượng).
     const data = ctx.getImageData(0, 0, w, h);
     const d = data.data;
     for (let i = 0; i < d.length; i += 4) {
@@ -47,130 +46,195 @@ async function getLogo() {
   } catch { return null; }
 }
 
-// Vẽ nền gradient xanh biển SDVICO.
-function drawBackground(ctx, W, H) {
-  const g = ctx.createLinearGradient(0, 0, 0, H);
+// Nền gradient động: dịch chuyển theo t để có cảm giác biển động nhẹ.
+function drawBackground(ctx, W, H, t = 0) {
+  const shift = Math.sin(t * 0.5) * 0.05;
+  const g = ctx.createLinearGradient(0, -H * shift, 0, H + H * shift);
   g.addColorStop(0, '#1f4e79');
+  g.addColorStop(0.5, '#164066');
   g.addColorStop(1, '#0d2a45');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
-}
-
-// Font size không vượt quá chiều CAO để tránh 2 dòng chồng nhau ở khung ngang (H nhỏ hơn W).
-// Dựa cả W và H, lấy min.
-function fs(W, H, ratio) {
-  return Math.max(14, Math.round(Math.min(W, H * 1.6) * ratio));
-}
-
-// Vẽ chữ có shadow nhẹ để dễ đọc trên nền gradient.
-function drawText(ctx, text, x, y, opts = {}) {
-  const { color = '#ffffff', font, shadow = true, align = 'center' } = opts;
-  ctx.textAlign = align;
-  ctx.textBaseline = 'middle';
-  ctx.font = font;
-  if (shadow) {
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.35)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetY = 2;
-    ctx.fillStyle = color;
-    ctx.fillText(text, x, y);
-    ctx.restore();
-  } else {
-    ctx.fillStyle = color;
-    ctx.fillText(text, x, y);
+  // Vài chấm sáng "sóng" trang trí (không quá rối).
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  for (let i = 0; i < 6; i++) {
+    const x = ((i * 137 + t * 30) % W);
+    const y = H * 0.3 + Math.sin(t * 1.5 + i) * H * 0.05;
+    ctx.beginPath();
+    ctx.arc(x, y, 20 + i * 3, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
-// Vẽ intro card. Logo trên, tên + slogan giữa/dưới. Cân đối cả 2 khung.
-async function drawIntro(W, H) {
+// Easing: hàm easeOutCubic cho animation vào mềm mại.
+const easeOut = (t) => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
+const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
+function drawText(ctx, text, x, y, opts = {}) {
+  const { color = '#ffffff', font, align = 'center', alpha = 1 } = opts;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.font = font;
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// Vẽ 1 frame INTRO tại thời điểm t (0..dur).
+// Timeline: 0-0.8s logo scale-in fade-in; 0.6-1.4s "SDVICO" slide up fade; 1.2-2.0s slogan fade.
+async function drawIntroFrame(W, H, t, dur) {
   const cv = createCanvas(W, H);
   const ctx = cv.getContext('2d');
-  drawBackground(ctx, W, H);
+  drawBackground(ctx, W, H, t);
   const logo = await getLogo();
   const isPortrait = H > W;
   const pos = isPortrait
     ? { logoY: 0.22, logoRatio: 0.4, nameY: 0.6, sloganY: 0.72 }
     : { logoY: 0.15, logoRatio: 0.3, nameY: 0.7, sloganY: 0.85 };
-  const logoSize = Math.round(Math.min(W, H) * pos.logoRatio);
-  if (logo) ctx.drawImage(logo, (W - logoSize) / 2, H * pos.logoY, logoSize, logoSize);
   const base = isPortrait ? H : Math.min(W, H * 1.6);
-  drawText(ctx, 'SDVICO', W / 2, H * pos.nameY, { font: `${Math.round(base * 0.09)}px BVP-Black` });
-  drawText(ctx, 'Công nghệ số cho ngành biển', W / 2, H * pos.sloganY, {
-    font: `${Math.round(base * 0.035)}px BVP`, color: 'rgba(255,255,255,0.9)'
-  });
+
+  // Logo: scale 0.6 → 1 + fade 0 → 1 trong 0-0.8s.
+  if (logo) {
+    const p = easeOut(t / 0.8);
+    const scale = 0.6 + 0.4 * p;
+    const alpha = p;
+    const size = Math.round(Math.min(W, H) * pos.logoRatio * scale);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(logo, (W - size) / 2, H * pos.logoY + (Math.min(W, H) * pos.logoRatio - size) / 2, size, size);
+    ctx.restore();
+  }
+
+  // "SDVICO": slide up 60px + fade in 0.6-1.4s.
+  const nameT = easeOut((t - 0.6) / 0.8);
+  if (nameT > 0) {
+    const offset = 60 * (1 - nameT);
+    drawText(ctx, 'SDVICO', W / 2, H * pos.nameY + offset, {
+      font: `${Math.round(base * 0.09)}px BVP-Black`, alpha: Math.min(1, nameT)
+    });
+  }
+
+  // Slogan fade 1.2-2.0s.
+  const sloganT = easeOut((t - 1.2) / 0.8);
+  if (sloganT > 0) {
+    drawText(ctx, 'Công nghệ số cho ngành biển', W / 2, H * pos.sloganY, {
+      font: `${Math.round(base * 0.035)}px BVP`, color: 'rgba(255,255,255,0.9)', alpha: Math.min(1, sloganT)
+    });
+  }
+
+  // Fade out toàn cảnh 0.4s cuối.
+  const fadeOut = Math.max(0, (dur - t) / 0.4);
+  if (fadeOut < 1) {
+    ctx.fillStyle = `rgba(0,0,0,${1 - fadeOut})`;
+    ctx.fillRect(0, 0, W, H);
+  }
   return cv.toBuffer('image/png');
 }
 
-// Vẽ outro card. Bố cục cân đối cả 2 khung (ngang/dọc): logo trên - "Gọi ngay tổng đài" - SỐ TO
-// - slogan dưới. Vertical căn giữa (khối chữ + logo tập trung ở giữa), Horizontal trải rộng.
-async function drawOutro(W, H) {
+// Vẽ 1 frame OUTRO tại t. Timeline: 0-0.7s logo pop + fade; 0.6-1.4s "Gọi ngay tổng đài" slide;
+// 1.3-2.0s số điện thoại scale-in + PULSE nhẹ liên tục; 1.8-2.5s slogan fade.
+async function drawOutroFrame(W, H, t, dur) {
   const cv = createCanvas(W, H);
   const ctx = cv.getContext('2d');
-  drawBackground(ctx, W, H);
+  drawBackground(ctx, W, H, t);
   const logo = await getLogo();
   const isPortrait = H > W;
-
-  // Vị trí % theo chiều CAO cho 2 khung, tránh trống hoặc chồng.
   const pos = isPortrait
     ? { logoY: 0.28, headY: 0.5, phoneY: 0.6, sloganY: 0.72, logoRatio: 0.28 }
     : { logoY: 0.08, headY: 0.4, phoneY: 0.6, sloganY: 0.85, logoRatio: 0.18 };
-
-  const logoSize = Math.round(Math.min(W, H) * pos.logoRatio);
-  if (logo) ctx.drawImage(logo, (W - logoSize) / 2, H * pos.logoY, logoSize, logoSize);
-
-  // Font base: dùng CHIỀU CAO cho dọc (chữ to hơn), MIN(W,H) cho ngang.
   const base = isPortrait ? H : Math.min(W, H * 1.6);
-  const headFont = Math.round(base * (isPortrait ? 0.045 : 0.045));
-  const phoneBase = Math.round(base * (isPortrait ? 0.095 : 0.09));
-  const sloganFont = Math.round(base * 0.028);
 
-  drawText(ctx, 'Gọi ngay tổng đài', W / 2, H * pos.headY, { font: `${headFont}px BVP-Black` });
-
-  // Số tổng đài: to, vàng. Nếu tràn W thì tự giảm.
-  ctx.font = `${phoneBase}px BVP-Black`;
-  const phoneText = '1900 23 23 49';
-  let actualFont = phoneBase;
-  while (ctx.measureText(phoneText).width > W * 0.88 && actualFont > 40) {
-    actualFont = Math.round(actualFont * 0.92);
-    ctx.font = `${actualFont}px BVP-Black`;
+  // Logo pop-in.
+  if (logo) {
+    const p = easeOut(t / 0.7);
+    const scale = 0.5 + 0.5 * p;
+    const alpha = p;
+    const size = Math.round(Math.min(W, H) * pos.logoRatio * scale);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(logo, (W - size) / 2, H * pos.logoY + (Math.min(W, H) * pos.logoRatio - size) / 2, size, size);
+    ctx.restore();
   }
-  drawText(ctx, phoneText, W / 2, H * pos.phoneY, { font: `${actualFont}px BVP-Black`, color: '#ffcc00' });
 
-  drawText(ctx, 'SDVICO đồng hành cùng ngư dân', W / 2, H * pos.sloganY, {
-    font: `${sloganFont}px BVP`, color: 'rgba(255,255,255,0.85)'
-  });
+  // "Gọi ngay tổng đài": slide từ trái vào + fade 0.6-1.4s.
+  const headT = easeOut((t - 0.6) / 0.8);
+  if (headT > 0) {
+    const offset = -120 * (1 - headT);
+    drawText(ctx, 'Gọi ngay tổng đài', W / 2 + offset, H * pos.headY, {
+      font: `${Math.round(base * 0.045)}px BVP-Black`, alpha: Math.min(1, headT)
+    });
+  }
+
+  // Số điện thoại: scale-in + PULSE liên tục sau đó (nhấp nhẹ 1.0-1.05).
+  const phoneInT = easeOut((t - 1.3) / 0.7);
+  if (phoneInT > 0) {
+    const scaleIn = 0.7 + 0.3 * Math.min(1, phoneInT);
+    const pulseT = Math.max(0, t - 2.0);
+    const pulse = 1 + 0.04 * Math.sin(pulseT * 3.5); // biên độ 4%, tần số ~0.56Hz
+    const finalScale = scaleIn * pulse;
+
+    const phoneBase = Math.round(base * (isPortrait ? 0.095 : 0.09));
+    const phoneText = '1900 23 23 49';
+    // Tính font tối đa fit W*0.88
+    let f = phoneBase;
+    ctx.font = `${f}px BVP-Black`;
+    while (ctx.measureText(phoneText).width > W * 0.88 && f > 40) {
+      f = Math.round(f * 0.92);
+      ctx.font = `${f}px BVP-Black`;
+    }
+    ctx.save();
+    ctx.translate(W / 2, H * pos.phoneY);
+    ctx.scale(finalScale, finalScale);
+    ctx.globalAlpha = Math.min(1, phoneInT);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${f}px BVP-Black`;
+    ctx.shadowColor = 'rgba(255,204,0,0.5)';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillText(phoneText, 0, 0);
+    ctx.restore();
+  }
+
+  // Slogan fade in 1.8-2.5s.
+  const sloganT = easeOut((t - 1.8) / 0.7);
+  if (sloganT > 0) {
+    drawText(ctx, 'SDVICO đồng hành cùng ngư dân', W / 2, H * pos.sloganY, {
+      font: `${Math.round(base * 0.028)}px BVP`, color: 'rgba(255,255,255,0.9)', alpha: Math.min(1, sloganT)
+    });
+  }
+
+  // Fade out 0.5s cuối.
+  const fadeOut = Math.max(0, (dur - t) / 0.5);
+  if (fadeOut < 1) {
+    ctx.fillStyle = `rgba(0,0,0,${1 - fadeOut})`;
+    ctx.fillRect(0, 0, W, H);
+  }
   return cv.toBuffer('image/png');
 }
 
-// Tạo file mp4 intro/outro với EFFECT: zoom nhẹ + fade in/out. Cùng codec cảnh chính để concat.
-// audioPath = null -> tiếng lặng. Fade: 0.4s vào đầu, 0.5s cuối. Zoom: 1.0 → 1.08 trong suốt clip.
-async function makeBumperClip(imagePath, audioPath, durationSec, outSeg, workDir, fmt) {
-  const dur = durationSec.toFixed(3);
-  const fadeOutStart = Math.max(0, durationSec - 0.5).toFixed(3);
-  const frames = Math.round(durationSec * 30);
-  // zoompan: phóng 1.0 -> 1.08 trong 'frames' khung, viewport wxh = fmt.w x fmt.h.
-  // fade: hiện lên trong 0.4s, tắt dần 0.5s cuối.
-  const vf = [
-    `scale=${fmt.w * 2}:${fmt.h * 2}:force_original_aspect_ratio=decrease`,
-    `pad=${fmt.w * 2}:${fmt.h * 2}:(ow-iw)/2:(oh-ih)/2:0x0d2a45`,
-    `zoompan=z='1+0.08*on/${frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${fmt.w}x${fmt.h}:fps=30`,
-    `fade=t=in:st=0:d=0.4`,
-    `fade=t=out:st=${fadeOutStart}:d=0.5`,
-    `format=yuv420p`
-  ].join(',');
-  // Audio fade: hiện 0.2s, tắt 0.4s cuối.
-  const af = `afade=t=in:st=0:d=0.2,afade=t=out:st=${fadeOutStart}:d=0.4`;
-
-  const args = ['-y', '-loop', '1', '-framerate', '30', '-i', imagePath];
+// Render toàn bộ frames + gọi ffmpeg concat → mp4. framesDir: thư mục con chứa PNG sequence.
+async function renderBumperMp4(drawFrame, framesDir, W, H, dur, audioPath, outSeg, workDir) {
+  await mkdir(framesDir, { recursive: true });
+  const totalFrames = Math.round(dur * FPS);
+  for (let i = 0; i < totalFrames; i++) {
+    const t = i / FPS;
+    const buf = await drawFrame(W, H, t, dur);
+    await writeFile(join(framesDir, `f${String(i).padStart(4, '0')}.png`), buf);
+  }
+  const inputPattern = join(framesDir, 'f%04d.png');
+  const args = ['-y', '-framerate', String(FPS), '-i', inputPattern];
   if (audioPath) args.push('-i', audioPath);
   else args.push('-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo');
   args.push(
-    '-t', dur,
-    '-vf', vf,
-    '-af', af,
+    '-t', dur.toFixed(3),
     '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
-    '-r', '30', '-video_track_timescale', '30000',
+    '-r', String(FPS), '-video_track_timescale', String(FPS * 1000),
     '-c:a', 'aac', '-ar', '44100', '-ac', '2',
     outSeg,
   );
@@ -178,27 +242,21 @@ async function makeBumperClip(imagePath, audioPath, durationSec, outSeg, workDir
   return outSeg;
 }
 
-// Tạo intro và outro cho một FORMAT. Trả về {introSeg, outroSeg} là tên file trong workDir để
-// concat cùng các cảnh chính. outroAudioPath: mp3 TTS đọc tổng đài (đã sinh sẵn), có thể null.
-// Thời lượng outro = MAX(minDur, audio_duration + 1s buffer) để không cắt tiếng giữa chừng.
-export async function buildBumpers({ workDir, fmt, outroAudioPath = null, introDurSec = 2.5, outroDurSec = 4 }) {
+// Tạo intro và outro cho một FORMAT. Trả về {introSeg, outroSeg} là tên file mp4 trong workDir để
+// concat cùng cảnh chính. outroAudioPath: mp3 TTS đọc tổng đài (đã sinh sẵn), có thể null.
+export async function buildBumpers({ workDir, fmt, outroAudioPath = null, introDurSec = 2.8, outroDurSec = 4 }) {
   registerFontsFromWorkdir(workDir);
-  const introPng = join(workDir, 'intro.png');
-  const outroPng = join(workDir, 'outro.png');
-  await writeFile(introPng, await drawIntro(fmt.w, fmt.h));
-  await writeFile(outroPng, await drawOutro(fmt.w, fmt.h));
-  const introSeg = 'intro.mp4';
-  const outroSeg = 'outro.mp4';
-  // Đo thời lượng audio outro để đảm bảo video đủ dài (đọc "1900 23 23 49" từng số mất ~6-7s,
-  // outro 4s cố định trước đây bị cắt tiếng giữa chừng).
+  // Outro dài đủ đọc hết TTS (đọc "1900 23 23 49" từng số ~6s).
   let outroActualDur = outroDurSec;
   if (outroAudioPath) {
     try {
       const audioDur = await probeDuration(outroAudioPath);
-      outroActualDur = Math.max(outroDurSec, audioDur + 1);
+      outroActualDur = Math.max(outroDurSec, audioDur + 1.2);
     } catch { /* thiếu audio -> giữ default */ }
   }
-  await makeBumperClip(introPng, null, introDurSec, introSeg, workDir, fmt);
-  await makeBumperClip(outroPng, outroAudioPath, outroActualDur, outroSeg, workDir, fmt);
-  return { introSeg, outroSeg };
+  const introFramesDir = join(workDir, '_intro_frames');
+  const outroFramesDir = join(workDir, '_outro_frames');
+  await renderBumperMp4(drawIntroFrame, introFramesDir, fmt.w, fmt.h, introDurSec, null, 'intro.mp4', workDir);
+  await renderBumperMp4(drawOutroFrame, outroFramesDir, fmt.w, fmt.h, outroActualDur, outroAudioPath, 'outro.mp4', workDir);
+  return { introSeg: 'intro.mp4', outroSeg: 'outro.mp4' };
 }
