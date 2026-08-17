@@ -216,14 +216,37 @@ export async function GET(req: Request) {
       try { logoActions.push({ group: 'Bài content', ...(await ensureLogoForPost(client, media.id)) }); }
       catch (e) { logoActions.push({ group: 'Bài content', action: 'error', reason: String((e as any)?.message || e) }); }
     }
+    // Chọn CỤM CONTENT theo tỷ lệ đề xuất Phòng KD (tuần 5 bài content):
+    //   qa=2, checklist=2, glossary=1, tip=1, engage=1, portrait=1, news=1 -> tổng 9 lượt/vòng.
+    //   Weight cao = chọn dày. news/portrait vẫn xuất hiện nhưng ít hơn vì cần chuẩn bị thật.
+    // @ts-ignore — module JS thuần
+    const { CONTENT_TOPICS } = await import('../../../lib/gen/products.mjs');
+    const KIND_WEIGHT: Record<string, number> = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 1, news: 1 };
+    const kindTotal = Object.values(KIND_WEIGHT).reduce((a, b) => a + b, 0);
+    let r = Math.random() * kindTotal;
+    let chosenKind = 'qa';
+    for (const [k, w] of Object.entries(KIND_WEIGHT)) { r -= w; if (r <= 0) { chosenKind = k; break; } }
+    const topicsOfKind = (CONTENT_TOPICS as any[]).filter((t) => t.type === chosenKind);
+    const chosenTopic = topicsOfKind.length ? pickRandom(topicsOfKind) : undefined;
+
     let gen: any;
     try {
-      gen = await generateContentPost({});
+      // @ts-ignore — generateContentPost là module JS thuần, TS không biết param topic.
+      gen = await generateContentPost({ topic: chosenTopic });
     } catch (e) {
       skipped.push({ group: 'Bài content', reason: 'gen loi: ' + (e as any)?.message });
       break;
     }
+    const kind = gen.contentType || chosenKind;
     const risk = gen.assessment?.risk || 'none';
+    // news + portrait CẦN người duyệt tay (news chạm quy định điều cấm 3; portrait cần điền tên thật).
+    const needsGov = risk === 'red' || kind === 'news' || kind === 'portrait';
+    // Nhãn queue theo loại cho người duyệt biết ngay đây là bài gì.
+    const KIND_LABEL: Record<string, string> = {
+      qa: '❓ Hỏi-Đáp', checklist: '📋 Checklist', glossary: '📖 Thuật ngữ', tip: '💡 Mẹo',
+      engage: '💬 Hỏi bà con', portrait: '👤 Chân dung (điền tay)', news: '⚠️ Thời sự (chờ duyệt QL)',
+    };
+    const kindTag = KIND_LABEL[kind] || '📰';
     const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';
     const assets = { image: media.id, video: null };
     const channels = ['facebook'];
@@ -242,22 +265,22 @@ export async function GET(req: Request) {
           rotation_group: 'Bài content',
           post_kind: 'content',
           topic: gen.topic,
-          content_type: 'tips',
+          content_type: kind,
         },
         draft: gen.text,
         status: 'review',
-        needs_gov_review: risk === 'red',
+        needs_gov_review: needsGov,
       })
       .select('id')
       .single();
     if (ce || !ins) { skipped.push({ group: 'Bài content', reason: 'insert loi' }); break; }
     await client.from('approval_queue').insert({
       kind: 'mkt_publish_content',
-      title: `[Facebook] 📰 ${displayTitle}`,
-      payload: { content_id: (ins as { id: string }).id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels, authored: 'ai', post_kind: 'content' },
+      title: `[Facebook] ${kindTag} ${displayTitle}`,
+      payload: { content_id: (ins as { id: string }).id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels, authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov },
       status: 'pending',
     });
-    results.push({ group: 'Bài content', channels, contentId: (ins as { id: string }).id, risk });
+    results.push({ group: 'Bài content', kind, channels, contentId: (ins as { id: string }).id, risk, needsGov });
   }
 
   return NextResponse.json({ ok: true, cycle, folders: pickedFolders, created: results.length, results, skipped, logoActions });

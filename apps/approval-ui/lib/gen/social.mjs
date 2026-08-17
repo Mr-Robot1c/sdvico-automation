@@ -117,6 +117,10 @@ const CONTENT_TYPE_INSTRUCTION = {
     'Bài dạng HỎI - ĐÁP. Bắt đầu bằng dòng "❓ Hỏi: <câu hỏi>" rồi dòng "💡 Đáp: <câu trả lời gọn 3 tới 5 câu>". Đáp phải đi thẳng, chính xác, có thể mở rộng 1 tới 2 lưu ý. Không lan man.',
   engage:
     'Bài dạng ĐẶT CÂU HỎI để bà con bình luận. Rất ngắn: 2 tới 3 câu dẫn dắt cảm xúc/kỷ niệm, rồi KẾT bằng câu hỏi mở (dấu ? cuối) mời bà con kể chuyện trong bình luận. Không nêu sản phẩm, không nhắc SDVICO trong bài này.',
+  portrait:
+    'Bài dạng CHÂN DUNG NGƯỜI TRONG NGHỀ - KHUNG SƯỜN để người viết sau này điền tên thật, tuổi thật, câu nói thật (KHÔNG bịa - điều cấm 5). Viết đúng format: 1 câu mở giới thiệu vai trò (dùng placeholder [TÊN, TUỔI, ĐỊA PHƯƠNG]), 2-3 câu bối cảnh nghề nghiệp chung, 1 dòng trích dẫn CÓ dấu ngoặc kép chứa placeholder ("...") - để người viết điền câu nói thật, 1 câu kết. Chèn CẢNH BÁO đầu bài: "📝 KHUNG SƯỜN - Phòng Kinh doanh điền tên/tuổi/câu nói thật rồi mới đăng". Cấm ghi tên/địa danh cụ thể; giữ nguyên placeholder trong ngoặc vuông.',
+  news:
+    'Bài dạng NHỊP THỜI SỰ NGÀNH - CHỜ CẤP QUẢN LÝ DUYỆT. Viết TRUNG THỰC, KHÔNG nêu con số/ngày tháng/mốc quy định cụ thể (điều cấm 5). Dùng ngôn ngữ chung: "quy định mới", "gần đây", "theo cập nhật của cơ quan quản lý". Cấu trúc: 1 câu nêu chủ đề, 2-3 câu bối cảnh chung mà bà con cần biết, 1 dòng khuyên bà con theo dõi kênh chính thức của Cục Thủy sản/địa phương. Chèn đầu bài: "⚠️ CẦN CẤP QUẢN LÝ DUYỆT - nội dung chạm quy định nhà nước (điều cấm 3)".',
 };
 
 // Bài CONTENT (không bán trực tiếp): viết theo một chủ đề để nuôi trang, lấy tương tác.

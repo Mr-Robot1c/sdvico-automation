@@ -132,6 +132,18 @@ export const CONTENT_TOPICS = [
   { type: 'engage', topic: 'kỷ niệm gặp cá lớn hoặc mẻ lớn ngoài khơi' },
   { type: 'engage', topic: 'câu chuyện được tàu bạn cứu giúp giữa biển' },
   { type: 'engage', topic: 'bến cá nào bà con thấy vui nhất mỗi khi về' },
+
+  // Chân dung người trong nghề - KHUNG SƯỜN, Phòng Kinh doanh điền tên/câu nói thật rồi mới đăng.
+  { type: 'portrait', topic: 'chân dung một bác thuyền trưởng nhiều năm gắn bó với biển' },
+  { type: 'portrait', topic: 'câu chuyện một ngư dân trẻ nối nghiệp cha ông' },
+  { type: 'portrait', topic: 'người thợ máy tàu cá và bí quyết giữ máy bền' },
+  { type: 'portrait', topic: 'chủ tàu nhiều đời gắn bó với nghề đánh bắt xa bờ' },
+
+  // Nhịp thời sự ngành - CẦN CẤP QUẢN LÝ DUYỆT (điều cấm 3, gắn needs_gov_review=true).
+  { type: 'news', topic: 'cập nhật chung về quy định chống khai thác IUU cho tàu cá' },
+  { type: 'news', topic: 'lưu ý mới về nhật ký khai thác thủy sản' },
+  { type: 'news', topic: 'khuyến cáo an toàn cho tàu cá mùa mưa bão' },
+  { type: 'news', topic: 'thông tin chung về gia hạn giấy phép khai thác' },
 ];
 
 // Hashtag mặc định gắn MỌI bài (4 thẻ chung, do Phòng chốt). KHÔNG để thẻ theo loại thiết bị

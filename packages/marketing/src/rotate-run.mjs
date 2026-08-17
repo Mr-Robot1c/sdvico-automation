@@ -75,21 +75,36 @@ if (process.env.ROTATE_CONTENT !== '0') {
   const media = poolImgs.length ? rnd(poolImgs) : null;
   if (media) {
     try {
-      const gen = await generateContentPost({});
+      // Chọn cụm content theo tỷ lệ đề xuất Phòng KD (tuần 5 bài content):
+      // qa=2, checklist=2, glossary=1, tip=1, engage=1, portrait=1, news=1.
+      const { CONTENT_TOPICS } = await import('./products.mjs');
+      const KIND_WEIGHT = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 1, news: 1 };
+      const kindTotal = Object.values(KIND_WEIGHT).reduce((a, b) => a + b, 0);
+      let r = Math.random() * kindTotal;
+      let chosenKind = 'qa';
+      for (const [k, w] of Object.entries(KIND_WEIGHT)) { r -= w; if (r <= 0) { chosenKind = k; break; } }
+      const topicsOfKind = CONTENT_TOPICS.filter((t) => t.type === chosenKind);
+      const chosenTopic = topicsOfKind.length ? rnd(topicsOfKind) : undefined;
+
+      const gen = await generateContentPost({ topic: chosenTopic });
+      const kind = gen.contentType || chosenKind;
       const risk = gen.assessment?.risk || 'none';
+      const needsGov = risk === 'red' || kind === 'news' || kind === 'portrait';
+      const KIND_LABEL = { qa: '❓ Hỏi-Đáp', checklist: '📋 Checklist', glossary: '📖 Thuật ngữ', tip: '💡 Mẹo', engage: '💬 Hỏi bà con', portrait: '👤 Chân dung (điền tay)', news: '⚠️ Thời sự (chờ duyệt QL)' };
+      const kindTag = KIND_LABEL[kind] || '📰';
       const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';
       const assets = { image: media.id, video: null };
       const { data: ins } = await client.from('mkt_content').insert({
         kind: 'social', title: displayTitle,
-        brief: { keyword: 'Bài content', intent: 'thong_tin', assets, channels: ['facebook'], generator: 'rotation', rotation: true, rotation_group: 'Bài content', post_kind: 'content', topic: gen.topic, content_type: 'tips' },
-        draft: gen.text, status: 'review', needs_gov_review: risk === 'red',
+        brief: { keyword: 'Bài content', intent: 'thong_tin', assets, channels: ['facebook'], generator: 'rotation', rotation: true, rotation_group: 'Bài content', post_kind: 'content', topic: gen.topic, content_type: kind },
+        draft: gen.text, status: 'review', needs_gov_review: needsGov,
       }).select('id').single();
       if (ins) {
         await client.from('approval_queue').insert({
-          kind: 'mkt_publish_content', title: `[Facebook] 📰 ${displayTitle}`,
-          payload: { content_id: ins.id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels: ['facebook'], authored: 'ai', post_kind: 'content' }, status: 'pending',
+          kind: 'mkt_publish_content', title: `[Facebook] ${kindTag} ${displayTitle}`,
+          payload: { content_id: ins.id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels: ['facebook'], authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov }, status: 'pending',
         });
-        console.log(`Cycle ${cycle} | [Facebook] 📰 ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk} | chu de: ${gen.topic}`);
+        console.log(`Cycle ${cycle} | [Facebook] ${kindTag} ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk}${needsGov ? ' | NEEDS_GOV_REVIEW' : ''} | chu de: ${gen.topic}`);
       }
     } catch (e) { console.log('  Loi bai content:', e.message); }
   }
