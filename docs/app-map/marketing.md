@@ -4,6 +4,8 @@
 covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- DOC-STATUS: SUSPECT (2026-08-14) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-14 - build-video.mjs 3 fix: (1) normalizeForTts thay so tong dai 1900 23 23 49 va cac phone thanh cach doc tung chu so truoc khi day vao edge-tts (tranh doc "mot nghin chin tram"). (2) Loc brand_assets THEO product_group cua bai (content.brief.rotation_group), bai SEA-40 chi dung tu lieu SEA-40 khong lan san pham khac. (3) BO ban vertical, chi xuat horizontal 16:9 cho post FB - Reel dung duong avatar AI rieng theo phan cong. -->
 <!-- re-verified: 2026-08-14 - 3 fix day chuyen video: (1) LOC TU LIEU theo folder san pham cua bai (rotation_group hoac guessGroup tren tieu de+tu khoa+draft) -> Gemini chi chon anh/video trong dung folder (vd bai loc dau CHI dung tu lieu folder 6, khong lay S-Tracking linh tinh). Da test 5b75cc75: 4 muc, dung folder. (2) TTS RESILIENT them: thu giong chinh -> giong du phong (Hoai My) -> cham -10% -> cuoi cung moi lang; giam ty le mat tieng do edge-tts "No audio". (3) build-video.mjs nhan CA UUID day du va PREFIX (>=32 ky tu la full, <32 la prefix - UUID khong LIKE duoc nen quet ordered limit 500 roi so trong JS). --skip-whisper truyen tu build-video-all. -->
 
 <!-- re-verified: 2026-08-14 - build-video.mjs them --skip-whisper (bo whisperArtifact) de dung tren GitHub Actions khoi cai faster-whisper (nang). Phu de van co (buildBlocks/srt.mjs tu kich ban). build-video-all.mjs passthrough co --skip-whisper. .github/workflows/video-build.yml pip install edge-tts, chay --requested --skip-whisper --limit 3, timeout 55 phut. -->

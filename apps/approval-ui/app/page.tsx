@@ -233,7 +233,6 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                     ? <span className="badge" title="Bài bán sản phẩm hay bài nội dung nuôi trang">{purposeLabel(info.postKind, info.format)}</span>
                     : (info.intent ? <span className="badge">{intentLabel(info.intent)}</span> : null)}
                   <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
-                  {info.keyword ? <span className="src">từ khóa: {info.keyword}</span> : null}
                 </div>
 
                 {img || vid ? (
@@ -257,11 +256,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                         ))}
                       </div>
                     ) : null}
-                    {info.keyword ? (
-                      <div className="metaline">
-                        Từ khóa: {info.keyword}{info.landingUrl ? ` · Trang đích: ${info.landingUrl}` : ''}
-                      </div>
-                    ) : null}
+                    {info.landingUrl ? <div className="metaline">Trang đích: {info.landingUrl}</div> : null}
                     {draft ? <div className="draftbox">{draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                     {cid && draft !== undefined ? (
                       <details className="raw editbox">

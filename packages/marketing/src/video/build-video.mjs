@@ -37,6 +37,24 @@ function python(script, args) {
   });
 }
 
+// Ép edge-tts đọc số điện thoại theo TỪNG CHỮ SỐ (một chín không không...) thay vì đọc số nguyên
+// (một nghìn chín trăm...). Áp cho tổng đài SDVICO và các dạng phone phổ biến.
+const DIGIT_VN = { '0':'không','1':'một','2':'hai','3':'ba','4':'bốn','5':'năm','6':'sáu','7':'bảy','8':'tám','9':'chín' };
+function spellDigits(s) { return [...s].map((d) => DIGIT_VN[d] || d).join(' '); }
+function normalizeForTts(text) {
+  return text
+    // Số tổng đài SDVICO: 1900 23 23 49 (có/không cách, có/không dấu chấm/gạch).
+    .replace(/1900[\s.\-]*23[\s.\-]*23[\s.\-]*49/g, spellDigits('1900') + ', ' + spellDigits('23') + ', ' + spellDigits('23') + ', ' + spellDigits('49'))
+    // Bất kỳ số 10 chữ số bắt đầu 0 (di động VN): đọc từng số.
+    .replace(/\b(0\d{9,10})\b/g, (m) => spellDigits(m))
+    // Số 1900/1800 8 chữ số: đọc từng số.
+    .replace(/\b(1[89]00\d{4,6})\b/g, (m) => spellDigits(m));
+}
+
+async function tts(text, outPath, voice, workDir, tag) {
+  const txt = join(workDir, `${tag}.txt`);
+  await writeFile(txt, normalizeForTts(text), 'utf8');
+  await python('tts.py', ['--text-file', txt, '--out', outPath, '--voice', voice]);
 // Làm sạch lời thoại trước khi đọc: bỏ emoji/ký hiệu lạ (edge-tts dễ trả "No audio"), gộp khoảng trắng.
 function cleanNarration(text) {
   return String(text || '')
@@ -216,6 +234,16 @@ async function main() {
   contentId = content.id;
   console.log('Nội dung nguồn:', content.title, `(${contentId.slice(0, 8)})`);
 
+  // Tư liệu: CHỈ dùng asset đúng sản phẩm (product_group của bài). Bài SEA-40 chỉ được dùng ảnh/
+  // video SEA-40, không lẫn S-Tracking hay sơn (điều cấm 5 - không nhận vơ, và tránh sai lệch nội dung).
+  const productGroup = content.brief?.rotation_group;
+  if (!productGroup) throw new Error('Bài chưa gán sản phẩm (brief.rotation_group). Cập nhật ở /tu-lieu rồi thử lại.');
+  const { data: assets } = await client.from('brand_assets')
+    .select('id, kind, title, storage_path')
+    .eq('product_group', productGroup)
+    .order('created_at', { ascending: false });
+  if (!assets?.length) throw new Error(`Sản phẩm "${productGroup}" chưa có tư liệu trong brand_assets.`);
+  console.log(`Sản phẩm: ${productGroup} (${assets.length} tư liệu)`);
   // Xác định SẢN PHẨM của bài để CHỈ lấy tư liệu đúng folder đó (không đưa cả kho cho Gemini
   // chọn linh tinh — bài lọc dầu mà chèn ảnh S-Tracking là do đó). Ưu tiên: brief.rotation_group
   // -> guessGroup(tiêu đề + từ khóa + nội dung). Không khớp -> lấy cả kho như cũ (fallback).
@@ -255,8 +283,8 @@ async function main() {
   const workDir = join(HERE, '..', '..', '..', '..', 'out', 'video', `work_${contentId.slice(0, 8)}`);
   await mkdir(workDir, { recursive: true });
 
-  // Tải các asset được dùng.
-  const usedIds = new Set([...script.vertical, ...script.horizontal].map((s) => s.assetId));
+  // Tải các asset được dùng. Chỉ dựng bản HORIZONTAL cho post FB (Reel dùng đường avatar AI riêng).
+  const usedIds = new Set(script.horizontal.map((s) => s.assetId));
   const assetPaths = new Map();
   for (const id of usedIds) {
     const a = assets.find((x) => x.id === id);
@@ -268,30 +296,27 @@ async function main() {
   }
   console.log('Đã tải', assetPaths.size, 'tư liệu.');
 
-  const results = {};
-  for (const fmt of ['vertical', 'horizontal']) {
-    console.log(`\n== Dựng bản ${fmt} ==`);
-    results[fmt] = await buildFormat(fmt, script[fmt], assetPaths, voice, workDir, outDir, contentId);
-    console.log(`  -> ${results[fmt].out} (${results[fmt].totalDur.toFixed(1)}s, ${results[fmt].scenes} cảnh)`);
-  }
+  console.log('\n== Dựng bản horizontal (16:9) cho post Facebook ==');
+  const horizontal = await buildFormat('horizontal', script.horizontal, assetPaths, voice, workDir, outDir, contentId);
+  console.log(`  -> ${horizontal.out} (${horizontal.totalDur.toFixed(1)}s, ${horizontal.scenes} cảnh)`);
 
-  // 3 ảnh đại diện từ bản dọc.
+  // 3 ảnh đại diện từ bản ngang.
   const thumbs = [];
-  const vdur = results.vertical.totalDur;
   for (let i = 0; i < 3; i++) {
-    const t = Math.max(0.5, (vdur * (i + 1)) / 4);
+    const t = Math.max(0.5, (horizontal.totalDur * (i + 1)) / 4);
     const th = join(outDir, `sdvico_${contentId.slice(0, 8)}_thumb${i + 1}.jpg`);
-    await ffmpeg(['-y', '-ss', t.toFixed(2), '-i', results.vertical.out, '-frames:v', '1', '-q:v', '3', th]);
+    await ffmpeg(['-y', '-ss', t.toFixed(2), '-i', horizontal.out, '-frames:v', '1', '-q:v', '3', th]);
     thumbs.push(th);
   }
 
   const summary = {
     contentId, title: content.title, titles: script.titles,
     compliance: script.assessment,
-    vertical: results.vertical, horizontal: results.horizontal, thumbnails: thumbs,
+    horizontal, thumbnails: thumbs,
   };
   await writeFile(join(outDir, `sdvico_${contentId.slice(0, 8)}_summary.json`), JSON.stringify(summary, null, 2), 'utf8');
   console.log('\nXONG. Tóm tắt:', join(outDir, `sdvico_${contentId.slice(0, 8)}_summary.json`));
+  console.log(JSON.stringify({ horizontal: horizontal.out, thumbs }, null, 2));
   console.log(JSON.stringify({ vertical: results.vertical.out, horizontal: results.horizontal.out, thumbs }, null, 2));
 
   // Đẩy vào Hàng đợi duyệt (mặc định bật; thêm --no-queue để chỉ tạo file, không đẩy).
