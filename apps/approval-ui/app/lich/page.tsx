@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { formatRelative } from '../labels';
-import { saveWindows } from '../actions';
+import { saveWindows, saveCapacity } from '../actions';
 
 // Lịch phỏng vấn đã tự sắp. Sắp theo người gần đến giờ nhất.
 export const dynamic = 'force-dynamic';
@@ -59,8 +59,12 @@ export default async function Page() {
     .map((r) => ({ r, near: nearest(r.payload?.khung_gio || []) }))
     .sort((a, b) => (a.near?.ts ?? Infinity) - (b.near?.ts ?? Infinity));
 
-  const { data: cfg } = await client.from('app_config').select('value').eq('key', 'interview_windows').maybeSingle();
+  const [{ data: cfg }, { data: capCfg }] = await Promise.all([
+    client.from('app_config').select('value').eq('key', 'interview_windows').maybeSingle(),
+    client.from('app_config').select('value').eq('key', 'interview_capacity').maybeSingle(),
+  ]);
   const windows: string[] = Array.isArray(cfg?.value) ? (cfg!.value as string[]) : ['09:00', '10:30', '14:00', '15:30'];
+  const capacity: number = Number(capCfg?.value) >= 1 ? Number(capCfg?.value) : 3;
 
   return (
     <main>
@@ -79,6 +83,18 @@ export default async function Page() {
         <div className="row">
           <input className="note" id="windows" name="windows" defaultValue={windows.join(', ')} placeholder="09:00, 10:30, 14:00, 15:30" />
           <button className="btn ok" type="submit">Lưu khung giờ</button>
+        </div>
+      </form>
+
+      <form action={saveCapacity} className="settings-box">
+        <label htmlFor="capacity"><b>Sức chứa mỗi khung</b></label>
+        <p className="muted" style={{ margin: '2px 0 8px' }}>
+          Số ứng viên tối đa cùng được đề xuất một khung giờ. 1 nghĩa là một kèm một. Đặt cao hơn
+          để phỏng vấn nhóm hoặc chạy song song nhiều phòng.
+        </p>
+        <div className="row">
+          <input className="note" id="capacity" name="capacity" type="number" min={1} max={20} step={1} defaultValue={capacity} style={{ maxWidth: 120 }} />
+          <button className="btn ok" type="submit">Lưu sức chứa</button>
         </div>
       </form>
 

@@ -61,22 +61,52 @@ function buildGrid(times: string[], days = 40): string[] {
   return out;
 }
 
-// Cấp n khung giờ trống, tránh trùng khung đã đề xuất cho ứng viên khác.
+// Cấp n khung giờ trống. Một khung được coi là "đầy" khi số ứng viên đang chiếm nó đã
+// đạt sức chứa. Trước đây mỗi khung chỉ chứa được một, và khung đã đề xuất bị coi là
+// chiếm vĩnh viễn, kể cả khi ứng viên bị từ chối. Cách đó khiến lưới 112 khung của
+// 40 ngày hết sạch sau khoảng 37 ứng viên.
+//
+// Nay:
+// - Sức chứa mỗi khung đọc từ app_config key 'interview_capacity', mặc định 3.
+//   Đổi trong trang Cài đặt hoặc Lịch phỏng vấn.
+// - Chỉ ứng viên còn ở bước phỏng vấn và chưa đánh dấu đã phỏng vấn mới tính chiếm.
+//   Đã Nhận, Không nhận, hoặc đã đánh dấu phỏng vấn xong đều coi là đã trả khung.
+// - Nếu ứng viên đã chọn một khung thì chỉ khung đó bị tính, hai khung còn lại nhả.
 export async function allocateInterviewSlots(client: DbClient, n = 3): Promise<string[]> {
-  let times = WORK_TIMES;
-  const { data: cfg } = await client.from('app_config').select('value').eq('key', 'interview_windows').maybeSingle();
-  if (Array.isArray(cfg?.value) && cfg!.value.length) times = cfg!.value as string[];
+  const [{ data: winCfg }, { data: capCfg }] = await Promise.all([
+    client.from('app_config').select('value').eq('key', 'interview_windows').maybeSingle(),
+    client.from('app_config').select('value').eq('key', 'interview_capacity').maybeSingle(),
+  ]);
+  const times = Array.isArray(winCfg?.value) && winCfg!.value.length ? (winCfg!.value as string[]) : WORK_TIMES;
+  const capacity = Math.max(1, Number(capCfg?.value) || 3);
 
-  const taken = new Set<string>();
-  const { data: rows } = await client.from('approval_queue').select('payload').eq('kind', 'hr_interview');
-  for (const r of (rows || []) as Array<{ payload: { khung_gio?: string[] } | null }>) {
-    const k = r.payload?.khung_gio;
-    if (Array.isArray(k)) for (const s of k) taken.add(s);
+  // Lấy các hồ sơ còn đang giữ khung: stage='interview' và chưa có interviewed_at.
+  // Cột interviewed_at có thể chưa migrate ở môi trường cũ, đọc an toàn.
+  const { data: apps } = await client
+    .from('hr_applications')
+    .select('id, stage, chosen_slot, interviewed_at')
+    .eq('stage', 'interview');
+  const active = ((apps || []) as Array<{ id: string; chosen_slot: string | null; interviewed_at: string | null }>)
+    .filter((a) => !a.interviewed_at);
+  const chosenById = new Map(active.map((a) => [a.id, a.chosen_slot]));
+  const activeIds = new Set(active.map((a) => a.id));
+
+  const { data: rows } = await client
+    .from('approval_queue')
+    .select('ref_id, payload, status')
+    .eq('kind', 'hr_interview')
+    .in('status', ['pending', 'approved']);
+  const load = new Map<string, number>();
+  for (const r of (rows || []) as Array<{ ref_id: string | null; payload: { khung_gio?: string[] } | null }>) {
+    if (!r.ref_id || !activeIds.has(r.ref_id)) continue;
+    const chosen = chosenById.get(r.ref_id);
+    const slots = chosen ? [chosen] : r.payload?.khung_gio || [];
+    for (const s of slots) load.set(s, (load.get(s) || 0) + 1);
   }
 
   const out: string[] = [];
   for (const s of buildGrid(times)) {
-    if (taken.has(s)) continue;
+    if ((load.get(s) || 0) >= capacity) continue;
     out.push(s);
     if (out.length >= n) break;
   }

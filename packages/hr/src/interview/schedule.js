@@ -46,32 +46,58 @@ export async function loadWindows(client) {
   return Array.isArray(v) && v.length ? v : WORK_TIMES;
 }
 
-// Cấp n khung giờ còn trống, bỏ qua khung đã có trong tập taken.
-// Thêm khung vừa cấp vào taken để lượt sau không cấp trùng.
-export function allocateSlots(taken, n = 3, opts = {}) {
+// Đọc sức chứa mỗi khung phỏng vấn từ app_config. Mặc định 3 người.
+export async function loadCapacity(client) {
+  const { data, error } = await client
+    .from('app_config').select('value').eq('key', 'interview_capacity').maybeSingle();
+  if (error) return 3;
+  const n = Number(data?.value);
+  return Number.isFinite(n) && n >= 1 ? n : 3;
+}
+
+// Cấp n khung giờ còn chỗ, bỏ qua khung đã đạt sức chứa.
+// load là Map<string, number> đếm số ứng viên đang chiếm mỗi khung.
+export function allocateSlots(load, n = 3, opts = {}) {
+  const capacity = opts.capacity || 1;
   const grid = buildGrid(opts);
   const out = [];
   for (const s of grid) {
-    if (taken.has(s)) continue;
+    if ((load.get(s) || 0) >= capacity) continue;
     out.push(s);
-    taken.add(s);
+    load.set(s, (load.get(s) || 0) + 1);
     if (out.length >= n) break;
   }
   return out;
 }
 
-// Gom các khung giờ đã đề xuất từ những mục thư mời trong approval_queue.
-// Trả về một Set các chuỗi khung giờ đang bị chiếm.
+// Đếm số ứng viên đang chiếm mỗi khung.
+// Chỉ tính hồ sơ còn ở bước 'interview' và chưa đánh dấu phỏng vấn xong. Đã chọn khung
+// nào thì chỉ tính khung đó, hai khung còn lại được nhả về lưới trống.
+// Trước đây chỉ trả về một Set khung "đã chiếm vĩnh viễn", không phân biệt ứng viên đã
+// bị từ chối hay đã xong, nên lưới cạn dần và lịch trôi xa. Cách mới đọc trạng thái thật.
 export async function loadTakenSlots(client) {
-  const { data, error } = await client
+  const { data: apps, error: e1 } = await client
+    .from('hr_applications')
+    .select('id, chosen_slot, interviewed_at')
+    .eq('stage', 'interview');
+  if (e1) throw new Error('Đọc hồ sơ ứng tuyển lỗi: ' + e1.message);
+  const active = (apps || []).filter((a) => !a.interviewed_at);
+  const chosenById = new Map(active.map((a) => [a.id, a.chosen_slot]));
+  const activeIds = new Set(active.map((a) => a.id));
+
+  const { data: rows, error: e2 } = await client
     .from('approval_queue')
-    .select('payload')
-    .eq('kind', 'hr_interview');
-  if (error) throw new Error('Đọc lịch đã xếp lỗi: ' + error.message);
-  const taken = new Set();
-  for (const row of data || []) {
-    const khung = row.payload?.khung_gio;
-    if (Array.isArray(khung)) for (const s of khung) taken.add(s);
+    .select('ref_id, payload, status')
+    .eq('kind', 'hr_interview')
+    .in('status', ['pending', 'approved']);
+  if (e2) throw new Error('Đọc lịch đã xếp lỗi: ' + e2.message);
+
+  const load = new Map();
+  for (const r of rows || []) {
+    if (!r.ref_id || !activeIds.has(r.ref_id)) continue;
+    const chosen = chosenById.get(r.ref_id);
+    const slots = chosen ? [chosen] : r.payload?.khung_gio || [];
+    for (const s of slots) load.set(s, (load.get(s) || 0) + 1);
   }
-  return taken;
+  return load;
 }

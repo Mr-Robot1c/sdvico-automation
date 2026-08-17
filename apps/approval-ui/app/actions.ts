@@ -443,6 +443,19 @@ export async function saveWindows(formData: FormData) {
   revalidatePath('/lich');
 }
 
+// Sức chứa mỗi khung phỏng vấn. 1 là một kèm một, đặt cao hơn để cho phỏng vấn nhóm
+// hoặc chạy song song nhiều phòng. Giới hạn trên 20 để phòng gõ nhầm.
+export async function saveCapacity(formData: FormData) {
+  const n = Number(formData.get('capacity'));
+  if (!Number.isFinite(n) || n < 1 || n > 20) return;
+  const client = getServerClient();
+  const { error } = await client
+    .from('app_config')
+    .upsert({ key: 'interview_capacity', value: Math.round(n), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) throw new Error(error.message);
+  revalidatePath('/lich');
+}
+
 // Thêm một nền tảng đăng tuyển hoặc tìm ứng viên.
 export async function addPlatform(formData: FormData) {
   const ten = String(formData.get('ten') || '').trim();

@@ -18,7 +18,7 @@ import { getServiceClient, logRun, pushApproval } from '../../../core/src/index.
 import { anonymizeCv } from '../screen/anonymize.js';
 import { fetchForInterview } from './applications.js';
 import { generateInterview } from './generate.js';
-import { allocateSlots, loadTakenSlots, loadWindows } from './schedule.js';
+import { allocateSlots, loadTakenSlots, loadWindows, loadCapacity } from './schedule.js';
 import { composeLetter, composeTakeHome, numberList } from './compose.js';
 import { guessGender, xungHo } from './gender.js';
 
@@ -40,6 +40,7 @@ async function main() {
   // dùng khung giờ mong muốn do người vận hành đặt trên web.
   const taken = await loadTakenSlots(client);
   const windows = await loadWindows(client);
+  const capacity = await loadCapacity(client);
   const results = [];
 
   for (const app of apps) {
@@ -54,7 +55,7 @@ async function main() {
     const name = cand.full_name || 'anh/chị';
     const { text } = anonymizeCv(cv);
     // Cấp ba khung giờ còn trống, không trùng ứng viên khác (tự sắp lịch).
-    const slots = allocateSlots(taken, 3, { times: windows });
+    const slots = allocateSlots(taken, 3, { times: windows, capacity });
 
     if (args.dryRun) {
       results.push({ application_id: app.id, ung_vien: name, vi_tri: position, khung_gio: slots, dry: true });
