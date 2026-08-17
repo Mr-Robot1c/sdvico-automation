@@ -105,34 +105,61 @@ export async function generateSocialPost({ productGroup, productName, channel, h
   return { text, body, headline, hashtags: tags, assessment };
 }
 
+// Chỉ dẫn cấu trúc bài cho từng LOẠI content. AI phải theo đúng dạng để bài hữu ích, không sáo rỗng.
+const CONTENT_TYPE_INSTRUCTION = {
+  checklist:
+    'Bài dạng CHECKLIST. Viết 1 câu mở ngắn dẫn dắt, rồi liệt kê 5 tới 7 mục ĐÁNH SỐ (1. 2. 3. ...), mỗi mục 1 dòng ngắn 8 tới 15 từ. Đầu mỗi mục có 1 emoji hợp cảnh (⚓ 🛟 🌊 📡 💧 ⚙️). Kết bằng 1 câu nhắc bà con lưu về hoặc chia sẻ cho anh em.',
+  glossary:
+    'Bài dạng GIẢI THÍCH THUẬT NGỮ. Câu đầu ĐỊNH NGHĨA gọn trong 1 dòng (dạng "X là..."). Sau đó 3 tới 4 câu giải thích ngắn: dùng để làm gì, khi nào bà con gặp, cần lưu ý gì. Không đi sâu kỹ thuật, dùng ví dụ đời thường. Không bịa số liệu.',
+  tip:
+    'Bài dạng MẸO / KINH NGHIỆM. Nêu vấn đề bà con hay gặp trong 1 câu, chỉ ra 2 tới 3 NGUYÊN NHÂN hoặc thói quen sai lầm (đánh dấu bằng ⚠️), rồi 2 tới 3 CÁCH XỬ LÝ (đánh dấu bằng ✅). Ngắn, thực dụng, không lý thuyết chung chung.',
+  qa:
+    'Bài dạng HỎI - ĐÁP. Bắt đầu bằng dòng "❓ Hỏi: <câu hỏi>" rồi dòng "💡 Đáp: <câu trả lời gọn 3 tới 5 câu>". Đáp phải đi thẳng, chính xác, có thể mở rộng 1 tới 2 lưu ý. Không lan man.',
+  engage:
+    'Bài dạng ĐẶT CÂU HỎI để bà con bình luận. Rất ngắn: 2 tới 3 câu dẫn dắt cảm xúc/kỷ niệm, rồi KẾT bằng câu hỏi mở (dấu ? cuối) mời bà con kể chuyện trong bình luận. Không nêu sản phẩm, không nhắc SDVICO trong bài này.',
+};
+
 // Bài CONTENT (không bán trực tiếp): viết theo một chủ đề để nuôi trang, lấy tương tác.
 // AI tự nghĩ nội dung theo chủ đề, KHÔNG bịa tin tức/số liệu cụ thể (điều cấm 5).
+// Chấp nhận 3 dạng đầu vào: {type,topic} object, string chủ đề, hoặc không truyền (random).
 export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {}) {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const chosen = topic || CONTENT_TOPICS[Math.floor(Math.random() * CONTENT_TOPICS.length)];
+
+  let chosen = topic;
+  if (!chosen) chosen = CONTENT_TOPICS[Math.floor(Math.random() * CONTENT_TOPICS.length)];
+  // Chuẩn hóa: nếu chỉ là string thì suy ngược object cùng type, mặc định 'tip'.
+  if (typeof chosen === 'string') {
+    const match = CONTENT_TOPICS.find((t) => (typeof t === 'object' ? t.topic === chosen : t === chosen));
+    chosen = typeof match === 'object' ? match : { type: 'tip', topic: chosen };
+  }
+  const type = chosen.type || 'tip';
+  const topicText = chosen.topic || String(chosen);
+  const structure = CONTENT_TYPE_INSTRUCTION[type] || CONTENT_TYPE_INSTRUCTION.tip;
 
   const system = [
     'Bạn viết bài cộng đồng cho trang của Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
-    'Đây KHÔNG phải bài bán hàng. Mục tiêu là gần gũi, hữu ích, lấy tương tác từ bà con ngư dân.',
+    'Đây KHÔNG phải bài bán hàng. Mục tiêu là hữu ích thật cho bà con ngư dân đọc là học được điều gì đó, hoặc để lại bình luận.',
     'Giọng ấm áp, gần gũi, câu ngắn, đọc trên điện thoại. Chèn vài emoji hợp cảnh biển (⚓ 🚢 🌊 🐟 🎣), đừng lạm dụng.',
     'Số theo chuẩn Việt Nam. KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'KHÔNG bịa tin tức, số liệu, sự kiện, quy định cụ thể. Nói chung, đúng, không phịa chi tiết.',
-    'KHÔNG mô tả phần mềm đối tác như của SDVICO. Có thể nhắc SDVICO đồng hành cùng bà con một cách nhẹ nhàng ở cuối.',
-    '4 tới 6 câu. Có thể kết bằng một câu hỏi mở để bà con bình luận, hoặc lời chúc ra khơi bình an.',
+    'KHÔNG mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO.',
+    'Chỉ nhắc SDVICO đồng hành nếu hợp cảnh, tối đa 1 lần cuối bài. Bài dạng ĐẶT CÂU HỎI thì tuyệt đối không nhắc thương hiệu.',
     'KHÔNG tự viết hashtag, hệ thống tự thêm.',
+    '',
+    structure,
   ].join('\n');
 
   const user = [
-    `Chủ đề: ${chosen}.`,
+    `Chủ đề: ${topicText}.`,
     'Trả về JSON đúng dạng, không thêm chữ ngoài JSON:',
-    '{"headline": "tiêu đề ngắn 6 tới 12 từ, cuốn, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag)"}',
+    '{"headline": "tiêu đề ngắn 6 tới 12 từ, cuốn, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag), theo đúng cấu trúc đã dặn"}',
   ].join('\n');
 
   const res = await genWithRetry(ai, {
     model: MKT_MODEL,
     contents: user,
-    config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.1 },
+    config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
   });
   const parsed = parseJson(res.text || '');
   const body = String(parsed.body || '').trim();
@@ -145,5 +172,5 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {})
     knownFactValues: knownFactValues(facts),
     testFactValues: testFactValues(facts),
   });
-  return { text, body, headline, topic: chosen, hashtags: tags, assessment };
+  return { text, body, headline, topic: topicText, contentType: type, hashtags: tags, assessment };
 }

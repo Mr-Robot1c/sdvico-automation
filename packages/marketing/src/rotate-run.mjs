@@ -21,7 +21,8 @@ for (const a of assetsRaw || []) {
   const f = folders.get(a.product_group);
   if (a.kind === 'image') f.images.push(a); else if (a.kind === 'video' || a.kind === 'clip') f.videos.push(a);
 }
-const eligible = [...folders.keys()].filter((g) => folders.get(g).images.length || folders.get(g).videos.length);
+// Folder 'Content' KHÔNG phải sản phẩm, loại khỏi vòng xoay sinh bài bán.
+const eligible = [...folders.keys()].filter((g) => g !== 'Content' && (folders.get(g).images.length || folders.get(g).videos.length));
 if (!eligible.length) { console.log('Chua folder nao co tu lieu.'); process.exit(0); }
 
 // 2. Vòng + folder đã dùng.
@@ -67,8 +68,11 @@ for (const group of picked) {
 
 // 1 bài content mỗi lượt (không bán).
 if (process.env.ROTATE_CONTENT !== '0') {
-  const allImgs = [...folders.values()].flatMap((f) => f.images);
-  const media = allImgs.length ? rnd(allImgs) : null;
+  // Ưu tiên ảnh trong folder 'Content'; trống thì fallback ảnh bất kỳ.
+  const contentImgs = folders.get('Content')?.images || [];
+  const fallbackImgs = [...folders.values()].flatMap((f) => f.images);
+  const poolImgs = contentImgs.length ? contentImgs : fallbackImgs;
+  const media = poolImgs.length ? rnd(poolImgs) : null;
   if (media) {
     try {
       const gen = await generateContentPost({});

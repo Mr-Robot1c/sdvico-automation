@@ -77,7 +77,10 @@ export async function GET(req: Request) {
     if (a.kind === 'image') f.images.push(a);
     else if (a.kind === 'video' || a.kind === 'clip') f.videos.push(a);
   }
+  // Folder 'Content' KHÔNG phải sản phẩm, chỉ chứa tư liệu cho bài content — loại khỏi vòng
+  // xoay sinh bài bán. Bài content sẽ dùng ảnh trong folder này ở bước dưới.
   const eligible = [...folders.keys()].filter((g) => {
+    if (g === 'Content') return false;
     const f = folders.get(g)!;
     return f.images.length || f.videos.length;
   });
@@ -199,10 +202,14 @@ export async function GET(req: Request) {
     results.push({ group, channels, contentId, risk });
   }
 
-  // Bài CONTENT (không bán): 1 bài mỗi lần chạy, dùng 1 ảnh bất kỳ trong kho.
+  // Bài CONTENT (không bán): 1 bài mỗi lần chạy. Ưu tiên ảnh trong folder 'Content'
+  // (ảnh biển, cảnh làng chài, đời sống ngư dân); trống thì fallback ảnh bất kỳ.
   for (let i = 0; i < CONTENT_PER_RUN; i++) {
-    const allImgs = [...folders.values()].flatMap((f) => f.images);
-    const media = allImgs.length ? pickRandom(allImgs) : null;
+    const contentFolder = folders.get('Content');
+    const contentImgs = contentFolder?.images || [];
+    const fallbackImgs = [...folders.values()].flatMap((f) => f.images);
+    const poolImgs = contentImgs.length ? contentImgs : fallbackImgs;
+    const media = poolImgs.length ? pickRandom(poolImgs) : null;
     if (!media) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
     // Auto-logo cho ảnh bài content (in-place, giữ nguyên id).
     if (AUTO_LOGO && media) {

@@ -5,9 +5,15 @@ import LogoButton from './logo-button';
 import LibUploader from './lib-uploader';
 import ProductGroupSelect from './product-group-select';
 // @ts-ignore — module JS thuần
-import { PRODUCTS } from '../../lib/gen/products.mjs';
+import { PRODUCTS, CONTENT_GROUP } from '../../lib/gen/products.mjs';
 
-const PRODUCT_GROUPS: string[] = (PRODUCTS as { group: string }[]).map((p) => p.group);
+// 8 folder sản phẩm + 1 folder "Content" cho tư liệu bài nội dung (ảnh biển, đời sống ngư
+// dân...) không gắn sản phẩm nào cụ thể. Rotate ưu tiên ảnh trong folder Content khi sinh bài
+// content, hết mới dùng ảnh sản phẩm bất kỳ.
+const PRODUCT_GROUPS: string[] = [
+  ...(PRODUCTS as { group: string }[]).map((p) => p.group),
+  CONTENT_GROUP as string,
+];
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;

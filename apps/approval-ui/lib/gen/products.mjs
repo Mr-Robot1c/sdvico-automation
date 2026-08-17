@@ -87,15 +87,51 @@ export function getFeatures(group) {
   return FEATURES[group] || [];
 }
 
-// Chủ đề cho bài content (không bán trực tiếp, để lấy tương tác + nuôi trang).
-// AI tự nghĩ nội dung theo chủ đề. Không bịa số liệu/tin tức cụ thể (điều cấm 5).
+// Folder tư liệu chung cho các BÀI CONTENT (không gắn sản phẩm cụ thể): ảnh biển, cảnh
+// làng chài, đời sống ngư dân... Trong brand_assets, cột product_group='Content'.
+// rotate/rotate-run ưu tiên ảnh trong folder này khi sinh bài content; hết mới fallback ảnh khác.
+export const CONTENT_GROUP = 'Content';
+
+// Chủ đề cho bài content (nuôi trang, kéo tương tác - KHÔNG bán trực tiếp).
+// Chia theo 5 CỤM, mỗi cụm có chỉ dẫn cấu trúc riêng trong prompt social.mjs.
+// KHÔNG bịa tin tức/số liệu/sự kiện cụ thể (điều cấm 5).
+// Hai cụm "chân dung người thật" và "thời sự ngành" cần người viết tay có tư liệu thật,
+// KHÔNG để AI tự sinh - không nằm trong danh sách này.
 export const CONTENT_TOPICS = [
-  'đời sống và chuyện nghề của bà con ngư dân ngày ra khơi',
-  'mẹo chuẩn bị và giữ an toàn cho chuyến biển dài ngày',
-  'kinh nghiệm bảo dưỡng tàu và thiết bị đi biển',
-  'vai trò của thiết bị công nghệ giúp ngư dân yên tâm bám biển',
-  'nhắc nhở tuân thủ quy định khi đánh bắt và ra khơi',
-  'câu chuyện gắn bó của SDVICO với bà con ngành biển',
+  // Checklist / danh sách kiểm tra - đánh số rõ, thiết thực.
+  { type: 'checklist', topic: 'những việc cần kiểm trước khi rời bến chuyến biển dài ngày' },
+  { type: 'checklist', topic: 'việc phải làm với máy tàu trong 24 giờ đầu sau khi về bến' },
+  { type: 'checklist', topic: 'bộ giấy tờ tàu cá cần chuẩn bị đầy đủ trước mỗi chuyến' },
+  { type: 'checklist', topic: 'các thiết bị an toàn nên có mặt trên tàu cá' },
+  { type: 'checklist', topic: 'lịch bảo dưỡng định kỳ cho tàu cá theo tháng' },
+
+  // Giải thích thuật ngữ ngành - ngắn, dễ hiểu, hữu ích để chia sẻ.
+  { type: 'glossary', topic: 'chống khai thác IUU là gì và tàu cá vướng khi nào' },
+  { type: 'glossary', topic: 'thiết bị VMS là gì và tại sao được yêu cầu lắp' },
+  { type: 'glossary', topic: 'chuẩn chống nước IP67 trên thiết bị nghĩa là chịu được cỡ nào' },
+  { type: 'glossary', topic: 'điện thoại vệ tinh khác điện thoại di động ở điểm nào' },
+  { type: 'glossary', topic: 'nhật ký khai thác thủy sản gồm những nội dung gì' },
+
+  // Mẹo & kinh nghiệm sửa vặt - nội dung kỹ thuật thật, không bán.
+  { type: 'tip', topic: 'ắc quy tàu cá dễ chai sớm vì những thói quen nào' },
+  { type: 'tip', topic: 'nước ngọt trên tàu có mùi lạ, nguyên nhân và cách xử lý' },
+  { type: 'tip', topic: 'nhận biết dầu diesel bẩn bằng mắt thường' },
+  { type: 'tip', topic: 'dấu hiệu động cơ tàu cần bảo dưỡng sớm' },
+  { type: 'tip', topic: 'cách bảo quản thiết bị điện tử trên tàu chống ăn mòn hơi muối' },
+
+  // Q&A - bà con hay hỏi tổng đài, viết dạng Hỏi-Đáp ngắn.
+  { type: 'qa', topic: 'giám sát hành trình có tự tắt khi hết pin tàu không' },
+  { type: 'qa', topic: 'lắp máy lọc nước biển xong dùng luôn được không' },
+  { type: 'qa', topic: 'sơn chống nóng tàu bao lâu phải sơn lại' },
+  { type: 'qa', topic: 'điện thoại vệ tinh bắt sóng ở khu vực nào của biển' },
+  { type: 'qa', topic: 'dầu nhớt hàng hải khác dầu nhớt xe máy như thế nào' },
+
+  // Tương tác - đặt câu hỏi mở để bà con bình luận.
+  { type: 'engage', topic: 'bà con ra khơi sợ nhất thứ gì' },
+  { type: 'engage', topic: 'chuyến biển dài nhất bà con từng đi mấy ngày' },
+  { type: 'engage', topic: 'kỷ niệm gặp cá lớn hoặc mẻ lớn ngoài khơi' },
+  { type: 'engage', topic: 'câu chuyện được tàu bạn cứu giúp giữa biển' },
+  { type: 'engage', topic: 'bến cá nào bà con thấy vui nhất mỗi khi về' },
 ];
 
 // Hashtag mặc định gắn MỌI bài (4 thẻ chung, do Phòng chốt). KHÔNG để thẻ theo loại thiết bị
