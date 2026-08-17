@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Xuong san xuat tich hop LAM VIDEO: nut moi "🎬 Xong + Lam video" canh nut Xong. Bam -> createContent them field request_video=1 -> brief.video_requested=true; tra ve contentId. Client PANEL TIEN TRINH (spinner) polling checkVideoDone moi 20s: khi may noi bo dung xong (video-pipeline sinh bai kind='social' co brief.source_content = id bai vua tao) thi hien link + PLAYER video xem tai cho. Timeout 15 phut -> nhac kiem tra watcher. checkVideoDone tra videoUrl (uu tien video_v, fallback video_h) tu Storage public. Vien watcher --requested van xoa co video_requested sau khi dung xong. -->
+
 <!-- re-verified: 2026-08-14 - createContent (Xuong san xuat "Xong") KHONG con revalidate /san-xuat: trang do chi doc brand_assets (khong doi khi tao content moi), revalidate lam serverless render lai nang -> nut Xong tung treo lau. Van revalidate '/' + '/noi-dung' cho 2 trang hien thi bai vua tao. Form reset state client. -->
 
 <!-- re-verified: 2026-08-14 - Nut "🎬 Lam video" o /noi-dung (moi bai viet kind!=video): action requestVideoForContent dat co brief.video_requested=true. Video dung NANG nen KHONG chay tren web (Vercel) - nut chi DAT YEU CAU; may noi bo chay build-video-all.mjs --requested (hoac --watch) moi dung that roi day Hang doi duyet + xoa co. Bai da bam hien badge "Da yeu cau video". Dung co trong brief, khong them cot DB. -->

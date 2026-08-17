@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { generateTextForTitle, createContent } from '../actions';
+import { generateTextForTitle, createContent, checkVideoDone } from '../actions';
 // @ts-ignore — module JS thuần, không có .d.ts
 import { guessGroup } from '../../lib/gen/products.mjs';
 import AssetUploader from './asset-uploader';
@@ -68,6 +68,34 @@ export default function SanXuatForm({
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
+  // Tiến trình dựng video sau khi bấm "Xong + Làm video". Client polling checkVideoDone mỗi 20s
+  // (máy nội bộ dựng ~5 phút). Xong -> hiện link + video xem tại chỗ. Quá lâu -> nhắc kiểm tra máy.
+  const [videoJob, setVideoJob] = useState<{
+    sourceId: string; status: 'waiting' | 'done' | 'timeout';
+    startedAt: number; videoUrl?: string; queueUrl?: string; title?: string;
+  } | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!videoJob || videoJob.status !== 'waiting') return;
+    // Poll ngay + mỗi 20s. Máy nội bộ dựng ~5 phút; timeout 15 phút (~45 lượt) rồi nhắc.
+    const tick = async () => {
+      try {
+        const r = await checkVideoDone(videoJob.sourceId);
+        if (r.done) {
+          setVideoJob((v) => v ? { ...v, status: 'done', videoUrl: r.videoUrl, queueUrl: r.url, title: r.title } : v);
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        } else if (Date.now() - videoJob.startedAt > 15 * 60 * 1000) {
+          setVideoJob((v) => v ? { ...v, status: 'timeout' } : v);
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        }
+      } catch { /* mạng chập chờn, thử lại lượt sau */ }
+    };
+    tick();
+    pollRef.current = setInterval(tick, 20000);
+    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+  }, [videoJob?.sourceId, videoJob?.status]);
+
   const selectedImg = images.find((a) => a.id === imgId);
   const selectedVid = videos.find((a) => a.id === vidId);
 
@@ -106,23 +134,30 @@ export default function SanXuatForm({
     return runGenerate(kw, 'giao_dich', null, assetHint, kind);
   };
 
-  const onSubmit = (formData: FormData) => {
-    formData.set('title', title);
-    formData.set('draft', draft);
-    formData.set('kind', kind);
-    // Kênh đăng: TikTok chỉ khi có video được chọn.
+  const submitCore = (opts: { requestVideo: boolean }) => {
+    const fd = new FormData();
+    fd.set('title', title);
+    fd.set('draft', draft);
+    fd.set('kind', kind);
     const chans: string[] = [];
     if (postFb) chans.push('facebook');
     if (postTt && vidId) chans.push('tiktok');
-    formData.set('channels', chans.join(','));
-    formData.set('content_type', contentType);
-    if (imgId) formData.set('image_asset_id', imgId);
-    if (vidId) formData.set('video_asset_id', vidId);
+    fd.set('channels', chans.join(','));
+    fd.set('content_type', contentType);
+    if (imgId) fd.set('image_asset_id', imgId);
+    if (vidId) fd.set('video_asset_id', vidId);
+    if (opts.requestVideo) fd.set('request_video', '1');
     startTransition(async () => {
-      setMsg('Đang tạo khung sườn và đẩy vào hàng đợi duyệt...');
+      setMsg(opts.requestVideo ? 'Đang lưu bài + yêu cầu làm video...' : 'Đang tạo khung sườn và đẩy vào hàng đợi duyệt...');
       try {
-        await createContent(formData);
-        setMsg('Xong. Nội dung đã ở Hàng đợi duyệt, chờ người bấm Duyệt để đăng.');
+        const res = await createContent(fd);
+        if (opts.requestVideo && res?.contentId) {
+          // Bật panel tiến trình; các state khác reset để soạn bài tiếp.
+          setVideoJob({ sourceId: res.contentId, status: 'waiting', startedAt: Date.now() });
+          setMsg('');
+        } else {
+          setMsg('Xong. Nội dung đã ở Hàng đợi duyệt, chờ người bấm Duyệt để đăng.');
+        }
         setTitle('');
         setTitleAuto(true);
         setDraft('');
@@ -136,6 +171,7 @@ export default function SanXuatForm({
       }
     });
   };
+  const onSubmit = () => submitCore({ requestVideo: false });
 
   // Chọn ảnh: tiêu đề tự đổi, GỘP tên ảnh + video đang chọn (trừ khi người tự gõ tay hoặc đã chọn từ khóa).
   const onSelectImage = (a: Asset) => {
@@ -296,7 +332,7 @@ export default function SanXuatForm({
           <span className="sx-slot-title">Soạn bài viết</span>
         </header>
 
-        <form action={onSubmit} className="sx-form">
+        <form action={() => onSubmit()} className="sx-form">
           <label className="sx-field">
             <span>Tiêu đề</span>
             <input
@@ -380,7 +416,7 @@ export default function SanXuatForm({
             ) : null}
           </label>
 
-          <div className="sx-actions">
+          <div className="sx-actions" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <button
               type="submit"
               className="btn ok"
@@ -388,8 +424,68 @@ export default function SanXuatForm({
             >
               {pending ? 'Đang đẩy...' : '✅ Xong — đẩy vào hàng đợi duyệt'}
             </button>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => submitCore({ requestVideo: true })}
+              disabled={pending || !title.trim() || !draft.trim()}
+              title="Lưu bài + yêu cầu máy nội bộ dựng video (FB 16:9 + TikTok dọc). Mất ~5 phút."
+            >
+              {pending ? 'Đang đẩy...' : '🎬 Xong + Làm video (~5 phút)'}
+            </button>
             {msg ? <span className="muted">{msg}</span> : null}
           </div>
+
+          {videoJob ? (
+            <div className={`videojob videojob-${videoJob.status}`} style={{
+              marginTop: 12, padding: 12, borderRadius: 8,
+              background: videoJob.status === 'done' ? 'rgba(22,163,74,.08)' : videoJob.status === 'timeout' ? 'rgba(217,119,6,.08)' : 'rgba(59,130,246,.08)',
+              border: `1px solid ${videoJob.status === 'done' ? '#16a34a55' : videoJob.status === 'timeout' ? '#d9770655' : '#3b82f655'}`
+            }}>
+              {videoJob.status === 'waiting' ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span className="spinner" aria-hidden="true" style={{
+                      display: 'inline-block', width: 16, height: 16, border: '2px solid #3b82f6',
+                      borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite'
+                    }} />
+                    <b>Đang dựng video...</b>
+                    <span className="muted">Máy nội bộ đang làm (~5 phút). Trang sẽ tự cập nhật.</span>
+                  </div>
+                  <p className="muted" style={{ marginTop: 6, fontSize: '.85rem' }}>
+                    Máy nội bộ phải đang chạy watcher (<code>video-watch.bat</code>) thì mới dựng được. Cứ để trang mở.
+                  </p>
+                </>
+              ) : videoJob.status === 'done' ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span>🎉</span>
+                    <b>Video đã dựng xong!</b>
+                    {videoJob.title ? <span className="muted">— {videoJob.title}</span> : null}
+                    {videoJob.queueUrl ? (
+                      <a className="btn ok sm" href={videoJob.queueUrl}>Xem ở Hàng đợi duyệt</a>
+                    ) : null}
+                    <button type="button" className="btn ghost sm" onClick={() => setVideoJob(null)}>✕ Đóng</button>
+                  </div>
+                  {videoJob.videoUrl ? (
+                    <video src={videoJob.videoUrl} controls preload="metadata" style={{ marginTop: 10, maxWidth: '100%', maxHeight: 380, borderRadius: 6 }} />
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span>⏱️</span>
+                    <b>Đã đợi hơn 15 phút mà chưa xong.</b>
+                    <button type="button" className="btn ghost sm" onClick={() => setVideoJob(null)}>✕ Đóng</button>
+                  </div>
+                  <p className="muted" style={{ marginTop: 6, fontSize: '.85rem' }}>
+                    Kiểm tra máy nội bộ có bật + đã mở <code>video-watch.bat</code> chưa. Yêu cầu vẫn còn trong hệ thống, khi máy chạy sẽ tự dựng.
+                  </p>
+                </>
+              )}
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            </div>
+          ) : null}
 
           <p className="sx-note">
             Nút <b>Xong</b> chỉ tạo khung sườn và đưa vào hàng đợi duyệt. Nội dung chưa lên trang mạng xã hội —

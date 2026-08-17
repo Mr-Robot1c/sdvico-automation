@@ -794,7 +794,9 @@ export async function generateTextForTitle(
 
 // Xong khung sản xuất: tạo bản ghi mkt_content + đẩy vào approval_queue.
 // KHÔNG tự đăng — người duyệt bấm 'Duyệt' ở Hàng đợi duyệt mới thực sự lên trang (Điều cấm 1).
-export async function createContent(formData: FormData) {
+// Nếu form đặt request_video=1 -> gắn cờ brief.video_requested để máy nội bộ (watcher --requested)
+// tự dựng video từ bài này. Trả về contentId để client polling xem video đã dựng xong chưa.
+export async function createContent(formData: FormData): Promise<{ contentId: string; videoRequested: boolean }> {
   const title = String(formData.get('title') || '').trim();
   const draft = String(formData.get('draft') || '').trim();
   const kind = (String(formData.get('kind') || 'social') as 'article' | 'social' | 'video');
@@ -811,10 +813,11 @@ export async function createContent(formData: FormData) {
     .filter(Boolean);
   if (!channels.length) channels = ['facebook'];
   const contentType = String(formData.get('content_type') || 'other').trim() || 'other';
-  if (!title || !draft) return;
+  const requestVideo = String(formData.get('request_video') || '') === '1';
+  if (!title || !draft) return { contentId: '', videoRequested: false };
 
   const client = getServerClient();
-  const brief = {
+  const brief: Record<string, unknown> = {
     keyword,
     intent,
     landing_url: landingUrl,
@@ -824,6 +827,10 @@ export async function createContent(formData: FormData) {
     content_type: contentType,
     assets: { image: imageAssetId, video: videoAssetId }
   };
+  if (requestVideo) {
+    brief.video_requested = true;
+    brief.video_requested_at = new Date().toISOString();
+  }
   const { data: inserted, error } = await client
     .from('mkt_content')
     .insert({ kind, title, brief, draft, status: 'review' })
@@ -855,6 +862,42 @@ export async function createContent(formData: FormData) {
   // treo lâu ở client.
   revalidatePath('/');
   revalidatePath('/noi-dung');
+  return { contentId, videoRequested: requestVideo };
+}
+
+// Kiểm tra máy nội bộ đã dựng xong video CHO bài <sourceContentId> chưa. Video pipeline sinh 1
+// bài mới kind='social' post_kind='video' brief.source_content=<gốc> + upload video vào Storage.
+// Trả về {done, videoContentId, url, title, videoUrl} khi thấy; ngược lại {done:false, elapsedMinutes}.
+export async function checkVideoDone(sourceContentId: string): Promise<{
+  done: boolean; videoContentId?: string; url?: string; title?: string; videoUrl?: string; elapsedMinutes?: number;
+}> {
+  if (!sourceContentId) return { done: false };
+  const client = getServerClient();
+  // Bài video kết quả: brief.source_content = sourceContentId, do video-pipeline sinh.
+  const { data: videos } = await client
+    .from('mkt_content')
+    .select('id, title, brief, created_at')
+    .eq('brief->>generator', 'video-pipeline')
+    .eq('brief->>source_content', sourceContentId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const v = (videos || [])[0] as { id: string; title: string; brief: any; created_at: string } | undefined;
+  if (v) {
+    // Lấy URL công khai của video (bản dọc mặc định).
+    const videoId = (v.brief?.assets?.video_v || v.brief?.assets?.video || v.brief?.assets?.video_h) as string | undefined;
+    let videoUrl: string | undefined;
+    if (videoId) {
+      const { data: a } = await client.from('brand_assets').select('storage_path').eq('id', videoId).single();
+      const sp = (a as { storage_path?: string } | null)?.storage_path;
+      if (sp) videoUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+    }
+    return { done: true, videoContentId: v.id, url: '/noi-dung?loai=video', title: v.title, videoUrl };
+  }
+  // Chưa xong. Trả về số phút đã đợi để client cảnh báo nếu quá lâu (máy tắt?).
+  const { data: src } = await client.from('mkt_content').select('brief').eq('id', sourceContentId).single();
+  const at = (src as any)?.brief?.video_requested_at as string | undefined;
+  const elapsedMinutes = at ? Math.round((Date.now() - new Date(at).getTime()) / 60000) : undefined;
+  return { done: false, elapsedMinutes };
 }
 
 // Chỉnh sửa bản nháp trước khi duyệt. Người sửa là người kiểm soát (điều cấm 1).
