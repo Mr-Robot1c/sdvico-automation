@@ -5,6 +5,9 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Trang chu Hang doi duyet: BO the "Kho tu khoa" (mkt_keywords khong dung o luong san xuat hien tai, gay roi). Con 3 the: bai cho duyet, can xem xet, bai da dang. -->
+<!-- re-verified: 2026-08-14 - waitFacebookVideoReady tang timeout 24s -> 60s. Video AI dung co intro/outro 40-70s, FB xu ly video lau hon => 24s khong du -> tha anh binh luan fail. -->
+
 <!-- re-verified: 2026-08-14 - publishContentToFacebook catch nay ghi run_log task=mkt.publish_facebook_ui status=error voi errMsg + hasImage/hasVideo. Truoc day catch nuot loi, mkt_posts.status=failed nhung khong co log de biet vi sao (token het, quota, videoUrl 404,...). Nay debug qua /api/fb-diag hoac SELECT run_log. -->
 
 <!-- re-verified: 2026-08-14 - /noi-dung: BO nut "🎬 Lam video" (trung voi nut "Xong + Lam video" o /san-xuat). Con badge "🎬 Da yeu cau video" hien khi brief.video_requested=true. Bo import requestVideoForContent khoi page.tsx (server action van con o actions.ts, chua go de tuong thich). -->

@@ -17,7 +17,7 @@ async function waitFacebookVideoReady(
   videoId: string,
   version: string,
   token: string,
-  maxWaitMs = 24000,
+  maxWaitMs = 60000, // Truoc 24s, khong du cho video 40-70s co intro/outro. Tang len 60s.
   intervalMs = 3000
 ): Promise<boolean> {
   const started = Date.now();

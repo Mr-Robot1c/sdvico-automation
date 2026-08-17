@@ -114,11 +114,10 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
     }
   }
 
-  // Số liệu tổng quan cho thẻ thống kê trên cùng.
-  const [{ count: kwCount }, { count: postCount }] = await Promise.all([
-    client.from('mkt_keywords').select('*', { count: 'exact', head: true }),
-    client.from('mkt_posts').select('*', { count: 'exact', head: true }).eq('status', 'published')
-  ]);
+  // Số liệu tổng quan cho thẻ thống kê trên cùng (đã bỏ thẻ "Từ khóa trong kho" vì kho từ
+  // khóa không còn dùng ở luồng sản xuất hiện tại).
+  const { count: postCount } = await client
+    .from('mkt_posts').select('*', { count: 'exact', head: true }).eq('status', 'published');
 
   return (
     <main>
@@ -145,13 +144,6 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
           <div className="statcard-body">
             <span className="statcard-label">Cần xem xét hoặc ưu tiên</span>
             <span className="statcard-num">{redCount}</span>
-          </div>
-        </div>
-        <div className="statcard">
-          <span className="statcard-icon" aria-hidden="true">🔑</span>
-          <div className="statcard-body">
-            <span className="statcard-label">Từ khóa trong kho</span>
-            <span className="statcard-num">{kwCount ?? 0}</span>
           </div>
         </div>
         <div className="statcard">
