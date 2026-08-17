@@ -6,7 +6,7 @@ import { writeFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { ffmpeg } from './ffmpeg.mjs';
+import { ffmpeg, probeDuration } from './ffmpeg.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -143,26 +143,35 @@ async function drawOutro(W, H) {
   return cv.toBuffer('image/png');
 }
 
-// Tạo file mp4 intro/outro CÙNG codec cảnh chính (H.264/AAC yuv420p 30fps 44100Hz stereo)
-// để nối bằng concat -c copy. imagePath là ảnh png ở workDir; durationSec là thời lượng.
-// audioPath = null -> lồng tiếng lặng để đồng nhất track audio.
+// Tạo file mp4 intro/outro với EFFECT: zoom nhẹ + fade in/out. Cùng codec cảnh chính để concat.
+// audioPath = null -> tiếng lặng. Fade: 0.4s vào đầu, 0.5s cuối. Zoom: 1.0 → 1.08 trong suốt clip.
 async function makeBumperClip(imagePath, audioPath, durationSec, outSeg, workDir, fmt) {
-  const args = [
-    '-y',
-    '-loop', '1', '-framerate', '30', '-i', imagePath,
-  ];
-  if (audioPath) {
-    args.push('-i', audioPath);
-  } else {
-    args.push('-f', 'lavfi', '-i', `anullsrc=r=44100:cl=stereo`);
-  }
+  const dur = durationSec.toFixed(3);
+  const fadeOutStart = Math.max(0, durationSec - 0.5).toFixed(3);
+  const frames = Math.round(durationSec * 30);
+  // zoompan: phóng 1.0 -> 1.08 trong 'frames' khung, viewport wxh = fmt.w x fmt.h.
+  // fade: hiện lên trong 0.4s, tắt dần 0.5s cuối.
+  const vf = [
+    `scale=${fmt.w * 2}:${fmt.h * 2}:force_original_aspect_ratio=decrease`,
+    `pad=${fmt.w * 2}:${fmt.h * 2}:(ow-iw)/2:(oh-ih)/2:0x0d2a45`,
+    `zoompan=z='1+0.08*on/${frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${fmt.w}x${fmt.h}:fps=30`,
+    `fade=t=in:st=0:d=0.4`,
+    `fade=t=out:st=${fadeOutStart}:d=0.5`,
+    `format=yuv420p`
+  ].join(',');
+  // Audio fade: hiện 0.2s, tắt 0.4s cuối.
+  const af = `afade=t=in:st=0:d=0.2,afade=t=out:st=${fadeOutStart}:d=0.4`;
+
+  const args = ['-y', '-loop', '1', '-framerate', '30', '-i', imagePath];
+  if (audioPath) args.push('-i', audioPath);
+  else args.push('-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo');
   args.push(
-    '-t', durationSec.toFixed(3),
-    '-vf', `scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=decrease,pad=${fmt.w}:${fmt.h}:(ow-iw)/2:(oh-ih)/2:black,fps=30,format=yuv420p`,
+    '-t', dur,
+    '-vf', vf,
+    '-af', af,
     '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
     '-r', '30', '-video_track_timescale', '30000',
     '-c:a', 'aac', '-ar', '44100', '-ac', '2',
-    '-shortest',
     outSeg,
   );
   await ffmpeg(args, { cwd: workDir });
@@ -171,6 +180,7 @@ async function makeBumperClip(imagePath, audioPath, durationSec, outSeg, workDir
 
 // Tạo intro và outro cho một FORMAT. Trả về {introSeg, outroSeg} là tên file trong workDir để
 // concat cùng các cảnh chính. outroAudioPath: mp3 TTS đọc tổng đài (đã sinh sẵn), có thể null.
+// Thời lượng outro = MAX(minDur, audio_duration + 1s buffer) để không cắt tiếng giữa chừng.
 export async function buildBumpers({ workDir, fmt, outroAudioPath = null, introDurSec = 2.5, outroDurSec = 4 }) {
   registerFontsFromWorkdir(workDir);
   const introPng = join(workDir, 'intro.png');
@@ -179,7 +189,16 @@ export async function buildBumpers({ workDir, fmt, outroAudioPath = null, introD
   await writeFile(outroPng, await drawOutro(fmt.w, fmt.h));
   const introSeg = 'intro.mp4';
   const outroSeg = 'outro.mp4';
+  // Đo thời lượng audio outro để đảm bảo video đủ dài (đọc "1900 23 23 49" từng số mất ~6-7s,
+  // outro 4s cố định trước đây bị cắt tiếng giữa chừng).
+  let outroActualDur = outroDurSec;
+  if (outroAudioPath) {
+    try {
+      const audioDur = await probeDuration(outroAudioPath);
+      outroActualDur = Math.max(outroDurSec, audioDur + 1);
+    } catch { /* thiếu audio -> giữ default */ }
+  }
   await makeBumperClip(introPng, null, introDurSec, introSeg, workDir, fmt);
-  await makeBumperClip(outroPng, outroAudioPath, outroDurSec, outroSeg, workDir, fmt);
+  await makeBumperClip(outroPng, outroAudioPath, outroActualDur, outroSeg, workDir, fmt);
   return { introSeg, outroSeg };
 }

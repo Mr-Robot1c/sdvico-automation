@@ -75,7 +75,8 @@ export async function generateVideoScript(content, assets, facts = []) {
     '  "horizontal": {"scenes": [{"narration": "câu thoại", "asset_id": "id"}]}',
     '}',
     'Bản dọc (vertical): 4 tới 5 cảnh, tổng lời thoại đọc khoảng 55 tới 60 giây.',
-    'Bản ngang (horizontal): 8 tới 12 cảnh, chi tiết hơn, tổng lời thoại khoảng 3 tới 4 phút.',
+    'Bản ngang (horizontal): 5 tới 7 cảnh, TỔNG LỜI THOẠI ĐỌC HẾT KHOẢNG 40-50 GIÂY (khoảng 100-130 từ tiếng Việt).',
+    'Lời thoại mỗi cảnh 6-9 giây (~15-25 từ). Súc tích, không lặp ý, không lan man - video ngắn hiệu quả hơn dài.',
   ].filter(Boolean).join('\n');
 
   const res = await generateWithRetry(ai, {

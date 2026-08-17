@@ -76,13 +76,13 @@ async function tts(text, outPath, voice, workDir, tag) {
   if (!clean) return silentAudio(outPath, estSec);
   const txt = join(workDir, `${tag}.txt`);
   await writeFile(txt, clean, 'utf8');
-  // edge-tts đôi khi trả "No audio received" cho 1 câu cụ thể (hình như phía Microsoft). Thử giọng
-  // chính -> giọng dự phòng (khác giới tính) -> chậm hơn. Hết mới lùi tiếng lặng.
-  const fallback = ['vi-VN-HoaiMyNeural', 'vi-VN-NamMinhNeural'].filter((v) => v !== voice);
+  // GIỮ NGUYÊN 1 GIỌNG NAM cho toàn video (không đổi qua giọng nữ giữa chừng). edge-tts hay bị
+  // "No audio received" -> thử lại vài lần với rate khác nhau. Hết mới lùi tiếng lặng.
   const attempts = [
     { voice, rate: '+0%' },
-    ...fallback.map((v) => ({ voice: v, rate: '+0%' })),
+    { voice, rate: '-5%' },
     { voice, rate: '-10%' },
+    { voice, rate: '+5%' },
   ];
   let lastErr;
   for (const a of attempts) {

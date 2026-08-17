@@ -439,7 +439,7 @@ export default function SanXuatForm({
             <select value={kind} onChange={(e) => setKind(e.target.value as any)} className="note">
               <option value="social">Bài ngắn</option>
               <option value="article">Bài dài</option>
-              <option value="video">Kịch bản video</option>
+              {/* Bỏ "Kịch bản video" - AI dựng video đã đọc lời thoại luôn, không cần định dạng riêng. */}
             </select>
           </label>
 
@@ -501,7 +501,7 @@ export default function SanXuatForm({
             </span>
             {kind === 'article' && postTt && vidIds.length ? (
               <span style={{ color: '#d97706', fontSize: '.8rem' }}>
-                ⚠️ Bài dài không hợp TikTok, caption sẽ bị rút gọn. Nên chọn "Bài ngắn" hoặc "Kịch bản video" khi đăng TikTok.
+                ⚠️ Bài dài không hợp TikTok, caption sẽ bị rút gọn. Nên chọn "Bài ngắn" khi đăng TikTok.
               </span>
             ) : null}
           </label>

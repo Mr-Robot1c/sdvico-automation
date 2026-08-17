@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Xuong san xuat "Do dai text" BO option "Kich ban video" (AI dung video da doc loi thoai truc tiep, khong can format rieng). Chi con "Bai ngan" + "Bai dai". Canh bao TikTok cap nhat theo. -->
+
 <!-- re-verified: 2026-08-14 - Xuong san xuat chip + thumbnail 🔍 nay MO LIGHTBOX (full man hinh, dark overlay, Esc/click ngoai de dong) thay vi chi doi preview. Ten chip da chon click DUOC de chuyen preview khung sang anh do. Avatar mini trong chip cung click duoc. Nhat quan: click ten/avatar = doi preview KHUNG; click 🔍 = phong to LIGHTBOX. -->
 
 <!-- re-verified: 2026-08-14 - Xuong san xuat khung anh/video: (1) previewImgId/previewVidId - preview to hien anh VUA CLICK (khong phai anh chon dau tien co dinh) de dua chon nhieu de coi tung cai. (2) Nut 🔍 goc trai moi thumbnail: xem to KHONG doi chon (stopPropagation). (3) Thumbnail dang xem co outline xanh de biet. (4) Chip da chon co avatar thumbnail nho + so thu tu + nut 🔍/✕. Ten hien duoi khung preview kem trang thai (👁 xem truoc / ✓ da chon). -->
