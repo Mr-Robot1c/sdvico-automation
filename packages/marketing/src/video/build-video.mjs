@@ -76,14 +76,26 @@ async function tts(text, outPath, voice, workDir, tag) {
   if (!clean) return silentAudio(outPath, estSec);
   const txt = join(workDir, `${tag}.txt`);
   await writeFile(txt, clean, 'utf8');
-  try {
-    await python('tts.py', ['--text-file', txt, '--out', outPath, '--voice', voice]);
-    return probeDuration(outPath);
-  } catch (e) {
-    // edge-tts vẫn lỗi sau khi retry: KHÔNG kéo sập cả dây chuyền — dùng tiếng lặng để cảnh vẫn dựng.
-    console.warn(`TTS lỗi cảnh ${tag} (${e.message}). Dùng tiếng lặng ${estSec}s để cảnh vẫn dựng, xem lại lời thoại cảnh này.`);
-    return silentAudio(outPath, estSec);
+  // edge-tts đôi khi trả "No audio received" cho 1 câu cụ thể (hình như phía Microsoft). Thử giọng
+  // chính -> giọng dự phòng (khác giới tính) -> chậm hơn. Hết mới lùi tiếng lặng.
+  const fallback = ['vi-VN-HoaiMyNeural', 'vi-VN-NamMinhNeural'].filter((v) => v !== voice);
+  const attempts = [
+    { voice, rate: '+0%' },
+    ...fallback.map((v) => ({ voice: v, rate: '+0%' })),
+    { voice, rate: '-10%' },
+  ];
+  let lastErr;
+  for (const a of attempts) {
+    try {
+      await python('tts.py', ['--text-file', txt, '--out', outPath, '--voice', a.voice, '--rate', a.rate]);
+      if (a.voice !== voice || a.rate !== '+0%') {
+        console.log(`  (cảnh ${tag}: TTS đổi qua ${a.voice} rate ${a.rate})`);
+      }
+      return probeDuration(outPath);
+    } catch (e) { lastErr = e; }
   }
+  console.warn(`TTS lỗi cảnh ${tag} sau ${attempts.length} lần thử (${lastErr?.message}). Dùng tiếng lặng ${estSec}s, xem lại lời thoại cảnh này.`);
+  return silentAudio(outPath, estSec);
 }
 
 // Ghép audio các cảnh thành 1 file rồi chạy Whisper (artifact/ghi nhận, không chặn).
@@ -185,8 +197,16 @@ async function main() {
   let contentId = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
   let content;
   if (contentId) {
-    const { data } = await client.from('mkt_content').select('id, title, draft, brief').eq('id', contentId).single();
-    content = data;
+    // Nhận cả UUID đầy đủ lẫn prefix (vd 8 ký tự đầu) — tiện chạy tay. UUID không dùng LIKE được
+    // nên với prefix phải quét rồi so trong JS.
+    if (contentId.length >= 32) {
+      const { data } = await client.from('mkt_content').select('id, title, draft, brief').eq('id', contentId).maybeSingle();
+      content = data;
+    } else {
+      const { data } = await client.from('mkt_content').select('id, title, draft, brief').order('created_at', { ascending: false }).limit(500);
+      content = (data || []).find((c) => String(c.id).startsWith(contentId));
+    }
+    if (content?.id) contentId = content.id;
   } else {
     const { data } = await client.from('mkt_content').select('id, title, draft, brief')
       .not('draft', 'is', null).order('created_at', { ascending: false }).limit(1);
@@ -196,10 +216,34 @@ async function main() {
   contentId = content.id;
   console.log('Nội dung nguồn:', content.title, `(${contentId.slice(0, 8)})`);
 
-  // Tư liệu.
-  const { data: assets } = await client.from('brand_assets')
-    .select('id, kind, title, storage_path').order('created_at', { ascending: false });
+  // Xác định SẢN PHẨM của bài để CHỈ lấy tư liệu đúng folder đó (không đưa cả kho cho Gemini
+  // chọn linh tinh — bài lọc dầu mà chèn ảnh S-Tracking là do đó). Ưu tiên: brief.rotation_group
+  // -> guessGroup(tiêu đề + từ khóa + nội dung). Không khớp -> lấy cả kho như cũ (fallback).
+  const { guessGroup: guess } = await import('../products.mjs');
+  const brief = content.brief || {};
+  const productGroup = brief.rotation_group
+    || guess(`${content.title || ''} ${brief.keyword || ''} ${(content.draft || '').slice(0, 300)}`);
+  console.log('Sản phẩm nhận diện:', productGroup || '(khong ro -> lay ca kho)');
+
+  // Tư liệu: nếu đoán được sản phẩm thì CHỈ lấy tư liệu trong folder đó.
+  let assets;
+  if (productGroup) {
+    const { data } = await client.from('brand_assets')
+      .select('id, kind, title, storage_path, product_group')
+      .eq('product_group', productGroup)
+      .order('created_at', { ascending: false });
+    assets = data;
+    if (!assets?.length) {
+      console.warn(`Folder "${productGroup}" rỗng, lấy cả kho làm fallback.`);
+    }
+  }
+  if (!assets?.length) {
+    const { data } = await client.from('brand_assets')
+      .select('id, kind, title, storage_path').order('created_at', { ascending: false });
+    assets = data;
+  }
   if (!assets?.length) throw new Error('brand_assets rỗng.');
+  console.log(`Tu lieu se dua cho Gemini chon: ${assets.length} muc${productGroup ? ` (folder "${productGroup}")` : ' (ca kho)'}.`);
 
   // Kịch bản.
   console.log('Sinh kịch bản (Gemini)...');
