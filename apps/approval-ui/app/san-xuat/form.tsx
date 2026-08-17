@@ -58,6 +58,14 @@ export default function SanXuatForm({
   // thumbnail hoặc nút 🔍 - kể cả khi chỉ xem không chọn.
   const [previewImgId, setPreviewImgId] = useState<string>('');
   const [previewVidId, setPreviewVidId] = useState<string>('');
+  // Lightbox: xem to gần full màn hình (bấm 🔍 hoặc phím Esc để đóng).
+  const [lightbox, setLightbox] = useState<{ kind: 'image' | 'video'; url: string; title: string } | null>(null);
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightbox(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox]);
   // Filter theo folder sản phẩm để khung ảnh/video không rối. '' = tất cả.
   const [folder, setFolder] = useState<string>('');
   const [postFb, setPostFb] = useState(true);
@@ -260,9 +268,9 @@ export default function SanXuatForm({
             {selectedImgs.map((a, i) => (
               <span key={a.id} className="chip on" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '3px 6px' }}>
                 <span style={{ background: '#16a34a', color: '#fff', width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
-                <img src={a.url} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3 }} />
-                <span style={{ fontSize: '.75rem', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.title}>{a.title}</span>
-                <button type="button" onClick={() => setPreviewImgId(a.id)} title="Xem to" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>🔍</button>
+                <img src={a.url} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3, cursor: 'pointer' }} onClick={() => setPreviewImgId(a.id)} title="Chuyển preview sang ảnh này" />
+                <button type="button" onClick={() => setPreviewImgId(a.id)} title="Bấm để chuyển preview sang ảnh này" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, fontSize: '.75rem', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{a.title}</button>
+                <button type="button" onClick={() => setLightbox({ kind: 'image', url: a.url, title: a.title })} title="Phóng to (Esc để đóng)" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>🔍</button>
                 <button type="button" onClick={() => onSelectImage(a)} title="Bỏ" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>✕</button>
               </span>
             ))}
@@ -290,8 +298,8 @@ export default function SanXuatForm({
                   <span
                     role="button"
                     tabIndex={0}
-                    onClick={(e) => { e.stopPropagation(); setPreviewImgId(a.id); }}
-                    title="Xem to (không chọn)"
+                    onClick={(e) => { e.stopPropagation(); setLightbox({ kind: 'image', url: a.url, title: a.title }); }}
+                    title="Phóng to (Esc để đóng) — không chọn"
                     style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, cursor: 'pointer' }}
                   >🔍</span>
                   {on ? (
@@ -336,12 +344,12 @@ export default function SanXuatForm({
             {selectedVids.map((a, i) => (
               <span key={a.id} className="chip on" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '3px 6px' }}>
                 <span style={{ background: '#16a34a', color: '#fff', width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
-                <span style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
+                <span style={{ position: 'relative', width: 28, height: 28, flexShrink: 0, cursor: 'pointer' }} onClick={() => setPreviewVidId(a.id)} title="Chuyển preview sang video này">
                   <video src={a.url} muted preload="metadata" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3, display: 'block' }} />
                   <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, textShadow: '0 0 3px #000' }}>▶</span>
                 </span>
-                <span style={{ fontSize: '.75rem', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.title}>{a.title}</span>
-                <button type="button" onClick={() => setPreviewVidId(a.id)} title="Xem to" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>🔍</button>
+                <button type="button" onClick={() => setPreviewVidId(a.id)} title="Bấm để chuyển preview sang video này" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, fontSize: '.75rem', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{a.title}</button>
+                <button type="button" onClick={() => setLightbox({ kind: 'video', url: a.url, title: a.title })} title="Phóng to (Esc để đóng)" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>🔍</button>
                 <button type="button" onClick={() => onSelectVideo(a)} title="Bỏ" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>✕</button>
               </span>
             ))}
@@ -369,8 +377,8 @@ export default function SanXuatForm({
                   <span
                     role="button"
                     tabIndex={0}
-                    onClick={(e) => { e.stopPropagation(); setPreviewVidId(a.id); }}
-                    title="Xem to (không chọn)"
+                    onClick={(e) => { e.stopPropagation(); setLightbox({ kind: 'video', url: a.url, title: a.title }); }}
+                    title="Phóng to (Esc để đóng) — không chọn"
                     style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, cursor: 'pointer' }}
                   >🔍</span>
                   {on ? (
@@ -575,6 +583,35 @@ export default function SanXuatForm({
           </p>
         </form>
       </section>
+
+      {lightbox ? (
+        <div
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20, cursor: 'zoom-out'
+          }}
+        >
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setLightbox(null); }}
+            aria-label="Đóng"
+            style={{ position: 'absolute', top: 12, right: 16, background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', width: 40, height: 40, borderRadius: '50%', fontSize: 20, cursor: 'pointer' }}
+          >✕</button>
+          <div style={{ maxWidth: '95vw', maxHeight: '85vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
+            {lightbox.kind === 'image' ? (
+              <img src={lightbox.url} alt={lightbox.title} style={{ maxWidth: '95vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 6 }} />
+            ) : (
+              <video src={lightbox.url} controls autoPlay style={{ maxWidth: '95vw', maxHeight: '85vh', borderRadius: 6 }} />
+            )}
+          </div>
+          <p style={{ color: '#fff', marginTop: 12, fontSize: '.9rem', textAlign: 'center' }}>
+            {lightbox.title} <span style={{ opacity: 0.6, marginLeft: 8 }}>· bấm ra ngoài hoặc Esc để đóng</span>
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
