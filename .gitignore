@@ -43,3 +43,7 @@ whisper-models/
 Thumbs.db
 .idea/
 .vscode/
+
+# Bản sao skill do công cụ khác tự sinh. Nguồn sự thật là .claude/skills,
+# AGENTS.md đã trỏ về đó. Để hai bản song song là sớm muộn lệch nhau.
+.agents/
