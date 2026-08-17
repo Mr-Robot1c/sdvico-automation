@@ -16,6 +16,7 @@ const GROUPS: NavGroup[] = [
       { href: '/dang-tin', label: 'Vị trí' },
       { href: '/ho-so', label: 'Hồ sơ ứng viên' },
       { href: '/lich', label: 'Lịch phỏng vấn' },
+      { href: '/bao-cao', label: 'Báo cáo' },
     ],
   },
 ];
