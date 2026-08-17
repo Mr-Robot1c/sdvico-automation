@@ -15,6 +15,7 @@ import { composeOfferLetter, composeRejectLetter } from '../lib/hr-letters';
 import { allocateInterviewSlots, composeInterviewLetter, generateInterviewQuestions, formatSlot } from '../lib/interview';
 import { linkedinConfigured, postToLinkedIn } from '../lib/linkedin';
 import { getSessionUser } from '../lib/auth';
+import { requireAdmin } from '../lib/hr-users';
 
 // Trả email người đang đăng nhập, hoặc null nếu chế độ basic. Bọc try để không rơi luồng cũ.
 async function currentEmail(): Promise<string | null> {
@@ -1488,4 +1489,83 @@ export async function approveAndSchedule(formData: FormData) {
 
   revalidatePath('/');
   revalidatePath('/dang-tin');
+}
+
+// ============================================================================
+// Quản lý người dùng nội bộ. Chỉ admin đăng nhập bằng magic link mới bấm được.
+// Ở chế độ AUTH_MODE=basic không có khái niệm user, các action này báo lỗi rõ ràng.
+// ============================================================================
+
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+export async function addHrUser(formData: FormData) {
+  const ok = await requireAdmin();
+  if ('error' in ok) throw new Error(ok.error);
+
+  const email = String(formData.get('email') || '').trim().toLowerCase();
+  const fullName = String(formData.get('full_name') || '').trim() || null;
+  const roleRaw = String(formData.get('role') || 'staff');
+  const role = roleRaw === 'admin' ? 'admin' : 'staff';
+
+  if (!email || !EMAIL_RE.test(email)) throw new Error('Email không hợp lệ.');
+
+  const client = getServerClient();
+  const { error } = await client.from('hr_users')
+    .insert({ email, full_name: fullName, role })
+    .select('id')
+    .single();
+  if (error) {
+    if (error.message?.includes('duplicate') || error.code === '23505') {
+      throw new Error('Email này đã có trong danh sách.');
+    }
+    throw new Error('Không thêm được: ' + error.message);
+  }
+  revalidatePath('/cai-dat/nguoi-dung');
+}
+
+export async function toggleHrUserDisabled(formData: FormData) {
+  const ok = await requireAdmin();
+  if ('error' in ok) throw new Error(ok.error);
+
+  const id = String(formData.get('id') || '');
+  if (!id) return;
+
+  const client = getServerClient();
+  const { data: row, error: readErr } = await client.from('hr_users')
+    .select('id, email, disabled_at').eq('id', id).maybeSingle();
+  if (readErr || !row) throw new Error('Không tìm thấy người dùng.');
+
+  // Chốt an toàn: không cho admin tự khóa chính mình. Khóa xong không vào lại được.
+  if (row.email?.toLowerCase() === ok.email.toLowerCase()) {
+    throw new Error('Không thể tự khóa tài khoản đang đăng nhập.');
+  }
+
+  const newVal = row.disabled_at ? null : new Date().toISOString();
+  const { error } = await client.from('hr_users').update({ disabled_at: newVal }).eq('id', id);
+  if (error) throw new Error('Không đổi được trạng thái: ' + error.message);
+  revalidatePath('/cai-dat/nguoi-dung');
+}
+
+export async function changeHrUserRole(formData: FormData) {
+  const ok = await requireAdmin();
+  if ('error' in ok) throw new Error(ok.error);
+
+  const id = String(formData.get('id') || '');
+  const roleRaw = String(formData.get('role') || '');
+  if (!id) return;
+  const role = roleRaw === 'admin' ? 'admin' : 'staff';
+
+  const client = getServerClient();
+  const { data: row } = await client.from('hr_users').select('email, role').eq('id', id).maybeSingle();
+  if (!row) throw new Error('Không tìm thấy người dùng.');
+
+  // Chốt an toàn: không cho admin tự hạ role của chính mình. Nếu công ty chỉ có một admin,
+  // hạ xong không còn admin nào bấm được nữa.
+  if (row.email?.toLowerCase() === ok.email.toLowerCase() && row.role === 'admin' && role === 'staff') {
+    throw new Error('Không thể tự hạ quyền admin của chính mình. Nhờ admin khác đổi giúp.');
+  }
+
+  const { error } = await client.from('hr_users').update({ role }).eq('id', id);
+  if (error) throw new Error('Không đổi được vai trò: ' + error.message);
+  revalidatePath('/cai-dat/nguoi-dung');
 }

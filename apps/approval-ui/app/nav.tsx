@@ -29,6 +29,10 @@ const SOLO_BOTTOM: (NavItem & { icon: string })[] = [
   { href: '/cai-dat', label: 'Cài đặt', icon: '⚙' },
 ];
 
+const ADMIN_ONLY: NavItem[] = [
+  { href: '/cai-dat/nguoi-dung', label: 'Người dùng' },
+];
+
 type NavUser = { email: string; fullName: string | null; role: string } | null;
 
 export default function Nav({ pendingCount = 0, user = null }: { pendingCount?: number; user?: NavUser }) {
@@ -105,6 +109,13 @@ export default function Nav({ pendingCount = 0, user = null }: { pendingCount?: 
             {item.label}
           </Link>
         ))}
+
+        {/* Trang chỉ dành cho admin. Ẩn hoàn toàn với người khác cho gọn sidebar. */}
+        {user?.role === 'admin' ? ADMIN_ONLY.map((item) => (
+          <Link key={item.href} href={item.href} className={`nav-item${path === item.href ? ' on' : ''}`} onClick={close} style={{ marginLeft: 20, fontSize: '0.88em' }}>
+            {item.label}
+          </Link>
+        )) : null}
 
         {/* Người đang đăng nhập. Chỉ hiện khi chế độ magic link đang bật và có phiên hợp lệ. */}
         {user ? (
