@@ -100,21 +100,23 @@ export default async function Page() {
         const imgs = list.filter((a) => a.kind === 'image').length;
         const vids = list.filter((a) => isVideo(a.kind)).length;
         const label = group === UNASSIGNED ? 'Chưa gán folder' : group;
+        // Folder có tư liệu -> mở sẵn (open). Folder trống -> gấp lại, đỡ chật trang.
+        const openByDefault = list.length > 0;
         return (
-          <section key={group} className="folder-section">
-            <div className="folder-head">
-              <h2>{label}</h2>
+          <details key={group} className="folder-section" open={openByDefault}>
+            <summary className="folder-head" style={{ cursor: 'pointer', listStyle: 'revert' }}>
+              <h2 style={{ display: 'inline', marginRight: 10 }}>📁 {label}</h2>
               <span className="folder-count">
                 {list.length === 0 ? 'trống' : `${imgs} ảnh · ${vids} video`}
                 {group !== UNASSIGNED && vids === 0 && list.length > 0 ? ' · chưa đăng TikTok được' : ''}
               </span>
-            </div>
+            </summary>
             {list.length === 0 ? (
               <p className="sub folder-empty">Chưa có tư liệu. Tải ảnh/video lên rồi gán vào folder này.</p>
             ) : (
               <ul className="assetgrid">{list.map(renderCard)}</ul>
             )}
-          </section>
+          </details>
         );
       })}
     </main>

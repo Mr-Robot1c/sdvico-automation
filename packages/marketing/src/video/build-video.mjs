@@ -37,24 +37,6 @@ function python(script, args) {
   });
 }
 
-// Ép edge-tts đọc số điện thoại theo TỪNG CHỮ SỐ (một chín không không...) thay vì đọc số nguyên
-// (một nghìn chín trăm...). Áp cho tổng đài SDVICO và các dạng phone phổ biến.
-const DIGIT_VN = { '0':'không','1':'một','2':'hai','3':'ba','4':'bốn','5':'năm','6':'sáu','7':'bảy','8':'tám','9':'chín' };
-function spellDigits(s) { return [...s].map((d) => DIGIT_VN[d] || d).join(' '); }
-function normalizeForTts(text) {
-  return text
-    // Số tổng đài SDVICO: 1900 23 23 49 (có/không cách, có/không dấu chấm/gạch).
-    .replace(/1900[\s.\-]*23[\s.\-]*23[\s.\-]*49/g, spellDigits('1900') + ', ' + spellDigits('23') + ', ' + spellDigits('23') + ', ' + spellDigits('49'))
-    // Bất kỳ số 10 chữ số bắt đầu 0 (di động VN): đọc từng số.
-    .replace(/\b(0\d{9,10})\b/g, (m) => spellDigits(m))
-    // Số 1900/1800 8 chữ số: đọc từng số.
-    .replace(/\b(1[89]00\d{4,6})\b/g, (m) => spellDigits(m));
-}
-
-async function tts(text, outPath, voice, workDir, tag) {
-  const txt = join(workDir, `${tag}.txt`);
-  await writeFile(txt, normalizeForTts(text), 'utf8');
-  await python('tts.py', ['--text-file', txt, '--out', outPath, '--voice', voice]);
 // Làm sạch lời thoại trước khi đọc: bỏ emoji/ký hiệu lạ (edge-tts dễ trả "No audio"), gộp khoảng trắng.
 function cleanNarration(text) {
   return String(text || '')
@@ -154,8 +136,11 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
     });
   }
   const wa = await whisperArtifact(sceneAudios, fdir, format);
+  // TTS cho outro: đọc "Gọi ngay tổng đài 1900 23 23 49" (spellPhones sẽ đọc từng chữ số).
+  const outroAudio = join(fdir, 'outro.mp3');
+  try { await tts('Gọi ngay tổng đài 1900 23 23 49 để được hỗ trợ.', outroAudio, voice, fdir, 'outro'); } catch { /* bo qua */ }
   const out = join(outDir, `sdvico_${contentId.slice(0, 8)}_${format}.mp4`);
-  await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out });
+  await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio });
   const totalDur = await probeDuration(out);
   return { out, totalDur, scenes: built.length, whisper: wa?.info || null };
 }
@@ -244,34 +229,6 @@ async function main() {
     .order('created_at', { ascending: false });
   if (!assets?.length) throw new Error(`Sản phẩm "${productGroup}" chưa có tư liệu trong brand_assets.`);
   console.log(`Sản phẩm: ${productGroup} (${assets.length} tư liệu)`);
-  // Xác định SẢN PHẨM của bài để CHỈ lấy tư liệu đúng folder đó (không đưa cả kho cho Gemini
-  // chọn linh tinh — bài lọc dầu mà chèn ảnh S-Tracking là do đó). Ưu tiên: brief.rotation_group
-  // -> guessGroup(tiêu đề + từ khóa + nội dung). Không khớp -> lấy cả kho như cũ (fallback).
-  const { guessGroup: guess } = await import('../products.mjs');
-  const brief = content.brief || {};
-  const productGroup = brief.rotation_group
-    || guess(`${content.title || ''} ${brief.keyword || ''} ${(content.draft || '').slice(0, 300)}`);
-  console.log('Sản phẩm nhận diện:', productGroup || '(khong ro -> lay ca kho)');
-
-  // Tư liệu: nếu đoán được sản phẩm thì CHỈ lấy tư liệu trong folder đó.
-  let assets;
-  if (productGroup) {
-    const { data } = await client.from('brand_assets')
-      .select('id, kind, title, storage_path, product_group')
-      .eq('product_group', productGroup)
-      .order('created_at', { ascending: false });
-    assets = data;
-    if (!assets?.length) {
-      console.warn(`Folder "${productGroup}" rỗng, lấy cả kho làm fallback.`);
-    }
-  }
-  if (!assets?.length) {
-    const { data } = await client.from('brand_assets')
-      .select('id, kind, title, storage_path').order('created_at', { ascending: false });
-    assets = data;
-  }
-  if (!assets?.length) throw new Error('brand_assets rỗng.');
-  console.log(`Tu lieu se dua cho Gemini chon: ${assets.length} muc${productGroup ? ` (folder "${productGroup}")` : ' (ca kho)'}.`);
 
   // Kịch bản.
   console.log('Sinh kịch bản (Gemini)...');

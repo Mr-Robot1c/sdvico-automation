@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Kho tu lieu (/tu-lieu): chuyen 8 folder san pham thanh <details> collapsible (folder co tu lieu mo san open, folder trong gap lai) - gon trang, de xem tung folder rieng. Tieu de moi folder co icon 📁 + so anh/video. -->
+
 <!-- re-verified: 2026-08-14 - Hang doi duyet (page.tsx): bo hien thi tu khoa (span .src goc phai card + dong Tu khoa trong modal), dong bo voi viec da bo dropdown /tu-khoa khoi luong san xuat. Chi giu Trang dich neu co. -->
 <!-- re-verified: 2026-08-14 - DUNG VIDEO TREN CLOUD (khong can may noi bo): workflow .github/workflows/video-build.yml (cron */10 phut + workflow_dispatch) chay build-video-all.mjs --requested --limit 3 --skip-whisper (bo Whisper artifact de nhanh, phu de van co tu kich ban). Route /api/trigger-video-build POST -> GitHub API dispatches workflow ngay khi user bam nut (khoi cho cron). createContent (Xuong san xuat) + requestVideoForContent (/noi-dung) tu goi trigger sau khi dat co video_requested. Can secrets GitHub SUPABASE_URL/SERVICE_ROLE/GEMINI_API_KEY/MKT_MODEL + Vercel env GITHUB_REPO + GITHUB_TOKEN (PAT quyen workflow). Thieu GITHUB_TOKEN thi cron 10 phut van quet (chi tre). Chi tiet video/README.md. -->
 

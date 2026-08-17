@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { ffmpeg } from './ffmpeg.mjs';
 import { buildBlocks, blocksToSrt } from './srt.mjs';
 import { ensureFonts, FONT_REGULAR, FONT_BLACK } from './fonts.mjs';
+import { buildBumpers } from './bumpers.mjs';
 
 export const FORMATS = {
   vertical: { w: 1080, h: 1920, subFont: 15, subMargin: 90 },
@@ -22,9 +23,15 @@ async function buildSceneSegment(scene, fmt, workDir, index) {
     `Fontname=${FONT_REGULAR},FontSize=${fmt.subFont},` +
     `PrimaryColour=&H00FFFFFF,OutlineColour=&H00202020,BorderStyle=1,Outline=2,Shadow=0,` +
     `Alignment=2,MarginV=${fmt.subMargin}`;
+  // Filter FIT-IN-BLUR-BACKGROUND: giữ nguyên tỷ lệ ảnh gốc (không crop, không méo). Nếu ảnh
+  // khác tỷ lệ khung, phủ 2 bên bằng chính ảnh đó phóng to + BLUR mạnh (kiểu TikTok/Reels).
   const vf =
-    `[0:v]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=increase,` +
-    `crop=${fmt.w}:${fmt.h},fps=30,format=yuv420p,` +
+    `[0:v]split[bg0][fg0];` +
+    `[bg0]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=increase,crop=${fmt.w}:${fmt.h},` +
+    `boxblur=luma_radius=20:luma_power=2:chroma_radius=20:chroma_power=1,` +
+    `eq=brightness=-0.05:saturation=0.85,fps=30,format=yuv420p[bg];` +
+    `[fg0]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=decrease,fps=30,format=yuv420p[fg];` +
+    `[bg][fg]overlay=(W-w)/2:(H-h)/2,` +
     `subtitles=${srtName}:fontsdir=.:force_style='${style}'[v]`;
 
   const inputArgs = scene.kind === 'image'
@@ -46,7 +53,7 @@ async function buildSceneSegment(scene, fmt, workDir, index) {
 
 // Ghép toàn bộ. scenes: [{videoPath, audioPath, durationSec, text, kind}].
 // brandLine: dòng nhận diện phủ trên đầu video (vd "SDVICO • Hotline 1900 23 23 49").
-export async function assembleVideo({ scenes, format, workDir, brandLine, outPath }) {
+export async function assembleVideo({ scenes, format, workDir, brandLine, outPath, outroAudioPath = null }) {
   const fmt = FORMATS[format];
   if (!fmt) throw new Error(`format khong hop le: ${format}`);
   await ensureFonts(workDir);
@@ -56,9 +63,21 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
     segs.push(await buildSceneSegment(scenes[i], fmt, workDir, i));
   }
 
-  // Nối các cảnh (cùng codec -> copy).
+  // Intro + Outro: đóng khung hai đầu video (logo/tổng đài SDVICO). Không chặn dây chuyền nếu lỗi.
+  let introSeg = null;
+  let outroSeg = null;
+  try {
+    const b = await buildBumpers({ workDir, fmt, outroAudioPath });
+    introSeg = b.introSeg;
+    outroSeg = b.outroSeg;
+  } catch (e) {
+    console.warn('Intro/Outro bỏ qua:', e.message);
+  }
+
+  // Nối các cảnh (cùng codec -> copy). Intro trước, cảnh chính, outro sau.
   const listName = `concat_${format}.txt`;
-  await writeFile(join(workDir, listName), segs.map((s) => `file '${s}'`).join('\n'), 'utf8');
+  const allSegs = [introSeg, ...segs, outroSeg].filter(Boolean);
+  await writeFile(join(workDir, listName), allSegs.map((s) => `file '${s}'`).join('\n'), 'utf8');
   const baseName = `base_${format}.mp4`;
   await ffmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listName, '-c', 'copy', baseName], { cwd: workDir });
 
