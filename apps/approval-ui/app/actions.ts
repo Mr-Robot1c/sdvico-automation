@@ -850,9 +850,11 @@ export async function createContent(formData: FormData) {
   });
   if (qErr) throw new Error(qErr.message);
 
+  // Chỉ revalidate 2 trang HIỂN THỊ bài vừa tạo. KHÔNG revalidate /san-xuat: trang đó chỉ đọc
+  // brand_assets (không đổi ở đây), revalidate làm serverless phải render lại nặng -> nút "Xong"
+  // treo lâu ở client.
   revalidatePath('/');
   revalidatePath('/noi-dung');
-  revalidatePath('/san-xuat');
 }
 
 // Chỉnh sửa bản nháp trước khi duyệt. Người sửa là người kiểm soát (điều cấm 1).

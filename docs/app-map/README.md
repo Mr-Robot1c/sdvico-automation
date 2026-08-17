@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - createContent (Xuong san xuat "Xong") KHONG con revalidate /san-xuat: trang do chi doc brand_assets (khong doi khi tao content moi), revalidate lam serverless render lai nang -> nut Xong tung treo lau. Van revalidate '/' + '/noi-dung' cho 2 trang hien thi bai vua tao. Form reset state client. -->
+
 <!-- re-verified: 2026-08-14 - Nut "🎬 Lam video" o /noi-dung (moi bai viet kind!=video): action requestVideoForContent dat co brief.video_requested=true. Video dung NANG nen KHONG chay tren web (Vercel) - nut chi DAT YEU CAU; may noi bo chay build-video-all.mjs --requested (hoac --watch) moi dung that roi day Hang doi duyet + xoa co. Bai da bam hien badge "Da yeu cau video". Dung co trong brief, khong them cot DB. -->
 
 <!-- re-verified: 2026-08-14 - Dang video THEO KENH: publishContentToFacebook lay brief.assets.video_h (ngang 16:9) neu co, publishContentToTikTok lay video_v (doc 9:16); fallback assets.video (tuong thich bai cu, rotation/manual khong doi). Video pipeline gan ca video_h + video_v vao 1 mkt_content, channels ['facebook','tiktok'] -> 1 bai duyet, dang dung dinh dang moi kenh. -->
