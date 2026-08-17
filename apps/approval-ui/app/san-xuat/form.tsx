@@ -429,9 +429,9 @@ export default function SanXuatForm({
               className="btn ghost"
               onClick={() => submitCore({ requestVideo: true })}
               disabled={pending || !title.trim() || !draft.trim()}
-              title="Lưu bài + yêu cầu máy nội bộ dựng video (FB 16:9 + TikTok dọc). Mất ~5 phút."
+              title="Lưu bài + yêu cầu GitHub Actions dựng video (FB 16:9 + TikTok dọc). Mất ~8 phút, không cần bật máy."
             >
-              {pending ? 'Đang đẩy...' : '🎬 Xong + Làm video (~5 phút)'}
+              {pending ? 'Đang đẩy...' : '🎬 Xong + Làm video (~8 phút)'}
             </button>
             {msg ? <span className="muted">{msg}</span> : null}
           </div>
@@ -450,10 +450,10 @@ export default function SanXuatForm({
                       borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite'
                     }} />
                     <b>Đang dựng video...</b>
-                    <span className="muted">Máy nội bộ đang làm (~5 phút). Trang sẽ tự cập nhật.</span>
+                    <span className="muted">GitHub Actions đang làm (~8 phút). Trang sẽ tự cập nhật.</span>
                   </div>
                   <p className="muted" style={{ marginTop: 6, fontSize: '.85rem' }}>
-                    Máy nội bộ phải đang chạy watcher (<code>video-watch.bat</code>) thì mới dựng được. Cứ để trang mở.
+                    Chạy trên cloud của GitHub, không cần bật máy nào. Cứ để trang mở hoặc quay lại sau.
                   </p>
                 </>
               ) : videoJob.status === 'done' ? (
@@ -479,7 +479,8 @@ export default function SanXuatForm({
                     <button type="button" className="btn ghost sm" onClick={() => setVideoJob(null)}>✕ Đóng</button>
                   </div>
                   <p className="muted" style={{ marginTop: 6, fontSize: '.85rem' }}>
-                    Kiểm tra máy nội bộ có bật + đã mở <code>video-watch.bat</code> chưa. Yêu cầu vẫn còn trong hệ thống, khi máy chạy sẽ tự dựng.
+                    GitHub Actions có thể đang xếp hàng (khi nhiều workflow chạy cùng lúc). Yêu cầu vẫn còn, sẽ tự dựng khi tới lượt.
+                    Xem tiến trình ở GitHub Actions tab của repo.
                   </p>
                 </>
               )}

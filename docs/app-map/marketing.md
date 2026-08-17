@@ -4,6 +4,8 @@
 covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - build-video.mjs them --skip-whisper (bo whisperArtifact) de dung tren GitHub Actions khoi cai faster-whisper (nang). Phu de van co (buildBlocks/srt.mjs tu kich ban). build-video-all.mjs passthrough co --skip-whisper. .github/workflows/video-build.yml pip install edge-tts, chay --requested --skip-whisper --limit 3, timeout 55 phut. -->
+
 <!-- re-verified: 2026-08-14 - Them file Windows scripts/video-watch.bat (chay watcher --requested --watch, tu restart neu loi) + cai-tu-dong-video.bat (schtasks onlogon "SDVICO Video Watcher") + go-tu-dong-video.bat. De "bam nut Lam video tren web -> may noi bo tu dung" chay khong can mo tay. Node o C:\Program Files\nodejs\node.exe. video/README.md co huong dan. -->
 
 <!-- re-verified: 2026-08-14 - build-video-all.mjs them --requested (chi dung bai co brief.video_requested = bai bam nut "Lam video" tren web /noi-dung; dung xong tu xoa co) + --watch [--interval 60] (quet lien tuc). "--requested --watch" chay tren may noi bo = bam nut tren web -> ~1 phut may tu dung (FB 16:9 + TikTok doc) -> Hang doi duyet. --limit N de chay theo me (161 bai ~13h neu lam het). -->

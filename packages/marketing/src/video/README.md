@@ -37,16 +37,20 @@ Dựng video cho các bài `mkt_content` có `draft` mà chưa có video (bỏ q
 - `--requested`: CHỈ làm bài đã bấm nút **"🎬 Làm video"** ở trang **Nội dung** (web đặt cờ `brief.video_requested`; dựng xong tự xóa cờ).
 - `--watch [--interval 60]`: chạy liên tục, cứ 60 giây quét bài mới rồi dựng. Ctrl+C để dừng.
 
-**"Bấm nút trên web là tự làm video":** vì video dựng nặng (ffmpeg/Whisper/TTS) KHÔNG chạy trên web (Vercel) được, nút web chỉ ĐẶT YÊU CẦU. Để nó tự dựng, mở trên máy nội bộ:
-```
-node packages/marketing/src/video/build-video-all.mjs --requested --watch
-```
-Cứ để cửa sổ này chạy; ai bấm "🎬 Làm video" trên web thì trong ~1 phút máy tự dựng (FB 16:9 + TikTok dọc) rồi đẩy vào Hàng đợi duyệt. **Vẫn phải người bấm Duyệt mới đăng lên trang (điều cấm 1).**
+**"Bấm nút trên web là tự làm video":** hai cách:
 
-Cho tiện, có sẵn file Windows trong `scripts/`:
-- `video-watch.bat` — bấm đúp để chạy watcher (tự khởi động lại nếu lỗi).
-- `cai-tu-dong-video.bat` — bấm đúp MỘT LẦN để watcher tự chạy mỗi khi đăng nhập Windows (Task Scheduler).
-- `go-tu-dong-video.bat` — gỡ tự chạy.
+**(A) GitHub Actions (khuyến nghị, không cần bật máy)** — workflow `.github/workflows/video-build.yml`
+quét bài đã yêu cầu (cron */10 phút) hoặc chạy ngay khi backend Vercel POST `/api/trigger-video-build`
+(khi bấm nút 🎬). Chạy trên cloud GitHub, miễn phí ~250 video/tháng. Cần:
+- Secrets repo GitHub: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `MKT_MODEL` (đã có).
+- Vercel env: `GITHUB_REPO` = `Mr-Robot1c/sdvico-automation` + `GITHUB_TOKEN` = PAT có quyền `workflow`.
+- Thiếu `GITHUB_TOKEN` thì cron 10 phút vẫn quét (chỉ hơi trễ).
+
+**(B) Máy nội bộ** — cài `scripts/cai-tu-dong-video.bat` 1 lần (đăng ký Task Scheduler), watcher
+tự chạy khi đăng nhập Windows. File `video-watch.bat` để chạy tay, `go-tu-dong-video.bat` để gỡ.
+Nhanh hơn GitHub Actions (~5 phút vs ~8 phút) nhưng phải bật máy.
+
+Cả hai đều dùng cùng batch runner `build-video-all.mjs --requested`. Vẫn phải người bấm Duyệt mới đăng (điều cấm 1).
 
 ## Thành phần
 | File | Việc |

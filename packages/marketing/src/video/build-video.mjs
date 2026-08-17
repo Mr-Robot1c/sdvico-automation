@@ -87,7 +87,9 @@ async function tts(text, outPath, voice, workDir, tag) {
 }
 
 // Ghép audio các cảnh thành 1 file rồi chạy Whisper (artifact/ghi nhận, không chặn).
+// Skip khi --skip-whisper (dùng cho CI/GitHub Actions để đỡ ~2 phút cài faster-whisper).
 async function whisperArtifact(sceneAudios, workDir, tag) {
+  if (process.argv.includes('--skip-whisper')) return null;
   try {
     const list = join(workDir, `wa_${tag}.txt`);
     await writeFile(list, sceneAudios.map((a) => `file '${a.replace(/\\/g, '/')}'`).join('\n'), 'utf8');

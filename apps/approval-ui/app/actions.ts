@@ -749,6 +749,11 @@ export async function requestVideoForContent(formData: FormData) {
     .update({ brief: { ...brief, video_requested: true, video_requested_at: new Date().toISOString() } })
     .eq('id', id);
   revalidatePath('/noi-dung');
+  // Kích hoạt GitHub Actions dựng ngay (khỏi chờ cron 10 phút).
+  const url = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}/api/trigger-video-build`
+    : 'http://localhost:3000/api/trigger-video-build';
+  fetch(url, { method: 'POST' }).catch((e) => console.warn('trigger-video-build lỗi:', e?.message));
 }
 
 // Xóa một BÀI (nội dung) khỏi hệ thống: gỡ bản ghi mkt_content + mục hàng đợi + bài đăng + số liệu.
@@ -862,6 +867,15 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
   // treo lâu ở client.
   revalidatePath('/');
   revalidatePath('/noi-dung');
+
+  // Đã yêu cầu video: kích hoạt GitHub Actions dựng ngay (thay vì chờ cron 10 phút). Không chờ
+  // response - "fire and forget" (workflow chạy ~8 phút, client sẽ tự polling checkVideoDone).
+  if (requestVideo && contentId) {
+    const url = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}/api/trigger-video-build`
+      : 'http://localhost:3000/api/trigger-video-build';
+    fetch(url, { method: 'POST' }).catch((e) => console.warn('trigger-video-build lỗi:', e?.message));
+  }
   return { contentId, videoRequested: requestVideo };
 }
 

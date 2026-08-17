@@ -1,0 +1,60 @@
+name: Dựng video theo yêu cầu
+
+# Quét mkt_content có brief.video_requested (bấm nút 🎬 ở /san-xuat hoặc /noi-dung), tự dựng
+# video (FB 16:9 + TikTok dọc) rồi đẩy vào Hàng đợi duyệt. KHÔNG tự đăng — người bấm Duyệt mới
+# đăng (điều cấm 1). Xong lượt dựng thì cờ tự xóa để không dựng lại.
+#
+# Trigger:
+#   - schedule mỗi 10 phút: check có yêu cầu mới không.
+#   - workflow_dispatch: chạy tay hoặc gọi từ backend Vercel (khi bấm nút -> trigger ngay).
+#
+# Bỏ Whisper artifact (--skip-whisper) trên CI để tiết kiệm ~2 phút cài faster-whisper mỗi lần.
+# Phụ đề vẫn có (lấy từ kịch bản, không lệ thuộc ASR).
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'So bai toi da moi lan chay'
+        required: false
+        default: '3'
+
+concurrency:
+  group: video-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Cai npm goi (co @ffmpeg-installer/ffmpeg, @google/genai, @supabase/supabase-js).
+      - name: Cai npm
+        run: npm install
+
+      # Chi can edge-tts (TTS giong Viet). Bo faster-whisper vi --skip-whisper (nhanh hon nhieu).
+      - name: Cai edge-tts
+        run: pip install --quiet edge-tts
+
+      - name: Dung video cho bai da yeu cau
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MKT_MODEL: ${{ secrets.MKT_MODEL }}
+        run: |
+          LIMIT="${{ github.event.inputs.limit || '3' }}"
+          node packages/marketing/src/video/build-video-all.mjs \
+            --requested --limit "$LIMIT" --skip-whisper

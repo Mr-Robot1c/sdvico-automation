@@ -25,6 +25,7 @@ function passthrough() {
     if (v) out.push(`--${f}`, v);
   }
   if (process.argv.includes('--no-queue')) out.push('--no-queue');
+  if (process.argv.includes('--skip-whisper')) out.push('--skip-whisper');
   return out;
 }
 

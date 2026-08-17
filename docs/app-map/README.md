@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - DUNG VIDEO TREN CLOUD (khong can may noi bo): workflow .github/workflows/video-build.yml (cron */10 phut + workflow_dispatch) chay build-video-all.mjs --requested --limit 3 --skip-whisper (bo Whisper artifact de nhanh, phu de van co tu kich ban). Route /api/trigger-video-build POST -> GitHub API dispatches workflow ngay khi user bam nut (khoi cho cron). createContent (Xuong san xuat) + requestVideoForContent (/noi-dung) tu goi trigger sau khi dat co video_requested. Can secrets GitHub SUPABASE_URL/SERVICE_ROLE/GEMINI_API_KEY/MKT_MODEL + Vercel env GITHUB_REPO + GITHUB_TOKEN (PAT quyen workflow). Thieu GITHUB_TOKEN thi cron 10 phut van quet (chi tre). Chi tiet video/README.md. -->
+
 <!-- re-verified: 2026-08-14 - Xuong san xuat tich hop LAM VIDEO: nut moi "🎬 Xong + Lam video" canh nut Xong. Bam -> createContent them field request_video=1 -> brief.video_requested=true; tra ve contentId. Client PANEL TIEN TRINH (spinner) polling checkVideoDone moi 20s: khi may noi bo dung xong (video-pipeline sinh bai kind='social' co brief.source_content = id bai vua tao) thi hien link + PLAYER video xem tai cho. Timeout 15 phut -> nhac kiem tra watcher. checkVideoDone tra videoUrl (uu tien video_v, fallback video_h) tu Storage public. Vien watcher --requested van xoa co video_requested sau khi dung xong. -->
 
 <!-- re-verified: 2026-08-14 - createContent (Xuong san xuat "Xong") KHONG con revalidate /san-xuat: trang do chi doc brand_assets (khong doi khi tao content moi), revalidate lam serverless render lai nang -> nut Xong tung treo lau. Van revalidate '/' + '/noi-dung' cho 2 trang hien thi bai vua tao. Form reset state client. -->
