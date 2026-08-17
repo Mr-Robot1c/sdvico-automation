@@ -16,6 +16,7 @@ type Item = {
   payload: unknown;
   created_at: string;
   ref_id: string | null;
+  note: string | null;
 };
 
 type HrPost = {
@@ -39,7 +40,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   const client = getServerClient();
   const { data, error } = await client
     .from('approval_queue')
-    .select('id, kind, title, payload, created_at, ref_id')
+    .select('id, kind, title, payload, created_at, ref_id, note')
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
 
@@ -179,6 +180,15 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
               </div>
 
               <div className="title">{item.title}</div>
+
+              {/* Lần bấm Duyệt trước gửi mail không thành. Mục được trả về hàng đợi, báo rõ
+                  lý do để sửa rồi bấm lại, thay vì im lặng biến mất như trước. */}
+              {item.note && item.note.startsWith('GỬI MAIL LỖI') ? (
+                <p className="send-failed" role="alert">
+                  Chưa gửi được thư. {item.note.replace(/^GỬI MAIL LỖI:\s*/, '')}
+                  <span> Sửa lại rồi bấm Duyệt lần nữa.</span>
+                </p>
+              ) : null}
 
               {/* Bài đăng Facebook: hiển thị nội dung có thể sửa ngay tại đây */}
               {hrPost ? (

@@ -59,6 +59,18 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
   const isJobPost = kind === 'hr_job_post' && postId;
   const isLinkedIn = platform === 'linkedin';
 
+  // Chạy server action rồi nhả nút ra.
+  // Trước đây busy chỉ được đặt chứ không bao giờ gỡ, dựa vào việc mục luôn biến mất khỏi
+  // hàng đợi sau khi bấm. Từ khi mục gửi mail hỏng được trả lại hàng đợi, giả định đó sai:
+  // mục ở lại mà mọi nút vẫn kẹt ở "Đang duyệt...", không bấm lại được.
+  const run = (fn: (fd: FormData) => Promise<void>) => async (fd: FormData) => {
+    try {
+      await fn(fd);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (isJobPost) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
@@ -87,7 +99,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
 
         <div className="row" style={{ flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           {/* Đăng ngay */}
-          <form action={approveAndPublish} onSubmit={() => setBusy('publish')}>
+          <form action={run(approveAndPublish)} onSubmit={() => setBusy('publish')}>
             <input type="hidden" name="queue_id" value={id} />
             <input type="hidden" name="post_id" value={postId} />
             {deleteOld && oldPostId && oldFbPostId ? (
@@ -112,7 +124,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
           {/* Xóa khỏi hàng đợi (đã bỏ "Từ chối" cho tin tuyển dụng: với bài máy tự soạn
               chỉ cần Duyệt hoặc Xóa; "Từ chối" giữ nguyên bản nháp làm kẹt vị trí) */}
           <form
-            action={dismissQueueItem}
+            action={run(dismissQueueItem)}
             onSubmit={(e) => {
               if (!window.confirm(`Xóa mục này khỏi hàng đợi?\n\n"${title}"\n\nBài nháp sẽ bị hủy và worker sẽ soạn lại.`)) { e.preventDefault(); return; }
               setBusy('dismiss');
@@ -137,7 +149,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
               <p style={{ fontSize: '0.8em', color: 'var(--ink-2)', margin: '0 0 4px' }}>Giờ vàng (lần tiếp theo):</p>
               <div className="peak-slots">
                 {PEAK_SLOTS.map((s) => (
-                  <form key={s.hourVN} action={approveAndSchedule} onSubmit={() => setBusy('schedule')}>
+                  <form key={s.hourVN} action={run(approveAndSchedule)} onSubmit={() => setBusy('schedule')}>
                     <input type="hidden" name="queue_id" value={id} />
                     <input type="hidden" name="post_id" value={postId} />
                     <input type="hidden" name="scheduled_at" value={nextVNPeak(s.hourVN)} />
@@ -159,7 +171,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
             {/* Slot cách X phút */}
             <div className="row" style={{ flexWrap: 'wrap', gap: 5 }}>
               {QUICK_SLOTS.map((s) => (
-                <form key={s.minutes} action={approveAndSchedule} onSubmit={() => setBusy('schedule')}>
+                <form key={s.minutes} action={run(approveAndSchedule)} onSubmit={() => setBusy('schedule')}>
                   <input type="hidden" name="queue_id" value={id} />
                   <input type="hidden" name="post_id" value={postId} />
                   <input type="hidden" name="minutes" value={s.minutes} />
@@ -188,7 +200,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
                 style={{ flex: 1 }}
               />
               {customAt ? (
-                <form action={approveAndSchedule} onSubmit={() => setBusy('schedule')}>
+                <form action={run(approveAndSchedule)} onSubmit={() => setBusy('schedule')}>
                   <input type="hidden" name="queue_id" value={id} />
                   <input type="hidden" name="post_id" value={postId} />
                   <input type="hidden" name="scheduled_at" value={customAt} />
@@ -223,7 +235,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
       <form
         className="row"
-        action={decideForm}
+        action={run(decideForm)}
         onSubmit={(e) => {
           const action = (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value');
           if (action === 'reject') {
@@ -242,7 +254,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
         </button>
       </form>
       <form
-        action={dismissQueueItem}
+        action={run(dismissQueueItem)}
         onSubmit={(e) => {
           if (!window.confirm(`Xóa mục này khỏi hàng đợi?\n\n"${title}"`)) { e.preventDefault(); return; }
           setBusy('dismiss');

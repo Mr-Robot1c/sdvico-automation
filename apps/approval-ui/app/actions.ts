@@ -36,8 +36,11 @@ type QueueItem = { id: string; kind: string; ref_id: string | null; payload: Rec
 
 // Gửi thư cho ứng viên khi người dùng bấm Duyệt (người bấm = người gửi, điều cấm 1).
 // Chỉ áp dụng cho các loại thư gửi ứng viên. Lỗi gửi được ghi note + run_log, không chặn duyệt.
-async function sendCandidateEmail(client: ReturnType<typeof getServerClient>, item: QueueItem): Promise<void> {
-  if (!['hr_interview', 'hr_offer', 'hr_reject'].includes(item.kind)) return;
+// Gửi thư cho ứng viên. Trả về null nếu gửi được, trả về câu lỗi nếu hỏng.
+// Người gọi phải xử lý câu lỗi đó, không được bỏ qua: bấm Duyệt mà thư không đi thì
+// người bấm buộc phải biết ngay (điều cấm 1, máy soạn người bấm gửi).
+async function sendCandidateEmail(client: ReturnType<typeof getServerClient>, item: QueueItem): Promise<string | null> {
+  if (!['hr_interview', 'hr_offer', 'hr_reject'].includes(item.kind)) return null;
   const p = (item.payload || {}) as { email?: string; thu_moi?: string; thu?: string; vi_tri?: string };
   const to = p.email || '';
 
@@ -63,10 +66,13 @@ async function sendCandidateEmail(client: ReturnType<typeof getServerClient>, it
     await sendEmail({ to, subject, text: body });
     await client.from('run_log').insert({ task: 'hr.send_email', status: 'ok', detail: { kind: item.kind, to } });
     await client.from('approval_queue').update({ note: `Đã gửi email tới ${to}` }).eq('id', item.id);
+    return null;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await client.from('run_log').insert({ task: 'hr.send_email', status: 'error', detail: { kind: item.kind, to, error: msg } });
-    await client.from('approval_queue').update({ note: `GỬI MAIL LỖI: ${msg}` }).eq('id', item.id);
+    // Không tự ghi note ở đây. Người gọi lo phần đó cùng lúc với việc trả mục về hàng đợi,
+    // để hai thao tác không giẫm lên nhau.
+    return msg;
   }
 }
 
@@ -93,8 +99,18 @@ export async function decideForm(formData: FormData) {
   if (error) throw new Error(error.message);
 
   // Người bấm Duyệt = người bấm gửi (điều cấm 1): gửi thư cho ứng viên.
+  // Gửi hỏng thì TRẢ MỤC VỀ HÀNG ĐỢI. Trước đây lỗi bị nuốt: mục đã chuyển sang approved
+  // nên biến mất khỏi trang Duyệt như thể xong việc, trong khi ứng viên không nhận được gì
+  // và trên màn hình không có dấu hiệu nào. Nay mục nằm lại kèm ghi chú đỏ, sửa email xong
+  // bấm Duyệt lại là gửi tiếp được.
   if (decision === 'approved' && item) {
-    await sendCandidateEmail(client, item as QueueItem);
+    const sendError = await sendCandidateEmail(client, item as QueueItem);
+    if (sendError) {
+      await client
+        .from('approval_queue')
+        .update({ status: 'pending', decided_at: null, note: `GỬI MAIL LỖI: ${sendError}` })
+        .eq('id', id);
+    }
   }
 
   revalidatePath('/');
