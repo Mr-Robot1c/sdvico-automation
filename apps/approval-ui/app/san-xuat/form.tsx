@@ -54,6 +54,10 @@ export default function SanXuatForm({
   // Multi-select: chọn NHIỀU ảnh + NHIỀU video. Video đầu là bài chính, ảnh dư thả bình luận.
   const [imgIds, setImgIds] = useState<string[]>([]);
   const [vidIds, setVidIds] = useState<string[]>([]);
+  // Ảnh/video đang XEM TO ở preview (ưu tiên hơn ảnh chọn đầu tiên). Đổi khi click bất kỳ
+  // thumbnail hoặc nút 🔍 - kể cả khi chỉ xem không chọn.
+  const [previewImgId, setPreviewImgId] = useState<string>('');
+  const [previewVidId, setPreviewVidId] = useState<string>('');
   // Filter theo folder sản phẩm để khung ảnh/video không rối. '' = tất cả.
   const [folder, setFolder] = useState<string>('');
   const [postFb, setPostFb] = useState(true);
@@ -95,6 +99,9 @@ export default function SanXuatForm({
   const selectedVids = vidIds.map((id) => videos.find((a) => a.id === id)).filter(Boolean) as Asset[];
   const firstImg = selectedImgs[0];
   const firstVid = selectedVids[0];
+  // Ảnh/video hiển thị ở khung preview to: ưu tiên cái đang xem, fallback về ảnh chọn đầu tiên.
+  const previewImg = images.find((a) => a.id === previewImgId) || firstImg;
+  const previewVid = videos.find((a) => a.id === previewVidId) || firstVid;
   // Chip filter theo folder (chỉ folder thật sự có tư liệu).
   const folderList = Array.from(new Set(
     [...images, ...videos].map((a) => a.product_group).filter((g): g is string => Boolean(g))
@@ -167,6 +174,8 @@ export default function SanXuatForm({
         setDraft('');
         setImgIds([]);
         setVidIds([]);
+        setPreviewImgId('');
+        setPreviewVidId('');
         setPostFb(true);
         setPostTt(false);
         setContentType('tips');
@@ -177,11 +186,12 @@ export default function SanXuatForm({
   };
   const onSubmit = () => submitCore({ requestVideo: false });
 
-  // Toggle chọn/bỏ ảnh. Tiêu đề tự cập nhật theo mục ĐẦU TIÊN của mỗi loại.
+  // Toggle chọn/bỏ ảnh. Đồng thời cập nhật preview to = ảnh vừa click (để coi được).
   const onSelectImage = (a: Asset) => {
     const has = imgIds.includes(a.id);
     const newIds = has ? imgIds.filter((id) => id !== a.id) : [...imgIds, a.id];
     setImgIds(newIds);
+    setPreviewImgId(a.id); // luôn hiện to ảnh vừa tương tác
     if (titleAuto || !title.trim()) {
       const firstImgTitle = images.find((x) => x.id === newIds[0])?.title;
       const t = unifiedTitle(firstImgTitle, firstVid?.title);
@@ -193,6 +203,7 @@ export default function SanXuatForm({
     const has = vidIds.includes(a.id);
     const newIds = has ? vidIds.filter((id) => id !== a.id) : [...vidIds, a.id];
     setVidIds(newIds);
+    setPreviewVidId(a.id);
     if (titleAuto || !title.trim()) {
       const firstVidTitle = videos.find((x) => x.id === newIds[0])?.title;
       const t = unifiedTitle(firstImg?.title, firstVidTitle);
@@ -228,8 +239,8 @@ export default function SanXuatForm({
         </header>
 
         <div className="sx-preview">
-          {firstImg ? (
-            <img src={firstImg.url} alt={firstImg.title} />
+          {previewImg ? (
+            <img src={previewImg.url} alt={previewImg.title} />
           ) : (
             <div className="sx-preview-empty">
               <span aria-hidden="true">🖼️</span>
@@ -237,39 +248,56 @@ export default function SanXuatForm({
             </div>
           )}
         </div>
+        {previewImg ? (
+          <p className="muted" style={{ margin: '4px 0', textAlign: 'center', fontSize: '.85rem' }}>
+            {imgIds.includes(previewImg.id) ? '✓ đã chọn — ' : '👁 xem trước — '}<b>{previewImg.title}</b>
+          </p>
+        ) : null}
 
         {selectedImgs.length ? (
-          <p className="muted sx-selected-name" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-            <b>{selectedImgs.length} ảnh đã chọn:</b>{' '}
-            {selectedImgs.map((a) => (
-              <span key={a.id} className="chip on" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ fontSize: '.8em' }}>{a.title}</span>
-                <button type="button" onClick={() => onSelectImage(a)} title="Bỏ" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}>✕</button>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', margin: '8px 0' }}>
+            <b className="muted" style={{ fontSize: '.85rem' }}>{selectedImgs.length} ảnh đã chọn:</b>{' '}
+            {selectedImgs.map((a, i) => (
+              <span key={a.id} className="chip on" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '3px 6px' }}>
+                <span style={{ background: '#16a34a', color: '#fff', width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                <img src={a.url} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3 }} />
+                <span style={{ fontSize: '.75rem', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.title}>{a.title}</span>
+                <button type="button" onClick={() => setPreviewImgId(a.id)} title="Xem to" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>🔍</button>
+                <button type="button" onClick={() => onSelectImage(a)} title="Bỏ" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>✕</button>
               </span>
             ))}
-            <button type="button" className="btn ghost sm" onClick={() => setImgIds([])}>✕ Bỏ hết</button>
-          </p>
+            <button type="button" className="btn ghost sm" onClick={() => { setImgIds([]); setPreviewImgId(''); }}>✕ Bỏ hết</button>
+          </div>
         ) : null}
 
         {shownImages.length > 0 ? (
           <div className="sx-thumbs" role="listbox" aria-label="Chọn ảnh từ kho" aria-multiselectable="true">
             {shownImages.map((a) => {
               const on = imgIds.includes(a.id);
+              const isPreview = previewImgId === a.id || (!previewImgId && firstImg?.id === a.id);
               return (
-                <button
+                <div
                   key={a.id}
-                  type="button"
+                  role="option"
+                  aria-selected={on}
                   className={`sx-thumb ${on ? 'on' : ''}`}
                   onClick={() => onSelectImage(a)}
-                  aria-pressed={on}
-                  title={a.title}
-                  style={{ position: 'relative' }}
+                  title={a.title + ' — bấm để chọn/bỏ, bấm 🔍 để chỉ xem'}
+                  style={{ position: 'relative', cursor: 'pointer', outline: isPreview ? '2px solid #3b82f6' : undefined }}
                 >
                   <img src={a.url} alt={a.title} loading="lazy" />
+                  {/* Nút zoom nhỏ góc trên trái: chỉ mở preview to, KHÔNG đổi chọn. */}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); setPreviewImgId(a.id); }}
+                    title="Xem to (không chọn)"
+                    style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, cursor: 'pointer' }}
+                  >🔍</span>
                   {on ? (
                     <span style={{ position: 'absolute', top: 4, right: 4, background: '#16a34a', color: '#fff', width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{imgOrder(a.id)}</span>
                   ) : null}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -287,8 +315,8 @@ export default function SanXuatForm({
         </header>
 
         <div className="sx-preview">
-          {firstVid ? (
-            <video src={firstVid.url} controls preload="metadata" />
+          {previewVid ? (
+            <video key={previewVid.id} src={previewVid.url} controls preload="metadata" />
           ) : (
             <div className="sx-preview-empty">
               <span aria-hidden="true">🎬</span>
@@ -296,40 +324,59 @@ export default function SanXuatForm({
             </div>
           )}
         </div>
+        {previewVid ? (
+          <p className="muted" style={{ margin: '4px 0', textAlign: 'center', fontSize: '.85rem' }}>
+            {vidIds.includes(previewVid.id) ? '✓ đã chọn — ' : '👁 xem trước — '}<b>{previewVid.title}</b>
+          </p>
+        ) : null}
 
         {selectedVids.length ? (
-          <p className="muted sx-selected-name" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-            <b>{selectedVids.length} video đã chọn:</b>{' '}
-            {selectedVids.map((a) => (
-              <span key={a.id} className="chip on" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ fontSize: '.8em' }}>{a.title}</span>
-                <button type="button" onClick={() => onSelectVideo(a)} title="Bỏ" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}>✕</button>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', margin: '8px 0' }}>
+            <b className="muted" style={{ fontSize: '.85rem' }}>{selectedVids.length} video đã chọn:</b>{' '}
+            {selectedVids.map((a, i) => (
+              <span key={a.id} className="chip on" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '3px 6px' }}>
+                <span style={{ background: '#16a34a', color: '#fff', width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
+                  <video src={a.url} muted preload="metadata" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3, display: 'block' }} />
+                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, textShadow: '0 0 3px #000' }}>▶</span>
+                </span>
+                <span style={{ fontSize: '.75rem', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.title}>{a.title}</span>
+                <button type="button" onClick={() => setPreviewVidId(a.id)} title="Xem to" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>🔍</button>
+                <button type="button" onClick={() => onSelectVideo(a)} title="Bỏ" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>✕</button>
               </span>
             ))}
-            <button type="button" className="btn ghost sm" onClick={() => setVidIds([])}>✕ Bỏ hết</button>
-          </p>
+            <button type="button" className="btn ghost sm" onClick={() => { setVidIds([]); setPreviewVidId(''); }}>✕ Bỏ hết</button>
+          </div>
         ) : null}
 
         {shownVideos.length > 0 ? (
           <div className="sx-thumbs" role="listbox" aria-label="Chọn video từ kho" aria-multiselectable="true">
             {shownVideos.map((a) => {
               const on = vidIds.includes(a.id);
+              const isPreview = previewVidId === a.id || (!previewVidId && firstVid?.id === a.id);
               return (
-                <button
+                <div
                   key={a.id}
-                  type="button"
+                  role="option"
+                  aria-selected={on}
                   className={`sx-thumb sx-thumb-video ${on ? 'on' : ''}`}
                   onClick={() => onSelectVideo(a)}
-                  aria-pressed={on}
-                  title={a.title}
-                  style={{ position: 'relative' }}
+                  title={a.title + ' — bấm để chọn/bỏ, bấm 🔍 để chỉ xem'}
+                  style={{ position: 'relative', cursor: 'pointer', outline: isPreview ? '2px solid #3b82f6' : undefined }}
                 >
                   <video src={a.url} muted preload="metadata" />
                   <span className="sx-thumb-badge" aria-hidden="true">▶</span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); setPreviewVidId(a.id); }}
+                    title="Xem to (không chọn)"
+                    style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, cursor: 'pointer' }}
+                  >🔍</span>
                   {on ? (
                     <span style={{ position: 'absolute', top: 4, right: 4, background: '#16a34a', color: '#fff', width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{vidOrder(a.id)}</span>
                   ) : null}
-                </button>
+                </div>
               );
             })}
           </div>
