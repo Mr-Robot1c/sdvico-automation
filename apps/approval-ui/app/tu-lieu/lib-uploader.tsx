@@ -59,6 +59,15 @@ export default function LibUploader() {
       setMsg('Chọn file trước.');
       return;
     }
+    // Chặn TRƯỚC KHI upload nếu file quá 50MB (Supabase Free tier). Nếu nâng Pro thì đổi ngưỡng.
+    const MAX_MB = 50;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setMsg(
+        `File ${mb(file.size)}MB quá lớn (max ${MAX_MB}MB do Supabase Free). ` +
+        `Nén video bằng scripts/nen-video.bat (bấm đúp), hoặc HandBrake, rồi tải lại.`
+      );
+      return;
+    }
     setBusy(true);
     setPct(0);
     setMsg(`Đang tải lên (${mb(file.size)}MB)...`);
