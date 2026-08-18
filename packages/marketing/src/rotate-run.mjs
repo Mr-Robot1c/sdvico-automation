@@ -60,7 +60,7 @@ for (const group of picked) {
   }).select('id').single();
   if (!ins) continue;
   await client.from('approval_queue').insert({
-    kind: 'mkt_publish_content', title: `[Facebook] ${displayTitle}`,
+    kind: 'mkt_publish_content', title: `${displayTitle}`,
     payload: { content_id: ins.id, format: 'social', keyword: name, intent: 'giao_dich', risk, assets, channels, authored: 'ai' }, status: 'pending',
   });
   console.log(`Cycle ${cycle} | [Facebook + video_req] ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk}`);
@@ -102,7 +102,7 @@ if (process.env.ROTATE_CONTENT !== '0') {
       }).select('id').single();
       if (ins) {
         await client.from('approval_queue').insert({
-          kind: 'mkt_publish_content', title: `[Facebook] ${kindTag} ${displayTitle}`,
+          kind: 'mkt_publish_content', title: `${kindTag} ${displayTitle}`,
           payload: { content_id: ins.id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels: ['facebook'], authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov }, status: 'pending',
         });
         console.log(`Cycle ${cycle} | [Facebook] ${kindTag} ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk}${needsGov ? ' | NEEDS_GOV_REVIEW' : ''} | chu de: ${gen.topic}`);

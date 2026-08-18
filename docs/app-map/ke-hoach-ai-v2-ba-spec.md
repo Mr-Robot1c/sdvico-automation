@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-18
 ttl_days: 90
+<!-- re-verified: 2026-08-18 - Doi chieu lan 2: build-video.mjs bo tag kenh trong ngoac khoi tieu de queue, hanh vi NV6/NV11 KHONG doi; quy tac trinh bay v1.7(c) mo rong: tieu de hang cho chi la ten bai, khong tag kenh/loai (kenh hien bang nhan phu). AC-8 assert nhan chua "Shorts" van dung. -->
 <!-- re-verified: 2026-08-18 - Doi chieu build-video.mjs (packages/marketing/src/video) sau khi bo prefix A/B khoi nhan queue: hanh vi NV6/AC-8 KHONG doi (short mode van bat theo ab_pair_id, bai video van ke thua variant + ma cap "<pair>-video"); chi doi cach ghi nhan hien thi. AC-8 assert nhan chua "Shorts" van dung. Them History v1.7. -->
 
 > **Mục đích**: oracle HÀNH VI cho khối tính năng "Kế hoạch AI v2 + kênh mở rộng" — phản hồi của sếp trên whiteboard Bạn B trình bày ngày 18/8/2026 (xem [marketing.md](marketing.md) cho luồng hiện có, [../roadmap-marketing.md](../roadmap-marketing.md) cho lịch 5 tuần). KHÔNG mô tả giao diện.

@@ -141,7 +141,7 @@ for (const variant of ['A', 'B']) {
 
   const govBadge = forcedGov ? ' ⚠️' : '';
   // Khong nhet A/B vao tieu de - payload.ab_variant lo badge "Thu A/B" tren Hang doi.
-  const qTitle = `[Facebook]${govBadge} ${displayTitle}`;
+  const qTitle = `${forcedGov ? '⚠️ ' : ''}${displayTitle}`;
   await client.from('approval_queue').insert({
     kind: 'mkt_publish_content', title: qTitle,
     payload: {
@@ -180,7 +180,7 @@ if (media) {
       draft: gen.text, status: 'review', needs_gov_review: needsGov,
     }).select('id').single();
     if (ins) {
-      const qTitle = `[Facebook] ${KIND_LABEL[kind] || '📰'} ${displayTitle}`;
+      const qTitle = `${KIND_LABEL[kind] || '📰'} ${displayTitle}`;
       await client.from('approval_queue').insert({
         kind: 'mkt_publish_content', title: qTitle,
         payload: { content_id: ins.id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels: ['facebook'], authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov },

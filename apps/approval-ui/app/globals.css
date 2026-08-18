@@ -128,23 +128,24 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
 
 /* Hàng nút quyết */
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+/* Ghi chú co giãn NHƯỜNG chỗ (flex 1 1 auto + min-width nhỏ), ô hẹn giờ KHÔNG co (flex none)
+   — trước đây ghi chú flex:1 nuốt hết bề ngang, đẩy ô datetime-local hẹp lại tới mức không
+   bấm được (user 18/8: "cái cũ đẹp và tiện, chỉ là thanh ghi chú che hết"). */
 .note {
-  flex: 1; min-width: 180px; padding: 9px 11px; border: 1px solid var(--line);
+  flex: 1 1 160px; min-width: 120px; padding: 9px 11px; border: 1px solid var(--line);
   border-radius: 8px; font-size: 14px; font-family: inherit; background: var(--surface); color: var(--ink);
 }
 .schedule-lbl {
+  flex: 0 0 auto;
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
   font-size: 13px; color: var(--ink-2); cursor: pointer;
 }
-.schedule-lbl input,
-.schedule-lbl select {
+.schedule-lbl input {
   border: 0; background: transparent; color: var(--ink); font-family: inherit;
-  font-size: 13px; padding: 2px 0; outline: none; color-scheme: light dark; cursor: pointer;
+  font-size: 13px; padding: 2px 0; outline: none; color-scheme: light dark;
+  min-width: 190px; /* đủ chỗ cho dd/mm/yyyy hh:mm, không bị bóp */
 }
-.schedule-lbl select { padding-right: 2px; }
-.schedule-lbl input[type='date'],
-.schedule-lbl input[type='time'] { min-width: 0; }
 .schedule-preview {
   font-size: 12px; color: var(--ok); font-weight: 600; white-space: nowrap;
   padding-left: 2px;

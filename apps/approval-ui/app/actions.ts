@@ -897,7 +897,8 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
   // và đẩy bài đó vào hàng đợi.
   const { error: qErr } = requestVideo ? { error: null } : await client.from('approval_queue').insert({
     kind: 'mkt_publish_content',
-    title: `[${kind === 'video' ? 'Video' : kind === 'article' ? 'Bài website' : 'Bài Facebook'}] ${title}`,
+    // Tiêu đề queue = tiêu đề bài, không tag ngoặc (kênh/loại đã có badge trên card).
+    title,
     payload: {
       content_id: contentId,
       format: kind,

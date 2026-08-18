@@ -284,11 +284,12 @@ export async function GET(req: Request) {
       const contentId = (inserted as { id: string }).id;
       // Không nhét A/B vào tiêu đề (user: "để title A/B kì lắm") — thông tin cặp nằm ở
       // payload.ab_variant, trang Hàng đợi hiện badge "🧪 Thử A/B" kín đáo.
-      const label = channels.length > 1 ? '[FB + TikTok]' : '[Facebook]';
-      const govBadge = forcedGov ? ' ⚠️' : '';
+      // Tiêu đề queue = tiêu đề bài, KHÔNG kèm tag ngoặc/kênh (user 18/8: sợ lỡ đăng kèm).
+      // Kênh đăng đã có badge riêng trên card. Chỉ giữ ⚠️ khi cần duyệt cấp quản lý.
+      const govBadge = forcedGov ? '⚠️ ' : '';
       await client.from('approval_queue').insert({
         kind: 'mkt_publish_content',
-        title: `${label}${govBadge} ${displayTitle}`,
+        title: `${govBadge}${displayTitle}`,
         payload: {
           content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich',
           risk, assets, channels, authored: 'ai',
@@ -380,7 +381,7 @@ export async function GET(req: Request) {
     if (ce || !ins) { skipped.push({ group: 'Bài content', reason: 'insert loi' }); break; }
     await client.from('approval_queue').insert({
       kind: 'mkt_publish_content',
-      title: `[Facebook] ${kindTag} ${displayTitle}`,
+      title: `${kindTag} ${displayTitle}`,
       payload: { content_id: (ins as { id: string }).id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels, authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov },
       status: 'pending',
     });

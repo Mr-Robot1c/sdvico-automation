@@ -207,12 +207,12 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   }).select('id').single();
   if (ce || !ins) throw new Error('mkt_content: ' + (ce?.message || ''));
   const { error: qe } = await client.from('approval_queue').insert({
-    kind: 'mkt_publish_content', title: `${isShortLabel}[FB 16:9 + TikTok dọc] 🎬 ${title}`,
+    kind: 'mkt_publish_content', title: `🎬 ${isShortLabel}${title}`,
     payload: { content_id: ins.id, format: 'social', keyword: title, intent: 'giao_dich', risk, assets, channels, authored: 'ai', post_kind: 'video', needs_manager_approval: risk === 'red', ...abMeta },
     status: 'pending',
   });
   if (qe) throw new Error('approval_queue: ' + qe.message);
-  console.log(`\nĐã đẩy vào Hàng đợi duyệt: ${isShortLabel}[FB 16:9 + TikTok dọc] 🎬 ${title}`);
+  console.log(`\nĐã đẩy vào Hàng đợi duyệt: 🎬 ${isShortLabel}${title}`);
   console.log(`  mkt_content=${ins.id.slice(0, 8)} | ngang(FB)=${videoH.slice(0, 8)} | doc(TikTok)=${videoV.slice(0, 8)} | risk=${risk}`);
 }
 

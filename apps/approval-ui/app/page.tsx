@@ -68,9 +68,14 @@ function mktInfo(payload: unknown) {
   };
 }
 
-// Bỏ prefix nhãn nội bộ khỏi tiêu đề card cho các bài cũ đã tạo trước fix (🎯A / 🎯B / ⚡A Shorts).
+// Bỏ MỌI nhãn nội bộ khỏi tiêu đề card: prefix A/B cũ (🎯A / ⚡A Shorts) và tag kênh trong
+// ngoặc ([Facebook], [FB 16:9 + TikTok dọc], [Video]...) — kể cả nhiều tag liền nhau. Kênh
+// đã có badge riêng; tiêu đề chỉ còn tên bài (user 18/8: "lỡ đăng lên nó kèm theo thì sao").
 function stripInternalPrefix(t: string): string {
-  return String(t || '').replace(/^\s*(🎯[AB]?\s*|⚡[AB]?\s*Shorts\s*)/u, '').trim();
+  return String(t || '')
+    .replace(/^\s*(🎯[AB]?\s*|⚡[AB]?\s*Shorts\s*)/u, '')
+    .replace(/^(\s*\[[^\]]+\]\s*)+/u, '')
+    .trim();
 }
 
 export default async function Page({ searchParams }: { searchParams: { kind?: string } }) {
@@ -219,7 +224,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
           if (item.kind === 'mkt_publish_content') {
             const info = mktInfo(item.payload);
             const rk = riskMeta(info.risk);
-            const cleanTitle = stripInternalPrefix(item.title).replace(/^\[[^\]]+\]\s*/, '');
+            const cleanTitle = stripInternalPrefix(item.title);
             const ids = assetIdsOf(item.payload);
             const img = ids.image ? assetUrl.get(ids.image) : undefined;
             const vid = ids.video ? assetUrl.get(ids.video) : undefined;
