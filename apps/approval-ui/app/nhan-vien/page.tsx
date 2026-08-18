@@ -27,6 +27,11 @@ function AddEmployeeForm() {
           <option value="probation">Thử việc</option>
           <option value="left">Đã nghỉ</option>
         </select>
+        <select name="bao_hiem" className="note" defaultValue="chua_dong" style={{ flex: '1 1 140px' }} aria-label="Bảo hiểm">
+          <option value="chua_dong">BH: Chưa đóng</option>
+          <option value="dang_dong">BH: Đang đóng</option>
+          <option value="da_ngung">BH: Đã ngừng</option>
+        </select>
       </div>
       <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
         <input className="note" name="luong" inputMode="numeric" placeholder="Lương (đồng), vd: 8000000" style={{ flex: '1 1 180px' }} />
@@ -58,6 +63,7 @@ export default async function Page() {
     email: e.email || '',
     phone: e.phone || '',
     trangThai: e.trang_thai,
+    baoHiem: e.bao_hiem,
     luong: e.luong,
     luongGhiChu: e.luong_ghi_chu || '',
     fromRecruitment: Boolean(e.application_id),

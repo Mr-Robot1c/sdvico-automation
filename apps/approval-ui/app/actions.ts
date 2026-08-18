@@ -52,6 +52,12 @@ function parseLuong(v: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+// Chuẩn hóa trạng thái bảo hiểm về đúng một trong ba giá trị hợp lệ, mặc định chưa đóng.
+function parseBaoHiem(v: FormDataEntryValue | null): 'dang_dong' | 'chua_dong' | 'da_ngung' {
+  const s = String(v ?? '');
+  return s === 'dang_dong' || s === 'da_ngung' ? s : 'chua_dong';
+}
+
 // datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
 // Server Vercel chạy UTC nên phải gắn +07:00 để parse đúng giờ Việt Nam.
 function parseVNTime(s: string): string {
@@ -1682,6 +1688,7 @@ export async function addEmployeeManual(formData: FormData) {
     phong_ban: String(formData.get('phong_ban') || '').trim() || null,
     ngay_bat_dau: String(formData.get('ngay_bat_dau') || '').trim() || null,
     trang_thai: trangThai,
+    bao_hiem: parseBaoHiem(formData.get('bao_hiem')),
     luong: parseLuong(formData.get('luong')),
     luong_ghi_chu: String(formData.get('luong_ghi_chu') || '').trim() || null,
     created_by: guard.email,
@@ -1703,6 +1710,7 @@ export async function updateEmployeeInfo(formData: FormData) {
     chuc_danh: String(formData.get('chuc_danh') || '').trim() || null,
     phong_ban: String(formData.get('phong_ban') || '').trim() || null,
     ngay_bat_dau: String(formData.get('ngay_bat_dau') || '').trim() || null,
+    bao_hiem: parseBaoHiem(formData.get('bao_hiem')),
     luong: parseLuong(formData.get('luong')),
     luong_ghi_chu: String(formData.get('luong_ghi_chu') || '').trim() || null,
     so_bhxh: String(formData.get('so_bhxh') || '').trim() || null,

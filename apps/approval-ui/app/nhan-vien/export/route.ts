@@ -13,6 +13,12 @@ const STATUS_LABEL: Record<string, string> = {
   left: 'Đã nghỉ',
 };
 
+const BAO_HIEM_LABEL: Record<string, string> = {
+  dang_dong: 'Đang đóng',
+  chua_dong: 'Chưa đóng',
+  da_ngung: 'Đã ngừng',
+};
+
 // Bọc một ô CSV: nhân đôi dấu nháy kép, luôn đặt trong nháy để an toàn với dấu phẩy/xuống dòng.
 function cell(v: unknown): string {
   const s = v == null ? '' : String(v);
@@ -33,7 +39,7 @@ export async function GET() {
 
   const headers = [
     'Họ tên', 'Chức danh', 'Phòng ban', 'Email', 'Điện thoại',
-    'Lương (đồng)', 'Chú thích lương', 'Trạng thái', 'Ngày bắt đầu',
+    'Lương (đồng)', 'Chú thích lương', 'Trạng thái', 'Bảo hiểm', 'Ngày bắt đầu',
     'Số BHXH', 'Số CCCD', 'Nguồn', 'Tạo lúc',
   ];
   const lines = [headers.map(cell).join(',')];
@@ -48,6 +54,7 @@ export async function GET() {
       cell(e.luong != null ? e.luong : ''),
       cell(e.luong_ghi_chu),
       cell(STATUS_LABEL[e.trang_thai] || e.trang_thai),
+      cell(BAO_HIEM_LABEL[e.bao_hiem] || e.bao_hiem),
       cell(fmtDate(e.ngay_bat_dau)),
       cell(e.so_bhxh),
       cell(e.so_cccd),

@@ -13,8 +13,15 @@ export type EmpRow = {
   luong: number | null;
   luongGhiChu: string;
   trangThai: 'active' | 'probation' | 'left';
+  baoHiem: 'dang_dong' | 'chua_dong' | 'da_ngung';
   fromRecruitment: boolean;
   ngayBatDau: string | null;
+};
+
+const BAO_HIEM_LABEL: Record<string, { label: string; tone: string }> = {
+  dang_dong: { label: 'Đang đóng', tone: 'ok' },
+  chua_dong: { label: 'Chưa đóng', tone: 'default' },
+  da_ngung: { label: 'Đã ngừng', tone: 'no' },
 };
 
 // Lương dạng số đồng thành "8.000.000 đồng". Null thì để trống.
@@ -98,6 +105,7 @@ export default function EmployeeList({ employees }: { employees: EmpRow[] }) {
                 <th>Điện thoại</th>
                 <th>Lương</th>
                 <th>Trạng thái</th>
+                <th>Bảo hiểm</th>
                 <th>Nguồn</th>
                 <th>Ngày bắt đầu</th>
               </tr>
@@ -116,6 +124,7 @@ export default function EmployeeList({ employees }: { employees: EmpRow[] }) {
                       {e.luongGhiChu ? <span className="muted" style={{ display: 'block', fontSize: '0.85em' }}>{e.luongGhiChu}</span> : null}
                     </td>
                     <td><span className={`stage tone-${st.tone}`}>{st.label}</span></td>
+                    <td>{(() => { const bh = BAO_HIEM_LABEL[e.baoHiem] || BAO_HIEM_LABEL.chua_dong; return <span className={`stage tone-${bh.tone}`}>{bh.label}</span>; })()}</td>
                     <td className="muted">{e.fromRecruitment ? 'Từ tuyển dụng' : 'Nhập tay'}</td>
                     <td className="muted">{e.ngayBatDau ? new Date(e.ngayBatDau).toLocaleDateString('vi-VN') : '—'}</td>
                   </tr>

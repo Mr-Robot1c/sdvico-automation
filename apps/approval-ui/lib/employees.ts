@@ -37,6 +37,7 @@ export type Employee = {
   phong_ban: string | null;
   ngay_bat_dau: string | null;
   trang_thai: 'active' | 'probation' | 'left';
+  bao_hiem: 'dang_dong' | 'chua_dong' | 'da_ngung';
   luong: number | null;
   luong_ghi_chu: string | null;
   so_bhxh: string | null;
@@ -63,7 +64,7 @@ export async function listEmployees(guard: EmployeeGuardResult): Promise<Employe
   const client = getServerClient();
   const { data, error } = await client
     .from('hr_employees')
-    .select('id, candidate_id, application_id, full_name, email, phone, chuc_danh, phong_ban, ngay_bat_dau, trang_thai, luong, luong_ghi_chu, so_bhxh, so_cccd, onboarding_checklist, created_by, created_at')
+    .select('id, candidate_id, application_id, full_name, email, phone, chuc_danh, phong_ban, ngay_bat_dau, trang_thai, bao_hiem, luong, luong_ghi_chu, so_bhxh, so_cccd, onboarding_checklist, created_by, created_at')
     .order('created_at', { ascending: false });
   if (error) throw new Error('Đọc hr_employees lỗi: ' + error.message);
   return (data || []) as Employee[];
@@ -77,7 +78,7 @@ export async function getEmployee(
   const client = getServerClient();
   const { data: employee } = await client
     .from('hr_employees')
-    .select('id, candidate_id, application_id, full_name, email, phone, chuc_danh, phong_ban, ngay_bat_dau, trang_thai, luong, luong_ghi_chu, so_bhxh, so_cccd, onboarding_checklist, created_by, created_at')
+    .select('id, candidate_id, application_id, full_name, email, phone, chuc_danh, phong_ban, ngay_bat_dau, trang_thai, bao_hiem, luong, luong_ghi_chu, so_bhxh, so_cccd, onboarding_checklist, created_by, created_at')
     .eq('id', id)
     .maybeSingle();
   if (!employee) return null;
