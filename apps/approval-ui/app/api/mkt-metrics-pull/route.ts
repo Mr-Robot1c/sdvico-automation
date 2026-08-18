@@ -44,11 +44,19 @@ export async function GET(req: Request) {
   // vì route này im lặng). Trang Dữ liệu AI + /api/fb-diag đọc được để chẩn đoán.
   try {
     const errs = Array.isArray(res?.results) ? res.results.filter((r: any) => r?.error).map((r: any) => String(r.error).slice(0, 200)) : [];
+    // insightErr: lý do thiếu lượt xem/người xem (thường: token thiếu quyền read_insights). Ghi vài
+    // dòng đầu để trang Dữ liệu/BOT nói được "có tương tác nhưng chưa có lượt xem vì ...".
+    const insightErrs = Array.isArray(res?.results)
+      ? Array.from(new Set(res.results.flatMap((r: any) => (Array.isArray(r?.insightErr) ? r.insightErr : []).map((e: any) => String(e).slice(0, 160))))).slice(0, 3)
+      : [];
+    const notes = Array.isArray(res?.results)
+      ? Array.from(new Set(res.results.flatMap((r: any) => (Array.isArray(r?.note) ? r.note : []).map((e: any) => String(e).slice(0, 160))))).slice(0, 3)
+      : [];
     await client.from('run_log').insert({
       task: 'mkt.metrics_pull',
       actor: 'cron',
       status: errs.length && !(res?.pulled > 0) ? 'error' : 'ok',
-      detail: { pulled: res?.pulled ?? 0, errors: errs.slice(0, 5), ms: Date.now() - startedAt },
+      detail: { pulled: res?.pulled ?? 0, errors: errs.slice(0, 5), insightErrs, notes, ms: Date.now() - startedAt },
     });
   } catch { /* không để lỗi ghi log làm hỏng cron */ }
 
