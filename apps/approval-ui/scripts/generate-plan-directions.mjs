@@ -99,7 +99,9 @@ const knowledgeBlock = [
 
 const prompt = `Ban la chuyen gia marketing cho SDVICO, cong ty phan phoi thiet bi cho ngu dan va tau ca Viet Nam.
 
-${goalText ? `MUC TIEU TUAN TU NGUOI QUAN LY (bam sat khi chon huong): ${goalText}\n` : ''}
+${goalText
+  ? `MUC TIEU TUAN TU NGUOI QUAN LY (bam sat khi chon huong): ${goalText}\n`
+  : 'Tuan nay KHONG co muc tieu cu the tu quan ly. Hay TU de xuat huong di tot nhat dua tren tri thuc va so lieu ben duoi (uu tien chu de dang nong va san pham co phan hoi khach that).\n'}
 Danh muc san pham cua cong ty:
 ${PRODUCTS.map((p) => '- ' + p).join('\n')}
 

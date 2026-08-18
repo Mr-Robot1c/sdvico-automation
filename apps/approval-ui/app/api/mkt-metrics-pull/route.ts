@@ -11,6 +11,11 @@ import { evaluateAbPairs } from '../../../lib/evaluator';
 // Thứ 4 và chủ nhật: sau khi kéo số liệu mới, sinh luôn 1 bản kế hoạch (con bot định hướng).
 // v2 (18/8/2026): Chủ nhật, TRƯỚC khi sinh kế hoạch, học tri thức public + import nội bộ để
 // sáng Thứ 2 bản kế hoạch có đủ nguyên liệu 7 ngày qua.
+// v3 (18/8/2026): import nội bộ chuyển sang chạy HÀNG NGÀY (không chỉ Chủ nhật). Lý do:
+// phiên đọc Zalo 16:00 đẩy file zalo-insight mỗi ngày lên bucket kho-tri-thuc-noi-bo,
+// cron này chạy 20:00 giờ VN nên import ngay trong ngày, AI Data học không dồn cục.
+// Import idempotent theo source_path nên chạy hàng ngày không tạo bản ghi trùng.
+// Kế hoạch Thứ 4 nhờ vậy thấy đủ bài học thứ 2, 3, 4 chứ không chờ tới Chủ nhật.
 // Gộp ở đây vì Vercel Hobby chỉ cho 2 cron, và kế hoạch nên bám số liệu vừa cập nhật.
 export const dynamic = 'force-dynamic';
 // Tăng maxDuration lên 90s vì có thêm 2 tác vụ Chủ nhật (import bucket + học public qua Gemini).
@@ -27,17 +32,19 @@ export async function GET(req: Request) {
   const client = getServerClient();
   const res = await pullFacebookMetrics(client);
 
-  // Chủ nhật: học tri thức public + import bucket TRƯỚC khi sinh kế hoạch.
+  // HÀNG NGÀY (v3): import file mới từ bucket Kho tri thức nội bộ, gồm zalo-insight
+  // do phiên đọc Zalo 16:00 đẩy lên. Idempotent theo source_path, file cũ tự bỏ qua.
   // Lỗi ở đây KHÔNG được đánh hỏng metrics-pull hoặc plan.
-  let knowledge: { internal: any; publicSrc: any } | null = null;
+  const knowledge: { internal: any; publicSrc: any } = { internal: null, publicSrc: null };
+  try {
+    knowledge.internal = await importInternalFromBucket(client, { limit: 30 });
+  } catch (e: any) {
+    console.error('[knowledge] import internal that bai:', e?.message || e);
+    knowledge.internal = { error: e?.message || String(e) };
+  }
+
+  // Chủ nhật: học tri thức public TRƯỚC khi sinh kế hoạch (bot public mỗi tuần một lần).
   if (isSundayVN(new Date())) {
-    knowledge = { internal: null, publicSrc: null };
-    try {
-      knowledge.internal = await importInternalFromBucket(client, { limit: 30 });
-    } catch (e: any) {
-      console.error('[knowledge] import internal that bai:', e?.message || e);
-      knowledge.internal = { error: e?.message || String(e) };
-    }
     try {
       knowledge.publicSrc = await learnPublicKnowledge(client);
     } catch (e: any) {

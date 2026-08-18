@@ -36,7 +36,10 @@ function parseJson(text) {
 }
 
 // content: {title, draft, brief}. assets: [{id, kind, title}]. facts: PRODUCT_FACTS.
-export async function generateVideoScript(content, assets, facts = []) {
+// opts.short: chế độ VIDEO SHORTS 10-20 giây (flowchart v3, bài thuộc cặp thử A/B) — ít cảnh,
+// lời thoại ngắn, câu đầu là móc câu. Mặc định false = bản dài 40-50 giây như cũ.
+export async function generateVideoScript(content, assets, facts = [], opts = {}) {
+  const short = !!opts.short;
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -76,9 +79,18 @@ export async function generateVideoScript(content, assets, facts = []) {
     '  "vertical": {"scenes": [{"narration": "câu thoại", "asset_id": "id"}]},',
     '  "horizontal": {"scenes": [{"narration": "câu thoại", "asset_id": "id"}]}',
     '}',
-    'Bản dọc (vertical): 4 tới 5 cảnh, tổng lời thoại đọc khoảng 55 tới 60 giây.',
-    'Bản ngang (horizontal): 5 tới 7 cảnh, TỔNG LỜI THOẠI ĐỌC HẾT KHOẢNG 40-50 GIÂY (khoảng 100-130 từ tiếng Việt).',
-    'Lời thoại mỗi cảnh 6-9 giây (~15-25 từ). Súc tích, không lặp ý, không lan man - video ngắn hiệu quả hơn dài.',
+    ...(short
+      ? [
+          'ĐÂY LÀ VIDEO SHORTS GÂY CHÚ Ý (10-20 giây).',
+          'Bản dọc (vertical): 2 tới 3 cảnh, tổng lời thoại đọc khoảng 12 tới 18 giây.',
+          'Bản ngang (horizontal): 2 tới 3 cảnh, TỔNG LỜI THOẠI ĐỌC HẾT KHOẢNG 10-18 GIÂY (khoảng 30-50 từ tiếng Việt).',
+          'Lời thoại mỗi cảnh 4-6 giây (~10-16 từ). CÂU ĐẦU TIÊN phải là MÓC CÂU khiến bà con dừng tay: một câu hỏi trúng nỗi lo hoặc một sự thật bất ngờ.',
+        ]
+      : [
+          'Bản dọc (vertical): 4 tới 5 cảnh, tổng lời thoại đọc khoảng 55 tới 60 giây.',
+          'Bản ngang (horizontal): 5 tới 7 cảnh, TỔNG LỜI THOẠI ĐỌC HẾT KHOẢNG 40-50 GIÂY (khoảng 100-130 từ tiếng Việt).',
+          'Lời thoại mỗi cảnh 6-9 giây (~15-25 từ). Súc tích, không lặp ý, không lan man - video ngắn hiệu quả hơn dài.',
+        ]),
   ].filter(Boolean).join('\n');
 
   const res = await generateWithRetry(ai, {

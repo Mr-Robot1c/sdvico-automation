@@ -185,19 +185,32 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   // image = ảnh sản phẩm thả vào bình luận đầu (publishContentToFacebook tự làm khi có cả video và image).
   const assets = { image: productImageId, video: videoH, video_h: videoH, video_v: videoV };
   const channels = ['facebook', 'tiktok'];
+
+  // Bài nguồn thuộc cặp thử A/B -> video kế thừa cặp, nhưng mã cặp RIÊNG '<pair>-video' để
+  // Evaluator so cặp VIDEO tách khỏi cặp bài text (không trộn 4 bài vào một cặp).
+  const srcBrief = content.brief || {};
+  const abMeta = srcBrief.ab_pair_id
+    ? {
+        ab_pair_id: `${srcBrief.ab_pair_id}-video`,
+        ab_variant: srcBrief.ab_variant || null,
+        suggestion_title: srcBrief.suggestion_title || null,
+      }
+    : {};
+  const isShortLabel = srcBrief.ab_pair_id ? `⚡${srcBrief.ab_variant || ''} Shorts ` : '';
+
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: 'social', title,
-    brief: { keyword: title, intent: 'giao_dich', assets, channels, generator: 'video-pipeline', post_kind: 'video', source_content: content.id, risk, compliance: script.assessment?.flags || {} },
+    brief: { keyword: title, intent: 'giao_dich', assets, channels, generator: 'video-pipeline', post_kind: 'video', source_content: content.id, risk, compliance: script.assessment?.flags || {}, ...abMeta },
     draft: caption, status: 'review', needs_gov_review: risk === 'red',
   }).select('id').single();
   if (ce || !ins) throw new Error('mkt_content: ' + (ce?.message || ''));
   const { error: qe } = await client.from('approval_queue').insert({
-    kind: 'mkt_publish_content', title: `[FB 16:9 + TikTok dọc] 🎬 ${title}`,
-    payload: { content_id: ins.id, format: 'social', keyword: title, intent: 'giao_dich', risk, assets, channels, authored: 'ai', post_kind: 'video', needs_manager_approval: risk === 'red' },
+    kind: 'mkt_publish_content', title: `${isShortLabel}[FB 16:9 + TikTok dọc] 🎬 ${title}`,
+    payload: { content_id: ins.id, format: 'social', keyword: title, intent: 'giao_dich', risk, assets, channels, authored: 'ai', post_kind: 'video', needs_manager_approval: risk === 'red', ...abMeta },
     status: 'pending',
   });
   if (qe) throw new Error('approval_queue: ' + qe.message);
-  console.log(`\nĐã đẩy vào Hàng đợi duyệt: [FB 16:9 + TikTok dọc] 🎬 ${title}`);
+  console.log(`\nĐã đẩy vào Hàng đợi duyệt: ${isShortLabel}[FB 16:9 + TikTok dọc] 🎬 ${title}`);
   console.log(`  mkt_content=${ins.id.slice(0, 8)} | ngang(FB)=${videoH.slice(0, 8)} | doc(TikTok)=${videoV.slice(0, 8)} | risk=${risk}`);
 }
 
@@ -247,9 +260,16 @@ async function main() {
   if (!assets?.length) throw new Error(`Sản phẩm "${productGroup}" chưa có tư liệu trong brand_assets.`);
   console.log(`Sản phẩm: ${productGroup} (${assets.length} tư liệu)`);
 
-  // Kịch bản.
-  console.log('Sinh kịch bản (Gemini)...');
-  const script = await generateVideoScript(content, assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title })), PRODUCT_FACTS);
+  // Kịch bản. Bài thuộc cặp thử A/B (rotate 🎯A/🎯B đặt brief.ab_pair_id) -> chế độ SHORTS
+  // 10-20 giây theo flowchart v3 (Creator viết 2 kịch bản A/B cho video shorts gây chú ý).
+  const isShort = !!brief.ab_pair_id;
+  console.log(`Sinh kịch bản (Gemini)${isShort ? ' - che do SHORTS 10-20s (cap A/B ' + String(brief.ab_variant || '?') + ')' : ''}...`);
+  const script = await generateVideoScript(
+    content,
+    assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title })),
+    PRODUCT_FACTS,
+    { short: isShort }
+  );
   console.log('Tiêu đề:', script.titles);
   console.log('Rủi ro tuân thủ:', script.assessment.risk, JSON.stringify(script.assessment.flags));
   console.log('Cảnh: dọc', script.vertical.length, '| ngang', script.horizontal.length);

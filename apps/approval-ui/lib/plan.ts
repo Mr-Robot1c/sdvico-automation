@@ -62,6 +62,7 @@ export type ContentDirection = {
   kind: string;                     // checklist | qa | tip | engage | glossary | news
   sources: string[];                // Nguồn tri thức đã dùng, vd ["public #7", "noi bo #2"]
   needs_gov_review: boolean;        // Nguồn chạm quy định thì bài theo hướng này cũng cần duyệt QL
+  used_at?: string;                 // Rotate đánh dấu khi hướng này đã sinh cặp bài A/B (không lặp)
 };
 
 export type Plan = {
@@ -367,9 +368,14 @@ function buildNarrative(
 ): string[] {
   const paras: string[] = [];
 
-  // Mục tiêu tuần do người giao đứng đầu bản kế hoạch — BOSS nhận việc từ người, không tự đặt.
+  // Mục tiêu tuần do người giao đứng đầu bản kế hoạch. Trống thì BOSS TỰ định hướng từ dữ
+  // liệu các AI đã học (người dùng chốt 18/8: "không biết làm gì thì BOSS cứ dựa vào dữ liệu").
   if (goal) {
     paras.push(`Mục tiêu tuần được giao: ${goal}`);
+  } else {
+    paras.push(
+      'Tuần này chưa có mục tiêu cụ thể được giao, bot tự định hướng dựa trên dữ liệu đã học và số đo lường bên dưới.'
+    );
   }
 
   // Đoạn mở đầu về nguồn tri thức đã đọc — bám AC-3 và AC-4 trong ba-spec (nếu cả hai == 0

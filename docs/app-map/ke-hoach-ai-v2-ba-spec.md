@@ -173,6 +173,7 @@ ttl_days: 90
   - NV10 — ô giao mục tiêu tuần trên trang Kế hoạch (v1.3)
   - NV11 — vòng xoay sinh cặp bài thử A/B theo hướng đi (v1.3)
   - NV12 — đánh giá cặp A/B, ghi kết luận về Kho tri thức, chạy Thứ 4 và Chủ nhật (v1.3; thước đo tạm là tương tác, chờ AD để lên CPC)
+  - NV6 — Video Shorts A/B: bài thuộc cặp thử tự dựng video chế độ Shorts 10-18 giây lõi, cặp video mang mã riêng để đánh giá tách khỏi cặp bài text (v1.4, user chốt "cứ làm đi" 18/8)
 - **OUT (chờ chốt trước khi build phần vận hành thật — xem §11 Open questions)**:
   - NV1 (vận hành thật) — ai là người phụ trách, tần suất
   - NV5 — SEO backlink, danh sách mục tiêu do ai chọn (có thể gộp vào tuần 36 SEO địa phương đã có trong roadmap, tránh làm trùng)
@@ -245,11 +246,11 @@ ttl_days: 90
 - **Then** không có mục tiêu nào trong danh sách được đánh dấu sẵn sàng để đăng ký ngoài hệ thống
 - **Assert**: số mục tiêu có trạng thái "sẵn sàng đăng ký" trong danh sách == 0 khi trạng thái duyệt tổng thể vẫn là "chờ duyệt"
 
-### AC-8 — Bản Video Shorts đi kèm hàng chờ duyệt của bài gốc · Maps to flow: NV6 · Test: integration
-- **Given** một bài đã có video gốc (bản ngang và bản dọc) đang ở hàng chờ duyệt
-- **When** tiến trình dựng thêm bản Shorts 10-20 giây hoàn tất không lỗi
-- **Then** bản Shorts được gắn vào cùng bài đó trong hàng chờ duyệt, có thời lượng trong khoảng 10 đến 20 giây
-- **Assert**: bài trong hàng chờ duyệt có thêm một tệp video gắn nhãn Shorts, thời lượng đo được nằm trong khoảng [10, 20] giây
+### AC-8 — Video Shorts A/B dựng từ cặp bài thử · Maps to flow: NV6, NV11 · Test: integration
+- **Given** một bài bán thuộc cặp thử A/B (có mã cặp) đã yêu cầu dựng video
+- **When** dây chuyền video dựng xong không lỗi
+- **Then** bài video mới được tạo ở chế độ Shorts (kịch bản 2 tới 3 cảnh, tổng lời thoại trong khoảng 10 đến 18 giây, chưa tính intro và outro), kế thừa biến thể của bài nguồn, mang mã cặp video riêng bằng mã cặp nguồn nối thêm hậu tố video, và vào hàng chờ duyệt với nhãn Shorts kèm biến thể
+- **Assert**: bài video mới có mã cặp == mã cặp nguồn + "-video", biến thể == biến thể bài nguồn, số cảnh kịch bản <= 3, và tồn tại đúng 1 mục hàng chờ duyệt trạng thái "pending" có nhãn chứa "Shorts" cho bài đó
 
 ### AC-9 — Không chiến dịch AD nào chạy khi chưa có bản duyệt ngân sách · Maps to flow: NV8 · Test: integration
 - **Given** một đề xuất chiến dịch AD với số tiền ngân sách cụ thể, chưa được Sếp/cấp quản lý duyệt
@@ -300,3 +301,4 @@ ttl_days: 90
 - v1.1 (2026-08-18): NV1 chuyển từ "nhập tay vào form Kho tư liệu" sang "thả file vào bucket Supabase" — vì Bạn B dùng Cowork trên chat Claude để đọc Zalo PC, chỉ cần hệ thống nhận đầu ra dạng file. Sửa NV1 flow, AC-1 (Test đổi thành integration, assert theo file), User registry, cross H1, Open question 1.
 - v1.2 (2026-08-18): NV3 bổ sung output `content_suggestions` — Kế hoạch v2 giờ ra HƯỚNG ĐI CỤ THỂ (5-7 gợi ý bài đăng bám nguồn tri thức, gọi đúng sản phẩm SDVICO), không chỉ dừng ở "đã học N nguồn". Đây là bước cầu nối để vòng xoay sinh bài dùng tri thức thật. Cũng bổ sung phương án fallback học public qua Google News RSS khi Gemini google_search grounding bị rate limit 429.
 - v1.3 (2026-08-18): khép VÒNG LẶP KÍN theo flowchart v3 của Bạn B (docs/flowchart-v3.html, 4 vai AI): thêm NV10 (người giao mục tiêu tuần cho BOSS — khối MỤC TIÊU), NV11 (Creator sinh cặp bài thử A/B cho một hướng đi, 2 bài bán + 1 content = đúng hạn mức 3/ngày), NV12 (Evaluator so cặp A/B theo tương tác FB rồi ghi kết luận ngược về Kho tri thức nội bộ — nhờ đó BOSS và mọi lần sinh kế hoạch sau tự học, không cần bảng mới). Thước đo A/B tạm dùng tương tác vì AD trả phí đang hoãn; khi AD chạy sẽ nâng lên CPC + điểm chạm đúng flowchart. Thêm AC-11, AC-12, AC-13.
+- v1.4 (2026-08-18): NV10 nới rõ — mục tiêu tuần ĐƯỢC PHÉP TRỐNG, khi trống BOSS tự định hướng từ dữ liệu các AI đã học (người dùng chốt "đôi khi tôi không biết làm gì thì BOSS cứ dựa vào dữ liệu"); narrative và prompt hướng đi phải nói rõ đang tự định hướng. NV6 chuyển vào IN: bài thuộc cặp A/B tự dựng video chế độ Shorts (kịch bản 2-3 cảnh, lõi 10-18 giây), bài video kế thừa biến thể, mã cặp video = mã cặp nguồn + "-video" để Evaluator so cặp video tách khỏi cặp text. Sửa AC-8 theo flow thật (video là bài mới kế thừa cặp, không phải tệp gắn vào bài cũ). NV4 thêm: xem lại bản kế hoạch cũ từ lịch sử, và sau khi Áp dụng phải thông báo tóm tắt bản áp dụng (ưu tiên vòng xoay, số hướng đi, mục tiêu).

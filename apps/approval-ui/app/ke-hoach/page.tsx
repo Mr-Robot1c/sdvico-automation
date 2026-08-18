@@ -47,7 +47,7 @@ function fmtDate(d: string | null): string {
   return day && m && y ? `${day}/${m}/${y}` : d;
 }
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams?: { xem?: string } }) {
   const client = getServerClient();
   const [{ data, error }, { data: goalRow }] = await Promise.all([
     client
@@ -61,9 +61,34 @@ export default async function Page() {
   const goalUpdatedAt = ((goalRow as any)?.value?.updated_at as string) || null;
 
   const rows = (data || []) as Row[];
-  const latest = rows[0];
-  const history = rows.slice(1);
+
+  // ?xem=<id>: xem lại một bản kế hoạch cũ trong thẻ chính (thay vì bản mới nhất).
+  // Bản cũ ngoài 12 dòng đầu thì nạp riêng theo id.
+  const viewId = searchParams?.xem || null;
+  let viewing: Row | null = viewId ? rows.find((r) => r.id === viewId) || null : null;
+  if (viewId && !viewing) {
+    const { data: one } = await client
+      .from('mkt_plans')
+      .select('id, period_start, period_end, generated_by, data, applied, applied_at, created_at')
+      .eq('id', viewId)
+      .maybeSingle();
+    viewing = (one as Row) || null;
+  }
+
+  const latest = viewing || rows[0];
+  const history = rows.filter((r) => r.id !== latest?.id);
   const appliedRow = rows.find((r) => r.applied);
+
+  // Tóm tắt bản đang áp dụng cho banner (hiện ngay sau khi bấm Áp dụng): ưu tiên vòng xoay,
+  // số hướng đi còn lại, mục tiêu bản đó bám theo.
+  const ap = appliedRow?.data;
+  const apTop = (ap?.products || [])
+    .filter((p) => p.postsPerWeek > 0)
+    .sort((a, b) => b.postsPerWeek - a.postsPerWeek)
+    .slice(0, 3)
+    .map((p) => `${p.product} ${vnInt(p.postsPerWeek)} bài/tuần`);
+  const apSug = ap?.content_suggestions || [];
+  const apSugUsed = apSug.filter((s) => s.used_at).length;
 
   return (
     <main>
@@ -89,7 +114,7 @@ export default async function Page() {
           </div>
           <p className="sub" style={{ margin: '4px 0 8px' }}>
             Viết như giao việc cho nhân viên: ưu tiên sản phẩm nào, cần bao nhiêu cuộc gọi hoặc lượt xem, có chạy quảng cáo không.
-            BOSS bám mục tiêu này khi sinh kế hoạch và hướng đi tuần.
+            Bỏ trống cũng được, khi đó BOSS tự định hướng dựa trên dữ liệu các AI đã học.
           </p>
           <textarea
             name="goal_text"
@@ -104,8 +129,25 @@ export default async function Page() {
       </section>
 
       {appliedRow ? (
+        <div className="applied-banner" role="status">
+          <b>✓ Đang áp dụng kế hoạch sinh lúc {fmtDateTime(appliedRow.created_at)}.</b>
+          {apTop.length ? (
+            <p>Vòng xoay sinh bài ưu tiên: {apTop.join(', ')}{(ap?.products?.length || 0) > 3 ? ' và các sản phẩm còn lại giữ nhịp tối thiểu' : ''}.</p>
+          ) : (
+            <p>Chưa có sản phẩm nào đủ số liệu, vòng xoay chọn đều các folder.</p>
+          )}
+          {apSug.length ? (
+            <p>
+              {vnInt(apSug.length - apSugUsed)} hướng đi tuần chưa dùng ({vnInt(apSugUsed)} đã dùng). Mỗi ngày vòng xoay lấy một hướng, sinh cặp bài thử A với B kèm video shorts, người duyệt mới đăng.
+            </p>
+          ) : null}
+          {ap?.goal ? <p className="sub">Bản này bám mục tiêu: {ap.goal}</p> : null}
+        </div>
+      ) : null}
+
+      {viewing ? (
         <p className="err" role="status">
-          Đang áp dụng trọng số của kế hoạch sinh lúc {fmtDateTime(appliedRow.created_at)}. Vòng xoay sinh bài đang ưu tiên theo bản này.
+          Đang xem lại bản kế hoạch cũ sinh lúc {fmtDateTime(viewing.created_at)}. <a href="/ke-hoach">Về bản mới nhất</a>
         </p>
       ) : null}
 
@@ -303,16 +345,19 @@ export default async function Page() {
                   <tbody>
                     {history.map((r) => (
                       <tr key={r.id}>
-                        <td>{fmtDateTime(r.created_at)}</td>
+                        <td><a href={`/ke-hoach?xem=${r.id}`} title="Xem lại bản kế hoạch này">{fmtDateTime(r.created_at)}</a></td>
                         <td>{r.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}{r.applied ? ' · đang áp' : ''}</td>
                         <td className="sub">{r.period_start ? `${fmtDate(r.period_start)}–${fmtDate(r.period_end)}` : '—'}</td>
                         <td>{r.data?.summary?.topProduct || '—'}</td>
                         <td className="num">{vnInt(r.data?.summary?.ranked || 0)}</td>
                         <td className="center">
-                          <form action={deletePlan}>
-                            <input type="hidden" name="plan_id" value={r.id} />
-                            <button className="btn no sm" type="submit" aria-label="Xóa kế hoạch">Xóa</button>
-                          </form>
+                          <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                            <a className="btn ghost sm" href={`/ke-hoach?xem=${r.id}`}>Xem</a>
+                            <form action={deletePlan}>
+                              <input type="hidden" name="plan_id" value={r.id} />
+                              <button className="btn no sm" type="submit" aria-label="Xóa kế hoạch">Xóa</button>
+                            </form>
+                          </div>
                         </td>
                       </tr>
                     ))}
