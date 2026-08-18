@@ -209,6 +209,102 @@ main { max-width: 860px; margin: 0 auto; padding: 28px 24px 72px; }
 .nav-section-items { display: flex; flex-direction: column; gap: 1px; }
 .nav-spacer { flex: 1; min-height: 16px; }
 
+/* === Search toàn cục (Cmd/Ctrl+K) === */
+/* Nút trigger đặt ở đầu nav (dưới nav-brand) — trông như search box, bấm mở dialog. */
+.nav-search-trigger {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+  font: inherit; font-size: 12.5px; color: var(--ink-2);
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+  margin-bottom: 6px;
+}
+.nav-search-trigger:hover { border-color: var(--accent); background: var(--surface); color: var(--ink); }
+.nav-search-label { flex: 1; text-align: left; }
+.nav-search-hint {
+  font-size: 10.5px; font-weight: 600; color: var(--ink-2);
+  background: var(--chip); border-radius: 4px; padding: 1px 6px;
+  border: 1px solid var(--line);
+}
+
+/* Modal search: overlay tối, box giữa màn hình. */
+.search-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.42);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 88px 20px 20px;
+  animation: modal-fade 0.14s ease;
+}
+.search-box {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  width: 100%; max-width: 640px;
+  max-height: 70vh; display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.08);
+  animation: modal-slide 0.16s ease;
+  overflow: hidden;
+}
+.search-input-wrap {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.search-input-icon { flex-shrink: 0; color: var(--ink-2); }
+.search-input {
+  flex: 1; border: 0; background: transparent;
+  font: inherit; font-size: 15px; color: var(--ink);
+  padding: 4px 0;
+}
+.search-input:focus { outline: none; box-shadow: none; border: 0; }
+.search-kbd {
+  font-size: 11px; font-weight: 600; color: var(--ink-2);
+  background: var(--chip); border-radius: 4px; padding: 2px 6px;
+  border: 1px solid var(--line);
+}
+.search-results {
+  padding: 6px;
+  overflow-y: auto;
+  flex: 1;
+}
+.search-empty {
+  padding: 20px 16px; margin: 0;
+  text-align: center; color: var(--ink-2); font-size: 13.5px;
+}
+.search-group { padding: 6px 0; }
+.search-group + .search-group { border-top: 1px solid var(--line); }
+.search-group-title {
+  padding: 6px 10px 4px;
+  font-size: 10.5px; font-weight: 700; color: var(--ink-2);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.search-item {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; text-align: left;
+  padding: 8px 10px; border-radius: 8px;
+  background: transparent; border: 0;
+  font: inherit; color: var(--ink);
+  cursor: pointer;
+}
+.search-item:hover, .search-item.is-active {
+  background: var(--accent-bg);
+}
+.search-item-title { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.search-item.is-active .search-item-title { color: var(--accent); }
+.search-item-sub { font-size: 12px; }
+.search-footer {
+  display: flex; gap: 16px; justify-content: flex-end;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--ink-2);
+}
+.search-footer kbd {
+  display: inline-block;
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  background: var(--chip); border: 1px solid var(--line); border-radius: 4px;
+  padding: 1px 6px; margin-right: 2px;
+}
+
 /* Nút chuyển chế độ hiển thị (Sáng / Tối / Theo máy). Chân sidebar cạnh Cài đặt. */
 .theme-toggle {
   display: flex; align-items: center; gap: 8px;

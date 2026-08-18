@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './theme-toggle';
+import SearchDialog from './search-dialog';
 
 const NAV_STORAGE_KEY = 'sdvico-nav-open';
 
@@ -222,6 +223,7 @@ export default function Nav({ pendingCount = 0, user = null }: { pendingCount?: 
       </div>
 
       <nav className="nav-body" aria-label="Điều hướng chính">
+        <SearchDialog />
         {renderItem(OVERVIEW)}
         {renderItem(INBOX, true)}
 
