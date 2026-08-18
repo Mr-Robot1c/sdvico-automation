@@ -93,7 +93,8 @@ export async function GET(req: Request) {
     const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
     const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; email?: string; website?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
 
-    const contactEmail = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
+    // Email liên hệ: ưu tiên Cài đặt (brand_config.email), rồi biến môi trường, cuối cùng mặc định.
+    const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
     const hotline = brand.hotline || '1900 23 23 49';
 
     for (const job of (autoJobs as Record<string, unknown>[]) || []) {
