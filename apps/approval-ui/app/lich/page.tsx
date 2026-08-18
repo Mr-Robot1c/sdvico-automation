@@ -3,11 +3,13 @@ import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { formatRelative } from '../labels';
 import { saveWindows, saveCapacity } from '../actions';
+import DismissInterviewButton from './dismiss-interview-button';
 
 // Lịch phỏng vấn đã tự sắp. Sắp theo người gần đến giờ nhất.
 export const dynamic = 'force-dynamic';
 
 type Row = {
+  id: string;
   status: string;
   title: string;
   created_at: string;
@@ -35,7 +37,7 @@ export default async function Page() {
   const client = getServerClient();
   const { data, error } = await client
     .from('approval_queue')
-    .select('status, title, created_at, ref_id, payload')
+    .select('id, status, title, created_at, ref_id, payload')
     .eq('kind', 'hr_interview')
     .limit(100);
 
@@ -120,42 +122,51 @@ export default async function Page() {
       {active.length ? <p className="sub">Có {active.length} ứng viên trong lịch, xếp theo giờ gần nhất.</p> : null}
 
       <ul className="list">
-        {active.map(({ r, near }, i) => (
-          <li key={i} className="card tone-hr">
-            <div className="head">
-              <span className="cand-name">{r.payload?.ung_vien || r.title}</span>
-              <span className="row-right">
-                <span className={`stage tone-${r.status === 'approved' ? 'ok' : 'mkt'}`}>{statusLabel[r.status] || r.status}</span>
-                <time className="time" dateTime={r.created_at}>{formatRelative(r.created_at)}</time>
-              </span>
-            </div>
-            <dl className="fields">
-              <div className="field"><dt>Gần nhất</dt><dd><b>{near?.label || '—'}</b></dd></div>
-              <div className="field"><dt>Vị trí</dt><dd>{r.payload?.vi_tri || '—'}</dd></div>
-              <div className="field"><dt>Email</dt><dd>{r.payload?.email || '—'}</dd></div>
-              <div className="field field-long">
-                <dt>Các khung đề xuất</dt>
-                <dd>
-                  {(r.payload?.khung_gio || []).length ? (
-                    <ol className="slots">{(r.payload?.khung_gio || []).map((s, j) => <li key={j}>{s}</li>)}</ol>
-                  ) : '—'}
-                </dd>
+        {active.map(({ r, near }, i) => {
+          const passed = near ? near.ts < Date.now() : false;
+          const candName = r.payload?.ung_vien || r.title;
+          return (
+            <li key={i} className="card tone-hr">
+              <div className="head">
+                <span className="cand-name">{candName}</span>
+                <span className="row-right">
+                  {passed ? <span className="stage tone-default" title="Khung giờ đã qua">Đã qua</span> : null}
+                  <span className={`stage tone-${r.status === 'approved' ? 'ok' : 'mkt'}`}>{statusLabel[r.status] || r.status}</span>
+                  <time className="time" dateTime={r.created_at}>{formatRelative(r.created_at)}</time>
+                </span>
               </div>
-              <div className="field">
-                <dt>Ứng viên đã chọn</dt>
-                <dd>{r.ref_id && appMap.get(r.ref_id)?.chosen_slot
-                  ? <b style={{ color: 'var(--ok)' }}>{appMap.get(r.ref_id)!.chosen_slot}</b>
-                  : <span className="muted">Chưa chọn</span>}</dd>
-              </div>
-              {r.ref_id && appMap.get(r.ref_id)?.schedule_token ? (
+              <dl className="fields">
+                <div className="field"><dt>Gần nhất</dt><dd><b>{near?.label || 'Chưa có khung'}</b></dd></div>
+                <div className="field"><dt>Vị trí</dt><dd>{r.payload?.vi_tri || 'Chưa gắn vị trí'}</dd></div>
+                <div className="field"><dt>Email</dt><dd>{r.payload?.email || 'Chưa có'}</dd></div>
                 <div className="field field-long">
-                  <dt>Link gửi ứng viên tự chọn giờ</dt>
-                  <dd><code style={{ fontSize: '0.8em', wordBreak: 'break-all' }}>{baseUrl}/phong-van/{appMap.get(r.ref_id)!.schedule_token}</code></dd>
+                  <dt>Các khung đề xuất</dt>
+                  <dd>
+                    {(r.payload?.khung_gio || []).length ? (
+                      <ol className="slots">{(r.payload?.khung_gio || []).map((s, j) => <li key={j}>{s}</li>)}</ol>
+                    ) : 'Chưa có khung'}
+                  </dd>
                 </div>
-              ) : null}
-            </dl>
-          </li>
-        ))}
+                <div className="field">
+                  <dt>Ứng viên đã chọn</dt>
+                  <dd>{r.ref_id && appMap.get(r.ref_id)?.chosen_slot
+                    ? <b style={{ color: 'var(--ok)' }}>{appMap.get(r.ref_id)!.chosen_slot}</b>
+                    : <span className="muted">Chưa chọn</span>}</dd>
+                </div>
+                {r.ref_id && appMap.get(r.ref_id)?.schedule_token ? (
+                  <div className="field field-long">
+                    <dt>Link gửi ứng viên tự chọn giờ</dt>
+                    <dd><code style={{ fontSize: '0.8em', wordBreak: 'break-all' }}>{baseUrl}/phong-van/{appMap.get(r.ref_id)!.schedule_token}</code></dd>
+                  </div>
+                ) : null}
+              </dl>
+
+              <div className="card-danger-row">
+                <DismissInterviewButton queueId={r.id} candName={candName} passed={passed} />
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </main>
   );

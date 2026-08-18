@@ -1629,6 +1629,23 @@ export async function removeJob(formData: FormData) {
   revalidatePath('/tao-jd');
 }
 
+// Xoá một mục lịch phỏng vấn khỏi trang /lich. Chỉ xoá bản ghi approval_queue tương ứng
+// (kind='hr_interview'); giữ nguyên hồ sơ ứng viên và các cột lịch trong hr_applications
+// (chosen_slot, schedule_token, interviewed_at) để không mất dấu vết. Dùng khi buổi phỏng
+// vấn đã xong hoặc bị huỷ và người quản lý muốn dọn khỏi cột hiển thị.
+export async function dismissInterviewSchedule(formData: FormData) {
+  const queueId = String(formData.get('queueId') || '');
+  if (!queueId) return;
+  const client = getServerClient();
+  const { error } = await client
+    .from('approval_queue')
+    .delete()
+    .eq('id', queueId)
+    .eq('kind', 'hr_interview');
+  if (error) throw new Error(error.message);
+  revalidatePath('/lich');
+}
+
 // Thêm vị trí vào hàng đợi tự động: draft → open + auto_post=true.
 // Cron sẽ tự soạn bài khi tìm thấy vị trí này. Người vẫn phải duyệt trước khi đăng (điều cấm 1).
 export async function addToAutoQueue(formData: FormData) {
