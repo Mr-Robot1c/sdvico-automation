@@ -18,6 +18,14 @@ npm-debug.log*
 
 # Hồ sơ trình duyệt Playwright và dữ liệu phiên. Không đưa cookie vào Git.
 profiles/
+
+# Dữ liệu nội bộ do Cowork/công cụ ngoài trích xuất từ nhóm Zalo. Điều cấm 6:
+# không đưa dữ liệu ra khỏi hạ tầng công ty. File này lên bucket Supabase private,
+# KHÔNG lên Git repo hosting bên ngoài.
+Zalo/
+zalo-groups-*.json
+zalo-messages.jsonl
+zalo-summary.md
 playwright-profiles/
 .playwright/
 test-results/

@@ -343,16 +343,11 @@ function buildNarrative(
   threshold: number,
   knowledge?: KnowledgeUsed
 ): string[] {
-  if (s.totalPosts === 0) {
-    return [
-      'Chưa có bài nào có số liệu nên chưa xếp hạng được. Đăng bài lên Facebook, chờ có tương tác rồi bấm Cập nhật số liệu ở trang Đo lường. Có số rồi kế hoạch sẽ bám vào đó mà định hướng.'
-    ];
-  }
-
   const paras: string[] = [];
 
   // Đoạn mở đầu về nguồn tri thức đã đọc — bám AC-3 và AC-4 trong ba-spec (nếu cả hai == 0
-  // thì phải nói rõ thiếu nguồn, không im lặng bỏ qua).
+  // thì phải nói rõ thiếu nguồn, không im lặng bỏ qua). Đoạn này CHẠY TRƯỚC early return
+  // totalPosts=0 để bà con thấy AI có học thật, chưa xếp hạng được không phải vì AI im lặng.
   if (knowledge) {
     const nI = knowledge.internal;
     const nP = knowledge.publicSrc;
@@ -373,6 +368,14 @@ function buildNarrative(
         `Tuần này đã học ${vnInt(nI)} bản ghi tri thức nội bộ và ${vnInt(nP)} nguồn tri thức public ngành cá. Cùng với số đo lường, đây là nguyên liệu cho các đoạn dưới đây.`
       );
     }
+  }
+
+  // Không có bài đo lường: nói rõ ngoài đoạn tri thức để bà con biết bước tiếp theo.
+  if (s.totalPosts === 0) {
+    paras.push(
+      'Chưa có bài nào có số liệu nên chưa xếp hạng sản phẩm được. Đăng bài lên Facebook, chờ có tương tác rồi bấm Cập nhật số liệu ở trang Đo lường. Có số rồi kế hoạch sẽ bám vào đó mà định hướng.'
+    );
+    return paras;
   }
 
   // Tổng quan.

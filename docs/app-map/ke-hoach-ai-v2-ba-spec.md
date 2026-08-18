@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-18
 ttl_days: 90
+<!-- DOC-STATUS: SUSPECT (2026-08-18) — code 'packages/marketing/src' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 
 > **Mục đích**: oracle HÀNH VI cho khối tính năng "Kế hoạch AI v2 + kênh mở rộng" — phản hồi của sếp trên whiteboard Bạn B trình bày ngày 18/8/2026 (xem [marketing.md](marketing.md) cho luồng hiện có, [../roadmap-marketing.md](../roadmap-marketing.md) cho lịch 5 tuần). KHÔNG mô tả giao diện.
 
