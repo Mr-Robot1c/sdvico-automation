@@ -2,6 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import type { Plan, Tier } from '../../lib/plan';
 import { vnInt, vnDec1 } from '../../lib/plan';
 import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
+import { saveWeeklyGoal } from './goal-actions';
 import GenerateButton from './generate-button';
 
 export const dynamic = 'force-dynamic';
@@ -48,11 +49,16 @@ function fmtDate(d: string | null): string {
 
 export default async function Page() {
   const client = getServerClient();
-  const { data, error } = await client
-    .from('mkt_plans')
-    .select('id, period_start, period_end, generated_by, data, applied, applied_at, created_at')
-    .order('created_at', { ascending: false })
-    .limit(12);
+  const [{ data, error }, { data: goalRow }] = await Promise.all([
+    client
+      .from('mkt_plans')
+      .select('id, period_start, period_end, generated_by, data, applied, applied_at, created_at')
+      .order('created_at', { ascending: false })
+      .limit(12),
+    client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle()
+  ]);
+  const goalText = ((goalRow as any)?.value?.text as string) || '';
+  const goalUpdatedAt = ((goalRow as any)?.value?.updated_at as string) || null;
 
   const rows = (data || []) as Row[];
   const latest = rows[0];
@@ -74,6 +80,28 @@ export default async function Page() {
       </header>
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
+
+      <section className="goal-card">
+        <form action={saveWeeklyGoal}>
+          <div className="goal-head">
+            <b>🎯 Mục tiêu tuần giao cho BOSS</b>
+            {goalUpdatedAt ? <span className="sub">Cập nhật {fmtDateTime(goalUpdatedAt)}</span> : null}
+          </div>
+          <p className="sub" style={{ margin: '4px 0 8px' }}>
+            Viết như giao việc cho nhân viên: ưu tiên sản phẩm nào, cần bao nhiêu cuộc gọi hoặc lượt xem, có chạy quảng cáo không.
+            BOSS bám mục tiêu này khi sinh kế hoạch và hướng đi tuần.
+          </p>
+          <textarea
+            name="goal_text"
+            defaultValue={goalText}
+            rows={2}
+            placeholder="Ví dụ: tuần này ưu tiên máy lọc dầu SF-50, cần 20 cuộc gọi về tổng đài, chưa chạy quảng cáo trả phí."
+          />
+          <div style={{ marginTop: 8 }}>
+            <button className="btn ok" type="submit">Lưu mục tiêu</button>
+          </div>
+        </form>
+      </section>
 
       {appliedRow ? (
         <p className="err" role="status">

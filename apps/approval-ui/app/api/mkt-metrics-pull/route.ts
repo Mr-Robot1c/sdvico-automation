@@ -4,6 +4,7 @@ import { pullFacebookMetrics } from '../../../lib/fb-metrics';
 import { isPlanDayVN, generateAndStorePlan } from '../../../lib/plan';
 import { importInternalFromBucket } from '../../../lib/knowledge';
 import { learnPublicKnowledge, isSundayVN } from '../../../lib/knowledge-public';
+import { evaluateAbPairs } from '../../../lib/evaluator';
 
 // Kéo số liệu tương tác Facebook về mkt_metrics. Gọi bởi Vercel Cron (Authorization: Bearer
 // CRON_SECRET) hoặc thủ công (?secret=CRON_SECRET).
@@ -45,6 +46,19 @@ export async function GET(req: Request) {
     }
   }
 
+  // Thứ 4 + Chủ nhật: Evaluator so cặp A/B TRƯỚC khi sinh kế hoạch — verdict được ghi
+  // vào Kho tri thức nội bộ nên bản kế hoạch sinh ngay sau đó đã học được kết quả A/B
+  // (vòng lặp kín flowchart v3). Lỗi evaluator không đánh hỏng metrics-pull hay plan.
+  let evaluation: { pairs: number; verdicts: number; skipped: number } | null = null;
+  if (isPlanDayVN(new Date())) {
+    try {
+      const ev = await evaluateAbPairs(client);
+      evaluation = { pairs: ev.pairs, verdicts: ev.verdicts, skipped: ev.skipped };
+    } catch (e: any) {
+      console.error('[evaluator] so cap A/B that bai:', e?.message || e);
+    }
+  }
+
   // Sinh kế hoạch vào thứ 4 và chủ nhật. Lỗi sinh kế hoạch không được đánh hỏng việc kéo số liệu.
   let plan: { id: string | null; ranked: number } | null = null;
   if (isPlanDayVN(new Date())) {
@@ -56,5 +70,5 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, ...res, knowledge, plan });
+  return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan });
 }

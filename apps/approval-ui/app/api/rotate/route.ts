@@ -134,7 +134,10 @@ export async function GET(req: Request) {
   const hasWeights = Object.keys(weights).length > 0;
 
   // v2: đọc content_suggestions chưa dùng từ plan đã áp. Suggestion nào có `used_at` là đã
-  // dùng, bỏ qua để không lặp bài. Map suggestion.product -> folder qua guessGroup (dedup).
+  // dùng, bỏ qua để không lặp bài. Map suggestion.product -> folder qua guessGroup.
+  // v3 (Creator A/B): mỗi lần chạy chỉ lấy MỘT suggestion, nhưng sinh CẶP 2 bài A/B cho nó
+  // (A = góc từ tri thức, B = góc đối chứng). 2 bài bán + 1 bài content = đúng hạn mức 3/ngày.
+  // Không có suggestion nào map được folder -> fallback vòng xoay cũ (2 folder, mỗi folder 1 bài).
   type Suggestion = {
     title: string; why: string; product: string; kind: string;
     sources?: string[]; needs_gov_review?: boolean; used_at?: string;
@@ -144,30 +147,27 @@ export async function GET(req: Request) {
     : [];
   const unusedSuggestions = allSuggestions.filter((s) => !s.used_at);
 
-  // Với mỗi suggestion chưa dùng, tìm folder khớp qua guessGroup. Suggestion không map được
-  // (product không có folder ảnh) -> bỏ qua, dùng random cho slot còn lại.
   type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number };
   const pickedFolders: PickedFolder[] = [];
   const usedInThisRun = new Set<string>();
   for (const s of unusedSuggestions) {
-    if (pickedFolders.length >= FOLDERS_PER_RUN) break;
+    if (pickedFolders.length) break; // 1 suggestion/run — cặp A/B chiếm 2 slot bài bán
     const guessed = (guessGroup as (t: string) => string | null)(s.product);
     // guessGroup trả về nhãn không có STT; đối chiếu với folder thật (có STT).
     const matchedFolder = guessed
-      ? unused.find((g) => productName(g).toLowerCase() === guessed.toLowerCase() && !usedInThisRun.has(g))
+      ? unused.find((g) => productName(g).toLowerCase() === guessed.toLowerCase())
       : null;
     if (!matchedFolder) continue;
     usedInThisRun.add(matchedFolder);
     const idx = allSuggestions.findIndex((x) => x === s);
     pickedFolders.push({ group: matchedFolder, suggestion: s, suggestionIdx: idx });
   }
-  // Lấp chỗ còn lại bằng vòng xoay/weights như cũ.
-  if (pickedFolders.length < FOLDERS_PER_RUN) {
+  // Không có suggestion -> vòng xoay/weights như cũ, mỗi folder 1 bài đơn.
+  if (!pickedFolders.length) {
     const remaining = unused.filter((g) => !usedInThisRun.has(g));
-    const need = FOLDERS_PER_RUN - pickedFolders.length;
     const extra = hasWeights
-      ? weightedSample(remaining, (g) => weights[productName(g)] ?? 1, need)
-      : shuffle(remaining).slice(0, need);
+      ? weightedSample(remaining, (g) => weights[productName(g)] ?? 1, FOLDERS_PER_RUN)
+      : shuffle(remaining).slice(0, FOLDERS_PER_RUN);
     for (const g of extra) pickedFolders.push({ group: g });
   }
 
@@ -183,94 +183,120 @@ export async function GET(req: Request) {
   // Track suggestions vừa dùng trong run này, cuối vòng update lại plan.data một lần.
   const suggestionsUsedThisRun: number[] = [];
 
+  // Góc ĐỐI CHỨNG cho bản B của cặp A/B — cố ý khác hướng bản A (góc từ tri thức) để
+  // Evaluator so được cách viết nào ăn khách hơn (flowchart v3: Creator viết 2 kịch bản A/B).
+  const CONTRAST_ANGLES = [
+    'nhấn tiết kiệm chi phí cụ thể cho mỗi chuyến biển rồi mời bà con liên hệ',
+    'nhấn ra khơi an toàn, gia đình ở nhà yên tâm, rồi mời lắp đặt',
+    'kể một tình huống thật ngoài khơi rồi dẫn vào sản phẩm, kết bằng mời gọi',
+  ];
+
   for (const pf of pickedFolders) {
     const group = pf.group;
     const f = folders.get(group)!;
     const name = productName(group);
     const sug = pf.suggestion;
+    // Cặp A/B khi có suggestion; bài đơn khi fallback vòng xoay cũ.
+    const variants: Array<'A' | 'B' | null> = sug ? ['A', 'B'] : [null];
+    const pairId = sug && appliedPlan ? `${appliedPlan.id.slice(0, 8)}-s${pf.suggestionIdx}` : null;
+    let firstImgId: string | null = null;
 
-    const img = f.images.length ? pickRandom(f.images) : null;
-    if (!img) {
-      skipped.push({ group, reason: 'folder chua co anh - can upload it nhat 1 anh de rotate' });
-      continue;
-    }
-    if (AUTO_LOGO) {
-      try { logoActions.push({ group, ...(await ensureLogoForPost(client, img.id)) }); }
-      catch (e) { logoActions.push({ group, action: 'error', reason: String((e as any)?.message || e) }); }
-    }
-    const channels = ['facebook'];
-    const assets = { image: img.id, video: null };
+    for (const variant of variants) {
+      // Bản B ưu tiên ảnh KHÁC bản A (nếu folder có từ 2 ảnh) để cặp thử khác nhau cả hình.
+      const pool: A[] = variant === 'B' && firstImgId && f.images.length > 1
+        ? f.images.filter((i) => i.id !== firstImgId)
+        : f.images;
+      const img: A | null = pool.length ? pickRandom(pool) : null;
+      if (!img) {
+        skipped.push({ group, variant, reason: 'folder chua co anh - can upload it nhat 1 anh de rotate' });
+        continue;
+      }
+      if (variant !== 'B') firstImgId = img.id;
+      if (AUTO_LOGO) {
+        try { logoActions.push({ group, ...(await ensureLogoForPost(client, img.id)) }); }
+        catch (e) { logoActions.push({ group, action: 'error', reason: String((e as any)?.message || e) }); }
+      }
+      const channels = ['facebook'];
+      const assets = { image: img.id, video: null };
 
-    // Nếu có suggestion cho slot này, truyền angleOverride (why) và preferredHeadline (title)
-    // vào generateSocialPost để bài bám hướng đi tuần thay vì góc random.
-    let gen: any;
-    try {
-      gen = await (generateSocialPost as any)({
-        productGroup: group,
-        productName: name,
-        channel: 'facebook',
-        hasVideo: false,
-        angleOverride: sug?.why ?? null,
-        preferredHeadline: sug?.title ?? null,
-      });
-    } catch (e) {
-      skipped.push({ group, reason: 'gen loi: ' + (e as any)?.message });
-      continue;
-    }
-    const risk = gen.assessment?.risk || 'none';
-    // Nếu suggestion có needs_gov_review, ép cờ cho bài luôn (rule R3 trong ba-spec).
-    const forcedGov = !!sug?.needs_gov_review;
-    const needsGov = risk === 'red' || forcedGov;
-    const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : (sug?.title || name);
-    const { data: inserted, error: e1 } = await client
-      .from('mkt_content')
-      .insert({
-        kind: 'social',
-        title: displayTitle,
-        brief: {
-          keyword: name,
-          intent: 'giao_dich',
-          assets,
-          channels,
-          generator: 'rotation',
-          rotation: true,
-          rotation_cycle: cycle,
-          rotation_group: group,
-          video_requested: true,
-          // v2: gắn suggestion đã dùng để truy được bài này đến từ hướng đi nào
-          ...(sug ? {
-            plan_id: appliedPlan?.id,
-            suggestion_index: pf.suggestionIdx,
-            suggestion_title: sug.title,
-            suggestion_sources: sug.sources,
-          } : {}),
+      // A bám góc tri thức (sug.why + tiêu đề gợi ý). B dùng góc đối chứng, tự do tiêu đề.
+      const angleOverride = sug
+        ? (variant === 'A' ? sug.why : pickRandom(CONTRAST_ANGLES))
+        : null;
+      const preferredHeadline = sug && variant === 'A' ? sug.title : null;
+
+      let gen: any;
+      try {
+        gen = await (generateSocialPost as any)({
+          productGroup: group,
+          productName: name,
+          channel: 'facebook',
+          hasVideo: false,
+          angleOverride,
+          preferredHeadline,
+        });
+      } catch (e) {
+        skipped.push({ group, variant, reason: 'gen loi: ' + (e as any)?.message });
+        continue;
+      }
+      const risk = gen.assessment?.risk || 'none';
+      // Nếu suggestion có needs_gov_review, ép cờ cho CẢ cặp (rule R3 trong ba-spec).
+      const forcedGov = !!sug?.needs_gov_review;
+      const needsGov = risk === 'red' || forcedGov;
+      const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : (sug?.title || name);
+      const { data: inserted, error: e1 } = await client
+        .from('mkt_content')
+        .insert({
+          kind: 'social',
+          title: displayTitle,
+          brief: {
+            keyword: name,
+            intent: 'giao_dich',
+            assets,
+            channels,
+            generator: 'rotation',
+            rotation: true,
+            rotation_cycle: cycle,
+            rotation_group: group,
+            video_requested: true,
+            // v2/v3: gắn suggestion + cặp A/B để Evaluator truy được và so sánh
+            ...(sug ? {
+              plan_id: appliedPlan?.id,
+              suggestion_index: pf.suggestionIdx,
+              suggestion_title: sug.title,
+              suggestion_sources: sug.sources,
+              ab_pair_id: pairId,
+              ab_variant: variant,
+            } : {}),
+          },
+          draft: gen.text,
+          status: 'review',
+          needs_gov_review: needsGov,
+        })
+        .select('id')
+        .single();
+      if (e1 || !inserted) {
+        skipped.push({ group, variant, reason: 'insert content loi: ' + (e1 as any)?.message });
+        continue;
+      }
+      const contentId = (inserted as { id: string }).id;
+      // Nhãn 🎯A / 🎯B khi bài thuộc cặp thử của kế hoạch, để người duyệt biết ngay.
+      const prefix = sug ? `🎯${variant} ` : '';
+      const label = channels.length > 1 ? '[FB + TikTok]' : '[Facebook]';
+      const govBadge = forcedGov ? ' ⚠️' : '';
+      await client.from('approval_queue').insert({
+        kind: 'mkt_publish_content',
+        title: `${prefix}${label}${govBadge} ${displayTitle}`,
+        payload: {
+          content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich',
+          risk, assets, channels, authored: 'ai',
+          ...(sug ? { from_plan_direction: true, suggestion_sources: sug.sources, ab_pair_id: pairId, ab_variant: variant } : {}),
         },
-        draft: gen.text,
-        status: 'review',
-        needs_gov_review: needsGov,
-      })
-      .select('id')
-      .single();
-    if (e1 || !inserted) {
-      skipped.push({ group, reason: 'insert content loi: ' + (e1 as any)?.message });
-      continue;
+        status: 'pending',
+      });
+      results.push({ group, channels, contentId, risk, from_suggestion: !!sug, variant });
     }
-    const contentId = (inserted as { id: string }).id;
-    // Nhãn có prefix 🎯 khi bài bám hướng đi kế hoạch, để người duyệt biết ngay.
-    const prefix = sug ? '🎯 ' : '';
-    const label = channels.length > 1 ? '[FB + TikTok]' : '[Facebook]';
-    const govBadge = forcedGov ? ' ⚠️' : '';
-    await client.from('approval_queue').insert({
-      kind: 'mkt_publish_content',
-      title: `${prefix}${label}${govBadge} ${displayTitle}`,
-      payload: {
-        content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich',
-        risk, assets, channels, authored: 'ai',
-        ...(sug ? { from_plan_direction: true, suggestion_sources: sug.sources } : {}),
-      },
-      status: 'pending',
-    });
-    results.push({ group, channels, contentId, risk, from_suggestion: !!sug });
+
     if (sug && typeof pf.suggestionIdx === 'number') suggestionsUsedThisRun.push(pf.suggestionIdx);
   }
 

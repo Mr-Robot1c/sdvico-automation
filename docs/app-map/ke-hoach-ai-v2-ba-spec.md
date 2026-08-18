@@ -4,7 +4,6 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-18
 ttl_days: 90
-<!-- DOC-STATUS: SUSPECT (2026-08-18) — code 'packages/marketing/src' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 
 > **Mục đích**: oracle HÀNH VI cho khối tính năng "Kế hoạch AI v2 + kênh mở rộng" — phản hồi của sếp trên whiteboard Bạn B trình bày ngày 18/8/2026 (xem [marketing.md](marketing.md) cho luồng hiện có, [../roadmap-marketing.md](../roadmap-marketing.md) cho lịch 5 tuần). KHÔNG mô tả giao diện.
 
@@ -40,6 +39,9 @@ ttl_days: 90
 | NV7 | Seeding hội nhóm ngoài (đăng video/bài vào group qua tài khoản cá nhân hoặc fanpage) | Bạn B (người thao tác) | — | — | theo lô | Could — chờ chốt tài khoản, xem §11 |
 | NV8 | Đề xuất và duyệt ngân sách quảng cáo trả phí (AD) | Bạn B (đề xuất) | Sếp / cấp quản lý (duyệt ngân sách) | — | theo chiến dịch | Should — chờ chốt ngân sách, xem §11 |
 | NV9 | Đo lường hiệu quả AD (CPC, điểm chạm) | Hệ thống (đọc report Ads) | Bạn B (xem ở Đo lường) | NV8 | định kỳ | Should |
+| NV10 | Giao mục tiêu tuần cho Kế hoạch AI (flowchart v3: khối MỤC TIÊU) | Bạn B / Sếp | Hệ thống Kế hoạch AI (đọc khi sinh kế hoạch và hướng đi) | — | mỗi tuần hoặc khi đổi ưu tiên | Must |
+| NV11 | Sinh cặp bài thử A/B cho một hướng đi (flowchart v3: AI Creator) | Hệ thống Dây chuyền nội dung | Bạn B (duyệt cả cặp như bài thường) | NV3 (có hướng đi) | mỗi lần vòng xoay chạy có hướng đi chưa dùng | Must |
+| NV12 | Đánh giá cặp A/B và ghi kết quả ngược về Kho tri thức (flowchart v3: AI Evaluator, vòng lặp kín) | Hệ thống Kế hoạch AI | — | NV11 (có cặp) + số liệu Đo lường | Thứ 4 và Chủ nhật, trước khi sinh kế hoạch | Must |
 
 > NV1, NV5, NV8, NV7 có phần **bị khoá bởi quyết định người khác chưa chốt** — không phải nghiệp vụ mồ côi, chỉ chưa đủ điều kiện build phần vận hành thật. Chi tiết Scope §7 và Open questions §11.
 
@@ -128,6 +130,30 @@ ttl_days: 90
 - **End**: Bạn B xem được số liệu AD cạnh số liệu tổ chức tự nhiên hiện có
 - **Cross**: không cross-user mới, Bạn B xem qua trang Đo lường hiện có
 
+### Flow NV10 — Giao mục tiêu tuần · owner: Bạn B / Sếp
+- **Start**: người quản lý muốn đổi ưu tiên tuần (sản phẩm, số cuộc gọi cần đạt, có chạy quảng cáo không)
+- **Input**: một đoạn mục tiêu viết như giao việc cho nhân viên
+- **Steps**: nhập mục tiêu trên trang Kế hoạch → hệ thống lưu (một bản duy nhất, ghi đè bản cũ) → mọi lần sinh kế hoạch và hướng đi sau đó đều đọc mục tiêu này đưa vào phần định hướng
+- **Output**: bản kế hoạch và danh sách hướng đi bám mục tiêu; mục tiêu hiện nguyên văn đầu đoạn định hướng
+- **End**: mục tiêu có hiệu lực tới khi người quản lý sửa lại
+- **Cross**: không cross; hệ thống chỉ đọc
+
+### Flow NV11 — Sinh cặp bài thử A/B · owner: Hệ thống Dây chuyền nội dung
+- **Start**: vòng xoay chạy và kế hoạch đang áp dụng còn hướng đi chưa dùng
+- **Input**: một hướng đi (tiêu đề, lý do, sản phẩm), tư liệu ảnh của folder sản phẩm khớp
+- **Steps**: chọn đúng một hướng đi → sinh hai bài bán cùng sản phẩm: bản A theo góc của hướng đi, bản B theo góc đối chứng (ưu tiên ảnh khác nhau) → cả hai vào hàng chờ duyệt với nhãn phân biệt → đánh dấu hướng đi đã dùng
+- **Output**: đúng 2 bài chờ duyệt cùng mã cặp, khác biến thể; cộng 1 bài content thường lệ là đủ hạn mức 3 bài/ngày
+- **End**: người duyệt xử lý từng bài như bài thường (máy soạn, người bấm — điều cấm 1)
+- **Cross**: không cross mới, dùng luồng duyệt hiện có
+
+### Flow NV12 — Đánh giá cặp A/B và học ngược · owner: Hệ thống Kế hoạch AI
+- **Start**: đến Thứ 4 hoặc Chủ nhật (trước bước sinh kế hoạch), có ít nhất một cặp A/B đã có số liệu
+- **Input**: các cặp bài A/B 30 ngày qua và số liệu tương tác mới nhất của từng bài (khi quảng cáo trả phí chạy thì thêm CPC, điểm chạm)
+- **Steps**: gom bài theo mã cặp → cặp nào đủ số liệu cả hai bên và không cùng bằng 0 thì so sánh → viết kết luận bản nào ăn khách hơn → ghi đè kết luận vào Kho tri thức nội bộ theo mã cặp (một cặp một bản ghi, số liệu lớn dần thì kết luận tự cập nhật)
+- **Output**: bản ghi kết luận trong Kho tri thức; lần sinh kế hoạch và hướng đi kế tiếp tự đọc kết luận này làm nguyên liệu — vòng lặp kín, các AI cùng học từ kết quả thật
+- **End**: cặp chưa đủ số liệu được bỏ qua chờ lần chạy sau, không kết luận ẩu
+- **Cross**: không cross; đầu ra quay về chính Kho tri thức (H1)
+
 ## 6. Flow optimization log
 
 | Flow | Candidate đã cân nhắc | Chọn / Loại | Lý do (theo rubric) | Đánh giá bởi | Conflict & xử (nếu có) |
@@ -144,6 +170,9 @@ ttl_days: 90
   - NV3 — tổng hợp Kế hoạch tuần v2 dùng thêm nguồn NV2 (và NV1 nếu có)
   - NV4 — mở rộng hiển thị nguồn tri thức trên trang Kế hoạch (không đổi luồng duyệt/áp dụng hiện có)
   - NV1 — phần khung nhập liệu tổng hợp nội bộ ở Kho tư liệu (ai dùng khung này để nhập là việc vận hành, chờ Bạn B giao người — xem §11, nhưng bản thân khung nhập không phụ thuộc ai khác)
+  - NV10 — ô giao mục tiêu tuần trên trang Kế hoạch (v1.3)
+  - NV11 — vòng xoay sinh cặp bài thử A/B theo hướng đi (v1.3)
+  - NV12 — đánh giá cặp A/B, ghi kết luận về Kho tri thức, chạy Thứ 4 và Chủ nhật (v1.3; thước đo tạm là tương tác, chờ AD để lên CPC)
 - **OUT (chờ chốt trước khi build phần vận hành thật — xem §11 Open questions)**:
   - NV1 (vận hành thật) — ai là người phụ trách, tần suất
   - NV5 — SEO backlink, danh sách mục tiêu do ai chọn (có thể gộp vào tuần 36 SEO địa phương đã có trong roadmap, tránh làm trùng)
@@ -234,6 +263,24 @@ ttl_days: 90
 - **Then** một bản ghi đo lường mới được tạo, có chi phí trên mỗi lượt click tính đúng bằng tổng chi phí chia cho tổng số click của chiến dịch đó
 - **Assert**: giá trị CPC lưu lại == tổng chi phí / tổng số click (sai số làm tròn không quá 1 đơn vị tiền nhỏ nhất), gắn đúng mã chiến dịch nguồn
 
+### AC-11 — Kế hoạch bám mục tiêu tuần được giao · Maps to flow: NV10, NV3 · Test: integration
+- **Given** người quản lý đã lưu mục tiêu tuần với nội dung không rỗng
+- **When** tiến trình sinh kế hoạch chạy (cron hoặc chạy tay)
+- **Then** bản kế hoạch mới lưu lại nguyên văn mục tiêu và đoạn định hướng mở đầu bằng mục tiêu đó
+- **Assert**: bản kế hoạch mới nhất có trường mục tiêu == chuỗi đã lưu, và đoạn định hướng đầu tiên chứa chuỗi "Mục tiêu tuần được giao"
+
+### AC-12 — Vòng xoay sinh đúng cặp A/B cho một hướng đi · Maps to flow: NV11 · Test: integration
+- **Given** kế hoạch đang áp dụng có ít nhất một hướng đi chưa dùng, và folder sản phẩm khớp có ít nhất một ảnh
+- **When** vòng xoay sinh bài chạy một lần
+- **Then** đúng hai bài bán được tạo cùng mã cặp, một bản A một bản B, cả hai ở hàng chờ duyệt trạng thái chờ, và hướng đi đó được đánh dấu đã dùng
+- **Assert**: số bài có cùng mã cặp == 2, tập biến thể == {A, B}, số mục hàng chờ duyệt tương ứng trạng thái "pending" == 2, hướng đi trong kế hoạch có mốc thời gian đã dùng khác rỗng
+
+### AC-13 — Kết luận A/B được ghi về Kho tri thức để vòng sau học · Maps to flow: NV12 · Test: integration
+- **Given** một cặp A/B mà cả hai bài đều có số liệu tương tác và tổng không cùng bằng 0
+- **When** tiến trình đánh giá chạy
+- **Then** đúng một bản ghi tri thức nội bộ gắn mã cặp được tạo hoặc cập nhật, nêu rõ biến thể thắng, và lần sinh hướng đi kế tiếp đọc được bản ghi này như một nguồn nội bộ
+- **Assert**: số bản ghi tri thức nội bộ có đường dẫn nguồn == "evaluator/" + mã cặp là 1, tóm tắt chứa cụm "bản A" hoặc "bản B", chạy tiến trình lần hai không tạo thêm bản ghi trùng cho cùng cặp
+
 ## 11. Assumptions / Open questions
 
 - **Assumptions** (tự quyết khi thiếu info, an toàn):
@@ -252,3 +299,4 @@ ttl_days: 90
 - v1 (2026-08-18): khởi tạo — đặc tả Kế hoạch AI v2 (học hai nguồn: nội bộ nhập tay + public tự tìm kiếm), SEO backlink, mở rộng Social (Video Shorts, seeding hội nhóm), và AD trả phí, theo phản hồi whiteboard của sếp trình bày qua Bạn B ngày 18/8/2026.
 - v1.1 (2026-08-18): NV1 chuyển từ "nhập tay vào form Kho tư liệu" sang "thả file vào bucket Supabase" — vì Bạn B dùng Cowork trên chat Claude để đọc Zalo PC, chỉ cần hệ thống nhận đầu ra dạng file. Sửa NV1 flow, AC-1 (Test đổi thành integration, assert theo file), User registry, cross H1, Open question 1.
 - v1.2 (2026-08-18): NV3 bổ sung output `content_suggestions` — Kế hoạch v2 giờ ra HƯỚNG ĐI CỤ THỂ (5-7 gợi ý bài đăng bám nguồn tri thức, gọi đúng sản phẩm SDVICO), không chỉ dừng ở "đã học N nguồn". Đây là bước cầu nối để vòng xoay sinh bài dùng tri thức thật. Cũng bổ sung phương án fallback học public qua Google News RSS khi Gemini google_search grounding bị rate limit 429.
+- v1.3 (2026-08-18): khép VÒNG LẶP KÍN theo flowchart v3 của Bạn B (docs/flowchart-v3.html, 4 vai AI): thêm NV10 (người giao mục tiêu tuần cho BOSS — khối MỤC TIÊU), NV11 (Creator sinh cặp bài thử A/B cho một hướng đi, 2 bài bán + 1 content = đúng hạn mức 3/ngày), NV12 (Evaluator so cặp A/B theo tương tác FB rồi ghi kết luận ngược về Kho tri thức nội bộ — nhờ đó BOSS và mọi lần sinh kế hoạch sau tự học, không cần bảng mới). Thước đo A/B tạm dùng tương tác vì AD trả phí đang hoãn; khi AD chạy sẽ nâng lên CPC + điểm chạm đúng flowchart. Thêm AC-11, AC-12, AC-13.

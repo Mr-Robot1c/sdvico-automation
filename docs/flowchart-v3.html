@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SDVICO — Flowchart Marketing Tự Động v3</title>
+<style>
+  :root{
+    --ink:#1e293b; --muted:#64748b; --line:#94a3b8;
+    --bg:#f1f5f9; --card:#ffffff;
+    --c-data:#475569; --c-ai:#7c3aed; --c-plan:#d97706; --c-kho:#0d9488;
+    --c-day:#2563eb; --c-seo:#16a34a; --c-soc:#db2777; --c-ad:#ea580c; --c-do:#4f46e5;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); font-family:"Segoe UI", system-ui, -apple-system, sans-serif; color:var(--ink); padding:28px 16px;}
+  .wrap{max-width:1220px; margin:0 auto;}
+  header.top{background:var(--card); border-radius:16px; padding:24px 28px; box-shadow:0 1px 3px rgba(15,23,42,.08); margin-bottom:14px;}
+  header.top h1{font-size:22px; letter-spacing:.2px;}
+  header.top h1 span{color:var(--c-plan);}
+  header.top p.sub{color:var(--muted); font-size:14px; margin-top:6px; line-height:1.5;}
+  .legend{display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; font-size:12.5px; align-items:center;}
+  .lg{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; background:#f8fafc; border:1px solid #e2e8f0;}
+  .dash{display:inline-block; width:26px; height:0; border-top:2.5px dashed;}
+  .chart{background:var(--card); border-radius:16px; padding:18px 6px 8px; box-shadow:0 1px 3px rgba(15,23,42,.08);}
+  svg{width:100%; height:auto; display:block;}
+  .fo{font-family:"Segoe UI", system-ui, sans-serif; height:100%;}
+  .box{height:100%; display:flex; flex-direction:column; padding:12px 14px 10px;}
+  .hd{display:flex; align-items:center; gap:8px; margin-bottom:7px; flex-wrap:wrap;}
+  .hd .t{font-weight:700; font-size:14.5px; letter-spacing:.2px;}
+  .hd .tag{font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; letter-spacing:.4px;}
+  ul{list-style:none; display:flex; flex-direction:column; gap:4px;}
+  li{font-size:12px; line-height:1.42; color:#334155; padding-left:13px; position:relative;}
+  li::before{content:""; position:absolute; left:0; top:7px; width:5px; height:5px; border-radius:50%; background:currentColor; opacity:.45;}
+  .st{display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:6px; vertical-align:1px; white-space:nowrap;}
+  .ok{background:#dcfce7; color:#15803d;}
+  .mid{background:#fef3c7; color:#b45309;}
+  .no{background:#fee2e2; color:#b91c1c;}
+  .aitag{background:#7c3aed; color:#fff;}
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:4px 24px;}
+  .subhd{font-size:10.5px; font-weight:800; letter-spacing:.6px; color:#4338ca; margin:2px 0 3px; text-transform:uppercase;}
+  .note{background:var(--card); border-radius:16px; padding:18px 26px; box-shadow:0 1px 3px rgba(15,23,42,.08); margin-top:14px; font-size:13.5px; line-height:1.65; color:#334155;}
+  .note b{color:var(--ink);}
+  .note .diff{color:var(--c-plan); font-weight:700;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>SDVICO — Hệ thống Marketing Tự Động <span>v3 · 4 vai AI + vòng lặp kín</span></h1>
+    <p class="sub">Cậu giao mục tiêu → <b>AI Planner (BOSS)</b> gọi dữ liệu từ 2 AI Data → trả cấu trúc chiến dịch → Kho tư liệu sinh bài → <b>AI Creator</b> viết kịch bản A/B → phân phối SEO / Social / AD → Đo lường → <b>AI Evaluator</b> so sánh A/B, báo cáo BOSS → BOSS tổng hợp, gửi kết quả cho mọi AI học tiếp (chính BOSS cũng tự học).</p>
+    <div class="legend">
+      <span class="lg"><span class="st ok">✓ ĐANG CHẠY</span> đã hoạt động thật</span>
+      <span class="lg"><span class="st mid">◐ ĐANG LÀM</span> một phần / đang kẹt</span>
+      <span class="lg"><span class="st no">✗ CHƯA CÓ</span> cần xây mới</span>
+      <span class="lg"><span class="dash" style="border-color:#4f46e5"></span> Evaluator + số liệu → BOSS</span>
+      <span class="lg"><span class="dash" style="border-color:#7c3aed"></span> BOSS phát kết quả → các AI học tiếp</span>
+    </div>
+  </header>
+
+  <div class="chart">
+  <svg viewBox="0 0 1620 2115" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+      </marker>
+      <marker id="arv" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/>
+      </marker>
+      <marker id="ari" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#4f46e5"/>
+      </marker>
+    </defs>
+
+    <!-- ================= FLÈCHES PRINCIPALES ================= -->
+    <g stroke="#475569" stroke-width="2.2" fill="none">
+      <path d="M330,180 L330,234" marker-end="url(#ar)"/>
+      <path d="M1230,180 L1230,234" marker-end="url(#ar)"/>
+      <path d="M780,180 L780,504" marker-end="url(#ar)"/>
+      <path d="M330,440 L330,475 L680,475 L680,504" marker-end="url(#ar)"/>
+      <path d="M1230,440 L1230,475 L880,475 L880,504" marker-end="url(#ar)"/>
+      <path d="M780,720 L780,794" marker-end="url(#ar)"/>
+      <path d="M780,990 L780,1064" marker-end="url(#ar)"/>
+      <path d="M780,1300 L780,1374" marker-end="url(#ar)"/>
+      <path d="M700,1300 L700,1337 L280,1337 L280,1374" marker-end="url(#ar)"/>
+      <path d="M860,1300 L860,1337 L1280,1337 L1280,1374" marker-end="url(#ar)"/>
+      <path d="M280,1720 L280,1794" marker-end="url(#ar)"/>
+      <path d="M780,1720 L780,1794" marker-end="url(#ar)"/>
+      <path d="M1280,1720 L1280,1794" marker-end="url(#ar)"/>
+    </g>
+
+    <g font-size="11.5" fill="#64748b" font-weight="600">
+      <text x="790" y="300">mục tiêu: doanh thu · traffic</text>
+      <text x="505" y="465" text-anchor="middle">data + đánh giá</text>
+      <text x="1055" y="465" text-anchor="middle">data + đánh giá</text>
+      <text x="790" y="757">cấu trúc chiến dịch: sản phẩm nào · kênh nào · ngân sách bao nhiêu</text>
+      <text x="790" y="1030">danh sách bài cần đăng + tư liệu</text>
+      <text x="790" y="1330">phân phối cả 2 bản A + B</text>
+    </g>
+
+    <!-- ================= VÒNG PHẢN HỒI ================= -->
+    <!-- Indigo : Đo lường / Evaluator -> BOSS -->
+    <g stroke="#4f46e5" stroke-width="2.4" fill="none" stroke-dasharray="7 6">
+      <path d="M1500,1880 L1562,1880 L1562,660 L1086,660" marker-end="url(#ari)"/>
+    </g>
+    <text transform="translate(1594,1270) rotate(90)" text-anchor="middle" font-size="12" fill="#4f46e5" font-weight="700">EVALUATOR BÁO CÁO A/B + SỐ LIỆU → BOSS TỔNG HỢP</text>
+
+    <!-- Violet : BOSS -> tous les AI (học tiếp) -->
+    <g stroke="#7c3aed" stroke-width="2.4" fill="none" stroke-dasharray="7 6">
+      <path d="M480,580 L230,580 L230,446" marker-end="url(#arv)"/>
+      <path d="M1080,580 L1330,580 L1330,446" marker-end="url(#arv)"/>
+      <path d="M480,650 L28,650 L28,1185 L424,1185" marker-end="url(#arv)"/>
+      <path d="M28,1185 L28,1925 L54,1925" marker-end="url(#arv)"/>
+    </g>
+    <g font-size="11" fill="#7c3aed" font-weight="700">
+      <text x="348" y="573" text-anchor="middle">học tiếp</text>
+      <text x="1212" y="573" text-anchor="middle">học tiếp</text>
+    </g>
+    <text transform="translate(15,1280) rotate(-90)" text-anchor="middle" font-size="12" fill="#7c3aed" font-weight="700">BOSS GỬI KẾT QUẢ → CREATOR + EVALUATOR HỌC TIẾP (BOSS CŨNG TỰ HỌC ⟲)</text>
+
+    <!-- ================= HÀNG 1 : MỤC TIÊU + NGUỒN DỮ LIỆU ================= -->
+    <g>
+      <rect x="110" y="30" width="440" height="150" rx="14" fill="#f8fafc" stroke="#475569" stroke-width="1.6"/>
+      <rect x="110" y="30" width="440" height="6" rx="3" fill="#475569"/>
+      <foreignObject x="110" y="36" width="440" height="144">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="t">🔒 KHO DATA NỘI BỘ (Private)</span></div>
+          <ul style="color:#475569">
+            <li>Danh mục thiết bị, giá, tỉnh phủ dịch vụ — từ Phòng KD <span class="st mid">◐ CHỜ CHỐT</span></li>
+            <li>CLAUDE.md: giọng thương hiệu + 7 điều cấm <span class="st ok">✓</span></li>
+            <li>Câu hỏi tổng đài 1900 23 23 49, case khách thật</li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+    <g>
+      <rect x="630" y="30" width="300" height="150" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+      <rect x="630" y="30" width="300" height="6" rx="3" fill="#d97706"/>
+      <foreignObject x="630" y="36" width="300" height="144">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="t" style="color:#b45309">🎯 MỤC TIÊU (CẬU / SẾP GIAO)</span></div>
+          <ul style="color:#d97706">
+            <li>Doanh thu, traffic cần đạt</li>
+            <li>Sản phẩm ưu tiên theo mùa vụ</li>
+            <li>Hạn mức ngân sách</li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+    <g>
+      <rect x="1010" y="30" width="440" height="150" rx="14" fill="#f8fafc" stroke="#475569" stroke-width="1.6"/>
+      <rect x="1010" y="30" width="440" height="6" rx="3" fill="#475569"/>
+      <foreignObject x="1010" y="36" width="440" height="144">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="t">🌐 DATA PUBLIC — NGÀNH CÁ / THỦY SẢN</span></div>
+          <ul style="color:#475569">
+            <li>Tin ngành, quy định IUU, Cục Thủy sản, mùa vụ đánh bắt</li>
+            <li>Đối thủ, xu hướng nội dung, giá thị trường</li>
+            <li>Kho từ khóa 152 mục <span class="st ok">✓</span> + keywords mới liên tục</li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+
+    <!-- ================= HÀNG 2 : HAI AI DATA ================= -->
+    <g>
+      <rect x="110" y="240" width="440" height="200" rx="14" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.8"/>
+      <rect x="110" y="240" width="440" height="6" rx="3" fill="#7c3aed"/>
+      <foreignObject x="110" y="246" width="440" height="194">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="tag aitag">AI</span><span class="t" style="color:#6d28d9">AI DATA #1 — HỌC NỘI BỘ</span><span class="st mid">◐ MỘT PHẦN</span></div>
+          <ul style="color:#7c3aed">
+            <li>Học sản phẩm thật, giọng văn, ranh giới pháp lý (skill brand-voice, product-boundary <span class="st ok">✓</span>)</li>
+            <li>Đánh giá: bài nào ra cuộc gọi / liên hệ, bài nào chỉ có view</li>
+            <li>Cấp data cho BOSS khi được gọi · nhận kết quả cuối vòng để học tiếp</li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+    <g>
+      <rect x="1010" y="240" width="440" height="200" rx="14" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.8"/>
+      <rect x="1010" y="240" width="440" height="6" rx="3" fill="#7c3aed"/>
+      <foreignObject x="1010" y="246" width="440" height="194">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="tag aitag">AI</span><span class="t" style="color:#6d28d9">AI DATA #2 — HỌC PUBLIC NGÀNH CÁ</span><span class="st no">✗ CHƯA CÓ</span></div>
+          <ul style="color:#7c3aed">
+            <li>Cào + học tin ngành thủy sản định kỳ (báo, hiệp hội, đối thủ)</li>
+            <li>Đánh giá xu hướng → đề xuất góc bài, keywords, thời điểm đăng</li>
+            <li>Cấp data cho BOSS khi được gọi · nhận kết quả cuối vòng để học tiếp</li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+
+    <!-- ================= HÀNG 3 : AI PLANNER (BOSS) ================= -->
+    <g>
+      <rect x="480" y="510" width="600" height="210" rx="16" fill="#fffbeb" stroke="#d97706" stroke-width="2.6"/>
+      <rect x="480" y="510" width="600" height="7" rx="3.5" fill="#d97706"/>
+      <foreignObject x="480" y="517" width="600" height="203">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="tag aitag">AI</span><span class="t" style="color:#b45309; font-size:16px">🧠 AI LẬP KẾ HOẠCH (PLANNER — BOSS)</span><span class="tag" style="background:#d97706; color:#fff">★ KHỐI KHỞI ĐẦU</span><span class="st mid">◐ ĐANG NÂNG CẤP</span></div>
+          <ul style="color:#d97706">
+            <li>Nhận mục tiêu doanh thu / traffic từ cậu → <b>gọi dữ liệu từ 2 AI Data</b></li>
+            <li>Trả ra <b>cấu trúc chiến dịch</b>: chạy sản phẩm nào, kênh nào, ngân sách bao nhiêu, tỷ lệ 2 bài bán hàng / 1 case study</li>
+            <li>Cuối vòng: tổng hợp báo cáo Evaluator → <b>gửi kết quả về mọi AI để học tiếp</b>, chính BOSS cũng tự học ⟲</li>
+            <li>Nền sẵn có: bot <b>/ke-hoach</b> chạy Thứ 4 + Chủ nhật, đọc số FB, nút Áp dụng trọng số <span class="st ok">✓</span> — mầm của BOSS</li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+
+    <!-- ================= HÀNG 4 : KHO TƯ LIỆU ================= -->
+    <g>
+      <rect x="480" y="800" width="600" height="190" rx="14" fill="#f0fdfa" stroke="#0d9488" stroke-width="1.8"/>
+      <rect x="480" y="800" width="600" height="6" rx="3" fill="#0d9488"/>
+      <foreignObject x="480" y="806" width="600" height="184">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="t" style="color:#0f766e">🗂️ KHO TƯ LIỆU</span><span class="st ok">✓ ĐANG CHẠY</span></div>
+          <ul style="color:#0d9488">
+            <li>Nhận cấu trúc chiến dịch từ BOSS → soạn danh sách bài cần đăng lên social</li>
+            <li>Tư liệu <b>Private</b>: ảnh, thông số, case khách thật · <b>Public</b>: tin ngành, số liệu thị trường</li>
+            <li>Kho từ khóa 152 mục phân nhóm ý định <span class="st ok">✓</span> · 7 cụm content (checklist, glossary, tip, qa, engage, portrait, news) <span class="st ok">✓</span></li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+
+    <!-- ================= HÀNG 5 : DÂY CHUYỀN + AI CREATOR ================= -->
+    <g>
+      <rect x="430" y="1070" width="700" height="230" rx="14" fill="#eff6ff" stroke="#2563eb" stroke-width="1.8"/>
+      <rect x="430" y="1070" width="700" height="6" rx="3" fill="#2563eb"/>
+      <foreignObject x="430" y="1076" width="700" height="224">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="t" style="color:#1d4ed8">⚙️ DÂY CHUYỀN SẢN XUẤT</span><span class="tag aitag">AI</span><span class="t" style="color:#6d28d9">✍️ AI SÁNG TẠO (CREATOR)</span><span class="st ok">✓ NỀN ĐANG CHẠY</span></div>
+          <ul style="color:#2563eb">
+            <li><b>Creator nhận lệnh từ Planner</b> → viết <b>2 kịch bản A/B</b> cho video shorts, bài chuẩn SEO, text Ads <span class="st no">✗ A/B CHƯA CÓ</span></li>
+            <li>Cỗ máy 4 bước: <b>brief → draft → duyệt (người bấm) → publish</b> · approval_queue chặn 100% bài trước khi đăng (7 điều cấm) <span class="st ok">✓</span></li>
+            <li>Dây chuyền video 2 bản: dọc TikTok + ngang FB/YTB, intro/outro animation <span class="st ok">✓</span> · Xưởng một chạm sinh video <span class="st ok">✓</span></li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+
+    <!-- ================= HÀNG 6 : BA KÊNH PHÂN PHỐI ================= -->
+    <g>
+      <rect x="60" y="1380" width="440" height="340" rx="14" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.8"/>
+      <rect x="60" y="1380" width="440" height="6" rx="3" fill="#16a34a"/>
+      <foreignObject x="60" y="1386" width="440" height="334">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="t" style="color:#15803d">🔍 SEO</span><span class="st mid">◐ ĐANG LÀM</span></div>
+          <ul style="color:#16a34a">
+            <li>Đẩy info public: bài lên website sdvico.vn <span class="st no">✗ CHƯA CÓ BÀI THẬT</span></li>
+            <li>Đi backlink tập trung theo keywords <span class="st no">✗</span></li>
+            <li>SEO địa phương theo tỉnh phủ dịch vụ (tuần 36) <span class="st no">✗</span></li>
+            <li>Rà SEO tự động seo-audit.mjs (Playwright + Lighthouse) <span class="st mid">◐ CÓ TOOL, CHƯA CHẠY ĐỀU</span></li>
+            <li>Đo bằng: thứ hạng từ khóa (Search Console) + traffic (GA4)</li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+    <g>
+      <rect x="560" y="1380" width="440" height="340" rx="14" fill="#fdf2f8" stroke="#db2777" stroke-width="1.8"/>
+      <rect x="560" y="1380" width="440" height="6" rx="3" fill="#db2777"/>
+      <foreignObject x="560" y="1386" width="440" height="334">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="t" style="color:#be185d">📣 SOCIAL</span><span class="st mid">◐ 1/4 KÊNH</span></div>
+          <ul style="color:#db2777">
+            <li>FB Page: đăng đều, token vĩnh viễn <span class="st ok">✓ ĐANG CHẠY</span></li>
+            <li>FB cá nhân + hội nhóm: seeding, đẩy video + bài text <span class="st no">✗</span></li>
+            <li>TikTok: API đăng được nhưng kẹt SELF_ONLY <span class="st mid">◐ CHỜ AUDIT</span></li>
+            <li>YouTube: tự đăng qua Data API (tuần 35) <span class="st no">✗ CHỜ OAUTH</span></li>
+            <li>Zalo OA: phễu chăm sóc + báo giá (tuần 37) <span class="st no">✗</span></li>
+            <li>Chủ lực: video shorts 10–20s gây chú ý + video SP giới thiệu — mỗi bài 2 bản A/B</li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+    <g>
+      <rect x="1060" y="1380" width="440" height="340" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="1.8"/>
+      <rect x="1060" y="1380" width="440" height="6" rx="3" fill="#ea580c"/>
+      <foreignObject x="1060" y="1386" width="440" height="334">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="t" style="color:#c2410c">💰 AD — QUẢNG CÁO TRẢ PHÍ</span><span class="st no">✗ CHƯA CÓ</span></div>
+          <ul style="color:#ea580c">
+            <li>Kênh chạy: Facebook, Google, TikTok, Zalo</li>
+            <li>Đánh giá hiệu quả theo <b>Click-to-Action, 1 điểm chạm</b></li>
+            <li>Đo bằng <b>CPC</b> từng kịch bản A/B + chi phí / 1 liên hệ thật</li>
+            <li>Ngân sách do BOSS đề xuất trong cấu trúc chiến dịch, dồn theo kịch bản thắng</li>
+            <li>Hạn mức tổng cần sếp duyệt riêng, tách khỏi chi phí mô hình</li>
+          </ul>
+        </div></div>
+      </foreignObject>
+    </g>
+
+    <!-- ================= HÀNG 7 : ĐO LƯỜNG + AI EVALUATOR ================= -->
+    <g>
+      <rect x="60" y="1800" width="1440" height="250" rx="14" fill="#eef2ff" stroke="#4f46e5" stroke-width="1.8"/>
+      <rect x="60" y="1800" width="1440" height="6" rx="3" fill="#4f46e5"/>
+      <foreignObject x="60" y="1806" width="1440" height="244">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="fo"><div class="box">
+          <div class="hd"><span class="t" style="color:#4338ca">📊 ĐO LƯỜNG — đổ về bảng mkt_metrics</span><span class="st mid">◐ 1/5 NGUỒN</span><span style="width:18px"></span><span class="tag aitag">AI</span><span class="t" style="color:#6d28d9">🧪 AI ĐÁNH GIÁ (EVALUATOR)</span><span class="st no">✗ CHƯA CÓ</span></div>
+          <div class="cols">
+            <div>
+              <div class="subhd">Nguồn số liệu</div>
+              <ul style="color:#4f46e5">
+                <li>FB Insights 30 phút/lần: reactions, view, người xem, giây xem, follower <span class="st ok">✓ ĐANG CHẠY</span></li>
+                <li>Google Search Console <span class="st no">✗ TUẦN 35</span> · Google Analytics 4 <span class="st no">✗ TUẦN 35</span> · YouTube Analytics <span class="st no">✗</span></li>
+                <li>CPC + Click-to-Action từ các kênh Ads <span class="st no">✗</span></li>
+                <li>Cuộc gọi / tin nhắn tổng đài 1900 23 23 49 theo nguồn — thước đo ra tiền thật <span class="st mid">◐ TUẦN 36</span></li>
+              </ul>
+            </div>
+            <div>
+              <div class="subhd">Evaluator làm gì</div>
+              <ul style="color:#7c3aed">
+                <li>Đọc CPC, Click-to-Action, insight từ khối Đo lường</li>
+                <li>So sánh kịch bản <b>A vs B</b> theo từng cụm nội dung, từng kênh</li>
+                <li>Báo cáo BOSS, ví dụ: <i>"Kịch bản B (tiết kiệm chi phí) đang ra chuyển đổi rẻ hơn kịch bản A (công nghệ), đề xuất dồn ngân sách vào B"</i></li>
+              </ul>
+            </div>
+          </div>
+        </div></div>
+      </foreignObject>
+    </g>
+  </svg>
+  </div>
+
+  <div class="note">
+    <b>Bốn vai AI trong một vòng lặp kín:</b> ① <span class="diff">2 AI Data</span> — con học data nội bộ công ty, con học data public ngành cá, cấp dữ liệu khi BOSS gọi. ② <span class="diff">AI Planner (BOSS)</span> — khối khởi đầu: nhận mục tiêu doanh thu/traffic từ cậu, gọi dữ liệu từ 2 AI Data, trả ra cấu trúc chiến dịch (sản phẩm nào, kênh nào, ngân sách bao nhiêu). ③ <span class="diff">AI Creator</span> — nằm trong Dây chuyền: nhận lệnh Planner, viết 2 kịch bản A/B cho video shorts, bài chuẩn SEO, text Ads. ④ <span class="diff">AI Evaluator</span> — nằm cạnh Đo lường: đọc CPC và click-to-action, so sánh A/B, báo cáo BOSS. Cuối vòng, <b>BOSS tổng hợp và gửi kết quả về tất cả các AI để học tiếp — chính BOSS cũng tự học</b>, nên kế hoạch vòng sau luôn tốt hơn vòng trước. Nét đứt chàm là đường số liệu về BOSS, nét đứt tím là đường BOSS phát kết quả xuống. Con người vẫn giữ 2 chốt: giao mục tiêu ở đầu vòng và bấm duyệt trước khi đăng (7 điều cấm). — Cập nhật 18/8/2026, trạng thái đối chiếu roadmap tuần 34.
+  </div>
+
+</div>
+</body>
+</html>

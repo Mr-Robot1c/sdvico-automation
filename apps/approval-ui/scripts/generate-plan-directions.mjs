@@ -62,12 +62,15 @@ if (planId) {
 }
 console.log(`Cap nhat plan id: ${plan.id} (sinh luc ${plan.created_at})`);
 
-// Doc tri thuc 7 ngay
+// Doc tri thuc 7 ngay + muc tieu tuan (nguoi giao cho BOSS)
 const since = new Date(Date.now() - 7 * 86400000).toISOString();
-const [{ data: internal }, { data: publicSrc }] = await Promise.all([
+const [{ data: internal }, { data: publicSrc }, { data: goalRow }] = await Promise.all([
   client.from('mkt_knowledge_internal').select('title, summary, needs_gov_review').gte('created_at', since).order('created_at', { ascending: false }).limit(20),
   client.from('mkt_knowledge_public').select('source_title, summary, source_url, needs_gov_review').gte('created_at', since).order('created_at', { ascending: false }).limit(30),
+  client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
 ]);
+const goalText = String(goalRow?.value?.text || '').trim();
+if (goalText) console.log(`Muc tieu tuan: ${goalText}`);
 
 console.log(`Doc ${internal?.length || 0} noi bo, ${publicSrc?.length || 0} public`);
 if (!internal?.length && !publicSrc?.length) {
@@ -96,6 +99,7 @@ const knowledgeBlock = [
 
 const prompt = `Ban la chuyen gia marketing cho SDVICO, cong ty phan phoi thiet bi cho ngu dan va tau ca Viet Nam.
 
+${goalText ? `MUC TIEU TUAN TU NGUOI QUAN LY (bam sat khi chon huong): ${goalText}\n` : ''}
 Danh muc san pham cua cong ty:
 ${PRODUCTS.map((p) => '- ' + p).join('\n')}
 

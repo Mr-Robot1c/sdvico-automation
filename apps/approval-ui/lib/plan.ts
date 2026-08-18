@@ -71,6 +71,8 @@ export type Plan = {
   products: PlanProduct[];
   weights: Record<string, number>; // product -> mức ưu tiên, cho /api/rotate
   narrative: string[];
+  // v3 (18/8): mục tiêu tuần do người giao (app_config mkt_weekly_goal) tại thời điểm sinh bản này.
+  goal?: string;
   // v2 (18/8): hướng đi cụ thể tuần tới, sinh từ tri thức. Bản cũ không có -> undefined.
   content_suggestions?: ContentDirection[];
   summary: {
@@ -227,10 +229,12 @@ export async function generateAndStorePlan(
   generatedBy: 'cron' | 'manual'
 ): Promise<{ id: string | null; plan: Plan }> {
   const now = new Date();
-  const [measurement, knowledge] = await Promise.all([
+  const [measurement, knowledge, goalRes] = await Promise.all([
     loadMeasurement(client),
     loadRecentKnowledge(client, 7, 30),
+    client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
   ]);
+  const goal = String(((goalRes.data as any)?.value?.text) || '').trim();
   const knowledgeUsed: KnowledgeUsed = {
     internal: knowledge.internal.length,
     publicSrc: knowledge.publicSrc.length,
@@ -249,6 +253,7 @@ export async function generateAndStorePlan(
   const plan = buildPlan(measurement, {
     generatedAt: now.toISOString(),
     knowledge: knowledgeUsed,
+    goal: goal || undefined,
   });
   const win = weekWindowVN(now);
   const { data, error } = await client
@@ -278,12 +283,13 @@ const WEIGHT_BY_TIER: Record<Tier, number> = {
 // đi vào narrative để bà con biết bản này bám bao nhiêu nguồn nội bộ + public.
 export function buildPlan(
   m: Measurement,
-  opts: { threshold?: number; weeklyBudget?: number; generatedAt: string; knowledge?: KnowledgeUsed } = { generatedAt: '' }
+  opts: { threshold?: number; weeklyBudget?: number; generatedAt: string; knowledge?: KnowledgeUsed; goal?: string } = { generatedAt: '' }
 ): Plan {
   const threshold = opts.threshold ?? 3;
   const weeklyBudget = opts.weeklyBudget ?? 14;
   const generatedAt = opts.generatedAt || '';
   const knowledge = opts.knowledge;
+  const goal = opts.goal;
 
   // Xếp sản phẩm đủ mẫu theo đơn/lead trung bình rồi tương tác trung bình.
   const ranked = m.products
@@ -338,7 +344,8 @@ export function buildPlan(
     weeklyBudget,
     products: all,
     weights,
-    narrative: buildNarrative(all, summary, weeklyBudget, threshold, knowledge),
+    goal,
+    narrative: buildNarrative(all, summary, weeklyBudget, threshold, knowledge, goal),
     summary
   };
 }
@@ -355,9 +362,15 @@ function buildNarrative(
   s: Plan['summary'],
   weeklyBudget: number,
   threshold: number,
-  knowledge?: KnowledgeUsed
+  knowledge?: KnowledgeUsed,
+  goal?: string
 ): string[] {
   const paras: string[] = [];
+
+  // Mục tiêu tuần do người giao đứng đầu bản kế hoạch — BOSS nhận việc từ người, không tự đặt.
+  if (goal) {
+    paras.push(`Mục tiêu tuần được giao: ${goal}`);
+  }
 
   // Đoạn mở đầu về nguồn tri thức đã đọc — bám AC-3 và AC-4 trong ba-spec (nếu cả hai == 0
   // thì phải nói rõ thiếu nguồn, không im lặng bỏ qua). Đoạn này CHẠY TRƯỚC early return
