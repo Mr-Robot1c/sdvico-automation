@@ -60,7 +60,7 @@ function DangerDelete({
 
   if (!open) {
     return (
-      <button className="btn del" type="button" style={{ fontSize: '0.85em' }} onClick={() => setOpen(true)}>
+      <button className="btn-danger-link" type="button" onClick={() => setOpen(true)}>
         {buttonLabel}
       </button>
     );
@@ -186,7 +186,11 @@ function CandidateCard({ c, windows, openJobs }: { c: CandView; windows: string[
       <div className="head">
         <span className="cand-name">{c.name}</span>
         <span className="row-right">
-          {hasScore ? <span className="score" title="Điểm chấm tự động">{c.score}/100</span> : null}
+          {hasScore && (c.score ?? 0) > 0 ? (
+            <span className="score" title="Điểm chấm tự động">{c.score}/100</span>
+          ) : (
+            <span className="muted" style={{ fontSize: '0.85em' }} title="Máy chưa chấm hồ sơ này">Chưa chấm</span>
+          )}
           <time className="time" dateTime={c.createdAt} suppressHydrationWarning>{formatRelative(c.createdAt)}</time>
         </span>
       </div>
@@ -330,27 +334,32 @@ function CandidateCard({ c, windows, openJobs }: { c: CandView; windows: string[
             <ReinviteControl appId={c.appId} jobs={openJobs} />
           </div>
         ) : null}
-        {c.sourced ? (
-          <DangerDelete
-            action={rejectSourced}
-            candidateId={c.id}
-            candidateName={c.name}
-            buttonLabel="Từ chối và xoá"
-            title="Từ chối và xóa khỏi cơ sở dữ liệu?"
-            warning="Ứng viên nguồn ngoài chưa có consent, từ chối là xóa hẳn thông tin theo Nghị định 13. Không khôi phục được."
-          />
-        ) : null}
-        {!c.sourced && c.id ? (
-          <DangerDelete
-            action={deleteCandidate}
-            candidateId={c.id}
-            candidateName={c.name}
-            buttonLabel="Xóa hồ sơ"
-            title="Xóa vĩnh viễn hồ sơ này?"
-            warning="Xóa cả điểm chấm, thư mời và mọi dữ liệu liên quan của ứng viên. Không khôi phục được."
-          />
-        ) : null}
       </div>
+
+      {/* Hàng phụ: nút phá huỷ tách khỏi các nút chính để tránh bấm nhầm. */}
+      {c.sourced || (!c.sourced && c.id) ? (
+        <div className="card-danger-row">
+          {c.sourced ? (
+            <DangerDelete
+              action={rejectSourced}
+              candidateId={c.id}
+              candidateName={c.name}
+              buttonLabel="Từ chối và xoá"
+              title="Từ chối và xóa khỏi cơ sở dữ liệu?"
+              warning="Ứng viên nguồn ngoài chưa có consent, từ chối là xóa hẳn thông tin theo Nghị định 13. Không khôi phục được."
+            />
+          ) : (
+            <DangerDelete
+              action={deleteCandidate}
+              candidateId={c.id}
+              candidateName={c.name}
+              buttonLabel="Xóa hồ sơ"
+              title="Xóa vĩnh viễn hồ sơ này?"
+              warning="Xóa cả điểm chấm, thư mời và mọi dữ liệu liên quan của ứng viên. Không khôi phục được."
+            />
+          )}
+        </div>
+      ) : null}
     </li>
   );
 }

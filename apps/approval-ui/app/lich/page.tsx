@@ -77,26 +77,37 @@ export default async function Page() {
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
 
-      <form action={saveWindows} className="settings-box">
-        <label htmlFor="windows"><b>Khung giờ phỏng vấn mong muốn</b></label>
-        <p className="muted" style={{ margin: '2px 0 8px' }}>Máy tự sắp lịch trong các khung này, các ngày làm việc. Nhập giờ cách nhau bằng dấu phẩy.</p>
-        <div className="row">
-          <input className="note" id="windows" name="windows" defaultValue={windows.join(', ')} placeholder="09:00, 10:30, 14:00, 15:30" />
-          <button className="btn ok" type="submit">Lưu khung giờ</button>
-        </div>
-      </form>
+      {/* Cấu hình khung giờ và sức chứa — gập lại mặc định để danh sách phỏng vấn nằm ngay dưới
+          tiêu đề. Ai chỉnh cấu hình bấm mở, chỉnh xong đóng lại. */}
+      <details className="settings-details">
+        <summary>
+          Cấu hình khung giờ và sức chứa
+          <span className="settings-summary-note">
+            {windows.length} khung · {capacity} người/khung
+          </span>
+        </summary>
 
-      <form action={saveCapacity} className="settings-box">
-        <label htmlFor="capacity"><b>Sức chứa mỗi khung</b></label>
-        <p className="muted" style={{ margin: '2px 0 8px' }}>
-          Số ứng viên tối đa cùng được đề xuất một khung giờ. 1 nghĩa là một kèm một. Đặt cao hơn
-          để phỏng vấn nhóm hoặc chạy song song nhiều phòng.
-        </p>
-        <div className="row">
-          <input className="note" id="capacity" name="capacity" type="number" min={1} max={20} step={1} defaultValue={capacity} style={{ maxWidth: 120 }} />
-          <button className="btn ok" type="submit">Lưu sức chứa</button>
-        </div>
-      </form>
+        <form action={saveWindows} className="settings-box">
+          <label htmlFor="windows"><b>Khung giờ phỏng vấn mong muốn</b></label>
+          <p className="muted" style={{ margin: '2px 0 8px' }}>Máy tự sắp lịch trong các khung này, các ngày làm việc. Nhập giờ cách nhau bằng dấu phẩy.</p>
+          <div className="row">
+            <input className="note" id="windows" name="windows" defaultValue={windows.join(', ')} placeholder="09:00, 10:30, 14:00, 15:30" />
+            <button className="btn ok" type="submit">Lưu khung giờ</button>
+          </div>
+        </form>
+
+        <form action={saveCapacity} className="settings-box">
+          <label htmlFor="capacity"><b>Sức chứa mỗi khung</b></label>
+          <p className="muted" style={{ margin: '2px 0 8px' }}>
+            Số ứng viên tối đa cùng được đề xuất một khung giờ. 1 nghĩa là một kèm một. Đặt cao hơn
+            để phỏng vấn nhóm hoặc chạy song song nhiều phòng.
+          </p>
+          <div className="row">
+            <input className="note" id="capacity" name="capacity" type="number" min={1} max={20} step={1} defaultValue={capacity} style={{ maxWidth: 120 }} />
+            <button className="btn ok" type="submit">Lưu sức chứa</button>
+          </div>
+        </form>
+      </details>
 
       {!error && active.length === 0 ? (
         <div className="empty">

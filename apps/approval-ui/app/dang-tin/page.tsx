@@ -1,8 +1,9 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
-import { addJobPost } from '../actions';
+import { addJobPost, trackPostedPost } from '../actions';
 import { SubmitButton } from '../submit-button';
 import PostListClient from '../post-list-client';
+import { getAllChannels, isManual } from '../../lib/channels';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,7 @@ type Post = {
   id: string; tieu_de: string; trang_thai: string; scheduled_at: string | null;
   posted_at: string | null; noi_dung: string | null; job_id: string | null;
   kenh: string | null; url: string | null; image_url: string | null; ghi_chu: string | null;
-  fb_post_id: string | null; created_at: string;
+  fb_post_id: string | null; proof_path: string | null; created_at: string;
 };
 
 type RunEntry = { task: string; status: string; created_at: string };
@@ -29,7 +30,7 @@ export default async function Page() {
   const [jRes, aqRes, logRes, jobsRes] = await Promise.all([
     client
       .from('hr_job_posts')
-      .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, fb_post_id, created_at')
+      .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, fb_post_id, proof_path, created_at')
       .is('deleted_at', null)
       .order('created_at', { ascending: false }).limit(100),
     client
@@ -66,6 +67,17 @@ export default async function Page() {
   );
   const openNeedingPost = openJobs.filter((j) => !activePostJobIds.has(j.id));
 
+  // Worklist "Đăng thủ công": bài kênh thủ công đã duyệt nhưng chưa đăng — việc người vận hành cần làm.
+  const manualToPost = posts.filter(
+    (p) => isManual(p.kenh) && approvedPostIds.has(p.id) && p.trang_thai !== 'posted' && p.trang_thai !== 'cancelled'
+  ).length;
+  // Tất cả kênh (built-in + tự thêm). Dùng cho: form track-only + nhãn/panel trong danh sách bài.
+  const allChannels = await getAllChannels(client);
+  const manualChannels = allChannels.filter((c) => c.enabled && c.method === 'manual');
+  const channelMeta = Object.fromEntries(
+    allChannels.map((c) => [c.kenh, { ten: c.ten, post_url: c.post_url, field_hints: c.field_hints }])
+  );
+
   const missing = (code?: string) => code === 'PGRST205' || code === '42P01' || code === '42703';
   const needMigration = missing(jRes.error?.code);
 
@@ -73,7 +85,8 @@ export default async function Page() {
     <main>
       <header className="head-row">
         <div>
-          <h1>Tin đăng tuyển dụng</h1>
+          <h1>Tin đăng</h1>
+          <p className="sub">Danh sách bài tuyển dụng đã soạn: nháp, đặt lịch, đã đăng và bài đăng thủ công chờ ghi nhận.</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>
@@ -91,13 +104,55 @@ export default async function Page() {
         </span>
       </div>
 
+      {/* Worklist đăng thủ công: bài đã duyệt trên kênh không có API, chờ người vận hành đăng lên. */}
+      {manualToPost > 0 ? (
+        <div className="sys-status" style={{ marginTop: 8 }}>
+          <span className="sys-label">Đăng thủ công:</span>
+          <span className="sys-chip tone-mkt">
+            <span className="sys-dot" />
+            {manualToPost} bài đã duyệt, chờ bạn đăng lên kênh (mở bài để lấy nội dung và dán link về)
+          </span>
+        </div>
+      ) : null}
+
       {needMigration ? (
         <div className="err" role="alert">
           Chưa bật đủ tính năng. Chạy migration <code>20260812090000_hr_social_posts.sql</code> trong Supabase rồi tải lại.
         </div>
       ) : (
-        <PostListClient posts={posts} approvedPostIds={[...approvedPostIds]} />
+        <PostListClient posts={posts} approvedPostIds={[...approvedPostIds]} channelMeta={channelMeta} />
       )}
+
+      {/* Ghi nhận đã đăng (track-only): người tự đăng thẳng trên sàn có form riêng, chỉ ghi link để theo dõi.
+          Không soạn, không qua Duyệt — vì không có nội dung máy sinh để gửi (điều cấm 1 không áp dụng). */}
+      {manualChannels.length > 0 ? (
+        <form action={trackPostedPost} className="settings-box" style={{ marginTop: 16 }}>
+          <b>Ghi nhận đã đăng (đăng thẳng trên nền tảng)</b>
+          <p className="muted" style={{ margin: '4px 0 8px', fontSize: '0.85em' }}>
+            Dùng khi bạn tự đăng trực tiếp trên sàn (TopCV, VietnamWorks, ...) theo form riêng của sàn,
+            không cần máy soạn. Chỉ ghi nhận link + ảnh để theo dõi — không qua bước Duyệt.
+          </p>
+          <div className="row" style={{ marginTop: 4, flexWrap: 'wrap', gap: 8 }}>
+            <select className="note" name="kenh" required aria-label="Kênh">
+              {manualChannels.map((c) => <option key={c.kenh} value={c.kenh}>{c.ten}</option>)}
+            </select>
+            <select className="note" name="job_id" aria-label="Vị trí (tùy chọn)" defaultValue="">
+              <option value="">— Gắn vị trí (tùy chọn) —</option>
+              {allJobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
+            </select>
+          </div>
+          <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <input className="note" type="url" name="url" placeholder="Link bài đã đăng trên sàn" aria-label="Link bài đã đăng" />
+            <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: 'var(--ink-2)' }}>Ảnh bằng chứng:</span>
+              <input type="file" name="proof_file" accept="image/*" style={{ fontSize: '0.85em' }} />
+            </label>
+          </div>
+          <div className="row" style={{ marginTop: 8 }}>
+            <SubmitButton label="Ghi nhận đã đăng" />
+          </div>
+        </form>
+      ) : null}
 
       <form action={addJobPost} className="settings-box" style={{ marginTop: 16 }}>
         <b>Thêm tin đăng thủ công</b>

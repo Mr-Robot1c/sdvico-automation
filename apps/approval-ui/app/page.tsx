@@ -3,7 +3,7 @@ import AutoRefresh from './auto-refresh';
 import DecideActions from './decide-actions';
 import { SubmitButton } from './submit-button';
 import { editJobPostDraft } from './actions';
-import { kindMeta, formatRelative, payloadRows } from './labels';
+import { kindMeta, formatRelative, splitPayload } from './labels';
 import { linkedinConfigured } from '../lib/linkedin';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
@@ -162,7 +162,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
       <ul className="list">
         {items.map((item) => {
           const meta = kindMeta(item.kind);
-          const rows = payloadRows(item.payload);
+          const { primary, secondary } = splitPayload(item.payload);
           const payload = item.payload as Record<string, unknown>;
           const postId = item.kind === 'hr_job_post' ? (payload?.post_id as string) : null;
           const hrPost = postId ? hrPostMap[postId] : null;
@@ -237,17 +237,32 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   </details>
                 </>
               ) : (
-                /* Các loại khác: hiển thị trường payload dạng danh sách */
-                rows.length > 0 ? (
-                  <dl className="fields">
-                    {rows.map((r) => (
-                      <div className={`field ${r.long ? 'field-long' : ''}`} key={r.key}>
-                        <dt>{r.label}</dt>
-                        <dd>{r.long ? <pre>{r.value}</pre> : r.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                ) : null
+                /* Các loại khác: nội dung chính lên đầu, metadata gập lại phía dưới. */
+                <>
+                  {primary.length > 0 ? (
+                    <div className="content-preview">
+                      {primary.map((r) => (
+                        <div className="content-block" key={r.key}>
+                          {primary.length > 1 ? <div className="content-label">{r.label}</div> : null}
+                          <pre className="content-body">{r.value}</pre>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {secondary.length > 0 ? (
+                    <details className="raw meta-details">
+                      <summary>Chi tiết kỹ thuật ({secondary.length} trường)</summary>
+                      <dl className="fields" style={{ marginTop: 8 }}>
+                        {secondary.map((r) => (
+                          <div className={`field ${r.long ? 'field-long' : ''}`} key={r.key}>
+                            <dt>{r.label}</dt>
+                            <dd>{r.long ? <pre>{r.value}</pre> : r.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+                  ) : null}
+                </>
               )}
 
               <DecideActions

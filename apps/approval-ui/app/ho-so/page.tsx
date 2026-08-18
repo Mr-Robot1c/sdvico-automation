@@ -1,7 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import CandidateList, { type CandView } from '../candidate-list';
-import { axisLabel } from '../labels';
+import { axisLabel, formatDate } from '../labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 export const dynamic = 'force-dynamic';
@@ -121,7 +121,9 @@ export default async function Page() {
       subject: c.cv_json?.source_message?.subject || '',
       attachments: (c.cv_json?.attachments || []).map((a) => a.filename).filter(Boolean).join(', '),
       consent:
-        (c.consent_at ? new Date(c.consent_at).toLocaleDateString('vi-VN') : '—') + ' · ' + (c.retention_until || '—'),
+        (c.consent_at ? formatDate(c.consent_at) : 'Chưa có') +
+        ' · lưu tới ' +
+        (c.retention_until ? formatDate(c.retention_until) : 'chưa đặt'),
       createdAt: c.created_at,
       stages: (c.hr_applications || []).map((a) => a.stage),
       appId: app?.id || null,

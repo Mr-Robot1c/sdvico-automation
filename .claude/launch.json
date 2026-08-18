@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "ui:dev"],
       "port": 3000
+    },
+    {
+      "name": "approval-ui-basic",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set AUTH_MODE=basic&& npm run ui:dev"],
+      "port": 3000
     }
   ]
 }

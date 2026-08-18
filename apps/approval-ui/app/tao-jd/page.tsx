@@ -1,13 +1,31 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { formatRelative } from '../labels';
+import { formatRelative, formatDateTime } from '../labels';
 import { JOB_GROUPS, JD_CHANNELS, GROUP_BY_KEY } from '../../lib/jd-groups';
-import { editJdVersion, regenerateJd, deleteJd, openAndQueueFbPost, openAndQueueLinkedInPost, finalizeJd } from '../actions';
+import { editJdVersion, regenerateJd, deleteJd, openAndQueueFbPost, openAndQueueLinkedInPost, openAndQueueChannelPost, finalizeJd } from '../actions';
 import { SubmitButton } from '../submit-button';
 import AutoPostToggle from './auto-post-toggle';
 import AddJobPanel from './add-job-panel';
 import RemoveJobButton from './remove-job-button';
+import { enabledChannels } from '../../lib/channels';
 
 export const dynamic = 'force-dynamic';
+
+// Nút "Soạn [Kênh]" cho các sàn đang bật ngoài Facebook/LinkedIn (đã có nút riêng).
+// Kênh thủ công (TopCV, VietnamWorks, ...): soạn nháp -> đưa vào Duyệt như FB/LinkedIn.
+function ChannelComposeButtons({ jobId, channels }: { jobId: string; channels: { kenh: string; ten: string }[] }) {
+  if (channels.length === 0) return null;
+  return (
+    <>
+      {channels.map((c) => (
+        <form key={c.kenh} action={openAndQueueChannelPost}>
+          <input type="hidden" name="job_id" value={jobId} />
+          <input type="hidden" name="kenh" value={c.kenh} />
+          <SubmitButton label={`Soạn ${c.ten}`} pendingLabel="Đang soạn..." className="btn ghost" style={{ fontSize: '0.85em' }} />
+        </form>
+      ))}
+    </>
+  );
+}
 
 type Job = {
   id: string; title: string; department: string | null; location: string | null;
@@ -53,7 +71,7 @@ function postStatusLabel(
     };
   }
   if (post.trang_thai === 'scheduled') {
-    const t = post.scheduled_at ? new Date(post.scheduled_at).toLocaleString('vi-VN') : '?';
+    const t = post.scheduled_at ? formatDateTime(post.scheduled_at) : 'chưa rõ';
     return {
       text: `Hẹn đăng lúc ${t}`, tone: 'mkt',
       composeLabel: 'Đã lên lịch', composeDisabled: true, needsRefresh: false,
@@ -93,6 +111,11 @@ export default async function Page() {
   const allJobs = (jobsRes.data || []) as Job[];
   const allPosts = (postsRes.data || []) as PostRow[];
   const colMissing = jobsRes.error?.code === '42703';
+
+  // Kênh đang bật ngoài Facebook/LinkedIn (đã có nút riêng) — hiện nút "Soạn [Kênh]" theo vị trí.
+  const extraChannels = (await enabledChannels(client))
+    .filter((c) => c.kenh !== 'facebook' && c.kenh !== 'linkedin')
+    .map((c) => ({ kenh: c.kenh, ten: c.ten }));
 
   const latestPostByJob: Record<string, PostRow> = {};
   for (const p of allPosts) {
@@ -178,9 +201,12 @@ export default async function Page() {
                     <input type="hidden" name="job_id" value={j.id} />
                     <SubmitButton label="Soạn LinkedIn" pendingLabel="Đang soạn..." className="btn ghost" />
                   </form>
+                  <ChannelComposeButtons jobId={j.id} channels={extraChannels} />
                   <span style={{ fontSize: 12, color: 'var(--ink-2)', alignSelf: 'center' }}>
                     Refresh mỗi {refreshDays} ngày
                   </span>
+                </div>
+                <div className="card-danger-row">
                   <RemoveJobButton jobId={j.id} jobTitle={j.title} />
                 </div>
               </li>
@@ -228,6 +254,9 @@ export default async function Page() {
                       <input type="hidden" name="job_id" value={j.id} />
                       <SubmitButton label="Soạn LinkedIn" pendingLabel="Đang soạn..." className="btn ghost" />
                     </form>
+                    <ChannelComposeButtons jobId={j.id} channels={extraChannels} />
+                  </div>
+                  <div className="card-danger-row">
                     <RemoveJobButton jobId={j.id} jobTitle={j.title} />
                   </div>
                 </li>
@@ -293,6 +322,7 @@ export default async function Page() {
                       <input type="hidden" name="job_id" value={j.id} />
                       <SubmitButton label="Soạn bài LinkedIn và đưa vào Duyệt" pendingLabel="AI đang soạn bài, chờ 10-20 giây..." className="btn ghost" />
                     </form>
+                    <ChannelComposeButtons jobId={j.id} channels={extraChannels} />
                     <form action={deleteJd}>
                       <input type="hidden" name="job_id" value={j.id} />
                       <SubmitButton label="Xóa nháp" pendingLabel="Đang xoá..." className="btn no" />

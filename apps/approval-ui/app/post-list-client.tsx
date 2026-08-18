@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { updateJobPost, editJobPostDraft, publishJobPost, recomposeDraft } from './actions';
+import { updateJobPost, editJobPostDraft, publishJobPost, recomposeDraft, markPostedManually } from './actions';
 import { SubmitButton } from './submit-button';
-import { formatRelative } from './labels';
+import { formatRelative, formatDateTime } from './labels';
 import { Countdown } from './countdown';
+import { channelLabel, isManual } from '../lib/channels';
 
 function isPast(iso: string | null): boolean {
   if (!iso) return false;
@@ -16,7 +17,7 @@ type Post = {
   scheduled_at: string | null; posted_at: string | null;
   noi_dung: string | null; job_id: string | null; kenh: string | null;
   url: string | null; image_url: string | null; ghi_chu: string | null;
-  fb_post_id: string | null; created_at: string;
+  fb_post_id: string | null; proof_path: string | null; created_at: string;
 };
 
 const TT: Record<string, { label: string; tone: string }> = {
@@ -25,11 +26,6 @@ const TT: Record<string, { label: string; tone: string }> = {
   posted: { label: 'Đã đăng', tone: 'ok' },
   failed: { label: 'Lỗi', tone: 'no' },
   cancelled: { label: 'Đã huỷ', tone: 'no' },
-};
-
-const KENH: Record<string, string> = {
-  facebook: 'Facebook', linkedin: 'LinkedIn', zalo: 'Zalo',
-  job_board: 'Trang tuyển dụng', website: 'Website', other: 'Khác',
 };
 
 // Nút copy nội dung bài để dán tay vào Nhóm Facebook (FB đã chặn API đăng Nhóm).
@@ -59,13 +55,19 @@ function CopyButton({ text }: { text: string }) {
 type Mode = 'view' | 'edit';
 type DeleteTarget = { id: string; tieu_de: string; trang_thai: string; fbLinked: boolean };
 
+type ChannelMeta = Record<string, { ten: string; post_url: string | null; field_hints: string[] }>;
+
 export default function PostListClient({
   posts,
   approvedPostIds,
+  channelMeta = {},
 }: {
   posts: Post[];
   approvedPostIds: string[];
+  channelMeta?: ChannelMeta;
 }) {
+  // Nhãn kênh: ưu tiên cấu hình từ server (phủ cả kênh người dùng tự thêm), lùi về registry code.
+  const chLabel = (k?: string | null) => (k && channelMeta[k]?.ten) || channelLabel(k);
   const [openId, setOpenId] = useState<string | null>(null);
   const [openMode, setOpenMode] = useState<Mode>('view');
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -80,7 +82,11 @@ export default function PostListClient({
   };
 
   if (posts.length === 0) {
-    return <p className="muted">Chưa có tin đăng nào. Vào tab Vị trí, bấm &quot;Soạn bài Facebook&quot; để tạo bài.</p>;
+    return (
+      <p className="muted">
+        Chưa có tin đăng nào. Sang <a href="/tao-jd">Vị trí tuyển dụng</a> rồi bấm &quot;Soạn bài Facebook&quot; ở vị trí muốn đăng.
+      </p>
+    );
   }
 
   return (
@@ -91,6 +97,11 @@ export default function PostListClient({
           const isApproved = approved.has(p.id);
           const canEdit = p.trang_thai !== 'posted' && p.trang_thai !== 'cancelled';
           const canPost = (isApproved || p.trang_thai === 'failed') && canEdit;
+          // Kênh thủ công (TopCV, VietnamWorks, ...): không đăng bằng API. Đã duyệt + chưa đăng
+          // thì hiện panel "Đăng thủ công" (mở kênh -> đăng -> dán link) thay cho nút "Đăng ngay".
+          const manual = isManual(p.kenh);
+          const chMeta = channelMeta[p.kenh || ''];
+          const canManualPost = manual && isApproved && canEdit;
           const isView = openId === p.id && openMode === 'view';
           const isEdit = openId === p.id && openMode === 'edit';
           const schedDate = p.scheduled_at ? new Date(p.scheduled_at) : null;
@@ -102,7 +113,7 @@ export default function PostListClient({
               <div className="pt-head" onClick={() => toggle(p.id, 'view')}>
                 <span className={`stage tone-${tt.tone}`} style={{ fontSize: '11px', flexShrink: 0 }}>{tt.label}</span>
                 <span className="pt-title">{p.tieu_de}</span>
-                <span className="pt-kenh">{KENH[p.kenh || ''] || p.kenh || '—'}</span>
+                <span className="pt-kenh">{chLabel(p.kenh)}</span>
                 {p.trang_thai === 'scheduled' && p.scheduled_at ? (
                   <span className="pt-time" style={{ color: 'var(--ok)', fontWeight: 600 }}>
                     <Countdown target={p.scheduled_at} prefix="còn " pastLabel="Đến giờ, đang đăng..." />
@@ -111,7 +122,7 @@ export default function PostListClient({
                   <time className="pt-time" suppressHydrationWarning>{formatRelative(p.created_at)}</time>
                 )}
                 <div className="pt-actions" onClick={(e) => e.stopPropagation()}>
-                  {mounted && canPost && isPast(p.scheduled_at) && p.trang_thai === 'scheduled' ? (
+                  {mounted && !manual && canPost && isPast(p.scheduled_at) && p.trang_thai === 'scheduled' ? (
                     <form action={publishJobPost}>
                       <input type="hidden" name="post_id" value={p.id} />
                       <SubmitButton label="Đăng ngay" pendingLabel="Đang đăng..." className="pt-btn ok" />
@@ -145,22 +156,28 @@ export default function PostListClient({
                   <div className="fields" style={{ marginBottom: 10 }}>
                     <div className="field">
                       <dt>Kênh</dt>
-                      <dd>{KENH[p.kenh || ''] || p.kenh || '—'}</dd>
+                      <dd>{chLabel(p.kenh)}</dd>
                     </div>
                     <div className="field">
                       <dt>Giờ đặt đăng</dt>
-                      <dd>{p.scheduled_at ? <><Countdown target={p.scheduled_at} /> ({new Date(p.scheduled_at).toLocaleString('vi-VN')})</> : '—'}</dd>
+                      <dd>{p.scheduled_at ? <><Countdown target={p.scheduled_at} /> ({formatDateTime(p.scheduled_at)})</> : 'Chưa đặt'}</dd>
                     </div>
                     {p.posted_at ? (
                       <div className="field">
                         <dt>Đã đăng lúc</dt>
-                        <dd>{new Date(p.posted_at).toLocaleString('vi-VN')}</dd>
+                        <dd>{formatDateTime(p.posted_at)}</dd>
                       </div>
                     ) : null}
                     {p.url ? (
                       <div className="field">
                         <dt>Đường dẫn</dt>
-                        <dd><a href={p.url} target="_blank" rel="noreferrer">{KENH[p.kenh || ''] || 'Xem bài đã đăng'}</a></dd>
+                        <dd><a href={p.url} target="_blank" rel="noreferrer">{chLabel(p.kenh) || 'Xem bài đã đăng'}</a></dd>
+                      </div>
+                    ) : null}
+                    {p.proof_path ? (
+                      <div className="field">
+                        <dt>Ảnh bằng chứng</dt>
+                        <dd><a href={p.proof_path} target="_blank" rel="noreferrer">Xem ảnh đã đăng</a></dd>
                       </div>
                     ) : null}
                   </div>
@@ -174,14 +191,15 @@ export default function PostListClient({
                     </pre>
                   ) : null}
                   <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                    {canPost ? (
+                    {/* Kênh API (Facebook/LinkedIn) đã duyệt: đăng ngay qua API. Kênh thủ công dùng panel bên dưới. */}
+                    {canPost && !manual ? (
                       <form action={publishJobPost}>
                         <input type="hidden" name="post_id" value={p.id} />
                         <SubmitButton label={p.trang_thai === 'failed' ? 'Thử đăng lại' : 'Đăng ngay'} pendingLabel="Đang đăng..." />
                       </form>
                     ) : null}
                     {!isApproved && canEdit ? (
-                      <span className="muted" style={{ fontSize: '0.85em', alignSelf: 'center' }}>Duyệt trên trang Duyệt để mở khoá Đăng</span>
+                      <span className="muted" style={{ fontSize: '0.85em', alignSelf: 'center' }}>Duyệt trên trang Duyệt để mở khoá {manual ? 'Đăng thủ công' : 'Đăng'}</span>
                     ) : null}
                     {/* Đăng tay vào Nhóm Facebook (FB đã chặn API đăng Nhóm từ 2024): copy rồi dán */}
                     {p.noi_dung ? <CopyButton text={p.noi_dung} /> : null}
@@ -191,6 +209,34 @@ export default function PostListClient({
                       </a>
                     ) : null}
                   </div>
+
+                  {/* Panel đăng thủ công cho kênh không có API: mở kênh -> đăng -> dán link + ảnh bằng chứng. */}
+                  {canManualPost ? (
+                    <div style={{ marginTop: 10, padding: 12, border: '1px dashed var(--line)', borderRadius: 8, background: 'var(--surface)' }}>
+                      <b style={{ fontSize: '0.9em' }}>Đăng thủ công lên {chLabel(p.kenh)}</b>
+                      <ol style={{ margin: '6px 0 10px', paddingLeft: 18, fontSize: '0.85em', color: 'var(--ink-2)', lineHeight: 1.7 }}>
+                        <li>Bấm <b>Copy nội dung</b> ở trên (mở ảnh để lưu nếu cần đính kèm).</li>
+                        <li>
+                          {chMeta?.post_url
+                            ? <>Mở <a href={chMeta.post_url} target="_blank" rel="noreferrer">trang đăng {chLabel(p.kenh)} ↗</a>, dán nội dung và đăng.</>
+                            : <>Đăng trên {chLabel(p.kenh)}.</>}
+                        </li>
+                        <li>Dán link bài vừa đăng vào ô dưới rồi bấm <b>Đánh dấu đã đăng</b>.</li>
+                      </ol>
+                      {chMeta?.field_hints?.length ? (
+                        <p className="muted" style={{ fontSize: '0.82em', margin: '0 0 8px' }}>Gợi ý điền: {chMeta.field_hints.join(' · ')}</p>
+                      ) : null}
+                      <form action={markPostedManually} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input type="hidden" name="post_id" value={p.id} />
+                        <input className="note" type="url" name="url" placeholder={`Link bài đã đăng trên ${chLabel(p.kenh)} (khuyến nghị)`} aria-label="Link bài đã đăng" />
+                        <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ color: 'var(--ink-2)' }}>Ảnh bằng chứng (tùy chọn):</span>
+                          <input type="file" name="proof_file" accept="image/*" style={{ fontSize: '0.85em' }} />
+                        </label>
+                        <SubmitButton label="Đánh dấu đã đăng" pendingLabel="Đang lưu..." className="btn ok" />
+                      </form>
+                    </div>
+                  ) : null}
                 </div>
               )}
 

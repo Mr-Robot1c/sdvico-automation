@@ -26,6 +26,14 @@ export function kindMeta(kind: string): KindMeta {
       return { label: 'Bài marketing', icon: '📣', tone: 'mkt' };
     case 'mkt_publish':
       return { label: 'Đăng nội dung', icon: '🌐', tone: 'mkt' };
+    case 'mkt_publish_content':
+      return { label: 'Nội dung marketing', icon: '📢', tone: 'mkt' };
+    case 'mkt_publish_video':
+      return { label: 'Video marketing', icon: '🎬', tone: 'mkt' };
+    case 'mkt_publish_reel':
+      return { label: 'Reel marketing', icon: '🎞️', tone: 'mkt' };
+    case 'mkt_reply':
+      return { label: 'Trả lời khách hàng', icon: '💬', tone: 'mkt' };
     case 'browser_action':
       return { label: 'Thao tác web', icon: '🖥️', tone: 'web' };
     case 'browser_barrier':
@@ -71,7 +79,45 @@ const FIELD_LABELS: Record<string, string> = {
   fb_comment_id: 'Mã bình luận Facebook',
   goi_y_tra_loi: 'Gợi ý trả lời (máy soạn)',
   reply_text: 'Nội dung trả lời',
+  // Nhánh marketing
+  caption: 'Chú thích',
+  noi_dung: 'Nội dung',
+  text: 'Nội dung',
+  keyword: 'Từ khóa',
+  intent: 'Mục tiêu',
+  format: 'Định dạng',
+  channels: 'Kênh đăng',
+  assets: 'Ảnh / video đính kèm',
+  content_id: 'Mã nội dung',
+  ab_pair_id: 'Cặp A/B',
+  ab_variant: 'Bản A/B',
+  authored: 'Do',
+  risk: 'Mức rủi ro',
+  has_video: 'Có video',
+  post_reel: 'Đăng Reel',
+  suggestion_sources: 'Nguồn gợi ý',
+  from_plan_direction: 'Theo kế hoạch',
+  needs_gov_review: 'Cần duyệt cấp quản lý',
 };
+
+// Trường nào là "nội dung chính" cần đưa lên đầu thẻ duyệt (đọc ngay là hiểu bài viết gì)?
+// Các trường còn lại đẩy vào phần "Chi tiết kỹ thuật" gập lại để không lấn nội dung.
+const PRIMARY_KEYS = new Set([
+  'subject', 'body', 'noi_dung', 'text', 'caption',
+  'thu_moi', 'thu', 'goi_y_tra_loi', 'reply_text',
+]);
+
+// Chia payload thành hai nhóm: primary (đọc ngay) và secondary (kỹ thuật, có thể gập).
+export function splitPayload(payload: unknown): { primary: PayloadRow[]; secondary: PayloadRow[] } {
+  const rows = payloadRows(payload);
+  const primary: PayloadRow[] = [];
+  const secondary: PayloadRow[] = [];
+  for (const r of rows) {
+    if (PRIMARY_KEYS.has(r.key)) primary.push(r);
+    else secondary.push(r);
+  }
+  return { primary, secondary };
+}
 
 export function fieldLabel(key: string): string {
   return FIELD_LABELS[key] || key;
@@ -89,7 +135,25 @@ export function formatRelative(iso: string): string {
   if (hours < 24) return `${hours} giờ trước`;
   const days = Math.round(hours / 24);
   if (days < 7) return `${days} ngày trước`;
-  return new Date(iso).toLocaleString('vi-VN');
+  return formatDateTime(iso);
+}
+
+// Ngày dd/MM/yyyy — chuẩn hiển thị Việt Nam.
+export function formatDate(iso: string | Date | null | undefined): string {
+  if (!iso) return '';
+  const d = iso instanceof Date ? iso : new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+// dd/MM/yyyy HH:mm — không giây, không AM/PM, cùng cách viết ở mọi trang.
+export function formatDateTime(iso: string | Date | null | undefined): string {
+  if (!iso) return '';
+  const d = iso instanceof Date ? iso : new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  const date = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${date} ${time}`;
 }
 
 export type PayloadRow = { key: string; label: string; value: string; long: boolean };
@@ -145,15 +209,11 @@ export function axisLabel(key: string): string {
   return AXIS_LABELS[key] || key;
 }
 
-// Nhãn kênh đăng tin (hr_job_posts.kenh, hr_platforms.loai='social'/'job_board').
-const KENH_LABELS: Record<string, string> = {
-  facebook: 'Facebook', linkedin: 'LinkedIn', zalo: 'Zalo',
-  job_board: 'Trang tuyển dụng', website: 'Website', other: 'Khác',
-};
+// Nhãn kênh đăng tin. Nguồn sự thật ở lib/channels.ts (registry) để không lặp nhiều nơi.
+import { channelLabel } from '../lib/channels';
 
 export function kenhLabel(kenh?: string | null): string {
-  if (!kenh) return 'Khác';
-  return KENH_LABELS[kenh] || kenh;
+  return channelLabel(kenh);
 }
 
 // Nhãn nguồn ứng viên.

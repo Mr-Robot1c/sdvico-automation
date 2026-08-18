@@ -1,6 +1,34 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import DailyChart from './daily-chart';
+import { kindMeta, formatDateTime } from '../labels';
+
+// Nhãn tiếng Việt cho các task hay gặp trong run_log — thay cho mã máy như "hr.publish_facebook".
+const TASK_LABELS: Record<string, string> = {
+  'hr.intake': 'Nạp CV từ hộp thư',
+  'hr-intake': 'Nạp CV từ hộp thư',
+  'hr.screen': 'Chấm điểm CV',
+  'hr-screen': 'Chấm điểm CV',
+  'hr.interview': 'Soạn thư mời phỏng vấn',
+  'hr-interview': 'Soạn thư mời phỏng vấn',
+  'hr.send_email': 'Gửi thư cho ứng viên',
+  'hr.publish_facebook': 'Đăng bài Facebook',
+  'hr.approve_and_publish': 'Duyệt và đăng bài',
+  'hr.publish_linkedin': 'Đăng bài LinkedIn',
+  'hr.queue_facebook': 'Soạn bài Facebook',
+  'hr.publish_facebook_ui': 'Đăng bài Facebook (từ UI)',
+};
+
+function taskLabel(task: string): string {
+  const t = String(task || '');
+  const hit = Object.keys(TASK_LABELS).find((k) => t === k || t.startsWith(k));
+  return hit ? TASK_LABELS[hit] : t;
+}
+
+const STATUS_LABELS: Record<string, string> = { ok: 'Thành công', error: 'Lỗi', warn: 'Cảnh báo' };
+const DECISION_LABELS: Record<string, string> = {
+  approved: 'Đã duyệt', rejected: 'Đã từ chối', dismissed: 'Đã bỏ qua',
+};
 
 // Trang báo cáo. Đọc số thật từ run_log và các bảng nghiệp vụ.
 // Mọi chỉ số đều tính hai mức: 7 ngày qua và 30 ngày qua.
@@ -117,16 +145,16 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Báo cáo</h1>
-          <p className="sub">Số liệu 7 ngày và 30 ngày qua, đọc từ run_log và các bảng nghiệp vụ. Tự làm mới mỗi 30 giây.</p>
+          <p className="sub">Số liệu 7 ngày và 30 ngày qua. Tự làm mới mỗi 30 giây.</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>
 
       <section className="report-grid">
-        <Stat label="CV nạp về" value7={cv7} value30={cands.length} sub="Đếm hồ sơ mới trong hr_candidates" />
-        <Stat label="Lượt nạp CV" value7={intake7} value30={intake30} sub="hr.yml chạy đầu mỗi giờ, bước 1" />
-        <Stat label="Lượt chấm CV" value7={screen7} value30={screen30} sub="hr.yml, bước 2" />
-        <Stat label="Lượt soạn thư mời" value7={interview7} value30={count(runs, 30, ['hr-interview', 'hr.interview'])} sub="hr.yml, bước 3" />
+        <Stat label="CV nạp về" value7={cv7} value30={cands.length} sub="Hồ sơ mới nhận được" />
+        <Stat label="Lượt nạp CV" value7={intake7} value30={intake30} sub="Số lần máy quét hộp thư tuyển dụng" />
+        <Stat label="Lượt chấm CV" value7={screen7} value30={screen30} sub="Số hồ sơ máy đã chấm điểm" />
+        <Stat label="Lượt soạn thư mời" value7={interview7} value30={count(runs, 30, ['hr-interview', 'hr.interview'])} sub="Số thư mời phỏng vấn máy đã soạn" />
 
         <Stat
           label="Bài đăng thành công"
@@ -138,7 +166,7 @@ export default async function Page() {
         <Stat
           label="Thư gửi ứng viên"
           value7={mailOk7} value30={mailOk30}
-          sub={mailErr30 > 0 ? `${mailErr30} lần gửi hỏng trong 30 ngày, kiểm hàng đợi Duyệt` : 'Không có lần gửi hỏng'}
+          sub={mailErr30 > 0 ? `${mailErr30} lần gửi hỏng trong 30 ngày. Xem lại ở trang Duyệt.` : 'Không có lần gửi hỏng'}
           tone={mailErr30 > 0 ? 'warn' : 'ok'}
         />
       </section>
@@ -163,72 +191,70 @@ export default async function Page() {
         {recentRuns.length === 0 ? (
           <p className="muted">Chưa có nhật ký nào trong 30 ngày qua.</p>
         ) : (
-          <table className="run-log">
-            <thead>
-              <tr>
-                <th>Lúc</th>
-                <th>Việc</th>
-                <th>Kết quả</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentRuns.map((r, i) => (
-                <tr key={i}>
-                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>
-                    {new Date(r.created_at).toLocaleString('vi-VN', { hour12: false })}
-                  </td>
-                  <td><code>{r.task}</code></td>
-                  <td>
-                    <span className={`stage tone-${r.status === 'ok' ? 'ok' : r.status === 'error' ? 'no' : 'mkt'}`}>
-                      {r.status}
-                    </span>
-                  </td>
+          <div className="table-scroll">
+            <table className="run-log">
+              <thead>
+                <tr>
+                  <th>Lúc</th>
+                  <th>Việc</th>
+                  <th>Kết quả</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentRuns.map((r, i) => (
+                  <tr key={i}>
+                    <td className="muted nowrap">{formatDateTime(r.created_at)}</td>
+                    <td>{taskLabel(r.task)}</td>
+                    <td>
+                      <span className={`stage tone-${r.status === 'ok' ? 'ok' : r.status === 'error' ? 'no' : 'mkt'}`}>
+                        {STATUS_LABELS[r.status] || r.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
       <section className="settings-box">
         <h2 style={{ margin: '0 0 10px', fontSize: '1.02rem' }}>Nhật ký duyệt gần đây</h2>
         <p className="muted" style={{ margin: '0 0 8px', fontSize: '0.82em' }}>
-          20 mục hàng đợi mới được xử lý. Cột &quot;Người bấm&quot; chỉ có giá trị khi
-          đã bật <code>AUTH_MODE=supabase</code>; nếu còn dùng mật khẩu chung sẽ để trống.
+          20 mục hàng đợi mới được xử lý. Cột &quot;Người bấm&quot; chỉ hiển thị khi đã bật
+          đăng nhập theo từng người; ở chế độ mật khẩu chung sẽ để trống.
         </p>
         {decided.length === 0 ? (
           <p className="muted">Chưa có mục nào được xử lý.</p>
         ) : (
-          <table className="run-log">
-            <thead>
-              <tr>
-                <th>Lúc</th>
-                <th>Loại</th>
-                <th>Kết quả</th>
-                <th>Người bấm</th>
-                <th>Tiêu đề</th>
-              </tr>
-            </thead>
-            <tbody>
-              {decided.map((r, i) => (
-                <tr key={i}>
-                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>
-                    {new Date(r.decided_at).toLocaleString('vi-VN', { hour12: false })}
-                  </td>
-                  <td><code>{r.kind}</code></td>
-                  <td>
-                    <span className={`stage tone-${r.status === 'approved' ? 'ok' : r.status === 'rejected' ? 'no' : 'mkt'}`}>
-                      {r.status}
-                    </span>
-                  </td>
-                  <td>{r.decided_by || <span className="muted">—</span>}</td>
-                  <td style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {r.title || ''}
-                  </td>
+          <div className="table-scroll">
+            <table className="run-log">
+              <thead>
+                <tr>
+                  <th>Lúc</th>
+                  <th>Loại</th>
+                  <th>Kết quả</th>
+                  <th>Người bấm</th>
+                  <th>Tiêu đề</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {decided.map((r, i) => (
+                  <tr key={i}>
+                    <td className="muted nowrap">{formatDateTime(r.decided_at)}</td>
+                    <td>{kindMeta(r.kind).label}</td>
+                    <td>
+                      <span className={`stage tone-${r.status === 'approved' ? 'ok' : r.status === 'rejected' ? 'no' : 'mkt'}`}>
+                        {DECISION_LABELS[r.status] || r.status}
+                      </span>
+                    </td>
+                    <td>{r.decided_by || <span className="muted">Không rõ</span>}</td>
+                    <td className="cell-ellipsis">{r.title || ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </main>

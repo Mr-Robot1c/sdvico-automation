@@ -17,6 +17,7 @@ import { linkedinConfigured, postToLinkedIn } from '../lib/linkedin';
 import { getSessionUser } from '../lib/auth';
 import { requireAdmin } from '../lib/hr-users';
 import { requireEmployeeAdmin, EMPLOYEE_DOCS_BUCKET } from '../lib/employees';
+import { getChannel, isManual, channelLabel, resolveChannel } from '../lib/channels';
 
 // Trả email người đang đăng nhập, hoặc null nếu chế độ basic. Bọc try để không rơi luồng cũ.
 async function currentEmail(): Promise<string | null> {
@@ -585,6 +586,69 @@ export async function removePlatform(formData: FormData) {
   revalidatePath('/dang-tin');
 }
 
+// Bật/tắt một kênh đăng tuyển theo khóa kenh. Upsert dòng hr_platforms nếu chưa có (lấy tên/loại từ registry).
+// Kênh tắt sẽ không hiện nút "Soạn bài" ở trang Vị trí và không có trong form ghi nhận đăng tay.
+export async function toggleChannel(formData: FormData) {
+  const kenh = String(formData.get('kenh') || '');
+  const bat = String(formData.get('bat') || '') === 'true';
+  if (!kenh) return;
+  const ch = getChannel(kenh);
+  const client = getServerClient();
+  const { data: existing } = await client.from('hr_platforms').select('id').eq('kenh', kenh).maybeSingle();
+  if (existing?.id) {
+    await client.from('hr_platforms').update({ bat }).eq('id', existing.id);
+  } else {
+    await client.from('hr_platforms').insert({ kenh, bat, ten: ch?.ten || kenh, loai: ch?.loai || 'job_board' });
+  }
+  revalidatePath('/kenh');
+  revalidatePath('/dang-tin');
+  revalidatePath('/tao-jd');
+}
+
+// Sinh khóa kenh từ tên: bỏ dấu tiếng Việt, chỉ giữ chữ thường và số. Ví dụ "Việc Làm Tốt" -> "vieclamtot".
+function slugKenh(ten: string): string {
+  return ten
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24);
+}
+
+// Thêm một sàn tuyển dụng MỚI do người dùng nhập (chỉ nằm trong hr_platforms).
+// Luôn là kênh đăng thủ công: soạn có hỗ trợ + ghi nhận đã đăng (track-only). Nối API cần code + credentials.
+export async function addChannel(formData: FormData) {
+  const ten = String(formData.get('ten') || '').trim();
+  const post_url = String(formData.get('post_url') || '').trim() || null;
+  if (!ten) return;
+  const kenh = slugKenh(ten);
+  if (!kenh) return; // tên không sinh được khóa hợp lệ
+
+  const client = getServerClient();
+  // Không đè kênh built-in (facebook/linkedin/topcv...) hay kênh đã thêm trước đó.
+  if (getChannel(kenh)) { revalidatePath('/kenh'); return; }
+  const { data: existing } = await client.from('hr_platforms').select('id').eq('kenh', kenh).maybeSingle();
+  if (existing?.id) { revalidatePath('/kenh'); return; }
+
+  const { error } = await client.from('hr_platforms').insert({ ten, kenh, loai: 'job_board', bat: true, post_url });
+  if (error) throw new Error(error.message);
+  revalidatePath('/kenh');
+  revalidatePath('/dang-tin');
+  revalidatePath('/tao-jd');
+}
+
+// Xóa một sàn do người dùng thêm. KHÔNG xóa kênh built-in (giữ adapter API/nhãn) — chỉ tắt được.
+// Tin đăng cũ vẫn còn, chỉ mất cấu hình kênh (nhãn lùi về khóa kenh).
+export async function removeChannel(formData: FormData) {
+  const kenh = String(formData.get('kenh') || '');
+  if (!kenh) return;
+  if (getChannel(kenh)) return; // kênh built-in: không xóa
+  const client = getServerClient();
+  const { error } = await client.from('hr_platforms').delete().eq('kenh', kenh);
+  if (error) throw new Error(error.message);
+  revalidatePath('/kenh');
+  revalidatePath('/dang-tin');
+  revalidatePath('/tao-jd');
+}
+
 // Tạo một tin đăng ở trạng thái nháp hoặc đặt lịch.
 export async function addJobPost(formData: FormData) {
   const tieu_de = String(formData.get('tieu_de') || '').trim();
@@ -861,6 +925,226 @@ export async function queueLinkedInPost(formData: FormData) {
   revalidatePath('/');
 }
 
+// Soạn bài cho MỘT kênh bất kỳ trong registry (TopCV, VietnamWorks, CareerBuilder, ...).
+// Máy soạn nháp (đăng có hỗ trợ), người bấm Duyệt (điều cấm 1). KHÔNG đăng gì ở đây.
+// Nội dung lấy từ bản JD đúng độ dài theo kênh (jd_versions[jd_variant]); thiếu thì ghép từ mô tả/yêu cầu/quyền lợi.
+export async function queueChannelPost(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  const kenh = String(formData.get('kenh') || '');
+  if (!jobId || !kenh) return;
+
+  const client = getServerClient();
+  // Giải kênh: registry code hoặc kênh người dùng tự thêm (hr_platforms).
+  const ch = await resolveChannel(client, kenh);
+  if (!ch) return;
+  const { data: job, error: e0 } = await client
+    .from('hr_jobs')
+    .select('id, title, location, short_desc, requirements, jd_versions, image_hint')
+    .eq('id', jobId).single();
+  if (e0) throw new Error(e0.message);
+
+  // Tránh trùng nháp cùng kênh (đã có bài chờ/đặt lịch thì thôi).
+  const { data: existing } = await client
+    .from('hr_job_posts').select('id')
+    .eq('job_id', jobId).eq('kenh', kenh)
+    .in('trang_thai', ['draft', 'scheduled']);
+  if (existing && existing.length) { revalidatePath('/dang-tin'); revalidatePath('/vi-tri'); return; }
+
+  let benefits: string | null = null;
+  {
+    const { data: benRow } = await client.from('hr_jobs').select('benefits').eq('id', jobId).maybeSingle();
+    benefits = (benRow?.benefits as string | undefined) || null;
+  }
+
+  const { email: contactEmail, hotline } = await resolveBrandContact(client);
+  const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
+  const brand = (brandRow?.value || {}) as { logo_url?: string; website?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
+  const reqText = (job as Record<string, unknown>).requirements as string | null;
+
+  // Ưu tiên bản JD đúng độ dài theo kênh; thiếu thì ghép nguyên văn từ thông tin vị trí.
+  const jdVersions = (job.jd_versions || {}) as Record<string, string>;
+  const jdBody = String(jdVersions[ch.jd_variant] || '').trim();
+  const assembled = jdBody || [
+    job.short_desc ? `Mô tả công việc:\n${job.short_desc}` : '',
+    reqText ? `Yêu cầu:\n${reqText}` : '',
+    benefits ? `Quyền lợi:\n${benefits}` : '',
+  ].filter(Boolean).join('\n\n');
+  const noi_dung = [
+    assembled,
+    '',
+    `Cách ứng tuyển: gửi CV về ${contactEmail}${hotline ? ` hoặc gọi hotline ${hotline}` : ''}.`,
+  ].join('\n').trim();
+
+  // Ảnh poster (tùy chọn) — sàn tuyển dụng cho đính ảnh. Lỗi thì bỏ ảnh, không chặn luồng.
+  let image_url: string | null = null;
+  try {
+    const unsplash_url = await fetchUnsplashPhoto(job.title, job.location || undefined, (job as Record<string, unknown>).image_hint as string | null);
+    const posterBuf = await buildRecruitmentPoster({
+      title: job.title,
+      location: job.location || null,
+      requirements: toBullets(reqText),
+      benefits: toBullets(benefits),
+      salary: '',
+      workingHours: '',
+      brandName: brand.company_name || 'SDVICO',
+      tagline: brand.tagline,
+      website: brand.website,
+      hotline,
+      photoUrl: unsplash_url,
+      logoUrl: brand.logo_url,
+      theme: brand.poster,
+    });
+    if (posterBuf) {
+      const imgPath = `posts/${jobId}/poster-${kenh}-${Date.now()}.jpg`;
+      const { error: upErr } = await client.storage.from('post-images').upload(imgPath, posterBuf, { contentType: 'image/jpeg', upsert: true });
+      if (!upErr) {
+        const { data: { publicUrl } } = client.storage.from('post-images').getPublicUrl(imgPath);
+        image_url = publicUrl;
+      }
+    }
+  } catch {
+    // ảnh là tùy chọn
+  }
+
+  const tieu_de = `[${ch.ten}] Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`;
+  const { data: post, error: e1 } = await client.from('hr_job_posts')
+    .insert({ job_id: jobId, kenh, tieu_de, noi_dung, image_url, trang_thai: 'draft' })
+    .select('id').single();
+  if (e1 || !post) {
+    // Không ném lỗi (tránh crash trang). Ghi run_log để biết nguyên nhân (vd chưa migrate kenh mới).
+    try { await client.from('run_log').insert({ task: 'hr.queue_channel', status: 'error', detail: { jobId, kenh, error: e1?.message || 'no post' } }); } catch {}
+    revalidatePath('/dang-tin'); revalidatePath('/vi-tri'); return;
+  }
+
+  const { error: e2 } = await client.from('approval_queue').insert({
+    kind: 'hr_job_post',
+    title: tieu_de,
+    payload: { post_id: post.id, job_id: jobId, kenh, dia_diem: job.location || null, body: noi_dung, image_url },
+    ref_table: 'hr_job_posts', ref_id: post.id, status: 'pending',
+  });
+  if (e2) { try { await client.from('run_log').insert({ task: 'hr.queue_channel', status: 'error', detail: { jobId, kenh, error: e2.message } }); } catch {} }
+
+  revalidatePath('/dang-tin');
+  revalidatePath('/vi-tri');
+  revalidatePath('/');
+}
+
+// Mở vị trí (draft -> open) và soạn bài cho một kênh, đưa vào Duyệt. Dùng từ trang Tạo JD / Vị trí.
+export async function openAndQueueChannelPost(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  if (!jobId) return;
+  const client = getServerClient();
+  await client.from('hr_jobs').update({ status: 'open' }).eq('id', jobId).eq('status', 'draft');
+  await queueChannelPost(formData);
+  redirect('/');
+}
+
+// Tải ảnh bằng chứng bài đã đăng lên Storage (bucket post-images, prefix proof/). Trả public URL hoặc null.
+// Best-effort: lỗi upload chỉ ghi run_log, không chặn việc đánh dấu đã đăng.
+async function uploadProof(
+  client: ReturnType<typeof getServerClient>,
+  postId: string,
+  file: File | null
+): Promise<string | null> {
+  if (!file || file.size === 0) return null;
+  try {
+    const bytes = await file.arrayBuffer();
+    const rawExt = file.name.split('.').pop() || 'jpg';
+    const ext = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
+    const path = `proof/${postId}/${Date.now()}.${ext}`;
+    const { error } = await client.storage.from('post-images').upload(path, bytes, { contentType: file.type, upsert: true });
+    if (error) {
+      try { await client.from('run_log').insert({ task: 'upload_proof', status: 'error', detail: { postId, error: error.message } }); } catch {}
+      return null;
+    }
+    const { data: { publicUrl } } = client.storage.from('post-images').getPublicUrl(path);
+    return publicUrl;
+  } catch (err: unknown) {
+    try { await client.from('run_log').insert({ task: 'upload_proof', status: 'error', detail: { postId, error: String(err) } }); } catch {}
+    return null;
+  }
+}
+
+// Đánh dấu ĐÃ ĐĂNG cho kênh thủ công (đăng có hỗ trợ): người vận hành đã đăng ngoài xong,
+// dán link + ảnh bằng chứng. Cổng an toàn y hệt publishJobPost: phải có mục approved (điều cấm 1).
+export async function markPostedManually(formData: FormData) {
+  const postId = String(formData.get('post_id') || '');
+  const url = String(formData.get('url') || '').trim() || null;
+  const proofFile = formData.get('proof_file') as File | null;
+  if (!postId) return;
+
+  const client = getServerClient();
+
+  const { data: approved } = await client
+    .from('approval_queue').select('id')
+    .eq('ref_id', postId).eq('kind', 'hr_job_post').eq('status', 'approved').limit(1);
+  if (!approved || approved.length === 0) {
+    await client.from('hr_job_posts')
+      .update({ ghi_chu: 'Bài chưa được duyệt trong hàng đợi — không thể đánh dấu đã đăng.' })
+      .eq('id', postId);
+    revalidatePath('/dang-tin');
+    return;
+  }
+
+  const proof_path = await uploadProof(client, postId, proofFile);
+  const email = await currentEmail();
+  const { error } = await client.from('hr_job_posts').update({
+    trang_thai: 'posted',
+    posted_at: new Date().toISOString(),
+    url,
+    posted_by: email,
+    ...(proof_path ? { proof_path } : {}),
+    ghi_chu: null,
+  }).eq('id', postId);
+  if (error) throw new Error(error.message);
+  try { await client.from('run_log').insert({ task: 'hr.mark_posted_manual', status: 'ok', detail: { postId, url, by: email } }); } catch {}
+
+  revalidatePath('/dang-tin');
+  revalidatePath('/vi-tri');
+  revalidatePath('/');
+}
+
+// Ghi nhận ĐÃ ĐĂNG kiểu track-only: người tự đăng trực tiếp trên nền tảng (sàn có form riêng),
+// hệ thống KHÔNG soạn, KHÔNG qua Duyệt — chỉ tạo bản ghi 'posted' + link + ảnh để theo dõi/kiểm soát.
+// Không có nội dung máy sinh để gửi nên không cần cổng duyệt; vẫn lưu posted_by để truy vết.
+export async function trackPostedPost(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '') || null;
+  const kenh = String(formData.get('kenh') || '');
+  const url = String(formData.get('url') || '').trim() || null;
+  const proofFile = formData.get('proof_file') as File | null;
+  if (!kenh || !isManual(kenh)) return; // chỉ dùng cho kênh thủ công
+
+  const client = getServerClient();
+
+  let title = 'Tin tuyển dụng';
+  if (jobId) {
+    const { data: job } = await client.from('hr_jobs').select('title, location').eq('id', jobId).maybeSingle();
+    if (job?.title) title = `${job.title}${job.location ? ' - ' + job.location : ''}`;
+  }
+
+  const email = await currentEmail();
+  const { data: inserted, error } = await client.from('hr_job_posts').insert({
+    job_id: jobId,
+    kenh,
+    tieu_de: `[${channelLabel(kenh)}] ${title}`,
+    trang_thai: 'posted',
+    posted_at: new Date().toISOString(),
+    url,
+    posted_by: email,
+    ghi_chu: 'Đăng trực tiếp trên nền tảng (ghi nhận, không qua soạn/duyệt).',
+  }).select('id').single();
+  if (error) throw new Error(error.message);
+
+  const proof_path = await uploadProof(client, inserted.id, proofFile);
+  if (proof_path) await client.from('hr_job_posts').update({ proof_path }).eq('id', inserted.id);
+
+  try { await client.from('run_log').insert({ task: 'hr.track_posted', status: 'ok', detail: { postId: inserted.id, jobId, kenh, url, by: email } }); } catch {}
+
+  revalidatePath('/dang-tin');
+  revalidatePath('/vi-tri');
+  revalidatePath('/');
+}
+
 // Sửa nội dung, hình ảnh, giờ đặt đăng trước khi duyệt. Người sửa là người kiểm soát (điều cấm 1).
 // Đồng bộ cả bản xem trong hàng đợi để trang Duyệt không lệch với nội dung sẽ đăng.
 // Ảnh: file từ máy ưu tiên hơn URL nhập tay. Cả hai đều tuỳ chọn.
@@ -1065,6 +1349,16 @@ export async function publishJobPost(formData: FormData) {
     .single();
   if (e1 || !post) { revalidatePath('/dang-tin'); return; }
   if (post.trang_thai === 'posted') { revalidatePath('/dang-tin'); return; }
+
+  // Kênh đăng thủ công (TopCV, VietnamWorks, ...): KHÔNG có API đăng — không gọi Facebook API.
+  // Hướng người dùng sang panel "Đăng thủ công": mở kênh -> đăng -> bấm "Đánh dấu đã đăng".
+  if (isManual(post.kenh)) {
+    await client.from('hr_job_posts')
+      .update({ ghi_chu: 'Kênh đăng thủ công — mở kênh để đăng, rồi bấm "Đánh dấu đã đăng" (dán link + ảnh).' })
+      .eq('id', postId);
+    revalidatePath('/dang-tin');
+    return;
+  }
 
   // Bài LinkedIn: đăng qua LinkedIn API nếu đã cấu hình, chưa thì báo dùng Copy đăng tay.
   if (post.kenh === 'linkedin') {
