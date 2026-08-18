@@ -52,6 +52,18 @@ export type KnowledgeUsed = {
   publicHighlights: Array<{ id: string; source_title: string | null; source_url: string; needs_gov_review: boolean }>;
 };
 
+// Hướng đi nội dung tuần tới, sinh từ tri thức nội bộ + public bởi Gemini/Claude
+// (xem apps/approval-ui/scripts/generate-plan-directions.mjs). Vòng xoay sinh bài đọc
+// content_suggestions này để chọn góc bài đăng bám tri thức thật, không sinh chung chung.
+export type ContentDirection = {
+  title: string;                    // Tiêu đề gợi ý bài đăng, 5-10 chữ
+  why: string;                      // Vì sao tuần này nên đăng chủ đề này (dựa tri thức nào)
+  product: string;                  // Sản phẩm chính bài này nói tới
+  kind: string;                     // checklist | qa | tip | engage | glossary | news
+  sources: string[];                // Nguồn tri thức đã dùng, vd ["public #7", "noi bo #2"]
+  needs_gov_review: boolean;        // Nguồn chạm quy định thì bài theo hướng này cũng cần duyệt QL
+};
+
 export type Plan = {
   generatedAt: string;
   threshold: number;
@@ -59,6 +71,8 @@ export type Plan = {
   products: PlanProduct[];
   weights: Record<string, number>; // product -> mức ưu tiên, cho /api/rotate
   narrative: string[];
+  // v2 (18/8): hướng đi cụ thể tuần tới, sinh từ tri thức. Bản cũ không có -> undefined.
+  content_suggestions?: ContentDirection[];
   summary: {
     totalProducts: number;
     ranked: number;

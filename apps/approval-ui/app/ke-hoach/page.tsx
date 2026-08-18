@@ -143,6 +143,29 @@ export default async function Page() {
               </aside>
             </div>
 
+            {latest.data.content_suggestions?.length ? (
+              <section className="content-directions" style={{ margin: '16px 0' }}>
+                <h2 style={{ marginBottom: 8 }}>Hướng đi tuần tới</h2>
+                <p className="sub" style={{ marginTop: 0 }}>
+                  Bot đọc kho tri thức rồi đề xuất {latest.data.content_suggestions.length} bài đăng cụ thể. Mỗi gợi ý bám nguồn thật, không sinh chung chung.
+                </p>
+                <ul className="directions-list">
+                  {latest.data.content_suggestions.map((d, i) => (
+                    <li key={i} className="direction-item">
+                      <div className="direction-head">
+                        <b>{d.title}</b>
+                        <span className="badge tone-default" style={{ marginLeft: 8 }}>{d.kind}</span>
+                        {d.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️ cần duyệt QL</span> : null}
+                      </div>
+                      <div className="sub">Sản phẩm: {d.product}</div>
+                      <p style={{ margin: '4px 0' }}>{d.why}</p>
+                      <div className="sub">Dựa trên: {(d.sources || []).join(', ')}</div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
             {latest.data.summary?.knowledge && (
               latest.data.summary.knowledge.internalHighlights?.length ||
               latest.data.summary.knowledge.publicHighlights?.length

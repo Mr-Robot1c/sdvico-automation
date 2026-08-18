@@ -251,3 +251,4 @@ ttl_days: 90
 
 - v1 (2026-08-18): khởi tạo — đặc tả Kế hoạch AI v2 (học hai nguồn: nội bộ nhập tay + public tự tìm kiếm), SEO backlink, mở rộng Social (Video Shorts, seeding hội nhóm), và AD trả phí, theo phản hồi whiteboard của sếp trình bày qua Bạn B ngày 18/8/2026.
 - v1.1 (2026-08-18): NV1 chuyển từ "nhập tay vào form Kho tư liệu" sang "thả file vào bucket Supabase" — vì Bạn B dùng Cowork trên chat Claude để đọc Zalo PC, chỉ cần hệ thống nhận đầu ra dạng file. Sửa NV1 flow, AC-1 (Test đổi thành integration, assert theo file), User registry, cross H1, Open question 1.
+- v1.2 (2026-08-18): NV3 bổ sung output `content_suggestions` — Kế hoạch v2 giờ ra HƯỚNG ĐI CỤ THỂ (5-7 gợi ý bài đăng bám nguồn tri thức, gọi đúng sản phẩm SDVICO), không chỉ dừng ở "đã học N nguồn". Đây là bước cầu nối để vòng xoay sinh bài dùng tri thức thật. Cũng bổ sung phương án fallback học public qua Google News RSS khi Gemini google_search grounding bị rate limit 429.

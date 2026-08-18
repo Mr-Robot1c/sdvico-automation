@@ -693,6 +693,11 @@ a.chip:hover { filter: brightness(0.98); }
 .stat-lbl { font-size: .76rem; color: var(--ink-2); margin-top: 3px; }
 @media (max-width: 860px) { .plan-top { grid-template-columns: 1fr; } }
 
+/* Trang Kế hoạch: khối "Hướng đi tuần tới" - list bài đăng gợi ý sinh từ tri thức. */
+.directions-list { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 10px; }
+.direction-item { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; border-left: 3px solid var(--accent, #2a78d6); }
+.direction-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+
 /* Trang Kho tri thức: hai cột nội bộ và public. */
 .kt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px; }
 .kt-col h2 { margin: 0 0 12px 0; }
