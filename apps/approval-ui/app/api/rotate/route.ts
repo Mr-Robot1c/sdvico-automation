@@ -73,17 +73,20 @@ export async function GET(req: Request) {
   }
 
   // 1. Gom tư liệu đã gán folder theo product_group.
+  //    videos = CLIP GỐC do người upload (loại video-pipeline đã dựng ra) — dùng để quyết
+  //    có yêu cầu dựng video AI cho bài không: folder có clip thì dựng, chỉ ảnh thì thôi
+  //    (user chốt 18/8: "folder sản phẩm có video thì ghép video AI, không thì thôi").
   const { data: assetsRaw } = await client
     .from('brand_assets')
-    .select('id, kind, title, product_group')
+    .select('id, kind, title, product_group, source')
     .not('product_group', 'is', null);
-  type A = { id: string; kind: string; title: string; product_group: string };
+  type A = { id: string; kind: string; title: string; product_group: string; source?: string | null };
   const folders = new Map<string, { images: A[]; videos: A[] }>();
   for (const a of (assetsRaw || []) as A[]) {
     if (!folders.has(a.product_group)) folders.set(a.product_group, { images: [], videos: [] });
     const f = folders.get(a.product_group)!;
     if (a.kind === 'image') f.images.push(a);
-    else if (a.kind === 'video' || a.kind === 'clip') f.videos.push(a);
+    else if ((a.kind === 'video' || a.kind === 'clip') && a.source !== 'video-pipeline') f.videos.push(a);
   }
   // Folder 'Content' KHÔNG phải sản phẩm, chỉ chứa tư liệu cho bài content — loại khỏi vòng
   // xoay sinh bài bán. Bài content sẽ dùng ảnh trong folder này ở bước dưới.
@@ -138,31 +141,41 @@ export async function GET(req: Request) {
   // v3 (Creator A/B): mỗi lần chạy chỉ lấy MỘT suggestion, nhưng sinh CẶP 2 bài A/B cho nó
   // (A = góc từ tri thức, B = góc đối chứng). 2 bài bán + 1 bài content = đúng hạn mức 3/ngày.
   // Không có suggestion nào map được folder -> fallback vòng xoay cũ (2 folder, mỗi folder 1 bài).
+  // v3.1 (18/8, user: "2 bài trùng nhau cùng 1 sản phẩm"): cặp A/B TÁCH 2 NGÀY. Mỗi lần chạy
+  // chỉ sinh MỘT bản: hôm nay bản A (ghi pending_variant='B', chưa used_at), hôm sau ưu tiên
+  // hướng đang chờ B -> sinh B rồi mới used_at. Trang không lặp sản phẩm trong ngày, Evaluator
+  // vẫn so được cặp (cùng ab_pair_id). Bài bán từ kế hoạch: 1/ngày + 1 bài content.
   type Suggestion = {
     title: string; why: string; product: string; kind: string;
-    sources?: string[]; needs_gov_review?: boolean; used_at?: string;
+    sources?: string[]; needs_gov_review?: boolean; used_at?: string; pending_variant?: 'B';
   };
   const allSuggestions: Suggestion[] = Array.isArray(appliedPlan?.data?.content_suggestions)
     ? appliedPlan!.data.content_suggestions
     : [];
-  const unusedSuggestions = allSuggestions.filter((s) => !s.used_at);
+  // Ưu tiên hướng đang chờ bản B (đã có A hôm trước), rồi mới tới hướng chưa dùng.
+  const candidateSuggestions = [
+    ...allSuggestions.filter((s) => !s.used_at && s.pending_variant === 'B'),
+    ...allSuggestions.filter((s) => !s.used_at && !s.pending_variant),
+  ];
 
-  type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number };
+  type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number; variant?: 'A' | 'B' };
   const pickedFolders: PickedFolder[] = [];
   const usedInThisRun = new Set<string>();
-  for (const s of unusedSuggestions) {
-    if (pickedFolders.length) break; // 1 suggestion/run — cặp A/B chiếm 2 slot bài bán
+  for (const s of candidateSuggestions) {
+    if (pickedFolders.length) break; // 1 hướng đi/run
     const guessed = (guessGroup as (t: string) => string | null)(s.product);
     // guessGroup trả NHÃN FOLDER đầy đủ KÈM STT ("6. Thiết bị lọc dầu SF-50") — phải strip
-    // STT CẢ HAI vế mới khớp (bug bắt được khi chạy thật 18/8: một vế giữ STT nên không
-    // suggestion nào map được folder, rotate luôn rơi về fallback random).
+    // STT CẢ HAI vế mới khớp (bug bắt được khi chạy thật 18/8).
+    // Với bản B không cần folder "chưa dùng trong vòng" (A hôm qua đã dùng folder này) —
+    // tìm trong eligible.
+    const pool = s.pending_variant === 'B' ? eligible : unused;
     const matchedFolder = guessed
-      ? unused.find((g) => productName(g).toLowerCase() === productName(guessed).toLowerCase())
+      ? pool.find((g) => productName(g).toLowerCase() === productName(guessed).toLowerCase())
       : null;
     if (!matchedFolder) continue;
     usedInThisRun.add(matchedFolder);
     const idx = allSuggestions.findIndex((x) => x === s);
-    pickedFolders.push({ group: matchedFolder, suggestion: s, suggestionIdx: idx });
+    pickedFolders.push({ group: matchedFolder, suggestion: s, suggestionIdx: idx, variant: s.pending_variant === 'B' ? 'B' : 'A' });
   }
   // Không có suggestion -> vòng xoay/weights như cũ, mỗi folder 1 bài đơn.
   if (!pickedFolders.length) {
@@ -182,8 +195,9 @@ export async function GET(req: Request) {
   const skipped: any[] = [];
   const logoActions: any[] = []; // nhật ký auto-logo cho mỗi ảnh (stamped/kept/already/skip)
 
-  // Track suggestions vừa dùng trong run này, cuối vòng update lại plan.data một lần.
-  const suggestionsUsedThisRun: number[] = [];
+  // Track thay đổi suggestion trong run này (idx -> 'A' vừa sinh | 'B' vừa sinh), cuối vòng
+  // update plan.data một lần: sinh A -> pending_variant='B'; sinh B -> used_at.
+  const suggestionsTouched: Array<{ idx: number; variant: 'A' | 'B'; imgId: string }> = [];
 
   // Góc ĐỐI CHỨNG cho bản B của cặp A/B — cố ý khác hướng bản A (góc từ tri thức) để
   // Evaluator so được cách viết nào ăn khách hơn (flowchart v3: Creator viết 2 kịch bản A/B).
@@ -198,10 +212,13 @@ export async function GET(req: Request) {
     const f = folders.get(group)!;
     const name = productName(group);
     const sug = pf.suggestion;
-    // Cặp A/B khi có suggestion; bài đơn khi fallback vòng xoay cũ.
-    const variants: Array<'A' | 'B' | null> = sug ? ['A', 'B'] : [null];
+    // Có suggestion: đúng 1 biến thể (A hôm nay hoặc B hôm sau). Fallback vòng xoay cũ: bài đơn.
+    const variants: Array<'A' | 'B' | null> = sug ? [pf.variant || 'A'] : [null];
     const pairId = sug && appliedPlan ? `${appliedPlan.id.slice(0, 8)}-s${pf.suggestionIdx}` : null;
-    let firstImgId: string | null = null;
+    // Ảnh bản A đã dùng (lưu trong suggestion.a_image_id) để bản B lấy ảnh khác nếu folder có >1.
+    const firstImgId: string | null = (sug as any)?.a_image_id || null;
+    // Folder có CLIP GỐC mới yêu cầu dựng video AI; chỉ ảnh thì đăng bài ảnh, không dựng.
+    const wantVideo = f.videos.length > 0;
 
     for (const variant of variants) {
       // Bản B ưu tiên ảnh KHÁC bản A (nếu folder có từ 2 ảnh) để cặp thử khác nhau cả hình.
@@ -213,7 +230,6 @@ export async function GET(req: Request) {
         skipped.push({ group, variant, reason: 'folder chua co anh - can upload it nhat 1 anh de rotate' });
         continue;
       }
-      if (variant !== 'B') firstImgId = img.id;
       if (AUTO_LOGO) {
         try { logoActions.push({ group, ...(await ensureLogoForPost(client, img.id)) }); }
         catch (e) { logoActions.push({ group, action: 'error', reason: String((e as any)?.message || e) }); }
@@ -260,7 +276,9 @@ export async function GET(req: Request) {
             rotation: true,
             rotation_cycle: cycle,
             rotation_group: group,
-            video_requested: true,
+            // Chỉ yêu cầu dựng video AI khi folder có clip gốc (SEA-40, SF-50, Ắc quy...).
+            // Folder chỉ ảnh (S-Tracking, Thuraya, XT-Pro...) -> bài ảnh, không dựng.
+            video_requested: wantVideo,
             // v2/v3: gắn suggestion + cặp A/B để Evaluator truy được và so sánh
             ...(sug ? {
               plan_id: appliedPlan?.id,
@@ -297,26 +315,20 @@ export async function GET(req: Request) {
         },
         status: 'pending',
       });
-      results.push({ group, channels, contentId, risk, from_suggestion: !!sug, variant });
+      results.push({ group, channels, contentId, risk, from_suggestion: !!sug, variant, video_requested: wantVideo });
+      if (sug && typeof pf.suggestionIdx === 'number' && (variant === 'A' || variant === 'B')) {
+        suggestionsTouched.push({ idx: pf.suggestionIdx, variant, imgId: img.id });
+      }
     }
-
-    if (sug && typeof pf.suggestionIdx === 'number') suggestionsUsedThisRun.push(pf.suggestionIdx);
   }
 
-  // Bài CONTENT (không bán): 1 bài mỗi lần chạy. Ưu tiên ảnh trong folder 'Content'
-  // (ảnh biển, cảnh làng chài, đời sống ngư dân); trống thì fallback ảnh bất kỳ.
+  // Bài CONTENT (không bán): 1 bài mỗi lần chạy. Ảnh chọn SAU khi có chủ đề + tiêu đề, KHỚP
+  // chủ đề (lib/gen/pick-image.mjs: folder sản phẩm được nhắc tới -> Unsplash theo từ khóa ->
+  // mới tới folder 'Content'). User 18/8: "hỏi đáp thiết bị giám sát hành trình mà lấy ảnh
+  // tàu cá chung chung".
+  // @ts-ignore — module JS thuần
+  const { pickImageForContent } = await import('../../../lib/gen/pick-image.mjs');
   for (let i = 0; i < CONTENT_PER_RUN; i++) {
-    const contentFolder = folders.get('Content');
-    const contentImgs = contentFolder?.images || [];
-    const fallbackImgs = [...folders.values()].flatMap((f) => f.images);
-    const poolImgs = contentImgs.length ? contentImgs : fallbackImgs;
-    const media = poolImgs.length ? pickRandom(poolImgs) : null;
-    if (!media) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
-    // Auto-logo cho ảnh bài content (in-place, giữ nguyên id).
-    if (AUTO_LOGO && media) {
-      try { logoActions.push({ group: 'Bài content', ...(await ensureLogoForPost(client, media.id)) }); }
-      catch (e) { logoActions.push({ group: 'Bài content', action: 'error', reason: String((e as any)?.message || e) }); }
-    }
     // Chọn CỤM CONTENT theo tỷ lệ đề xuất Phòng KD (tuần 5 bài content):
     //   qa=2, checklist=2, glossary=1, tip=1, engage=1, portrait=1, news=1 -> tổng 9 lượt/vòng.
     //   Weight cao = chọn dày. news/portrait vẫn xuất hiện nhưng ít hơn vì cần chuẩn bị thật.
@@ -353,6 +365,17 @@ export async function GET(req: Request) {
     };
     const kindTag = KIND_LABEL[kind] || '📰';
     const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';
+
+    // Chọn ảnh KHỚP chủ đề (sau khi đã biết chủ đề + tiêu đề).
+    const picked = await (pickImageForContent as any)(client, folders, `${gen.topic || ''} ${displayTitle}`);
+    if (!picked?.id) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
+    const media = { id: picked.id as string };
+    // Auto-logo cho ảnh bài content (in-place, giữ nguyên id). Ảnh Unsplash mới tải cũng đóng logo.
+    if (AUTO_LOGO) {
+      try { logoActions.push({ group: 'Bài content', via: picked.via, ...(await ensureLogoForPost(client, media.id)) }); }
+      catch (e) { logoActions.push({ group: 'Bài content', action: 'error', reason: String((e as any)?.message || e) }); }
+    }
+
     const assets = { image: media.id, video: null };
     const channels = ['facebook'];
     const { data: ins, error: ce } = await client
@@ -371,6 +394,7 @@ export async function GET(req: Request) {
           post_kind: 'content',
           topic: gen.topic,
           content_type: kind,
+          image_via: picked.via,
         },
         draft: gen.text,
         status: 'review',
@@ -388,12 +412,17 @@ export async function GET(req: Request) {
     results.push({ group: 'Bài content', kind, channels, contentId: (ins as { id: string }).id, risk, needsGov });
   }
 
-  // v2: đánh dấu suggestions vừa dùng để lần rotate sau không lặp. Cập nhật 1 lần cuối vòng.
-  if (appliedPlan && suggestionsUsedThisRun.length) {
+  // v3.1: cập nhật trạng thái hướng đi. Sinh A -> pending_variant='B' + a_image_id (để B lấy
+  // ảnh khác); sinh B -> used_at (hướng này xong cả cặp). Cập nhật 1 lần cuối vòng.
+  if (appliedPlan && suggestionsTouched.length) {
     const nowIso = new Date().toISOString();
-    const updatedSuggestions = allSuggestions.map((s, i) =>
-      suggestionsUsedThisRun.includes(i) ? { ...s, used_at: nowIso } : s
-    );
+    const updatedSuggestions = allSuggestions.map((s, i) => {
+      const t = suggestionsTouched.find((x) => x.idx === i);
+      if (!t) return s;
+      if (t.variant === 'A') return { ...s, pending_variant: 'B' as const, a_image_id: t.imgId, a_at: nowIso };
+      const { pending_variant: _pv, ...rest } = s as any;
+      return { ...rest, used_at: nowIso };
+    });
     const newData = { ...appliedPlan.data, content_suggestions: updatedSuggestions };
     await client.from('mkt_plans').update({ data: newData }).eq('id', appliedPlan.id);
   }
@@ -402,7 +431,7 @@ export async function GET(req: Request) {
     ok: true, cycle,
     folders: pickedFolders.map((pf) => pf.group),
     created: results.length,
-    used_suggestions: suggestionsUsedThisRun.length,
+    suggestions_touched: suggestionsTouched.map((t) => ({ idx: t.idx, variant: t.variant })),
     results, skipped, logoActions
   });
 }
