@@ -35,7 +35,7 @@ function formatDate(iso: string): string {
 
 type Flags = Record<string, string[] | undefined>;
 type Assets = { image?: string | null; video?: string | null } | null;
-type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[]; video_requested?: boolean } | null;
+type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[]; video_requested?: boolean; post_reel?: boolean } | null;
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
 export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
@@ -61,13 +61,30 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     .eq('kind', 'mkt_publish_content');
   const queueStatus = new Map<string, string>();
   const decidedAt = new Map<string, string>();
+  // Giờ hẹn đăng (payload.scheduled_at, decideForm ghi khi duyệt + hẹn). Bài đã duyệt mà có giờ hẹn
+  // còn ở tương lai -> hiện "Đã duyệt, đợi hẹn giờ HH:mm dd/mm" (user 18/8).
+  const scheduledAt = new Map<string, string>();
   for (const q of qRows || []) {
     const cid = (q.payload && typeof q.payload === 'object' ? (q.payload as any).content_id : null) as string | null;
     if (cid) {
       queueStatus.set(cid, q.status as string);
       if ((q as any).decided_at) decidedAt.set(cid, (q as any).decided_at as string);
+      const sa = (q.payload as any)?.scheduled_at as string | undefined;
+      if (sa && q.status === 'approved') scheduledAt.set(cid, sa);
     }
   }
+  // "YYYY-MM-DDTHH:mm" (giờ máy người duyệt = giờ VN) -> "HH:mm dd/mm/yyyy". Không đổi múi giờ.
+  const fmtSchedule = (s: string): string => {
+    const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    return m ? `${m[4]}:${m[5]} ${m[3]}/${m[2]}/${m[1]}` : s;
+  };
+  // Giờ hẹn còn ở tương lai (so theo giờ VN) thì mới là "đợi", qua rồi thì FB đã tự đăng.
+  const isFuture = (s: string): boolean => {
+    const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!m) return false;
+    const utcMs = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 7, +m[5]);
+    return utcMs > Date.now();
+  };
   const effStatus = (c: Content): string => {
     const qs = queueStatus.get(c.id);
     if (qs === 'approved') return 'approved';
@@ -254,10 +271,20 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                       ) : null}
                     </td>
                     <td>{lengthLabel(c.kind)}</td>
-                    <td>{channelsLabel(c.brief?.channels)}</td>
+                    <td>{channelsLabel(c.brief?.channels, c.brief?.post_reel === true)}</td>
                     <td>{formatDate(c.created_at)}</td>
                     <td>
-                      <span className={`badge tone-${st.tone}`}>{st.label}</span>
+                      {effStatus(c) === 'approved' && scheduledAt.get(c.id) && isFuture(scheduledAt.get(c.id)!) ? (
+                        <span className="badge tone-demo" title="Bài đã được duyệt và Facebook sẽ tự đăng đúng giờ hẹn.">
+                          ⏰ Đã duyệt, đợi hẹn giờ {fmtSchedule(scheduledAt.get(c.id)!)}
+                        </span>
+                      ) : effStatus(c) === 'approved' && scheduledAt.get(c.id) ? (
+                        <span className={`badge tone-${st.tone}`} title={`Đã hẹn ${fmtSchedule(scheduledAt.get(c.id)!)}, đến giờ Facebook đã tự đăng.`}>
+                          {st.label} (hẹn {fmtSchedule(scheduledAt.get(c.id)!)})
+                        </span>
+                      ) : (
+                        <span className={`badge tone-${st.tone}`}>{st.label}</span>
+                      )}
                       {blockedReason.get(c.id) ? (
                         <div style={{ marginTop: 4 }}>
                           <span className="badge tone-no">⛔ {blockedReason.get(c.id)}</span>

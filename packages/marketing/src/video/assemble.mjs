@@ -2,7 +2,7 @@
 // Chuẩn hóa từng cảnh về đúng khung (dọc 9:16 hoặc ngang 16:9) rồi nối, phủ nhận diện.
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ffmpeg } from './ffmpeg.mjs';
+import { ffmpeg, probeDuration } from './ffmpeg.mjs';
 import { buildBlocks, blocksToSrt } from './srt.mjs';
 import { ensureFonts, FONT_REGULAR, FONT_BLACK } from './fonts.mjs';
 import { buildBumpers } from './bumpers.mjs';
@@ -66,10 +66,16 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
   // Intro + Outro: đóng khung hai đầu video (logo/tổng đài SDVICO). Không chặn dây chuyền nếu lỗi.
   let introSeg = null;
   let outroSeg = null;
+  let introDur = 0;
+  let outroDur = 0;
   try {
     const b = await buildBumpers({ workDir, fmt, outroAudioPath });
     introSeg = b.introSeg;
     outroSeg = b.outroSeg;
+    // Thời lượng thật để banner "SDVICO • Hotline" CHỈ hiện ở cảnh nội dung, không đè lên
+    // intro/outro (đã có logo + số điện thoại to, thêm banner là trùng — sếp góp ý 18/8).
+    try { introDur = introSeg ? await probeDuration(join(workDir, introSeg)) : 0; } catch { introDur = 0; }
+    try { outroDur = outroSeg ? await probeDuration(join(workDir, outroSeg)) : 0; } catch { outroDur = 0; }
   } catch (e) {
     console.warn('Intro/Outro bỏ qua:', e.message);
   }
@@ -85,11 +91,17 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
   await writeFile(join(workDir, 'brand.txt'), brandLine || 'SDVICO', 'utf8');
   const brandFont = fmt.w >= 1920 ? 26 : 30;
   const pad = fmt.w >= 1920 ? 40 : 30;
+  // enable=between(t, introDur, total-outroDur): banner chỉ ở phần nội dung chính.
+  let totalDur = 0;
+  try { totalDur = await probeDuration(join(workDir, baseName)); } catch { totalDur = 0; }
+  const enableExpr = totalDur > 0 && (introDur > 0 || outroDur > 0)
+    ? `:enable='between(t,${introDur.toFixed(2)},${(totalDur - outroDur).toFixed(2)})'`
+    : '';
   const drawtext =
     `drawtext=fontfile=BeVietnamPro-Black.ttf:textfile=brand.txt:` +
     `fontcolor=white:fontsize=${brandFont}:` +
     `box=1:boxcolor=black@0.45:boxborderw=16:` +
-    `x=(w-tw)/2:y=${pad}`;
+    `x=(w-tw)/2:y=${pad}${enableExpr}`;
 
   await ffmpeg([
     '-y', '-i', baseName,

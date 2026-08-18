@@ -391,9 +391,15 @@ export async function decideForm(formData: FormData) {
   const client = getServerClient();
   // Lấy loại + payload để biết có phải bài marketing không.
   const { data: row } = await client.from('approval_queue').select('kind, payload').eq('id', id).single();
+  // Lưu giờ hẹn vào payload để trang Quản lý bài viết hiện "Đã duyệt, đợi hẹn giờ HH:mm dd/mm"
+  // (user 18/8). Chỉ khi duyệt + có hẹn; từ chối hoặc đăng ngay thì không ghi.
+  const basePayload = ((row as any)?.payload || {}) as Record<string, unknown>;
+  const newPayload = decision === 'approved' && scheduledAt
+    ? { ...basePayload, scheduled_at: scheduledAt }
+    : basePayload;
   const { data: updated, error } = await client
     .from('approval_queue')
-    .update({ status: decision, decided_at: new Date().toISOString(), note: note || null })
+    .update({ status: decision, decided_at: new Date().toISOString(), note: note || null, payload: newPayload })
     .eq('id', id)
     .eq('status', 'pending')
     .select('id');

@@ -22,46 +22,80 @@ function registerFontsFromWorkdir(workDir) {
   } catch { /* font thiếu -> canvas dùng font mặc định */ }
 }
 
-// Logo cắt nền trắng (nếu file PNG đã trong suốt sẵn thì thuật toán vẫn chạy - vô hại).
-let logoCut = null;
+// Logo: GIỮ NGUYÊN file gốc (không cắt nền). Sếp góp ý 18/8 "logo bị mờ": nguyên nhân là
+// thuật toán cắt nền trắng ăn luôn viền sáng của chữ SDVICO + mép quả cầu xám -> răng cưa,
+// nhòe; cộng thêm phóng file 350px lên quá 1x. Cách sửa: vẽ logo trên ĐĨA TRÒN TRẮNG (đúng
+// nền thiết kế gốc, viền không mất), kích thước không vượt 1x pixel gốc, có bóng đổ nhẹ.
+let logoImg = null;
 async function getLogo() {
-  if (logoCut) return logoCut;
+  if (logoImg) return logoImg;
   const p = join(HERE, '..', '..', '..', '..', 'apps', 'approval-ui', 'lib', 'gen', 'assets', 'logo-sdvico.png');
-  try {
-    const img = await loadImage(readFileSync(p));
-    const w = img.width, h = img.height;
-    const cv = createCanvas(w, h);
-    const ctx = cv.getContext('2d');
-    ctx.drawImage(img, 0, 0, w, h);
-    const data = ctx.getImageData(0, 0, w, h);
-    const d = data.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const r = d[i], g = d[i + 1], b = d[i + 2];
-      if (r > 240 && g > 240 && b > 240) d[i + 3] = 0;
-      else if (r > 220 && g > 220 && b > 220) d[i + 3] = Math.max(0, d[i + 3] - 120);
-    }
-    ctx.putImageData(data, 0, 0);
-    logoCut = cv;
-    return logoCut;
-  } catch { return null; }
+  try { logoImg = await loadImage(readFileSync(p)); return logoImg; } catch { return null; }
 }
 
-// Nền gradient động: dịch chuyển theo t để có cảm giác biển động nhẹ.
+// Vẽ logo trong đĩa trắng bo tròn tại tâm (cx, cy), đường kính diskSize, alpha 0..1.
+// Logo chiếm ~72% đĩa, KHÔNG phóng quá 1x kích thước gốc (giữ nét).
+function drawLogoDisk(ctx, logo, cx, cy, diskSize, alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // Bóng đổ nhẹ cho đĩa nổi trên nền navy.
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = Math.round(diskSize * 0.12);
+  ctx.shadowOffsetY = Math.round(diskSize * 0.04);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(cx, cy, diskSize / 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  if (logo) {
+    const maxNative = Math.min(logo.width, logo.height);
+    const inner = Math.min(Math.round(diskSize * 0.72), maxNative);
+    // Vẽ mượt khi thu nhỏ.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(logo, cx - inner / 2, cy - inner / 2, inner, inner);
+  }
+  ctx.restore();
+}
+
+// Nền: navy sạch + vệt sáng tỏa từ phía trên (spotlight) + dải sóng mờ dưới đáy. Bỏ mấy chấm
+// tròn (sếp: "màu hơi kì"). Chuyển động rất nhẹ theo t để không tĩnh chết.
+const BRAND_NAVY = '#0b2a4a';
+const BRAND_NAVY_DEEP = '#061a30';
+const BRAND_BLUE = '#1f5fbf';
+const BRAND_RED = '#e23b2e';
 function drawBackground(ctx, W, H, t = 0) {
-  const shift = Math.sin(t * 0.5) * 0.05;
-  const g = ctx.createLinearGradient(0, -H * shift, 0, H + H * shift);
-  g.addColorStop(0, '#1f4e79');
-  g.addColorStop(0.5, '#164066');
-  g.addColorStop(1, '#0d2a45');
+  // Nền phẳng navy đậm dần xuống dưới.
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, BRAND_NAVY);
+  g.addColorStop(1, BRAND_NAVY_DEEP);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
-  // Vài chấm sáng "sóng" trang trí (không quá rối).
-  ctx.fillStyle = 'rgba(255,255,255,0.05)';
-  for (let i = 0; i < 6; i++) {
-    const x = ((i * 137 + t * 30) % W);
-    const y = H * 0.3 + Math.sin(t * 1.5 + i) * H * 0.05;
+  // Spotlight xanh thương hiệu tỏa từ trên xuống, hơi lắc theo t.
+  const sx = W / 2 + Math.sin(t * 0.6) * W * 0.03;
+  const rg = ctx.createRadialGradient(sx, H * 0.18, 0, sx, H * 0.18, Math.max(W, H) * 0.7);
+  rg.addColorStop(0, 'rgba(31,95,191,0.55)');
+  rg.addColorStop(0.5, 'rgba(31,95,191,0.18)');
+  rg.addColorStop(1, 'rgba(31,95,191,0)');
+  ctx.fillStyle = rg;
+  ctx.fillRect(0, 0, W, H);
+  // Dải sóng mờ dưới đáy (2 lớp), gợi biển mà không rối.
+  const waveBase = H * 0.86;
+  for (let layer = 0; layer < 2; layer++) {
     ctx.beginPath();
-    ctx.arc(x, y, 20 + i * 3, 0, Math.PI * 2);
+    ctx.moveTo(0, H);
+    const amp = H * (0.018 + layer * 0.01);
+    const freq = 2.2 + layer * 0.8;
+    const phase = t * (0.9 + layer * 0.4) + layer * 1.3;
+    for (let x = 0; x <= W; x += 12) {
+      const y = waveBase + layer * H * 0.03 + Math.sin((x / W) * Math.PI * freq + phase) * amp;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fillStyle = layer === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.035)';
     ctx.fill();
   }
 }
@@ -98,32 +132,41 @@ async function drawIntroFrame(W, H, t, dur) {
     : { logoY: 0.15, logoRatio: 0.3, nameY: 0.7, sloganY: 0.85 };
   const base = isPortrait ? H : Math.min(W, H * 1.6);
 
-  // Logo: scale 0.6 → 1 + fade 0 → 1 trong 0-0.8s.
-  if (logo) {
+  // Logo trên đĩa trắng: scale 0.6 → 1 + fade 0 → 1 trong 0-0.8s.
+  {
     const p = easeOut(t / 0.8);
     const scale = 0.6 + 0.4 * p;
-    const alpha = p;
-    const size = Math.round(Math.min(W, H) * pos.logoRatio * scale);
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.drawImage(logo, (W - size) / 2, H * pos.logoY + (Math.min(W, H) * pos.logoRatio - size) / 2, size, size);
-    ctx.restore();
+    const disk = Math.round(Math.min(W, H) * pos.logoRatio * scale);
+    const cy = H * pos.logoY + Math.min(W, H) * pos.logoRatio / 2;
+    drawLogoDisk(ctx, logo, W / 2, cy, disk, p);
   }
 
-  // "SDVICO": slide up 60px + fade in 0.6-1.4s.
+  // "SDVICO": slide up 60px + fade in 0.6-1.4s. Chữ trắng, gạch nhấn 2 màu thương hiệu bên dưới.
   const nameT = easeOut((t - 0.6) / 0.8);
   if (nameT > 0) {
     const offset = 60 * (1 - nameT);
+    const fontPx = Math.round(base * 0.09);
     drawText(ctx, 'SDVICO', W / 2, H * pos.nameY + offset, {
-      font: `${Math.round(base * 0.09)}px BVP-Black`, alpha: Math.min(1, nameT)
+      font: `${fontPx}px BVP-Black`, alpha: Math.min(1, nameT)
     });
+    // Gạch nhấn xanh + đỏ dưới tên (mở rộng dần theo nameT).
+    const barW = Math.round(fontPx * 2.4 * Math.min(1, nameT));
+    const barH = Math.max(4, Math.round(fontPx * 0.07));
+    const by = H * pos.nameY + offset + fontPx * 0.62;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, nameT);
+    ctx.fillStyle = BRAND_BLUE;
+    ctx.fillRect(W / 2 - barW / 2, by, Math.round(barW * 0.62), barH);
+    ctx.fillStyle = BRAND_RED;
+    ctx.fillRect(W / 2 - barW / 2 + Math.round(barW * 0.62), by, barW - Math.round(barW * 0.62), barH);
+    ctx.restore();
   }
 
   // Slogan fade 1.2-2.0s.
   const sloganT = easeOut((t - 1.2) / 0.8);
   if (sloganT > 0) {
-    drawText(ctx, 'Công nghệ số cho ngành biển', W / 2, H * pos.sloganY, {
-      font: `${Math.round(base * 0.035)}px BVP`, color: 'rgba(255,255,255,0.9)', alpha: Math.min(1, sloganT)
+    drawText(ctx, 'Công nghệ số cho ngành biển và thủy sản', W / 2, H * pos.sloganY, {
+      font: `${Math.round(base * 0.032)}px BVP`, color: 'rgba(255,255,255,0.92)', alpha: Math.min(1, sloganT)
     });
   }
 
@@ -150,15 +193,13 @@ async function drawOutroFrame(W, H, t, dur) {
   const base = isPortrait ? H : Math.min(W, H * 1.6);
 
   // Logo pop-in.
-  if (logo) {
+  // Logo trên đĩa trắng: pop 0.5 → 1 + fade trong 0-0.7s.
+  {
     const p = easeOut(t / 0.7);
     const scale = 0.5 + 0.5 * p;
-    const alpha = p;
-    const size = Math.round(Math.min(W, H) * pos.logoRatio * scale);
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.drawImage(logo, (W - size) / 2, H * pos.logoY + (Math.min(W, H) * pos.logoRatio - size) / 2, size, size);
-    ctx.restore();
+    const disk = Math.round(Math.min(W, H) * pos.logoRatio * scale);
+    const cy = H * pos.logoY + Math.min(W, H) * pos.logoRatio / 2;
+    drawLogoDisk(ctx, logo, W / 2, cy, disk, p);
   }
 
   // "Gọi ngay tổng đài": slide từ trái vào + fade 0.6-1.4s.
@@ -244,6 +285,11 @@ async function renderBumperMp4(drawFrame, framesDir, W, H, dur, audioPath, outSe
 
 // Tạo intro và outro cho một FORMAT. Trả về {introSeg, outroSeg} là tên file mp4 trong workDir để
 // concat cùng cảnh chính. outroAudioPath: mp3 TTS đọc tổng đài (đã sinh sẵn), có thể null.
+// Xem trước 1 frame (dùng cho scripts/preview-bumpers.mjs) — không ảnh hưởng pipeline.
+export async function previewFrame(kind, W, H, t, dur) {
+  return kind === 'outro' ? drawOutroFrame(W, H, t, dur) : drawIntroFrame(W, H, t, dur);
+}
+
 export async function buildBumpers({ workDir, fmt, outroAudioPath = null, introDurSec = 2.8, outroDurSec = 4 }) {
   registerFontsFromWorkdir(workDir);
   // Outro dài đủ đọc hết TTS (đọc "1900 23 23 49" từng số ~6s).
