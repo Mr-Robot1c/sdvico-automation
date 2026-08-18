@@ -58,7 +58,7 @@ export async function generateVideoScript(content, assets, facts = []) {
     'Lời thoại mỗi cảnh là câu nói trơn, không ghi chú, không tiêu đề, vì sẽ được máy đọc thành tiếng.',
     'CẤM cảnh cuối gọi tổng đài / mời liên hệ SDVICO - phần OUTRO cuối video đã đọc "Gọi ngay tổng đài 1900 23 23 49" rồi, KHÔNG lặp lại ở nội dung chính (tránh trùng).',
     'Cảnh cuối nên là một câu chốt ngắn về lợi ích/thông điệp sản phẩm (vd "yên tâm vươn khơi cùng thiết bị bền bỉ"), KHÔNG nhắc số điện thoại hay từ "gọi", "liên hệ".',
-    'Số điện thoại phải VIẾT DẠNG SỐ (vd 1900 23 23 49), KHÔNG viết ra chữ ("một chín không không..."); máy đọc sẽ tự đọc từng số.',
+    'MỌI SỐ phải VIẾT DẠNG SỐ (95%, 220V, 80 lít, 1900 23 23 49, 5 năm...), KHÔNG viết ra chữ ("chín lăm phần trăm", "hai trăm hai mươi vôn"). Lý do: PHỤ ĐỀ video lấy nguyên văn kịch bản này - bà con nhìn thấy "95%" dễ hiểu hơn "chín lăm phần trăm". Máy đọc tiếng sẽ tự đọc số ra chữ.',
     '',
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số được duyệt: nói chung chung, không nêu số cụ thể.',
     '',

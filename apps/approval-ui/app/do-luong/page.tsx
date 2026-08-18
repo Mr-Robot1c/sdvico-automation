@@ -31,14 +31,17 @@ export default async function Page() {
   }
   const pageFollowers = Number(pageMetrics?.followers) || 0;
 
-  // Tên sản phẩm của một bài: ưu tiên folder xoay vòng (rotation_group), rồi keyword, rồi tiêu đề.
-  const productOf = (brief: any, title: string): string => {
+  // Tên sản phẩm của một bài. Ưu tiên: rotation_group folder chuẩn -> guessGroup(rot+kw+title+draft)
+  // -> keyword thô -> title thô. Thêm draft (300 ký tự đầu) để bắt bài Xưởng sản xuất tay có title
+  // không nêu tên SP nhưng thân bài có (vd "Chạy máy khoẻ..." + thân "Thiết bị lọc dầu SF-50 giúp...").
+  const productOf = (brief: any, title: string, draft: string = ''): string => {
     const g = brief?.rotation_group as string | undefined;
-    // Bài content (nuôi trang) giữ nhóm riêng, không gộp vào sản phẩm.
     if (brief?.post_kind === 'content' || g === 'Bài content') return 'Bài content';
-    // Gộp các BIẾN THỂ tên về đúng MỘT sản phẩm (vd "GSHT tàu cá Viettel" và "giám sát hành trình
-    // Viettel S-Tracking" là một). guessGroup dò theo từ khóa sản phẩm; khớp thì dùng tên chuẩn.
-    const guess = (guessGroup as (s: string) => string | null)(`${g || ''} ${brief?.keyword || ''} ${title || ''}`);
+    if (g && g !== 'Content' && /^\d+\.\s/.test(g)) return g.replace(/^\s*\d+\.\s*/, '').trim();
+    const draftSnippet = String(draft || '').slice(0, 300);
+    const guess = (guessGroup as (s: string) => string | null)(
+      `${g || ''} ${brief?.keyword || ''} ${title || ''} ${draftSnippet}`
+    );
     if (guess) return guess.replace(/^\s*\d+\.\s*/, '').trim();
     const name = (g ? g.replace(/^\s*\d+\.\s*/, '').trim() : '') || brief?.keyword || title || 'Khác';
     return String(name).trim() || 'Khác';
@@ -52,7 +55,7 @@ export default async function Page() {
       const brief = (c as any).brief || {};
       contents.set((c as any).id, {
         title: (c as any).title || '(không tên)',
-        product: productOf(brief, (c as any).title),
+        product: productOf(brief, (c as any).title, (c as any).draft),
         conversions: Number(brief.conversions) || 0,
         draft: String((c as any).draft || '')
       });

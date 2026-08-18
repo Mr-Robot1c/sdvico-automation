@@ -43,7 +43,8 @@ async function waitFacebookVideoReady(
 // SAU khi người đã bấm Duyệt. Chưa cấu hình token thì bỏ qua, không lỗi.
 async function publishContentToFacebook(
   client: ReturnType<typeof getServerClient>,
-  contentId: string
+  contentId: string,
+  scheduledAt?: string | null
 ): Promise<{ ok: boolean; error?: string; url?: string; warn?: string }> {
   const PAGE_ID = process.env.FACEBOOK_PAGE_ID;
   const TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
@@ -110,6 +111,16 @@ async function publishContentToFacebook(
     } else {
       endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
       body = new URLSearchParams({ message, access_token: TOKEN });
+    }
+    // Hẹn giờ đăng: FB nhận unix timestamp (giây). published=false + scheduled_publish_time
+    // -> FB tự đăng đúng giờ (min 10 phút, max 6 tháng - đã kiểm ở decide-actions.tsx).
+    // Áp cho cả /videos, /photos, /feed. Bài hẹn giờ KHÔNG thả ảnh comment ngay (không có post_id
+    // để comment vì bài chưa đăng); ảnh dư/comment sẽ bỏ qua với warn.
+    const scheduledUnix = scheduledAt ? Math.floor(new Date(scheduledAt).getTime() / 1000) : 0;
+    if (scheduledUnix) {
+      body.set('published', 'false');
+      body.set('scheduled_publish_time', String(scheduledUnix));
+      commentImage = false; // bài chưa lên, không comment ảnh ngay
     }
     const res = await fetchWithRetry(endpoint, { method: 'POST', body });
     const json: any = await res.json();
@@ -298,6 +309,10 @@ export async function decideForm(formData: FormData) {
   const id = String(formData.get('id') || '');
   const action = String(formData.get('action') || '');
   const note = String(formData.get('note') || '');
+  // Hẹn giờ đăng (không bắt buộc). Định dạng datetime-local: "YYYY-MM-DDTHH:mm" (giờ theo máy người dùng).
+  // Có -> Facebook nhận scheduled_publish_time, tự đăng đúng giờ. Trống -> đăng ngay như cũ.
+  // TikTok API không hỗ trợ hẹn giờ public -> bỏ qua khi có hẹn (chỉ Facebook được hẹn).
+  const scheduledAt = String(formData.get('scheduled_at') || '').trim() || null;
 
   const decision = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : null;
   if (!id || !decision) return;
@@ -351,7 +366,7 @@ export async function decideForm(formData: FormData) {
               continue;
             }
           }
-          if (ch === 'facebook') jobs.push(publishContentToFacebook(bgClient, contentId));
+          if (ch === 'facebook') jobs.push(publishContentToFacebook(bgClient, contentId, scheduledAt));
           if (ch === 'tiktok') jobs.push(publishContentToTikTok(bgClient, contentId));
         }
         await Promise.allSettled(jobs);
@@ -786,10 +801,13 @@ export async function deleteContent(formData: FormData) {
   const id = String(formData.get('content_id') || '');
   if (!id) return;
   const client = getServerClient();
-  await client.from('approval_queue').delete().eq('payload->>content_id', id);
-  await client.from('mkt_posts').delete().eq('content_id', id);
-  await client.from('mkt_metrics').delete().eq('entity_ref', id);
-  await client.from('mkt_content').delete().eq('id', id);
+  // Chạy 4 DELETE SONG SONG (trước đây tuần tự nên chờ 4 round-trip Supabase = lag/treo).
+  await Promise.all([
+    client.from('approval_queue').delete().eq('payload->>content_id', id),
+    client.from('mkt_posts').delete().eq('content_id', id),
+    client.from('mkt_metrics').delete().eq('entity_ref', id),
+    client.from('mkt_content').delete().eq('id', id)
+  ]);
   revalidatePath('/do-luong');
   revalidatePath('/noi-dung');
   revalidatePath('/');

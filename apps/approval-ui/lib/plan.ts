@@ -60,11 +60,19 @@ export type Plan = {
   };
 };
 
-// Tên sản phẩm của một bài: gộp biến thể tên về đúng MỘT sản phẩm (guessGroup), khớp trang Đo lường.
-function productOf(brief: any, title: string): string {
+// Tên sản phẩm của một bài: gộp biến thể tên về đúng MỘT sản phẩm.
+// Ưu tiên: rotation_group thẳng (đã chọn folder chuẩn) → guessGroup(rot+keyword+title+draft snippet) →
+// keyword thô → title thô. Bổ sung draft (300 ký tự đầu) để bắt bài Xưởng sản xuất tay có title
+// không có tên SP nhưng thân bài nêu (vd "Chạy máy khoẻ" - thân bài có "Thiết bị lọc dầu SF-50").
+function productOf(brief: any, title: string, draft: string = ''): string {
   const g = brief?.rotation_group as string | undefined;
   if (brief?.post_kind === 'content' || g === 'Bài content') return 'Bài content';
-  const guess = (guessGroup as (s: string) => string | null)(`${g || ''} ${brief?.keyword || ''} ${title || ''}`);
+  // rotation_group đã là folder chuẩn -> dùng luôn, không cần guess.
+  if (g && g !== 'Content' && /^\d+\.\s/.test(g)) return g.replace(/^\s*\d+\.\s*/, '').trim();
+  const draftSnippet = String(draft || '').slice(0, 300);
+  const guess = (guessGroup as (s: string) => string | null)(
+    `${g || ''} ${brief?.keyword || ''} ${title || ''} ${draftSnippet}`
+  );
   if (guess) return guess.replace(/^\s*\d+\.\s*/, '').trim();
   const name = (g ? g.replace(/^\s*\d+\.\s*/, '').trim() : '') || brief?.keyword || title || 'Khác';
   return String(name).trim() || 'Khác';
@@ -105,10 +113,14 @@ function joinAnd(items: string[]): string {
 // Đọc số liệu: mkt_metrics (chuỗi snapshot, lấy bản mới nhất mỗi bài) gộp với mkt_content,
 // rồi gom theo sản phẩm. Trả về tổng và top bài. Giống hệt logic app/do-luong/page.tsx.
 export async function loadMeasurement(client: Client): Promise<Measurement> {
+  // Cửa sổ 7 ngày gần nhất: chỉ dùng snapshot mới trong tuần để lên kế hoạch T4/CN, không lấy
+  // lịch sử vĩnh viễn (bài cũ đã lỗi thời không đại diện tình hình bây giờ).
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: mrows } = await client
     .from('mkt_metrics')
     .select('entity_ref, metrics, created_at')
     .eq('source', 'facebook')
+    .gte('created_at', sevenDaysAgo)
     .order('created_at', { ascending: false })
     .limit(500);
 
@@ -121,12 +133,12 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
   const cids = [...latest.keys()];
   const contents = new Map<string, { title: string; product: string; conversions: number }>();
   if (cids.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, title, brief').in('id', cids);
+    const { data: cs } = await client.from('mkt_content').select('id, title, brief, draft').in('id', cids);
     for (const c of cs || []) {
       const brief = (c as any).brief || {};
       contents.set((c as any).id, {
         title: (c as any).title || '(không tên)',
-        product: productOf(brief, (c as any).title),
+        product: productOf(brief, (c as any).title, (c as any).draft),
         conversions: Number(brief.conversions) || 0
       });
     }
