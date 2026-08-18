@@ -1,6 +1,5 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
-import { kenhLabel } from '../labels';
 import KenhTabs from './kenh-tabs';
 import { getAllChannels, methodLabel } from '../../lib/channels';
 import { toggleChannel, addChannel, removeChannel } from '../actions';
@@ -9,14 +8,18 @@ import { SubmitButton } from '../submit-button';
 export const dynamic = 'force-dynamic';
 
 type Post = { id: string; job_id: string | null; kenh: string | null; trang_thai: string };
-type Job = { id: string; title: string };
 type App = { id: string; job_id: string | null };
 
-type ChannelStat = {
+type ChannelRow = {
   kenh: string;
-  totalPosts: number;
+  ten: string;
+  method: 'api' | 'manual';
+  manual_default?: 'assisted' | 'track_only';
+  builtin: boolean;
+  post_url: string | null;
+  enabled: boolean;
   postedCount: number;
-  jobs: { id: string; title: string }[];
+  totalPosts: number;
   applicantCount: number;
 };
 
@@ -30,12 +33,10 @@ export default async function Page() {
   ]);
 
   const posts = (postsRes.data || []) as Post[];
-  const jobs = (jobsRes.data || []) as Job[];
+  const jobs = (jobsRes.data || []) as { id: string; title: string }[];
   const apps = (appsRes.data || []) as App[];
-  // Tất cả kênh (built-in trong code + kênh người dùng tự thêm) kèm trạng thái bật/tắt.
   const channelViews = await getAllChannels(client);
 
-  const jobTitle = new Map(jobs.map((j) => [j.id, j.title]));
   // Số ứng viên theo từng vị trí — dùng để ước tính "kênh này ra bao nhiêu ứng viên".
   const appsByJob = new Map<string, number>();
   for (const a of apps) {
@@ -43,135 +44,158 @@ export default async function Page() {
     appsByJob.set(a.job_id, (appsByJob.get(a.job_id) || 0) + 1);
   }
 
-  const byChannel = new Map<string, ChannelStat>();
+  // Thống kê per kênh: tổng bài, bài đã đăng, ứng viên ước tính.
+  const stats = new Map<string, { total: number; posted: number; jobs: Set<string> }>();
   for (const p of posts) {
     const key = p.kenh || 'other';
-    if (!byChannel.has(key)) byChannel.set(key, { kenh: key, totalPosts: 0, postedCount: 0, jobs: [], applicantCount: 0 });
-    const stat = byChannel.get(key)!;
-    stat.totalPosts += 1;
-    if (p.trang_thai === 'posted') stat.postedCount += 1;
-    if (p.job_id && !stat.jobs.some((j) => j.id === p.job_id)) {
-      stat.jobs.push({ id: p.job_id, title: jobTitle.get(p.job_id) || 'Vị trí đã xóa' });
-    }
-  }
-  for (const stat of byChannel.values()) {
-    stat.applicantCount = stat.jobs.reduce((sum, j) => sum + (appsByJob.get(j.id) || 0), 0);
+    if (!stats.has(key)) stats.set(key, { total: 0, posted: 0, jobs: new Set() });
+    const s = stats.get(key)!;
+    s.total += 1;
+    if (p.trang_thai === 'posted') s.posted += 1;
+    if (p.job_id) s.jobs.add(p.job_id);
   }
 
-  const channels = [...byChannel.values()].sort((a, b) => b.postedCount - a.postedCount);
-  const totalPostedAllChannels = channels.reduce((s, c) => s + c.postedCount, 0);
+  // Gộp channelViews + stats thành 1 mảng để render bảng.
+  const rows: ChannelRow[] = channelViews.map((c) => {
+    const s = stats.get(c.kenh);
+    const applicantCount = s ? [...s.jobs].reduce((sum, jid) => sum + (appsByJob.get(jid) || 0), 0) : 0;
+    return {
+      kenh: c.kenh,
+      ten: c.ten,
+      method: c.method,
+      manual_default: c.manual_default,
+      builtin: c.builtin,
+      post_url: c.post_url ?? null,
+      enabled: c.enabled,
+      postedCount: s?.posted || 0,
+      totalPosts: s?.total || 0,
+      applicantCount,
+    };
+  });
+
+  // Kênh bật lên đầu, trong nhóm bật sort theo postedCount giảm dần.
+  rows.sort((a, b) => {
+    if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+    return b.postedCount - a.postedCount;
+  });
+
+  const totalPostedAllChannels = rows.reduce((s, r) => s + r.postedCount, 0);
+  const enabledCount = rows.filter((r) => r.enabled).length;
 
   return (
     <main>
       <header className="head-row">
         <div>
           <h1>Kênh đăng tin</h1>
-          <p className="sub">Tổng hợp số bài đã đăng và vị trí đã đăng theo từng kênh.</p>
+          <p className="sub">Cấu hình kênh đăng và tổng hợp bài đăng theo từng kênh.</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>
 
       <KenhTabs />
 
-      {/* Danh sách kênh & cấu hình: phương thức (API/thủ công), trạng thái bật/tắt, trang đăng.
-          Nguồn: registry code + kênh người dùng thêm (hr_platforms). Bật kênh để hiện ở trang Vị trí. */}
-      <section style={{ marginTop: 8 }}>
-        <h2 style={{ fontSize: '1.05em', margin: '0 0 8px' }}>Kênh đăng tuyển & cấu hình</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-          {channelViews.map((c) => {
-            const on = c.enabled;
-            return (
-              <div key={c.kenh} className="card">
-                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <b>{c.ten}</b>
-                  <span className={`stage tone-${on ? 'ok' : 'default'}`} style={{ fontSize: 11 }}>{on ? 'Đang bật' : 'Đang tắt'}</span>
-                </div>
-                <p className="muted" style={{ margin: '6px 0', fontSize: '0.85em' }}>
-                  {methodLabel(c.kenh)}
-                  {c.method === 'manual' ? (c.manual_default === 'track_only' ? ' · ưu tiên gắn link' : ' · có hỗ trợ soạn') : ' · tự đăng sau duyệt'}
-                  {c.builtin ? '' : ' · tự thêm'}
-                </p>
-                {c.post_url ? (
-                  <p style={{ margin: '0 0 8px', fontSize: '0.82em' }}>
-                    <a href={c.post_url} target="_blank" rel="noreferrer">Mở trang đăng ↗</a>
-                  </p>
-                ) : null}
-                <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                  <form action={toggleChannel}>
-                    <input type="hidden" name="kenh" value={c.kenh} />
-                    <input type="hidden" name="bat" value={on ? 'false' : 'true'} />
-                    <SubmitButton label={on ? 'Tắt kênh' : 'Bật kênh'} className="btn ghost" style={{ fontSize: '0.85em' }} />
+      <p className="sub" style={{ margin: '0 0 8px' }}>
+        {rows.length} kênh · {enabledCount} đang bật · {totalPostedAllChannels} bài đã đăng.
+      </p>
+
+      <div className="table-scroll">
+        <table className="chan-table">
+          <thead>
+            <tr>
+              <th className="chan-th-name">Kênh</th>
+              <th className="chan-th-method">Phương thức</th>
+              <th className="chan-th-status">Trạng thái</th>
+              <th className="chan-th-num">Bài đã đăng</th>
+              <th className="chan-th-num">Ứng viên</th>
+              <th className="chan-th-actions">Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.kenh} className={`chan-row${r.enabled ? '' : ' chan-row-off'}`}>
+                <td className="chan-td-name">
+                  <div className="chan-name">{r.ten}</div>
+                  {r.post_url ? (
+                    <a href={r.post_url} target="_blank" rel="noreferrer" className="chan-post-url">
+                      Mở trang đăng ↗
+                    </a>
+                  ) : null}
+                  {!r.builtin ? <span className="chan-tag">Tự thêm</span> : null}
+                </td>
+                <td className="chan-td-method">
+                  <span>{methodLabel(r.kenh)}</span>
+                  <div className="muted chan-method-sub">
+                    {r.method === 'manual'
+                      ? (r.manual_default === 'track_only' ? 'Ưu tiên gắn link' : 'Có hỗ trợ soạn')
+                      : 'Tự đăng sau duyệt'}
+                  </div>
+                </td>
+                <td className="chan-td-status">
+                  <span className={`stage tone-${r.enabled ? 'ok' : 'default'}`}>
+                    {r.enabled ? 'Đang bật' : 'Đang tắt'}
+                  </span>
+                </td>
+                <td className="chan-td-num">
+                  <span className="chan-num-value">{r.postedCount}</span>
+                  {r.totalPosts > r.postedCount ? (
+                    <span className="muted chan-num-sub"> / {r.totalPosts} tổng</span>
+                  ) : null}
+                </td>
+                <td className="chan-td-num">
+                  {r.applicantCount > 0 ? (
+                    <>~<span className="chan-num-value">{r.applicantCount}</span></>
+                  ) : (
+                    <span className="muted">0</span>
+                  )}
+                </td>
+                <td className="chan-td-actions">
+                  <form action={toggleChannel} style={{ display: 'inline-block' }}>
+                    <input type="hidden" name="kenh" value={r.kenh} />
+                    <input type="hidden" name="bat" value={r.enabled ? 'false' : 'true'} />
+                    <SubmitButton
+                      label={r.enabled ? 'Tắt' : 'Bật'}
+                      className={`btn ${r.enabled ? 'ghost' : 'ok'}`}
+                      style={{ fontSize: '0.82em', padding: '4px 12px' }}
+                    />
                   </form>
-                  {/* Chỉ xóa được kênh người dùng tự thêm; kênh built-in chỉ tắt được. */}
-                  {!c.builtin ? (
-                    <form action={removeChannel}>
-                      <input type="hidden" name="kenh" value={c.kenh} />
-                      <SubmitButton label="Xóa" className="btn no" style={{ fontSize: '0.85em' }} />
+                  {!r.builtin ? (
+                    <form action={removeChannel} style={{ display: 'inline-block', marginLeft: 4 }}>
+                      <input type="hidden" name="kenh" value={r.kenh} />
+                      <SubmitButton
+                        label="Xoá"
+                        className="btn ghost"
+                        style={{ fontSize: '0.82em', padding: '4px 12px', color: 'var(--no)' }}
+                      />
                     </form>
                   ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Thêm sàn tuyển dụng mới do người dùng nhập. Luôn là kênh đăng thủ công. */}
-        <form action={addChannel} className="settings-box" style={{ marginTop: 12 }}>
-          <b>Thêm sàn tuyển dụng mới</b>
-          <p className="muted" style={{ margin: '4px 0 8px', fontSize: '0.85em' }}>
-            Kênh tự thêm luôn là <b>đăng thủ công</b> (soạn có hỗ trợ + ghi nhận đã đăng). Nối API tự động
-            cần cấu hình credentials trong code.
-          </p>
-          <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-            <input className="note" name="ten" placeholder="Tên sàn, ví dụ JobsGO" required aria-label="Tên sàn" />
-            <input className="note" type="url" name="post_url" placeholder="Link trang đăng (tùy chọn)" aria-label="Link trang đăng" />
-          </div>
-          <div className="row" style={{ marginTop: 8 }}>
-            <SubmitButton label="Thêm kênh" />
-          </div>
-        </form>
-      </section>
-
-      <div className="err" role="alert" style={{ background: 'var(--surface)', color: 'var(--ink-2)', border: '1px solid var(--line)', marginTop: 16 }}>
-        <b>Giới hạn số liệu:</b> số ứng viên bên dưới là ước tính theo vị trí (job), không phải theo
-        từng bài đăng cụ thể — vì ứng viên gửi CV qua một hộp thư chung, không qua đường dẫn riêng
-        từng bài. Một vị trí đăng ở nhiều kênh sẽ bị tính ứng viên ở cả các kênh đó, nên tổng cộng
-        dồn qua các kênh sẽ lớn hơn số ứng viên thực tế toàn hệ thống.
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {channels.length === 0 ? (
-        <div className="empty">
-          <div className="empty-icon" aria-hidden="true">📡</div>
-          <p>Chưa có bài đăng nào.</p>
+      {/* Thêm sàn tuyển dụng mới do người dùng nhập. Luôn là kênh đăng thủ công. */}
+      <form action={addChannel} className="settings-box" style={{ marginTop: 16 }}>
+        <b>Thêm sàn tuyển dụng mới</b>
+        <p className="muted" style={{ margin: '4px 0 8px', fontSize: '0.85em' }}>
+          Kênh tự thêm luôn là <b>đăng thủ công</b> (soạn có hỗ trợ + ghi nhận đã đăng). Nối API tự động
+          cần cấu hình credentials trong code.
+        </p>
+        <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+          <input className="note" name="ten" placeholder="Tên sàn, ví dụ JobsGO" required aria-label="Tên sàn" />
+          <input className="note" type="url" name="post_url" placeholder="Link trang đăng (tùy chọn)" aria-label="Link trang đăng" />
         </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginTop: 16 }}>
-          {channels.map((c) => (
-            <div key={c.kenh} className="card">
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <b>{kenhLabel(c.kenh)}</b>
-                <span className="stage tone-ok">{c.postedCount} đã đăng</span>
-              </div>
-              <p className="muted" style={{ margin: '6px 0' }}>
-                {c.totalPosts} bài (kể cả nháp/đặt lịch) · ~{c.applicantCount} ứng viên (ước tính)
-              </p>
-              {c.jobs.length === 0 ? (
-                <p className="sub">Chưa gắn vị trí nào.</p>
-              ) : (
-                <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: '0.88em' }}>
-                  {c.jobs.map((j) => (
-                    <li key={j.id}>{j.title} <span className="muted">· {appsByJob.get(j.id) || 0} ứng viên</span></li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
+        <div className="row" style={{ marginTop: 8 }}>
+          <SubmitButton label="Thêm kênh" />
         </div>
-      )}
+      </form>
 
-      {channels.length > 0 ? (
-        <p className="muted" style={{ marginTop: 16 }}>Tổng {totalPostedAllChannels} bài đã đăng trên {channels.length} kênh.</p>
-      ) : null}
+      <p className="muted" style={{ marginTop: 14, fontSize: '0.82em' }}>
+        Số ứng viên bên trên là ước tính theo vị trí (job), không phải theo từng bài đăng — ứng viên
+        gửi CV qua một hộp thư chung, không qua đường dẫn riêng của từng bài. Một vị trí đăng ở nhiều
+        kênh sẽ bị tính ở tất cả các kênh đó nên tổng cộng có thể lớn hơn số ứng viên thực tế.
+      </p>
     </main>
   );
 }
