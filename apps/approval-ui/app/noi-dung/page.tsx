@@ -2,6 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
+import DeleteButton from './delete-button';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
 
 export const dynamic = 'force-dynamic';
@@ -319,6 +320,9 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                       {c.brief?.video_requested ? (
                         <span className="badge tone-demo" style={{ marginLeft: 8 }} title="Đã đánh dấu — đang dựng video">🎬 Đã yêu cầu video</span>
                       ) : null}
+                      <span style={{ marginLeft: 8 }}>
+                        <DeleteButton contentId={c.id} title={c.title} />
+                      </span>
                     </td>
                   </tr>
                 );
