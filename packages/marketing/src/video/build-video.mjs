@@ -185,10 +185,46 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   // image = ảnh sản phẩm thả vào bình luận đầu (publishContentToFacebook tự làm khi có cả video và image).
   const assets = { image: productImageId, video: videoH, video_h: videoH, video_v: videoV };
   const channels = ['facebook', 'tiktok'];
+  const srcBrief = content.brief || {};
 
+  // ===== BÀI BÁN HÀNG TỪ VÒNG XOAY (rotation): GẮN video vào CHÍNH BÀI, KHÔNG tạo bài mới =====
+  // User chốt 18/8: "bài bán hàng sản phẩm có video thì video kèm ảnh luôn trong 1 bài, đăng cả
+  // Post lẫn Reel". Trước đây pipeline luôn sinh bài video RIÊNG (source_content) -> người duyệt
+  // thấy 2 card, tưởng bài chữ "chưa có video". Nay: bài rotation -> update brief.assets của bài
+  // gốc (giữ ảnh gốc, thêm video_h/video_v, đánh dấu post_reel=true) + cập nhật payload queue.
+  // Bài content / thủ công (Xưởng sản xuất bấm Làm video) vẫn theo luồng cũ: bài video riêng.
+  if (srcBrief.generator === 'rotation' && srcBrief.rotation === true) {
+    const mergedAssets = { ...(srcBrief.assets || {}), video: videoH, video_h: videoH, video_v: videoV };
+    // Ảnh: giữ ảnh gốc của bài; nếu bài gốc chưa có ảnh thì dùng ảnh sản phẩm vừa chọn.
+    if (!mergedAssets.image && productImageId) mergedAssets.image = productImageId;
+    const mergedChannels = Array.from(new Set([...(srcBrief.channels || ['facebook']), 'tiktok']));
+    const newBrief = {
+      ...srcBrief,
+      assets: mergedAssets,
+      channels: mergedChannels,
+      post_reel: true,                 // publish: đăng Post (video_h) + Reel (video_v) trên FB
+      video_requested: false,          // dựng xong
+      video_titles: script.titles || [],
+      video_risk: risk,
+      video_compliance: script.assessment?.flags || {},
+    };
+    const { error: ue } = await client.from('mkt_content').update({ brief: newBrief }).eq('id', content.id);
+    if (ue) throw new Error('mkt_content update: ' + ue.message);
+    // Cập nhật payload của mục hàng đợi tương ứng (còn pending) để card hiện video + kênh.
+    const { data: qrows } = await client.from('approval_queue')
+      .select('id, payload').eq('kind', 'mkt_publish_content').eq('payload->>content_id', content.id).eq('status', 'pending');
+    for (const q of qrows || []) {
+      const p = { ...(q.payload || {}), assets: mergedAssets, channels: mergedChannels, post_reel: true, has_video: true };
+      await client.from('approval_queue').update({ payload: p }).eq('id', q.id);
+    }
+    console.log(`\nĐã GẮN video vào bài gốc (Post + Reel + TikTok): ${content.title}`);
+    console.log(`  mkt_content=${content.id.slice(0, 8)} | ngang(Post)=${videoH.slice(0, 8)} | doc(Reel/TikTok)=${videoV.slice(0, 8)} | risk=${risk}`);
+    return;
+  }
+
+  // ===== Luồng cũ (bài content / thủ công): tạo bài video riêng =====
   // Bài nguồn thuộc cặp thử A/B -> video kế thừa cặp, nhưng mã cặp RIÊNG '<pair>-video' để
   // Evaluator so cặp VIDEO tách khỏi cặp bài text (không trộn 4 bài vào một cặp).
-  const srcBrief = content.brief || {};
   const abMeta = srcBrief.ab_pair_id
     ? {
         ab_pair_id: `${srcBrief.ab_pair_id}-video`,

@@ -51,7 +51,8 @@ async function runOnce(client, { requested, limit, extra }) {
   const doneSources = new Set(
     rows.filter((c) => c.brief?.generator === 'video-pipeline' && c.brief?.source_content).map((c) => c.brief.source_content)
   );
-  let todo = rows.filter((c) => c.brief?.generator !== 'video-pipeline' && !doneSources.has(c.id));
+  // Bo qua bai da GAN video vao chinh no (bai rotation gop Post+Reel, brief.assets.video_h co san).
+  let todo = rows.filter((c) => c.brief?.generator !== 'video-pipeline' && !doneSources.has(c.id) && !c.brief?.assets?.video_h);
   if (requested) todo = todo.filter((c) => c.brief?.video_requested === true);
   const picked = limit ? todo.slice(0, limit) : todo;
   if (!picked.length) return { ok: 0, fail: 0, total: 0 };

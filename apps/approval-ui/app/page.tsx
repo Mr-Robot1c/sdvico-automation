@@ -64,6 +64,8 @@ function mktInfo(payload: unknown) {
     // prefix 🎯A/🎯B lộ trong tiêu đề (user: "để title A/B như vậy thì kì lắm").
     abVariant: (p.ab_variant as string | undefined) || undefined,
     fromPlan: p.from_plan_direction === true,
+    // Bài bán hàng có video AI GỘP vào chính bài -> Facebook đăng cả Post lẫn Reel.
+    postReel: p.post_reel === true,
     flags
   };
 }
@@ -280,7 +282,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   {info.authored === 'human'
                     ? <span className="badge tone-no" title="Bài do người tự soạn">🚩 Người viết</span>
                     : <span className="badge" title="Bài do máy tự sinh, chờ người duyệt">🤖 Máy viết</span>}
-                  <span className="badge badge-format" title="Nơi bài sẽ được đăng">📍 {channelsLabel(info.channels)}</span>
+                  <span className="badge badge-format" title={info.postReel ? 'Bài có video AI: Facebook đăng cả Post (video ngang + chữ + ảnh sản phẩm thả bình luận) lẫn Reel (video dọc). TikTok đăng bản dọc.' : 'Nơi bài sẽ được đăng'}>📍 {channelsLabel(info.channels, info.postReel)}</span>
                   {purposeLabel(info.postKind, info.format)
                     ? <span className="badge" title="Bài bán sản phẩm hay bài nội dung nuôi trang">{purposeLabel(info.postKind, info.format)}</span>
                     : (info.intent ? <span className="badge">{intentLabel(info.intent)}</span> : null)}

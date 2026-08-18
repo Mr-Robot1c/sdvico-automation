@@ -87,8 +87,10 @@ export function contentTypeLabel(t?: string | null): string {
 
 // Nhãn kênh đăng THẬT, lấy từ brief.channels (facebook, tiktok, website). Đăng ở đâu ghi ở đó.
 // Trống thì mặc định Facebook.
-export function channelsLabel(channels?: string[] | null): string {
-  const map: Record<string, string> = { facebook: 'Facebook', tiktok: 'TikTok', website: 'Website', youtube: 'YouTube' };
+// postReel=true (bài bán hàng có video AI gộp): Facebook đăng cả Post lẫn Reel -> ghi rõ
+// "Facebook (Post + Reel)" để người duyệt biết trước khi bấm (user chốt 18/8).
+export function channelsLabel(channels?: string[] | null, postReel?: boolean): string {
+  const map: Record<string, string> = { facebook: postReel ? 'Facebook (Post + Reel)' : 'Facebook', tiktok: 'TikTok', website: 'Website', youtube: 'YouTube' };
   const arr = Array.isArray(channels) && channels.length ? channels : ['facebook'];
   return arr.map((c) => map[c] || c).join(' + ');
 }

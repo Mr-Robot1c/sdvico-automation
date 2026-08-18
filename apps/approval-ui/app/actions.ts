@@ -38,9 +38,61 @@ async function waitFacebookVideoReady(
   return false;
 }
 
+// Đăng REEL lên Facebook Page (Reels Publishing API, 3 bước: start -> upload theo URL -> finish).
+// Dùng bản DỌC 9:16 (video_v). Chạy SAU khi Post đã đăng; lỗi Reel KHÔNG làm hỏng Post (chỉ warn).
+// Trả về url Reel hoặc lỗi. Ghi mkt_posts channel='facebook' external_url .../reel/<id> để phân biệt.
+async function publishReelToFacebook(
+  client: ReturnType<typeof getServerClient>,
+  contentId: string,
+  videoUrl: string,
+  description: string
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+  const PAGE_ID = process.env.FACEBOOK_PAGE_ID;
+  const TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+  if (!PAGE_ID || !TOKEN) return { ok: false, error: 'chưa cấu hình Facebook token' };
+  // Không đăng lại Reel đã đăng.
+  const { data: posted } = await client
+    .from('mkt_posts').select('id, external_url').eq('channel', 'facebook').eq('content_id', contentId).eq('status', 'published');
+  if ((posted || []).some((p: any) => String(p.external_url || '').includes('/reel/'))) return { ok: true };
+  try {
+    // 1) start
+    const s = await fetchWithRetry(`https://graph.facebook.com/${VERSION}/${PAGE_ID}/video_reels`, {
+      method: 'POST', body: new URLSearchParams({ upload_phase: 'start', access_token: TOKEN })
+    });
+    const sj: any = await s.json();
+    if (!s.ok || sj.error || !sj.video_id) throw new Error(sj.error?.message || `start HTTP ${s.status}`);
+    const videoId = String(sj.video_id);
+    // 2) upload theo URL công khai (rupload). Header file_url, không body.
+    const u = await fetch(`https://rupload.facebook.com/video-upload/${VERSION}/${videoId}`, {
+      method: 'POST', headers: { Authorization: `OAuth ${TOKEN}`, file_url: videoUrl }
+    });
+    const uj: any = await u.json().catch(() => ({}));
+    if (!u.ok || uj.error || uj.success === false) throw new Error(uj.error?.message || uj?.debug_info?.message || `upload HTTP ${u.status}`);
+    // 3) finish + publish (mô tả = caption ngắn: dòng đầu bài + hashtag; Reel không hợp chữ dài).
+    const shortDesc = description.length > 900 ? description.slice(0, 880).replace(/\s+\S*$/, '') + '…' : description;
+    const f = await fetchWithRetry(`https://graph.facebook.com/${VERSION}/${PAGE_ID}/video_reels`, {
+      method: 'POST',
+      body: new URLSearchParams({ upload_phase: 'finish', video_id: videoId, video_state: 'PUBLISHED', description: shortDesc, access_token: TOKEN })
+    });
+    const fj: any = await f.json();
+    if (!f.ok || fj.error || fj.success === false) throw new Error(fj.error?.message || `finish HTTP ${f.status}`);
+    const url = `https://www.facebook.com/reel/${videoId}`;
+    await client.from('mkt_posts').insert({ content_id: contentId, channel: 'facebook', status: 'published', external_url: url, published_at: new Date().toISOString() });
+    try { await client.from('run_log').insert({ task: 'mkt.publish_facebook_reel', actor: 'decideForm', status: 'ok', detail: { contentId, videoId, url } }); } catch { /* bỏ qua */ }
+    return { ok: true, url };
+  } catch (e: any) {
+    const errMsg = String(e?.message || e);
+    try { await client.from('run_log').insert({ task: 'mkt.publish_facebook_reel', actor: 'decideForm', status: 'error', detail: { contentId, error: errMsg } }); } catch { /* bỏ qua */ }
+    return { ok: false, error: errMsg };
+  }
+}
+
 // Đăng một bài marketing đã duyệt lên Facebook Page qua Graph API. CHỈ đăng nội dung SDVICO
 // lên Page của SDVICO (API chính thức). Máy soạn, người bấm Duyệt (điều cấm 1) — hàm này chạy
 // SAU khi người đã bấm Duyệt. Chưa cấu hình token thì bỏ qua, không lỗi.
+// v3.2 (18/8): bài có brief.post_reel=true (bài bán hàng có video AI gộp) -> sau khi đăng POST
+// (video ngang + chữ + ảnh thả bình luận) đăng thêm REEL (video dọc). "Đăng trên Post + Reel".
 async function publishContentToFacebook(
   client: ReturnType<typeof getServerClient>,
   contentId: string,
@@ -176,6 +228,25 @@ async function publishContentToFacebook(
       published_at: new Date().toISOString()
     });
     await client.from('mkt_content').update({ status: 'published' }).eq('id', contentId);
+
+    // REEL: bài bán hàng có video AI gộp (brief.post_reel) -> đăng thêm bản DỌC lên Reel.
+    // Không áp cho bài hẹn giờ (Reels API không hỗ trợ scheduled_publish_time như /videos).
+    // Lỗi Reel chỉ cảnh báo, Post đã lên vẫn tính thành công.
+    const brief = (c as any).brief || {};
+    if (brief.post_reel && assets.video_v && !scheduledUnix) {
+      const reelUrl = await assetUrlOf(assets.video_v);
+      if (reelUrl) {
+        const r = await publishReelToFacebook(client, contentId, reelUrl, message);
+        if (!r.ok) {
+          const m = 'Reel chưa đăng được: ' + (r.error || 'lỗi không rõ');
+          warn = warn ? warn + '; ' + m : m;
+          console.error('[facebook] ' + m);
+        }
+      }
+    } else if (brief.post_reel && scheduledUnix) {
+      const m = 'Bài hẹn giờ: Post đã hẹn, Reel không hỗ trợ hẹn giờ nên bỏ qua (đăng tay Reel sau nếu cần).';
+      warn = warn ? warn + '; ' + m : m;
+    }
     // Nhật ký để soi vì sao ảnh không vào bình luận (đọc qua /api/fb-diag). Không để lỗi ghi log làm hỏng đăng.
     try {
       await client.from('run_log').insert({
