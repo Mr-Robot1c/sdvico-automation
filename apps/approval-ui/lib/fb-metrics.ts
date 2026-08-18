@@ -136,30 +136,53 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
         const v = d?.values?.[0]?.value;
         return v == null ? null : Number(v);
       };
-      const grab = async (path: string, key: string, pick: (r: any) => number | null) => {
-        try {
-          const r = await graph(path, 6000);
-          if (r?.error) { insightErr.push(`${key}: ${r.error.message}`); return; }
-          const v = pick(r);
-          if (v != null && !Number.isNaN(v)) metrics[key] = v;
-        } catch (e: any) {
-          insightErr.push(`${key}: ${String(e?.message || e)}`);
+      // Thử LẦN LƯỢT nhiều tên chỉ số cho cùng một ý (Meta đổi tên theo phiên bản: từ 15/11/2025
+      // `post_impressions` -> `post_media_view`, `post_impressions_unique` -> `post_total_media_view_unique`;
+      // 6/2026 bỏ tiếp các biến thể unique video). Cái nào FB trả số thì lấy, hết danh sách mới ghi lỗi.
+      type Cand = { path: string; name: string; scale?: number };
+      const grabFirst = async (key: string, cands: Cand[]) => {
+        const errs: string[] = [];
+        for (const c of cands) {
+          try {
+            const r = await graph(c.path, 6000);
+            if (r?.error) { errs.push(`${c.name}: ${r.error.message}`); continue; }
+            const v = valOf(r, c.name);
+            if (v != null && !Number.isNaN(v)) { metrics[key] = c.scale ? Math.round(v * c.scale) : v; return; }
+            errs.push(`${c.name}: không có giá trị`);
+          } catch (e: any) {
+            errs.push(`${c.name}: ${String(e?.message || e)}`);
+          }
         }
+        insightErr.push(`${key}: ${errs.join(' | ')}`.slice(0, 300));
       };
+      const vi = (metric: string) => `${objId}/video_insights?metric=${metric}`;
+      const pi = (metric: string) => `${postId}/insights?metric=${metric}`;
       if (isVideo) {
-        // Lượt xem video + tổng thời gian xem (ms -> giây) + số NGƯỜI xem (unique = reach).
-        // video_insights nằm trên node VIDEO (objId), không phải node bài.
-        await grab(`${objId}/video_insights?metric=total_video_views`, 'views', (r) => valOf(r, 'total_video_views'));
-        await grab(`${objId}/video_insights?metric=total_video_view_total_time`, 'watchSec', (r) => {
-          const ms = valOf(r, 'total_video_view_total_time');
-          return ms == null ? null : Math.round(ms / 1000);
-        });
-        await grab(`${objId}/video_insights?metric=total_video_views_unique`, 'reach', (r) => valOf(r, 'total_video_views_unique'));
+        // Lượt xem video + tổng thời gian xem (ms -> giây) + số NGƯỜI xem. video_insights nằm trên
+        // node VIDEO (objId); dự phòng bằng chỉ số bài (postId = PAGEID_VIDEOID) nếu Meta bỏ tên cũ.
+        await grabFirst('views', [
+          { path: vi('total_video_views'), name: 'total_video_views' },
+          ...(postId ? [{ path: pi('post_video_views'), name: 'post_video_views' }, { path: pi('post_media_view'), name: 'post_media_view' }] : []),
+        ]);
+        await grabFirst('watchSec', [
+          { path: vi('total_video_view_total_time'), name: 'total_video_view_total_time', scale: 1 / 1000 },
+          ...(postId ? [{ path: pi('post_video_view_time'), name: 'post_video_view_time', scale: 1 / 1000 }] : []),
+        ]);
+        await grabFirst('reach', [
+          { path: vi('total_video_views_unique'), name: 'total_video_views_unique' },
+          ...(postId ? [{ path: pi('post_total_media_view_unique'), name: 'post_total_media_view_unique' }] : []),
+        ]);
       } else if (postId) {
-        // Bài ảnh/chữ: lượt hiển thị (impressions) = "lượt xem"; số NGƯỜI thấy (unique) = "người xem" (reach).
-        // /insights chỉ có trên node BÀI (postId), node ảnh không có.
-        await grab(`${postId}/insights?metric=post_impressions`, 'views', (r) => valOf(r, 'post_impressions'));
-        await grab(`${postId}/insights?metric=post_impressions_unique`, 'reach', (r) => valOf(r, 'post_impressions_unique'));
+        // Bài ảnh/chữ: "lượt xem" = media view (tên mới) hoặc impressions (tên cũ);
+        // "người xem" = unique media viewers hoặc impressions_unique. /insights chỉ có trên node BÀI.
+        await grabFirst('views', [
+          { path: pi('post_media_view'), name: 'post_media_view' },
+          { path: pi('post_impressions'), name: 'post_impressions' },
+        ]);
+        await grabFirst('reach', [
+          { path: pi('post_total_media_view_unique'), name: 'post_total_media_view_unique' },
+          { path: pi('post_impressions_unique'), name: 'post_impressions_unique' },
+        ]);
       } else {
         insightErr.push('views/reach: chưa có id bài để hỏi /insights');
       }
