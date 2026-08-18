@@ -1613,6 +1613,37 @@ export async function confirmHired(formData: FormData) {
   revalidatePath('/nhan-vien');
 }
 
+// Thêm nhân viên đã có sẵn (công ty hoạt động lâu, phần lớn nhân viên không đến từ luồng tuyển
+// dụng trong hệ thống). Tạo hr_employees không gắn candidate_id/application_id — hai cột này
+// nullable, chỉ có giá trị khi nhân viên đến từ ứng viên qua confirmHired.
+export async function addEmployeeManual(formData: FormData) {
+  const guard = await requireEmployeeAdmin();
+  if ('error' in guard) throw new Error(guard.error);
+
+  const fullName = String(formData.get('full_name') || '').trim();
+  if (!fullName) throw new Error('Cần nhập họ tên nhân viên.');
+
+  const trangThaiRaw = String(formData.get('trang_thai') || 'active');
+  const trangThai = (['active', 'probation', 'left'].includes(trangThaiRaw) ? trangThaiRaw : 'active') as
+    'active' | 'probation' | 'left';
+
+  const client = getServerClient();
+  const { data, error } = await client.from('hr_employees').insert({
+    full_name: fullName,
+    email: String(formData.get('email') || '').trim() || null,
+    phone: String(formData.get('phone') || '').trim() || null,
+    chuc_danh: String(formData.get('chuc_danh') || '').trim() || null,
+    phong_ban: String(formData.get('phong_ban') || '').trim() || null,
+    ngay_bat_dau: String(formData.get('ngay_bat_dau') || '').trim() || null,
+    trang_thai: trangThai,
+    created_by: guard.email,
+  }).select('id').single();
+  if (error) throw new Error('Không thêm được nhân viên: ' + error.message);
+
+  revalidatePath('/nhan-vien');
+  redirect(`/nhan-vien/${data.id}`);
+}
+
 export async function updateEmployeeInfo(formData: FormData) {
   const guard = await requireEmployeeAdmin();
   if ('error' in guard) throw new Error(guard.error);
@@ -1746,7 +1777,7 @@ export async function decideCommentReply(formData: FormData) {
 
   await client.from('hr_fb_comments').update({ trang_thai: 'approved', reply_text: replyText }).eq('id', commentId);
 
-  revalidatePath('/binh-luan');
+  revalidatePath('/kenh/binh-luan');
   revalidatePath('/');
 }
 
@@ -1765,7 +1796,7 @@ export async function ignoreCommentReply(formData: FormData) {
     .eq('status', 'pending');
   await client.from('hr_fb_comments').update({ trang_thai: 'ignored' }).eq('id', commentId);
 
-  revalidatePath('/binh-luan');
+  revalidatePath('/kenh/binh-luan');
   revalidatePath('/');
 }
 

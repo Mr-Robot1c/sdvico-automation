@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { decideCommentReply, ignoreCommentReply } from '../actions';
+import { decideCommentReply, ignoreCommentReply } from '../../actions';
 
 export type PendingReply = {
   queueId: string;

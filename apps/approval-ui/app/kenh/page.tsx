@@ -1,6 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { kenhLabel } from '../labels';
+import KenhTabs from './kenh-tabs';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +65,8 @@ export default async function Page() {
         </div>
         <AutoRefresh seconds={30} />
       </header>
+
+      <KenhTabs />
 
       <div className="err" role="alert" style={{ background: 'var(--surface)', color: 'var(--ink-2)', border: '1px solid var(--line)' }}>
         <b>Giới hạn số liệu:</b> số ứng viên bên dưới là ước tính theo vị trí (job), không phải theo
