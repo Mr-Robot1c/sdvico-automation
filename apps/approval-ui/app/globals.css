@@ -748,6 +748,87 @@ select.note { cursor: pointer; }
   .inbox-back { display: inline-flex; }
 }
 
+/* === Bảng vị trí tuyển dụng (/tao-jd) === */
+.job-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+.job-table thead th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--ink-2);
+  font-size: 11.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.job-th-title  { width: auto; }
+.job-th-loc    { width: 22%; }
+.job-th-status { width: 110px; }
+.job-th-post   { width: 140px; }
+.job-th-auto   { width: 80px; }
+.job-th-caret  { width: 32px; }
+
+.job-row {
+  cursor: pointer;
+  background: var(--surface);
+  transition: background 0.1s;
+}
+.job-row > td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.job-row:hover > td { background: var(--surface-2); }
+.job-row.is-open > td { background: var(--accent-bg); border-bottom: 1px solid var(--accent); }
+.job-row-title { font-weight: 600; color: var(--ink); }
+.job-row-sub { font-size: 12px; margin-top: 2px; }
+.job-td-caret { text-align: center; color: var(--ink-2); }
+
+.job-expand-row > td {
+  padding: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.job-detail {
+  padding: 16px 18px 18px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+}
+
+/* Mobile ≤720: bảng vị trí thành card. */
+@media (max-width: 720px) {
+  .job-table, .job-table thead, .job-table tbody, .job-table tr, .job-table td { display: block; }
+  .job-table thead { display: none; }
+  .job-table tr { margin-bottom: 8px; }
+  .job-row {
+    border: 1px solid var(--line); border-radius: 10px;
+    display: grid; grid-template-columns: 1fr auto;
+    padding: 12px 14px 6px; gap: 4px 12px;
+  }
+  .job-row > td {
+    border-bottom: 0; padding: 4px 0; background: transparent !important;
+  }
+  .job-td-title  { grid-column: 1 / 2; grid-row: 1; }
+  .job-td-caret  { grid-column: 2 / 3; grid-row: 1; align-self: start; }
+  .job-td-loc    { grid-column: 1 / -1; grid-row: 2; font-size: 12px; }
+  .job-td-loc::before { content: 'Địa điểm: '; color: var(--ink-2); }
+  .job-td-status { grid-column: 1 / 2; grid-row: 3; }
+  .job-td-post   { grid-column: 2 / 3; grid-row: 3; text-align: right; }
+  .job-td-auto   { grid-column: 1 / -1; grid-row: 4; font-size: 12px; }
+  .job-td-auto::before { content: 'Tự động: '; color: var(--ink-2); }
+  .job-row.is-open { border-color: var(--accent); background: var(--accent-bg); }
+  .job-expand-row { display: block; }
+  .job-expand-row > td { display: block; padding: 0; border: 0; }
+  .job-detail {
+    margin: -6px 0 8px;
+    border: 1px solid var(--accent); border-top: 0; border-radius: 0 0 10px 10px;
+    border-left-width: 3px;
+  }
+}
+
 /* === Bảng kênh đăng tin (/kenh) === */
 /* Không có expand row: mỗi kênh là 1 hàng, hành động (Bật/Tắt/Xoá) inline trong cột phải. */
 .chan-table {
