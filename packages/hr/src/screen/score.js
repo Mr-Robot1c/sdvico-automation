@@ -1,4 +1,4 @@
-// Chấm một CV đã ẩn danh bằng Groq (Llama 3.3 70B), theo thang điểm cố định.
+// Chấm một CV đã ẩn danh bằng Groq (mặc định openai/gpt-oss-120b), theo thang điểm cố định.
 // Mô hình chỉ chấm theo trục có sẵn, không tự nghĩ tiêu chí (cổng an toàn mục 2).
 // Đầu ra: điểm từng trục, ba câu tóm tắt, ba điểm mạnh, ba điểm cần làm rõ khi phỏng vấn.
 // Không đưa ra quyết định đỗ hay trượt (điều cấm 2): việc đó của con người.
@@ -9,8 +9,10 @@
 import Groq from 'groq-sdk';
 import { weightedScore } from './rubric.js';
 
-// Model mặc định miễn phí. Đổi bằng biến môi trường HR_SCREEN_MODEL nếu muốn model khác.
-const MODEL = process.env.HR_SCREEN_MODEL || 'llama-3.3-70b-versatile';
+// Model mặc định: openai/gpt-oss-120b (đổi từ llama-3.3-70b-versatile đã bị Groq gỡ, gọi trả 404).
+// Đổi bằng biến môi trường HR_SCREEN_MODEL nếu muốn model khác. Nhớ đặt env này ở secrets GitHub
+// Actions (worker chạy ở đó), không chỉ Vercel.
+const MODEL = process.env.HR_SCREEN_MODEL || 'openai/gpt-oss-120b';
 
 // Mô tả dạng JSON để mô hình trả đúng khóa. Groq dùng chế độ json_object, không có lược đồ chặt.
 function jsonShape(rubric) {

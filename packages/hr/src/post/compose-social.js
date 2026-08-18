@@ -4,7 +4,7 @@
 
 import Groq from 'groq-sdk';
 
-const MODEL = process.env.HR_POST_MODEL || process.env.HR_SCREEN_MODEL || 'llama-3.3-70b-versatile';
+const MODEL = process.env.HR_POST_MODEL || process.env.HR_SCREEN_MODEL || 'openai/gpt-oss-120b';
 const EMAIL = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
 const HOTLINE = '1900 23 23 49';
 

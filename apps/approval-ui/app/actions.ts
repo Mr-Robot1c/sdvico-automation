@@ -8,7 +8,7 @@ import { groqChat } from '../lib/groq';
 import { randomBytes } from 'node:crypto';
 import { headers } from 'next/headers';
 import { fetchUnsplashPhoto } from '../lib/unsplash';
-import { buildJobDetailSection } from '../lib/job-detail';
+import { fbIntroSystem, assembleFacebookPost, fallbackIntro } from '../lib/fb-compose';
 import { buildRecruitmentPoster, toBullets } from '../lib/poster';
 import { sendEmail } from '../lib/mailer';
 import { composeOfferLetter, composeRejectLetter } from '../lib/hr-letters';
@@ -327,25 +327,24 @@ export async function recomposeDraft(formData: FormData) {
   };
 
   const contactEmail = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
-  const system = `Bạn viết lại PHẦN MỞ ĐẦU bài đăng tuyển dụng Facebook cho SDVICO, ngành thiết bị biển và thủy sản, trụ sở Vũng Tàu.
-${styleMap[style] || styleMap.default}
-Phần chi tiết (công việc, yêu cầu, quyền lợi) sẽ được ghép nguyên văn ngay bên dưới, nên KHÔNG liệt kê lại yêu cầu hay quyền lợi ở đây, tránh trùng lặp.
-Kết phần mở đầu: kêu gọi gửi CV về ${contactEmail} hoặc gọi 1900 23 23 49. Có thể thêm hashtag ngành biển.
-Quy tắc: không bịa lương hay con số (điều cấm 5). Không mô tả phần mềm đối tác như năng lực SDVICO (điều cấm 4).
-Chỉ trả về nội dung bài đăng, không kèm giải thích hay tiêu đề.`;
+  const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
+  const hotline = ((brandRow?.value as { hotline?: string } | null)?.hotline) || '1900 23 23 49';
 
-  const v = (job.jd_versions as Record<string, string>) || {};
-  const user = [
+  // Chỉ viết lại PHẦN MỞ ĐẦU theo giọng đã chọn. Chi tiết + liên hệ do hệ thống ghép, giữ bố cục.
+  const sourceInfo = [
     `Vị trí: ${job.title}.`,
     job.department ? `Phòng ban: ${job.department}.` : '',
     job.location ? `Nơi làm: ${job.location}.` : '',
     job.short_desc ? `Mô tả: ${job.short_desc}.` : '',
     job.requirements ? `Yêu cầu: ${job.requirements}.` : '',
-    v.facebook ? `Bản cũ để tham khảo: ${v.facebook}` : '',
   ].filter(Boolean).join('\n');
 
-  const aiPart = await groqChat(system, user, { maxTokens: 700, temperature: 0.75 });
-  if (!aiPart) return;
+  const composed = await groqChat(
+    fbIntroSystem({ styleNote: styleMap[style] || styleMap.default }),
+    sourceInfo,
+    { json: true, maxTokens: 1200, temperature: 0.75 }
+  );
+  if (!composed) return;
 
   // Quyền lợi lưu ở cột benefits (có thể chưa migrate — đọc an toàn).
   let benefits: string | null = null;
@@ -353,8 +352,26 @@ Chỉ trả về nội dung bài đăng, không kèm giải thích hay tiêu đ�
     const { data: benRow } = await client.from('hr_jobs').select('benefits').eq('id', post.job_id).maybeSingle();
     benefits = (benRow?.benefits as string | undefined) || null;
   }
-  // Giữ phần chi tiết gốc bên dưới phần AI viết lại.
-  const noi_dung = aiPart + buildJobDetailSection({ short_desc: job.short_desc, requirements: job.requirements, benefits });
+
+  let intro = fallbackIntro(job.title, job.location as string | null);
+  let hashtags = '';
+  try {
+    const obj = JSON.parse(composed) as { mo_dau?: string; hashtags?: string };
+    if ((obj.mo_dau || '').trim()) intro = (obj.mo_dau as string).trim();
+    hashtags = (obj.hashtags || '').trim();
+  } catch {
+    if (composed.trim()) intro = composed.trim();
+  }
+
+  const noi_dung = assembleFacebookPost({
+    intro,
+    short_desc: job.short_desc,
+    requirements: job.requirements,
+    benefits,
+    contactEmail,
+    hotline,
+    hashtags,
+  });
 
   await client.from('hr_job_posts').update({ noi_dung }).eq('id', postId);
   revalidatePath('/dang-tin');
@@ -647,18 +664,6 @@ export async function queueFacebookPost(formData: FormData) {
     return;
   }
 
-  const versions = (job.jd_versions || {}) as Record<string, string>;
-  const baseFb = String(versions.facebook || '').trim();
-
-  // Fallback nếu chưa có bản Facebook (JD cũ hoặc Groq chưa chạy).
-  const fallbackContent = (() => {
-    const dong = [`Công ty SDVICO tuyển ${job.title}${job.location ? ' tại ' + job.location : ''}.`];
-    if (job.short_desc) dong.push('', String(job.short_desc).trim());
-    const contactEmail = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
-    dong.push('', `Ứng tuyển: gửi CV về ${contactEmail}. Hotline 1900 23 23 49.`);
-    return dong.join('\n');
-  })();
-
   // Đọc cài đặt thương hiệu để gắn footer liên hệ và dùng logo khi không có ảnh.
   const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
   const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; email?: string; website?: string; company_desc?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
@@ -667,60 +672,47 @@ export async function queueFacebookPost(formData: FormData) {
   const hotline = brand.hotline || '1900 23 23 49';
   const reqText = (job as Record<string, unknown>).requirements as string | null;
 
-  // Thông tin gốc để AI viết đúng, không bịa.
+  // Thông tin gốc để AI viết đúng, không bịa. AI CHỈ viết phần mở đầu; chi tiết ghép nguyên văn.
   const sourceInfo = [
     `Vị trí: ${job.title}`,
     job.location ? `Địa điểm: ${job.location}` : '',
     job.short_desc ? `Mô tả công việc: ${job.short_desc}` : '',
     reqText ? `Yêu cầu: ${reqText}` : '',
     benefits ? `Quyền lợi: ${benefits}` : '',
-    baseFb ? `Bản Facebook cũ để tham khảo văn phong: ${baseFb}` : '',
   ].filter(Boolean).join('\n');
 
-  const contactLine = `Hotline/Zalo ${hotline}, gửi CV về ${contactEmail}`;
-
   const [composed, unsplash_url] = await Promise.all([
-    groqChat(
-      [
-        'Bạn là chuyên gia viết bài tuyển dụng cho Facebook, ngành biển và thủy sản Việt Nam.',
-        'Viết một bài tuyển dụng HOÀN CHỈNH, DÙNG ĐẦY ĐỦ mọi thông tin được cung cấp (gồm cả phần Mô tả công việc, mức lương, giờ làm nếu có nêu trong đó).',
-        '',
-        'Trường "bai" theo định dạng (emoji đầu mục, xuống dòng rõ ràng):',
-        '- Dòng đầu: 🔥 SDVICO TUYỂN DỤNG: [tên vị trí] 📣',
-        '- 1-2 câu hook gần gũi',
-        '- 📍 Nơi làm việc (nếu có)',
-        '- 💰 Mức lương (nếu Mô tả hoặc Quyền lợi có nêu)',
-        '- 🕐 Giờ làm việc (nếu có nêu)',
-        '- 📋 Công việc: tóm tắt từ phần Mô tả',
-        '- ✅ Yêu cầu: MỖI Ý MỘT DÒNG, mỗi dòng bắt đầu bằng "- ", lấy đúng từ phần Yêu cầu',
-        '- 🎁 Quyền lợi: MỖI Ý MỘT DÒNG, mỗi dòng bắt đầu bằng "- ", lấy đúng từ phần Quyền lợi',
-        `- 📞 Liên hệ: ${contactLine}`,
-        '- Câu chốt kêu gọi ngắn + 3-4 hashtag tiếng Việt',
-        '',
-        'QUAN TRỌNG về trình bày: các mục Yêu cầu và Quyền lợi phải LIỆT KÊ THEO DÒNG (mỗi ý xuống dòng riêng, bắt đầu bằng "- "). TUYỆT ĐỐI không gộp nhiều ý thành một câu dài ngăn cách bằng dấu phẩy, không viết ngang.',
-        'Quy tắc: CHỈ dùng thông tin được cung cấp, KHÔNG bịa (điều cấm 5). Không mô tả phần mềm đối tác như năng lực SDVICO (điều cấm 4).',
-        '',
-        'Chỉ trả về JSON đúng dạng: {"bai": "<nội dung bài>", "luong": "<mức lương nếu có, để trống nếu không>", "gio_lam": "<giờ làm nếu có, để trống nếu không>"}',
-      ].join('\n'),
-      sourceInfo,
-      { json: true, temperature: 0.7, maxTokens: 900 }
-    ).catch(() => null),
+    groqChat(fbIntroSystem(), sourceInfo, { json: true, temperature: 0.7, maxTokens: 1200 }).catch(() => null),
     fetchUnsplashPhoto(job.title, job.location || undefined, (job as Record<string, unknown>).image_hint as string | null),
   ]);
 
-  let noi_dung = baseFb || fallbackContent;
+  // AI chỉ trả phần mở đầu + hashtag + lương/giờ (lương/giờ để dựng poster). Chi tiết mô tả,
+  // yêu cầu, quyền lợi ghép NGUYÊN VĂN bên dưới, rồi tới liên hệ (bố cục người dùng chốt).
+  let intro = fallbackIntro(job.title, job.location as string | null);
+  let hashtags = '';
   let salary = '';
   let workingHours = '';
   if (composed) {
     try {
-      const obj = JSON.parse(composed) as { bai?: string; luong?: string; gio_lam?: string };
-      noi_dung = (obj.bai || '').trim() || baseFb || fallbackContent;
+      const obj = JSON.parse(composed) as { mo_dau?: string; hashtags?: string; luong?: string; gio_lam?: string };
+      if ((obj.mo_dau || '').trim()) intro = (obj.mo_dau as string).trim();
+      hashtags = (obj.hashtags || '').trim();
       salary = (obj.luong || '').trim();
       workingHours = (obj.gio_lam || '').trim();
     } catch {
-      noi_dung = composed.trim() || baseFb || fallbackContent;
+      if (composed.trim()) intro = composed.trim();
     }
   }
+
+  const noi_dung = assembleFacebookPost({
+    intro,
+    short_desc: job.short_desc,
+    requirements: reqText,
+    benefits,
+    contactEmail,
+    hotline,
+    hashtags,
+  });
 
   // Ảnh = poster tuyển dụng (satori). Lỗi thì lùi về ảnh Unsplash/logo.
   let image_url: string | null = null;

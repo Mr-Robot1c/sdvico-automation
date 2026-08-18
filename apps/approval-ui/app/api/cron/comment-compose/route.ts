@@ -123,7 +123,7 @@ export async function GET(req: Request) {
         if (row.message?.trim()) {
           const user = [postContext ? `Bài đăng gốc: ${postContext}` : '', `Bình luận cần trả lời: ${row.message}`].filter(Boolean).join('\n');
           const text = await groqChat(replySystemPrompt(), user, { temperature: 0.5, maxTokens: 300 }).catch(() => null);
-          if (text?.trim()) { goiY = text.trim(); generator = process.env.HR_POST_MODEL || process.env.HR_SCREEN_MODEL || 'llama-3.3-70b-versatile'; }
+          if (text?.trim()) { goiY = text.trim(); generator = process.env.HR_POST_MODEL || process.env.HR_SCREEN_MODEL || 'openai/gpt-oss-120b'; }
         }
 
         await client.from('hr_fb_comments').update({ trang_thai: 'composed', phan_loai: nhan, goi_y_tra_loi: goiY }).eq('id', row.id);

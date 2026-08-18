@@ -12,7 +12,12 @@ export async function groqChat(
   const key = process.env.GROQ_API_KEY;
   if (!key) return null;
 
-  const model = process.env.HR_JD_MODEL || process.env.HR_SCREEN_MODEL || 'llama-3.3-70b-versatile';
+  // Model mặc định: openai/gpt-oss-120b (mạnh, KHÔNG agentic nên không tự tra web — an toàn
+  // dữ liệu, điều cấm 6). Đổi từ 'llama-3.3-70b-versatile' vì Groq đã gỡ model đó (gọi trả 404
+  // "model_not_found") khiến mọi lời gọi AI rơi về bản dự phòng. Ghi đè bằng biến môi trường
+  // HR_JD_MODEL nếu muốn dùng model khác. Lưu ý: gpt-oss là model suy luận, cần max_tokens đủ
+  // rộng để kịp trả JSON (các lời gọi JSON nên để tối thiểu ~1000 token).
+  const model = process.env.HR_JD_MODEL || process.env.HR_SCREEN_MODEL || 'openai/gpt-oss-120b';
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },

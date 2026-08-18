@@ -7,7 +7,7 @@
 import Groq from 'groq-sdk';
 import { prioritizeLocations } from './locations.js';
 
-const MODEL = process.env.HR_ANALYZE_MODEL || process.env.HR_SCREEN_MODEL || 'llama-3.3-70b-versatile';
+const MODEL = process.env.HR_ANALYZE_MODEL || process.env.HR_SCREEN_MODEL || 'openai/gpt-oss-120b';
 
 function jsonShape() {
   return [

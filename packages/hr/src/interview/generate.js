@@ -4,7 +4,7 @@
 
 import Groq from 'groq-sdk';
 
-const MODEL = process.env.HR_INTERVIEW_MODEL || process.env.HR_SCREEN_MODEL || 'llama-3.3-70b-versatile';
+const MODEL = process.env.HR_INTERVIEW_MODEL || process.env.HR_SCREEN_MODEL || 'openai/gpt-oss-120b';
 
 function jsonShape() {
   return [

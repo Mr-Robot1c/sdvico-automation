@@ -7,6 +7,7 @@ import { getServerClient } from '../../../../lib/supabase-server';
 import { groqChat } from '../../../../lib/groq';
 import { fetchUnsplashPhoto } from '../../../../lib/unsplash';
 import { buildRecruitmentPoster, toBullets } from '../../../../lib/poster';
+import { fbIntroSystem, assembleFacebookPost, fallbackIntro } from '../../../../lib/fb-compose';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -123,7 +124,7 @@ export async function GET(req: Request) {
       const reqBullets = toBullets(job.requirements as string | null);
       const benBullets = toBullets(benefitsText);
 
-      // Thông tin gốc để AI viết đúng, không bịa.
+      // Thông tin gốc để AI viết đúng, không bịa. AI CHỈ viết mở đầu; chi tiết ghép nguyên văn.
       const sourceInfo = [
         `Vị trí: ${job.title}`,
         job.location ? `Địa điểm: ${job.location}` : '',
@@ -132,42 +133,8 @@ export async function GET(req: Request) {
         benefitsText ? `Quyền lợi: ${benefitsText}` : '',
       ].filter(Boolean).join('\n');
 
-      const contactLine = `Hotline/Zalo ${hotline}, gửi CV về ${contactEmail}`;
-      const fallbackContent = [
-        `🔥 SDVICO TUYỂN DỤNG: ${job.title}${job.location ? ` — ${job.location}` : ''} 📣`,
-        '',
-        job.short_desc ? String(job.short_desc) : '',
-        job.requirements ? `\n✅ Yêu cầu:\n${job.requirements}` : '',
-        benefitsText ? `\n🎁 Quyền lợi:\n${benefitsText}` : '',
-        `\n📞 Liên hệ: ${contactLine}`,
-      ].filter(Boolean).join('\n');
-
-      const systemPrompt = [
-        'Bạn là chuyên gia viết bài tuyển dụng cho Facebook, ngành biển và thủy sản Việt Nam.',
-        isRefresh ? 'Viết LẠI bài cho một vị trí đã đăng trước — diễn đạt khác đi để tránh trùng.' : '',
-        'Viết một bài tuyển dụng HOÀN CHỈNH, DÙNG ĐẦY ĐỦ mọi thông tin được cung cấp (gồm cả phần Mô tả công việc, mức lương, giờ làm nếu có nêu trong đó).',
-        '',
-        'Trường "bai" theo định dạng (emoji đầu mục, xuống dòng rõ ràng):',
-        '- Dòng đầu: 🔥 SDVICO TUYỂN DỤNG: [tên vị trí] 📣',
-        '- 1-2 câu hook gần gũi',
-        '- 📍 Nơi làm việc (nếu có)',
-        '- 💰 Mức lương (nếu Mô tả hoặc Quyền lợi có nêu)',
-        '- 🕐 Giờ làm việc (nếu có nêu)',
-        '- 📋 Công việc: tóm tắt từ phần Mô tả',
-        '- ✅ Yêu cầu: MỖI Ý MỘT DÒNG, mỗi dòng bắt đầu bằng "- ", lấy đúng từ phần Yêu cầu',
-        '- 🎁 Quyền lợi: MỖI Ý MỘT DÒNG, mỗi dòng bắt đầu bằng "- ", lấy đúng từ phần Quyền lợi',
-        `- 📞 Liên hệ: ${contactLine}`,
-        '- Câu chốt kêu gọi ngắn + 3-4 hashtag tiếng Việt',
-        '',
-        'QUAN TRỌNG về trình bày: các mục Yêu cầu và Quyền lợi phải LIỆT KÊ THEO DÒNG (mỗi ý xuống dòng riêng, bắt đầu bằng "- "). TUYỆT ĐỐI không gộp nhiều ý thành một câu dài ngăn cách bằng dấu phẩy, không viết ngang.',
-        'Quy tắc: CHỈ dùng thông tin được cung cấp, KHÔNG bịa (điều cấm 5). Không mô tả phần mềm đối tác như năng lực SDVICO (điều cấm 4). Giọng gần gũi với thợ và ngư dân.',
-        '',
-        'Chỉ trả về JSON đúng dạng sau, không kèm chữ nào khác:',
-        '{"bai": "<toàn bộ nội dung bài đăng>", "luong": "<mức lương ngắn gọn nếu có, vd 8-12 triệu; để trống nếu không nêu>", "gio_lam": "<giờ làm việc nếu có; để trống nếu không nêu>"}',
-      ].filter(Boolean).join('\n');
-
       const [composed, unsplash_url] = await Promise.all([
-        groqChat(systemPrompt, sourceInfo, { json: true, temperature: 0.7, maxTokens: 900 }).catch(() => null),
+        groqChat(fbIntroSystem({ isRefresh }), sourceInfo, { json: true, temperature: 0.7, maxTokens: 1200 }).catch(() => null),
         fetchUnsplashPhoto(
           String(job.title),
           job.location ? String(job.location) : undefined,
@@ -175,19 +142,33 @@ export async function GET(req: Request) {
         ).catch(() => null),
       ]);
 
-      let noi_dung = fallbackContent;
+      // AI trả mở đầu + hashtag + lương/giờ (lương/giờ dựng poster). Chi tiết mô tả, yêu cầu,
+      // quyền lợi ghép NGUYÊN VĂN bên dưới, rồi tới liên hệ (bố cục người dùng chốt).
+      let intro = fallbackIntro(String(job.title), job.location ? String(job.location) : null);
+      let hashtags = '';
       let salary = '';
       let workingHours = '';
       if (composed) {
         try {
-          const obj = JSON.parse(composed) as { bai?: string; luong?: string; gio_lam?: string };
-          noi_dung = (obj.bai || '').trim() || fallbackContent;
+          const obj = JSON.parse(composed) as { mo_dau?: string; hashtags?: string; luong?: string; gio_lam?: string };
+          if ((obj.mo_dau || '').trim()) intro = (obj.mo_dau as string).trim();
+          hashtags = (obj.hashtags || '').trim();
           salary = (obj.luong || '').trim();
           workingHours = (obj.gio_lam || '').trim();
         } catch {
-          noi_dung = composed.trim() || fallbackContent;
+          if (composed.trim()) intro = composed.trim();
         }
       }
+
+      const noi_dung = assembleFacebookPost({
+        intro,
+        short_desc: job.short_desc as string | null,
+        requirements: job.requirements as string | null,
+        benefits: benefitsText || null,
+        contactEmail,
+        hotline,
+        hashtags,
+      });
 
       // Ảnh = poster tuyển dụng (satori). Lỗi thì lùi về ảnh Unsplash/logo.
       let image_url: string | null = null;
