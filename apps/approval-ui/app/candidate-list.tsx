@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { formatRelative, stageMeta, sourceLabel } from './labels';
+import { Fragment, useMemo, useState } from 'react';
+import { formatDate, stageMeta, sourceLabel } from './labels';
 import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate, confirmHired, reinviteForJob } from './actions';
 
 export type JobOption = { id: string; title: string };
@@ -14,6 +14,7 @@ export type CandView = {
   source: string | null;
   dedupKey: string;
   subject: string;
+  viTri: string;
   attachments: string;
   consent: string;
   createdAt: string;
@@ -172,44 +173,23 @@ function ReinviteControl({ appId, jobs }: { appId: string; jobs: JobOption[] }) 
   );
 }
 
-// Một thẻ hồ sơ, có tab chi tiết mở khi bấm để giao diện gọn gàng.
-function CandidateCard({ c, windows, openJobs }: { c: CandView; windows: string[]; openJobs: JobOption[] }) {
+// Nội dung mở rộng của một hồ sơ: chi tiết, tab CV/điểm/phỏng vấn/ghi chú, nút hành động.
+// Không có wrapper <li>/<div className="card"> nữa — dùng bên trong expand row của bảng,
+// khối bao ngoài do bảng cha chịu trách nhiệm.
+function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: string[]; openJobs: JobOption[] }) {
   const [tab, setTab] = useState<string | null>(null);
   const toggle = (t: string) => setTab((cur) => (cur === t ? null : t));
 
-  const hasScore = c.score !== null;
   const hasCv = c.raw.length > 0;
+  const hasScore = c.score !== null;
   const hasInterview = c.interview !== null;
 
   return (
-    <li className="card tone-hr">
-      <div className="head">
-        <span className="cand-name">{c.name}</span>
-        <span className="row-right">
-          {hasScore && (c.score ?? 0) > 0 ? (
-            <span className="score" title="Điểm chấm tự động">{c.score}/100</span>
-          ) : (
-            <span className="muted" style={{ fontSize: '0.85em' }} title="Máy chưa chấm hồ sơ này">Chưa chấm</span>
-          )}
-          <time className="time" dateTime={c.createdAt} suppressHydrationWarning>{formatRelative(c.createdAt)}</time>
-        </span>
-      </div>
-
-      <div className="stages">
-        {c.stages.length === 0 ? (
-          <span className="stage tone-default">Chưa có hồ sơ ứng tuyển</span>
-        ) : (
-          c.stages.map((s, i) => {
-            const m = stageMeta(s);
-            return <span key={i} className={`stage tone-${m.tone}`}>{m.label}</span>;
-          })
-        )}
-        <span className="src">Nguồn: {sourceLabel(c.source)}</span>
-      </div>
-
+    <div className="cand-detail">
       <dl className="fields">
-        <div className="field"><dt>Email</dt><dd>{c.email || '—'}</dd></div>
-        <div className="field"><dt>Điện thoại</dt><dd>{c.phone || '—'}</dd></div>
+        <div className="field"><dt>Email</dt><dd>{c.email || 'Chưa có'}</dd></div>
+        <div className="field"><dt>Điện thoại</dt><dd>{c.phone || 'Chưa có'}</dd></div>
+        <div className="field"><dt>Nguồn</dt><dd>{sourceLabel(c.source)}</dd></div>
         <div className="field"><dt>Đồng ý / lưu tới</dt><dd>{c.consent}</dd></div>
       </dl>
 
@@ -360,15 +340,18 @@ function CandidateCard({ c, windows, openJobs }: { c: CandView; windows: string[
           )}
         </div>
       ) : null}
-    </li>
+    </div>
   );
 }
 
 // Danh sách hồ sơ: tìm kiếm, lọc theo trạng thái, sắp xếp theo mới nhất hoặc điểm.
+// Bố cục dạng bảng — mỗi hàng gọn (tên, vị trí, điểm, giai đoạn, ngày nhận), bấm mở
+// expand row phía dưới chứa chi tiết + tab + nút hành động.
 export default function CandidateList({ candidates, windows, openJobs }: { candidates: CandView[]; windows: string[]; openJobs: JobOption[] }) {
   const [q, setQ] = useState('');
   const [stage, setStage] = useState<string | null>(null);
   const [sort, setSort] = useState<'moi' | 'diem'>('moi');
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const stageCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -384,7 +367,7 @@ export default function CandidateList({ candidates, windows, openJobs }: { candi
     const list = candidates.filter((c) => {
       // Mặc định (chưa chọn trạng thái): chỉ hồ sơ đang xử lý, ẩn "đã nhận/từ chối/lưu nguồn".
       const okStage = stage ? c.stages.includes(stage) : !(c.appStage && FINISHED.includes(c.appStage));
-      const okText = !t || [c.name, c.email, c.phone, c.dedupKey, c.subject].some((v) => (v || '').toLowerCase().includes(t));
+      const okText = !t || [c.name, c.email, c.phone, c.dedupKey, c.subject, c.viTri].some((v) => (v || '').toLowerCase().includes(t));
       return okStage && okText;
     });
     return [...list].sort((a, b) => {
@@ -393,13 +376,15 @@ export default function CandidateList({ candidates, windows, openJobs }: { candi
     });
   }, [candidates, q, stage, sort]);
 
+  const toggleRow = (id: string) => setOpenId((cur) => (cur === id ? null : id));
+
   return (
     <>
       <div className="toolbar">
         <input
           className="search"
           type="search"
-          placeholder="Tìm theo tên, email, số điện thoại..."
+          placeholder="Tìm theo tên, email, số điện thoại, vị trí..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="Tìm hồ sơ"
@@ -428,11 +413,75 @@ export default function CandidateList({ candidates, windows, openJobs }: { candi
 
       <p className="sub">Hiện {filtered.length} trên {candidates.length} hồ sơ.</p>
 
-      <ul className="list">
-        {filtered.map((c) => <CandidateCard key={c.id} c={c} windows={windows} openJobs={openJobs} />)}
-      </ul>
-
-      {filtered.length === 0 ? <p className="muted">Không có hồ sơ khớp bộ lọc.</p> : null}
+      {filtered.length === 0 ? (
+        <p className="muted">Không có hồ sơ khớp bộ lọc.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="cand-table">
+            <thead>
+              <tr>
+                <th className="cand-th-name">Ứng viên</th>
+                <th className="cand-th-vitri">Vị trí</th>
+                <th className="cand-th-score">Điểm</th>
+                <th className="cand-th-stage">Giai đoạn</th>
+                <th className="cand-th-date">Nhận</th>
+                <th className="cand-th-caret" aria-hidden="true"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c) => {
+                const isOpen = openId === c.id;
+                const hasScore = c.score !== null;
+                const stagePrimary = c.appStage || c.stages[0] || null;
+                const meta = stagePrimary ? stageMeta(stagePrimary) : null;
+                return (
+                  <Fragment key={c.id}>
+                    <tr
+                      className={`cand-row${isOpen ? ' is-open' : ''}`}
+                      onClick={() => toggleRow(c.id)}
+                    >
+                      <td className="cand-td-name">
+                        <div className="cand-row-name">{c.name}</div>
+                        <div className="muted cand-row-contact">
+                          {c.email || c.phone || 'Chưa có liên hệ'}
+                        </div>
+                      </td>
+                      <td className="cand-td-vitri">
+                        {c.viTri || <span className="muted">Chưa gắn</span>}
+                      </td>
+                      <td className="cand-td-score">
+                        {hasScore && (c.score ?? 0) > 0 ? (
+                          <span className="score" title="Điểm chấm tự động">{c.score}/100</span>
+                        ) : (
+                          <span className="muted" title="Máy chưa chấm hồ sơ này">Chưa chấm</span>
+                        )}
+                      </td>
+                      <td className="cand-td-stage">
+                        {meta ? (
+                          <span className={`stage tone-${meta.tone}`}>{meta.label}</span>
+                        ) : (
+                          <span className="stage tone-default">Chưa ứng tuyển</span>
+                        )}
+                      </td>
+                      <td className="cand-td-date muted" suppressHydrationWarning>{formatDate(c.createdAt)}</td>
+                      <td className="cand-td-caret">
+                        <span className={`caret${isOpen ? ' open' : ''}`} aria-hidden="true">›</span>
+                      </td>
+                    </tr>
+                    {isOpen ? (
+                      <tr className="cand-expand-row">
+                        <td colSpan={6}>
+                          <CandidateDetail c={c} windows={windows} openJobs={openJobs} />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   );
 }

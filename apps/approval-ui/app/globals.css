@@ -342,6 +342,100 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
 /* Sắp xếp */
 .sortbar { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; flex-wrap: wrap; }
 
+/* === Bảng ứng viên (/ho-so) === */
+/* Mỗi hồ sơ là một hàng gọn (tên, vị trí, điểm, giai đoạn, ngày nhận). Bấm mở expand row
+   ngay phía dưới chứa chi tiết + tab + nút hành động. Trên mobile bảng chuyển thành card
+   xếp dọc (media query dưới). */
+.cand-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+.cand-table thead th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--ink-2);
+  font-size: 11.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.cand-th-name    { width: 24%; }
+.cand-th-vitri   { width: 22%; }
+.cand-th-score   { width: 90px; }
+.cand-th-stage   { width: 120px; }
+.cand-th-date    { width: 110px; }
+.cand-th-caret   { width: 32px; }
+
+.cand-row {
+  cursor: pointer;
+  background: var(--surface);
+  transition: background 0.1s;
+}
+.cand-row > td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.cand-row:hover > td { background: var(--surface-2); }
+.cand-row.is-open > td {
+  background: var(--accent-bg);
+  border-bottom: 1px solid var(--accent);
+}
+.cand-row-name { font-weight: 600; color: var(--ink); }
+.cand-row-contact { font-size: 12px; margin-top: 2px; }
+.cand-td-vitri, .cand-td-score, .cand-td-stage, .cand-td-date { font-size: 13.5px; }
+.cand-td-caret { text-align: center; color: var(--ink-2); }
+.caret {
+  display: inline-block; font-size: 18px; line-height: 1;
+  transition: transform 0.16s ease;
+}
+.caret.open { transform: rotate(90deg); color: var(--accent); }
+
+.cand-expand-row > td {
+  padding: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.cand-detail {
+  padding: 16px 18px 18px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+}
+.cand-detail .fields { margin-bottom: 12px; }
+
+/* Mobile: bảng thành card xếp dọc, mỗi ô là một hàng nhãn/giá trị. */
+@media (max-width: 720px) {
+  .cand-table, .cand-table thead, .cand-table tbody, .cand-table tr, .cand-table td { display: block; }
+  .cand-table thead { display: none; }
+  .cand-table tr { margin-bottom: 8px; }
+  .cand-row {
+    border: 1px solid var(--line); border-radius: 10px;
+    display: grid; grid-template-columns: 1fr auto;
+    padding: 12px 14px 6px; gap: 4px 12px;
+  }
+  .cand-row > td {
+    border-bottom: 0; padding: 4px 0; background: transparent !important;
+  }
+  .cand-td-name    { grid-column: 1 / 2; grid-row: 1; }
+  .cand-td-caret   { grid-column: 2 / 3; grid-row: 1; align-self: start; }
+  .cand-td-vitri   { grid-column: 1 / -1; grid-row: 2; }
+  .cand-td-vitri::before { content: 'Vị trí: '; color: var(--ink-2); font-size: 12px; }
+  .cand-td-stage   { grid-column: 1 / 2; grid-row: 3; }
+  .cand-td-score   { grid-column: 2 / 3; grid-row: 3; text-align: right; }
+  .cand-td-date    { grid-column: 1 / -1; grid-row: 4; font-size: 12px; }
+  .cand-td-date::before { content: 'Nhận: '; color: var(--ink-2); }
+  .cand-row.is-open { border-color: var(--accent); background: var(--accent-bg); }
+  .cand-expand-row { display: block; }
+  .cand-expand-row > td { display: block; padding: 0; border: 0; }
+  .cand-detail {
+    margin: -6px 0 8px;
+    border: 1px solid var(--accent); border-top: 0; border-radius: 0 0 10px 10px;
+    border-left-width: 3px;
+  }
+}
+
 /* Tab chi tiết trong thẻ hồ sơ */
 .cand-tabs { display: flex; gap: 6px; margin: 12px 0 0; flex-wrap: wrap; }
 .cand-tab {

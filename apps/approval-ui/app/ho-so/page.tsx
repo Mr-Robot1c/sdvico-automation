@@ -17,6 +17,7 @@ type App = {
   summary: string | null;
   strengths: string[] | null;
   clarifications: string[] | null;
+  job_id: string | null;
 };
 type CvJson = {
   raw_text?: string;
@@ -49,12 +50,20 @@ export default async function Page() {
   const { data, error } = await client
     .from('hr_candidates')
     .select(
-      'id, full_name, email, phone, source, cv_storage_path, cv_json, dedup_key, consent_at, retention_until, created_at, hr_applications(id, stage, created_at, score_json, summary, strengths, clarifications)'
+      'id, full_name, email, phone, source, cv_storage_path, cv_json, dedup_key, consent_at, retention_until, created_at, hr_applications(id, stage, created_at, score_json, summary, strengths, clarifications, job_id)'
     )
     .order('created_at', { ascending: false })
     .limit(100);
 
   const rows = (data || []) as Cand[];
+
+  // Bản đồ id → tên vị trí (gồm cả vị trí đã đóng) để cột "Vị trí" trong bảng hồ sơ luôn
+  // đọc được tên, thay vì mã UUID hoặc trống khi vị trí đã kết thúc tuyển.
+  const jobTitleMap = new Map<string, string>();
+  const { data: allJobsRes } = await client.from('hr_jobs').select('id, title');
+  for (const j of ((allJobsRes || []) as Array<{ id: string; title: string }>)) {
+    jobTitleMap.set(j.id, j.title);
+  }
 
   // Thư mời phỏng vấn đã soạn, gắn theo mã hồ sơ (ref_id), để hiện tab Câu hỏi phỏng vấn.
   const interviews = new Map<string, InterviewPayload>();
@@ -119,6 +128,7 @@ export default async function Page() {
       source: c.source,
       dedupKey: c.dedup_key || '',
       subject: c.cv_json?.source_message?.subject || '',
+      viTri: (app?.job_id && jobTitleMap.get(app.job_id)) || '',
       attachments: (c.cv_json?.attachments || []).map((a) => a.filename).filter(Boolean).join(', '),
       consent:
         (c.consent_at ? formatDate(c.consent_at) : 'Chưa có') +
