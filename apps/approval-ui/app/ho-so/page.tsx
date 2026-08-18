@@ -87,6 +87,10 @@ export default async function Page() {
     if (r.hired_at) hiredAt.set(r.id, r.hired_at);
   }
 
+  // Vị trí đang tuyển, để mời lại ứng viên đã từ chối cho một việc khác phù hợp.
+  const { data: jobRows } = await client.from('hr_jobs').select('id, title').eq('status', 'open').order('created_at', { ascending: false });
+  const openJobs = ((jobRows || []) as Array<{ id: string; title: string }>).map((j) => ({ id: j.id, title: j.title }));
+
   // Đường tải CV có ký, hết hạn sau một giờ. Bucket riêng tư nên phải ký mới tải được.
   const signed = new Map<string, string>();
   await Promise.all(
@@ -164,7 +168,7 @@ export default async function Page() {
         </div>
       ) : null}
 
-      {!error && candidates.length > 0 ? <CandidateList candidates={candidates} windows={windows} /> : null}
+      {!error && candidates.length > 0 ? <CandidateList candidates={candidates} windows={windows} openJobs={openJobs} /> : null}
     </main>
   );
 }

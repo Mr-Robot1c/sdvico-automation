@@ -63,6 +63,9 @@ export default async function Page() {
             hoặc thêm tay bên dưới cho người đã có sẵn. Tổng: {employees.length} người.
           </p>
         </div>
+        {employees.length > 0 ? (
+          <a className="btn ghost" href="/nhan-vien/export" style={{ whiteSpace: 'nowrap' }}>Xuất Excel</a>
+        ) : null}
       </header>
 
       {employees.length === 0 ? (

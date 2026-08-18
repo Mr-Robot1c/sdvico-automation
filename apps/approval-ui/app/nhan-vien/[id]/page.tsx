@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { requireEmployeeAdmin, getEmployee } from '../../../lib/employees';
 import { updateEmployeeInfo, toggleOnboardingItem, addOnboardingItem, uploadEmployeeDocument } from '../../actions';
 import { SubmitButton } from '../../submit-button';
+import DeleteEmployeeButton from './delete-employee-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,6 +120,10 @@ export default async function Page({ params }: { params: { id: string } }) {
           <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" />
           <SubmitButton label="Tải lên" pendingLabel="Đang tải..." />
         </form>
+      </div>
+
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+        <DeleteEmployeeButton id={employee.id} name={employee.full_name || 'Chưa rõ tên'} />
       </div>
     </main>
   );

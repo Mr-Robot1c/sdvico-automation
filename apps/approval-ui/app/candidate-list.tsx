@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { formatRelative, stageMeta, sourceLabel } from './labels';
-import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate, confirmHired } from './actions';
+import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate, confirmHired, reinviteForJob } from './actions';
+
+export type JobOption = { id: string; title: string };
 
 export type CandView = {
   id: string;
@@ -142,8 +144,36 @@ function InterviewApprove({ appId, name, windows }: { appId: string; name: strin
   );
 }
 
+// Mời lại một ứng viên đã từ chối (hoặc đã mời/lưu nguồn) cho một vị trí đang tuyển khác.
+// Từ chối không xoá dữ liệu — ứng viên vẫn nằm trong nguồn, chọn vị trí phù hợp là đưa lại vào luồng.
+function ReinviteControl({ appId, jobs }: { appId: string; jobs: JobOption[] }) {
+  const [open, setOpen] = useState(false);
+  const [jobId, setJobId] = useState('');
+
+  if (jobs.length === 0) {
+    return <span className="muted" style={{ fontSize: '0.85em' }}>Chưa có vị trí đang tuyển để mời lại.</span>;
+  }
+  if (!open) {
+    return <button className="btn ghost" type="button" onClick={() => setOpen(true)}>Mời lại cho vị trí khác</button>;
+  }
+  return (
+    <div className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+      <select className="note" value={jobId} onChange={(e) => setJobId(e.target.value)} aria-label="Chọn vị trí">
+        <option value="">— Chọn vị trí đang tuyển —</option>
+        {jobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
+      </select>
+      <form action={reinviteForJob}>
+        <input type="hidden" name="appId" value={appId} />
+        <input type="hidden" name="jobId" value={jobId} />
+        <button className="btn ok" type="submit" disabled={!jobId}>Đưa vào tuyển</button>
+      </form>
+      <button className="btn ghost" type="button" style={{ fontSize: '0.85em' }} onClick={() => setOpen(false)}>Đóng</button>
+    </div>
+  );
+}
+
 // Một thẻ hồ sơ, có tab chi tiết mở khi bấm để giao diện gọn gàng.
-function CandidateCard({ c, windows }: { c: CandView; windows: string[] }) {
+function CandidateCard({ c, windows, openJobs }: { c: CandView; windows: string[]; openJobs: JobOption[] }) {
   const [tab, setTab] = useState<string | null>(null);
   const toggle = (t: string) => setTab((cur) => (cur === t ? null : t));
 
@@ -294,7 +324,12 @@ function CandidateCard({ c, windows }: { c: CandView; windows: string[] }) {
         {c.appStage === 'offer' && c.hiredAt ? (
           <a className="stage tone-ok" href="/nhan-vien">✓ Đã nhận việc · xem ở trang Nhân viên</a>
         ) : null}
-        {c.appStage === 'rejected' ? <span className="muted">Đã từ chối</span> : null}
+        {c.appStage === 'rejected' && c.appId ? (
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span className="muted">Đã từ chối · giữ trong nguồn</span>
+            <ReinviteControl appId={c.appId} jobs={openJobs} />
+          </div>
+        ) : null}
         {c.sourced ? (
           <DangerDelete
             action={rejectSourced}
@@ -321,7 +356,7 @@ function CandidateCard({ c, windows }: { c: CandView; windows: string[] }) {
 }
 
 // Danh sách hồ sơ: tìm kiếm, lọc theo trạng thái, sắp xếp theo mới nhất hoặc điểm.
-export default function CandidateList({ candidates, windows }: { candidates: CandView[]; windows: string[] }) {
+export default function CandidateList({ candidates, windows, openJobs }: { candidates: CandView[]; windows: string[]; openJobs: JobOption[] }) {
   const [q, setQ] = useState('');
   const [stage, setStage] = useState<string | null>(null);
   const [sort, setSort] = useState<'moi' | 'diem'>('moi');
@@ -385,7 +420,7 @@ export default function CandidateList({ candidates, windows }: { candidates: Can
       <p className="sub">Hiện {filtered.length} trên {candidates.length} hồ sơ.</p>
 
       <ul className="list">
-        {filtered.map((c) => <CandidateCard key={c.id} c={c} windows={windows} />)}
+        {filtered.map((c) => <CandidateCard key={c.id} c={c} windows={windows} openJobs={openJobs} />)}
       </ul>
 
       {filtered.length === 0 ? <p className="muted">Không có hồ sơ khớp bộ lọc.</p> : null}

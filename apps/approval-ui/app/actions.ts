@@ -204,6 +204,43 @@ export async function decideCandidate(formData: FormData) {
   revalidatePath('/');
 }
 
+// Mời lại một ứng viên đã kết thúc (từ chối / đã mời / lưu nguồn) cho một vị trí khác.
+// Điều cấm 2 tinh thần: từ chối không xoá dữ liệu, ứng viên vẫn nằm trong nguồn để dùng lại.
+// Đưa hồ sơ về stage 'review' cho vị trí mới, giữ điểm chấm và tóm tắt để tham khảo,
+// reset các mốc phỏng vấn/quyết định cũ. KHÔNG gửi gì cho ứng viên (điều cấm 1) — chỉ đưa
+// lại vào luồng để người xét, muốn mời phỏng vấn thì bấm ở bước sau như thường.
+export async function reinviteForJob(formData: FormData) {
+  const appId = String(formData.get('appId') || '');
+  const jobId = String(formData.get('jobId') || '');
+  if (!appId || !jobId) return;
+
+  const client = getServerClient();
+  const who = await currentEmail();
+
+  const { data: app } = await client.from('hr_applications').select('id, stage').eq('id', appId).maybeSingle();
+  if (!app || !['rejected', 'offer', 'pool'].includes(app.stage)) return;
+
+  await client.from('hr_applications').update({
+    job_id: jobId,
+    stage: 'review',
+    interviewed_at: null,
+    hired_at: null,
+    decided_by: null,
+    advanced_by: null,
+    interviewed_by: null,
+    chosen_slot: null,
+    slot_chosen_at: null,
+  }).eq('id', appId);
+
+  // Dọn các thư còn treo của hồ sơ này (thư mời/nhận/từ chối cũ hết nghĩa khi mời lại vị trí mới).
+  await client.from('approval_queue')
+    .update({ status: 'dismissed', decided_at: new Date().toISOString(), decided_by: who, note: 'Tự dọn: hồ sơ được mời lại cho vị trí khác.' })
+    .in('kind', ['hr_interview', 'hr_offer', 'hr_reject']).eq('ref_id', appId).eq('status', 'pending');
+
+  revalidatePath('/ho-so');
+  revalidatePath('/');
+}
+
 // Đánh dấu ứng viên đã phỏng vấn xong. Chỉ khi có mốc này mới hiện nút Nhận/Không nhận.
 export async function markInterviewed(formData: FormData) {
   const appId = String(formData.get('appId') || '');
@@ -1742,6 +1779,36 @@ export async function uploadEmployeeDocument(formData: FormData) {
   if (error) throw new Error('Lưu bản ghi tài liệu lỗi: ' + error.message);
 
   revalidatePath(`/nhan-vien/${employeeId}`);
+}
+
+// Xoá hẳn một nhân viên: xoá tệp tài liệu trong Storage (bucket không tự dọn khi xoá dòng),
+// rồi xoá dòng hr_employees (hr_employee_documents tự xoá theo on delete cascade).
+// Không đụng tới hr_applications/hr_candidates — dữ liệu tuyển dụng của người này vẫn còn.
+export async function deleteEmployee(formData: FormData) {
+  const guard = await requireEmployeeAdmin();
+  if ('error' in guard) throw new Error(guard.error);
+
+  const id = String(formData.get('id') || '');
+  if (!id) return;
+
+  const client = getServerClient();
+
+  // Xoá tệp trong Storage theo tiền tố "<employeeId>/". Lỗi liệt kê/xoá tệp không chặn việc
+  // xoá bản ghi — nhưng ghi log để còn dọn tay nếu cần.
+  try {
+    const { data: files } = await client.storage.from(EMPLOYEE_DOCS_BUCKET).list(id);
+    if (files && files.length) {
+      await client.storage.from(EMPLOYEE_DOCS_BUCKET).remove(files.map((f) => `${id}/${f.name}`));
+    }
+  } catch {
+    // eo
+  }
+
+  const { error } = await client.from('hr_employees').delete().eq('id', id);
+  if (error) throw new Error('Không xoá được nhân viên: ' + error.message);
+
+  revalidatePath('/nhan-vien');
+  redirect('/nhan-vien');
 }
 
 // --- Trả lời bình luận Facebook ---
