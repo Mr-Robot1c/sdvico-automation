@@ -27,7 +27,7 @@ export default function AutoPostToggle({ jobId, isOn }: Props) {
       className={`toggle-pill${optimisticOn ? ' on' : ''}`}
       onClick={handleToggle}
       aria-pressed={optimisticOn}
-      title={optimisticOn ? 'Tự động đăng BẬT — bấm để tắt' : 'Bấm để bật tự động đăng bài'}
+      title={optimisticOn ? 'Tự động đăng BẬT, bấm để tắt' : 'Bấm để bật tự động đăng bài'}
     >
       <span className="toggle-knob" aria-hidden="true" />
       {optimisticOn ? 'Tự động BẬT' : 'Tự động TẮT'}

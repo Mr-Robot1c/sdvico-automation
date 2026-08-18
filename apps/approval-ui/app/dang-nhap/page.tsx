@@ -49,7 +49,7 @@ export default async function Page({ searchParams }: { searchParams: { ok?: stri
   return (
     <main className="login-shell">
       <div className="login-card">
-        <h1 style={{ margin: '0 0 6px' }}>SDVICO — Đăng nhập</h1>
+        <h1 style={{ margin: '0 0 6px' }}>SDVICO · Đăng nhập</h1>
         <p className="muted" style={{ margin: '0 0 18px', fontSize: '0.9rem' }}>
           Hệ thống quản lý tuyển dụng
         </p>

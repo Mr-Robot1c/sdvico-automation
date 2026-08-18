@@ -137,7 +137,7 @@ export default async function Page() {
               {manualChannels.map((c) => <option key={c.kenh} value={c.kenh}>{c.ten}</option>)}
             </select>
             <select className="note" name="job_id" aria-label="Vị trí (tùy chọn)" defaultValue="">
-              <option value="">— Gắn vị trí (tùy chọn) —</option>
+              <option value="">Gắn vị trí (tùy chọn)</option>
               {allJobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
             </select>
           </div>

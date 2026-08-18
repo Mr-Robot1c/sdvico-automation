@@ -230,7 +230,7 @@ export default function JobTable({ jobs, extraChannels }: Props) {
                     {j.status === 'open' ? (
                       j.autoPost ? <span className="stage tone-ok">Bật</span> : <span className="muted">Tắt</span>
                     ) : (
-                      <span className="muted">—</span>
+                      <span className="muted">Chưa áp dụng</span>
                     )}
                   </td>
                   <td className="job-td-caret">

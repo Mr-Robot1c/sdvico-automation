@@ -36,7 +36,7 @@ export default async function Page({ params }: { params: { id: string } }) {
       <header className="head-row">
         <div>
           <h1>{employee.full_name || 'Chưa rõ tên'}</h1>
-          <p className="sub">{employee.email || '—'} · {employee.phone || '—'}</p>
+          <p className="sub">{employee.email || 'Chưa có email'} · {employee.phone || 'Chưa có SĐT'}</p>
         </div>
       </header>
 

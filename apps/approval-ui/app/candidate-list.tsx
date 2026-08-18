@@ -160,7 +160,7 @@ function ReinviteControl({ appId, jobs }: { appId: string; jobs: JobOption[] }) 
   return (
     <div className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
       <select className="note" value={jobId} onChange={(e) => setJobId(e.target.value)} aria-label="Chọn vị trí">
-        <option value="">— Chọn vị trí đang tuyển —</option>
+        <option value="">Chọn vị trí đang tuyển</option>
         {jobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
       </select>
       <form action={reinviteForJob}>
@@ -265,7 +265,7 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
         ) : null}
         {c.appStage === 'interview' && c.appId && !c.interviewedAt ? (
           <>
-            <span className="muted" style={{ alignSelf: 'center' }}>Đã đưa vào phỏng vấn — thư mời ở tab Duyệt</span>
+            <span className="muted" style={{ alignSelf: 'center' }}>Đã đưa vào phỏng vấn, thư mời ở tab Duyệt</span>
             <form
               action={markInterviewed}
               onSubmit={(e) => { if (!window.confirm(`Đánh dấu ĐÃ PHỎNG VẤN XONG cho:\n\n${c.name}\n\nSau bước này mới hiện nút Nhận / Không nhận.`)) e.preventDefault(); }}
@@ -277,7 +277,7 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
         ) : null}
         {c.appStage === 'interview' && c.appId && c.interviewedAt ? (
           <>
-            <span className="muted" style={{ alignSelf: 'center', marginRight: 2 }}>Đã phỏng vấn — quyết định:</span>
+            <span className="muted" style={{ alignSelf: 'center', marginRight: 2 }}>Đã phỏng vấn. Quyết định:</span>
             <form
               action={decideCandidate}
               onSubmit={(e) => { if (!window.confirm(`Nhận ứng viên này?\n\n${c.name}\n\nMáy soạn thư mời nhận việc, bạn duyệt trên trang Duyệt rồi mới gửi.`)) e.preventDefault(); }}

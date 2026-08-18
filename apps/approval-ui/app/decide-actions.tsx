@@ -76,7 +76,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
         {isLinkedIn && !linkedinReady ? (
           <div className="err" role="alert" style={{ fontSize: '0.85em' }}>
-            Chưa nối API LinkedIn (hoặc token hết hạn) — không thể tự đăng lên LinkedIn. Hãy Duyệt rồi dùng nút &quot;Copy nội dung&quot; để đăng tay lên Company Page.
+            Chưa nối API LinkedIn (hoặc token hết hạn) nên không thể tự đăng lên LinkedIn. Hãy Duyệt rồi dùng nút &quot;Copy nội dung&quot; để đăng tay lên Company Page.
           </div>
         ) : null}
 
@@ -85,7 +85,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
           <div className="old-post-warning">
             <strong>Bài đang chạy:</strong>{' '}
             {oldPostTitle || 'Bài cũ'}
-            {oldPostedAt ? ` — đăng ${new Date(oldPostedAt).toLocaleDateString('vi-VN')}` : ''}
+            {oldPostedAt ? ` · đăng ${new Date(oldPostedAt).toLocaleDateString('vi-VN')}` : ''}
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -141,7 +141,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
         {showSchedule ? (
           <div className="settings-box" style={{ margin: 0, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={{ fontSize: '0.88em', fontWeight: 600 }}>
-              Duyệt và đặt lịch — worker tự đăng khi đến giờ
+              Duyệt và đặt lịch. Worker tự đăng khi đến giờ.
             </span>
 
             {/* Giờ vàng VN */}

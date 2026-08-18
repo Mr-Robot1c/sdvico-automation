@@ -87,7 +87,7 @@ export default async function Page() {
                     <b>{u.email}</b>
                     {isMe ? <span className="muted" style={{ marginLeft: 6, fontSize: '0.85em' }}>(chính bạn)</span> : null}
                   </td>
-                  <td>{u.full_name || <span className="muted">—</span>}</td>
+                  <td>{u.full_name || <span className="muted">Chưa có</span>}</td>
                   <td>
                     <span className={`stage tone-${u.role === 'admin' ? 'ok' : 'mkt'}`}>
                       {u.role === 'admin' ? 'Quản trị' : 'Nhân viên'}

@@ -281,7 +281,7 @@ export default function PostListClient({
                               <input type="hidden" name="post_id" value={p.id} />
                               {p.trang_thai === 'posted' ? (
                                 <p style={{ margin: 0, fontSize: '0.82em', padding: '6px 10px', background: 'var(--accent-bg)', borderRadius: 6, color: 'var(--accent)' }}>
-                                  Bài đã đăng — Lưu sẽ cập nhật nội dung trực tiếp lên Facebook{p.fb_post_id ? ` (ID: ...${p.fb_post_id.slice(-8)})` : '. Paste link bài Facebook bên dưới để bật xoá và sửa tự động.'}.
+                                  Bài đã đăng. Lưu sẽ cập nhật nội dung trực tiếp lên Facebook{p.fb_post_id ? ` (ID: ...${p.fb_post_id.slice(-8)})` : '. Paste link bài Facebook bên dưới để bật xoá và sửa tự động.'}.
                                 </p>
                               ) : null}
                               <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>Nội dung bài đăng</label>
@@ -308,7 +308,7 @@ export default function PostListClient({
                               {p.trang_thai === 'posted' ? (
                                 <>
                                   <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>
-                                    Link bài Facebook{p.fb_post_id ? ' (để trống = giữ nguyên ID đã lưu)' : ' — paste để bật xoá/sửa tự động'}
+                                    Link bài Facebook{p.fb_post_id ? ' (để trống = giữ nguyên ID đã lưu)' : ' · paste để bật xoá/sửa tự động'}
                                   </label>
                                   <input
                                     className="note"
@@ -385,7 +385,7 @@ export default function PostListClient({
               {deleteTarget.fbLinked ? (
                 <span className="modal-warn">Bài đang trên Facebook. Xoá ở đây sẽ gỡ bài khỏi Facebook và xoá vĩnh viễn khỏi hệ thống.</span>
               ) : deleteTarget.trang_thai === 'posted' ? (
-                <span className="modal-info">Bài đã đăng trên Facebook nhưng chưa lưu link. Hệ thống không thể tự gỡ khỏi Facebook — bạn cần vào Facebook xoá thủ công. Bài sẽ xoá vĩnh viễn khỏi hệ thống quản lý.</span>
+                <span className="modal-info">Bài đã đăng trên Facebook nhưng chưa lưu link. Hệ thống không thể tự gỡ khỏi Facebook, bạn cần vào Facebook xoá thủ công. Bài sẽ xoá vĩnh viễn khỏi hệ thống quản lý.</span>
               ) : (
                 <span className="modal-info">Xoá vĩnh viễn. Không thể khôi phục.</span>
               )}

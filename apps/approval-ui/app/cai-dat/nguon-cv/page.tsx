@@ -54,7 +54,7 @@ export default async function Page() {
   let sources: Source[] = [];
   if (!missing) {
     const tenById = new Map((platforms || []).map((p: { id: string; ten: string }) => [p.id, p.ten]));
-    sources = ((cfgs || []) as Omit<Source, 'ten'>[]).map((c) => ({ ...c, ten: tenById.get(c.platform_id) || '—' }));
+    sources = ((cfgs || []) as Omit<Source, 'ten'>[]).map((c) => ({ ...c, ten: tenById.get(c.platform_id) || 'Chưa gán' }));
   }
 
   return (
@@ -94,7 +94,7 @@ export default async function Page() {
                   return (
                     <tr key={s.id}>
                       <td><b>{s.ten}</b></td>
-                      <td>{s.gioi_han_ngay ?? <span className="muted">—</span>}</td>
+                      <td>{s.gioi_han_ngay ?? <span className="muted">Không giới hạn</span>}</td>
                       <td>
                         {confirmed ? (
                           <span className="muted">{s.xac_nhan_phap_ly_boi} · {new Date(s.xac_nhan_luc!).toLocaleDateString('vi-VN')}</span>

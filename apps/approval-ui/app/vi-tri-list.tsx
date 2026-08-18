@@ -214,7 +214,7 @@ export default function ViTriList({
                       ) : null}
                       {fbPost.trang_thai !== 'posted' ? (
                         <span className="muted" style={{ fontSize: '0.82em' }}>
-                          {approved.has(fbPost.id) ? 'Đã duyệt — chờ đăng' : 'Vào trang Duyệt để duyệt'}
+                          {approved.has(fbPost.id) ? 'Đã duyệt · chờ đăng' : 'Vào trang Duyệt để duyệt'}
                         </span>
                       ) : null}
                     </>

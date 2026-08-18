@@ -40,7 +40,7 @@ export default function AddJobPanel() {
           <div className="panel-body">
             {!result ? (
               <>
-                <p className="panel-step">Bước 1 — Nhập thông tin vị trí</p>
+                <p className="panel-step">Bước 1 · Nhập thông tin vị trí</p>
                 <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <input className="note" name="title" placeholder="Tên vị trí" list="panel-positions" required />
                   <datalist id="panel-positions">
@@ -58,7 +58,7 @@ export default function AddJobPanel() {
               </>
             ) : (
               <>
-                <p className="panel-step">Bước 2 — Xem bản nháp và đưa vào Duyệt</p>
+                <p className="panel-step">Bước 2 · Xem bản nháp và đưa vào Duyệt</p>
                 <p style={{ fontWeight: 700, marginBottom: 12, fontSize: 15 }}>{result.title}</p>
                 {JD_CHANNELS.map((c) => (
                   <details key={c.key} className="raw">

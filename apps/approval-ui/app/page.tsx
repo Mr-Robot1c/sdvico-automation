@@ -311,7 +311,7 @@ function ItemPreview({
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <label style={{ fontSize: '0.82em', color: 'var(--ink-2)' }}>
-                  Ảnh đính kèm — dán URL hoặc chọn file từ máy (file ưu tiên hơn URL)
+                  Ảnh đính kèm: dán URL hoặc chọn file từ máy (file ưu tiên hơn URL)
                 </label>
                 <input
                   className="note"

@@ -46,10 +46,25 @@ export default async function Page() {
   const guard = await requireEmployeeAdmin();
 
   if ('error' in guard) {
+    // Phân biệt hai lý do fail: (a) auth mode basic — hướng dẫn bật supabase, hiển thị info
+    // banner mềm; (b) không đủ quyền (role) — vẫn dùng err banner đỏ để nhấn.
+    const authGateFail = guard.error.includes('AUTH_MODE=supabase');
     return (
       <main>
         <header className="head-row"><div><h1>Nhân viên</h1></div></header>
-        <div className="err" role="alert">{guard.error}</div>
+        <div className="empty" style={{ padding: '40px 24px' }}>
+          <div className="empty-icon" aria-hidden="true" style={{ background: authGateFail ? 'var(--accent-bg)' : 'var(--no-bg)', color: authGateFail ? 'var(--accent)' : 'var(--no)' }}>
+            {authGateFail ? '🔒' : '⚠'}
+          </div>
+          <p style={{ fontWeight: 600, color: 'var(--ink)' }}>
+            {authGateFail ? 'Cần bật đăng nhập theo từng người' : 'Không có quyền truy cập'}
+          </p>
+          <p className="sub" style={{ maxWidth: 520, margin: '4px auto 0' }}>
+            {authGateFail
+              ? 'Dữ liệu nhân viên nhạy cảm hơn hồ sơ ứng viên nên trang này chỉ dùng khi đã bật đăng nhập theo từng người (AUTH_MODE=supabase). Hãy đặt biến trên Vercel và cấu hình theo docs/dang-nhap-supabase-auth.md, sau đó redeploy.'
+              : guard.error}
+          </p>
+        </div>
       </main>
     );
   }

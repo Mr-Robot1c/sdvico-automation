@@ -12,7 +12,7 @@ function Header() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <span style={{ fontSize: 26, fontWeight: 800, letterSpacing: 1, color: '#0b4da2' }}>SDVICO</span>
-      <span style={{ fontSize: 14, color: '#5b6b7f' }}>Phòng Nhân sự — Công ty Hiệp Lực Phát Triển Việt</span>
+      <span style={{ fontSize: 14, color: '#5b6b7f' }}>Phòng Nhân sự · Công ty Hiệp Lực Phát Triển Việt</span>
     </div>
   );
 }

@@ -116,17 +116,17 @@ export default function EmployeeList({ employees }: { employees: EmpRow[] }) {
                 return (
                   <tr key={e.id}>
                     <td><Link href={`/nhan-vien/${e.id}`}><b>{e.fullName || 'Chưa rõ tên'}</b></Link></td>
-                    <td>{e.chucDanh || <span className="muted">—</span>}</td>
-                    <td>{e.phongBan || <span className="muted">—</span>}</td>
-                    <td>{e.phone || <span className="muted">—</span>}</td>
+                    <td>{e.chucDanh || <span className="muted">Chưa có</span>}</td>
+                    <td>{e.phongBan || <span className="muted">Chưa có</span>}</td>
+                    <td>{e.phone || <span className="muted">Chưa có</span>}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      {e.luong != null ? fmtLuong(e.luong) : <span className="muted">—</span>}
+                      {e.luong != null ? fmtLuong(e.luong) : <span className="muted">Chưa có</span>}
                       {e.luongGhiChu ? <span className="muted" style={{ display: 'block', fontSize: '0.85em' }}>{e.luongGhiChu}</span> : null}
                     </td>
                     <td><span className={`stage tone-${st.tone}`}>{st.label}</span></td>
                     <td>{(() => { const bh = BAO_HIEM_LABEL[e.baoHiem] || BAO_HIEM_LABEL.chua_dong; return <span className={`stage tone-${bh.tone}`}>{bh.label}</span>; })()}</td>
                     <td className="muted">{e.fromRecruitment ? 'Từ tuyển dụng' : 'Nhập tay'}</td>
-                    <td className="muted">{e.ngayBatDau ? new Date(e.ngayBatDau).toLocaleDateString('vi-VN') : '—'}</td>
+                    <td className="muted">{e.ngayBatDau ? new Date(e.ngayBatDau).toLocaleDateString('vi-VN') : 'Chưa có'}</td>
                   </tr>
                 );
               })}
