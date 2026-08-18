@@ -153,9 +153,11 @@ export async function GET(req: Request) {
   for (const s of unusedSuggestions) {
     if (pickedFolders.length) break; // 1 suggestion/run — cặp A/B chiếm 2 slot bài bán
     const guessed = (guessGroup as (t: string) => string | null)(s.product);
-    // guessGroup trả về nhãn không có STT; đối chiếu với folder thật (có STT).
+    // guessGroup trả NHÃN FOLDER đầy đủ KÈM STT ("6. Thiết bị lọc dầu SF-50") — phải strip
+    // STT CẢ HAI vế mới khớp (bug bắt được khi chạy thật 18/8: một vế giữ STT nên không
+    // suggestion nào map được folder, rotate luôn rơi về fallback random).
     const matchedFolder = guessed
-      ? unused.find((g) => productName(g).toLowerCase() === guessed.toLowerCase())
+      ? unused.find((g) => productName(g).toLowerCase() === productName(guessed).toLowerCase())
       : null;
     if (!matchedFolder) continue;
     usedInThisRun.add(matchedFolder);
