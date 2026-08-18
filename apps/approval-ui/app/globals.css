@@ -512,7 +512,95 @@ select.note { cursor: pointer; }
   .stage.tone-web { background: #241a33; }
 }
 
-/* Danh sách tin đăng dạng bảng gọn */
+/* === Bảng Tin đăng (/dang-tin) === */
+/* Cấu trúc giống bảng ứng viên: bấm hàng mở expand row có view/edit + form + Xoá.
+   Chia sẻ style với .cand-table cho nhất quán, riêng cột chuyên biệt của bài đăng. */
+.post-table-v2 {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+.post-table-v2 thead th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--ink-2);
+  font-size: 11.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.post-th-title  { width: auto; }
+.post-th-kenh   { width: 130px; }
+.post-th-status { width: 110px; }
+.post-th-time   { width: 180px; }
+.post-th-caret  { width: 32px; }
+
+.post-row {
+  cursor: pointer;
+  background: var(--surface);
+  transition: background 0.1s;
+}
+.post-row > td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.post-row:hover > td { background: var(--surface-2); }
+.post-row.is-open > td {
+  background: var(--accent-bg);
+  border-bottom: 1px solid var(--accent);
+}
+.post-row-title {
+  font-weight: 600; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.post-td-kenh, .post-td-time { font-size: 13.5px; }
+.post-td-caret { text-align: center; color: var(--ink-2); }
+
+.post-expand-row > td {
+  padding: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.post-detail {
+  padding: 16px 18px 18px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+}
+.post-detail .fields { margin-bottom: 12px; }
+
+/* Mobile ≤720: bảng thành card grid như /ho-so. */
+@media (max-width: 720px) {
+  .post-table-v2, .post-table-v2 thead, .post-table-v2 tbody, .post-table-v2 tr, .post-table-v2 td { display: block; }
+  .post-table-v2 thead { display: none; }
+  .post-table-v2 tr { margin-bottom: 8px; }
+  .post-row {
+    border: 1px solid var(--line); border-radius: 10px;
+    display: grid; grid-template-columns: 1fr auto;
+    padding: 12px 14px 6px; gap: 4px 12px;
+  }
+  .post-row > td {
+    border-bottom: 0; padding: 4px 0; background: transparent !important;
+  }
+  .post-td-title  { grid-column: 1 / 2; grid-row: 1; }
+  .post-td-caret  { grid-column: 2 / 3; grid-row: 1; align-self: start; }
+  .post-td-kenh   { grid-column: 1 / -1; grid-row: 2; font-size: 12px; }
+  .post-td-kenh::before { content: 'Kênh: '; color: var(--ink-2); }
+  .post-td-status { grid-column: 1 / 2; grid-row: 3; }
+  .post-td-time   { grid-column: 2 / 3; grid-row: 3; text-align: right; font-size: 12px; }
+  .post-row.is-open { border-color: var(--accent); background: var(--accent-bg); }
+  .post-expand-row { display: block; }
+  .post-expand-row > td { display: block; padding: 0; border: 0; }
+  .post-detail {
+    margin: -6px 0 8px;
+    border: 1px solid var(--accent); border-top: 0; border-radius: 0 0 10px 10px;
+    border-left-width: 3px;
+  }
+}
+
+/* Danh sách tin đăng dạng cũ (deprecated — giữ để không phá component khác nếu còn dùng) */
 .post-table { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 3px; }
 .pt-row { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .pt-row.is-open { border-color: var(--accent); }
