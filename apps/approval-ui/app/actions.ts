@@ -43,6 +43,15 @@ async function auditApp(
   }
 }
 
+// Đọc lương từ ô nhập: người dùng có thể gõ "8.000.000", "8000000", "8 000 000".
+// Bỏ mọi ký tự không phải chữ số rồi đổi sang số nguyên đồng. Rỗng hoặc không có số thì trả null.
+function parseLuong(v: FormDataEntryValue | null): number | null {
+  const digits = String(v ?? '').replace(/[^\d]/g, '');
+  if (!digits) return null;
+  const n = Number(digits);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 // datetime-local trả về chuỗi không có timezone (vd "2026-08-13T14:47").
 // Server Vercel chạy UTC nên phải gắn +07:00 để parse đúng giờ Việt Nam.
 function parseVNTime(s: string): string {
@@ -1673,6 +1682,8 @@ export async function addEmployeeManual(formData: FormData) {
     phong_ban: String(formData.get('phong_ban') || '').trim() || null,
     ngay_bat_dau: String(formData.get('ngay_bat_dau') || '').trim() || null,
     trang_thai: trangThai,
+    luong: parseLuong(formData.get('luong')),
+    luong_ghi_chu: String(formData.get('luong_ghi_chu') || '').trim() || null,
     created_by: guard.email,
   }).select('id').single();
   if (error) throw new Error('Không thêm được nhân viên: ' + error.message);
@@ -1692,6 +1703,8 @@ export async function updateEmployeeInfo(formData: FormData) {
     chuc_danh: String(formData.get('chuc_danh') || '').trim() || null,
     phong_ban: String(formData.get('phong_ban') || '').trim() || null,
     ngay_bat_dau: String(formData.get('ngay_bat_dau') || '').trim() || null,
+    luong: parseLuong(formData.get('luong')),
+    luong_ghi_chu: String(formData.get('luong_ghi_chu') || '').trim() || null,
     so_bhxh: String(formData.get('so_bhxh') || '').trim() || null,
     so_cccd: String(formData.get('so_cccd') || '').trim() || null,
     trang_thai: (['active', 'probation', 'left'].includes(String(formData.get('trang_thai')))

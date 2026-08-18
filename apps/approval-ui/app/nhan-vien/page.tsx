@@ -27,6 +27,10 @@ function AddEmployeeForm() {
           <option value="probation">Thử việc</option>
           <option value="left">Đã nghỉ</option>
         </select>
+      </div>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+        <input className="note" name="luong" inputMode="numeric" placeholder="Lương (đồng), vd: 8000000" style={{ flex: '1 1 180px' }} />
+        <input className="note" name="luong_ghi_chu" placeholder="Chú thích lương (tùy chọn)" style={{ flex: '2 1 220px' }} />
         <SubmitButton label="Thêm nhân viên" pendingLabel="Đang thêm..." />
       </div>
     </form>
@@ -54,6 +58,8 @@ export default async function Page() {
     email: e.email || '',
     phone: e.phone || '',
     trangThai: e.trang_thai,
+    luong: e.luong,
+    luongGhiChu: e.luong_ghi_chu || '',
     fromRecruitment: Boolean(e.application_id),
     ngayBatDau: e.ngay_bat_dau,
   }));

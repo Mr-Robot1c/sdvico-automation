@@ -33,7 +33,8 @@ export async function GET() {
 
   const headers = [
     'Họ tên', 'Chức danh', 'Phòng ban', 'Email', 'Điện thoại',
-    'Trạng thái', 'Ngày bắt đầu', 'Số BHXH', 'Số CCCD', 'Nguồn', 'Tạo lúc',
+    'Lương (đồng)', 'Chú thích lương', 'Trạng thái', 'Ngày bắt đầu',
+    'Số BHXH', 'Số CCCD', 'Nguồn', 'Tạo lúc',
   ];
   const lines = [headers.map(cell).join(',')];
   for (const e of employees) {
@@ -43,6 +44,9 @@ export async function GET() {
       cell(e.phong_ban),
       cell(e.email),
       cell(e.phone),
+      // Xuất lương ra số thô để Excel tính toán được; định dạng để mắt người đọc trong app.
+      cell(e.luong != null ? e.luong : ''),
+      cell(e.luong_ghi_chu),
       cell(STATUS_LABEL[e.trang_thai] || e.trang_thai),
       cell(fmtDate(e.ngay_bat_dau)),
       cell(e.so_bhxh),

@@ -52,6 +52,8 @@ export default async function Page({ params }: { params: { id: string } }) {
             <option value="active">Đang làm</option>
             <option value="left">Đã nghỉ</option>
           </select>
+          <input className="note" name="luong" inputMode="numeric" defaultValue={employee.luong != null ? String(employee.luong) : ''} placeholder="Lương (đồng)" style={{ flex: '1 1 160px' }} />
+          <input className="note" name="luong_ghi_chu" defaultValue={employee.luong_ghi_chu || ''} placeholder="Chú thích lương" style={{ flex: '2 1 200px' }} />
           <input className="note" name="so_bhxh" defaultValue={employee.so_bhxh || ''} placeholder="Số BHXH" style={{ flex: '1 1 160px' }} />
           <input className="note" name="so_cccd" defaultValue={employee.so_cccd || ''} placeholder="Số CCCD" style={{ flex: '1 1 160px' }} />
           <SubmitButton label="Lưu" pendingLabel="Đang lưu..." />

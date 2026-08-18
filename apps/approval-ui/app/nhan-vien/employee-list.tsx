@@ -10,10 +10,18 @@ export type EmpRow = {
   phongBan: string;
   email: string;
   phone: string;
+  luong: number | null;
+  luongGhiChu: string;
   trangThai: 'active' | 'probation' | 'left';
   fromRecruitment: boolean;
   ngayBatDau: string | null;
 };
+
+// Lương dạng số đồng thành "8.000.000 đồng". Null thì để trống.
+function fmtLuong(n: number | null): string {
+  if (n == null) return '';
+  return n.toLocaleString('vi-VN') + ' đồng';
+}
 
 const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
   active: { label: 'Đang làm', tone: 'ok' },
@@ -80,33 +88,42 @@ export default function EmployeeList({ employees }: { employees: EmpRow[] }) {
       {filtered.length === 0 ? (
         <p className="muted">Không có nhân viên khớp bộ lọc.</p>
       ) : (
-        <table className="run-log">
-          <thead>
-            <tr>
-              <th>Họ tên</th>
-              <th>Chức danh</th>
-              <th>Phòng ban</th>
-              <th>Trạng thái</th>
-              <th>Nguồn</th>
-              <th>Ngày bắt đầu</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((e) => {
-              const st = STATUS_LABEL[e.trangThai] || STATUS_LABEL.active;
-              return (
-                <tr key={e.id}>
-                  <td><Link href={`/nhan-vien/${e.id}`}><b>{e.fullName || 'Chưa rõ tên'}</b></Link></td>
-                  <td>{e.chucDanh || <span className="muted">—</span>}</td>
-                  <td>{e.phongBan || <span className="muted">—</span>}</td>
-                  <td><span className={`stage tone-${st.tone}`}>{st.label}</span></td>
-                  <td className="muted">{e.fromRecruitment ? 'Từ tuyển dụng' : 'Nhập tay'}</td>
-                  <td className="muted">{e.ngayBatDau ? new Date(e.ngayBatDau).toLocaleDateString('vi-VN') : '—'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="run-log">
+            <thead>
+              <tr>
+                <th>Họ tên</th>
+                <th>Chức danh</th>
+                <th>Phòng ban</th>
+                <th>Điện thoại</th>
+                <th>Lương</th>
+                <th>Trạng thái</th>
+                <th>Nguồn</th>
+                <th>Ngày bắt đầu</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((e) => {
+                const st = STATUS_LABEL[e.trangThai] || STATUS_LABEL.active;
+                return (
+                  <tr key={e.id}>
+                    <td><Link href={`/nhan-vien/${e.id}`}><b>{e.fullName || 'Chưa rõ tên'}</b></Link></td>
+                    <td>{e.chucDanh || <span className="muted">—</span>}</td>
+                    <td>{e.phongBan || <span className="muted">—</span>}</td>
+                    <td>{e.phone || <span className="muted">—</span>}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {e.luong != null ? fmtLuong(e.luong) : <span className="muted">—</span>}
+                      {e.luongGhiChu ? <span className="muted" style={{ display: 'block', fontSize: '0.85em' }}>{e.luongGhiChu}</span> : null}
+                    </td>
+                    <td><span className={`stage tone-${st.tone}`}>{st.label}</span></td>
+                    <td className="muted">{e.fromRecruitment ? 'Từ tuyển dụng' : 'Nhập tay'}</td>
+                    <td className="muted">{e.ngayBatDau ? new Date(e.ngayBatDau).toLocaleDateString('vi-VN') : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </>
   );
