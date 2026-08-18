@@ -30,6 +30,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
+      { href: '/kho-tri-thuc', label: 'Kho tri thức', icon: '🧠' },
       { href: '/do-luong', label: 'Đo lường', icon: '📈' },
       { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' }
     ]

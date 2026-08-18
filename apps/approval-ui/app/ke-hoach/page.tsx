@@ -128,8 +128,66 @@ export default async function Page() {
                   <div className="stat-num">{vnInt(latest.data.weeklyBudget || 0)} <span className="stat-sub">bài/tuần</span></div>
                   <div className="stat-lbl">{latest.data.summary?.topProduct ? `Dẫn đầu: ${latest.data.summary.topProduct}` : 'Ngân sách gợi ý tuần tới'}</div>
                 </div>
+                {latest.data.summary?.knowledge ? (
+                  <>
+                    <div className="stat-tile" title="Số bản ghi tri thức nội bộ 7 ngày qua (file thả vào bucket kho-tri-thuc-noi-bo).">
+                      <div className="stat-num">{vnInt(latest.data.summary.knowledge.internal || 0)}</div>
+                      <div className="stat-lbl">Nguồn nội bộ (7 ngày)</div>
+                    </div>
+                    <div className="stat-tile" title="Số nguồn tri thức public bot học từ web mỗi Chủ nhật.">
+                      <div className="stat-num">{vnInt(latest.data.summary.knowledge.publicSrc || 0)}</div>
+                      <div className="stat-lbl">Nguồn public (7 ngày)</div>
+                    </div>
+                  </>
+                ) : null}
               </aside>
             </div>
+
+            {latest.data.summary?.knowledge && (
+              latest.data.summary.knowledge.internalHighlights?.length ||
+              latest.data.summary.knowledge.publicHighlights?.length
+            ) ? (
+              <details className="knowledge-detail" style={{ margin: '12px 0' }}>
+                <summary style={{ cursor: 'pointer' }}>
+                  Xem chi tiết nguồn tri thức đã dùng
+                </summary>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+                  <div>
+                    <b>Nội bộ:</b>
+                    {latest.data.summary.knowledge.internalHighlights?.length ? (
+                      <ul>
+                        {latest.data.summary.knowledge.internalHighlights.map((h) => (
+                          <li key={h.id}>
+                            {h.title || '(không tiêu đề)'}
+                            {h.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="sub">chưa có nguồn nội bộ tuần này</p>
+                    )}
+                    <a className="sub" href="/kho-tri-thuc">Mở Kho tri thức</a>
+                  </div>
+                  <div>
+                    <b>Public:</b>
+                    {latest.data.summary.knowledge.publicHighlights?.length ? (
+                      <ul>
+                        {latest.data.summary.knowledge.publicHighlights.map((h) => (
+                          <li key={h.id}>
+                            <a href={h.source_url} target="_blank" rel="noopener noreferrer">
+                              {h.source_title || h.source_url}
+                            </a>
+                            {h.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="sub">chưa có nguồn public tuần này</p>
+                    )}
+                  </div>
+                </div>
+              </details>
+            ) : null}
 
             <div className="plan-actions" style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
               {latest.applied ? (

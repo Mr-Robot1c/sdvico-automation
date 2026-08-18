@@ -693,6 +693,16 @@ a.chip:hover { filter: brightness(0.98); }
 .stat-lbl { font-size: .76rem; color: var(--ink-2); margin-top: 3px; }
 @media (max-width: 860px) { .plan-top { grid-template-columns: 1fr; } }
 
+/* Trang Kho tri thức: hai cột nội bộ và public. */
+.kt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px; }
+.kt-col h2 { margin: 0 0 12px 0; }
+.kt-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.kt-item { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.kt-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.kt-item p { margin: 6px 0 0 0; line-height: 1.55; }
+.kt-item code { font-size: 0.82em; word-break: break-all; }
+@media (max-width: 860px) { .kt-grid { grid-template-columns: 1fr; } }
+
 /* Cột số trong bảng: canh giữa, số cân đều (tabular-nums). Dùng cho Kế hoạch cho đều mắt. */
 .datatable th.num, .datatable td.num { text-align: center; font-variant-numeric: tabular-nums; }
 .datatable th.center, .datatable td.center { text-align: center; }

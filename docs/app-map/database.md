@@ -8,6 +8,7 @@ ttl_days: 180
 <!-- re-verified: 2026-08-14 - Migration 20260813150000 noi CHECK: mkt_posts.channel them 'tiktok', mkt_metrics.source them 'manual'. Cap nhat 2 hang bang tuong ung. -->
 <!-- re-verified: 2026-08-14 - Migration 20260814100000: them cot brand_assets.product_group (folder san pham theo STT) + index. Phuc vu vong xoay dang bai hang ngay theo folder. -->
 <!-- re-verified: 2026-08-14 - Migration 20260814120000: them bang mkt_plans (con bot dinh huong ke hoach tu so lieu Do luong, cron T4 & CN). RLS bat, policy staff. Them 1 hang bang. -->
+<!-- re-verified: 2026-08-18 - Migration 20260818120000_kho_tri_thuc: them 2 bang mkt_knowledge_internal + mkt_knowledge_public cho Ke hoach AI v2 (dac ta docs/app-map/ke-hoach-ai-v2-ba-spec.md). Them bucket Storage kho-tri-thuc-noi-bo (private, RLS authenticated). CHI la nguyen lieu dinh huong, KHONG tu tao bai/hang cho duyet. Da ap len live jwisiccphcepgpabyyco qua db-apply.mjs. -->
 <!-- LUU Y: DATABASE_URL trong .env tro NHAM project cu (schema khac). Migration phai ap len project live jwisiccphcepgpabyyco qua SQL Editor hoac sau khi sua DATABASE_URL. db-apply.mjs da co chot chan ap nham DB. -->
 
 Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp dụng: `supabase/README.md`.
@@ -24,7 +25,9 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 | mkt_posts | Marketing | Bài đã đăng + kênh (facebook/website/youtube/tiktok), external_url | Bật, staff |
 | mkt_metrics | Marketing | Số liệu đo lường (gsc/ga4/facebook/youtube/manual) | Bật, staff |
 | mkt_oauth_tokens | Marketing | Token OAuth cần refresh (TikTok): access/refresh token, hạn. **RLS không policy = chỉ service_role đọc/ghi, không lộ ra giao diện** | Bật, service_role only |
-| mkt_plans | Marketing | Kế hoạch định hướng do bot sinh từ số liệu Đo lường (cron T4 & CN hoặc bấm tay). data jsonb chứa xếp hạng + trọng số + đoạn định hướng; `applied` bật thì vòng xoay ưu tiên theo | Bật, staff |
+| mkt_plans | Marketing | Kế hoạch định hướng do bot sinh từ số liệu Đo lường (cron T4 & CN hoặc bấm tay). data jsonb chứa xếp hạng + trọng số + đoạn định hướng; `applied` bật thì vòng xoay ưu tiên theo; v2 thêm `summary.knowledge` (số nguồn tri thức 7 ngày đã dùng) | Bật, staff |
+| mkt_knowledge_internal | Marketing | Tri thức nội bộ (file trong bucket kho-tri-thuc-noi-bo, Cowork xuất từ Zalo). Cột `source_path` UNIQUE để idempotent. Chỉ nguyên liệu cho Kế hoạch AI | Bật, staff |
+| mkt_knowledge_public | Marketing | Tri thức public bot học mỗi CN từ Gemini google_search grounding. Cột `source_url` bắt buộc khác rỗng. Chỉ nguyên liệu cho Kế hoạch AI | Bật, staff |
 | hr_jobs | Tuyển dụng | Vị trí tuyển dụng | Bật, staff |
 | hr_candidates | Tuyển dụng | Ứng viên, dữ liệu cá nhân (consent_at, retention_until, dedup_key) | Bật, dữ liệu cá nhân |
 | hr_applications | Tuyển dụng | Hồ sơ ứng tuyển, dữ liệu cá nhân | Bật, dữ liệu cá nhân |

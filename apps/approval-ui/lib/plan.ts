@@ -13,6 +13,7 @@
 import type { getServerClient } from './supabase-server';
 // @ts-ignore — module JS thuần
 import { guessGroup } from './gen/products.mjs';
+import { loadRecentKnowledge } from './knowledge';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -42,6 +43,15 @@ export type PlanProduct = ProductAgg & {
   note: string;
 };
 
+export type KnowledgeUsed = {
+  // Số bản ghi tri thức 7 ngày qua được đọc để sinh kế hoạch. Cặp (internal, public).
+  internal: number;
+  publicSrc: number;
+  // Vài mục đáng chú ý để hiển thị trên trang Kế hoạch (giữ nhỏ để không phình mkt_plans.data).
+  internalHighlights: Array<{ id: string; title: string | null; needs_gov_review: boolean }>;
+  publicHighlights: Array<{ id: string; source_title: string | null; source_url: string; needs_gov_review: boolean }>;
+};
+
 export type Plan = {
   generatedAt: string;
   threshold: number;
@@ -57,6 +67,8 @@ export type Plan = {
     totalEngagement: number;
     totalConversions: number;
     topProduct: string | null;
+    // v2: số nguồn tri thức đã dùng cho lần sinh kế hoạch này. Bản v1 không có -> đọc ra undefined.
+    knowledge?: KnowledgeUsed;
   };
 };
 
@@ -195,13 +207,35 @@ export function isPlanDayVN(now: Date): boolean {
 
 // Sinh 1 bản kế hoạch từ số liệu hiện tại rồi lưu vào mkt_plans (applied = false).
 // Bot ĐỀ XUẤT, người quyết (điều cấm 1 và 2). Dùng chung cho cron, action tạo tay, và cron metrics-pull.
+// v2 (18/8/2026): thêm nguyên liệu tri thức (nội bộ + public) 7 ngày qua vào plan.summary.knowledge.
 export async function generateAndStorePlan(
   client: Client,
   generatedBy: 'cron' | 'manual'
 ): Promise<{ id: string | null; plan: Plan }> {
   const now = new Date();
-  const measurement = await loadMeasurement(client);
-  const plan = buildPlan(measurement, { generatedAt: now.toISOString() });
+  const [measurement, knowledge] = await Promise.all([
+    loadMeasurement(client),
+    loadRecentKnowledge(client, 7, 30),
+  ]);
+  const knowledgeUsed: KnowledgeUsed = {
+    internal: knowledge.internal.length,
+    publicSrc: knowledge.publicSrc.length,
+    internalHighlights: knowledge.internal.slice(0, 5).map((k) => ({
+      id: k.id,
+      title: k.title,
+      needs_gov_review: !!k.needs_gov_review,
+    })),
+    publicHighlights: knowledge.publicSrc.slice(0, 5).map((k) => ({
+      id: k.id,
+      source_title: k.source_title,
+      source_url: k.source_url,
+      needs_gov_review: !!k.needs_gov_review,
+    })),
+  };
+  const plan = buildPlan(measurement, {
+    generatedAt: now.toISOString(),
+    knowledge: knowledgeUsed,
+  });
   const win = weekWindowVN(now);
   const { data, error } = await client
     .from('mkt_plans')
@@ -226,13 +260,16 @@ const WEIGHT_BY_TIER: Record<Tier, number> = {
 };
 
 // Sinh kế hoạch từ số liệu. threshold: số bài tối thiểu để xếp hạng. weeklyBudget: số bài/tuần để chia.
+// opts.knowledge (v2): số nguồn tri thức 7 ngày qua đã đọc — hiển thị lên trang Kế hoạch và
+// đi vào narrative để bà con biết bản này bám bao nhiêu nguồn nội bộ + public.
 export function buildPlan(
   m: Measurement,
-  opts: { threshold?: number; weeklyBudget?: number; generatedAt: string } = { generatedAt: '' }
+  opts: { threshold?: number; weeklyBudget?: number; generatedAt: string; knowledge?: KnowledgeUsed } = { generatedAt: '' }
 ): Plan {
   const threshold = opts.threshold ?? 3;
   const weeklyBudget = opts.weeklyBudget ?? 14;
   const generatedAt = opts.generatedAt || '';
+  const knowledge = opts.knowledge;
 
   // Xếp sản phẩm đủ mẫu theo đơn/lead trung bình rồi tương tác trung bình.
   const ranked = m.products
@@ -277,7 +314,8 @@ export function buildPlan(
     totalPosts: m.totals.posts,
     totalEngagement: m.totals.engagement,
     totalConversions: m.totals.conversions,
-    topProduct: rankedPlan[0]?.product || null
+    topProduct: rankedPlan[0]?.product || null,
+    knowledge,
   };
 
   return {
@@ -286,7 +324,7 @@ export function buildPlan(
     weeklyBudget,
     products: all,
     weights,
-    narrative: buildNarrative(all, summary, weeklyBudget, threshold),
+    narrative: buildNarrative(all, summary, weeklyBudget, threshold, knowledge),
     summary
   };
 }
@@ -302,7 +340,8 @@ function buildNarrative(
   all: PlanProduct[],
   s: Plan['summary'],
   weeklyBudget: number,
-  threshold: number
+  threshold: number,
+  knowledge?: KnowledgeUsed
 ): string[] {
   if (s.totalPosts === 0) {
     return [
@@ -311,6 +350,30 @@ function buildNarrative(
   }
 
   const paras: string[] = [];
+
+  // Đoạn mở đầu về nguồn tri thức đã đọc — bám AC-3 và AC-4 trong ba-spec (nếu cả hai == 0
+  // thì phải nói rõ thiếu nguồn, không im lặng bỏ qua).
+  if (knowledge) {
+    const nI = knowledge.internal;
+    const nP = knowledge.publicSrc;
+    if (nI === 0 && nP === 0) {
+      paras.push(
+        'Tuần này bản kế hoạch chỉ dựa trên số đo lường Facebook, chưa có nguồn tri thức nội bộ hay public nào trong 7 ngày qua. Muốn kế hoạch bám thực tế hơn, thả file nội bộ vào Kho tri thức, và chờ bot học nguồn public vào Chủ nhật.'
+      );
+    } else if (nI === 0 && nP > 0) {
+      paras.push(
+        `Tuần này đã học được ${vnInt(nP)} nguồn tri thức public ngành cá, chưa có nguồn nội bộ nào. Bổ sung nguồn nội bộ giúp kế hoạch bám sát chuyện thật của công ty hơn.`
+      );
+    } else if (nI > 0 && nP === 0) {
+      paras.push(
+        `Tuần này đã học được ${vnInt(nI)} bản ghi tri thức nội bộ, chưa có nguồn public nào (bot học vào Chủ nhật).`
+      );
+    } else {
+      paras.push(
+        `Tuần này đã học ${vnInt(nI)} bản ghi tri thức nội bộ và ${vnInt(nP)} nguồn tri thức public ngành cá. Cùng với số đo lường, đây là nguyên liệu cho các đoạn dưới đây.`
+      );
+    }
+  }
 
   // Tổng quan.
   let overview = `Đợt này gom được ${vnInt(s.totalPosts)} bài có số liệu, ${vnInt(s.totalEngagement)} lượt tương tác`;
