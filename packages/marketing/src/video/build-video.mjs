@@ -171,8 +171,19 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   const tags = [...DEFAULT_HASHTAGS, ...(grp ? productHashtags(grp) : [])].join(' ');
   const caption = `${title}\n\nGọi tổng đài 1900 23 23 49 để được tư vấn tận nơi.\n\n${tags}`;
   const risk = script.assessment?.risk === 'red' ? 'red' : script.assessment?.risk === 'amber' ? 'amber' : 'none';
+
+  // Chọn 1 ẢNH SẢN PHẨM để thả vào bình luận đầu của bài video (bà con thấy sản phẩm rõ,
+  // không chỉ có video). Ưu tiên ảnh trong folder sản phẩm này; không có thì để null.
+  let productImageId = null;
+  if (grp) {
+    const { data: imgs } = await client.from('brand_assets')
+      .select('id').eq('kind', 'image').eq('product_group', grp).limit(20);
+    if (imgs && imgs.length) productImageId = imgs[Math.floor(Math.random() * imgs.length)].id;
+  }
+
   // video = fallback dùng ngang; video_h ngang cho FB; video_v dọc cho TikTok.
-  const assets = { image: null, video: videoH, video_h: videoH, video_v: videoV };
+  // image = ảnh sản phẩm thả vào bình luận đầu (publishContentToFacebook tự làm khi có cả video và image).
+  const assets = { image: productImageId, video: videoH, video_h: videoH, video_v: videoV };
   const channels = ['facebook', 'tiktok'];
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: 'social', title,
