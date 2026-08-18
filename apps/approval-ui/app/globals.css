@@ -693,6 +693,40 @@ a.chip:hover { filter: brightness(0.98); }
 .stat-lbl { font-size: .76rem; color: var(--ink-2); margin-top: 3px; }
 @media (max-width: 860px) { .plan-top { grid-template-columns: 1fr; } }
 
+/* BOT chip - noi bat goc duoi phai, hien thi trang thai AI da hoc. */
+.bot-chip-wrap { position: fixed; right: 20px; bottom: 20px; z-index: 9998; }
+.bot-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-radius: 999px;
+  background: linear-gradient(135deg, #1f5fbf 0%, #2a78d6 100%);
+  color: #fff; border: 0; box-shadow: 0 4px 14px rgba(31,95,191,.35);
+  cursor: pointer; font-size: 0.9rem; font-family: inherit;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.bot-chip:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(31,95,191,.45); }
+.bot-chip-icon { font-size: 1.2rem; line-height: 1; }
+.bot-chip-text { line-height: 1.2; }
+.bot-chip-text b { font-weight: 700; }
+.bot-reopen {
+  position: fixed; right: 20px; bottom: 20px; z-index: 9998;
+  width: 44px; height: 44px; border-radius: 999px; border: 0;
+  background: var(--surface-2); box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  cursor: pointer; font-size: 1.4rem;
+}
+.bot-panel {
+  width: 320px; padding: 14px 16px;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.25);
+}
+.bot-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.bot-panel-body p { margin: 6px 0; line-height: 1.5; }
+.bot-panel-links { display: flex; gap: 8px; margin-top: 10px; }
+.bot-x { background: transparent; border: 0; color: var(--ink-2); font-size: 1.4rem; cursor: pointer; padding: 0 6px; }
+.bot-x:hover { color: var(--ink); }
+.bot-dismiss { display: block; margin-top: 10px; padding: 4px 8px; background: transparent; border: 0; color: var(--ink-2); font-size: 0.8rem; text-decoration: underline; cursor: pointer; }
+.btn.sm { padding: 4px 10px; font-size: 0.85rem; }
+
 /* Trang Kế hoạch: khối "Hướng đi tuần tới" - list bài đăng gợi ý sinh từ tri thức. */
 .directions-list { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 10px; }
 .direction-item { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; border-left: 3px solid var(--accent, #2a78d6); }

@@ -2,6 +2,7 @@ import './globals.css';
 import type { ReactNode } from 'react';
 import Nav from './nav';
 import TopHeader from './top-header';
+import BotChip from './bot-chip';
 
 export const metadata = {
   title: 'SDVICO · Duyệt nội dung',
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <div className="content">{children}</div>
           </div>
         </div>
+        <BotChip />
       </body>
     </html>
   );

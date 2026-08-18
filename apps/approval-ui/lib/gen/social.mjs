@@ -49,7 +49,13 @@ export function hashtagBlock(productGroup, extra = []) {
 }
 
 // channel: 'facebook' | 'tiktok'. productName: tên sạch của sản phẩm. hasVideo: có kèm video không.
-export async function generateSocialPost({ productGroup, productName, channel, hasVideo, facts = PRODUCT_FACTS }) {
+// v2 (18/8): angleOverride + preferredHeadline dùng khi rotate bám suggestion từ Kế hoạch AI —
+// bài đăng sẽ đi đúng hướng đi tuần (dựa why từ tri thức) thay vì góc random.
+export async function generateSocialPost({
+  productGroup, productName, channel, hasVideo,
+  facts = PRODUCT_FACTS,
+  angleOverride = null, preferredHeadline = null,
+}) {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -58,7 +64,7 @@ export async function generateSocialPost({ productGroup, productName, channel, h
 
   const features = getFeatures(productGroup);
   const isTikTok = channel === 'tiktok';
-  const angle = ANGLES[Math.floor(Math.random() * ANGLES.length)];
+  const angle = angleOverride || ANGLES[Math.floor(Math.random() * ANGLES.length)];
   const system = [
     'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${productName}". Bắt buộc: nêu rõ tên sản phẩm này, 1 tới 2 lợi ích thật của nó, và MỜI bà con liên hệ SDVICO để mua hoặc lắp đặt (SDVICO phân phối chính hãng, lắp đặt tận bến, bảo hành). Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
@@ -81,6 +87,7 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     features.length ? 'Đặc điểm sản phẩm (nêu đúng, chọn vài ý nổi bật, không thêm thông số ngoài danh sách này):\n- ' + features.join('\n- ') : '',
     hasVideo ? 'Bài có kèm video minh họa.' : 'Bài dùng ảnh minh họa.',
     `Góc tiếp cận lần này: ${angle}.`,
+    preferredHeadline ? `Nếu phù hợp, giữ hoặc bám gần tiêu đề gợi ý: "${preferredHeadline}" (đây là hướng đi tuần từ Kế hoạch AI). Không bắt buộc chép nguyên, nhưng nội dung phải khớp hướng đi này.` : '',
     'Trả về JSON đúng dạng, không thêm chữ ngoài JSON:',
     '{"headline": "tiêu đề ngắn 6 tới 12 từ, riêng biệt, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag)"}',
   ].filter(Boolean).join('\n');
