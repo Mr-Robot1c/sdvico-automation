@@ -6,12 +6,18 @@ import { usePathname } from 'next/navigation';
 
 // Icon SVG nhỏ, đồng phong cách outline 1.5px. Đặt ngay trong file để tránh phụ thuộc lib.
 type IconKey =
-  | 'inbox' | 'briefcase' | 'megaphone' | 'share'
+  | 'home' | 'inbox' | 'briefcase' | 'megaphone' | 'share'
   | 'user' | 'calendar' | 'chart' | 'employees'
   | 'settings' | 'users-cog' | 'source';
 
 function Icon({ name }: { name: IconKey }) {
   const paths: Record<IconKey, JSX.Element> = {
+    home: (
+      <>
+        <path d="M3 11l9-7 9 7" />
+        <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+      </>
+    ),
     inbox: (
       <>
         <path d="M4 13l2.5-7A2 2 0 0 1 8.4 4.7h7.2a2 2 0 0 1 1.9 1.3L20 13" />
@@ -136,6 +142,7 @@ const SECTIONS: Section[] = [
   },
 ];
 
+const OVERVIEW: Item = { href: '/tong-quan', label: 'Tổng quan', icon: 'home' };
 const INBOX: Item = { href: '/', label: 'Duyệt & gửi', icon: 'inbox' };
 const SETTINGS: Item = { href: '/cai-dat', label: 'Cài đặt', icon: 'settings' };
 const SETTINGS_SUB: Item[] = [
@@ -185,6 +192,7 @@ export default function Nav({ pendingCount = 0, user = null }: { pendingCount?: 
       </div>
 
       <nav className="nav-body" aria-label="Điều hướng chính">
+        {renderItem(OVERVIEW)}
         {renderItem(INBOX, true)}
 
         {SECTIONS.map((section) => {

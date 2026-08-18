@@ -465,6 +465,79 @@ select.note { cursor: pointer; }
 }
 .send-failed span { display: block; font-weight: 400; margin-top: 2px; }
 
+/* === Trang Tổng quan === */
+/* 4 KPI trên đầu — bấm được, đi thẳng tới trang xử lý. */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 18px 0 22px;
+}
+@media (max-width: 1100px) { .dash-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px)  { .dash-grid { grid-template-columns: 1fr; } }
+.dash-kpi {
+  display: flex; flex-direction: column; gap: 6px;
+  text-decoration: none; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px;
+  transition: border-color 0.12s, box-shadow 0.12s, transform 0.08s;
+}
+.dash-kpi:hover { border-color: var(--accent); box-shadow: 0 3px 12px rgba(0,0,0,0.06); }
+.dash-kpi:active { transform: translateY(1px); }
+.dash-kpi-label { font-size: 0.85rem; color: var(--ink-2); font-weight: 600; }
+.dash-kpi-value { font-size: 2rem; font-weight: 700; color: var(--ink); line-height: 1.1; }
+.dash-kpi-sub { font-size: 0.82rem; color: var(--ink-2); line-height: 1.4; }
+.dash-kpi--warn { border-left: 4px solid #e5a344; }
+.dash-kpi--warn:hover { border-color: #e5a344; }
+.dash-kpi--warn .dash-kpi-value { color: #b56800; }
+.dash-kpi--accent { border-left: 4px solid var(--accent); }
+.dash-kpi--accent .dash-kpi-value { color: var(--accent); }
+.dash-kpi--danger { border-left: 4px solid var(--no); }
+.dash-kpi--danger .dash-kpi-value { color: var(--no); }
+
+/* Hai cột: sắp tới | hoạt động. Cột trái đủ cho tiêu đề + giờ; cột phải rộng hơn để feed dễ đọc. */
+.dash-two-col {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.5fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+@media (max-width: 900px) { .dash-two-col { grid-template-columns: 1fr; } }
+.dash-panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px;
+}
+.dash-panel-title { margin: 0 0 12px; font-size: 1.05rem; font-weight: 700; }
+.dash-subsection { margin-top: 14px; }
+.dash-subsection:first-of-type { margin-top: 0; }
+.dash-subtitle {
+  margin: 0 0 8px;
+  font-size: 0.88rem; font-weight: 700; color: var(--ink);
+}
+.dash-subtitle .muted { font-weight: 500; font-size: 0.82rem; margin-left: 4px; }
+.dash-subtitle--warn { color: var(--no); }
+.dash-empty { font-size: 0.88rem; margin: 4px 0 0; }
+.dash-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.dash-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 10px; border-radius: 8px; background: var(--surface-2);
+  border: 1px solid transparent;
+}
+.dash-item--warn { background: var(--no-bg); border-color: var(--no); }
+.dash-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dash-item-title {
+  font-size: 0.92rem; font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dash-item-sub { font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-item-time {
+  font-size: 0.8rem; color: var(--ink-2); white-space: nowrap; flex-shrink: 0;
+  text-align: right;
+}
+.dash-item-time--today { color: var(--accent); font-weight: 600; }
+.dash-item-time--ok { color: var(--ok); }
+.dash-item-time--no { color: var(--no); }
+
 /* Trang Báo cáo: thẻ số. Không phụ thuộc lib biểu đồ nào, tất cả CSS ở đây. */
 .report-grid {
   display: grid;
