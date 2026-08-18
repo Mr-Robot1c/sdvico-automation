@@ -3,7 +3,7 @@ import AutoRefresh from '../auto-refresh';
 import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
 import DeleteButton from './delete-button';
-import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
+import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,10 +27,9 @@ function shortCode(id: string): string {
   return (id || '').replace(/-/g, '').slice(0, 6).toUpperCase();
 }
 
+// Ngày + giờ theo giờ VN (user 18/8: "thêm luôn giờ để biết chính xác khi nào").
 function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('vi-VN');
+  return formatDateTimeVN(iso);
 }
 
 type Flags = Record<string, string[] | undefined>;

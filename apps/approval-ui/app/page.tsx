@@ -3,7 +3,7 @@ import AutoRefresh from './auto-refresh';
 import DecideActions from './decide-actions';
 import ViewModal from './view-modal';
 import { editDraft } from './actions';
-import { kindMeta, formatRelative, payloadRows, intentLabel, channelsLabel, purposeLabel, riskMeta, COMPLIANCE_LABELS } from './labels';
+import { kindMeta, formatRelative, formatDateTimeVN, payloadRows, intentLabel, channelsLabel, purposeLabel, riskMeta, COMPLIANCE_LABELS } from './labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 // (Hàng đợi duyệt hiện ảnh/video đã gắn từ payload.assets — build 2026-08-12.)
@@ -273,7 +273,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
               <li key={item.id} className="card tone-mkt">
                 <div className="head">
                   <span className="kind"><span aria-hidden="true">{meta.icon}</span> {meta.label}</span>
-                  <time className="time" dateTime={item.created_at}>{formatRelative(item.created_at)}</time>
+                  <time className="time" dateTime={item.created_at} title={`Tạo lúc ${formatDateTimeVN(item.created_at)}`}>{formatRelative(item.created_at)} · {formatDateTimeVN(item.created_at)}</time>
                 </div>
 
                 <div className="title">{cleanTitle}</div>
@@ -369,7 +369,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                 <span className="kind">
                   <span aria-hidden="true">{meta.icon}</span> {meta.label}
                 </span>
-                <time className="time" dateTime={item.created_at}>{formatRelative(item.created_at)}</time>
+                <time className="time" dateTime={item.created_at} title={`Tạo lúc ${formatDateTimeVN(item.created_at)}`}>{formatRelative(item.created_at)} · {formatDateTimeVN(item.created_at)}</time>
               </div>
 
               <div className="title">{item.title}</div>

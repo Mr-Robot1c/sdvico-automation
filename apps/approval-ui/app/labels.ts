@@ -132,6 +132,17 @@ export const COMPLIANCE_LABELS: Record<string, string> = {
 };
 
 // Thời gian tương đối, dễ đọc hơn mốc tuyệt đối. Cập nhật mỗi lần trang làm mới.
+// Ngày + giờ đầy đủ theo giờ Việt Nam: "18/08/2026 17:05". Ép múi giờ Asia/Ho_Chi_Minh vì
+// server Vercel chạy UTC — toLocaleString mặc định sẽ lệch 7 tiếng (user 18/8: "thêm giờ để
+// biết chính xác khi nào").
+export function formatDateTimeVN(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
+  });
+}
+
 export function formatRelative(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return iso;
