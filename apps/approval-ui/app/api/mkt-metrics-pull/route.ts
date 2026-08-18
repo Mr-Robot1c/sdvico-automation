@@ -33,7 +33,24 @@ export async function GET(req: Request) {
     if (!bearer && !query) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const client = getServerClient();
-  const res = await pullFacebookMetrics(client);
+  const startedAt = Date.now();
+  let res: any;
+  try {
+    res = await pullFacebookMetrics(client);
+  } catch (e: any) {
+    res = { pulled: 0, results: [{ error: String(e?.message || e) }] };
+  }
+  // GHI run_log mỗi lần chạy (18/8: mkt_metrics trống suốt mà không ai biết cron có chạy không
+  // vì route này im lặng). Trang Dữ liệu AI + /api/fb-diag đọc được để chẩn đoán.
+  try {
+    const errs = Array.isArray(res?.results) ? res.results.filter((r: any) => r?.error).map((r: any) => String(r.error).slice(0, 200)) : [];
+    await client.from('run_log').insert({
+      task: 'mkt.metrics_pull',
+      actor: 'cron',
+      status: errs.length && !(res?.pulled > 0) ? 'error' : 'ok',
+      detail: { pulled: res?.pulled ?? 0, errors: errs.slice(0, 5), ms: Date.now() - startedAt },
+    });
+  } catch { /* không để lỗi ghi log làm hỏng cron */ }
 
   // HẰNG NGÀY — AI Data #1: import file mới từ bucket Kho tri thức nội bộ (zalo-insight
   // phiên 16:00 đẩy lên). Idempotent theo source_path, file cũ tự bỏ qua.
