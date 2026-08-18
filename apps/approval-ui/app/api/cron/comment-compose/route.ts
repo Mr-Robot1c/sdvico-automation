@@ -51,7 +51,9 @@ async function classifyComment(comment: string): Promise<'muon_biet_them' | 'tic
     'Chỉ trả về JSON: {"nhan": "muon_biet_them"|"tich_cuc"|"khac"}, không kèm chữ nào khác.',
   ].join('\n');
   try {
-    const text = await groqChat(system, comment, { json: true, temperature: 0, maxTokens: 40 });
+    // 256 token: model suy luận (gpt-oss) cần đủ chỗ cho phần suy luận rồi mới trả JSON;
+    // 40 token khiến nó trả 400 json_validate_failed và luôn rơi về phân loại bằng regex.
+    const text = await groqChat(system, comment, { json: true, temperature: 0, maxTokens: 256 });
     if (!text) return fallback;
     const obj = JSON.parse(text) as { nhan?: string };
     if (obj.nhan === 'muon_biet_them' || obj.nhan === 'tich_cuc' || obj.nhan === 'khac') return obj.nhan;

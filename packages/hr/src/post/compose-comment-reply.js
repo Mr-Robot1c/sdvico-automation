@@ -51,7 +51,9 @@ export async function classifyComment(comment, { apiKey = process.env.GROQ_API_K
     const completion = await groq.chat.completions.create({
       model: MODEL,
       temperature: 0,
-      max_tokens: 40,
+      // 256 token: model suy luận (gpt-oss) cần chỗ cho suy luận rồi mới trả JSON; 40 token
+      // khiến nó lỗi json_validate_failed và luôn rơi về phân loại bằng regex.
+      max_tokens: 256,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: classifyPrompt() },
