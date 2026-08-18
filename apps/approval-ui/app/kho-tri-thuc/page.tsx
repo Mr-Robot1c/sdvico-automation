@@ -57,10 +57,10 @@ export default async function Page() {
     <main>
       <header className="head-row">
         <div>
-          <h1>Kho tri thức</h1>
+          <h1>Nguồn</h1>
           <p className="sub">
-            Hai nguồn nguyên liệu cho bot Kế hoạch AI. Bên trái là bản ghi nội bộ (từ file thả vào bucket kho-tri-thuc-noi-bo).
-            Bên phải là bản ghi public bot tự học mỗi Chủ nhật. Kho này không tự đăng bài, chỉ là nguyên liệu định hướng.
+            Những gì các AI đã học được để làm nguyên liệu cho Kế hoạch. Bên trái là nguồn nội bộ (AI Data 1 đọc từ file Zalo thả vào bucket kho-tri-thuc-noi-bo, cộng kết luận A/B của AI Đánh giá).
+            Bên phải là nguồn public (AI Data 2 tự lên mạng học mỗi ngày). Kho này không tự đăng bài, chỉ là nguyên liệu định hướng. Xem AI học tới đâu ở trang <a href="/du-lieu-ai">Dữ liệu</a>.
           </p>
         </div>
       </header>

@@ -30,9 +30,17 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
-      { href: '/kho-tri-thuc', label: 'Kho tri thức', icon: '🧠' },
       { href: '/do-luong', label: 'Đo lường', icon: '📈' },
       { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' }
+    ]
+  };
+  // Nhóm AI (user 18/8): Nguồn = tri thức các AI đã học (nội bộ + public); Dữ liệu = 5 AI
+  // đang học tới đâu, kết quả gì — để người quản lý biết AI có thật sự học hay không.
+  const ai: Group = {
+    title: 'AI',
+    items: [
+      { href: '/kho-tri-thuc', label: 'Nguồn', icon: '🧠' },
+      { href: '/du-lieu-ai', label: 'Dữ liệu', icon: '🤖' }
     ]
   };
   const hangDoi: Group = {
@@ -44,10 +52,11 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   };
 
   const groups: Group[] = marketingOnly
-    ? [hangDoi, quanLySanXuat, ketNoi, quyTac]
+    ? [hangDoi, quanLySanXuat, ai, ketNoi, quyTac]
     : [
         hangDoi,
         quanLySanXuat,
+        ai,
         {
           title: 'Tuyển dụng',
           items: [
