@@ -178,7 +178,17 @@ async function publishContentToFacebook(
     const json: any = await res.json();
     if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
     // /videos trả {id: videoId}; /feed và /photos trả {id} hoặc {post_id}.
-    const postId = json.post_id || json.id;
+    // /photos nhiều lúc CHỈ trả {id} = id ẢNH (18/8: 2 bài lưu id ảnh -> kéo số liệu hỏi `shares`
+    // + /insights bị FB từ chối). Bài đăng ngay thì hỏi thêm `page_story_id` để lấy id BÀI chứa
+    // ảnh; bài hẹn giờ chưa có bài -> giữ id ảnh, lệnh kéo số liệu sẽ tự phân giải sau khi lên.
+    let postId: string = json.post_id || json.id;
+    if (!videoUrl && imageUrl && !json.post_id && !scheduledUnix && json.id) {
+      try {
+        const pr = await fetch(`https://graph.facebook.com/${VERSION}/${json.id}?fields=page_story_id&access_token=${encodeURIComponent(TOKEN)}`);
+        const pj: any = await pr.json();
+        if (pj?.page_story_id) postId = String(pj.page_story_id);
+      } catch { /* giữ id ảnh */ }
+    }
     const externalUrl = videoUrl
       ? `https://www.facebook.com/${PAGE_ID}/videos/${json.id}`
       : `https://www.facebook.com/${postId}`;
@@ -256,6 +266,9 @@ async function publishContentToFacebook(
         detail: {
           contentId,
           videoId: videoUrl ? json.id : null,
+          graphId: json.id || null,
+          postId,
+          scheduledAt: scheduledAt || null,
           externalUrl,
           hasImage: !!imageUrl,
           hasVideo: !!videoUrl,
@@ -960,13 +973,15 @@ export async function deleteContent(formData: FormData) {
   const id = String(formData.get('content_id') || '');
   if (!id) return;
   const client = getServerClient();
-  // Chạy 4 DELETE SONG SONG (trước đây tuần tự nên chờ 4 round-trip Supabase = lag/treo).
+  // 3 bảng con xóa SONG SONG, rồi mới xóa mkt_content. Trước đây xóa cả 4 cùng lúc: FK
+  // mkt_posts.content_id ON DELETE SET NULL chạy trước lệnh xóa mkt_posts -> để lại dòng mồ côi
+  // content_id=null (18/8 thấy 2 dòng như vậy), lệnh kéo số liệu bỏ qua mà không ai biết.
   await Promise.all([
     client.from('approval_queue').delete().eq('payload->>content_id', id),
     client.from('mkt_posts').delete().eq('content_id', id),
-    client.from('mkt_metrics').delete().eq('entity_ref', id),
-    client.from('mkt_content').delete().eq('id', id)
+    client.from('mkt_metrics').delete().eq('entity_ref', id)
   ]);
+  await client.from('mkt_content').delete().eq('id', id);
   revalidatePath('/do-luong');
   revalidatePath('/noi-dung');
   revalidatePath('/');

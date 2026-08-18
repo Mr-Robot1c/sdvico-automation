@@ -46,6 +46,22 @@ async function fetchJsonWithTimeout(url: string, token: string, timeoutMs = 8000
   }
 }
 
+// Loại node Graph đứng sau external_url. Quan trọng vì mỗi loại có trường KHÁC nhau:
+//  - post  ("<PAGEID>_<POSTID>", hoặc /reel/<id>): đủ reactions, comments, `shares` và /insights.
+//  - photo ("<id>" thuần số — /photos trả id ẢNH, không phải id bài; thấy 18/8): KHÔNG có `shares`,
+//    KHÔNG có /insights -> hỏi `page_story_id` để lấy id BÀI chứa ảnh rồi hỏi như post.
+//  - video (".../<pageid>/videos/<id>"): node Video KHÔNG có `shares` -> bài chứa video là post
+//    "<pageid>_<videoid>"; lượt xem/giây xem vẫn lấy qua video_insights của node Video.
+// Trước 18/8 code hỏi `shares` trên mọi node -> FB trả "(#100) nonexisting field (shares)" cho
+// bài ảnh + bài video -> cả bài bị bỏ, mkt_metrics trống suốt mà không ai biết.
+type NodeKind = 'post' | 'photo' | 'video';
+function classify(url: string, objId: string): { kind: NodeKind; pageId: string | null } {
+  const mVideo = url.match(/facebook\.com\/(\d+)\/videos\/(\d+)/);
+  if (mVideo) return { kind: 'video', pageId: mVideo[1] };
+  if (/\/reel\//.test(url) || objId.includes('_')) return { kind: 'post', pageId: null };
+  return { kind: 'photo', pageId: null };
+}
+
 export async function pullFacebookMetrics(client: Client): Promise<{ pulled: number; results: any[] }> {
   const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
   const TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
@@ -53,7 +69,7 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
 
   const { data: posts } = await client
     .from('mkt_posts')
-    .select('content_id, external_url')
+    .select('id, content_id, external_url')
     .eq('channel', 'facebook')
     .eq('status', 'published')
     .not('external_url', 'is', null)
@@ -61,31 +77,56 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
     .limit(80);
 
   // Khử trùng theo bài (một bài có thể đăng nhiều lần) — chỉ lấy bản mới nhất, đỡ gọi thừa.
+  // Bài đăng dạng Reel (/reel/) đi kèm bài Post gộp: bỏ qua ở đây, đo Post là chính.
   const seen = new Set<string>();
-  const targets: { cid: string; objId: string; isVideo: boolean }[] = [];
+  const targets: { rowId: string; cid: string; objId: string; url: string; kind: NodeKind; pageId: string | null }[] = [];
   for (const p of posts || []) {
     const cid = (p as any).content_id as string | null;
     const url = (p as any).external_url as string | null;
     const objId = objectIdFromUrl(url);
-    if (!cid || !objId || seen.has(cid)) continue;
+    if (!cid || !objId || !url || seen.has(cid)) continue;
+    if (/\/reel\//.test(url)) continue;
     seen.add(cid);
-    targets.push({ cid, objId, isVideo: /\/videos\//.test(url || '') });
+    const { kind, pageId } = classify(url, objId);
+    targets.push({ rowId: (p as any).id, cid, objId, url, kind, pageId });
   }
 
   const day = todayVN();
+  const graph = (path: string, ms = 8000) => fetchJsonWithTimeout(`https://graph.facebook.com/${VERSION}/${path}`, TOKEN, ms);
 
   // Gọi Graph API song song (tối đa 8 việc cùng lúc), mỗi request có timeout riêng.
-  const results = await mapPool(targets, 8, async ({ cid, objId, isVideo }) => {
+  const results = await mapPool(targets, 8, async ({ rowId, cid, objId, kind, pageId }) => {
     try {
-      const j = await fetchJsonWithTimeout(
-        `https://graph.facebook.com/${VERSION}/${objId}?fields=reactions.summary(total_count),comments.summary(total_count),shares`,
-        TOKEN
-      );
-      if (j?.error) return { contentId: cid, objId, error: j.error.message } as any;
+      // 1) Tìm node BÀI (post) để hỏi reactions/comments/shares.
+      let postId: string | null = kind === 'post' ? objId : null;
+      const note: string[] = [];
+      if (kind === 'photo') {
+        const pj = await graph(`${objId}?fields=page_story_id`);
+        if (pj?.page_story_id) {
+          postId = String(pj.page_story_id);
+          // Tự chữa: lưu id BÀI vào external_url để lần sau hỏi thẳng, link cũng mở đúng bài.
+          await client.from('mkt_posts').update({ external_url: `https://www.facebook.com/${postId}` }).eq('id', rowId);
+        } else {
+          note.push(pj?.error ? `photo: ${pj.error.message}` : 'photo: chưa có page_story_id (bài hẹn giờ chưa lên?)');
+        }
+      } else if (kind === 'video' && pageId) {
+        postId = `${pageId}_${objId}`;
+      }
+
+      // 2) Hỏi tương tác. Có post -> hỏi post đủ 3 chỉ số; lỗi -> lùi về hỏi node gốc không `shares`.
+      const askPost = postId ? await graph(`${postId}?fields=reactions.summary(total_count),comments.summary(total_count),shares`) : null;
+      let j: any = askPost && !askPost.error ? askPost : null;
+      if (!j) {
+        if (askPost?.error) note.push(`post ${postId}: ${askPost.error.message}`);
+        j = await graph(`${objId}?fields=reactions.summary(total_count),comments.summary(total_count)`);
+        if (j?.error) return { contentId: cid, objId, error: j.error.message, note } as any;
+        if (kind !== 'post') postId = null; // không có node bài dùng được -> khỏi hỏi /insights bài
+      }
       const reactions = j?.reactions?.summary?.total_count ?? 0;
       const comments = j?.comments?.summary?.total_count ?? 0;
       const shares = j?.shares?.count ?? 0;
       const metrics: any = { reactions, comments, shares, engagement: reactions + comments + shares };
+      const isVideo = kind === 'video';
 
       // Chỉ số CẦN read_insights: lượt xem + số giây xem. Gọi RIÊNG + try/catch từng cái để một
       // metric lỗi (thiếu quyền / sai tên) không làm mất chỉ số khác. Thiếu quyền -> để trống.
@@ -97,7 +138,7 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
       };
       const grab = async (path: string, key: string, pick: (r: any) => number | null) => {
         try {
-          const r = await fetchJsonWithTimeout(`https://graph.facebook.com/${VERSION}/${path}`, TOKEN, 6000);
+          const r = await graph(path, 6000);
           if (r?.error) { insightErr.push(`${key}: ${r.error.message}`); return; }
           const v = pick(r);
           if (v != null && !Number.isNaN(v)) metrics[key] = v;
@@ -107,19 +148,23 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
       };
       if (isVideo) {
         // Lượt xem video + tổng thời gian xem (ms -> giây) + số NGƯỜI xem (unique = reach).
+        // video_insights nằm trên node VIDEO (objId), không phải node bài.
         await grab(`${objId}/video_insights?metric=total_video_views`, 'views', (r) => valOf(r, 'total_video_views'));
         await grab(`${objId}/video_insights?metric=total_video_view_total_time`, 'watchSec', (r) => {
           const ms = valOf(r, 'total_video_view_total_time');
           return ms == null ? null : Math.round(ms / 1000);
         });
         await grab(`${objId}/video_insights?metric=total_video_views_unique`, 'reach', (r) => valOf(r, 'total_video_views_unique'));
-      } else {
+      } else if (postId) {
         // Bài ảnh/chữ: lượt hiển thị (impressions) = "lượt xem"; số NGƯỜI thấy (unique) = "người xem" (reach).
-        await grab(`${objId}/insights?metric=post_impressions`, 'views', (r) => valOf(r, 'post_impressions'));
-        await grab(`${objId}/insights?metric=post_impressions_unique`, 'reach', (r) => valOf(r, 'post_impressions_unique'));
+        // /insights chỉ có trên node BÀI (postId), node ảnh không có.
+        await grab(`${postId}/insights?metric=post_impressions`, 'views', (r) => valOf(r, 'post_impressions'));
+        await grab(`${postId}/insights?metric=post_impressions_unique`, 'reach', (r) => valOf(r, 'post_impressions_unique'));
+      } else {
+        insightErr.push('views/reach: chưa có id bài để hỏi /insights');
       }
 
-      return { contentId: cid, objId, metrics, insightErr: insightErr.length ? insightErr : undefined } as any;
+      return { contentId: cid, objId, postId, metrics, note: note.length ? note : undefined, insightErr: insightErr.length ? insightErr : undefined } as any;
     } catch (e: any) {
       return { contentId: cid, objId, error: String(e?.message || e) } as any;
     }

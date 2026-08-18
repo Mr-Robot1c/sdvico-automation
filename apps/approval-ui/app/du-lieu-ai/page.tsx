@@ -1,5 +1,6 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { vnInt } from '../../lib/plan';
+import { metricsAlert } from '../../lib/metrics-alert';
 
 // Trang "Dữ liệu" (nhóm AI, user 18/8): 5 AI trong vòng lặp kín (docs/flowchart-v3.html)
 // đang học tới đâu, kết quả gì — để người quản lý biết AI có THẬT SỰ học hay không.
@@ -102,14 +103,13 @@ export default async function Page() {
 
   // Cảnh báo ĐÓI ở đầu trang (cùng logic /api/bot-status): AI nào quá lâu không học, số liệu
   // FB có kéo về không — kèm nguyên nhân khả dĩ để người quản lý biết phải kiểm chỗ nào.
-  const { data: lastMetricRow } = await client.from('mkt_metrics').select('created_at').order('created_at', { ascending: false }).limit(1);
+  // Phần Đo lường: đọc run_log lượt kéo gần nhất để nói ĐÚNG lỗi Facebook trả (lib/metrics-alert.ts).
+  const metric = await metricsAlert(client);
   const hrs = (iso?: string | null) => (iso ? (Date.now() - new Date(iso).getTime()) / 3600000 : Infinity);
-  const hM = hrs((lastMetricRow || [])[0]?.created_at as string | undefined);
   const alerts: string[] = [];
   if (hrs(d1Last) > 30) alerts.push(d1Last ? `AI Data 1 đã ${Math.floor(hrs(d1Last))} giờ không có bản ghi nội bộ mới — phiên đọc Zalo hôm nay có chạy không, file đã lên bucket chưa (task Windows SDVICO-DayKhoZalo 8:15 / 16:30 / 20:30)?` : 'AI Data 1 chưa học nội bộ bao giờ.');
   if (hrs(d2Last) > 30) alerts.push(d2Last ? `AI Data 2 đã ${Math.floor(hrs(d2Last))} giờ không có nguồn public mới — cron mkt-metrics-pull (chạy học public mỗi ngày) có thể đang không chạy.` : 'AI Data 2 chưa học public bao giờ.');
-  if (hM === Infinity) alerts.push('Chưa có số liệu Facebook nào được kéo về (bảng Đo lường trống). Cron GitHub mkt-metrics-pull chưa chạy hoặc CRON_SECRET lệch — BOSS và Evaluator không có số để học. Kiểm tra GitHub Actions hoặc bấm "Cập nhật số liệu" ở trang Đo lường.');
-  else if (hM > 26) alerts.push(`Đã ${Math.floor(hM)} giờ không kéo số liệu Facebook — cron GitHub có thể đã dừng.`);
+  if (metric.alert) alerts.push(`Đo lường: ${metric.alert.message} BOSS và Evaluator chưa có số để học.`);
 
   const cards = [
     {
