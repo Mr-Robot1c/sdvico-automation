@@ -167,7 +167,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               {latest.data.cadence === 'weekly' ? (
                 <span className="badge">📅 Kế hoạch tuần (Thứ 2)</span>
               ) : latest.data.cadence === 'update' ? (
-                <span className="badge">🔁 Cập nhật giữa tuần (Thứ 4)</span>
+                <span className="badge">🔁 Cập nhật giữa tuần (Thứ 6)</span>
               ) : null}
               <span className="sub">Sinh lúc {fmtDateTime(latest.created_at)}</span>
               {latest.period_start ? (

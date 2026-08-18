@@ -32,7 +32,7 @@ ttl_days: 90
 |---|---|---|---|---|---|---|
 | NV1 | Nạp tri thức nội bộ vào Kho tri thức (thả file đã trích xuất từ Zalo vào bucket) | Nhân viên phụ trách nạp tri thức nội bộ | Hệ thống Kế hoạch AI (đọc lại làm nguyên liệu) | — | tuỳ ý, không bắt buộc mỗi tuần | Must — build khung ngay, việc vận hành chờ Bạn B giao người (xem §11) |
 | NV2 | Tự học tri thức public ngành cá/thủy sản | Hệ thống Kế hoạch AI | — | — | mỗi ngày (RSS); Chủ nhật thêm lượt quét sâu | Must |
-| NV3 | Tổng hợp và sinh Kế hoạch (kèm hướng đi cho Creator) | Hệ thống Kế hoạch AI | Bạn B (nhận để xem) | NV2 (bắt buộc), NV1 (tuỳ có) | Thứ 2 từ 8h sáng (kế hoạch tuần) và Thứ 4 từ 8h sáng (cập nhật lần 1); mỗi ngày tối đa 1 bản tự động | Must |
+| NV3 | Tổng hợp và sinh Kế hoạch (kèm hướng đi cho Creator) | Hệ thống Kế hoạch AI | Bạn B (nhận để xem) | NV2 (bắt buộc), NV1 (tuỳ có) | Thứ 2 từ 8h sáng (kế hoạch tuần) và Thứ 6 từ 8h sáng (cập nhật lần 1, đủ 4 ngày số liệu); mỗi ngày tối đa 1 bản tự động | Must |
 | NV4 | Xem, duyệt và áp dụng Kế hoạch tuần (mở rộng hiển thị nguồn học của bản v1 đã có) | Bạn B | Hệ thống Dây chuyền nội dung (nhận trọng số) | NV3 | mỗi tuần | Must |
 | NV5 | Đề xuất và duyệt mục tiêu SEO backlink theo từ khóa | Hệ thống (đề xuất), Bạn B (duyệt) | Phòng Kinh doanh (nếu mục tiêu chạm nội dung sản phẩm/giá) | — | theo lô | Should — chờ chốt phạm vi, xem §11 |
 | NV6 | Dựng thêm bản Video Shorts 10-20 giây cho đa kênh | Hệ thống Dây chuyền video (đã có) | Bạn B (duyệt như video hiện tại) | — | mỗi video được yêu cầu | Should |
@@ -41,7 +41,7 @@ ttl_days: 90
 | NV9 | Đo lường hiệu quả AD (CPC, điểm chạm) | Hệ thống (đọc report Ads) | Bạn B (xem ở Đo lường) | NV8 | định kỳ | Should |
 | NV10 | Giao mục tiêu tuần cho Kế hoạch AI (flowchart v3: khối MỤC TIÊU) | Bạn B / Sếp | Hệ thống Kế hoạch AI (đọc khi sinh kế hoạch và hướng đi) | — | mỗi tuần hoặc khi đổi ưu tiên | Must |
 | NV11 | Sinh cặp bài thử A/B cho một hướng đi (flowchart v3: AI Creator) | Hệ thống Dây chuyền nội dung | Bạn B (duyệt cả cặp như bài thường) | NV3 (có hướng đi) | mỗi lần vòng xoay chạy có hướng đi chưa dùng | Must |
-| NV12 | Đánh giá cặp A/B và ghi kết quả ngược về Kho tri thức (flowchart v3: AI Evaluator, vòng lặp kín) | Hệ thống Kế hoạch AI | — | NV11 (có cặp) + số liệu Đo lường | Thứ 4 và Chủ nhật, trước khi sinh kế hoạch | Must |
+| NV12 | Đánh giá cặp A/B và ghi kết quả ngược về Kho tri thức (flowchart v3: AI Evaluator, vòng lặp kín) | Hệ thống Kế hoạch AI | — | NV11 (có cặp) + số liệu Đo lường | hằng ngày (kết luận ghi đè theo cặp, số liệu lớn dần tự cập nhật) | Must |
 
 > NV1, NV5, NV8, NV7 có phần **bị khoá bởi quyết định người khác chưa chốt** — không phải nghiệp vụ mồ côi, chỉ chưa đủ điều kiện build phần vận hành thật. Chi tiết Scope §7 và Open questions §11.
 
@@ -218,15 +218,15 @@ ttl_days: 90
 
 ### AC-3 — Kế hoạch nêu rõ số nguồn tri thức đã dùng · Maps to flow: NV3 · Test: integration
 - **Given** đã có số đo lường 7 ngày qua, và có thể có hoặc không có bản ghi tri thức nội bộ và public trong 7 ngày qua
-- **When** tiến trình sinh kế hoạch chạy (Thứ 2 kế hoạch tuần, Thứ 4 cập nhật lần 1, hoặc chạy tay)
+- **When** tiến trình sinh kế hoạch chạy (Thứ 2 kế hoạch tuần, Thứ 6 cập nhật lần 1, hoặc chạy tay)
 - **Then** bản kế hoạch mới có một trường ghi rõ số bản ghi tri thức đã dùng theo từng loại (nội bộ, public); nếu một loại bằng 0 thì đoạn định hướng phải nêu rõ việc thiếu nguồn đó bằng chữ, không được bỏ qua im lặng
 - **Assert**: bản kế hoạch mới có trường số nguồn tri thức là một cặp số nguyên không âm (nội bộ, public); nếu cả hai == 0 thì đoạn định hướng chứa cụm từ nêu rõ thiếu nguồn (kiểm bằng so khớp chuỗi)
 
 ### AC-14 — Mỗi ngày tối đa một bản kế hoạch tự động, đúng khung giờ · Maps to flow: NV3 · Test: integration
-- **Given** hôm nay là Thứ 2 hoặc Thứ 4 theo giờ Việt Nam và tiến trình định kỳ chạy nhiều lần trong ngày (mỗi 30 phút)
+- **Given** hôm nay là Thứ 2 hoặc Thứ 6 theo giờ Việt Nam và tiến trình định kỳ chạy nhiều lần trong ngày (mỗi 30 phút)
 - **When** các lần chạy trước 8 giờ sáng và các lần chạy sau khi đã có bản tự động trong ngày đi qua
-- **Then** trước 8 giờ sáng không bản tự động nào được sinh; từ 8 giờ sáng chỉ lần chạy đầu tiên sinh đúng một bản (Thứ 2 mang nhãn kế hoạch tuần, Thứ 4 mang nhãn cập nhật giữa tuần, kèm hướng đi), các lần sau trong ngày không sinh thêm
-- **Assert**: số bản kế hoạch nguồn tự động tạo trong một ngày Việt Nam <= 1, bản đó có thời điểm tạo >= 8 giờ sáng giờ Việt Nam và trường nhịp == "weekly" (Thứ 2) hoặc "update" (Thứ 4)
+- **Then** trước 8 giờ sáng không bản tự động nào được sinh; từ 8 giờ sáng chỉ lần chạy đầu tiên sinh đúng một bản (Thứ 2 mang nhãn kế hoạch tuần, Thứ 6 mang nhãn cập nhật giữa tuần, kèm hướng đi), các lần sau trong ngày không sinh thêm
+- **Assert**: số bản kế hoạch nguồn tự động tạo trong một ngày Việt Nam <= 1, bản đó có thời điểm tạo >= 8 giờ sáng giờ Việt Nam và trường nhịp == "weekly" (Thứ 2) hoặc "update" (Thứ 6)
 
 ### AC-4 — Không tự tạo nội dung hay hàng chờ duyệt từ bước học tri thức · Maps to flow: NV2, NV3 · Test: integration
 - **Given** một bản ghi tri thức nguồn public có cờ cần duyệt cấp quản lý
@@ -309,3 +309,4 @@ ttl_days: 90
 - v1.3 (2026-08-18): khép VÒNG LẶP KÍN theo flowchart v3 của Bạn B (docs/flowchart-v3.html, 4 vai AI): thêm NV10 (người giao mục tiêu tuần cho BOSS — khối MỤC TIÊU), NV11 (Creator sinh cặp bài thử A/B cho một hướng đi, 2 bài bán + 1 content = đúng hạn mức 3/ngày), NV12 (Evaluator so cặp A/B theo tương tác FB rồi ghi kết luận ngược về Kho tri thức nội bộ — nhờ đó BOSS và mọi lần sinh kế hoạch sau tự học, không cần bảng mới). Thước đo A/B tạm dùng tương tác vì AD trả phí đang hoãn; khi AD chạy sẽ nâng lên CPC + điểm chạm đúng flowchart. Thêm AC-11, AC-12, AC-13.
 - v1.4 (2026-08-18): NV10 nới rõ — mục tiêu tuần ĐƯỢC PHÉP TRỐNG, khi trống BOSS tự định hướng từ dữ liệu các AI đã học (người dùng chốt "đôi khi tôi không biết làm gì thì BOSS cứ dựa vào dữ liệu"); narrative và prompt hướng đi phải nói rõ đang tự định hướng. NV6 chuyển vào IN: bài thuộc cặp A/B tự dựng video chế độ Shorts (kịch bản 2-3 cảnh, lõi 10-18 giây), bài video kế thừa biến thể, mã cặp video = mã cặp nguồn + "-video" để Evaluator so cặp video tách khỏi cặp text. Sửa AC-8 theo flow thật (video là bài mới kế thừa cặp, không phải tệp gắn vào bài cũ). NV4 thêm: xem lại bản kế hoạch cũ từ lịch sử, và sau khi Áp dụng phải thông báo tóm tắt bản áp dụng (ưu tiên vòng xoay, số hướng đi, mục tiêu).
 - v1.5 (2026-08-18): chốt NHỊP VÒNG LẶP theo lời user ("AI data 1 lấy data Zalo mỗi ngày, AI data 2 lên mạng học mỗi ngày, Thứ 4 8h sáng cập nhật kế hoạch lần 1, Chủ nhật thu thập tổng, Thứ 2 ra kế hoạch tuần"): NV2 đổi tần suất sang HẰNG NGÀY qua Google News RSS (không quota), Chủ nhật thêm lượt quét sâu Gemini grounding (lỗi 429 bỏ qua); NV3 đổi lịch sinh sang Thứ 2 từ 8h (kế hoạch tuần, cadence weekly) + Thứ 4 từ 8h (cập nhật lần 1, cadence update), mỗi ngày tối đa 1 bản tự động (chặn spam cron 30 phút — lỗi nhịp cũ); Evaluator chuyển sang chạy HẰNG NGÀY (chỉ query, verdict upsert). Mỗi bản kế hoạch (kể cả bấm tay) TỰ KÈM hướng đi qua lib/plan-directions.ts — chỉ đạo Creator không còn phụ thuộc chạy script tay. Sửa AC-2 (hằng ngày + không trùng URL 30 ngày), AC-3 (thêm Thứ 4), thêm AC-14 (khung giờ + chặn trùng).
+- v1.6 (2026-08-18): dời bản cập nhật lần 1 từ Thứ 4 sang THỨ 6 từ 8h sáng (user: "cho nó xa tí, vậy mới có số liệu" — bài kế hoạch Thứ 2 chạy được 4 ngày mới đủ tương tác để cập nhật có căn cứ). NV12 ghi đúng tần suất hằng ngày (đã chạy vậy từ v1.5). Sửa NV3, AC-3, AC-14 theo. Hệ thống bắt đầu ĐƯA VÀO HOẠT ĐỘNG THẬT từ tuần này.

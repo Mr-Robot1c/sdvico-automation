@@ -225,7 +225,8 @@ export function isPlanDayVN(now: Date): boolean {
 }
 
 // Nhịp MỚI (user chốt 18/8, flowchart v3): Thứ 2 từ 8h sáng VN = kế hoạch TUẦN (BOSS đã gom
-// đủ thông tin Chủ nhật); Thứ 4 từ 8h sáng VN = CẬP NHẬT lần 1 giữa tuần. Ngoài 2 khung đó
+// đủ thông tin Chủ nhật); Thứ 6 từ 8h sáng VN = CẬP NHẬT lần 1 (user dời từ Thứ 4 sang Thứ 6
+// "cho nó xa tí, vậy mới có số liệu" — 4 ngày bài chạy sau kế hoạch Thứ 2). Ngoài 2 khung đó
 // không sinh. Cron 30 phút/lần nên chỗ gọi phải tự chặn trùng (1 bản cron mỗi ngày).
 export function planSlotVN(now: Date): 'weekly' | 'update' | null {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
@@ -233,7 +234,7 @@ export function planSlotVN(now: Date): 'weekly' | 'update' | null {
   const hour = vn.getUTCHours();
   if (hour < 8) return null;
   if (dow === 1) return 'weekly';
-  if (dow === 3) return 'update';
+  if (dow === 5) return 'update';
   return null;
 }
 

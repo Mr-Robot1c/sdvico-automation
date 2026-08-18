@@ -16,7 +16,7 @@ import { evaluateAbPairs } from '../../../lib/evaluator';
 //   CHỦ NHẬT  : thêm lượt quét public SÂU bằng Gemini grounding (hay 429, lỗi bỏ qua)
 //               — ngày BOSS "thu thập tổng" trước kế hoạch tuần
 //   THỨ 2 8h+ : BOSS sinh KẾ HOẠCH TUẦN (cadence weekly) từ mọi thứ đã gom, TỰ KÈM hướng đi
-//   THỨ 4 8h+ : BOSS sinh bản CẬP NHẬT lần 1 giữa tuần (cadence update)
+//   THỨ 6 8h+ : BOSS sinh bản CẬP NHẬT lần 1 (cadence update) — 4 ngày số liệu sau Thứ 2
 //   Chặn trùng: mỗi ngày chỉ 1 bản cron (đếm mkt_plans generated_by=cron từ đầu ngày VN) —
 //   trước đây thiếu chốt này nên ngày kế hoạch cron 30 phút sinh bản mới liên tục.
 // Gộp ở đây vì Vercel Hobby chỉ cho 2 cron, và kế hoạch nên bám số liệu vừa cập nhật.
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
     console.error('[evaluator] so cap A/B that bai:', e?.message || e);
   }
 
-  // THỨ 2 (kế hoạch tuần) + THỨ 4 (cập nhật lần 1), từ 8h sáng VN, mỗi ngày đúng 1 bản cron.
+  // THỨ 2 (kế hoạch tuần) + THỨ 6 (cập nhật lần 1), từ 8h sáng VN, mỗi ngày đúng 1 bản cron.
   // Bản sinh ra TỰ KÈM hướng đi (generateAndStorePlan gọi Gemini directions bên trong).
   let plan: { id: string | null; ranked: number; cadence: string; directions: number } | { skipped: string } | null = null;
   const slot = planSlotVN(new Date());
