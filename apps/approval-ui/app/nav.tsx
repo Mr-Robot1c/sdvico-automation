@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+
+const NAV_STORAGE_KEY = 'sdvico-nav-open';
 
 // Icon SVG nhỏ, đồng phong cách outline 1.5px. Đặt ngay trong file để tránh phụ thuộc lib.
 type IconKey =
@@ -157,6 +159,33 @@ export default function Nav({ pendingCount = 0, user = null }: { pendingCount?: 
   // Hook phải gọi trước mọi return sớm để giữ thứ tự cố định giữa các lần render.
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Trạng thái gập/mở của các section trong sidebar. Server render mặc định = tất cả mở
+  // (để lần đầu vào trang chưa hydrate, người dùng đã thấy đủ menu). Sau khi client hydrate
+  // xong, đọc localStorage để phục hồi lựa chọn cá nhân — tránh hydration mismatch.
+  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(SECTIONS.map((s) => s.id)));
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(NAV_STORAGE_KEY);
+      if (stored) {
+        const arr = JSON.parse(stored);
+        if (Array.isArray(arr)) setOpenSections(new Set(arr.filter((x): x is string => typeof x === 'string')));
+      }
+    } catch { /* localStorage bị chặn hoặc dữ liệu hỏng — bỏ qua, dùng mặc định */ }
+    setHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    try { localStorage.setItem(NAV_STORAGE_KEY, JSON.stringify([...openSections])); } catch { /* ignore */ }
+  }, [openSections, hydrated]);
+
+  const toggleSection = (id: string) =>
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
   // Trang công khai cho ứng viên (chọn giờ phỏng vấn) không hiện điều hướng nội bộ.
   if (path?.startsWith('/phong-van')) return null;
   // Trang đăng nhập cũng không hiện sidebar cho gọn.
@@ -198,10 +227,24 @@ export default function Nav({ pendingCount = 0, user = null }: { pendingCount?: 
         {SECTIONS.map((section) => {
           const visible = section.items.filter((i) => !i.adminOnly || isAdmin);
           if (visible.length === 0) return null;
+          const isOpen = openSections.has(section.id);
           return (
-            <div key={section.id} className="nav-section">
-              <div className="nav-section-label">{section.label}</div>
-              {visible.map((i) => renderItem(i))}
+            <div key={section.id} className={`nav-section${isOpen ? ' is-open' : ''}`}>
+              <button
+                type="button"
+                className="nav-section-label"
+                onClick={() => toggleSection(section.id)}
+                aria-expanded={isOpen}
+                aria-controls={`nav-section-${section.id}`}
+              >
+                <span>{section.label}</span>
+                <span className="nav-section-chevron" aria-hidden="true">›</span>
+              </button>
+              {isOpen ? (
+                <div id={`nav-section-${section.id}`} className="nav-section-items">
+                  {visible.map((i) => renderItem(i))}
+                </div>
+              ) : null}
             </div>
           );
         })}
