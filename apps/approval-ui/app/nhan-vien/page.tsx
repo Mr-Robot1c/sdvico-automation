@@ -1,15 +1,9 @@
-import Link from 'next/link';
 import { requireEmployeeAdmin, listEmployees } from '../../lib/employees';
 import { addEmployeeManual } from '../actions';
 import { SubmitButton } from '../submit-button';
+import EmployeeList, { type EmpRow } from './employee-list';
 
 export const dynamic = 'force-dynamic';
-
-const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
-  active: { label: 'Đang làm', tone: 'ok' },
-  probation: { label: 'Thử việc', tone: 'mkt' },
-  left: { label: 'Đã nghỉ', tone: 'no' },
-};
 
 function AddEmployeeForm() {
   return (
@@ -52,6 +46,17 @@ export default async function Page() {
   }
 
   const employees = await listEmployees(guard);
+  const rows: EmpRow[] = employees.map((e) => ({
+    id: e.id,
+    fullName: e.full_name || '',
+    chucDanh: e.chuc_danh || '',
+    phongBan: e.phong_ban || '',
+    email: e.email || '',
+    phone: e.phone || '',
+    trangThai: e.trang_thai,
+    fromRecruitment: Boolean(e.application_id),
+    ngayBatDau: e.ngay_bat_dau,
+  }));
 
   return (
     <main>
@@ -75,33 +80,9 @@ export default async function Page() {
           <p className="sub">Thêm nhân viên đã có bằng biểu mẫu bên dưới, hoặc xác nhận từ hồ sơ ứng viên đã được mời nhận việc.</p>
         </div>
       ) : (
-        <table className="run-log" style={{ marginTop: 16 }}>
-          <thead>
-            <tr>
-              <th>Họ tên</th>
-              <th>Chức danh</th>
-              <th>Phòng ban</th>
-              <th>Trạng thái</th>
-              <th>Nguồn</th>
-              <th>Ngày bắt đầu</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((e) => {
-              const st = STATUS_LABEL[e.trang_thai] || STATUS_LABEL.active;
-              return (
-                <tr key={e.id}>
-                  <td><Link href={`/nhan-vien/${e.id}`}><b>{e.full_name || 'Chưa rõ tên'}</b></Link></td>
-                  <td>{e.chuc_danh || <span className="muted">—</span>}</td>
-                  <td>{e.phong_ban || <span className="muted">—</span>}</td>
-                  <td><span className={`stage tone-${st.tone}`}>{st.label}</span></td>
-                  <td className="muted">{e.application_id ? 'Từ tuyển dụng' : 'Nhập tay'}</td>
-                  <td className="muted">{e.ngay_bat_dau ? new Date(e.ngay_bat_dau).toLocaleDateString('vi-VN') : '—'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div style={{ marginTop: 16 }}>
+          <EmployeeList employees={rows} />
+        </div>
       )}
 
       <AddEmployeeForm />
