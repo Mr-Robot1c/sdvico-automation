@@ -60,8 +60,17 @@ function mktInfo(payload: unknown) {
     landingUrl: p.landing_url as string | undefined,
     channels: Array.isArray(p.channels) ? (p.channels as string[]) : [],
     postKind: p.post_kind as string | undefined,
+    // Cặp bài thử A/B theo hướng đi kế hoạch (rotate v3). Hiển thị badge kín đáo thay vì
+    // prefix 🎯A/🎯B lộ trong tiêu đề (user: "để title A/B như vậy thì kì lắm").
+    abVariant: (p.ab_variant as string | undefined) || undefined,
+    fromPlan: p.from_plan_direction === true,
     flags
   };
+}
+
+// Bỏ prefix nhãn nội bộ khỏi tiêu đề card cho các bài cũ đã tạo trước fix (🎯A / 🎯B / ⚡A Shorts).
+function stripInternalPrefix(t: string): string {
+  return String(t || '').replace(/^\s*(🎯[AB]?\s*|⚡[AB]?\s*Shorts\s*)/u, '').trim();
 }
 
 export default async function Page({ searchParams }: { searchParams: { kind?: string } }) {
@@ -203,7 +212,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
           if (item.kind === 'mkt_publish_content') {
             const info = mktInfo(item.payload);
             const rk = riskMeta(info.risk);
-            const cleanTitle = item.title.replace(/^\[[^\]]+\]\s*/, '');
+            const cleanTitle = stripInternalPrefix(item.title).replace(/^\[[^\]]+\]\s*/, '');
             const ids = assetIdsOf(item.payload);
             const img = ids.image ? assetUrl.get(ids.image) : undefined;
             const vid = ids.video ? assetUrl.get(ids.video) : undefined;
@@ -224,6 +233,9 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   {purposeLabel(info.postKind, info.format)
                     ? <span className="badge" title="Bài bán sản phẩm hay bài nội dung nuôi trang">{purposeLabel(info.postKind, info.format)}</span>
                     : (info.intent ? <span className="badge">{intentLabel(info.intent)}</span> : null)}
+                  {info.abVariant
+                    ? <span className="badge badge-ab" title="Cặp bài thử theo hướng đi kế hoạch. Đăng cả hai, bot đo bản nào bà con thích hơn rồi học cho vòng sau.">🧪 Thử {info.abVariant}</span>
+                    : (info.fromPlan ? <span className="badge badge-ab" title="Bài theo hướng đi của kế hoạch tuần">🧭 Theo kế hoạch</span> : null)}
                   <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
                 </div>
 

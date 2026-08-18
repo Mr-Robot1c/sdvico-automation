@@ -140,7 +140,8 @@ for (const variant of ['A', 'B']) {
   if (e1 || !ins) { console.error(`  insert ${variant} loi: ${e1?.message}`); continue; }
 
   const govBadge = forcedGov ? ' ⚠️' : '';
-  const qTitle = `🎯${variant} [Facebook]${govBadge} ${displayTitle}`;
+  // Khong nhet A/B vao tieu de - payload.ab_variant lo badge "Thu A/B" tren Hang doi.
+  const qTitle = `[Facebook]${govBadge} ${displayTitle}`;
   await client.from('approval_queue').insert({
     kind: 'mkt_publish_content', title: qTitle,
     payload: {
@@ -191,8 +192,9 @@ if (media) {
   } catch (e) { console.warn(`  content loi (bo qua): ${e?.message || e}`); }
 }
 
-// 6. Danh dau huong di da dung.
-if (created.some((t) => t.startsWith('🎯'))) {
+// 6. Danh dau huong di da dung (co it nhat 1 ban A/B sinh thanh cong).
+const abCreated = created.length > 0 && created.some((t) => !t.includes('💬') && !t.includes('❓') && !t.includes('📋') && !t.includes('📖') && !t.includes('💡'));
+if (abCreated) {
   const updated = allSuggestions.map((s, i) => (i === sugIdx ? { ...s, used_at: new Date().toISOString() } : s));
   await client.from('mkt_plans').update({ data: { ...planRow.data, content_suggestions: updated } }).eq('id', planRow.id);
   console.log(`\nDa danh dau huong di #${sugIdx} used_at.`);

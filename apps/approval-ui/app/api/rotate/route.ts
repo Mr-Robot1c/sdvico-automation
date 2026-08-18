@@ -282,13 +282,13 @@ export async function GET(req: Request) {
         continue;
       }
       const contentId = (inserted as { id: string }).id;
-      // Nhãn 🎯A / 🎯B khi bài thuộc cặp thử của kế hoạch, để người duyệt biết ngay.
-      const prefix = sug ? `🎯${variant} ` : '';
+      // Không nhét A/B vào tiêu đề (user: "để title A/B kì lắm") — thông tin cặp nằm ở
+      // payload.ab_variant, trang Hàng đợi hiện badge "🧪 Thử A/B" kín đáo.
       const label = channels.length > 1 ? '[FB + TikTok]' : '[Facebook]';
       const govBadge = forcedGov ? ' ⚠️' : '';
       await client.from('approval_queue').insert({
         kind: 'mkt_publish_content',
-        title: `${prefix}${label}${govBadge} ${displayTitle}`,
+        title: `${label}${govBadge} ${displayTitle}`,
         payload: {
           content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich',
           risk, assets, channels, authored: 'ai',
@@ -321,9 +321,11 @@ export async function GET(req: Request) {
     //   Weight cao = chọn dày. news/portrait vẫn xuất hiện nhưng ít hơn vì cần chuẩn bị thật.
     // @ts-ignore — module JS thuần
     const { CONTENT_TOPICS } = await import('../../../lib/gen/products.mjs');
-    // portrait=0, news=0: TẮT hai cụm này khỏi rotate. Portrait cần người thật + xin phép,
-    // news dễ chạm quy định. Cả hai CHỈ được viết tay khi có tư liệu thật (điều cấm 5, dieu cam 3).
-    const KIND_WEIGHT: Record<string, number> = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 0, news: 0 };
+    // portrait=1 (bật lại 18/8): đã có tư liệu ảnh đời sống thật từ Zalo (Zalo/media/) và
+    // ĐÃ XIN PHÉP người liên quan. Bài portrait vẫn needs_gov_review, người duyệt điền tên
+    // thật + gắn ảnh thật trước khi duyệt (điều cấm 5). news=0: giữ tắt, dễ chạm quy định
+    // (điều cấm 3), chỉ viết tay khi có nguồn chính thống.
+    const KIND_WEIGHT: Record<string, number> = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 1, news: 0 };
     const kindTotal = Object.values(KIND_WEIGHT).reduce((a, b) => a + b, 0);
     let r = Math.random() * kindTotal;
     let chosenKind = 'qa';

@@ -196,7 +196,9 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
         suggestion_title: srcBrief.suggestion_title || null,
       }
     : {};
-  const isShortLabel = srcBrief.ab_pair_id ? `⚡${srcBrief.ab_variant || ''} Shorts ` : '';
+  // Nhan "Shorts" cho nguoi duyet biet day la ban ngan; KHONG lo A/B trong tieu de
+  // (payload.ab_variant -> badge "Thu A/B" tren Hang doi).
+  const isShortLabel = srcBrief.ab_pair_id ? 'Shorts ' : '';
 
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: 'social', title,
