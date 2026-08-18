@@ -504,6 +504,88 @@ export async function refreshFacebookMetrics() {
   revalidatePath('/do-luong');
 }
 
+// Bóc id đối tượng Graph từ mọi dạng link Facebook người dùng dán vào (bài đăng TAY trên Page).
+// Hỗ trợ: .../posts/<id|pfbid>, .../photos/a.x/<id>, .../videos/<id>, .../reel/<id>,
+// permalink.php?story_fbid=<id>&id=<page>, ?story_fbid=..., story.php, và link đã chuẩn
+// facebook.com/<pageid>_<postid> hoặc facebook.com/<id>. Trả null nếu không nhận ra.
+function facebookObjectIdFromLink(raw: string): { id: string; kind: 'video' | 'reel' | 'post' } | null {
+  let u: URL;
+  try { u = new URL(raw.trim()); } catch { return null; }
+  if (!/facebook\.com$|fb\.com$|fb\.watch$/i.test(u.hostname)) return null;
+  const q = u.searchParams;
+  const sf = q.get('story_fbid'); const pid = q.get('id');
+  if (sf) return { id: /^\d+$/.test(sf) && pid && /^\d+$/.test(pid) ? `${pid}_${sf}` : sf, kind: 'post' };
+  const v = q.get('v'); if (v && /^\d+$/.test(v)) return { id: v, kind: 'video' };
+  const seg = u.pathname.split('/').filter(Boolean);
+  const idx = (k: string) => seg.findIndex((s) => s === k);
+  const iV = idx('videos'); if (iV >= 0 && seg[iV + 1]) return { id: seg[iV + 1], kind: 'video' };
+  const iR = idx('reel'); if (iR >= 0 && seg[iR + 1]) return { id: seg[iR + 1], kind: 'reel' };
+  const iP = idx('posts'); if (iP >= 0 && seg[iP + 1]) return { id: seg[iP + 1], kind: 'post' };
+  const iPh = idx('photos'); if (iPh >= 0) { const last = seg[seg.length - 1]; if (/^\d+$/.test(last)) return { id: last, kind: 'post' }; }
+  const last = seg[seg.length - 1];
+  if (last && /^\d+(_\d+)?$/.test(last)) return { id: last, kind: 'post' };
+  if (last && /^pfbid/i.test(last)) return { id: last, kind: 'post' };
+  return null;
+}
+
+// Nhập bài ĐĂNG TAY trên Page vào hệ thống để kéo số liệu như bài máy đăng (user 18/8: "nếu
+// tôi đăng tay bên page chính thức thì có thể lấy số liệu được không"). Điều kiện: bài nằm trên
+// đúng Page mà FACEBOOK_PAGE_ACCESS_TOKEN đang giữ. Bước làm: bóc id -> gọi Graph kiểm bài có
+// thật + lấy nội dung -> tạo mkt_content (generator='manual-import') + mkt_posts published với
+// external_url dạng chuẩn https://www.facebook.com/<id> (pullFacebookMetrics đọc được) -> kéo số
+// liệu ngay lần đầu. Không đăng gì, không đụng bài trên FB (chỉ đọc). Trả về thông báo cho UI.
+export async function importManualFacebookPost(formData: FormData): Promise<void> {
+  const link = String(formData.get('fb_link') || '').trim();
+  const titleIn = String(formData.get('title') || '').trim();
+  const client = getServerClient();
+  const PAGE_ID = process.env.FACEBOOK_PAGE_ID;
+  const TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+  const say = async (status: 'ok' | 'error', msg: string, extra: any = {}) => {
+    try { await client.from('run_log').insert({ task: 'mkt.import_manual_post', actor: 'do-luong', status, detail: { link, msg, ...extra } }); } catch { /* bỏ qua */ }
+  };
+  if (!link) { await say('error', 'thiếu link'); revalidatePath('/do-luong'); return; }
+  if (!TOKEN || !PAGE_ID) { await say('error', 'chưa cấu hình Facebook token'); revalidatePath('/do-luong'); return; }
+  const parsed = facebookObjectIdFromLink(link);
+  if (!parsed) { await say('error', 'không nhận ra dạng link Facebook'); revalidatePath('/do-luong'); return; }
+
+  // Kiểm bài có thật + thuộc Page (Graph trả lỗi nếu token không có quyền đọc bài đó).
+  const fields = parsed.kind === 'video' || parsed.kind === 'reel' ? 'id,description,title,created_time' : 'id,message,story,created_time,permalink_url';
+  const r = await fetch(`https://graph.facebook.com/${VERSION}/${encodeURIComponent(parsed.id)}?fields=${fields}&access_token=${TOKEN}`);
+  const j: any = await r.json().catch(() => ({}));
+  if (!r.ok || j?.error) {
+    await say('error', 'Facebook không trả bài này (kiểm token có quyền đọc bài trên Page không): ' + (j?.error?.message || `HTTP ${r.status}`));
+    revalidatePath('/do-luong');
+    return;
+  }
+  const graphId = String(j.id || parsed.id);
+  const text = String(j.message || j.description || j.story || j.title || '').trim();
+  const title = titleIn || (text ? text.split('\n')[0].slice(0, 90) : `Bài đăng tay ${graphId}`);
+  const externalUrl = parsed.kind === 'video' ? `https://www.facebook.com/${PAGE_ID}/videos/${graphId}` : `https://www.facebook.com/${graphId}`;
+
+  // Đã nhập rồi thì thôi (khử trùng theo external_url).
+  const { data: dup } = await client.from('mkt_posts').select('content_id').eq('channel', 'facebook').eq('external_url', externalUrl).limit(1);
+  if (dup && dup.length) { await say('ok', 'bài đã có trong hệ thống', { content_id: dup[0].content_id }); await pullFacebookMetrics(client); revalidatePath('/do-luong'); return; }
+
+  const { data: ins, error: ce } = await client.from('mkt_content').insert({
+    kind: parsed.kind === 'post' ? 'social' : 'video',
+    title,
+    brief: { keyword: title, intent: 'giao_dich', channels: ['facebook'], generator: 'manual-import', imported_link: link, fb_object_id: graphId, fb_created_time: j.created_time || null, authored: 'human' },
+    draft: text || null,
+    status: 'published',
+    needs_gov_review: false,
+  }).select('id').single();
+  if (ce || !ins) { await say('error', 'không lưu được bài: ' + (ce?.message || '')); revalidatePath('/do-luong'); return; }
+  await client.from('mkt_posts').insert({
+    content_id: (ins as any).id, channel: 'facebook', status: 'published', external_url: externalUrl,
+    published_at: j.created_time ? new Date(j.created_time).toISOString() : new Date().toISOString(),
+  });
+  // Kéo số liệu ngay để người dùng thấy liền.
+  await pullFacebookMetrics(client);
+  await say('ok', 'đã nhập + kéo số liệu', { content_id: (ins as any).id, graphId });
+  revalidatePath('/do-luong');
+}
+
 // Thêm một từ khóa vào kho.
 export async function addKeyword(formData: FormData) {
   const keyword = String(formData.get('keyword') || '').trim();

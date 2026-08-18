@@ -1,5 +1,5 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { refreshFacebookMetrics, setConversions, deleteContent } from '../actions';
+import { refreshFacebookMetrics, setConversions, deleteContent, importManualFacebookPost } from '../actions';
 import BarChart from './bar-chart';
 import PostTitle from './post-title';
 import MetricsAuto from './metrics-auto';
@@ -13,6 +13,17 @@ type M = { reactions?: number; comments?: number; shares?: number; engagement?: 
 
 export default async function Page() {
   const client = getServerClient();
+
+  // Kết quả lần nhập bài đăng tay gần nhất (run_log task mkt.import_manual_post) để báo rõ
+  // thành công / lỗi ngay dưới ô nhập (server action không trả message về form được).
+  const { data: impRows } = await client
+    .from('run_log')
+    .select('status, detail, created_at')
+    .eq('task', 'mkt.import_manual_post')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const impRow = (impRows || [])[0] as any;
+  const lastImport = impRow ? { status: String(impRow.status), msg: String(impRow.detail?.msg || ''), link: String(impRow.detail?.link || '') } : null;
 
   // Số liệu Facebook mới nhất của mỗi bài (mkt_metrics là chuỗi snapshot, lấy bản mới nhất).
   const { data: mrows } = await client
@@ -149,6 +160,28 @@ export default async function Page() {
           <RefreshButton action={refreshFacebookMetrics} />
         </div>
       </header>
+
+      {/* Nhập bài ĐĂNG TAY trên Page để hệ thống kéo số liệu như bài máy đăng (user 18/8). */}
+      <section className="import-manual">
+        <form action={importManualFacebookPost} className="import-manual-form">
+          <div style={{ minWidth: 0, flex: '1 1 320px' }}>
+            <b>➕ Thêm bài đăng tay trên Page</b>
+            <p className="sub" style={{ margin: '2px 0 6px' }}>
+              Dán link bài đã đăng tay trên Page (bài viết, ảnh, video, reel). Hệ thống kiểm bài có thật, lưu lại và kéo số liệu ngay; từ đó cron 30 phút cập nhật đều như bài máy đăng. Chỉ đọc số liệu, không đụng bài trên Facebook.
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input name="fb_link" type="url" required placeholder="https://www.facebook.com/…/posts/… hoặc …/videos/…" className="note" style={{ flex: '1 1 320px', maxWidth: 'none' }} />
+              <input name="title" placeholder="Tên gợi nhớ (không bắt buộc)" className="note" style={{ flex: '1 1 200px', maxWidth: 260 }} />
+              <button className="btn ok" type="submit">Thêm và kéo số liệu</button>
+            </div>
+          </div>
+        </form>
+        {lastImport ? (
+          <p className={`sub ${lastImport.status === 'error' ? 'err-note' : ''}`} style={{ marginTop: 6 }}>
+            Lần nhập gần nhất: {lastImport.status === 'ok' ? '✅' : '⛔'} {lastImport.msg}{lastImport.link ? ` — ${lastImport.link.slice(0, 80)}` : ''}
+          </p>
+        ) : null}
+      </section>
 
       {rows.length === 0 ? (
         <div className="empty">
