@@ -14,6 +14,7 @@ type BotStatus = {
   suggestions: number;           // so content_suggestions con lai chua dung
   suggestionsUsed: number;       // so da dung
   latestPlanId?: string | null;
+  alerts?: Array<{ who: string; msg: string }>; // AI dang DOI / cron dung -> canh bao do
 };
 
 function fmtTime(iso: string | null) {
@@ -55,9 +56,11 @@ export default function BotChip() {
   if (!status) return null;
 
   const totalKnowledge = status.internal + status.publicSrc;
-  if (totalKnowledge === 0 && status.suggestions === 0) return null; // chua co gi de bao
+  const alertsEarly = status.alerts || [];
+  // Chua co gi de bao VA khong co canh bao -> an. Co canh bao thi LUON hien (ke ca da an truoc do).
+  if (totalKnowledge === 0 && status.suggestions === 0 && alertsEarly.length === 0) return null;
 
-  if (dismissed) {
+  if (dismissed && alertsEarly.length === 0) {
     return (
       <button
         className="bot-reopen"
@@ -70,9 +73,13 @@ export default function BotChip() {
     );
   }
 
-  const shortMsg = status.suggestions > 0
-    ? `${status.suggestions} hướng đi sẵn`
-    : `${totalKnowledge} nguồn`;
+  const alerts = status.alerts || [];
+  const hasAlert = alerts.length > 0;
+  const shortMsg = hasAlert
+    ? `${alerts.length} AI đang đói`
+    : status.suggestions > 0
+      ? `${status.suggestions} hướng đi sẵn`
+      : `${totalKnowledge} nguồn`;
 
   return (
     <div className="bot-chip-wrap">
@@ -83,6 +90,13 @@ export default function BotChip() {
             <button className="bot-x" aria-label="Đóng" onClick={() => setOpen(false)}>×</button>
           </div>
           <div className="bot-panel-body">
+            {hasAlert ? (
+              <div className="bot-alerts">
+                {alerts.map((a, i) => (
+                  <p key={i} className="bot-alert"><b>⚠️ {a.who}:</b> {a.msg}</p>
+                ))}
+              </div>
+            ) : null}
             <p>Đã học <b>{status.internal}</b> bản ghi nội bộ và <b>{status.publicSrc}</b> nguồn public trong 7 ngày qua.</p>
             {status.suggestions > 0 ? (
               <p>Có <b>{status.suggestions}</b> hướng đi tuần chưa dùng {status.suggestionsUsed > 0 ? `(đã dùng ${status.suggestionsUsed})` : ''}. Vòng xoay sinh bài sẽ bám hướng đi này.</p>
@@ -102,9 +116,9 @@ export default function BotChip() {
           </button>
         </div>
       ) : (
-        <button className="bot-chip" onClick={() => setOpen(true)} aria-label="Xem chi tiết Bot AI">
-          <span className="bot-chip-icon" aria-hidden="true">🤖</span>
-          <span className="bot-chip-text">Bot đã học · <b>{shortMsg}</b></span>
+        <button className={`bot-chip${hasAlert ? ' bot-chip-alert' : ''}`} onClick={() => setOpen(true)} aria-label="Xem chi tiết Bot AI">
+          <span className="bot-chip-icon" aria-hidden="true">{hasAlert ? '⚠️' : '🤖'}</span>
+          <span className="bot-chip-text">{hasAlert ? 'Bot cần chú ý' : 'Bot đã học'} · <b>{shortMsg}</b></span>
         </button>
       )}
     </div>

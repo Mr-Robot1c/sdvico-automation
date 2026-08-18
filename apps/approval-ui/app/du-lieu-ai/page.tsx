@@ -100,6 +100,17 @@ export default async function Page() {
   const evLast = ev[0]?.imported_at || ev[0]?.created_at || null;
   const evLatest = ev[0]?.summary || null;
 
+  // Cảnh báo ĐÓI ở đầu trang (cùng logic /api/bot-status): AI nào quá lâu không học, số liệu
+  // FB có kéo về không — kèm nguyên nhân khả dĩ để người quản lý biết phải kiểm chỗ nào.
+  const { data: lastMetricRow } = await client.from('mkt_metrics').select('created_at').order('created_at', { ascending: false }).limit(1);
+  const hrs = (iso?: string | null) => (iso ? (Date.now() - new Date(iso).getTime()) / 3600000 : Infinity);
+  const hM = hrs((lastMetricRow || [])[0]?.created_at as string | undefined);
+  const alerts: string[] = [];
+  if (hrs(d1Last) > 30) alerts.push(d1Last ? `AI Data 1 đã ${Math.floor(hrs(d1Last))} giờ không có bản ghi nội bộ mới — phiên đọc Zalo hôm nay có chạy không, file đã lên bucket chưa (task Windows SDVICO-DayKhoZalo 8:15 / 16:30 / 20:30)?` : 'AI Data 1 chưa học nội bộ bao giờ.');
+  if (hrs(d2Last) > 30) alerts.push(d2Last ? `AI Data 2 đã ${Math.floor(hrs(d2Last))} giờ không có nguồn public mới — cron mkt-metrics-pull (chạy học public mỗi ngày) có thể đang không chạy.` : 'AI Data 2 chưa học public bao giờ.');
+  if (hM === Infinity) alerts.push('Chưa có số liệu Facebook nào được kéo về (bảng Đo lường trống). Cron GitHub mkt-metrics-pull chưa chạy hoặc CRON_SECRET lệch — BOSS và Evaluator không có số để học. Kiểm tra GitHub Actions hoặc bấm "Cập nhật số liệu" ở trang Đo lường.');
+  else if (hM > 26) alerts.push(`Đã ${Math.floor(hM)} giờ không kéo số liệu Facebook — cron GitHub có thể đã dừng.`);
+
   const cards = [
     {
       key: 'data1', icon: '🔒', name: 'AI Data 1 · Nội bộ',
@@ -185,6 +196,15 @@ export default async function Page() {
           </p>
         </div>
       </header>
+
+      {alerts.length ? (
+        <div className="ai-alerts" role="alert">
+          <b>⚠️ AI đang đói / mắt xích chưa chạy</b>
+          <ul>{alerts.map((t, i) => <li key={i}>{t}</li>)}</ul>
+        </div>
+      ) : (
+        <p className="ai-ok">✅ Mọi AI đều học trong 30 giờ qua và số liệu đang chảy về.</p>
+      )}
 
       <div className="ai-grid">
         {cards.map((c) => {
