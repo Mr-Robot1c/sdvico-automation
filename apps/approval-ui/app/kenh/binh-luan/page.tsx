@@ -2,6 +2,7 @@ import { getServerClient } from '../../../lib/supabase-server';
 import AutoRefresh from '../../auto-refresh';
 import KenhTabs from '../kenh-tabs';
 import CommentListClient, { type PendingReply } from './comment-list-client';
+import { formatDateTime } from '../../labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +81,7 @@ export default async function Page() {
     <main>
       <header className="head-row">
         <div>
-          <h1>Kênh mạng xã hội</h1>
+          <h1>Kênh đăng tin</h1>
           <p className="sub">Bình luận công khai trên bài Facebook đã đăng.</p>
         </div>
         <AutoRefresh seconds={30} />
@@ -104,24 +105,26 @@ export default async function Page() {
           <CommentListClient items={items} />
 
           {history.length > 0 ? (
-            <div style={{ marginTop: 24 }}>
-              <b>Lịch sử gần đây</b>
-              <table className="run-log" style={{ marginTop: 8 }}>
-                <thead><tr><th>Từ</th><th>Trạng thái</th><th>Lúc</th></tr></thead>
-                <tbody>
-                  {history.map((h) => {
-                    const st = HIST_LABEL[h.trang_thai] || { label: h.trang_thai, tone: 'default' };
-                    return (
-                      <tr key={h.id}>
-                        <td>{h.from_name || 'Ẩn danh'}</td>
-                        <td><span className={`stage tone-${st.tone}`}>{st.label}</span></td>
-                        <td className="muted">{new Date(h.created_at).toLocaleString('vi-VN')}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <section className="settings-box" style={{ marginTop: 20 }}>
+              <h2 style={{ margin: '0 0 10px', fontSize: '1.02rem' }}>Lịch sử gần đây</h2>
+              <div className="table-scroll">
+                <table className="run-log">
+                  <thead><tr><th>Từ</th><th>Trạng thái</th><th>Lúc</th></tr></thead>
+                  <tbody>
+                    {history.map((h) => {
+                      const st = HIST_LABEL[h.trang_thai] || { label: h.trang_thai, tone: 'default' };
+                      return (
+                        <tr key={h.id}>
+                          <td>{h.from_name || 'Ẩn danh'}</td>
+                          <td><span className={`stage tone-${st.tone}`}>{st.label}</span></td>
+                          <td className="muted nowrap">{formatDateTime(h.created_at)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           ) : null}
         </>
       )}

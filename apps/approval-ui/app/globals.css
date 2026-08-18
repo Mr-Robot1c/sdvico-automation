@@ -829,6 +829,94 @@ select.note { cursor: pointer; }
   }
 }
 
+/* === Bảng bình luận Facebook (/kenh/binh-luan) === */
+.cmt-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+.cmt-table thead th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--ink-2);
+  font-size: 11.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.cmt-th-from  { width: 18%; }
+.cmt-th-post  { width: 22%; }
+.cmt-th-msg   { width: auto; }
+.cmt-th-time  { width: 120px; }
+.cmt-th-caret { width: 32px; }
+
+.cmt-row {
+  cursor: pointer;
+  background: var(--surface);
+  transition: background 0.1s;
+}
+.cmt-row > td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.cmt-row:hover > td { background: var(--surface-2); }
+.cmt-row.is-open > td { background: var(--accent-bg); border-bottom: 1px solid var(--accent); }
+
+.cmt-from-name { font-weight: 600; color: var(--ink); }
+.cmt-post-title {
+  font-size: 13px; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cmt-msg-preview {
+  color: var(--ink-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cmt-td-caret { text-align: center; color: var(--ink-2); }
+
+.cmt-expand-row > td {
+  padding: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.comment-detail {
+  padding: 16px 18px 18px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+}
+
+/* Mobile ≤720: bảng bình luận thành card. */
+@media (max-width: 720px) {
+  .cmt-table, .cmt-table thead, .cmt-table tbody, .cmt-table tr, .cmt-table td { display: block; }
+  .cmt-table thead { display: none; }
+  .cmt-table tr { margin-bottom: 8px; }
+  .cmt-row {
+    border: 1px solid var(--line); border-radius: 10px;
+    display: grid; grid-template-columns: 1fr auto;
+    padding: 12px 14px 6px; gap: 4px 12px;
+  }
+  .cmt-row > td {
+    border-bottom: 0; padding: 4px 0; background: transparent !important;
+  }
+  .cmt-td-from  { grid-column: 1 / 2; grid-row: 1; }
+  .cmt-td-caret { grid-column: 2 / 3; grid-row: 1; align-self: start; }
+  .cmt-td-post  { grid-column: 1 / -1; grid-row: 2; font-size: 12px; }
+  .cmt-td-post::before { content: 'Bài: '; color: var(--ink-2); }
+  .cmt-td-msg   { grid-column: 1 / -1; grid-row: 3; }
+  .cmt-td-time  { grid-column: 1 / -1; grid-row: 4; font-size: 12px; }
+  .cmt-row.is-open { border-color: var(--accent); background: var(--accent-bg); }
+  .cmt-expand-row { display: block; }
+  .cmt-expand-row > td { display: block; padding: 0; border: 0; }
+  .comment-detail {
+    margin: -6px 0 8px;
+    border: 1px solid var(--accent); border-top: 0; border-radius: 0 0 10px 10px;
+    border-left-width: 3px;
+  }
+}
+
 /* === Bảng kênh đăng tin (/kenh) === */
 /* Không có expand row: mỗi kênh là 1 hàng, hành động (Bật/Tắt/Xoá) inline trong cột phải. */
 .chan-table {
