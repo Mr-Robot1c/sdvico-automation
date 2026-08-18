@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-18
 ttl_days: 90
+<!-- re-verified: 2026-08-18 - NV1 van hanh: buoc 'tha file vao bucket' nay TU DONG qua task Windows 16:30 (upload-zalo-to-bucket) sau phien Cowork 16:00; file cung ten noi dung moi duoc them ban dated de AC-1 (import idempotent theo source_path) van dung ma tin moi van duoc hoc. Hanh vi AC-1 KHONG doi. -->
 <!-- re-verified: 2026-08-18 - Doi chieu bumpers.mjs + assemble.mjs (redesign intro/outro theo sep): thuan hinh thuc trinh bay video, hanh vi NV6/AC-8 KHONG doi. -->
 <!-- re-verified: 2026-08-18 - Doi chieu build-video-all.mjs sau fix race (doc lai brief truoc khi tat co): hanh vi NV6/AC-8 KHONG doi, chi sua loi ky thuat lam mat video da gan. -->
 <!-- re-verified: 2026-08-18 - v1.8: NV6/AC-8 DOI HANH VI theo user - bai ban hang co clip goc: video AI GAN VAO CHINH BAI (khong tao bai video rieng), dang Post + Reel + TikTok tu 1 lan duyet. build-video.mjs generator=rotation -> update brief bai goc; actions.ts publishReelToFacebook. -->

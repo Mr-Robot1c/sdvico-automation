@@ -222,6 +222,9 @@ export async function importInternalFromBucket(
 
     // Chỉ import file được hỗ trợ, các định dạng khác bỏ qua nhưng KHÔNG báo lỗi.
     if (!isTextFile(f.path) && !isImageFile(f.path)) { skipped += 1; continue; }
+    // Tài liệu hướng dẫn / bí kíp của phiên đọc Zalo không phải tri thức nội bộ -> bỏ qua
+    // (18/8: prompt-doc-zalo-hang-ngay.md bị học nhầm thành "Quy trình trích xuất...").
+    if (/(^|\/)(prompt-|readme|huong-dan|bi-kip|upload-log)/i.test(f.path) || /\.log$/i.test(f.path)) { skipped += 1; continue; }
 
     try {
       const { excerpt, via, reason } = await readFileContent(client, f.path);

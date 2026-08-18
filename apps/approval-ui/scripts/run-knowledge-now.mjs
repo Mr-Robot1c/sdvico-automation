@@ -390,6 +390,13 @@ console.log('\n== BUOC 1: Import file tu bucket kho-tri-thuc-noi-bo ==');
 const r1 = await importInternal();
 console.log(`Ket qua: quet ${r1.scanned}, import ${r1.imported} moi, bo qua ${r1.skipped}`);
 
+// --only-internal: chi cho AI Data 1 hoc (task Windows 16:30 goi sau khi day Zalo), khong hoc
+// public / khong sinh ke hoach o day (cron Vercel + lich T2/T6 lo). Tranh sinh plan ngoai lich.
+if (process.argv.includes('--only-internal')) {
+  console.log('\n(--only-internal) Xong buoc 1, dung tai day.');
+  process.exit(0);
+}
+
 console.log('\n== BUOC 2: Hoc tri thuc public nganh ca (Gemini google_search) ==');
 const r2 = await learnPublic();
 console.log(`Ket qua: ${r2.topics} chu de, ${r2.found} nguon tim thay, ${r2.inserted} nguon moi luu`);
