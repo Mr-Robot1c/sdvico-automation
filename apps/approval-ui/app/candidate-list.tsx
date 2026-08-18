@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatRelative, stageMeta, sourceLabel } from './labels';
-import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate } from './actions';
+import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate, confirmHired } from './actions';
 
 export type CandView = {
   id: string;
@@ -19,6 +19,7 @@ export type CandView = {
   appId: string | null;
   appStage: string | null;
   interviewedAt: string | null;
+  hiredAt: string | null;
   sourced: boolean;
   note: string;
   score: number | null;
@@ -281,7 +282,18 @@ function CandidateCard({ c, windows }: { c: CandView; windows: string[] }) {
             </form>
           </>
         ) : null}
-        {c.appStage === 'offer' ? <span className="stage tone-ok">Đã nhận</span> : null}
+        {c.appStage === 'offer' && !c.hiredAt ? (
+          <form
+            action={confirmHired}
+            onSubmit={(e) => { if (!window.confirm(`Xác nhận ${c.name} đã thật sự nhận việc và đi làm?\n\nSẽ tạo hồ sơ nhân viên ở trang Nhân viên.`)) e.preventDefault(); }}
+          >
+            <input type="hidden" name="appId" value={c.appId || ''} />
+            <button className="btn ok" type="submit">Xác nhận đã nhận việc</button>
+          </form>
+        ) : null}
+        {c.appStage === 'offer' && c.hiredAt ? (
+          <a className="stage tone-ok" href="/nhan-vien">✓ Đã nhận việc · xem ở trang Nhân viên</a>
+        ) : null}
         {c.appStage === 'rejected' ? <span className="muted">Đã từ chối</span> : null}
         {c.sourced ? (
           <DangerDelete

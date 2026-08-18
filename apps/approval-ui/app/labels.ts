@@ -20,6 +20,8 @@ export function kindMeta(kind: string): KindMeta {
       return { label: 'Vị trí tuyển dụng', icon: '💼', tone: 'hr' };
     case 'hr_job_post':
       return { label: 'Tin tuyển dụng', icon: '📣', tone: 'hr' };
+    case 'fb_comment_reply':
+      return { label: 'Trả lời bình luận', icon: '💬', tone: 'hr' };
     case 'mkt_post':
       return { label: 'Bài marketing', icon: '📣', tone: 'mkt' };
     case 'mkt_publish':
@@ -64,7 +66,11 @@ const FIELD_LABELS: Record<string, string> = {
   cau_hoi_hanh_vi: 'Câu hỏi hành vi',
   bai_ve_nha: 'Bài về nhà',
   khung_gio: 'Khung giờ đề xuất',
-  luu_y: 'Lưu ý'
+  luu_y: 'Lưu ý',
+  comment_id: 'Mã bình luận',
+  fb_comment_id: 'Mã bình luận Facebook',
+  goi_y_tra_loi: 'Gợi ý trả lời (máy soạn)',
+  reply_text: 'Nội dung trả lời',
 };
 
 export function fieldLabel(key: string): string {
@@ -137,6 +143,17 @@ const AXIS_LABELS: Record<string, string> = {
 
 export function axisLabel(key: string): string {
   return AXIS_LABELS[key] || key;
+}
+
+// Nhãn kênh đăng tin (hr_job_posts.kenh, hr_platforms.loai='social'/'job_board').
+const KENH_LABELS: Record<string, string> = {
+  facebook: 'Facebook', linkedin: 'LinkedIn', zalo: 'Zalo',
+  job_board: 'Trang tuyển dụng', website: 'Website', other: 'Khác',
+};
+
+export function kenhLabel(kenh?: string | null): string {
+  if (!kenh) return 'Khác';
+  return KENH_LABELS[kenh] || kenh;
 }
 
 // Nhãn nguồn ứng viên.

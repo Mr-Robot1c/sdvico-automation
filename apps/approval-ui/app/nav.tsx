@@ -14,6 +14,8 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: '/tao-jd', label: 'Tạo JD' },
       { href: '/dang-tin', label: 'Vị trí' },
+      { href: '/kenh', label: 'Kênh mạng xã hội' },
+      { href: '/binh-luan', label: 'Bình luận Facebook' },
       { href: '/ho-so', label: 'Hồ sơ ứng viên' },
       { href: '/lich', label: 'Lịch phỏng vấn' },
       { href: '/bao-cao', label: 'Báo cáo' },
@@ -30,7 +32,9 @@ const SOLO_BOTTOM: (NavItem & { icon: string })[] = [
 ];
 
 const ADMIN_ONLY: NavItem[] = [
+  { href: '/nhan-vien', label: 'Nhân viên' },
   { href: '/cai-dat/nguoi-dung', label: 'Người dùng' },
+  { href: '/cai-dat/nguon-cv', label: 'Nguồn CV chủ động' },
 ];
 
 type NavUser = { email: string; fullName: string | null; role: string } | null;

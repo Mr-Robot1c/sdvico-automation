@@ -73,6 +73,12 @@ Lấy chuỗi in ra rồi đặt vào đúng ba chỗ, phải giống hệt nhau
 | SDVICO soạn bài | `https://TEN-APP.vercel.app/api/cron/compose` | Mỗi 15 phút |
 | SDVICO đăng Facebook | `https://TEN-APP.vercel.app/api/cron/publish` | Mỗi 15 phút |
 | SDVICO đăng LinkedIn | `https://TEN-APP.vercel.app/api/cron/linkedin-publish` | Mỗi 15 phút |
+| SDVICO soạn trả lời bình luận | `https://TEN-APP.vercel.app/api/cron/comment-compose` | Mỗi 15 phút |
+| SDVICO đăng trả lời bình luận | `https://TEN-APP.vercel.app/api/cron/comment-publish` | Mỗi 15 phút |
+
+Hai job trả lời bình luận chỉ có việc khi webhook Facebook đã cấu hình xong (xem
+`docs/facebook-test-setup.md`) và có bình luận thật gửi tới `/api/webhooks/facebook`. Chưa
+cấu hình webhook thì hai job này chạy vẫn trả 200, chỉ là không có gì để làm.
 
 3. Với mỗi job, mở tab **Advanced** rồi đặt:
 

@@ -16,6 +16,7 @@ import { allocateInterviewSlots, composeInterviewLetter, generateInterviewQuesti
 import { linkedinConfigured, postToLinkedIn } from '../lib/linkedin';
 import { getSessionUser } from '../lib/auth';
 import { requireAdmin } from '../lib/hr-users';
+import { requireEmployeeAdmin, EMPLOYEE_DOCS_BUCKET } from '../lib/employees';
 
 // Trả email người đang đăng nhập, hoặc null nếu chế độ basic. Bọc try để không rơi luồng cũ.
 async function currentEmail(): Promise<string | null> {
@@ -1568,4 +1569,267 @@ export async function changeHrUserRole(formData: FormData) {
   const { error } = await client.from('hr_users').update({ role }).eq('id', id);
   if (error) throw new Error('Không đổi được vai trò: ' + error.message);
   revalidatePath('/cai-dat/nguoi-dung');
+}
+
+// --- Quản lý nhân viên (sau khi đã nhận việc thật) ---
+// Toàn bộ hàm dưới đây kiểm requireEmployeeAdmin() trước, vì hr_employees/hr_employee_documents
+// không cấp policy RLS cho authenticated (dữ liệu nhạy cảm hơn hồ sơ ứng viên, xem
+// 20260818010000_hr_employees.sql). Không được gọi thẳng service role mà bỏ qua bước này.
+
+// Xác nhận ứng viên đã thật sự nhận việc (khác offer = chỉ mới mời). Chỉ cho khi stage='offer'.
+// Tạo một bản ghi hr_employees, copy tên/email/phone từ hr_candidates làm điểm khởi đầu.
+export async function confirmHired(formData: FormData) {
+  const guard = await requireEmployeeAdmin();
+  if ('error' in guard) throw new Error(guard.error);
+
+  const appId = String(formData.get('appId') || '');
+  if (!appId) return;
+
+  const client = getServerClient();
+  const { data: app } = await client
+    .from('hr_applications')
+    .select('id, stage, hired_at, candidate_id')
+    .eq('id', appId).maybeSingle();
+  if (!app || app.stage !== 'offer' || app.hired_at) return;
+
+  const { data: cand } = await client
+    .from('hr_candidates')
+    .select('full_name, email, phone')
+    .eq('id', app.candidate_id).maybeSingle();
+
+  const { error: insErr } = await client.from('hr_employees').insert({
+    candidate_id: app.candidate_id,
+    application_id: appId,
+    full_name: cand?.full_name || null,
+    email: cand?.email || null,
+    phone: cand?.phone || null,
+    created_by: guard.email,
+  });
+  if (insErr) throw new Error('Không tạo được hồ sơ nhân viên: ' + insErr.message);
+
+  await client.from('hr_applications').update({ hired_at: new Date().toISOString() }).eq('id', appId);
+
+  revalidatePath('/ho-so');
+  revalidatePath('/nhan-vien');
+}
+
+export async function updateEmployeeInfo(formData: FormData) {
+  const guard = await requireEmployeeAdmin();
+  if ('error' in guard) throw new Error(guard.error);
+
+  const id = String(formData.get('id') || '');
+  if (!id) return;
+
+  const fields = {
+    chuc_danh: String(formData.get('chuc_danh') || '').trim() || null,
+    phong_ban: String(formData.get('phong_ban') || '').trim() || null,
+    ngay_bat_dau: String(formData.get('ngay_bat_dau') || '').trim() || null,
+    so_bhxh: String(formData.get('so_bhxh') || '').trim() || null,
+    so_cccd: String(formData.get('so_cccd') || '').trim() || null,
+    trang_thai: (['active', 'probation', 'left'].includes(String(formData.get('trang_thai')))
+      ? String(formData.get('trang_thai'))
+      : 'active') as 'active' | 'probation' | 'left',
+  };
+
+  const client = getServerClient();
+  const { error } = await client.from('hr_employees').update(fields).eq('id', id);
+  if (error) throw new Error('Không lưu được: ' + error.message);
+  revalidatePath(`/nhan-vien/${id}`);
+}
+
+// Bật/tắt một mục trong checklist onboarding. checklist lưu dạng jsonb [{label, done}].
+export async function toggleOnboardingItem(formData: FormData) {
+  const guard = await requireEmployeeAdmin();
+  if ('error' in guard) throw new Error(guard.error);
+
+  const id = String(formData.get('id') || '');
+  const index = Number(formData.get('index'));
+  if (!id || Number.isNaN(index)) return;
+
+  const client = getServerClient();
+  const { data: emp } = await client.from('hr_employees').select('onboarding_checklist').eq('id', id).maybeSingle();
+  if (!emp) return;
+  const checklist = Array.isArray(emp.onboarding_checklist) ? [...emp.onboarding_checklist] : [];
+  if (!checklist[index]) return;
+  checklist[index] = { ...checklist[index], done: !checklist[index].done };
+
+  const { error } = await client.from('hr_employees').update({ onboarding_checklist: checklist }).eq('id', id);
+  if (error) throw new Error('Không lưu được: ' + error.message);
+  revalidatePath(`/nhan-vien/${id}`);
+}
+
+export async function addOnboardingItem(formData: FormData) {
+  const guard = await requireEmployeeAdmin();
+  if ('error' in guard) throw new Error(guard.error);
+
+  const id = String(formData.get('id') || '');
+  const label = String(formData.get('label') || '').trim();
+  if (!id || !label) return;
+
+  const client = getServerClient();
+  const { data: emp } = await client.from('hr_employees').select('onboarding_checklist').eq('id', id).maybeSingle();
+  if (!emp) return;
+  const checklist = Array.isArray(emp.onboarding_checklist) ? [...emp.onboarding_checklist] : [];
+  checklist.push({ label, done: false });
+
+  const { error } = await client.from('hr_employees').update({ onboarding_checklist: checklist }).eq('id', id);
+  if (error) throw new Error('Không lưu được: ' + error.message);
+  revalidatePath(`/nhan-vien/${id}`);
+}
+
+// Tải lên một tài liệu nhân viên (hợp đồng, bằng cấp, BHXH, CCCD). Lưu vào bucket riêng tư
+// employee-documents, không public URL — trang chi tiết tự ký URL tạm khi hiển thị.
+export async function uploadEmployeeDocument(formData: FormData) {
+  const guard = await requireEmployeeAdmin();
+  if ('error' in guard) throw new Error(guard.error);
+
+  const employeeId = String(formData.get('employee_id') || '');
+  const loaiRaw = String(formData.get('loai') || 'khac');
+  const loai = (['hop_dong', 'bang_cap', 'bhxh', 'cccd', 'khac'].includes(loaiRaw) ? loaiRaw : 'khac') as
+    'hop_dong' | 'bang_cap' | 'bhxh' | 'cccd' | 'khac';
+  const ghiChu = String(formData.get('ghi_chu') || '').trim() || null;
+  const file = formData.get('file');
+  if (!employeeId || !(file instanceof File) || file.size === 0) return;
+
+  const client = getServerClient();
+  const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+  const path = `${employeeId}/${Date.now()}-${loai}.${ext}`;
+  const buf = Buffer.from(await file.arrayBuffer());
+
+  const { error: upErr } = await client.storage
+    .from(EMPLOYEE_DOCS_BUCKET)
+    .upload(path, buf, { contentType: file.type || 'application/octet-stream' });
+  if (upErr) throw new Error('Tải tệp lỗi: ' + upErr.message);
+
+  const { error } = await client.from('hr_employee_documents').insert({
+    employee_id: employeeId,
+    loai,
+    storage_path: path,
+    ghi_chu: ghiChu,
+    uploaded_by: guard.email,
+  });
+  if (error) throw new Error('Lưu bản ghi tài liệu lỗi: ' + error.message);
+
+  revalidatePath(`/nhan-vien/${employeeId}`);
+}
+
+// --- Trả lời bình luận Facebook ---
+// Máy soạn (worker queue-comment-replies), người bấm Duyệt mới đăng (điều cấm 1). Duyệt xong
+// KHÔNG đăng ngay ở đây — worker publish-comment-reply chạy theo lịch (~15 phút) mới gọi Graph
+// API, giữ đúng một chỗ duy nhất gọi API đăng thật, tránh trùng logic với route cron.
+
+export async function decideCommentReply(formData: FormData) {
+  const queueId = String(formData.get('queue_id') || '');
+  const commentId = String(formData.get('comment_id') || '');
+  const replyText = String(formData.get('reply_text') || '').trim();
+  if (!queueId || !commentId || !replyText) return;
+
+  const client = getServerClient();
+  const who = await currentEmail();
+
+  // Đọc payload gốc trước (comment_id, fb_comment_id, message...) để ghép thêm reply_text
+  // đã sửa, không ghi đè mất các khóa còn lại — publish-comment-reply cần fb_comment_id.
+  const { data: item } = await client.from('approval_queue').select('payload').eq('id', queueId).eq('status', 'pending').maybeSingle();
+  if (!item) return;
+
+  const { error } = await client
+    .from('approval_queue')
+    .update({
+      status: 'approved',
+      decided_at: new Date().toISOString(),
+      decided_by: who,
+      payload: { ...(item.payload as object), reply_text: replyText },
+    })
+    .eq('id', queueId)
+    .eq('status', 'pending');
+  if (error) throw new Error(error.message);
+
+  await client.from('hr_fb_comments').update({ trang_thai: 'approved', reply_text: replyText }).eq('id', commentId);
+
+  revalidatePath('/binh-luan');
+  revalidatePath('/');
+}
+
+export async function ignoreCommentReply(formData: FormData) {
+  const queueId = String(formData.get('queue_id') || '');
+  const commentId = String(formData.get('comment_id') || '');
+  if (!queueId || !commentId) return;
+
+  const client = getServerClient();
+  const who = await currentEmail();
+
+  await client
+    .from('approval_queue')
+    .update({ status: 'dismissed', decided_at: new Date().toISOString(), decided_by: who })
+    .eq('id', queueId)
+    .eq('status', 'pending');
+  await client.from('hr_fb_comments').update({ trang_thai: 'ignored' }).eq('id', commentId);
+
+  revalidatePath('/binh-luan');
+  revalidatePath('/');
+}
+
+// --- Nguồn CV chủ động (TopCV và tương tự) ---
+// Cổng tắt mặc định. Toàn bộ hàm dưới đây chỉ đổi cấu hình trong DB, KHÔNG tự chạy trình
+// duyệt hay gọi trang ngoài — việc chạy thật nằm ở packages/hr/src/sourcing-cv/run.mjs, và
+// script đó tự kiểm lại xac_nhan_phap_ly_boi/xac_nhan_luc trước khi làm gì (không tin riêng cờ bat).
+
+export async function addCvSource(formData: FormData) {
+  const ok = await requireAdmin();
+  if ('error' in ok) throw new Error(ok.error);
+
+  const ten = String(formData.get('ten') || '').trim();
+  const gioiHan = Number(formData.get('gioi_han_ngay')) || null;
+  if (!ten) return;
+
+  const client = getServerClient();
+  const { data: platform, error: e1 } = await client
+    .from('hr_platforms')
+    .insert({ ten, loai: 'cv_source', bat: false, ghi_chu: 'Nguồn tìm CV chủ động — xem docs, cần xác nhận pháp lý trước khi bật.' })
+    .select('id').single();
+  if (e1) throw new Error('Không tạo được nguồn: ' + e1.message);
+
+  const { error: e2 } = await client.from('hr_cv_sources').insert({ platform_id: platform.id, gioi_han_ngay: gioiHan, bat: false });
+  if (e2) throw new Error('Không tạo được cấu hình nguồn: ' + e2.message);
+
+  revalidatePath('/cai-dat/nguon-cv');
+}
+
+// Người có thẩm quyền xác nhận đã rà pháp lý/hợp đồng dịch vụ. KHÔNG tự bật bat ở đây — chỉ
+// mở khóa để nút Bật hiện ra, người vẫn phải bấm Bật riêng một bước nữa.
+export async function confirmCvSourceLegal(formData: FormData) {
+  const ok = await requireAdmin();
+  if ('error' in ok) throw new Error(ok.error);
+
+  const id = String(formData.get('id') || '');
+  if (!id) return;
+
+  const client = getServerClient();
+  const { error } = await client
+    .from('hr_cv_sources')
+    .update({ xac_nhan_phap_ly_boi: ok.email, xac_nhan_luc: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw new Error('Không lưu được xác nhận: ' + error.message);
+  revalidatePath('/cai-dat/nguon-cv');
+}
+
+export async function toggleCvSource(formData: FormData) {
+  const ok = await requireAdmin();
+  if ('error' in ok) throw new Error(ok.error);
+
+  const id = String(formData.get('id') || '');
+  if (!id) return;
+
+  const client = getServerClient();
+  const { data: row } = await client.from('hr_cv_sources').select('id, bat, xac_nhan_phap_ly_boi, xac_nhan_luc').eq('id', id).maybeSingle();
+  if (!row) throw new Error('Không tìm thấy nguồn.');
+
+  // Chặn cứng: không cho bật nếu chưa xác nhận pháp lý, kể cả khi ai đó cố gọi thẳng action này.
+  if (!row.bat && (!row.xac_nhan_phap_ly_boi || !row.xac_nhan_luc)) {
+    throw new Error('Chưa có xác nhận pháp lý. Bấm "Xác nhận đã rà pháp lý" trước.');
+  }
+
+  const { error } = await client.from('hr_cv_sources').update({ bat: !row.bat }).eq('id', id);
+  if (error) throw new Error('Không đổi được trạng thái: ' + error.message);
+  revalidatePath('/cai-dat/nguon-cv');
 }

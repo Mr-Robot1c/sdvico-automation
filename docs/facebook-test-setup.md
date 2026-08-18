@@ -101,3 +101,24 @@ Bốn tầng, máy soạn người bấm Duyệt, worker mới đăng, đúng đ
 Worker chỉ đăng mục đã duyệt, có trần `HR_FB_MAX_PER_DAY` bài mỗi ngày, gặp lỗi thì dừng. Vì Page để Chưa xuất bản, chỉ mình bạn thấy bài.
 
 Nguồn tham khảo tài liệu Meta: Test Users, Pages API, Access Tokens, Graph API Explorer.
+
+## Bước 7 (tùy chọn). Nhận bình luận qua webhook
+
+Việc này KHÔNG bắt buộc để đăng tin — chỉ cần nếu muốn hệ thống đọc và soạn gợi ý trả lời
+bình luận công khai (trang Bình luận Facebook trong giao diện). Đây là bước cấu hình thủ công
+trên Meta, không phải code:
+
+1. Trong app, vào mục **Webhooks**, chọn object **Page**.
+2. Điền **Callback URL**: `https://TEN-APP.vercel.app/api/webhooks/facebook`. URL phải là domain
+   thật đã deploy (Vercel), không chạy được trên localhost vì Meta cần gọi vào được từ ngoài.
+3. Điền **Verify Token**: đặt một chuỗi tự chọn, dán đúng chuỗi đó vào biến môi trường
+   `FACEBOOK_WEBHOOK_VERIFY_TOKEN` trên Vercel, redeploy trước khi bấm Verify and Save.
+4. Chọn field **feed** (KHÔNG chọn `messages` — Messenger cần thêm quyền `pages_messaging` và
+   App Review riêng của Meta, nằm ngoài phạm vi bản này).
+5. Vào Page test, mục Webhooks (hoặc qua app), **Subscribe** app vào Page với field `feed`.
+6. Chế độ Development chỉ nhận được webhook cho Page mà người có vai trò trên app quản trị —
+   đủ để test. Đưa lên Page thật công khai cần App Review cho `pages_read_engagement` (đọc
+   bình luận) và `pages_manage_engagement` (đăng trả lời), việc đó để người vận hành xin sau,
+   có thể mất vài ngày Meta mới duyệt.
+7. Sau khi có bình luận thật gửi tới, hai job cron `comment-compose` và `comment-publish` (xem
+   `docs/cron-job-org.md`) sẽ tự soạn gợi ý và đăng trả lời sau khi được duyệt.
