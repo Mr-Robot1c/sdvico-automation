@@ -3,7 +3,10 @@
 // -> day Hang doi duyet (pending, nguoi bam Duyet moi dang - dieu cam 1) -> danh dau used_at.
 // Logic dong bo app/api/rotate/route.ts (phien A/B v3). Chi dung khi can bai gap ngoai cron sang.
 //
-// Chay:  node apps/approval-ui/scripts/rotate-now.mjs
+// Chay:  node apps/approval-ui/scripts/rotate-now.mjs [--sug=N] [--kind=engage|qa|checklist|tip|glossary] [--no-content]
+//   --sug=N       ep chon huong di #N (mac dinh: uu tien huong dang cho B, roi huong chua dung dau tien)
+//   --kind=X      ep cum bai content (mac dinh: random theo trong so)
+//   --no-content  chi sinh bai ban, khong sinh bai content
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +25,9 @@ function parseEnv(path) {
 function loadRealEnv() {
   let dir = dirname(fileURLToPath(import.meta.url));
   const root = parse(dir).root;
+  // Nap them apps/approval-ui/.env.local (co UNSPLASH_ACCESS_KEY dung cho Xuong anh) - khong ghi de bien da co.
+  const appLocal = join(dir, '..', '.env.local');
+  if (existsSync(appLocal)) for (const [k, v] of Object.entries(parseEnv(appLocal))) if (!process.env[k] && k !== 'SUPABASE_URL' && k !== 'SUPABASE_SERVICE_ROLE_KEY') process.env[k] = v;
   while (true) {
     const p = join(dir, '.env');
     if (existsSync(p)) {
@@ -37,6 +43,7 @@ function loadRealEnv() {
   return process.env;
 }
 const env = loadRealEnv();
+const ARG = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => { const [k, v] = a.slice(2).split('='); return [k, v ?? true]; }));
 const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
 // Modules JS thuan cua app (cung logic voi route).
@@ -57,7 +64,9 @@ const { data: planRow } = await client.from('mkt_plans').select('id, data').eq('
 if (!planRow) { console.error('Chua co ke hoach nao dang ap dung. Vao /ke-hoach bam Ap dung truoc.'); process.exit(1); }
 const allSuggestions = Array.isArray(planRow.data?.content_suggestions) ? planRow.data.content_suggestions : [];
 // v3.1: cap A/B TACH 2 NGAY - uu tien huong dang cho ban B (da co A hom truoc), roi toi huong chua dung.
-let sugIdx = allSuggestions.findIndex((s) => !s.used_at && s.pending_variant === 'B');
+let sugIdx = ARG.sug != null && ARG.sug !== true ? Number(ARG.sug) : -1;
+if (sugIdx >= 0 && (!allSuggestions[sugIdx] || allSuggestions[sugIdx].used_at)) { console.error(`--sug=${sugIdx} khong hop le hoac da dung.`); process.exit(1); }
+if (sugIdx < 0) sugIdx = allSuggestions.findIndex((s) => !s.used_at && s.pending_variant === 'B');
 if (sugIdx < 0) sugIdx = allSuggestions.findIndex((s) => !s.used_at && !s.pending_variant);
 if (sugIdx < 0) { console.error('Het huong di chua dung trong ke hoach dang ap. Tao ke hoach moi + Ap dung.'); process.exit(1); }
 const sug = allSuggestions[sugIdx];
@@ -169,8 +178,9 @@ const KIND_WEIGHT = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portr
 const kindTotal = Object.values(KIND_WEIGHT).reduce((a, b) => a + b, 0);
 let r = Math.random() * kindTotal, chosenKind = 'qa';
 for (const [k, w] of Object.entries(KIND_WEIGHT)) { r -= w; if (r <= 0) { chosenKind = k; break; } }
+if (ARG.kind && ARG.kind !== true) chosenKind = String(ARG.kind);
 const topicsOfKind = CONTENT_TOPICS.filter((t) => t.type === chosenKind);
-{
+if (!ARG['no-content']) {
   console.log(`\nSinh bai content (${chosenKind})...`);
   try {
     const gen = await generateContentPost({ topic: topicsOfKind.length ? pickRandom(topicsOfKind) : undefined });
