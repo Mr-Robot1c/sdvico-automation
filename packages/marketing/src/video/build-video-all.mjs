@@ -67,8 +67,15 @@ async function runOnce(client, { requested, limit, extra }) {
     if (code === 0) {
       ok++;
       // Dung xong: xoa co video_requested (neu co) de khong dung lai + UI het "Da yeu cau".
+      // PHAI doc lai brief MOI NHAT truoc khi update: voi bai rotation, build-video.mjs vua GAN
+      // video_h/video_v + post_reel vao brief bai goc; dung `c.brief` (ban cu load truoc khi
+      // dung) se GHI DE mat video (bug bat duoc 18/8: queue co video ma mkt_content khong).
       if (c.brief?.video_requested) {
-        try { await client.from('mkt_content').update({ brief: { ...c.brief, video_requested: false } }).eq('id', c.id); } catch { /* bo qua */ }
+        try {
+          const { data: fresh } = await client.from('mkt_content').select('brief').eq('id', c.id).single();
+          const b = fresh?.brief || c.brief || {};
+          if (b.video_requested !== false) await client.from('mkt_content').update({ brief: { ...b, video_requested: false } }).eq('id', c.id);
+        } catch { /* bo qua */ }
       }
     } else {
       fail++;
