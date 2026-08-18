@@ -10,12 +10,19 @@ export const runtime = 'nodejs';
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get('code');
+  // Luồng token_hash: link do Admin API sinh trực tiếp (auth.admin.generateLink), không qua
+  // PKCE nên không cần code verifier ở trình duyệt. Dùng cho đăng nhập nhanh khi SMTP bị rate
+  // limit. verifyOtp vẫn xác thực token một lần qua Supabase — an toàn như magic link email.
+  const tokenHash = url.searchParams.get('token_hash');
+  const otpType = url.searchParams.get('type');
   const origin = url.origin;
 
-  if (!code) return NextResponse.redirect(new URL('/dang-nhap?loi=Thi%E1%BA%BFu%20code', origin));
+  if (!code && !tokenHash) return NextResponse.redirect(new URL('/dang-nhap?loi=Thi%E1%BA%BFu%20code', origin));
 
   const auth = getAuthClient();
-  const { data, error } = await auth.auth.exchangeCodeForSession(code);
+  const { data, error } = tokenHash
+    ? await auth.auth.verifyOtp({ token_hash: tokenHash, type: (otpType as 'magiclink' | 'email') || 'magiclink' })
+    : await auth.auth.exchangeCodeForSession(code as string);
   if (error || !data.session?.user?.email) {
     return NextResponse.redirect(new URL('/dang-nhap?loi=' + encodeURIComponent('Không đổi được code: ' + (error?.message || 'không có phiên')), origin));
   }
