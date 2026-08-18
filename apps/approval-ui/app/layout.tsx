@@ -35,6 +35,10 @@ const THEME_SCRIPT = `
     if (t === 'dark' || t === 'light') {
       document.documentElement.setAttribute('data-theme', t);
     }
+    var d = localStorage.getItem('sdvico-density');
+    if (d === 'compact') {
+      document.documentElement.setAttribute('data-density', 'compact');
+    }
   } catch (e) {}
 })();
 `;

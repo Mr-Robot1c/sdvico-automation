@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './theme-toggle';
+import DensityToggle from './density-toggle';
 import SearchDialog from './search-dialog';
 
 const NAV_STORAGE_KEY = 'sdvico-nav-open';
@@ -254,7 +255,10 @@ export default function Nav({ pendingCount = 0, user = null }: { pendingCount?: 
 
         <div className="nav-spacer" />
 
-        <ThemeToggle />
+        <div className="nav-toggles">
+          <ThemeToggle />
+          <DensityToggle />
+        </div>
 
         {renderItem(SETTINGS)}
         {settingsAdminSub
