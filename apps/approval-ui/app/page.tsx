@@ -97,11 +97,18 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   const redCount = filtered.filter((it) => isRedFlag(it.payload)).length;
 
   // Nạp bản nháp cho các bài marketing, để nút Chỉnh sửa preload đúng nội dung.
+  // Kèm cờ brief.video_requested: bài đã yêu cầu dây chuyền video AI dựng (cron GitHub 10 phút
+  // quét, mỗi bản ~15-20 phút) -> card hiện "🎬 Đang làm video AI" để người duyệt biết là đang
+  // chờ, không phải quên (user 18/8: "đợi 15 phút chưa thấy video"). Dựng xong cờ tự tắt.
   const contentIds = items.map((it) => contentIdOf(it.payload)).filter((x): x is string => !!x);
   const drafts = new Map<string, string>();
+  const videoPending = new Set<string>();
   if (contentIds.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, draft').in('id', contentIds);
-    for (const c of cs || []) drafts.set(c.id as string, (c.draft as string) || '');
+    const { data: cs } = await client.from('mkt_content').select('id, draft, brief').in('id', contentIds);
+    for (const c of cs || []) {
+      drafts.set(c.id as string, (c.draft as string) || '');
+      if ((c as any).brief?.video_requested === true) videoPending.add(c.id as string);
+    }
   }
 
   // Nạp ảnh/video đã gắn: đổi id trong brand_assets ra link công khai để hiện trong modal và trên card.
@@ -236,6 +243,9 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   {info.abVariant
                     ? <span className="badge badge-ab" title="Cặp bài thử theo hướng đi kế hoạch. Đăng cả hai, bot đo bản nào bà con thích hơn rồi học cho vòng sau.">🧪 Thử {info.abVariant}</span>
                     : (info.fromPlan ? <span className="badge badge-ab" title="Bài theo hướng đi của kế hoạch tuần">🧭 Theo kế hoạch</span> : null)}
+                  {cid && videoPending.has(cid)
+                    ? <span className="badge badge-video-pending" title="Dây chuyền video AI đang dựng bản Shorts từ bài này (10 tới 40 phút tuỳ hàng chờ máy). Xong sẽ có thêm một bài video riêng ở hàng đợi để duyệt. Bài chữ này vẫn duyệt đăng bình thường.">🎬 Đang làm video AI</span>
+                    : null}
                   <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
                 </div>
 
