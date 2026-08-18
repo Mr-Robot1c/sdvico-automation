@@ -20,8 +20,13 @@
   --tone-default: #5b6879;
 }
 
+/* Palette dark. Áp dụng qua 2 đường:
+   1. @media prefers-color-scheme: dark → theo OS, trừ khi người dùng chọn "Sáng" (data-theme="light")
+   2. [data-theme="dark"] → ép Tối bất kể OS
+   Bảng chuyển đổi trong header sidebar quản lý data-theme trên <html>.
+*/
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0f141b;
     --surface: #171e28;
     --surface-2: #1e2733;
@@ -41,6 +46,26 @@
     --tone-demo: #9aa7b6;
     --tone-default: #9aa7b6;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b;
+  --surface: #171e28;
+  --surface-2: #1e2733;
+  --line: #2a3542;
+  --ink: #e7ecf3;
+  --ink-2: #9aa7b6;
+  --ok: #4cc38a;
+  --ok-bg: #12301f;
+  --no: #f06a6a;
+  --no-bg: #341717;
+  --accent: #7fb2e5;
+  --accent-bg: #16273a;
+  --chip: #1e2733;
+  --tone-hr: #7fb2e5;
+  --tone-mkt: #e0b354;
+  --tone-web: #b79ae0;
+  --tone-demo: #9aa7b6;
+  --tone-default: #9aa7b6;
 }
 
 * { box-sizing: border-box; }
@@ -183,6 +208,20 @@ main { max-width: 860px; margin: 0 auto; padding: 28px 24px 72px; }
 .nav-section.is-open .nav-section-chevron { transform: rotate(90deg); }
 .nav-section-items { display: flex; flex-direction: column; gap: 1px; }
 .nav-spacer { flex: 1; min-height: 16px; }
+
+/* Nút chuyển chế độ hiển thị (Sáng / Tối / Theo máy). Chân sidebar cạnh Cài đặt. */
+.theme-toggle {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent; border: 1px dashed var(--line); border-radius: 8px;
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-2);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.theme-toggle:hover { background: var(--chip); color: var(--ink); border-color: var(--ink-2); }
+.theme-toggle-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.theme-toggle-label { flex: 1; text-align: left; }
 
 /* Nút hamburger — chỉ hiện trên điện thoại */
 .mobile-toggle {
@@ -508,9 +547,11 @@ select.note { cursor: pointer; }
 .axis-n { font-size: 13px; font-weight: 600; text-align: right; color: var(--ink-2); }
 
 @media (prefers-color-scheme: dark) {
-  .stage.tone-mkt { background: #2a2410; }
-  .stage.tone-web { background: #241a33; }
+  :root:not([data-theme="light"]) .stage.tone-mkt { background: #2a2410; }
+  :root:not([data-theme="light"]) .stage.tone-web { background: #241a33; }
 }
+:root[data-theme="dark"] .stage.tone-mkt { background: #2a2410; }
+:root[data-theme="dark"] .stage.tone-web { background: #241a33; }
 
 /* === Bảng Tin đăng (/dang-tin) === */
 /* Cấu trúc giống bảng ứng viên: bấm hàng mở expand row có view/edit + form + Xoá.
@@ -1139,8 +1180,9 @@ select.note { cursor: pointer; }
 .vt-badge-sep         { opacity: 0.55; margin: 0 1px; }
 
 @media (prefers-color-scheme: dark) {
-  .vt-badge.tone-mkt { color: #f0c040; background: #2a2010; border-color: #6a5010; }
+  :root:not([data-theme="light"]) .vt-badge.tone-mkt { color: #f0c040; background: #2a2010; border-color: #6a5010; }
 }
+:root[data-theme="dark"] .vt-badge.tone-mkt { color: #f0c040; background: #2a2010; border-color: #6a5010; }
 
 /* Toolbar tìm kiếm */
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -1172,8 +1214,9 @@ select.note { cursor: pointer; }
 }
 .sys-hint { margin-left: auto; color: var(--ink-2); font-size: 11.5px; }
 @media (prefers-color-scheme: dark) {
-  .sys-chip.tone-mkt { background: #2a2010; border-color: #6a5010; color: #f0c040; }
+  :root:not([data-theme="light"]) .sys-chip.tone-mkt { background: #2a2010; border-color: #6a5010; color: #f0c040; }
 }
+:root[data-theme="dark"] .sys-chip.tone-mkt { background: #2a2010; border-color: #6a5010; color: #f0c040; }
 
 /* Điện thoại nhỏ */
 @media (max-width: 480px) {
@@ -1295,7 +1338,10 @@ select.note { cursor: pointer; }
 }
 .old-post-warning a { color: #6b4400; font-weight: 600; }
 @media (prefers-color-scheme: dark) {
-  .queue-tag.mkt  { color: #f0c040; background: #2a2010; border-color: #6a5010; }
-  .peak-slot      { background: #2a2010; color: #f0c040; border-color: #6a5010; }
-  .old-post-warning { background: #2a2010; border-color: #6a5010; color: #f0c040; }
+  :root:not([data-theme="light"]) .queue-tag.mkt  { color: #f0c040; background: #2a2010; border-color: #6a5010; }
+  :root:not([data-theme="light"]) .peak-slot      { background: #2a2010; color: #f0c040; border-color: #6a5010; }
+  :root:not([data-theme="light"]) .old-post-warning { background: #2a2010; border-color: #6a5010; color: #f0c040; }
 }
+:root[data-theme="dark"] .queue-tag.mkt  { color: #f0c040; background: #2a2010; border-color: #6a5010; }
+:root[data-theme="dark"] .peak-slot      { background: #2a2010; color: #f0c040; border-color: #6a5010; }
+:root[data-theme="dark"] .old-post-warning { background: #2a2010; border-color: #6a5010; color: #f0c040; }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import ThemeToggle from './theme-toggle';
 
 const NAV_STORAGE_KEY = 'sdvico-nav-open';
 
@@ -250,6 +251,8 @@ export default function Nav({ pendingCount = 0, user = null }: { pendingCount?: 
         })}
 
         <div className="nav-spacer" />
+
+        <ThemeToggle />
 
         {renderItem(SETTINGS)}
         {settingsAdminSub

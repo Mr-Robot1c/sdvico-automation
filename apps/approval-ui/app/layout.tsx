@@ -25,10 +25,27 @@ async function getPendingCount(): Promise<number> {
   }
 }
 
+// Script chạy đồng bộ trong <head> trước khi hydrate. Đọc localStorage và áp data-theme
+// (dark/light/empty) lên <html> — CSS đã có rule tương ứng, nên tránh flash khi vào trang.
+// Nếu localStorage bị chặn hoặc chưa có, giữ default (system): CSS media query lo phần còn lại.
+const THEME_SCRIPT = `
+(function() {
+  try {
+    var t = localStorage.getItem('sdvico-theme');
+    if (t === 'dark' || t === 'light') {
+      document.documentElement.setAttribute('data-theme', t);
+    }
+  } catch (e) {}
+})();
+`;
+
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const [pendingCount, user] = await Promise.all([getPendingCount(), getSessionUser()]);
   return (
     <html lang="vi">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>
         <div className="app-shell">
           <Nav pendingCount={pendingCount} user={user} />
