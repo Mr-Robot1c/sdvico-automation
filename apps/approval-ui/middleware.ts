@@ -27,6 +27,10 @@ export async function middleware(req: NextRequest) {
   // Callback và logout của Supabase Auth. Bản thân callback đã tự kiểm hr_users.
   if (path.startsWith('/api/auth/')) return NextResponse.next();
 
+  // Webhook Facebook do Meta gọi từ ngoài, không đăng nhập được. Tự bảo vệ bằng verify token
+  // (GET) và chữ ký X-Hub-Signature-256 (POST) trong chính route, không qua cổng đăng nhập.
+  if (path.startsWith('/api/webhooks/')) return NextResponse.next();
+
   // Trang công khai cho ứng viên tự chọn giờ phỏng vấn.
   if (path.startsWith('/phong-van/')) return NextResponse.next();
 
