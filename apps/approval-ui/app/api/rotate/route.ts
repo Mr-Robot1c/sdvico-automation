@@ -181,6 +181,8 @@ export async function GET(req: Request) {
           rotation_group: group,
           video_requested: true,
         },
+        // Ghi chú weight portrait/news = 0: hai cụm này CẦN người thật + xin phép, KHÔNG cho AI
+        // random. Xem CONTENT_TYPE_INSTRUCTION.portrait + điều cấm 5 CLAUDE.md.
         draft: gen.text,
         status: 'review',
         needs_gov_review: risk === 'red',
@@ -221,7 +223,9 @@ export async function GET(req: Request) {
     //   Weight cao = chọn dày. news/portrait vẫn xuất hiện nhưng ít hơn vì cần chuẩn bị thật.
     // @ts-ignore — module JS thuần
     const { CONTENT_TOPICS } = await import('../../../lib/gen/products.mjs');
-    const KIND_WEIGHT: Record<string, number> = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 1, news: 1 };
+    // portrait=0, news=0: TẮT hai cụm này khỏi rotate. Portrait cần người thật + xin phép,
+    // news dễ chạm quy định. Cả hai CHỈ được viết tay khi có tư liệu thật (điều cấm 5, dieu cam 3).
+    const KIND_WEIGHT: Record<string, number> = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 0, news: 0 };
     const kindTotal = Object.values(KIND_WEIGHT).reduce((a, b) => a + b, 0);
     let r = Math.random() * kindTotal;
     let chosenKind = 'qa';

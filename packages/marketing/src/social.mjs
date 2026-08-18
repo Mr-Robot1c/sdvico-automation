@@ -108,7 +108,7 @@ export async function generateSocialPost({ productGroup, productName, channel, h
 // Chỉ dẫn cấu trúc bài cho từng LOẠI content. AI phải theo đúng dạng để bài hữu ích, không sáo rỗng.
 const CONTENT_TYPE_INSTRUCTION = {
   checklist:
-    'Bài dạng CHECKLIST. Viết 1 câu mở ngắn dẫn dắt, rồi liệt kê 5 tới 7 mục ĐÁNH SỐ (1. 2. 3. ...), mỗi mục 1 dòng ngắn 8 tới 15 từ. Đầu mỗi mục có 1 emoji hợp cảnh (⚓ 🛟 🌊 📡 💧 ⚙️). Kết bằng 1 câu nhắc bà con lưu về hoặc chia sẻ cho anh em.',
+    'Bài dạng CHECKLIST. Viết 1 câu mở ngắn dẫn dắt, XUỐNG DÒNG TRỐNG, rồi liệt kê 5 tới 7 mục ĐÁNH SỐ (1. 2. 3. ...). MỖI MỤC PHẢI XUỐNG DÒNG RIÊNG (dùng 2 ký tự xuống dòng \\n\\n giữa các mục để cách 1 dòng trống nhìn cho thoáng, KHÔNG viết liền nhau trong 1 đoạn). Mỗi mục dài 8 tới 15 từ, đầu mục có 1 emoji hợp cảnh (⚓ 🛟 🌊 📡 💧 ⚙️). Sau mục cuối, XUỐNG DÒNG TRỐNG, kết bằng 1 câu nhắc bà con lưu bài hoặc chia sẻ cho anh em.',
   glossary:
     'Bài dạng GIẢI THÍCH THUẬT NGỮ. Câu đầu ĐỊNH NGHĨA gọn trong 1 dòng (dạng "X là..."). Sau đó 3 tới 4 câu giải thích ngắn: dùng để làm gì, khi nào bà con gặp, cần lưu ý gì. Không đi sâu kỹ thuật, dùng ví dụ đời thường. Không bịa số liệu.',
   tip:

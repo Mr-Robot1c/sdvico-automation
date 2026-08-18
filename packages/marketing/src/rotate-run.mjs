@@ -78,7 +78,8 @@ if (process.env.ROTATE_CONTENT !== '0') {
       // Chọn cụm content theo tỷ lệ đề xuất Phòng KD (tuần 5 bài content):
       // qa=2, checklist=2, glossary=1, tip=1, engage=1, portrait=1, news=1.
       const { CONTENT_TOPICS } = await import('./products.mjs');
-      const KIND_WEIGHT = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 1, news: 1 };
+      // portrait=0, news=0: tắt hai cụm này, cần tư liệu thật + xin phép (điều cấm 5).
+      const KIND_WEIGHT = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 0, news: 0 };
       const kindTotal = Object.values(KIND_WEIGHT).reduce((a, b) => a + b, 0);
       let r = Math.random() * kindTotal;
       let chosenKind = 'qa';

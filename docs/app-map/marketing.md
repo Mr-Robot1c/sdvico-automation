@@ -5,6 +5,9 @@ covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
 <!-- re-verified: 2026-08-14 - build-video RESTORE dung CA 2 ban: horizontal (16:9 cho FB) + vertical (9:16 cho TikTok). Truoc chi ngang -> user thay TikTok khong thay video moi. pushToApprovalQueue upload 2 file -> brand_assets, brief.assets.{video_h,video_v}, channels ['facebook','tiktok'], nhan "[FB 16:9 + TikTok doc] 🎬". Thoi gian dung tang tu ~8p len ~15-20p (danh doi de co ca 2 dinh dang). --skip-whisper van dung. -->
+<!-- re-verified: 2026-08-14 - CONTENT_TYPE_INSTRUCTION.checklist siet moi muc phai xuong dong rieng bang 
+
+. KIND_WEIGHT rotate-run.mjs + rotate/route.ts: portrait=0, news=0. -->
 <!-- re-verified: 2026-08-14 - Rotate BAI BAN chi dung ANH; video san pham goc KHONG dang thang len FB nua (user chot 18/8: dung video AI tu build-video pipeline chu khong gui clip goc). Chi channels=[facebook], brief.assets.video=null, brief.video_requested=true de cron GA */10 phut quet + dung video AI + push bai moi "[FB 16:9 + TikTok doc] 🎬". Folder khong co anh -> skip. Sua ca app rotate/route.ts va CLI rotate-run.mjs. Bai content van dung anh goc nhu cu de giu chan that. -->
 <!-- re-verified: 2026-08-14 - script.mjs prompt siet MOI SO dang so cho phu de video. products.mjs dong bo sang CLI. -->
 <!-- re-verified: 2026-08-14 - Video AI (build-video pushToApprovalQueue) nay chon 1 ANH san pham trong dung folder san pham -> assets.image, khong con null. Khi Duyet, publishContentToFacebook thay video + image se dang video roi tha ANH SAN PHAM vao binh luan dau. Truoc do bai video AI chi co video, khong co anh, ba con khong thay san pham ro. -->

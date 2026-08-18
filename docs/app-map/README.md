@@ -5,6 +5,9 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Checklist prompt siet XUONG DONG rieng moi muc (
+
+ giua cac muc). Da sua nhap bai 1bcc264e hien tai bang regex. KIND_WEIGHT rotate: portrait=0, news=0 (tat hai cum can nguoi that + xin phep - dieu cam 5). CLI dong bo. -->
 <!-- re-verified: 2026-08-14 - Rotate bai ban chi dung ANH; video san pham goc khong dang thang len FB nua. brief.video_requested=true de cron GA quet dung video AI (build-video pipeline) va push bai moi "[FB 16:9 + TikTok doc] 🎬". Chi tiet o marketing.md. -->
 <!-- re-verified: 2026-08-14 - DecideActions: hien giờ hẹn tiếng Việt dưới input datetime (vd "→ 08:00 sáng 18/08/2026") de user khoi nham AM/PM (12:00 AM = 0h khuya, khong phai trua). Alert khi validation fail cung neu ro gio da chon vs gio hien tai va nhac AM/PM. -->
 <!-- re-verified: 2026-08-14 - Quan ly bai viet (/noi-dung) them nut Xoa moi bai (DeleteButton client, confirm 1 lan; dung deleteContent server action da co). Xoa khoi mkt_content + approval_queue + mkt_posts + mkt_metrics; KHONG go bai da dang that tren FB/TikTok. Da purge toan bo DB (180 content + 42 posts + 169 queue) truoc khi Page test chuyen public. -->
