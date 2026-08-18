@@ -108,11 +108,49 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   const contentIds = items.map((it) => contentIdOf(it.payload)).filter((x): x is string => !!x);
   const drafts = new Map<string, string>();
   const videoPending = new Set<string>();
+  // Video Shorts ĐI KÈM bài chữ: bài video-pipeline có brief.source_content = id bài chữ. Card bài
+  // chữ hiện thumbnail video + dòng nối để người duyệt không tưởng "chưa có video" (user 18/8).
+  // Ngược lại card video hiện tên bài chữ nguồn. Hai bài vẫn duyệt/đăng RIÊNG (video còn đi TikTok).
+  const linkedVideo = new Map<string, { contentId: string; videoAssetId: string | null; title: string; queueStatus: string }>();
+  const videoSourceTitle = new Map<string, string>(); // contentId video -> tiêu đề bài chữ nguồn
   if (contentIds.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, draft, brief').in('id', contentIds);
+    const { data: cs } = await client.from('mkt_content').select('id, title, draft, brief').in('id', contentIds);
     for (const c of cs || []) {
       drafts.set(c.id as string, (c.draft as string) || '');
       if ((c as any).brief?.video_requested === true) videoPending.add(c.id as string);
+    }
+    // Bài video-pipeline sinh từ các bài chữ đang trong hàng đợi (bất kỳ trạng thái duyệt).
+    const { data: vids } = await client
+      .from('mkt_content')
+      .select('id, title, brief')
+      .eq('brief->>generator', 'video-pipeline')
+      .in('brief->>source_content', contentIds);
+    const vidIds = (vids || []).map((v: any) => v.id as string);
+    const vidQueueStatus = new Map<string, string>();
+    if (vidIds.length) {
+      const { data: vq } = await client
+        .from('approval_queue')
+        .select('payload, status')
+        .eq('kind', 'mkt_publish_content')
+        .in('payload->>content_id', vidIds);
+      for (const q of vq || []) vidQueueStatus.set(String((q as any).payload?.content_id || ''), String((q as any).status || ''));
+    }
+    for (const v of vids || []) {
+      const src = String((v as any).brief?.source_content || '');
+      const vAsset = ((v as any).brief?.assets?.video_h || (v as any).brief?.assets?.video || null) as string | null;
+      linkedVideo.set(src, {
+        contentId: (v as any).id as string,
+        videoAssetId: vAsset,
+        title: ((v as any).title as string) || '',
+        queueStatus: vidQueueStatus.get((v as any).id as string) || 'pending',
+      });
+    }
+    // Chiều ngược: card video -> tên bài chữ nguồn.
+    const srcIds = (vids || []).map((v: any) => String(v.brief?.source_content || '')).filter(Boolean);
+    if (srcIds.length) {
+      const { data: srcRows } = await client.from('mkt_content').select('id, title').in('id', srcIds);
+      const srcTitle = new Map((srcRows || []).map((r: any) => [r.id as string, (r.title as string) || '']));
+      for (const v of vids || []) videoSourceTitle.set((v as any).id as string, srcTitle.get(String((v as any).brief?.source_content || '')) || '');
     }
   }
 
@@ -123,6 +161,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
     if (a.image) assetIds.add(a.image);
     if (a.video) assetIds.add(a.video);
   }
+  for (const lv of linkedVideo.values()) if (lv.videoAssetId) assetIds.add(lv.videoAssetId);
   const assetUrl = new Map<string, { url: string; kind: string; title: string }>();
   if (assetIds.size) {
     const { data: as } = await client
@@ -251,10 +290,16 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   {cid && videoPending.has(cid)
                     ? <span className="badge badge-video-pending" title="Dây chuyền video AI đang dựng bản Shorts từ bài này (10 tới 40 phút tuỳ hàng chờ máy). Xong sẽ có thêm một bài video riêng ở hàng đợi để duyệt. Bài chữ này vẫn duyệt đăng bình thường.">🎬 Đang làm video AI</span>
                     : null}
+                  {cid && linkedVideo.has(cid)
+                    ? <span className="badge badge-video-linked" title="Video Shorts dựng từ bài này đã xong và là một bài riêng trong hàng đợi (đăng cả Facebook lẫn TikTok). Duyệt bài chữ này và bài video riêng.">🎬 Có video Shorts đi kèm</span>
+                    : null}
+                  {info.postKind === 'video' && cid && videoSourceTitle.get(cid)
+                    ? <span className="badge badge-video-linked" title="Video này dựng từ bài chữ bên dưới. Bài chữ và video duyệt riêng.">🔗 Video của bài: {videoSourceTitle.get(cid)}</span>
+                    : null}
                   <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
                 </div>
 
-                {img || vid ? (
+                {img || vid || (cid && linkedVideo.get(cid)?.videoAssetId) ? (
                   <div className="card-media">
                     {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} loading="lazy" /> : null}
                     {vid ? (
@@ -263,7 +308,20 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                         <span className="card-media-badge" aria-hidden="true">▶</span>
                       </span>
                     ) : null}
+                    {/* Thumbnail video Shorts đi kèm (bài riêng) — hiện cạnh ảnh để thấy đủ bộ. */}
+                    {!vid && cid && linkedVideo.get(cid)?.videoAssetId && assetUrl.get(linkedVideo.get(cid)!.videoAssetId!) ? (
+                      <span className="card-media-vid card-media-linked" title={`Video Shorts đi kèm: ${linkedVideo.get(cid)!.title} (bài riêng, ${linkedVideo.get(cid)!.queueStatus === 'pending' ? 'đang chờ duyệt' : linkedVideo.get(cid)!.queueStatus === 'approved' ? 'đã duyệt' : linkedVideo.get(cid)!.queueStatus})`}>
+                        <video src={assetUrl.get(linkedVideo.get(cid)!.videoAssetId!)!.url} muted preload="metadata" />
+                        <span className="card-media-badge" aria-hidden="true">▶</span>
+                        <span className="card-media-linked-tag">Shorts đi kèm</span>
+                      </span>
+                    ) : null}
                   </div>
+                ) : null}
+                {cid && linkedVideo.has(cid) ? (
+                  <p className="sub linked-note">
+                    🎬 Video Shorts của bài này: <b>{linkedVideo.get(cid)!.title}</b> — là một bài riêng {linkedVideo.get(cid)!.queueStatus === 'pending' ? 'đang chờ duyệt trong danh sách này' : linkedVideo.get(cid)!.queueStatus === 'approved' ? 'đã được duyệt' : `(${linkedVideo.get(cid)!.queueStatus})`}. Bài chữ và video duyệt riêng, video đăng cả Facebook lẫn TikTok.
+                  </p>
                 ) : null}
 
                 <div className="card-actions">
