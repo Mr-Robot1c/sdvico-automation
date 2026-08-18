@@ -42,28 +42,28 @@ if (!unused.length) { cycle += 1; unused = [...eligible]; }
 const picked = shuffle(unused).slice(0, N);
 for (const group of picked) {
   const f = folders.get(group); const name = productName(group);
+  // Bài BÁN chỉ dùng ẢNH; video sản phẩm gốc không đăng thẳng nữa (user chốt 18/8), thay bằng
+  // video AI dựng qua dây chuyền build-video. Đặt video_requested=true để cron GA quét dựng.
   const img = f.images.length ? rnd(f.images) : null;
-  const vid = f.videos.length ? rnd(f.videos) : null;
-  if (!img && !vid) continue;
-  const channels = vid ? ['facebook', 'tiktok'] : ['facebook'];
-  const assets = { image: img?.id || null, video: vid?.id || null };
+  if (!img) { console.log(`  Bo qua ${name}: folder chua co anh`); continue; }
+  const channels = ['facebook'];
+  const assets = { image: img.id, video: null };
   let gen;
-  try { gen = await generateSocialPost({ productGroup: group, productName: name, channel: 'facebook', hasVideo: !!vid }); }
+  try { gen = await generateSocialPost({ productGroup: group, productName: name, channel: 'facebook', hasVideo: false }); }
   catch (e) { console.log(`  Loi gen ${name}: ${e.message}`); continue; }
   const risk = gen.assessment?.risk || 'none';
   const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : name;
   const { data: ins } = await client.from('mkt_content').insert({
     kind: 'social', title: displayTitle,
-    brief: { keyword: name, intent: 'giao_dich', assets, channels, generator: 'rotation', rotation: true, rotation_cycle: cycle, rotation_group: group },
+    brief: { keyword: name, intent: 'giao_dich', assets, channels, generator: 'rotation', rotation: true, rotation_cycle: cycle, rotation_group: group, video_requested: true },
     draft: gen.text, status: 'review', needs_gov_review: risk === 'red',
   }).select('id').single();
   if (!ins) continue;
-  const label = channels.length > 1 ? '[FB + TikTok]' : '[Facebook]';
   await client.from('approval_queue').insert({
-    kind: 'mkt_publish_content', title: `${label} ${displayTitle}`,
+    kind: 'mkt_publish_content', title: `[Facebook] ${displayTitle}`,
     payload: { content_id: ins.id, format: 'social', keyword: name, intent: 'giao_dich', risk, assets, channels, authored: 'ai' }, status: 'pending',
   });
-  console.log(`Cycle ${cycle} | ${label} ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk}`);
+  console.log(`Cycle ${cycle} | [Facebook + video_req] ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk}`);
 }
 
 // 1 bài content mỗi lượt (không bán).

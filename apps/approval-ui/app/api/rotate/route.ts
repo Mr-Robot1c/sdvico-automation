@@ -140,26 +140,25 @@ export async function GET(req: Request) {
     const f = folders.get(group)!;
     const name = productName(group);
 
-    // MỘT bài mỗi folder, đăng CẢ HAI nền tảng: Facebook (ảnh, kèm video nếu có) + TikTok (video).
-    // Folder không có video thì chỉ Facebook (TikTok bắt buộc video).
+    // Rotate CHỈ DÙNG ẢNH cho bài bán (điều user chốt 18/8): video sản phẩm gốc không đăng thẳng
+    // lên FB nữa, mà kích hoạt DÂY CHUYỀN VIDEO AI (build-video pipeline) dựng script + TTS + ghép
+    // cảnh + intro/outro rồi push bài "[FB 16:9 + TikTok dọc] 🎬" riêng. Bài rotate này chỉ ảnh + FB.
+    // Cần ít nhất 1 ảnh trong folder; folder không có ảnh -> bỏ qua (dù có video gốc cũng không dùng).
     const img = f.images.length ? pickRandom(f.images) : null;
-    const vid = f.videos.length ? pickRandom(f.videos) : null;
-    if (!img && !vid) {
-      skipped.push({ group, reason: 'folder rong' });
+    if (!img) {
+      skipped.push({ group, reason: 'folder chua co anh - can upload it nhat 1 anh de rotate' });
       continue;
     }
-    // Auto-logo: bảo đảm ảnh có logo SDVICO trước khi gắn (in-place, giữ nguyên id). Không chặn sinh bài nếu lỗi.
-    if (AUTO_LOGO && img) {
+    if (AUTO_LOGO) {
       try { logoActions.push({ group, ...(await ensureLogoForPost(client, img.id)) }); }
       catch (e) { logoActions.push({ group, action: 'error', reason: String((e as any)?.message || e) }); }
     }
-    const channels = vid ? ['facebook', 'tiktok'] : ['facebook'];
-    const assets = { image: img?.id || null, video: vid?.id || null };
+    const channels = ['facebook'];
+    const assets = { image: img.id, video: null };
 
     let gen: any;
     try {
-      // Một text dùng cho cả hai kênh (kiểu Facebook, hợp cả TikTok).
-      gen = await generateSocialPost({ productGroup: group, productName: name, channel: 'facebook', hasVideo: !!vid });
+      gen = await generateSocialPost({ productGroup: group, productName: name, channel: 'facebook', hasVideo: false });
     } catch (e) {
       skipped.push({ group, reason: 'gen loi: ' + (e as any)?.message });
       continue;
@@ -180,6 +179,7 @@ export async function GET(req: Request) {
           rotation: true,
           rotation_cycle: cycle,
           rotation_group: group,
+          video_requested: true,
         },
         draft: gen.text,
         status: 'review',
