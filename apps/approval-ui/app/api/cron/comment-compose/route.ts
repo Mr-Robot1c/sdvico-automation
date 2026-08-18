@@ -61,11 +61,11 @@ async function classifyComment(comment: string): Promise<'muon_biet_them' | 'tic
   }
 }
 
-function fallbackReply(): string {
-  return `Chào bạn, cảm ơn bạn đã quan tâm. Bạn nhắn tin trực tiếp cho page qua Messenger hoặc gửi CV về ${EMAIL} (hotline ${HOTLINE}) để được tư vấn chi tiết hơn nhé.`;
+function fallbackReply(email: string, hotline: string): string {
+  return `Chào bạn, cảm ơn bạn đã quan tâm. Bạn nhắn tin trực tiếp cho page qua Messenger hoặc gửi CV về ${email} (hotline ${hotline}) để được tư vấn chi tiết hơn nhé.`;
 }
 
-function replySystemPrompt(): string {
+function replySystemPrompt(email: string): string {
   return [
     'Bạn trả lời bình luận Facebook cho Công ty SDVICO, ngành thiết bị biển và thủy sản.',
     'Người bình luận đang hỏi thêm chi tiết. Mục tiêu duy nhất: cảm ơn ngắn gọn rồi MỜI HỌ NHẮN TIN',
@@ -74,7 +74,7 @@ function replySystemPrompt(): string {
     'Độ dài 1 tới 2 câu, giọng gần gũi lịch sự.',
     'Không hứa hẹn kết quả tuyển dụng, không hứa lương/phúc lợi cụ thể nếu không có trong bài gốc (điều cấm 5).',
     'Không mô tả phần mềm đối tác như năng lực của SDVICO (điều cấm 4). Không tự trả lời số liệu/chi tiết ở đây.',
-    `Câu mời phải nhắc rõ "nhắn Messenger" (hoặc "gửi CV về ${EMAIL}").`,
+    `Câu mời phải nhắc rõ "nhắn Messenger" (hoặc "gửi CV về ${email}").`,
     'Số theo chuẩn Việt Nam. Không dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'Chỉ trả về câu trả lời, không kèm giải thích.',
   ].join('\n');
@@ -96,6 +96,11 @@ export async function GET(req: Request) {
   if (!verifyAuth(req)) return new Response('Unauthorized', { status: 401 });
 
   const client = getServerClient();
+  // Email/hotline liên hệ: ưu tiên Cài đặt (brand_config), rồi biến môi trường, cuối cùng mặc định.
+  const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
+  const brand = (brandRow?.value || {}) as { email?: string; hotline?: string };
+  const email = brand.email || EMAIL;
+  const hotline = brand.hotline || HOTLINE;
   let queued = 0;
   let reacted = 0;
   let ignored = 0;
@@ -118,11 +123,11 @@ export async function GET(req: Request) {
           const { data: post } = await client.from('hr_job_posts').select('tieu_de').eq('id', row.job_post_id).maybeSingle();
           postContext = post?.tieu_de || '';
         }
-        let goiY = fallbackReply();
+        let goiY = fallbackReply(email, hotline);
         let generator = 'fallback';
         if (row.message?.trim()) {
           const user = [postContext ? `Bài đăng gốc: ${postContext}` : '', `Bình luận cần trả lời: ${row.message}`].filter(Boolean).join('\n');
-          const text = await groqChat(replySystemPrompt(), user, { temperature: 0.5, maxTokens: 300 }).catch(() => null);
+          const text = await groqChat(replySystemPrompt(email), user, { temperature: 0.5, maxTokens: 300 }).catch(() => null);
           if (text?.trim()) { goiY = text.trim(); generator = process.env.HR_POST_MODEL || process.env.HR_SCREEN_MODEL || 'openai/gpt-oss-120b'; }
         }
 

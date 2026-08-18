@@ -14,11 +14,13 @@ export type JobInput = {
   nhom?: string;
 };
 
+// Mặc định khi không truyền liên hệ vào (giữ để lib chạy độc lập). Nơi gọi nên truyền
+// email/hotline từ Cài đặt (brand_config) để ưu tiên cấu hình của công ty.
 const EMAIL = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
 const HOTLINE = '1900 23 23 49';
 const KEYS = ['website', 'job_board', 'facebook', 'zalo_sms'] as const;
 
-function systemPrompt(): string {
+function systemPrompt(email: string, hotline: string): string {
   return [
     'Bạn viết mô tả công việc (JD) cho Công ty SDVICO, ngành thiết bị biển và thủy sản, trụ sở Vũng Tàu.',
     'Viết tiếng Việt tự nhiên, chuyên nghiệp nhưng gần gũi. Không dịch máy, không sáo rỗng.',
@@ -29,7 +31,7 @@ function systemPrompt(): string {
     '- Không mô tả phần mềm đối tác như năng lực của SDVICO (điều cấm 4).',
     '- Số theo chuẩn Việt Nam, dấu chấm ngăn cách hàng nghìn.',
     '- Không dùng gạch dài, mũi tên, dấu chấm tròn giữa câu, ký hiệu thay chữ và.',
-    `- Cuối mỗi bản nêu cách ứng tuyển: gửi CV về ${EMAIL} hoặc gọi ${HOTLINE}.`,
+    `- Cuối mỗi bản nêu cách ứng tuyển: gửi CV về ${email} hoặc gọi ${hotline}.`,
     '',
     'Trả về một đối tượng JSON đúng dạng sau, không kèm chữ nào khác:',
     '{',
@@ -55,9 +57,9 @@ function userPrompt(job: JobInput): string {
 }
 
 // Bản ghép cơ bản, tất định, để trang chạy được khi chưa có khóa mô hình.
-export function jdFallback(job: JobInput): Record<string, string> {
+export function jdFallback(job: JobInput, email: string = EMAIL, hotline: string = HOTLINE): Record<string, string> {
   const loc = job.location ? ` tại ${job.location}` : '';
-  const apply = `Ứng tuyển: gửi CV về ${EMAIL} hoặc gọi ${HOTLINE}.`;
+  const apply = `Ứng tuyển: gửi CV về ${email} hoặc gọi ${hotline}.`;
   const benefits = job.benefits ? `Quyền lợi: ${job.benefits}.` : 'Quyền lợi: thỏa thuận theo năng lực.';
   const desc = job.short_desc ? String(job.short_desc).trim() : '';
   const req = job.requirements ? String(job.requirements).trim() : '';
@@ -93,10 +95,15 @@ export function jdFallback(job: JobInput): Record<string, string> {
 }
 
 // Soạn đủ bốn phiên bản. Trả { versions, generator }.
-export async function composeJdVersions(job: JobInput): Promise<{ versions: Record<string, string>; generator: string }> {
-  const fb = jdFallback(job);
+export async function composeJdVersions(
+  job: JobInput,
+  contact: { email?: string; hotline?: string } = {}
+): Promise<{ versions: Record<string, string>; generator: string }> {
+  const email = contact.email || EMAIL;
+  const hotline = contact.hotline || HOTLINE;
+  const fb = jdFallback(job, email, hotline);
   try {
-    const raw = await groqChat(systemPrompt(), userPrompt(job), { json: true, maxTokens: 2600 });
+    const raw = await groqChat(systemPrompt(email, hotline), userPrompt(job), { json: true, maxTokens: 2600 });
     if (!raw) return { versions: fb, generator: 'fallback' };
 
     const parsed = JSON.parse(raw) as Record<string, unknown>;

@@ -1114,6 +1114,17 @@ export async function publishJobPost(formData: FormData) {
   revalidatePath('/');
 }
 
+// Đọc email/hotline liên hệ từ Cài đặt (brand_config), lùi về biến môi trường rồi mặc định.
+// Dùng để chèn cách ứng tuyển đúng cấu hình công ty vào các bản JD do AI/bản ghép sinh ra.
+async function resolveBrandContact(client: ReturnType<typeof getServerClient>): Promise<{ email: string; hotline: string }> {
+  const { data } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
+  const brand = (data?.value || {}) as { email?: string; hotline?: string };
+  return {
+    email: brand.email || process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com',
+    hotline: brand.hotline || '1900 23 23 49',
+  };
+}
+
 // Tạo bản nháp JD từ thông tin người dùng nhập. AI viết bốn phiên bản, lưu nháp.
 // Người xem, sửa rồi bấm "Soạn bài và đưa vào Duyệt" — không tự đăng (điều cấm 1).
 export async function createJdDraft(formData: FormData) {
@@ -1130,9 +1141,9 @@ export async function createJdDraft(formData: FormData) {
     nhom: String(formData.get('nhom') || '').trim() || undefined
   };
   const image_hint = String(formData.get('image_hint') || '').trim() || null;
-  const { versions } = await composeJdVersions(job);
-
   const client = getServerClient();
+  const { versions } = await composeJdVersions(job, await resolveBrandContact(client));
+
   const { error } = await client.from('hr_jobs').insert({
     title: job.title,
     department: job.department || null,
@@ -1286,7 +1297,7 @@ export async function regenerateJd(formData: FormData) {
     short_desc: job.short_desc || undefined,
     requirements: job.requirements || undefined,
     nhom: job.nhom || undefined
-  });
+  }, await resolveBrandContact(client));
   const { error: e2 } = await client.from('hr_jobs').update({ jd_versions: versions }).eq('id', jobId);
   if (e2) throw new Error(e2.message);
   revalidatePath('/tao-jd');
@@ -1379,9 +1390,9 @@ export async function createJdDraftForPanel(
     nhom: String(formData.get('nhom') || '').trim() || undefined,
   };
   const image_hint = String(formData.get('image_hint') || '').trim() || null;
-  const { versions } = await composeJdVersions(job);
-
   const client = getServerClient();
+  const { versions } = await composeJdVersions(job, await resolveBrandContact(client));
+
   const { data, error } = await client.from('hr_jobs').insert({
     title: job.title,
     department: job.department || null,
