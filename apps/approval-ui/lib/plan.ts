@@ -74,6 +74,9 @@ export type Plan = {
   narrative: string[];
   // v3 (18/8): mục tiêu tuần do người giao (app_config mkt_weekly_goal) tại thời điểm sinh bản này.
   goal?: string;
+  // v3 (18/8): nhịp bản này — 'weekly' (Thứ 2, kế hoạch tuần), 'update' (Thứ 4, cập nhật lần 1),
+  // 'manual' (bấm tay). Bản cũ không có -> undefined.
+  cadence?: 'weekly' | 'update' | 'manual';
   // v2 (18/8): hướng đi cụ thể tuần tới, sinh từ tri thức. Bản cũ không có -> undefined.
   content_suggestions?: ContentDirection[];
   summary: {
@@ -214,20 +217,42 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
   return { products, totals, topPosts };
 }
 
-// Thứ 4 (3) hoặc chủ nhật (0) theo giờ Việt Nam. Dùng để cron metrics-pull hàng ngày biết
-// hôm nay có sinh kế hoạch không (Vercel Hobby chỉ 2 cron nên gộp thay vì thêm cron thứ 3).
+// Thứ 4 (3) hoặc chủ nhật (0) theo giờ Việt Nam. Nhịp CŨ, giữ cho tương thích chỗ khác gọi.
 export function isPlanDayVN(now: Date): boolean {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
   const dow = vn.getUTCDay();
   return dow === 3 || dow === 0;
 }
 
+// Nhịp MỚI (user chốt 18/8, flowchart v3): Thứ 2 từ 8h sáng VN = kế hoạch TUẦN (BOSS đã gom
+// đủ thông tin Chủ nhật); Thứ 4 từ 8h sáng VN = CẬP NHẬT lần 1 giữa tuần. Ngoài 2 khung đó
+// không sinh. Cron 30 phút/lần nên chỗ gọi phải tự chặn trùng (1 bản cron mỗi ngày).
+export function planSlotVN(now: Date): 'weekly' | 'update' | null {
+  const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const dow = vn.getUTCDay();
+  const hour = vn.getUTCHours();
+  if (hour < 8) return null;
+  if (dow === 1) return 'weekly';
+  if (dow === 3) return 'update';
+  return null;
+}
+
+// Mốc đầu ngày hôm nay theo giờ VN, trả ISO UTC — để đếm "hôm nay cron đã sinh bản nào chưa".
+export function vnDayStartIso(now: Date): string {
+  const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const startUtcMs = Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - 7 * 60 * 60 * 1000;
+  return new Date(startUtcMs).toISOString();
+}
+
 // Sinh 1 bản kế hoạch từ số liệu hiện tại rồi lưu vào mkt_plans (applied = false).
 // Bot ĐỀ XUẤT, người quyết (điều cấm 1 và 2). Dùng chung cho cron, action tạo tay, và cron metrics-pull.
 // v2 (18/8/2026): thêm nguyên liệu tri thức (nội bộ + public) 7 ngày qua vào plan.summary.knowledge.
+// v3 (18/8/2026): mỗi bản TỰ KÈM hướng đi (content_suggestions, chỉ đạo cho AI Creator) qua
+// Gemini — lỗi LLM không đánh hỏng bản kế hoạch, chỉ thiếu hướng đi (chạy tay bù sau).
 export async function generateAndStorePlan(
   client: Client,
-  generatedBy: 'cron' | 'manual'
+  generatedBy: 'cron' | 'manual',
+  opts: { cadence?: 'weekly' | 'update' } = {}
 ): Promise<{ id: string | null; plan: Plan }> {
   const now = new Date();
   const [measurement, knowledge, goalRes] = await Promise.all([
@@ -256,6 +281,21 @@ export async function generateAndStorePlan(
     knowledge: knowledgeUsed,
     goal: goal || undefined,
   });
+  plan.cadence = opts.cadence || (generatedBy === 'manual' ? 'manual' : undefined);
+
+  // Chỉ đạo cho AI Creator: sinh hướng đi từ chính tri thức vừa nạp. Lỗi -> bản kế hoạch
+  // vẫn lưu, hướng đi trống (chạy tay scripts/generate-plan-directions.mjs bù).
+  try {
+    const { generateContentDirections } = await import('./plan-directions');
+    plan.content_suggestions = await generateContentDirections(
+      { internal: knowledge.internal, publicSrc: knowledge.publicSrc },
+      goal
+    );
+  } catch (e: any) {
+    console.error('[plan] sinh huong di that bai (ke hoach van luu):', e?.message || e);
+    plan.content_suggestions = [];
+  }
+
   const win = weekWindowVN(now);
   const { data, error } = await client
     .from('mkt_plans')

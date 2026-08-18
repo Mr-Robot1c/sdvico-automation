@@ -164,6 +164,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           <section className="plan-card">
             <div className="plan-meta">
               <span className="badge">{latest.generated_by === 'cron' ? '🤖 Tự động' : '✍️ Tạo tay'}</span>
+              {latest.data.cadence === 'weekly' ? (
+                <span className="badge">📅 Kế hoạch tuần (Thứ 2)</span>
+              ) : latest.data.cadence === 'update' ? (
+                <span className="badge">🔁 Cập nhật giữa tuần (Thứ 4)</span>
+              ) : null}
               <span className="sub">Sinh lúc {fmtDateTime(latest.created_at)}</span>
               {latest.period_start ? (
                 <span className="sub">Tuần {fmtDate(latest.period_start)} đến {fmtDate(latest.period_end)}</span>
