@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-14 - Fix bai anh + chu dai bi day anh xuong comment: publishContentToFacebook bo nhanh "message.length > 500 -> /feed + comment anh". Bay gio CO ANH luon di /photos (anh trong post chinh, caption dai thi FB tu gap "See more"). Anh la nhan dien thuong hieu, khong duoc day xuong comment chi vi caption dai. Comment mo ta trong code cap nhat. -->
 <!-- re-verified: 2026-08-14 - Trang chu Hang doi duyet: BO the "Kho tu khoa" (mkt_keywords khong dung o luong san xuat hien tai, gay roi). Con 3 the: bai cho duyet, can xem xet, bai da dang. -->
 <!-- re-verified: 2026-08-14 - waitFacebookVideoReady tang timeout 24s -> 60s. Video AI dung co intro/outro 40-70s, FB xu ly video lau hon => 24s khong du -> tha anh binh luan fail. -->
 

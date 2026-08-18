@@ -93,11 +93,9 @@ async function publishContentToFacebook(
   try {
     // Facebook không cho gộp video và ảnh vào CHUNG một post. Cách chọn:
     //  - Có video: đăng video (/videos); kèm ảnh thì thả ảnh vào BÌNH LUẬN đầu (chờ video xử lý xong).
-    //  - Bài CHỮ DÀI + ảnh: đăng CHỮ (/feed) để hiện đủ nội dung, rồi thả ảnh vào bình luận đầu (thay
-    //    vì nhét chữ dài làm caption ảnh /photos bị gấp lại "Xem thêm").
-    //  - Bài NGẮN + ảnh: đăng ảnh (/photos) kèm caption (ảnh nổi bật, hợp bài quảng cáo ngắn).
+    //  - Có ảnh: LUÔN đăng ảnh (/photos) kèm caption. Chữ dài thì FB tự gấp "See more" (bà con quen
+    //    bấm) - đánh đổi này TỐT hơn mất ảnh khỏi post chính (post FB nào cũng nên có ảnh nổi bật).
     //  - Không ảnh không video: đăng chữ (/feed).
-    const LONG_TEXT = 500; // ký tự: trên mức này coi là bài dài -> ưu tiên chữ làm bài chính
     let endpoint: string;
     let body: URLSearchParams;
     let commentImage = false; // có thả ảnh vào bình luận đầu sau khi đăng không
@@ -106,10 +104,6 @@ async function publishContentToFacebook(
       endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/videos`;
       body = new URLSearchParams({ file_url: videoUrl, description: message, access_token: TOKEN });
       if (imageUrl) { commentImage = true; waitVideo = true; }
-    } else if (imageUrl && message.length > LONG_TEXT) {
-      endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
-      body = new URLSearchParams({ message, access_token: TOKEN });
-      commentImage = true;
     } else if (imageUrl) {
       endpoint = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/photos`;
       body = new URLSearchParams({ url: imageUrl, caption: message, access_token: TOKEN });
