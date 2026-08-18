@@ -733,12 +733,20 @@ a.chip:hover { filter: brightness(0.98); }
 .direction-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
 
 /* Trang Kho tri thức: hai cột nội bộ và public. */
-.kt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px; }
+.kt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px; min-width: 0; }
+.kt-col { min-width: 0; }
 .kt-col h2 { margin: 0 0 12px 0; }
 .kt-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
-.kt-item { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+/* min-width:0 + overflow-wrap:break-word: URL/token khong space (vd Google News redirect
+   link dai 300 ky tu) khong con phong to card lam be layout sidebar */
+.kt-item {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; min-width: 0; overflow-wrap: anywhere; word-break: break-word;
+}
 .kt-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-.kt-item p { margin: 6px 0 0 0; line-height: 1.55; }
+.kt-item-head b { min-width: 0; overflow-wrap: anywhere; }
+.kt-item-head a { overflow-wrap: anywhere; word-break: break-word; }
+.kt-item p { margin: 6px 0 0 0; line-height: 1.55; overflow-wrap: anywhere; }
 .kt-item code { font-size: 0.82em; word-break: break-all; }
 @media (max-width: 860px) { .kt-grid { grid-template-columns: 1fr; } }
 

@@ -65,8 +65,29 @@ const TOPICS = [
   'khai thác cá xa bờ',
 ];
 
+// Google News RSS <description> chua CDATA bao <a href...>Title</a><font>Source</font>,
+// va CHINH ky tu HTML lai encoded 2 lop: &lt;a&gt; hoac binh thuong <a>. Phai:
+// 1) decode entities (kể cả numeric &#NNN;) LẶP LẠI toi khi khong doi
+// 2) strip HTML tags
+// 3) decode entities lan nua (vi de-strip co the lo entities sot)
+// Neu bo qua se lot chuoi kieu href="..." target="_blank" vao DB -> hong UI.
+function decodeEntities(s) {
+  let prev = null; let cur = String(s || '');
+  const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+  while (prev !== cur) {
+    prev = cur;
+    cur = cur
+      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCharCode(parseInt(n, 16)))
+      .replace(/&([a-zA-Z]+);/g, (_, name) => named[name.toLowerCase()] ?? `&${name};`);
+  }
+  return cur;
+}
 function stripHtml(s) {
-  return String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+  let out = decodeEntities(String(s || ''));
+  out = out.replace(/<[^>]+>/g, ' ');
+  out = decodeEntities(out);
+  return out.replace(/\s+/g, ' ').trim();
 }
 
 // Parse RSS XML thu cong (khong can dep). Trich <item>...<title>...<link>...<description>...<pubDate>...
