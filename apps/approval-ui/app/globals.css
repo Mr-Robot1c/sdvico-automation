@@ -670,9 +670,15 @@ a.chip:hover { filter: brightness(0.98); }
 
 /* Hàng thao tác của card: nút mắt bên trái, Duyệt/Từ chối bên phải */
 .card-actions {
-  display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap;
+  display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; flex-wrap: wrap;
 }
-.card-actions > form.row { flex: 1; min-width: 0; }
+/* Form duyệt (dù là .row cũ hay .decide-wrap có composer TikTok) giãn hết bề ngang để
+   ghi chú/hẹn giờ/nút trải đều, không dồn cục một bên. Nút 👁 xem bài căn TRÊN (flex-start)
+   cho thẳng với đỉnh composer thay vì trôi ra giữa. */
+.card-actions > form.row,
+.card-actions > form.decide-wrap { flex: 1; min-width: 0; }
+/* Trong khối duyệt, hàng ghi chú/hẹn giờ/nút căn TRÊN + cách composer một khoảng đều. */
+.decide-wrap > .row { width: 100%; }
 
 /* ===== Modal xem chi tiết (native <dialog>) ===== */
 .modal {

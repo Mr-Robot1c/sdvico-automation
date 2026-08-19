@@ -1,8 +1,11 @@
-name: Kéo số liệu Facebook 30 phút/lần
+name: Cron 30 phút - số liệu + sinh nội dung
 
-# GỌI endpoint /api/mkt-metrics-pull trên Vercel để cập nhật mkt_metrics.
-# Vercel Cron gói Hobby không chạy được lịch dưới 1 ngày; workflow này lấp chỗ đó.
-# Endpoint bảo vệ bằng CRON_SECRET (đặt cùng giá trị trên GitHub secret + Vercel env production).
+# GỌI 2 endpoint trên Vercel mỗi 30 phút (cron Vercel Hobby không chạy được lịch dưới 1 ngày):
+#  1) /api/mkt-metrics-pull  - cập nhật mkt_metrics + học tri thức + sinh kế hoạch theo lịch.
+#  2) /api/rotate            - sinh bài A/B chờ duyệt. Route có GUARD 1 lần/ngày (VN) nên gọi 30
+#     phút/lần vẫn chỉ tạo 1 đợt bài mỗi ngày; đây là LƯỚI AN TOÀN cho cron Vercel /api/rotate hay
+#     bị trượt (19/8: cron Vercel trượt cả ngày, không ai biết vì route im lặng — nay có run_log).
+# Cả 2 bảo vệ bằng CRON_SECRET (đặt cùng giá trị trên GitHub secret + Vercel env production).
 
 on:
   schedule:
@@ -17,7 +20,7 @@ jobs:
   pull:
     runs-on: ubuntu-latest
     steps:
-      - name: Kéo số liệu Facebook
+      - name: Kéo số liệu Facebook + học tri thức + kế hoạch
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
@@ -25,6 +28,18 @@ jobs:
           code=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
             -H "Authorization: Bearer $CRON_SECRET" \
             "https://sdvico-mktit.vercel.app/api/mkt-metrics-pull")
-          echo "HTTP $code"
+          echo "metrics-pull HTTP $code"
           head -c 800 /tmp/resp.json; echo
           test "$code" = "200"
+      - name: Sinh nội dung A/B chờ duyệt (guard 1 lần/ngày)
+        if: always() # chạy kể cả bước trên lỗi, để không lỡ đợt bài trong ngày
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "Thieu CRON_SECRET"; exit 0; fi
+          code=$(curl -s -o /tmp/rot.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://sdvico-mktit.vercel.app/api/rotate")
+          echo "rotate HTTP $code"
+          head -c 800 /tmp/rot.json; echo
+          # KHÔNG fail workflow nếu rotate lỗi (số liệu vẫn tính là chạy); run_log mkt.rotate ghi lý do.

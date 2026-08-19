@@ -66,10 +66,35 @@ export async function GET(req: Request) {
   }
 
   const client = getServerClient();
+  const startedAt = Date.now();
+  const forced = new URL(req.url).searchParams.get('force') === '1';
+  // Ghi run_log mỗi lần chạy (19/8: route này im lặng suốt, cron Vercel trượt 1 ngày mà không ai
+  // biết vì không có nhật ký — y hệt bẫy metrics đã vá). Có log rồi thì trang Dữ liệu/BOT thấy được.
+  const logRotate = async (status: 'ok' | 'skipped' | 'error', detail: any) => {
+    try { await client.from('run_log').insert({ task: 'mkt.rotate', actor: 'cron', status, detail: { ...detail, ms: Date.now() - startedAt } }); } catch { /* bỏ qua */ }
+  };
 
   // Dừng khẩn: không sinh bài mới khi công tắc bật (cổng an toàn Phần 5.4).
   if (await isEmergencyStopped(client)) {
+    await logRotate('skipped', { reason: 'emergency_stop' });
     return NextResponse.json({ ok: true, created: 0, note: 'emergency_stop' });
+  }
+
+  // GUARD 1 LẦN/NGÀY: cron tin cậy (metrics-pull 30 phút/lần) sẽ gọi route này để bù khi cron Vercel
+  // trượt; guard đảm bảo chỉ sinh 1 đợt bài mỗi ngày VN dù bị gọi nhiều lần. ?force=1 để bỏ qua guard
+  // (chạy tay khi cần thêm). Đếm bài generator=rotation tạo từ đầu ngày VN.
+  if (!forced) {
+    const vn = new Date(Date.now() + 7 * 3600 * 1000);
+    const dayStartIso = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - 7 * 3600 * 1000).toISOString();
+    const { count: madeToday } = await client
+      .from('mkt_content')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', dayStartIso)
+      .eq('brief->>generator', 'rotation');
+    if (madeToday && madeToday > 0) {
+      await logRotate('skipped', { reason: 'da sinh hom nay', madeToday });
+      return NextResponse.json({ ok: true, created: 0, note: `da sinh ${madeToday} bai hom nay (guard 1 lan/ngay; ?force=1 de ep)` });
+    }
   }
 
   // 1. Gom tư liệu đã gán folder theo product_group.
@@ -96,6 +121,7 @@ export async function GET(req: Request) {
     return f.images.length || f.videos.length;
   });
   if (!eligible.length) {
+    await logRotate('skipped', { reason: 'chua folder nao co tu lieu' });
     return NextResponse.json({ ok: true, created: 0, note: 'chưa folder nào có tư liệu (product_group)' });
   }
 
@@ -427,6 +453,11 @@ export async function GET(req: Request) {
     await client.from('mkt_plans').update({ data: newData }).eq('id', appliedPlan.id);
   }
 
+  await logRotate(results.length > 0 ? 'ok' : 'skipped', {
+    created: results.length,
+    folders: pickedFolders.map((pf) => pf.group),
+    fromPlan: suggestionsTouched.length,
+  });
   return NextResponse.json({
     ok: true, cycle,
     folders: pickedFolders.map((pf) => pf.group),
