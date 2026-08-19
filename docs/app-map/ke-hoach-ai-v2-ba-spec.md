@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-18
 ttl_days: 90
+<!-- re-verified: 2026-08-19 - Xuong san xuat form (san-xuat/form.tsx) input/select dung .note bi max-width 320px cua .note (dung cho o ghi chu hang doi) -> cot phai trong. Scope override .sx-field .note {max-width:none; width:100%} de field lap full cot form. -->
 <!-- re-verified: 2026-08-19 - Giong doc video quay lai NamMinh (nam), rate +8%. -->
 <!-- re-verified: 2026-08-19 - Giong doc video AI mac dinh HoaiMy nu (thay NamMinh nam) + nut zoom video trong composer TikTok. Khong doi NV/AC. -->
 <!-- re-verified: 2026-08-19 - NGUOI GIAO VIEC doi muc tieu/focus -> BOSS sinh lai ke hoach ngay + ap dung (goal-actions.ts regeneratePlanAndApply; plan.ts noi mkt_focus vao goal). Them ?plan=1 o route metrics-pull + workflow force_plan. -->
