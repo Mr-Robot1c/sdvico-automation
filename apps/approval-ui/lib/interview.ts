@@ -127,9 +127,9 @@ export function composeInterviewLetter({ name, position, slots, cvText = '' }: {
     `Đề xuất các khung giờ, ${xh} bấm link cuối thư để xác nhận một khung phù hợp:`,
     ...slots.map((s, i) => `${i + 1}. ${s}`),
     '',
-    `Nếu ${xh} không sắp xếp được khung giờ nào ở trên, vui lòng phản hồi trực tiếp thư này với 2 tới 3 ngày giờ ${xh} sắp xếp được. Phòng Nhân sự sẽ liên hệ lại để chốt lịch.`,
+    `Trong trường hợp cả 3 khung trên không phù hợp, ${xh} bấm link cuối thư và đề xuất giờ khác. Phòng Nhân sự sẽ liên hệ lại để chốt lịch.`,
     '',
-    `Buổi làm việc gồm phần trao đổi chuyên môn và một bài về nhà ngắn khoảng ba giờ. Chúng tôi sẽ gửi đề bài sau khi ${xh} xác nhận lịch.`,
+    `Buổi phỏng vấn khoảng 60 phút, trao đổi trực tiếp về chuyên môn và kinh nghiệm.`,
     '',
     'Trân trọng,',
     'Phòng Nhân sự, Công ty TNHH Hiệp Lực Phát Triển Việt (SDVICO)',
@@ -178,6 +178,8 @@ function redactForGroq(cvText: string, pii?: { full_name?: string | null; email?
 
 // Sinh câu hỏi phỏng vấn bằng Groq (best-effort). Lỗi/không có khóa → trả rỗng, không chặn luồng.
 // pii: các trường đã trích được từ CV để redact TRƯỚC KHI gọi Groq. Truyền càng đủ càng ẩn được sạch.
+// Bỏ "bai_ve_nha" — SDVICO không giao bài về nhà; buổi phỏng vấn chỉ trao đổi trực tiếp.
+// Câu hỏi vẫn được sinh để người phỏng vấn dùng làm gợi ý (không gửi cho ứng viên).
 export async function generateInterviewQuestions(
   cvText: string,
   position: string,
@@ -192,24 +194,19 @@ export async function generateInterviewQuestions(
   const system = [
     'Bạn là trợ lý chuẩn bị phỏng vấn cho Công ty SDVICO, ngành thiết bị biển và thủy sản.',
     `Ứng viên ứng tuyển: ${position}.`,
-    'Dựa vào hồ sơ, soạn bộ câu hỏi và một bài về nhà riêng cho ứng viên này.',
+    'Dựa vào hồ sơ, soạn bộ câu hỏi cho người phỏng vấn dùng khi trao đổi với ứng viên này.',
     '- Đúng 8 câu hỏi kỹ thuật bám sát kinh nghiệm trong hồ sơ.',
     '- Đúng 4 câu hỏi hành vi.',
-    '- Một bài về nhà khoảng ba giờ, kèm barem 3 tới 5 tiêu chí.',
     'Chỉ dựa vào hồ sơ, không bịa (điều cấm 5). Không dùng gạch dài, mũi tên.',
-    'Chỉ trả về JSON đúng dạng: {"cau_hoi_ky_thuat":[...],"cau_hoi_hanh_vi":[...],"bai_ve_nha":{"de_bai":"...","barem":[...]}}',
+    'Chỉ trả về JSON đúng dạng: {"cau_hoi_ky_thuat":[...],"cau_hoi_hanh_vi":[...]}',
   ].join('\n');
 
   try {
-    const raw = await groqChat(system, `Hồ sơ ứng tuyển:\n\n${anon}`, { json: true, temperature: 0.4, maxTokens: 2000 });
+    const raw = await groqChat(system, `Hồ sơ ứng tuyển:\n\n${anon}`, { json: true, temperature: 0.4, maxTokens: 1500 });
     if (!raw) return empty;
-    const obj = JSON.parse(raw) as { cau_hoi_ky_thuat?: string[]; cau_hoi_hanh_vi?: string[]; bai_ve_nha?: { de_bai?: string; barem?: string[] } };
+    const obj = JSON.parse(raw) as { cau_hoi_ky_thuat?: string[]; cau_hoi_hanh_vi?: string[] };
     const numList = (arr?: string[]) => (Array.isArray(arr) ? arr.map((s, i) => `${i + 1}. ${String(s).trim()}`).join('\n') : '');
-    const bai = obj.bai_ve_nha;
-    const baiStr = bai?.de_bai
-      ? `Đề bài (khoảng ba giờ):\n${bai.de_bai}${Array.isArray(bai.barem) && bai.barem.length ? `\n\nBarem chấm:\n${bai.barem.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : ''}`
-      : '';
-    return { cau_hoi_ky_thuat: numList(obj.cau_hoi_ky_thuat), cau_hoi_hanh_vi: numList(obj.cau_hoi_hanh_vi), bai_ve_nha: baiStr };
+    return { cau_hoi_ky_thuat: numList(obj.cau_hoi_ky_thuat), cau_hoi_hanh_vi: numList(obj.cau_hoi_hanh_vi), bai_ve_nha: '' };
   } catch {
     return empty;
   }

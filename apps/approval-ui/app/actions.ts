@@ -573,6 +573,37 @@ export async function chooseInterviewSlot(formData: FormData) {
   revalidatePath('/lich');
 }
 
+// Ứng viên đề xuất giờ khác khi 3 khung đề xuất không phù hợp. Không tự lên lịch —
+// chỉ lưu đề xuất; Phòng Nhân sự thấy trong /lich rồi liên hệ lại chốt.
+// Xác thực bằng token (không cần đăng nhập). Không đụng dữ liệu khác.
+export async function proposeInterviewSlot(formData: FormData) {
+  const token = String(formData.get('token') || '').trim();
+  const proposal = String(formData.get('proposal') || '').trim().slice(0, 500);
+  const note = String(formData.get('note') || '').trim().slice(0, 1000);
+  if (!token || !proposal) return;
+
+  const client = getServerClient();
+  const { data: app } = await client
+    .from('hr_applications')
+    .select('id, chosen_slot')
+    .eq('schedule_token', token)
+    .maybeSingle();
+  if (!app) return;
+  // Đã chọn 1 trong 3 khung rồi thì không cho đề xuất thêm.
+  if (app.chosen_slot) return;
+
+  await client.from('hr_applications')
+    .update({
+      proposed_slot: proposal,
+      proposed_note: note || null,
+      proposed_at: new Date().toISOString(),
+    })
+    .eq('id', app.id);
+
+  revalidatePath(`/phong-van/${token}`);
+  revalidatePath('/lich');
+}
+
 // Từ chối một ứng viên nguồn ngoài và XOÁ khỏi cơ sở dữ liệu.
 // Nghị định 13: dữ liệu nguồn ngoài chưa có consent thì tối thiểu hóa, từ chối là xoá luôn.
 // Chốt an toàn: chỉ xoá ứng viên nguồn ngoài chưa có consent, KHÔNG đụng ứng viên đã tự nộp.

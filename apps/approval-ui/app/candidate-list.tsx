@@ -134,21 +134,31 @@ function InterviewApprove({ appId, name, windows }: { appId: string; name: strin
       ))}
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="btn ghost" style={{ fontSize: '0.85em' }} onClick={() => setRows((rs) => [...rs, { date: '', time: times[0] }])}>+ Thêm khung</button>
-        {/* Nút chính: 1-click soạn + gửi ngay (điều cấm 1 vẫn tôn trọng vì đây là 1 hành động của 1 người) */}
+        {/* Nút CHÍNH: chỉ soạn nháp — người vận hành sang / Duyệt & gửi để rà thư trước khi gửi thật */}
+        <form action={advanceToInterview} style={{ display: 'inline' }}>
+          <input type="hidden" name="appId" value={appId} />
+          {chosen.map((r, i) => <input key={i} type="hidden" name="slot" value={`${r.date}|${r.time}`} />)}
+          <button className="btn ok" type="submit" title="Máy soạn thư mời nháp. Vào trang Duyệt & gửi để xem thư, chỉnh sửa xong bấm Duyệt là gửi cho ứng viên.">
+            {chosen.length ? `Soạn thư mời nháp (${chosen.length} khung)` : 'Soạn thư mời nháp (tự chọn giờ)'}
+          </button>
+        </form>
+        {/* Nút phụ: gửi luôn không cần rà — chỉ dùng khi bạn chắc chắn */}
         <form action={advanceToInterview} style={{ display: 'inline' }}>
           <input type="hidden" name="appId" value={appId} />
           <input type="hidden" name="send_now" value="1" />
           {chosen.map((r, i) => <input key={i} type="hidden" name="slot" value={`${r.date}|${r.time}`} />)}
-          <button className="btn ok" type="submit" title="Soạn thư mời và gửi cho ứng viên trong 1 lần bấm">
-            {chosen.length ? `Soạn & gửi ngay (${chosen.length} khung)` : 'Soạn & gửi ngay (tự chọn giờ)'}
-          </button>
-        </form>
-        {/* Nút phụ: chỉ soạn để rà lại trước khi gửi (giữ luồng cũ cho ai muốn xem thư trước) */}
-        <form action={advanceToInterview} style={{ display: 'inline' }}>
-          <input type="hidden" name="appId" value={appId} />
-          {chosen.map((r, i) => <input key={i} type="hidden" name="slot" value={`${r.date}|${r.time}`} />)}
-          <button className="btn ghost" type="submit" style={{ fontSize: '0.85em' }} title="Chỉ soạn, chưa gửi. Vào trang Duyệt & gửi để rà lại rồi bấm Duyệt">
-            Chỉ soạn, rà lại sau
+          <button
+            className="btn ghost"
+            type="submit"
+            style={{ fontSize: '0.85em' }}
+            title="Gửi thư mời cho ứng viên NGAY, không cần rà lại. Chỉ dùng khi bạn đã chắc nội dung."
+            onClick={(e) => {
+              if (!window.confirm('Gửi thư mời NGAY cho ứng viên?\n\nMáy sẽ soạn thư và gửi trong 1 lần bấm, không có bước rà lại. Bấm OK nếu đã chắc chắn.')) {
+                e.preventDefault();
+              }
+            }}
+          >
+            Soạn & gửi ngay
           </button>
         </form>
         <button type="button" className="btn ghost" style={{ fontSize: '0.85em' }} onClick={() => setOpen(false)}>Đóng</button>

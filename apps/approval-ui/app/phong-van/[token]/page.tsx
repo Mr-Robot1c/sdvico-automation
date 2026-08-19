@@ -23,7 +23,7 @@ export default async function Page({ params }: { params: { token: string } }) {
 
   const { data: app } = await client
     .from('hr_applications')
-    .select('id, chosen_slot')
+    .select('id, chosen_slot, proposed_slot, proposed_note, proposed_at')
     .eq('schedule_token', token)
     .maybeSingle();
 
@@ -65,6 +65,17 @@ export default async function Page({ params }: { params: { token: string } }) {
             <div>Khung giờ bạn chọn: <b>{app.chosen_slot}</b></div>
             <div style={{ marginTop: 8, color: '#5b6b7f', fontSize: 14 }}>
               Cảm ơn bạn. Phòng Nhân sự sẽ xác nhận lại và gửi chi tiết buổi phỏng vấn qua email.
+            </div>
+          </div>
+        ) : app.proposed_slot ? (
+          <div style={{ background: '#fff8e1', border: '1px solid #f0d78e', borderRadius: 12, padding: 18 }}>
+            <div style={{ fontWeight: 700, color: '#8a6a00', marginBottom: 4 }}>Đã nhận đề xuất của bạn ✓</div>
+            <div>Đề xuất: <b>{app.proposed_slot}</b></div>
+            {app.proposed_note ? (
+              <div style={{ marginTop: 6, color: '#5b6b7f', fontSize: 14 }}>Ghi chú: {app.proposed_note}</div>
+            ) : null}
+            <div style={{ marginTop: 8, color: '#5b6b7f', fontSize: 14 }}>
+              Phòng Nhân sự sẽ liên hệ lại với bạn qua email để chốt lịch cụ thể.
             </div>
           </div>
         ) : slots.length ? (

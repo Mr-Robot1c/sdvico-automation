@@ -43,13 +43,14 @@ export default async function Page() {
 
   const rows = (data || []) as Row[];
 
-  // Token + giờ ứng viên đã chọn (cột có thể chưa migrate — đọc an toàn).
-  const appMap = new Map<string, { schedule_token: string | null; chosen_slot: string | null }>();
+  // Token + giờ ứng viên đã chọn / đã đề xuất khác (cột có thể chưa migrate — đọc an toàn).
+  type AppInfo = { schedule_token: string | null; chosen_slot: string | null; proposed_slot: string | null; proposed_note: string | null };
+  const appMap = new Map<string, AppInfo>();
   const refIds = rows.map((r) => r.ref_id).filter(Boolean) as string[];
   if (refIds.length) {
-    const { data: apps } = await client.from('hr_applications').select('id, schedule_token, chosen_slot').in('id', refIds);
-    for (const a of (apps || []) as Array<{ id: string; schedule_token: string | null; chosen_slot: string | null }>) {
-      appMap.set(a.id, { schedule_token: a.schedule_token, chosen_slot: a.chosen_slot });
+    const { data: apps } = await client.from('hr_applications').select('id, schedule_token, chosen_slot, proposed_slot, proposed_note').in('id', refIds);
+    for (const a of (apps || []) as Array<{ id: string } & AppInfo>) {
+      appMap.set(a.id, { schedule_token: a.schedule_token, chosen_slot: a.chosen_slot, proposed_slot: a.proposed_slot, proposed_note: a.proposed_note });
     }
   }
   const h = headers();
@@ -153,6 +154,22 @@ export default async function Page() {
                     ? <b style={{ color: 'var(--ok)' }}>{appMap.get(r.ref_id)!.chosen_slot}</b>
                     : <span className="muted">Chưa chọn</span>}</dd>
                 </div>
+                {r.ref_id && appMap.get(r.ref_id)?.proposed_slot ? (
+                  <div className="field field-long">
+                    <dt>⚠ Ứng viên đề xuất giờ khác</dt>
+                    <dd>
+                      <b style={{ color: 'var(--warn, #8a6a00)' }}>{appMap.get(r.ref_id)!.proposed_slot}</b>
+                      {appMap.get(r.ref_id)?.proposed_note ? (
+                        <div className="muted" style={{ fontSize: '0.85em', marginTop: 4 }}>
+                          Ghi chú: {appMap.get(r.ref_id)!.proposed_note}
+                        </div>
+                      ) : null}
+                      <div className="muted" style={{ fontSize: '0.8em', marginTop: 4 }}>
+                        Liên hệ ứng viên qua email để chốt lịch cụ thể.
+                      </div>
+                    </dd>
+                  </div>
+                ) : null}
                 {r.ref_id && appMap.get(r.ref_id)?.schedule_token ? (
                   <div className="field field-long">
                     <dt>Link gửi ứng viên tự chọn giờ</dt>
