@@ -17,6 +17,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="vi">
       <head>
+        {/* TikTok Developer domain verify (meta method). Xanh cả 3 URL: /, /privacy, /terms
+            vì cùng layout gốc chèn meta này. File /public/tiktok<token>.txt là dự phòng cho
+            method "verify domain" nếu về sau cần. */}
+        <meta name="tiktok-developers-site-verification" content="0RpAvSQjCxE6vBEr86J6Sl9RVestLIXd" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
