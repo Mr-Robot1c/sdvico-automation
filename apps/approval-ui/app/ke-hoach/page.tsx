@@ -2,7 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import type { Plan, Tier } from '../../lib/plan';
 import { vnInt, vnDec1 } from '../../lib/plan';
 import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
-import { saveWeeklyGoal } from './goal-actions';
+import { saveWeeklyGoal, saveFocus } from './goal-actions';
 import GenerateButton from './generate-button';
 
 export const dynamic = 'force-dynamic';
@@ -49,16 +49,22 @@ function fmtDate(d: string | null): string {
 
 export default async function Page({ searchParams }: { searchParams?: { xem?: string } }) {
   const client = getServerClient();
-  const [{ data, error }, { data: goalRow }] = await Promise.all([
+  const [{ data, error }, { data: goalRow }, { data: focusRow }] = await Promise.all([
     client
       .from('mkt_plans')
       .select('id, period_start, period_end, generated_by, data, applied, applied_at, created_at')
       .order('created_at', { ascending: false })
       .limit(12),
-    client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle()
+    client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
+    client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle()
   ]);
   const goalText = ((goalRow as any)?.value?.text as string) || '';
   const goalUpdatedAt = ((goalRow as any)?.value?.updated_at as string) || null;
+  // Sản phẩm tập trung tuần (vòng xoay chỉ lấy các folder này tới ngày `until`).
+  const focusVal = ((focusRow as any)?.value || {}) as { groups?: string[]; until?: string };
+  const focusGroups = Array.isArray(focusVal.groups) ? focusVal.groups : [];
+  const focusUntil = focusVal.until ? String(focusVal.until).slice(0, 10) : '';
+  const focusActive = focusGroups.length > 0 && (!focusVal.until || new Date(focusVal.until).getTime() > Date.now());
 
   const rows = (data || []) as Row[];
 
@@ -124,6 +130,30 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           />
           <div style={{ marginTop: 8 }}>
             <button className="btn ok" type="submit">Lưu mục tiêu</button>
+          </div>
+        </form>
+
+        {/* Tập trung sản phẩm tuần: vòng xoay CHỈ sinh bài cho các sản phẩm này tới ngày hết hạn,
+            rồi tự trở lại đủ sản phẩm (user 19/8: "tuần này up lọc dầu với lọc nước"). */}
+        <form action={saveFocus} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+          <div className="goal-head">
+            <b>🎯 Tuần này chỉ đăng sản phẩm</b>
+            {focusGroups.length ? (
+              <span className={`sub ${focusActive ? '' : 'muted'}`}>
+                {focusActive ? `Đang áp: ${focusGroups.join(', ')}${focusUntil ? ` (đến hết ${focusUntil.split('-').reverse().join('/')})` : ''}` : 'Đã hết hạn, vòng xoay đủ sản phẩm'}
+              </span>
+            ) : null}
+          </div>
+          <p className="sub" style={{ margin: '4px 0 8px' }}>
+            Gõ tên sản phẩm cách nhau dấu phẩy (khớp theo tên folder Kho tư liệu, ví dụ: <code>lọc dầu, lọc nước</code>). Để trống và Lưu = bỏ tập trung.
+          </p>
+          <div className="row" style={{ alignItems: 'center' }}>
+            <input className="note" name="focus_groups" defaultValue={focusGroups.join(', ')} placeholder="lọc dầu, lọc nước" style={{ maxWidth: 360 }} aria-label="Sản phẩm tập trung" />
+            <label className="sub" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              đến hết ngày
+              <input type="date" name="focus_until" defaultValue={focusUntil} className="note" style={{ maxWidth: 170, flex: '0 0 auto' }} aria-label="Đến ngày" />
+            </label>
+            <button className="btn ok" type="submit">Lưu</button>
           </div>
         </form>
       </section>

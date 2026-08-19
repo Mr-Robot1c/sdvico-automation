@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-18
 ttl_days: 90
+<!-- re-verified: 2026-08-19 - Them co che mkt_focus (tap trung san pham tuan) o /api/rotate: loc eligible + bo qua huong di ke hoach ngoai focus. Khong doi NV/AC; la rang buoc dau vao cho Creator (nguoi giao viec chot san pham tuan). -->
 <!-- re-verified: 2026-08-19 - packages/marketing/src/social.mjs prompt portrait doi sang viet HOAN CHINH voi nhan vat dien hinh (sep chot 19/8, thay khung suon dien tay); rotate-run.mjs portrait weight 1, khong needsGov. Khong dong toi NV/AC ke hoach AI v2. -->
 <!-- re-verified: 2026-08-18 - NV1 van hanh: buoc 'tha file vao bucket' nay TU DONG qua task Windows 16:30 (upload-zalo-to-bucket) sau phien Cowork 16:00; file cung ten noi dung moi duoc them ban dated de AC-1 (import idempotent theo source_path) van dung ma tin moi van duoc hoc. Hanh vi AC-1 KHONG doi. -->
 <!-- re-verified: 2026-08-18 - Doi chieu bumpers.mjs + assemble.mjs (redesign intro/outro theo sep): thuan hinh thuc trinh bay video, hanh vi NV6/AC-8 KHONG doi. -->

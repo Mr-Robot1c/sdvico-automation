@@ -115,7 +115,7 @@ export async function GET(req: Request) {
   }
   // Folder 'Content' KHÔNG phải sản phẩm, chỉ chứa tư liệu cho bài content — loại khỏi vòng
   // xoay sinh bài bán. Bài content sẽ dùng ảnh trong folder này ở bước dưới.
-  const eligible = [...folders.keys()].filter((g) => {
+  let eligible = [...folders.keys()].filter((g) => {
     if (g === 'Content') return false;
     const f = folders.get(g)!;
     return f.images.length || f.videos.length;
@@ -123,6 +123,25 @@ export async function GET(req: Request) {
   if (!eligible.length) {
     await logRotate('skipped', { reason: 'chua folder nao co tu lieu' });
     return NextResponse.json({ ok: true, created: 0, note: 'chưa folder nào có tư liệu (product_group)' });
+  }
+
+  // TẬP TRUNG SẢN PHẨM TUẦN (user 19/8: "tuần này up lọc dầu với lọc nước"). app_config key
+  // 'mkt_focus' = { groups: [từ khoá/tên sản phẩm...], until: ISO, note }. Còn hạn -> vòng xoay
+  // CHỈ lấy các folder khớp (khớp theo tên sản phẩm không STT, hoặc chứa từ khoá); hướng đi
+  // kế hoạch không thuộc nhóm này cũng bỏ qua trong tuần. Không khớp folder nào -> bỏ qua focus,
+  // ghi chú vào run_log để biết. Hết hạn -> tự trở lại vòng xoay đủ sản phẩm, không phải gỡ tay.
+  const { data: focusRow } = await client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle();
+  const focusVal = ((focusRow as any)?.value || {}) as { groups?: string[]; until?: string; note?: string };
+  const focusKeys = (Array.isArray(focusVal.groups) ? focusVal.groups : []).map((s) => String(s).toLowerCase().trim()).filter(Boolean);
+  const focusActive = focusKeys.length > 0 && (!focusVal.until || new Date(focusVal.until).getTime() > Date.now());
+  let focusNote: string | null = null;
+  if (focusActive) {
+    const matched = eligible.filter((g) => {
+      const name = productName(g).toLowerCase();
+      return focusKeys.some((k) => name === k || name.includes(k) || g.toLowerCase().includes(k));
+    });
+    if (matched.length) { eligible = matched; focusNote = `focus: ${matched.map(productName).join(' + ')}`; }
+    else focusNote = `focus KHONG khop folder nao (${focusKeys.join(', ')}) -> dung du san pham`;
   }
 
   // 2. Vòng hiện tại + folder đã dùng trong vòng (đọc từ mkt_content.brief).
@@ -459,6 +478,7 @@ export async function GET(req: Request) {
     created: results.length,
     folders: pickedFolders.map((pf) => pf.group),
     fromPlan: suggestionsTouched.length,
+    focus: focusNote,
   });
   return NextResponse.json({
     ok: true, cycle,
