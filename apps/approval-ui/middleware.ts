@@ -22,6 +22,19 @@ export function middleware(req: NextRequest) {
   // API nội bộ (Vercel Cron gọi /api/rotate) không dùng basic-auth — tự bảo vệ bằng CRON_SECRET.
   if (req.nextUrl.pathname.startsWith('/api/')) return NextResponse.next();
 
+  // File xác minh TikTok (tiktok<token>.txt): method "URL prefix" GET file tại subpath của prefix
+  // (prefix /privacy/ -> GET /privacy/tiktok<token>.txt). Trả THẲNG nội dung ở MỌI path để khớp
+  // mọi prefix. PHẢI đặt TRƯỚC check /privacy /terms bên dưới, vì regex đó cũng khớp
+  // /privacy/tiktok<token>.txt và sẽ cho Next render 404 nếu chạy trước.
+  const ttMatch = req.nextUrl.pathname.match(/\/tiktok([A-Za-z0-9]+)\.txt$/);
+  if (ttMatch) {
+    const token = ttMatch[1];
+    return new NextResponse(`tiktok-developers-site-verification=${token}\n`, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=300' },
+    });
+  }
+
   // Trang chính sách và điều khoản phải CÔNG KHAI (TikTok/Facebook review + người dùng xem yêu cầu URL mở).
   // TikTok verify GET đúng URL đã đăng ký, hay chuẩn hoá thêm '/' cuối; Next mặc định 308 redirect
   // /privacy/ -> /privacy nhưng TikTok KHÔNG follow -> báo "no signature". Rewrite tại đây để cùng
@@ -33,19 +46,6 @@ export function middleware(req: NextRequest) {
     return NextResponse.rewrite(target);
   }
   if (/^\/(privacy|terms)(\/|$)/.test(pth)) return NextResponse.next();
-
-  // File xác minh TikTok (tiktok<token>.txt): method "URL prefix" GET file tại subpath của prefix
-  // (prefix /privacy/ -> GET /privacy/tiktok<token>.txt). Trả THẲNG nội dung file (đọc từ ENV) ở
-  // MỌI path để khớp mọi prefix, không phụ thuộc trình rewrite của Next tới /public. Nội dung file
-  // dạng "tiktok-developers-site-verification=<token>"; token đặt trong ENV để đổi khỏi phải rebuild.
-  const ttMatch = req.nextUrl.pathname.match(/\/tiktok([A-Za-z0-9]+)\.txt$/);
-  if (ttMatch) {
-    const token = ttMatch[1];
-    return new NextResponse(`tiktok-developers-site-verification=${token}\n`, {
-      status: 200,
-      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=300' },
-    });
-  }
 
   if (process.env.NODE_ENV !== 'production') return NextResponse.next();
 
