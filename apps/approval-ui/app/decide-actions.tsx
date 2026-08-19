@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { decideForm } from './actions';
 
 // Ô ghi chú, ô hẹn giờ đăng (không bắt buộc) và hai nút quyết.
@@ -46,6 +46,7 @@ type CreatorInfo = {
 function TiktokComposer({ videoUrl, caption }: { videoUrl?: string | null; caption?: string | null }) {
   const [info, setInfo] = useState<CreatorInfo | null>(null);
   const [privacy, setPrivacy] = useState<string>('');
+  const zoomRef = useRef<HTMLDialogElement | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -75,7 +76,26 @@ function TiktokComposer({ videoUrl, caption }: { videoUrl?: string | null; capti
       <div className="tt-head">🎵 <b>Đăng lên TikTok</b></div>
       {/* Xác nhận rõ NỘI DUNG sẽ đăng (bắt buộc cho audit): video trái, mô tả phải. */}
       <div className="tt-body">
-        {videoUrl ? <video className="tt-prev" src={`${videoUrl}#t=2`} controls preload="metadata" /> : null}
+        {videoUrl ? (
+          <div className="tt-prev-wrap">
+            <video className="tt-prev" src={`${videoUrl}#t=2`} controls preload="metadata" />
+            <button
+              type="button"
+              className="tt-zoom"
+              title="Xem to"
+              aria-label="Xem video to"
+              onClick={() => zoomRef.current?.showModal()}
+            >🔍</button>
+            <dialog
+              ref={zoomRef}
+              className="tt-zoom-dlg"
+              onClick={(e) => { if ((e.target as HTMLElement).tagName === 'DIALOG') zoomRef.current?.close(); }}
+            >
+              <video src={`${videoUrl}#t=2`} controls autoPlay playsInline />
+              <button type="button" className="tt-zoom-x" aria-label="Đóng" onClick={() => zoomRef.current?.close()}>×</button>
+            </dialog>
+          </div>
+        ) : null}
         <div className="tt-body-text">
           {caption ? <p className="tt-cap">{caption}</p> : null}
           <p className="tt-disc">Video và mô tả sẽ được đăng lên tài khoản TikTok{info?.nickname ? ` @${info.nickname}` : ' của SDVICO'}.</p>

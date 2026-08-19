@@ -78,11 +78,14 @@ async function tts(text, outPath, voice, workDir, tag) {
   await writeFile(txt, clean, 'utf8');
   // GIỮ NGUYÊN 1 GIỌNG NAM cho toàn video (không đổi qua giọng nữ giữa chừng). edge-tts hay bị
   // "No audio received" -> thử lại vài lần với rate khác nhau. Hết mới lùi tiếng lặng.
+  // Rate mac dinh +8% cho tuoi (user 19/8: "giong doc buon ngu"). Env TTS_RATE ep khac. Cac
+  // lan retry giu +8% roi lui rate cham dan neu edge-tts bao "No audio received".
+  const baseRate = process.env.TTS_RATE || '+8%';
   const attempts = [
+    { voice, rate: baseRate },
     { voice, rate: '+0%' },
     { voice, rate: '-5%' },
     { voice, rate: '-10%' },
-    { voice, rate: '+5%' },
   ];
   let lastErr;
   for (const a of attempts) {
@@ -255,7 +258,7 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
 async function main() {
   const env = loadRealEnv();
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-  const voice = arg('voice', 'vi-VN-NamMinhNeural');
+  const voice = arg('voice', process.env.TTS_VOICE || 'vi-VN-HoaiMyNeural');
   const outDir = arg('out', join(HERE, '..', '..', '..', '..', 'out', 'video'));
   await mkdir(outDir, { recursive: true });
 

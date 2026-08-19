@@ -183,7 +183,25 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
 .tt-head { font-size: 13.5px; }
 /* Video trái, mô tả phải để lấp đều bề ngang (trước đây video xếp dọc, hộp rộng trống bên phải). */
 .tt-body { display: flex; gap: 12px; align-items: flex-start; }
-.tt-prev { width: 168px; flex: 0 0 auto; max-height: 300px; border-radius: 8px; background: #0b0f14; }
+.tt-prev-wrap { position: relative; flex: 0 0 auto; }
+.tt-prev { width: 168px; max-height: 300px; border-radius: 8px; background: #0b0f14; display: block; }
+/* Nut zoom nho goc phai duoi anh video, luon nhin thay du video full screen hay chua. */
+.tt-zoom {
+  position: absolute; right: 6px; bottom: 10px; width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--line); background: rgba(255,255,255,.92); color: #0f172a;
+  font-size: 14px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.35);
+}
+.tt-zoom:hover { background: #fff; }
+/* Modal xem video to (dung <dialog>): full width toi ~min(900px, 95vw). Click ngoai video de dong. */
+.tt-zoom-dlg { border: none; padding: 0; background: transparent; max-width: min(900px, 95vw); }
+.tt-zoom-dlg::backdrop { background: rgba(0,0,0,.72); }
+.tt-zoom-dlg video { width: min(900px, 95vw); max-height: 85vh; border-radius: 12px; background: #000; display: block; }
+.tt-zoom-x {
+  position: absolute; top: -14px; right: -14px; width: 34px; height: 34px; border-radius: 50%;
+  border: none; background: #fff; color: #0f172a; font-size: 22px; line-height: 1; cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,.4);
+}
 .tt-body-text { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .tt-cap {
   font-size: 12.5px; color: var(--ink-2); margin: 0; white-space: pre-wrap;
