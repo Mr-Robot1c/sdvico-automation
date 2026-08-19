@@ -23,7 +23,16 @@ export function middleware(req: NextRequest) {
   if (req.nextUrl.pathname.startsWith('/api/')) return NextResponse.next();
 
   // Trang chính sách và điều khoản phải CÔNG KHAI (TikTok/Facebook review + người dùng xem yêu cầu URL mở).
-  if (/^\/(privacy|terms)(\/|$)/.test(req.nextUrl.pathname)) return NextResponse.next();
+  // TikTok verify GET đúng URL đã đăng ký, hay chuẩn hoá thêm '/' cuối; Next mặc định 308 redirect
+  // /privacy/ -> /privacy nhưng TikTok KHÔNG follow -> báo "no signature". Rewrite tại đây để cùng
+  // URL trả thẳng HTML (kèm meta trong <head> layout) thay vì redirect.
+  const pth = req.nextUrl.pathname;
+  if (/^\/(privacy|terms)\/$/.test(pth)) {
+    const target = req.nextUrl.clone();
+    target.pathname = pth.replace(/\/$/, '');
+    return NextResponse.rewrite(target);
+  }
+  if (/^\/(privacy|terms)(\/|$)/.test(pth)) return NextResponse.next();
 
   // File xác minh sở hữu tên miền của TikTok Developer (tiktok<token>.txt ở web root).
   // TikTok tải file này để xác nhận app điều khiển tên miền -> mở khoá "Verify URL properties".
