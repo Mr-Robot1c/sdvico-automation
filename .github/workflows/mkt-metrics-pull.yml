@@ -11,6 +11,13 @@ on:
   schedule:
     - cron: '*/30 * * * *' # mỗi 30 phút
   workflow_dispatch:
+    inputs:
+      force_rotate:
+        description: 'Ép sinh thêm 1 đợt bài A/B (bỏ qua guard 1 lần/ngày). true/false.'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
 
 concurrency:
   group: mkt-metrics-pull
@@ -31,15 +38,18 @@ jobs:
           echo "metrics-pull HTTP $code"
           head -c 800 /tmp/resp.json; echo
           test "$code" = "200"
-      - name: Sinh nội dung A/B chờ duyệt (guard 1 lần/ngày)
+      - name: Sinh nội dung A/B chờ duyệt (guard 1 lần/ngày; force_rotate=true để ép)
         if: always() # chạy kể cả bước trên lỗi, để không lỡ đợt bài trong ngày
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          FORCE_ROTATE: ${{ github.event.inputs.force_rotate }}
         run: |
           if [ -z "$CRON_SECRET" ]; then echo "Thieu CRON_SECRET"; exit 0; fi
+          Q=""
+          if [ "$FORCE_ROTATE" = "true" ]; then Q="?force=1"; echo "FORCE mode: bo qua guard"; fi
           code=$(curl -s -o /tmp/rot.json -w "%{http_code}" \
             -H "Authorization: Bearer $CRON_SECRET" \
-            "https://sdvico-mktit.vercel.app/api/rotate")
+            "https://sdvico-mktit.vercel.app/api/rotate$Q")
           echo "rotate HTTP $code"
           head -c 800 /tmp/rot.json; echo
           # KHÔNG fail workflow nếu rotate lỗi (số liệu vẫn tính là chạy); run_log mkt.rotate ghi lý do.
