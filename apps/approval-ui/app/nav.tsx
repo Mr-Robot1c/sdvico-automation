@@ -126,6 +126,7 @@ const SECTIONS: Section[] = [
     items: [
       { href: '/tao-jd', label: 'Vị trí tuyển dụng', icon: 'briefcase' },
       { href: '/dang-tin', label: 'Tin đăng', icon: 'megaphone' },
+      { href: '/tuong-tac', label: 'Bài tương tác', icon: 'share' },
       { href: '/kenh', label: 'Kênh đăng tin', icon: 'share' },
     ],
   },

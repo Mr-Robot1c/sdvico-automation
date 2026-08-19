@@ -18,6 +18,10 @@ type Post = {
   noi_dung: string | null; job_id: string | null; kenh: string | null;
   url: string | null; image_url: string | null; ghi_chu: string | null;
   fb_post_id: string | null; proof_path: string | null; created_at: string;
+  // Bài tương tác dùng chung bảng nhưng loai='tuong_tac' và có thể có video_url.
+  // Các trường tùy chọn — nếu component nhận post cũ (không có 2 field này), vẫn chạy bình thường.
+  loai?: string | null;
+  video_url?: string | null;
 };
 
 const TT: Record<string, { label: string; tone: string }> = {
@@ -136,7 +140,18 @@ export default function PostListClient({
                     onClick={() => toggleRow(p.id)}
                   >
                     <td className="post-td-title">
-                      <div className="post-row-title">{p.tieu_de}</div>
+                      <div className="post-row-title" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {p.loai === 'tuong_tac' ? (
+                          <span
+                            className="stage tone-mkt"
+                            style={{ fontSize: '0.7em', padding: '1px 6px', borderRadius: 4 }}
+                            title="Bài tương tác hâm nóng trang, không gắn vị trí"
+                          >
+                            Tương tác
+                          </span>
+                        ) : null}
+                        <span>{p.tieu_de}</span>
+                      </div>
                     </td>
                     <td className="post-td-kenh">{chLabel(p.kenh)}</td>
                     <td className="post-td-status">
@@ -203,6 +218,15 @@ export default function PostListClient({
                                   </div>
                                 ) : null}
                               </dl>
+
+                              {p.video_url ? (
+                                <video
+                                  src={p.video_url}
+                                  controls
+                                  preload="metadata"
+                                  style={{ maxWidth: '100%', maxHeight: 260, borderRadius: 8, marginBottom: 10, display: 'block', background: '#000' }}
+                                />
+                              ) : null}
 
                               {p.image_url ? (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -298,12 +322,28 @@ export default function PostListClient({
                                 type="url"
                                 name="image_url"
                                 defaultValue={p.image_url || ''}
-                                placeholder="https://... (để trống nếu không cần)"
+                                placeholder="https://... (dán URL từ Thư viện media, hoặc để trống)"
                                 aria-label="URL hình ảnh"
                               />
                               <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{ color: 'var(--ink-2)', flexShrink: 0 }}>Hoặc chọn từ máy:</span>
                                 <input type="file" name="image_file" accept="image/*" style={{ fontSize: '0.85em' }} />
+                              </label>
+
+                              <label style={{ fontSize: '0.82em', color: 'var(--ink-2)', marginTop: 4 }}>
+                                Video đính kèm (ưu tiên hơn ảnh khi đăng)
+                              </label>
+                              <input
+                                className="note"
+                                type="url"
+                                name="video_url"
+                                defaultValue={p.video_url || ''}
+                                placeholder="https://... (dán URL từ Thư viện media, hoặc để trống)"
+                                aria-label="URL video"
+                              />
+                              <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ color: 'var(--ink-2)', flexShrink: 0 }}>Hoặc chọn từ máy:</span>
+                                <input type="file" name="video_file" accept="video/*" style={{ fontSize: '0.85em' }} />
                               </label>
                               {p.trang_thai === 'posted' ? (
                                 <>

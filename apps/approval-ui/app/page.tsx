@@ -201,7 +201,18 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                       </span>
                       <time className="inbox-item-time" dateTime={it.created_at}>{formatRelative(it.created_at)}</time>
                     </div>
-                    <div className="inbox-item-title">{it.title}</div>
+                    <div className="inbox-item-title" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      {((it.payload as Record<string, unknown>)?.loai as string) === 'tuong_tac' ? (
+                        <span
+                          className="stage tone-mkt"
+                          style={{ fontSize: '0.7em', padding: '1px 6px', borderRadius: 4, flexShrink: 0 }}
+                          title="Bài tương tác hâm nóng trang"
+                        >
+                          Tương tác
+                        </span>
+                      ) : null}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</span>
+                    </div>
                   </div>
                 </Link>
               );

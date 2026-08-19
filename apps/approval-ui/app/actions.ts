@@ -1469,6 +1469,8 @@ export async function editJobPostDraft(formData: FormData) {
   const noi_dung = String(formData.get('noi_dung') || '');
   const imageUrlInput = String(formData.get('image_url') || '').trim() || null;
   const imageFile = formData.get('image_file') as File | null;
+  const videoUrlInput = String(formData.get('video_url') || '').trim() || null;
+  const videoFile = formData.get('video_file') as File | null;
   const scheduledRaw = String(formData.get('scheduled_at') || '').trim();
   const fbPostLink = String(formData.get('fb_post_link') || '').trim();
   const parsedFbPostId = parseFbPostId(fbPostLink);
@@ -1501,17 +1503,40 @@ export async function editJobPostDraft(formData: FormData) {
       try { await client.from('run_log').insert({ task: 'upload_post_image', status: 'error', detail: { postId, error: String(err) } }); } catch {}
     }
   }
+  // Upload video từ máy nếu người dùng chọn file. Cùng bucket 'post-images', khác thư mục.
+  // Facebook /videos giới hạn ~1 GB / 20 phút; UI cảnh báo trước; ở đây chỉ ghi và không chặn size.
+  let video_url = videoUrlInput;
+  if (videoFile && videoFile.size > 0) {
+    try {
+      const bytes = await videoFile.arrayBuffer();
+      const rawExt = videoFile.name.split('.').pop() || 'mp4';
+      const ext = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'mp4';
+      const path = `posts/${postId}/video-${Date.now()}.${ext}`;
+      const { error: uploadErr } = await client.storage
+        .from('post-images')
+        .upload(path, bytes, { contentType: videoFile.type || 'video/mp4', upsert: true });
+      if (!uploadErr) {
+        const { data: { publicUrl } } = client.storage.from('post-images').getPublicUrl(path);
+        video_url = publicUrl;
+      } else {
+        try { await client.from('run_log').insert({ task: 'upload_post_video', status: 'error', detail: { postId, error: uploadErr.message } }); } catch {}
+      }
+    } catch (err: unknown) {
+      try { await client.from('run_log').insert({ task: 'upload_post_video', status: 'error', detail: { postId, error: String(err) } }); } catch {}
+    }
+  }
+
   // Lấy trạng thái và fb_post_id hiện tại để xử lý bài đã đăng khác với nháp.
   const { data: cur } = await client.from('hr_job_posts')
     .select('trang_thai, fb_post_id').eq('id', postId).maybeSingle();
 
   let updateData: Record<string, unknown>;
   if (cur?.trang_thai === 'posted') {
-    // Bài đã đăng: chỉ cập nhật nội dung và hình ảnh, giữ nguyên trạng thái và lịch.
-    updateData = { noi_dung, image_url };
+    // Bài đã đăng: chỉ cập nhật nội dung, ảnh, video. Giữ nguyên trạng thái và lịch.
+    updateData = { noi_dung, image_url, video_url };
     if (parsedFbPostId) updateData.fb_post_id = parsedFbPostId;
   } else {
-    updateData = { noi_dung, image_url, scheduled_at, trang_thai };
+    updateData = { noi_dung, image_url, video_url, scheduled_at, trang_thai };
   }
 
   const { error } = await client.from('hr_job_posts').update(updateData).eq('id', postId);
@@ -1538,12 +1563,13 @@ export async function editJobPostDraft(formData: FormData) {
       .eq('kind', 'hr_job_post')
       .eq('status', 'pending');
     for (const row of rows || []) {
-      const payload = { ...((row.payload || {}) as Record<string, unknown>), body: noi_dung, image_url };
+      const payload = { ...((row.payload || {}) as Record<string, unknown>), body: noi_dung, image_url, video_url };
       await client.from('approval_queue').update({ payload }).eq('id', row.id);
     }
   }
 
   revalidatePath('/dang-tin');
+  revalidatePath('/tuong-tac');
   revalidatePath('/');
 }
 
@@ -2650,4 +2676,162 @@ export async function toggleCvSource(formData: FormData) {
   const { error } = await client.from('hr_cv_sources').update({ bat: !row.bat }).eq('id', id);
   if (error) throw new Error('Không đổi được trạng thái: ' + error.message);
   revalidatePath('/cai-dat/nguon-cv');
+}
+
+// =====================================================================
+// Thư viện media dùng cho bài tương tác: brand_assets + bucket post-images/library/
+// =====================================================================
+
+// Upload một file vào thư viện. Ảnh hoặc video, tự nhận diện kind theo mime.
+// Tệp lưu ở bucket 'post-images' đường dẫn 'library/{uuid}.{ext}' (bucket đã public,
+// URL trả về dán được vào bài đăng ngay). Bản ghi vào brand_assets với license='owned',
+// license_note để trống — luôn phải là tư liệu công ty sở hữu (điều cấm 5 phần đối tác).
+export async function uploadBrandAsset(formData: FormData) {
+  const file = formData.get('file') as File | null;
+  const titleInput = String(formData.get('title') || '').trim();
+  if (!file || file.size === 0) return;
+
+  const client = getServerClient();
+  const mime = file.type || 'application/octet-stream';
+  const kind = mime.startsWith('video/') ? 'video' : mime.startsWith('image/') ? 'image' : null;
+  if (!kind) {
+    try { await client.from('run_log').insert({ task: 'upload_brand_asset', status: 'error', detail: { name: file.name, mime, error: 'Chỉ nhận ảnh hoặc video' } }); } catch {}
+    return;
+  }
+
+  try {
+    const bytes = await file.arrayBuffer();
+    const rawExt = file.name.split('.').pop() || (kind === 'video' ? 'mp4' : 'jpg');
+    const ext = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || (kind === 'video' ? 'mp4' : 'jpg');
+    const id = randomBytes(8).toString('hex');
+    const path = `library/${id}.${ext}`;
+    const { error: upErr } = await client.storage
+      .from('post-images')
+      .upload(path, bytes, { contentType: mime, upsert: false });
+    if (upErr) {
+      try { await client.from('run_log').insert({ task: 'upload_brand_asset', status: 'error', detail: { name: file.name, error: upErr.message } }); } catch {}
+      return;
+    }
+    const { data: { publicUrl } } = client.storage.from('post-images').getPublicUrl(path);
+    const title = titleInput || file.name;
+    const { error: insErr } = await client.from('brand_assets').insert({
+      kind, title, storage_path: path,
+      license: 'owned',
+      mime, size_bytes: file.size, public_url: publicUrl,
+    });
+    if (insErr) {
+      // Rollback storage nếu insert lỗi để không dồn file mồ côi.
+      await client.storage.from('post-images').remove([path]);
+      throw new Error(insErr.message);
+    }
+  } catch (err: unknown) {
+    try { await client.from('run_log').insert({ task: 'upload_brand_asset', status: 'error', detail: { name: file.name, error: String(err) } }); } catch {}
+  }
+
+  revalidatePath('/tuong-tac');
+}
+
+// Xóa mềm một media trong thư viện. Giữ file trong storage để có thể phục hồi nếu cần;
+// cleanup thật xóa qua công việc định kỳ, không xóa trực tiếp ở đây.
+export async function deleteBrandAsset(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  if (!id) return;
+  const client = getServerClient();
+  const { error } = await client
+    .from('brand_assets')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw new Error('Không xóa được media: ' + error.message);
+  revalidatePath('/tuong-tac');
+}
+
+// =====================================================================
+// Soạn bài tương tác từ UI: gọi lại logic pickTopics + composeEngagementPost + pushApproval.
+// Điều cấm 1: chỉ soạn nháp, đẩy approval_queue, người bấm Duyệt.
+// =====================================================================
+export async function queueEngagementNow(formData: FormData) {
+  const count = Math.max(1, Math.min(5, Number(formData.get('count')) || 1));
+  const themeRaw = String(formData.get('theme') || '').trim();
+  const themes = themeRaw ? themeRaw.split(',').map((s) => s.trim()).filter(Boolean) : null;
+
+  const client = getServerClient();
+
+  // Import động: script Node dùng ESM path packages/hr/src/post/*. Trong Next thì workspace
+  // resolve tương đối từ apps/approval-ui/. Đường dẫn tương đối đủ vì monorepo dùng workspace npm.
+  // Các module là JS thuần không có d.ts, cast qua any để TS không bám vào default-null narrowing.
+  const [topicsMod, composeMod, coreMod] = await Promise.all([
+    import('../../../packages/hr/src/post/engagement-topics.js'),
+    import('../../../packages/hr/src/post/compose-engagement.js'),
+    import('../../../packages/core/src/index.js'),
+  ]);
+  const pickTopics = (topicsMod as unknown as { pickTopics: (arg: { count: number; themes: string[] | null; startAt: number }) => Array<{ id: string; chu_de: string; goc: string; tieu_de: string; noi_dung: string }> }).pickTopics;
+  const composeEngagementPost = (composeMod as unknown as { composeEngagementPost: (t: unknown) => Promise<{ tieu_de: string; noi_dung: string; generator: string }> }).composeEngagementPost;
+  const pushApproval = (coreMod as unknown as {
+    pushApproval: (client: unknown, opts: { kind: string; title: string; payload: unknown; refTable?: string; refId?: string }) => Promise<unknown>;
+    logRun: (client: unknown, opts: { task: string; status: string; detail?: unknown }) => Promise<unknown>;
+  }).pushApproval;
+  const logRun = (coreMod as unknown as {
+    logRun: (client: unknown, opts: { task: string; status: string; detail?: unknown }) => Promise<unknown>;
+  }).logRun;
+
+  // Lấy Facebook platform_id (nếu có cấu hình) và số bài đã có để startAt xoay vòng.
+  const { data: platforms } = await client.from('hr_platforms').select('id, ten, loai').eq('loai', 'social');
+  const fb = (platforms || []).find((p: { ten: string }) => /face/i.test(p.ten));
+  const platformId = fb ? (fb as { id: string }).id : null;
+  const { count: existing } = await client
+    .from('hr_job_posts')
+    .select('id', { count: 'exact', head: true })
+    .eq('loai', 'tuong_tac')
+    .is('deleted_at', null);
+
+  const topics = pickTopics({ count, themes, startAt: existing || 0 });
+  const done: Array<{ topic: string; post_id: string; generator: string }> = [];
+
+  for (const topic of topics) {
+    // Bỏ qua góc bài đã có nháp chờ duyệt để tránh chất đống trùng.
+    const { data: pending } = await client
+      .from('hr_job_posts')
+      .select('id')
+      .eq('loai', 'tuong_tac')
+      .eq('ghi_chu', `topic:${topic.id}`)
+      .is('deleted_at', null)
+      .in('trang_thai', ['draft', 'scheduled']);
+    if ((pending || []).length > 0) continue;
+
+    const { tieu_de, noi_dung, generator } = await composeEngagementPost(topic);
+
+    const { data: post, error: e1 } = await client
+      .from('hr_job_posts')
+      .insert({
+        job_id: null,
+        platform_id: platformId,
+        kenh: 'facebook',
+        loai: 'tuong_tac',
+        chu_de: topic.chu_de,
+        tieu_de,
+        noi_dung,
+        ghi_chu: `topic:${topic.id}`,
+        trang_thai: 'draft',
+      })
+      .select('id')
+      .single();
+    if (e1 || !post) continue;
+
+    await pushApproval(client, {
+      kind: 'hr_job_post',
+      title: tieu_de,
+      payload: { post_id: post.id, loai: 'tuong_tac', chu_de: topic.chu_de, kenh: 'facebook', body: noi_dung, nguon_soan: generator },
+      refTable: 'hr_job_posts',
+      refId: post.id,
+    });
+
+    done.push({ topic: topic.id, post_id: post.id, generator });
+  }
+
+  try {
+    await logRun(client, { task: 'hr.queue_engagement', status: 'ok', detail: { queued: done.length, items: done, source: 'ui' } });
+  } catch { /* logRun best-effort */ }
+
+  revalidatePath('/tuong-tac');
+  revalidatePath('/');
 }

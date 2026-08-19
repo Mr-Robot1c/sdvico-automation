@@ -10,8 +10,12 @@ export const dynamic = 'force-dynamic';
 type Post = {
   id: string; tieu_de: string; trang_thai: string; scheduled_at: string | null;
   posted_at: string | null; noi_dung: string | null; job_id: string | null;
-  kenh: string | null; url: string | null; image_url: string | null; ghi_chu: string | null;
-  fb_post_id: string | null; proof_path: string | null; created_at: string;
+  kenh: string | null; url: string | null; image_url: string | null;
+  video_url: string | null;
+  ghi_chu: string | null;
+  fb_post_id: string | null; proof_path: string | null;
+  loai: string | null;
+  created_at: string;
 };
 
 type RunEntry = { task: string; status: string; created_at: string };
@@ -28,10 +32,14 @@ export default async function Page() {
   const client = getServerClient();
 
   const [jRes, aqRes, logRes, jobsRes] = await Promise.all([
+    // Chỉ hiển thị bài tuyển dụng ở trang này. Bài tương tác có tab riêng /tuong-tac.
+    // Dùng or() với loai is null để bài cũ trước khi migration đã áp (chưa có cột loai
+    // hoặc loai=null) vẫn được coi là tuyển dụng và hiện đúng chỗ.
     client
       .from('hr_job_posts')
-      .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, ghi_chu, fb_post_id, proof_path, created_at')
+      .select('id, tieu_de, trang_thai, scheduled_at, posted_at, noi_dung, job_id, kenh, url, image_url, video_url, ghi_chu, fb_post_id, proof_path, loai, created_at')
       .is('deleted_at', null)
+      .or('loai.eq.tuyen_dung,loai.is.null')
       .order('created_at', { ascending: false }).limit(100),
     client
       .from('approval_queue')

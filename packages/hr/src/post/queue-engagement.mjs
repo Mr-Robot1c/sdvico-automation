@@ -94,14 +94,14 @@ for (const topic of topics) {
 
   await pushApproval(client, {
     kind: 'hr_job_post',
-    title: `[Tương tác] ${tieu_de}`,
+    title: tieu_de,
     payload: { post_id: post.id, loai: 'tuong_tac', chu_de: topic.chu_de, kenh: 'facebook', body: noi_dung, nguon_soan: generator },
     refTable: 'hr_job_posts',
     refId: post.id
   });
 
   done.push({ topic: topic.id, post_id: post.id, generator });
-  console.log(`- Đã soạn và đẩy duyệt: [Tương tác] ${tieu_de} (${generator})`);
+  console.log(`- Đã soạn và đẩy duyệt: ${tieu_de} (${generator})`);
 }
 
 if (!DRY) {

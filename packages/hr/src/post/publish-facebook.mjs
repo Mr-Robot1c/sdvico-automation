@@ -42,7 +42,7 @@ if (jobs.length === 0) {
 const postIds = jobs.map((j) => j.postId);
 const { data: posts, error: e2 } = await client
   .from('hr_job_posts')
-  .select('id, tieu_de, noi_dung, trang_thai, url, image_url, scheduled_at')
+  .select('id, tieu_de, noi_dung, trang_thai, url, image_url, video_url, scheduled_at')
   .in('id', postIds);
 if (e2) throw new Error('Đọc hr_job_posts lỗi: ' + e2.message);
 const byId = new Map((posts || []).map((p) => [p.id, p]));
@@ -98,7 +98,19 @@ for (const j of queue) {
 
   try {
     let fbPostId;
-    if (p.image_url) {
+    if (p.video_url) {
+      // Ưu tiên video: dùng /videos endpoint, Facebook tự tải video từ URL.
+      // description = caption; title bỏ trống để bài đăng không có tiêu đề riêng lẫn với message.
+      const videoUrl = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/videos`;
+      const res = await fetch(videoUrl, {
+        method: 'POST',
+        body: new URLSearchParams({ file_url: p.video_url, description: message, access_token: TOKEN })
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
+      // Video trả về id là video id; post_id là id bài feed chứa video (dùng cho link).
+      fbPostId = json.post_id || json.id;
+    } else if (p.image_url) {
       // Đăng ảnh kèm caption. Facebook tự tải ảnh từ URL, đăng dạng photo post.
       const photoUrl = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/photos`;
       const res = await fetch(photoUrl, {
@@ -109,7 +121,7 @@ for (const j of queue) {
       if (!res.ok || json.error) throw new Error(json.error?.message || `HTTP ${res.status}`);
       fbPostId = json.post_id || json.id;
     } else {
-      // Không có ảnh: đăng text-only.
+      // Không có media: đăng text-only.
       const feedUrl = `https://graph.facebook.com/${VERSION}/${PAGE_ID}/feed`;
       const res = await fetch(feedUrl, { method: 'POST', body: new URLSearchParams({ message, access_token: TOKEN }) });
       const json = await res.json();
