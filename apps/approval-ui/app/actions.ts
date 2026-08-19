@@ -253,6 +253,34 @@ export async function decideCandidate(formData: FormData) {
   revalidatePath('/');
 }
 
+// Gán / đổi / bỏ vị trí ứng tuyển cho một hồ sơ. CV gửi vào hộp thư chung có thể không kèm
+// vị trí cụ thể; người vận hành gán tay ở /ho-so. jobId rỗng = bỏ gán (đưa lại NULL).
+// Validate jobId phải nằm trong hr_jobs (không cho gán id bậy).
+export async function assignJobToApplication(formData: FormData) {
+  const appId = String(formData.get('appId') || '');
+  const jobId = String(formData.get('jobId') || '').trim();
+  if (!appId) return;
+
+  const client = getServerClient();
+
+  let newJobId: string | null = null;
+  if (jobId) {
+    const { data: job } = await client.from('hr_jobs').select('id').eq('id', jobId).maybeSingle();
+    if (!job) throw new Error('Vị trí không tồn tại. Chọn lại từ danh sách.');
+    newJobId = jobId;
+  }
+
+  const { error } = await client
+    .from('hr_applications')
+    .update({ job_id: newJobId })
+    .eq('id', appId);
+  if (error) throw new Error('Gán vị trí lỗi: ' + error.message);
+
+  revalidatePath('/ho-so');
+  revalidatePath('/');
+  revalidatePath('/lich');
+}
+
 // Mời lại một ứng viên đã kết thúc (từ chối / đã mời / lưu nguồn) cho một vị trí khác.
 // Điều cấm 2 tinh thần: từ chối không xoá dữ liệu, ứng viên vẫn nằm trong nguồn để dùng lại.
 // Đưa hồ sơ về stage 'review' cho vị trí mới, giữ điểm chấm và tóm tắt để tham khảo,

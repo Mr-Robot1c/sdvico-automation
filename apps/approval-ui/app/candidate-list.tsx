@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import { formatDate, stageMeta, sourceLabel } from './labels';
-import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate, confirmHired, reinviteForJob } from './actions';
+import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate, confirmHired, reinviteForJob, assignJobToApplication } from './actions';
 
 export type JobOption = { id: string; title: string };
 
@@ -167,6 +167,43 @@ function InterviewApprove({ appId, name, windows }: { appId: string; name: strin
   );
 }
 
+// Gán vị trí ứng tuyển cho hồ sơ. CV gửi vào hộp thư chung thường không kèm vị trí cụ thể;
+// intake sẽ thử match tự động theo subject/CV, nhưng nếu không đúng thì người vận hành chỉnh
+// tay ở đây. Bỏ gán = xoá liên kết, thư mời phỏng vấn sẽ dùng fallback "vị trí đã ứng tuyển".
+function AssignJobControl({ appId, current, openJobs }: { appId: string; current: string; openJobs: JobOption[] }) {
+  const [edit, setEdit] = useState(false);
+  const [jobId, setJobId] = useState('');
+
+  if (!edit) {
+    return (
+      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+        <span>{current || <span className="muted">Chưa gắn</span>}</span>
+        <button className="btn ghost" type="button" onClick={() => setEdit(true)} style={{ fontSize: '0.85em' }}>
+          {current ? 'Đổi' : 'Gán vị trí'}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form
+      action={assignJobToApplication}
+      className="row"
+      style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}
+      onSubmit={() => setEdit(false)}
+    >
+      <input type="hidden" name="appId" value={appId} />
+      <select className="note" name="jobId" value={jobId} onChange={(e) => setJobId(e.target.value)} aria-label="Chọn vị trí">
+        <option value="">Bỏ gán (không rõ vị trí)</option>
+        {openJobs.map((j) => (
+          <option key={j.id} value={j.id}>{j.title}</option>
+        ))}
+      </select>
+      <button className="btn ok" type="submit" style={{ fontSize: '0.85em' }}>Lưu</button>
+      <button className="btn ghost" type="button" onClick={() => setEdit(false)} style={{ fontSize: '0.85em' }}>Hủy</button>
+    </form>
+  );
+}
+
 // Mời lại một ứng viên đã từ chối (hoặc đã mời/lưu nguồn) cho một vị trí đang tuyển khác.
 // Từ chối không xoá dữ liệu — ứng viên vẫn nằm trong nguồn, chọn vị trí phù hợp là đưa lại vào luồng.
 function ReinviteControl({ appId, jobs }: { appId: string; jobs: JobOption[] }) {
@@ -213,6 +250,12 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
         <div className="field"><dt>Điện thoại</dt><dd>{c.phone || 'Chưa có'}</dd></div>
         <div className="field"><dt>Nguồn</dt><dd>{sourceLabel(c.source)}</dd></div>
         <div className="field"><dt>Đồng ý / lưu tới</dt><dd>{c.consent}</dd></div>
+        {c.appId ? (
+          <div className="field field-long">
+            <dt>Vị trí ứng tuyển</dt>
+            <dd><AssignJobControl appId={c.appId} current={c.viTri} openJobs={openJobs} /></dd>
+          </div>
+        ) : null}
       </dl>
 
       {/* Tab chi tiết. Bấm mở, bấm lại đóng. Chỉ hiện tab có nội dung. */}

@@ -25,6 +25,7 @@ import { ensureBucket, uploadCv } from './storage.js';
 import { upsertCandidate, ensureApplication } from './candidates.js';
 import { getMailConfig, withMailbox, fetchRecentCvMessages } from './mailbox.js';
 import { loadProcessed, saveProcessed } from './seen.js';
+import { guessJobIdForNewApplication } from './guess-job.js';
 
 function parseArgs(argv) {
   const args = { dryRun: false, file: null, max: 300, sinceDays: 3, from: null };
@@ -134,7 +135,13 @@ async function processMessage(client, msg, { dryRun }) {
     cvStoragePath: storagePaths[0] || null,
     consented: true
   });
-  const app = await ensureApplication(client.__db, candidateId);
+  // Đoán vị trí ứng tuyển: substring-match subject + CV text với hr_jobs.title đang mở/nháp.
+  // Đoán sai không nguy hiểm — người vận hành thấy trong /ho-so và có nút "Đổi" chỉnh lại.
+  const guessedJobId = await guessJobIdForNewApplication(client.__db, {
+    subject: msg.subject,
+    cvText: text
+  }).catch(() => null);
+  const app = await ensureApplication(client.__db, candidateId, { jobId: guessedJobId });
 
   return {
     uid: msg.uid,
