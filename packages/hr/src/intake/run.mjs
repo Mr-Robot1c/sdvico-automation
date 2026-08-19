@@ -216,6 +216,13 @@ async function main() {
 }
 
 main().catch((err) => {
+  // Log đầy đủ để debug: err.message thường quá ngắn ("Command failed") không định vị được nguồn.
   console.error('Lỗi nạp CV:', err.message);
+  if (err.stack) console.error('Stack trace:\n' + err.stack);
+  if (err.cause) console.error('Cause:', err.cause);
+  if (err.code) console.error('Code:', err.code);
+  // In toàn bộ thuộc tính không chuẩn (ví dụ err.stderr, err.stdout của child_process).
+  const extra = Object.getOwnPropertyNames(err).filter((k) => !['message', 'stack', 'cause', 'code'].includes(k));
+  if (extra.length) console.error('Extra:', Object.fromEntries(extra.map((k) => [k, err[k]])));
   process.exit(1);
 });
