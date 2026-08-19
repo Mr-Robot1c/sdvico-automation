@@ -6,6 +6,7 @@ covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
 <!-- re-verified: 2026-08-19 - rotate: tuan TAP TRUNG lay du MOI san pham trong focus moi luot (unused = eligible), khong ap 'da dung trong vong' -> 1 lan kich ra du 2 bai ban (truoc phai kich 3 lan). -->
+<!-- re-verified: 2026-08-19 - Form Xuong san xuat input/select bi cao ngat vi .note co flex:1 (danh cho .row hang duyet); .sx-field la flex COLUMN nen flex:1 keo chieu cao. Them flex:0 0 auto cho .sx-field .note -> height tu nhien theo padding. -->
 <!-- re-verified: 2026-08-19 - Form Xuong san xuat: gioi han .sx-form max-width 720px (user: o bu qua), select ngan .sx-field select.note 320px. Chi trong form san xuat. -->
 <!-- re-verified: 2026-08-19 - BUG am thanh chay nen: dialog zoom composer TikTok dong nhung video autoPlay ben trong VAN chay -> chuyen trang khac quay lai van nghe. Fix: onClose pause + currentTime=0. -->
 <!-- re-verified: 2026-08-19 - UI LIGHT MODE (user 19/8: kho thay duong): dam mau chu phu --ink-2 #5b6879 -> #3c4a5c (contrast ~7:1 tren trang), dam --line #dce2ec -> #c7d0dd (card noi bat hon), --ink #1a2230 -> #0f1622. applied-banner tang font 15px + line-height 1.6, border-left day 6px, chu p/div dung --ink dam. Dark mode khong doi. -->
