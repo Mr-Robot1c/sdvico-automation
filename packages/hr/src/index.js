@@ -30,3 +30,5 @@ export { normalizeLocation, prioritizeLocations } from './sourcing/locations.js'
 export { analyzeJd, buildTargeting } from './sourcing/jd-analyzer.js';
 // Dữ liệu giả để chạy thử pipeline
 export { generateSyntheticCandidates } from './synthetic/generate.js';
+// Bài tương tác: KHÔNG re-export ở đây vì sẽ kéo cả playwright/imapflow/tesseract vào
+// webpack của apps/approval-ui (nặng). Import trực tiếp qua subpath '@sdvico/hr/post'.

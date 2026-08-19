@@ -2756,16 +2756,15 @@ export async function queueEngagementNow(formData: FormData) {
 
   const client = getServerClient();
 
-  // Import động: script Node dùng ESM path packages/hr/src/post/*. Trong Next thì workspace
-  // resolve tương đối từ apps/approval-ui/. Đường dẫn tương đối đủ vì monorepo dùng workspace npm.
-  // Các module là JS thuần không có d.ts, cast qua any để TS không bám vào default-null narrowing.
-  const [topicsMod, composeMod, coreMod] = await Promise.all([
-    import('../../../packages/hr/src/post/engagement-topics.js'),
-    import('../../../packages/hr/src/post/compose-engagement.js'),
-    import('../../../packages/core/src/index.js'),
+  // Import qua tên workspace package thay vì đường dẫn tương đối. Vercel monorepo webpack
+  // không xử lý tốt dynamic import trỏ ra ngoài app root; qua package name thì stable.
+  // Các module là JS thuần không có d.ts, cast qua unknown để TS không bám vào default-null narrowing.
+  const [hrMod, coreMod] = await Promise.all([
+    import('@sdvico/hr/post'),
+    import('@sdvico/core'),
   ]);
-  const pickTopics = (topicsMod as unknown as { pickTopics: (arg: { count: number; themes: string[] | null; startAt: number }) => Array<{ id: string; chu_de: string; goc: string; tieu_de: string; noi_dung: string }> }).pickTopics;
-  const composeEngagementPost = (composeMod as unknown as { composeEngagementPost: (t: unknown) => Promise<{ tieu_de: string; noi_dung: string; generator: string }> }).composeEngagementPost;
+  const pickTopics = (hrMod as unknown as { pickTopics: (arg: { count: number; themes: string[] | null; startAt: number }) => Array<{ id: string; chu_de: string; goc: string; tieu_de: string; noi_dung: string }> }).pickTopics;
+  const composeEngagementPost = (hrMod as unknown as { composeEngagementPost: (t: unknown) => Promise<{ tieu_de: string; noi_dung: string; generator: string }> }).composeEngagementPost;
   const pushApproval = (coreMod as unknown as {
     pushApproval: (client: unknown, opts: { kind: string; title: string; payload: unknown; refTable?: string; refId?: string }) => Promise<unknown>;
     logRun: (client: unknown, opts: { task: string; status: string; detail?: unknown }) => Promise<unknown>;
