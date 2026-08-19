@@ -5,7 +5,9 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- DOC-STATUS: SUSPECT (2026-08-19) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- re-verified: 2026-08-19 - rotate: tuan TAP TRUNG lay du MOI san pham trong focus moi luot (unused = eligible), khong ap 'da dung trong vong' -> 1 lan kich ra du 2 bai ban (truoc phai kich 3 lan). -->
+<!-- re-verified: 2026-08-19 - UI LIGHT MODE (user 19/8: kho thay duong): dam mau chu phu --ink-2 #5b6879 -> #3c4a5c (contrast ~7:1 tren trang), dam --line #dce2ec -> #c7d0dd (card noi bat hon), --ink #1a2230 -> #0f1622. applied-banner tang font 15px + line-height 1.6, border-left day 6px, chu p/div dung --ink dam. Dark mode khong doi. -->
 <!-- re-verified: 2026-08-19 - Xuong san xuat form (san-xuat/form.tsx) input/select dung .note bi max-width 320px cua .note (dung cho o ghi chu hang doi) -> cot phai trong. Scope override .sx-field .note {max-width:none; width:100%} de field lap full cot form. -->
 <!-- re-verified: 2026-08-19 - User chot giu giong NAM (NamMinhNeural): dao mac dinh ve NamMinh, giu rate +8% cho do buon ngu (rate cao van tro nen tuoi hon). Env TTS_VOICE ep khac. -->
 <!-- re-verified: 2026-08-19 - (1) GIONG DOC VIDEO: mac dinh doi tu vi-VN-NamMinhNeural (nam, buon ngu) -> vi-VN-HoaiMyNeural (nu, tuoi tan) + rate +8% (user 19/8: 'giong doc buon ngu'). Env TTS_VOICE + TTS_RATE ep khac. (2) COMPOSER TIKTOK zoom video: them nut 🔍 goc phai duoi anh preview mo <dialog> xem to (900px hoac 95vw), click nen den de dong. Chi trong hop composer, khong dung UI khac. -->

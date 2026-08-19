@@ -3,8 +3,8 @@
 
 | Doc | Trang thai | Ly do |
 |---|---|---|
-| docs/app-map/README.md | SUSPECT | code 'supabase/migrations' doi sau last_verified |
+| docs/app-map/README.md | VERIFIED | ok |
 | docs/app-map/database.md | VERIFIED | ok |
-| docs/app-map/ke-hoach-ai-v2-ba-spec.md | VERIFIED | ok |
-| docs/app-map/marketing.md | VERIFIED | ok |
+| docs/app-map/ke-hoach-ai-v2-ba-spec.md | SUSPECT | code 'supabase/migrations' doi sau last_verified |
+| docs/app-map/marketing.md | SUSPECT | code 'packages/marketing' doi sau last_verified |
 | docs/app-map/tuyen-dung.md | VERIFIED | ok |

@@ -5,6 +5,7 @@ covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
 <!-- re-verified: 2026-08-14 - build-video RESTORE dung CA 2 ban: horizontal (16:9 cho FB) + vertical (9:16 cho TikTok). Truoc chi ngang -> user thay TikTok khong thay video moi. pushToApprovalQueue upload 2 file -> brand_assets, brief.assets.{video_h,video_v}, channels ['facebook','tiktok'], nhan "[FB 16:9 + TikTok doc] 🎬". Thoi gian dung tang tu ~8p len ~15-20p (danh doi de co ca 2 dinh dang). --skip-whisper van dung. -->
+<!-- re-verified: 2026-08-19 - UI LIGHT MODE (user 19/8: kho thay duong): dam mau chu phu --ink-2 #5b6879 -> #3c4a5c (contrast ~7:1 tren trang), dam --line #dce2ec -> #c7d0dd (card noi bat hon), --ink #1a2230 -> #0f1622. applied-banner tang font 15px + line-height 1.6, border-left day 6px, chu p/div dung --ink dam. Dark mode khong doi. -->
 <!-- re-verified: 2026-08-19 - Xuong san xuat form (san-xuat/form.tsx) input/select dung .note bi max-width 320px cua .note (dung cho o ghi chu hang doi) -> cot phai trong. Scope override .sx-field .note {max-width:none; width:100%} de field lap full cot form. -->
 <!-- re-verified: 2026-08-19 - Giong doc video quay lai NamMinh (nam), rate +8%. -->
 <!-- re-verified: 2026-08-19 - Giong doc video mac dinh doi tu vi-VN-NamMinhNeural sang vi-VN-HoaiMyNeural (nu, Friendly Positive) + rate +8% (build-video.mjs). Env TTS_VOICE / TTS_RATE ep khac. -->

@@ -2,9 +2,9 @@
   --bg: #f4f6fa;
   --surface: #ffffff;
   --surface-2: #f6f8fb;
-  --line: #dce2ec;
-  --ink: #1a2230;
-  --ink-2: #5b6879;
+  --line: #c7d0dd;
+  --ink: #0f1622;
+  --ink-2: #3c4a5c;
   --ok: #1c7a4d;
   --ok-bg: #e7f4ec;
   --no: #b02a2a;
@@ -798,10 +798,12 @@ a.chip:hover { filter: brightness(0.98); }
 /* Banner "Đang áp dụng" trên trang Kế hoạch: tóm tắt bản áp dụng ngay sau khi bấm nút. */
 .applied-banner {
   background: var(--ok-bg, #dcfce7); color: var(--ink);
-  border: 1px solid var(--ok, #16a34a); border-left-width: 4px;
-  border-radius: 10px; padding: 12px 16px; margin: 10px 0;
+  border: 1px solid var(--ok, #16a34a); border-left-width: 6px;
+  border-radius: 10px; padding: 14px 18px; margin: 10px 0;
+  font-size: 15px; line-height: 1.6;
 }
-.applied-banner b { color: var(--ok, #15803d); }
+.applied-banner b { color: var(--ok, #15803d); font-weight: 700; }
+.applied-banner p, .applied-banner div { color: var(--ink); }
 .applied-banner p { margin: 6px 0 0 0; line-height: 1.55; }
 
 /* Ô Mục tiêu tuần trên trang Kế hoạch - người giao việc cho BOSS (flowchart v3). */
