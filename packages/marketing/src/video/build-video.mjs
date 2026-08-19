@@ -258,7 +258,7 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
 async function main() {
   const env = loadRealEnv();
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-  const voice = arg('voice', process.env.TTS_VOICE || 'vi-VN-HoaiMyNeural');
+  const voice = arg('voice', process.env.TTS_VOICE || 'vi-VN-NamMinhNeural');
   const outDir = arg('out', join(HERE, '..', '..', '..', '..', 'out', 'video'));
   await mkdir(outDir, { recursive: true });
 
