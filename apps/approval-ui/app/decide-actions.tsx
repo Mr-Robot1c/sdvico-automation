@@ -73,10 +73,14 @@ function TiktokComposer({ videoUrl, caption }: { videoUrl?: string | null; capti
   return (
     <div className="tt-composer">
       <div className="tt-head">🎵 <b>Đăng lên TikTok</b></div>
-      {/* Xác nhận rõ NỘI DUNG sẽ đăng (bắt buộc cho audit). */}
-      {videoUrl ? <video className="tt-prev" src={videoUrl} controls preload="metadata" /> : null}
-      {caption ? <p className="tt-cap">{caption}</p> : null}
-      <p className="tt-disc">Video và mô tả trên sẽ được đăng lên tài khoản TikTok{info?.nickname ? ` @${info.nickname}` : ' của SDVICO'}.</p>
+      {/* Xác nhận rõ NỘI DUNG sẽ đăng (bắt buộc cho audit): video trái, mô tả phải. */}
+      <div className="tt-body">
+        {videoUrl ? <video className="tt-prev" src={`${videoUrl}#t=2`} controls preload="metadata" /> : null}
+        <div className="tt-body-text">
+          {caption ? <p className="tt-cap">{caption}</p> : null}
+          <p className="tt-disc">Video và mô tả sẽ được đăng lên tài khoản TikTok{info?.nickname ? ` @${info.nickname}` : ' của SDVICO'}.</p>
+        </div>
+      </div>
 
       {!info ? (
         <p className="sub">Đang lấy cài đặt tài khoản TikTok…</p>

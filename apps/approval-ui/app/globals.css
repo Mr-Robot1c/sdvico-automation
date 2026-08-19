@@ -50,7 +50,10 @@ body {
 
 /* Full-width: bỏ trần 1180px (user 18/8: "2 bên phình ra luôn, để giữa khó chịu").
    Giữ padding 2 bên cho chữ không dính mép màn hình. */
-main { padding: 24px 32px 64px; max-width: none; margin: 0; width: 100%; }
+/* Giới hạn bề ngang + căn giữa: màn hình siêu rộng trước đây để max-width:none nên card duyệt
+   trải hết ~1900px, nội dung dồn trái, trống huơ bên phải (user 19/8 "nhìn chưa đều"). 1200px
+   căn giữa cho gọn; bảng rộng (Quản lý bài viết, Đo lường) tự cuộn ngang trong khung của nó. */
+main { padding: 24px 32px 64px; max-width: 1200px; margin: 0 auto; width: 100%; }
 
 .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 h1 { font-size: 22px; margin: 0 0 4px; }
@@ -171,18 +174,21 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
   padding-left: 2px;
 }
 
-/* Khối duyệt: composer TikTok (nếu có) xếp TRÊN hàng ghi chú/hẹn giờ/nút. */
-.decide-wrap { display: flex; flex-direction: column; gap: 10px; }
+/* Khối duyệt: composer TikTok (nếu có) xếp TRÊN hàng ghi chú/hẹn giờ/nút, cùng bề ngang cho đều. */
+.decide-wrap { display: flex; flex-direction: column; gap: 10px; max-width: 720px; }
 /* Màn composer TikTok (yêu cầu audit): xem trước video + caption, ô chọn riêng tư, câu disclosure. */
 .tt-composer {
   border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
-  padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; max-width: 460px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; width: 100%;
 }
 .tt-head { font-size: 13.5px; }
-.tt-prev { width: 100%; max-width: 220px; max-height: 300px; border-radius: 8px; background: #000; }
+/* Video trái, mô tả phải để lấp đều bề ngang (trước đây video xếp dọc, hộp rộng trống bên phải). */
+.tt-body { display: flex; gap: 12px; align-items: flex-start; }
+.tt-prev { width: 168px; flex: 0 0 auto; max-height: 300px; border-radius: 8px; background: #0b0f14; }
+.tt-body-text { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .tt-cap {
   font-size: 12.5px; color: var(--ink-2); margin: 0; white-space: pre-wrap;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;
 }
 .tt-disc { font-size: 12px; color: var(--ink-2); margin: 0; }
 .tt-priv { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); }

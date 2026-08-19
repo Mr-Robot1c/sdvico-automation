@@ -306,7 +306,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                     {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} loading="lazy" /> : null}
                     {vid ? (
                       <span className="card-media-vid">
-                        <video src={vid.url} muted preload="metadata" />
+                        <video src={`${vid.url}#t=2`} muted preload="metadata" />
                         <span className="card-media-badge" aria-hidden="true">▶</span>
                       </span>
                     ) : null}
@@ -350,7 +350,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                     {img || vid ? (
                       <div className="modal-media">
                         {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} /> : null}
-                        {vid ? <video src={vid.url} controls preload="metadata" /> : null}
+                        {vid ? <video src={`${vid.url}#t=2`} controls preload="metadata" playsInline /> : null}
                       </div>
                     ) : null}
                   </ViewModal>
