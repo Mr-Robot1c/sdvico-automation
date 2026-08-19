@@ -55,8 +55,13 @@ function TiktokComposer({ videoUrl, caption }: { videoUrl?: string | null; capti
         if (!alive || !j) { setInfo({ ok: false, error: 'không gọi được creator_info' }); return; }
         setInfo(j);
         const opts = j.privacyOptions || [];
-        // Mặc định chọn Công khai nếu tài khoản/app cho phép (sau audit), không thì mức đầu tiên.
-        setPrivacy(opts.includes('PUBLIC_TO_EVERYONE') ? 'PUBLIC_TO_EVERYONE' : opts[0] || 'SELF_ONLY');
+        // Mặc định: Công khai nếu đã audit; chưa thì để RIÊNG TƯ cho an toàn (người duyệt tự nâng lên
+        // Followers/Bạn bè nếu muốn). Không mặc định mức rộng hơn để tránh lỡ đăng công khai ngoài ý.
+        setPrivacy(
+          opts.includes('PUBLIC_TO_EVERYONE') ? 'PUBLIC_TO_EVERYONE'
+            : opts.includes('SELF_ONLY') ? 'SELF_ONLY'
+              : opts[0] || 'SELF_ONLY'
+        );
       })
       .catch(() => { if (alive) setInfo({ ok: false, error: 'lỗi mạng' }); });
     return () => { alive = false; };
@@ -95,7 +100,7 @@ function TiktokComposer({ videoUrl, caption }: { videoUrl?: string | null; capti
             <p className="sub">Tài khoản đang tắt: {[info.commentDisabled && 'bình luận', info.duetDisabled && 'duet', info.stitchDisabled && 'stitch'].filter(Boolean).join(', ')}.</p>
           ) : null}
           {onlySelf ? (
-            <p className="sub">Hiện chỉ đăng riêng tư được vì app chưa qua audit TikTok. Sau khi audit đậu, mục này sẽ có "Công khai".</p>
+            <p className="sub">Chưa có mục "Công khai" vì app chưa qua audit TikTok (hiện chỉ đăng được cho Người theo dõi, Bạn bè hoặc Riêng tư). Sau khi audit đậu sẽ có "Công khai (mọi người)".</p>
           ) : null}
         </>
       )}
