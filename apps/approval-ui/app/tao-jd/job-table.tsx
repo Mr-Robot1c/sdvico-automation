@@ -97,7 +97,7 @@ function JobDetail({ j, extraChannels }: { j: JobRow; extraChannels: { kenh: str
             <dt>Tự động đăng</dt>
             <dd style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <AutoPostToggle jobId={j.id} isOn={j.autoPost} />
-              {j.autoPost ? <RefreshInterval jobId={j.id} current={j.refreshAfterDays} /> : null}
+              <RefreshInterval jobId={j.id} current={j.refreshAfterDays} />
             </dd>
           </div>
         ) : null}
