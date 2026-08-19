@@ -1028,9 +1028,9 @@ export async function deleteContent(formData: FormData) {
     client.from('mkt_metrics').delete().eq('entity_ref', id)
   ]);
   await client.from('mkt_content').delete().eq('id', id);
-  revalidatePath('/do-luong');
+  // Chỉ revalidate trang đang đứng (/noi-dung); các trang khác (/, /do-luong) đều force-dynamic
+  // nên tự lấy dữ liệu mới khi mở. Bớt 2 lần revalidate = phản hồi nhanh hơn khi xoá liên tiếp.
   revalidatePath('/noi-dung');
-  revalidatePath('/');
 }
 
 // Sinh text cho khung sản xuất: nhập từ khóa (kèm intent/landing_url tùy chọn), trả bản nháp

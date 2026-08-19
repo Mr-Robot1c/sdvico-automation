@@ -261,7 +261,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                 const img = c.brief?.assets?.image ? assetUrl.get(c.brief.assets.image) : undefined;
                 const vid = c.brief?.assets?.video ? assetUrl.get(c.brief.assets.video) : undefined;
                 return (
-                  <tr key={c.id}>
+                  <tr key={c.id} id={`row-${c.id}`}>
                     <td className="cell-code">{shortCode(c.id)}</td>
                     <td className="cell-title">
                       <div className="cell-title-main">{c.title}</div>
