@@ -360,8 +360,10 @@ export async function GET(req: Request) {
     //   Weight cao = chọn dày. news/portrait vẫn xuất hiện nhưng ít hơn vì cần chuẩn bị thật.
     // @ts-ignore — module JS thuần
     const { CONTENT_TOPICS } = await import('../../../lib/gen/products.mjs');
-    // portrait=1 (bật lại 18/8): đã có tư liệu ảnh đời sống thật từ Zalo (Zalo/media/) và
-    // ĐÃ XIN PHÉP người liên quan. Bài portrait vẫn needs_gov_review, người duyệt điền tên
+    // portrait=1 (sếp chốt 19/8 qua user): bài chân dung viết HOÀN CHỈNH với nhân vật ĐIỂN HÌNH
+    // (tên gọi thân mật + tuổi + địa phương + câu nói, không họ tên đầy đủ, không số liệu cá nhân)
+    // để đăng ngay, KHÔNG để ô trống cho người điền tay nữa. Prompt ở lib/gen/social.mjs.
+    // Bài portrait không cần duyệt cấp quản lý (không chạm quy định nhà nước); người duyệt vẫn đọc
     // thật + gắn ảnh thật trước khi duyệt (điều cấm 5). news=0: giữ tắt, dễ chạm quy định
     // (điều cấm 3), chỉ viết tay khi có nguồn chính thống.
     const KIND_WEIGHT: Record<string, number> = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 1, news: 0 };
@@ -383,11 +385,11 @@ export async function GET(req: Request) {
     const kind = gen.contentType || chosenKind;
     const risk = gen.assessment?.risk || 'none';
     // news + portrait CẦN người duyệt tay (news chạm quy định điều cấm 3; portrait cần điền tên thật).
-    const needsGov = risk === 'red' || kind === 'news' || kind === 'portrait';
+    const needsGov = risk === 'red' || kind === 'news';
     // Nhãn queue theo loại cho người duyệt biết ngay đây là bài gì.
     const KIND_LABEL: Record<string, string> = {
       qa: '❓ Hỏi-Đáp', checklist: '📋 Checklist', glossary: '📖 Thuật ngữ', tip: '💡 Mẹo',
-      engage: '💬 Hỏi bà con', portrait: '👤 Chân dung (điền tay)', news: '⚠️ Thời sự (chờ duyệt QL)',
+      engage: '💬 Hỏi bà con', portrait: '👤 Chân dung', news: '⚠️ Thời sự (chờ duyệt QL)',
     };
     const kindTag = KIND_LABEL[kind] || '📰';
     const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';

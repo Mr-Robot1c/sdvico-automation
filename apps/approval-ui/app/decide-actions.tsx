@@ -135,10 +135,9 @@ export default function DecideActions({
       action={decideForm}
       onSubmit={(e) => {
         const action = (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value');
-        if (action === 'reject') {
-          const ok = window.confirm(`Từ chối mục này?\n\n"${title}"`);
-          if (!ok) { e.preventDefault(); return; }
-        }
+        // Bỏ popup xác nhận Từ chối (user 19/8: "bấm popup mỗi lần tốn thời gian").
+        // Từ chối chỉ đánh dấu bản ghi rejected trong hàng đợi, KHÔNG xoá dữ liệu, KHÔNG đăng gì
+        // -> có thể mở lại từ Vận hành nếu lỡ bấm nhầm; hỏi lại mỗi lần là dư thừa.
         if (action === 'approve' && schedule) {
           const t = new Date(schedule).getTime();
           const now = Date.now();
