@@ -34,6 +34,9 @@ export async function middleware(req: NextRequest) {
   // Trang công khai cho ứng viên tự chọn giờ phỏng vấn.
   if (path.startsWith('/phong-van/')) return NextResponse.next();
 
+  // Trang công khai cho sếp xem CV + ra quyết định qua link do HR cấp (token 48 ký tự).
+  if (path.startsWith('/xem-ho-so/')) return NextResponse.next();
+
   if (AUTH_MODE === 'supabase') {
     return handleSupabase(req, path);
   }

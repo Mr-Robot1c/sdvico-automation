@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import { formatDate, stageMeta, sourceLabel } from './labels';
-import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate, confirmHired, reinviteForJob, assignJobToApplication } from './actions';
+import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate, confirmHired, reinviteForJob, assignJobToApplication, createBossReviewLink, revokeBossReviewLink } from './actions';
 
 export type JobOption = { id: string; title: string };
 
@@ -23,6 +23,10 @@ export type CandView = {
   appStage: string | null;
   interviewedAt: string | null;
   hiredAt: string | null;
+  bossReviewToken: string | null;
+  bossReviewExpiresAt: string | null;
+  bossReviewedAt: string | null;
+  bossDecision: string | null;
   sourced: boolean;
   note: string;
   score: number | null;
@@ -167,6 +171,72 @@ function InterviewApprove({ appId, name, windows }: { appId: string; name: strin
   );
 }
 
+// Link công khai cho sếp xem CV + ra quyết định phỏng vấn qua trang /xem-ho-so/[token].
+// HR bấm "Tạo link" → hiện URL đầy đủ + nút Copy + hạn dùng + nút Thu hồi.
+// Trạng thái "Sếp đã bấm" hiện luôn kết quả sếp chọn để HR biết đã xử lý xong.
+function BossReviewLinkControl({ appId, token, expiresAt, reviewedAt, decision }: {
+  appId: string; token: string | null; expiresAt: string | null; reviewedAt: string | null; decision: string | null;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const decisionLabel = decision === 'interview' ? 'hẹn phỏng vấn' : decision === 'reject' ? 'không phù hợp' : decision === 'hold' ? 'chờ thêm thông tin' : decision;
+
+  if (reviewedAt) {
+    return (
+      <div className="row" style={{ gap: 8, alignItems: 'center', fontSize: '0.9em' }}>
+        <span className="stage tone-ok">✓ Sếp đã bấm: <b>{decisionLabel}</b></span>
+        <span className="muted" style={{ fontSize: '0.85em' }}>lúc {new Date(reviewedAt).toLocaleString('vi-VN')}</span>
+      </div>
+    );
+  }
+
+  if (!token || !expiresAt) {
+    return (
+      <form action={createBossReviewLink} style={{ display: 'inline' }}>
+        <input type="hidden" name="appId" value={appId} />
+        <button className="btn ghost" type="submit" style={{ fontSize: '0.85em' }} title="Tạo link công khai gửi sếp qua chat (không cần login). Link có hạn 7 ngày.">
+          Tạo link cho sếp xem
+        </button>
+      </form>
+    );
+  }
+
+  const url = typeof window !== 'undefined' ? `${window.location.origin}/xem-ho-so/${token}` : `/xem-ho-so/${token}`;
+  const daysLeft = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (24 * 3600 * 1000)));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+        <code style={{ fontSize: '0.8em', wordBreak: 'break-all', background: 'var(--panel, #f8fafc)', padding: '4px 8px', borderRadius: 4, flex: 1 }}>{url}</code>
+        <button
+          type="button"
+          className="btn ok"
+          style={{ fontSize: '0.85em' }}
+          onClick={() => {
+            navigator.clipboard.writeText(url).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            });
+          }}
+        >
+          {copied ? 'Đã copy ✓' : 'Copy'}
+        </button>
+      </div>
+      <div className="row" style={{ gap: 8, alignItems: 'center', fontSize: '0.85em' }}>
+        <span className="muted">Hết hạn sau {daysLeft} ngày. Chưa được bấm.</span>
+        <form
+          action={revokeBossReviewLink}
+          style={{ display: 'inline' }}
+          onSubmit={(e) => { if (!window.confirm('Thu hồi link này? Sếp mở link sẽ không xem được nữa.')) e.preventDefault(); }}
+        >
+          <input type="hidden" name="appId" value={appId} />
+          <button className="btn ghost" type="submit" style={{ fontSize: '0.85em' }}>Thu hồi</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // Gán vị trí ứng tuyển cho hồ sơ. CV gửi vào hộp thư chung thường không kèm vị trí cụ thể;
 // intake sẽ thử match tự động theo subject/CV, nhưng nếu không đúng thì người vận hành chỉnh
 // tay ở đây. Bỏ gán = xoá liên kết, thư mời phỏng vấn sẽ dùng fallback "vị trí đã ứng tuyển".
@@ -254,6 +324,20 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
           <div className="field field-long">
             <dt>Vị trí ứng tuyển</dt>
             <dd><AssignJobControl appId={c.appId} current={c.viTri} openJobs={openJobs} /></dd>
+          </div>
+        ) : null}
+        {c.appId ? (
+          <div className="field field-long">
+            <dt>Chia sẻ cho sếp xem</dt>
+            <dd>
+              <BossReviewLinkControl
+                appId={c.appId}
+                token={c.bossReviewToken}
+                expiresAt={c.bossReviewExpiresAt}
+                reviewedAt={c.bossReviewedAt}
+                decision={c.bossDecision}
+              />
+            </dd>
           </div>
         ) : null}
       </dl>

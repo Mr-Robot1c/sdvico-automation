@@ -253,6 +253,165 @@ export async function decideCandidate(formData: FormData) {
   revalidatePath('/');
 }
 
+// ===== BOSS REVIEW LINK (Hướng A) =====================================================
+// HR tạo link công khai per candidate → copy gửi sếp qua chat. Sếp mở link không cần login,
+// xem CV + điểm chấm + câu hỏi phỏng vấn (nếu có), rồi chọn 1 trong 3: hẹn phỏng vấn (+ chọn
+// khung giờ), không phù hợp, hoặc chờ thêm. Kết quả tạo pending trong / → HR bấm gửi thật.
+// Điều cấm 1 vẫn giữ: sếp bấm quyết + chọn slots (máy soạn), HR bấm gửi (người bấm cuối).
+
+const BOSS_LINK_TTL_DAYS = 7;
+
+export async function createBossReviewLink(formData: FormData) {
+  const appId = String(formData.get('appId') || '');
+  if (!appId) return;
+  const client = getServerClient();
+  const token = randomBytes(24).toString('hex'); // 48 chars
+  const expires = new Date(Date.now() + BOSS_LINK_TTL_DAYS * 24 * 3600 * 1000).toISOString();
+  const { error } = await client
+    .from('hr_applications')
+    .update({
+      review_token: token,
+      review_token_expires_at: expires,
+      boss_reviewed_at: null,
+      boss_decision: null,
+    })
+    .eq('id', appId);
+  if (error) throw new Error('Tạo link cho sếp lỗi: ' + error.message);
+  revalidatePath('/ho-so');
+}
+
+export async function revokeBossReviewLink(formData: FormData) {
+  const appId = String(formData.get('appId') || '');
+  if (!appId) return;
+  const client = getServerClient();
+  const { error } = await client
+    .from('hr_applications')
+    .update({ review_token: null, review_token_expires_at: null })
+    .eq('id', appId);
+  if (error) throw new Error('Thu hồi link lỗi: ' + error.message);
+  revalidatePath('/ho-so');
+}
+
+// Sếp bấm quyết từ /xem-ho-so/[token]. Xác thực bằng token (không cần đăng nhập).
+// decision:
+//   'interview' → cần slots (chuỗi "YYYY-MM-DD|HH:MM" cách nhau bằng dòng); tạo hr_interview pending
+//   'reject'    → chuyển stage='rejected', không tạo mail (HR mới bấm để gửi nếu muốn)
+//   'hold'      → chỉ ghi note, không đổi stage
+export async function bossSubmitDecision(formData: FormData) {
+  const token = String(formData.get('token') || '').trim();
+  const decision = String(formData.get('decision') || '').trim();
+  const note = String(formData.get('note') || '').trim().slice(0, 1000);
+  if (!token || !['interview', 'reject', 'hold'].includes(decision)) return;
+
+  const client = getServerClient();
+
+  // Load application + validate token còn hạn.
+  const { data: app } = await client
+    .from('hr_applications')
+    .select('id, stage, candidate_id, job_id, review_token, review_token_expires_at, boss_reviewed_at')
+    .eq('review_token', token)
+    .maybeSingle();
+  if (!app) return; // token sai/không tồn tại
+  if (!app.review_token_expires_at || new Date(app.review_token_expires_at) < new Date()) return; // hết hạn
+  if (app.boss_reviewed_at) return; // đã dùng
+
+  // Đánh dấu đã review + revoke token (1-time use).
+  const now = new Date().toISOString();
+
+  if (decision === 'hold') {
+    await client.from('hr_applications')
+      .update({
+        boss_reviewed_at: now,
+        boss_decision: 'hold',
+        note: note || null,
+        review_token: null,
+        review_token_expires_at: null,
+      })
+      .eq('id', app.id);
+    revalidatePath('/ho-so');
+    return;
+  }
+
+  if (decision === 'reject') {
+    await client.from('hr_applications')
+      .update({
+        stage: 'rejected',
+        boss_reviewed_at: now,
+        boss_decision: 'reject',
+        note: note || null,
+        review_token: null,
+        review_token_expires_at: null,
+      })
+      .eq('id', app.id);
+    // Không soạn thư từ chối tự động — HR bấm nút "Không nhận & gửi" ở /ho-so nếu muốn.
+    revalidatePath('/ho-so');
+    return;
+  }
+
+  // decision === 'interview'
+  // Parse slots từ form (mỗi dòng "YYYY-MM-DD|HH:MM").
+  const rawSlots = String(formData.get('slots') || '').split('\n').map((s) => s.trim()).filter(Boolean);
+  const chosen = rawSlots
+    .map((rs) => { const [d, t] = rs.split('|'); return formatSlot(d, t); })
+    .filter(Boolean);
+  const slots = chosen.length ? chosen : await allocateInterviewSlots(client, 3);
+
+  // P0-6: kiểm consent.
+  const { data: cand } = await client
+    .from('hr_candidates')
+    .select('full_name, email, phone, cv_json, consent_at')
+    .eq('id', app.candidate_id)
+    .maybeSingle();
+  if (!cand?.consent_at) throw new Error('Ứng viên chưa có consent_at.');
+
+  let position = 'vị trí đã ứng tuyển';
+  if (app.job_id) {
+    const { data: job } = await client.from('hr_jobs').select('title').eq('id', app.job_id).maybeSingle();
+    if (job?.title) position = job.title;
+  }
+
+  const name = (cand.full_name as string) || null;
+  const email = (cand.email as string) || '';
+  const cvText = ((cand.cv_json as { raw_text?: string } | null)?.raw_text) || '';
+
+  const scheduleToken = randomBytes(18).toString('hex');
+  await client.from('hr_applications')
+    .update({
+      stage: 'interview',
+      schedule_token: scheduleToken,
+      boss_reviewed_at: now,
+      boss_decision: 'interview',
+      note: note || null,
+      review_token: null,
+      review_token_expires_at: null,
+    })
+    .eq('id', app.id);
+
+  const q = await generateInterviewQuestions(cvText, position, {
+    full_name: name,
+    email,
+    phone: (cand.phone as string) || null,
+    address: ((cand.cv_json as { address?: string } | null)?.address) || null,
+  });
+  const thu_moi = composeInterviewLetter({ name, position, slots, cvText });
+
+  await client.from('approval_queue').insert({
+    kind: 'hr_interview',
+    title: `[Sếp duyệt] Thư mời phỏng vấn: ${name || email || app.id}`,
+    payload: {
+      ung_vien: name, vi_tri: position, email,
+      khung_gio: slots, thu_moi,
+      cau_hoi_ky_thuat: q.cau_hoi_ky_thuat, cau_hoi_hanh_vi: q.cau_hoi_hanh_vi, bai_ve_nha: q.bai_ve_nha,
+      luu_y: `Sếp đã duyệt qua link công khai${note ? ` · Ghi chú: ${note}` : ''}. HR bấm Duyệt để gửi mail.`,
+      da_qua_sep_duyet: true,
+    },
+    ref_table: 'hr_applications', ref_id: app.id, status: 'pending',
+  });
+
+  revalidatePath('/ho-so');
+  revalidatePath('/');
+}
+
 // Gán / đổi / bỏ vị trí ứng tuyển cho một hồ sơ. CV gửi vào hộp thư chung có thể không kèm
 // vị trí cụ thể; người vận hành gán tay ở /ho-so. jobId rỗng = bỏ gán (đưa lại NULL).
 // Validate jobId phải nằm trong hr_jobs (không cho gán id bậy).

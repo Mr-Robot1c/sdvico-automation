@@ -18,6 +18,10 @@ type App = {
   strengths: string[] | null;
   clarifications: string[] | null;
   job_id: string | null;
+  review_token: string | null;
+  review_token_expires_at: string | null;
+  boss_reviewed_at: string | null;
+  boss_decision: string | null;
 };
 type CvJson = {
   raw_text?: string;
@@ -50,7 +54,7 @@ export default async function Page() {
   const { data, error } = await client
     .from('hr_candidates')
     .select(
-      'id, full_name, email, phone, source, cv_storage_path, cv_json, dedup_key, consent_at, retention_until, created_at, hr_applications(id, stage, created_at, score_json, summary, strengths, clarifications, job_id)'
+      'id, full_name, email, phone, source, cv_storage_path, cv_json, dedup_key, consent_at, retention_until, created_at, hr_applications(id, stage, created_at, score_json, summary, strengths, clarifications, job_id, review_token, review_token_expires_at, boss_reviewed_at, boss_decision)'
     )
     .order('created_at', { ascending: false })
     .limit(100);
@@ -154,6 +158,10 @@ export default async function Page() {
       appStage: app?.stage || null,
       interviewedAt: (app?.id && interviewedAt.get(app.id)) || null,
       hiredAt: (app?.id && hiredAt.get(app.id)) || null,
+      bossReviewToken: app?.review_token || null,
+      bossReviewExpiresAt: app?.review_token_expires_at || null,
+      bossReviewedAt: app?.boss_reviewed_at || null,
+      bossDecision: app?.boss_decision || null,
       sourced: (c.source || '').startsWith('sourced'),
       note: (app?.id && notes.get(app.id)) || '',
       score: typeof app?.score_json?.diem_tong === 'number' ? app.score_json!.diem_tong! : null,
