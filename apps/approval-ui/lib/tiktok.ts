@@ -91,8 +91,16 @@ export async function postVideoToTikTok(
     steps.creatorInfo = ciErr ? { error: ci.error } : { privacy_options: ci?.data?.privacy_level_options };
     if (!ciRes.ok || ciErr) return { ok: false, steps, error: 'creator_info: ' + (ciErr || `HTTP ${ciRes.status}`) };
     const options: string[] = ci?.data?.privacy_level_options || [];
-    // Chưa audit: chỉ SELF_ONLY. Ưu tiên SELF_ONLY cho an toàn.
-    const privacy = options.includes('SELF_ONLY') ? 'SELF_ONLY' : options[0] || 'SELF_ONLY';
+    // Ưu tiên PUBLIC nếu TikTok cho phép. TikTok CHỈ trả 'PUBLIC_TO_EVERYONE' trong options khi app
+    // ĐÃ QUA AUDIT — chưa audit thì options chỉ có 'SELF_ONLY' (riêng tư), không ép public được bằng
+    // code. env TIKTOK_PRIVACY: 'public'|'auto' = lấy public khi có; 'self' = luôn riêng tư (mặc định
+    // auto -> sau khi audit đậu là tự động đăng public, không phải sửa code).
+    const pref = (process.env.TIKTOK_PRIVACY || 'auto').toLowerCase();
+    const wantPublic = pref === 'public' || pref === 'auto';
+    const privacy = wantPublic && options.includes('PUBLIC_TO_EVERYONE')
+      ? 'PUBLIC_TO_EVERYONE'
+      : options.includes('SELF_ONLY') ? 'SELF_ONLY' : options[0] || 'SELF_ONLY';
+    steps.privacyChosen = privacy;
 
     // 2. Tải video về (từ Supabase). Chuẩn hóa bằng ffmpeg (nướng chiều xoay + H.264/AAC) để TikTok
     //    không hiển thị nghiêng 90 độ; lỗi/thiếu ffmpeg thì dùng file gốc, KHÔNG chặn đăng.

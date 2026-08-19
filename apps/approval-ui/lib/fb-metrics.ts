@@ -62,10 +62,37 @@ function classify(url: string, objId: string): { kind: NodeKind; pageId: string 
   return { kind: 'photo', pageId: null };
 }
 
+// Id Page đứng trước trong external_url (video ".../<pageId>/videos/..." hoặc bài "<pageId>_<postId>").
+// Null nếu chưa biết (id ảnh trần) -> phải dò token.
+function pageIdOf(url: string, objId: string): string | null {
+  const mV = url.match(/facebook\.com\/(\d+)\/videos\//);
+  if (mV) return mV[1];
+  if (objId.includes('_')) return objId.split('_')[0];
+  return null;
+}
+
+export type FbPageToken = { pageId: string | null; token: string; label: 'test' | 'real' };
+
+// Danh sách token Page đang cấu hình.
+//  - Page test (FACEBOOK_PAGE_*): MÁY ĐĂNG tự động + đọc số của chính nó.
+//  - Page chính thức (FACEBOOK_REAL_PAGE_*): CHỈ để ĐỌC số bài đăng TAY (sếp muốn page chính thức
+//    đăng tay). KHÔNG nhánh nào đăng bằng token này — publishContentToFacebook chỉ đọc token test.
+// Vì sao cần 2 token: Facebook không cho token của page này đọc số liệu bài của page khác, nên mỗi
+// bài phải hỏi bằng đúng token của page sở hữu nó.
+export function fbPageTokens(): FbPageToken[] {
+  const out: FbPageToken[] = [];
+  const t1 = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  if (t1) out.push({ pageId: process.env.FACEBOOK_PAGE_ID || null, token: t1, label: 'test' });
+  const t2 = process.env.FACEBOOK_REAL_PAGE_ACCESS_TOKEN;
+  if (t2) out.push({ pageId: process.env.FACEBOOK_REAL_PAGE_ID || null, token: t2, label: 'real' });
+  return out;
+}
+
 export async function pullFacebookMetrics(client: Client): Promise<{ pulled: number; results: any[] }> {
   const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
-  const TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
-  if (!TOKEN) return { pulled: 0, results: [{ error: 'chưa cấu hình FACEBOOK_PAGE_ACCESS_TOKEN' }] };
+  const tokens = fbPageTokens();
+  if (!tokens.length) return { pulled: 0, results: [{ error: 'chưa cấu hình FACEBOOK_PAGE_ACCESS_TOKEN' }] };
+  const graphT = (path: string, token: string, ms = 8000) => fetchJsonWithTimeout(`https://graph.facebook.com/${VERSION}/${path}`, token, ms);
 
   const { data: posts } = await client
     .from('mkt_posts')
@@ -92,14 +119,30 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
   }
 
   const day = todayVN();
-  const graph = (path: string, ms = 8000) => fetchJsonWithTimeout(`https://graph.facebook.com/${VERSION}/${path}`, TOKEN, ms);
 
   // Gọi Graph API song song (tối đa 8 việc cùng lúc), mỗi request có timeout riêng.
-  const results = await mapPool(targets, 8, async ({ rowId, cid, objId, kind, pageId }) => {
+  const results = await mapPool(targets, 8, async ({ rowId, cid, objId, url, kind, pageId }) => {
     try {
+      // 0) Chọn TOKEN của đúng page sở hữu bài. Biết pageId (video / bài PAGEID_POSTID) -> khớp
+      // token theo pageId. Không biết (id ảnh trần) -> dò lần lượt token bằng call rẻ objId?fields=id;
+      // token nào đọc được là token page sở hữu. 1 token thì khỏi dò.
+      const pid = pageIdOf(url, objId);
+      const matched = pid ? tokens.filter((t) => t.pageId === pid) : [];
+      const cands = matched.length ? matched : tokens;
+      const note: string[] = [];
+      let token = cands[0].token;
+      if (cands.length > 1) {
+        let found = false;
+        for (const c of cands) {
+          const probe = await graphT(`${objId}?fields=id`, c.token, 6000);
+          if (probe && !probe.error && probe.id) { token = c.token; found = true; break; }
+        }
+        if (!found) note.push('không token nào đọc được bài này (kiểm token page chính thức có quyền đọc bài không)');
+      }
+      const graph = (path: string, ms = 8000) => graphT(path, token, ms);
+
       // 1) Tìm node BÀI (post) để hỏi reactions/comments/shares.
       let postId: string | null = kind === 'post' ? objId : null;
-      const note: string[] = [];
       if (kind === 'photo') {
         const pj = await graph(`${objId}?fields=page_story_id`);
         if (pj?.page_story_id) {
@@ -199,27 +242,26 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
     .map((r: any) => ({ source: 'facebook', entity_ref: r.contentId, metric_date: day, metrics: r.metrics }));
   if (rows.length) await client.from('mkt_metrics').insert(rows);
 
-  // Số NGƯỜI THEO DÕI Trang (page-level). Lưu 1 dòng entity_ref='__page__' để trang Đo lường hiện
-  // "X follower" làm mốc so với reach từng bài. followers_count/fan_count là field cơ bản của Page
-  // (không cần read_insights). Với Page token, /me chính là Trang.
-  try {
-    const pj = await fetchJsonWithTimeout(
-      `https://graph.facebook.com/${VERSION}/me?fields=followers_count,fan_count,name`,
-      TOKEN
-    );
-    if (pj && !pj.error) {
-      const followers = Number(pj.followers_count) || Number(pj.fan_count) || 0;
-      const fans = Number(pj.fan_count) || 0;
-      if (followers || fans) {
-        await client.from('mkt_metrics').insert({
-          source: 'facebook',
-          entity_ref: '__page__',
-          metric_date: day,
-          metrics: { followers, fans, name: pj.name || null }
-        });
+  // Số NGƯỜI THEO DÕI Trang (page-level) cho MỖI page cấu hình. Lưu dòng entity_ref='__page__'
+  // (page test) và '__page_real__' (page chính thức) để trang Đo lường hiện "X follower" làm mốc
+  // so với reach từng bài. followers_count/fan_count là field cơ bản của Page (không cần read_insights).
+  for (const t of tokens) {
+    try {
+      const pj = await fetchJsonWithTimeout(`https://graph.facebook.com/${VERSION}/me?fields=followers_count,fan_count,name`, t.token);
+      if (pj && !pj.error) {
+        const followers = Number(pj.followers_count) || Number(pj.fan_count) || 0;
+        const fans = Number(pj.fan_count) || 0;
+        if (followers || fans) {
+          await client.from('mkt_metrics').insert({
+            source: 'facebook',
+            entity_ref: t.label === 'real' ? '__page_real__' : '__page__',
+            metric_date: day,
+            metrics: { followers, fans, name: pj.name || null, page: t.label }
+          });
+        }
       }
-    }
-  } catch { /* bỏ qua lỗi lấy follower */ }
+    } catch { /* bỏ qua lỗi lấy follower */ }
+  }
 
   return { pulled: rows.length, results };
 }

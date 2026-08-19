@@ -8,7 +8,7 @@ import { getServerClient } from '../lib/supabase-server';
 import { postVideoToTikTok } from '../lib/tiktok';
 import { isEmergencyStopped, reservePostQuota, setEmergencyStop, isQuotaDisabled, setQuotaDisabled } from '../lib/safety';
 import { fetchWithRetry } from '../lib/retry';
-import { pullFacebookMetrics } from '../lib/fb-metrics';
+import { pullFacebookMetrics, fbPageTokens } from '../lib/fb-metrics';
 import { generateAndStorePlan } from '../lib/plan';
 
 // Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment ngay lúc video còn
@@ -551,30 +551,37 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   const link = String(formData.get('fb_link') || '').trim();
   const titleIn = String(formData.get('title') || '').trim();
   const client = getServerClient();
-  const PAGE_ID = process.env.FACEBOOK_PAGE_ID;
-  const TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
   const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
   const say = async (status: 'ok' | 'error', msg: string, extra: any = {}) => {
     try { await client.from('run_log').insert({ task: 'mkt.import_manual_post', actor: 'do-luong', status, detail: { link, msg, ...extra } }); } catch { /* bỏ qua */ }
   };
   if (!link) { await say('error', 'thiếu link'); revalidatePath('/do-luong'); return; }
-  if (!TOKEN || !PAGE_ID) { await say('error', 'chưa cấu hình Facebook token'); revalidatePath('/do-luong'); return; }
+  // Ưu tiên token page CHÍNH THỨC (bài đăng tay thường ở page chính thức), rồi tới page test.
+  const tokens = [...fbPageTokens()].sort((a, b) => (a.label === 'real' ? -1 : 1) - (b.label === 'real' ? -1 : 1));
+  if (!tokens.length) { await say('error', 'chưa cấu hình Facebook token'); revalidatePath('/do-luong'); return; }
   const parsed = facebookObjectIdFromLink(link);
   if (!parsed) { await say('error', 'không nhận ra dạng link Facebook'); revalidatePath('/do-luong'); return; }
 
-  // Kiểm bài có thật + thuộc Page (Graph trả lỗi nếu token không có quyền đọc bài đó).
+  // Kiểm bài có thật + tìm token của page SỞ HỮU bài (thử lần lượt; Graph trả lỗi nếu token không
+  // có quyền đọc bài đó). Token nào đọc được là token đúng page -> dùng luôn pageId của token đó.
   const fields = parsed.kind === 'video' || parsed.kind === 'reel' ? 'id,description,title,created_time' : 'id,message,story,created_time,permalink_url';
-  const r = await fetch(`https://graph.facebook.com/${VERSION}/${encodeURIComponent(parsed.id)}?fields=${fields}&access_token=${TOKEN}`);
-  const j: any = await r.json().catch(() => ({}));
-  if (!r.ok || j?.error) {
-    await say('error', 'Facebook không trả bài này (kiểm token có quyền đọc bài trên Page không): ' + (j?.error?.message || `HTTP ${r.status}`));
+  let j: any = null; let usedToken: (typeof tokens)[number] | null = null; let lastErr = '';
+  for (const t of tokens) {
+    const r = await fetch(`https://graph.facebook.com/${VERSION}/${encodeURIComponent(parsed.id)}?fields=${fields}&access_token=${t.token}`);
+    const body: any = await r.json().catch(() => ({}));
+    if (r.ok && !body?.error && body?.id) { j = body; usedToken = t; break; }
+    lastErr = body?.error?.message || `HTTP ${r.status}`;
+  }
+  if (!j || !usedToken) {
+    await say('error', 'Facebook không trả bài này. Nếu là bài trên page chính thức, cần cấu hình FACEBOOK_REAL_PAGE_ACCESS_TOKEN (token page đó, có quyền read_insights). Lỗi cuối: ' + lastErr);
     revalidatePath('/do-luong');
     return;
   }
+  const pageId = usedToken.pageId || process.env.FACEBOOK_PAGE_ID || '';
   const graphId = String(j.id || parsed.id);
   const text = String(j.message || j.description || j.story || j.title || '').trim();
   const title = titleIn || (text ? text.split('\n')[0].slice(0, 90) : `Bài đăng tay ${graphId}`);
-  const externalUrl = parsed.kind === 'video' ? `https://www.facebook.com/${PAGE_ID}/videos/${graphId}` : `https://www.facebook.com/${graphId}`;
+  const externalUrl = parsed.kind === 'video' ? `https://www.facebook.com/${pageId}/videos/${graphId}` : `https://www.facebook.com/${graphId}`;
 
   // Đã nhập rồi thì thôi (khử trùng theo external_url).
   const { data: dup } = await client.from('mkt_posts').select('content_id').eq('channel', 'facebook').eq('external_url', externalUrl).limit(1);
@@ -583,7 +590,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: parsed.kind === 'post' ? 'social' : 'video',
     title,
-    brief: { keyword: title, intent: 'giao_dich', channels: ['facebook'], generator: 'manual-import', imported_link: link, fb_object_id: graphId, fb_created_time: j.created_time || null, authored: 'human' },
+    brief: { keyword: title, intent: 'giao_dich', channels: ['facebook'], generator: 'manual-import', imported_link: link, fb_object_id: graphId, fb_created_time: j.created_time || null, authored: 'human', page: usedToken.label },
     draft: text || null,
     status: 'published',
     needs_gov_review: false,
@@ -595,7 +602,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   });
   // Kéo số liệu ngay để người dùng thấy liền.
   await pullFacebookMetrics(client);
-  await say('ok', 'đã nhập + kéo số liệu', { content_id: (ins as any).id, graphId });
+  await say('ok', `đã nhập + kéo số liệu (page ${usedToken.label === 'real' ? 'chính thức' : 'test'})`, { content_id: (ins as any).id, graphId, page: usedToken.label });
   revalidatePath('/do-luong');
 }
 
