@@ -6,6 +6,7 @@ last_verified: 2026-08-14
 ttl_days: 180
 <!-- DOC-STATUS: SUSPECT (2026-08-19) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- re-verified: 2026-08-14 - build-video RESTORE dung CA 2 ban: horizontal (16:9 cho FB) + vertical (9:16 cho TikTok). Truoc chi ngang -> user thay TikTok khong thay video moi. pushToApprovalQueue upload 2 file -> brand_assets, brief.assets.{video_h,video_v}, channels ['facebook','tiktok'], nhan "[FB 16:9 + TikTok doc] 🎬". Thoi gian dung tang tu ~8p len ~15-20p (danh doi de co ca 2 dinh dang). --skip-whisper van dung. -->
+<!-- re-verified: 2026-08-19 - fb-diag them field content_category, universal_video_id, post_id, is_crossposting_eligible, no_story. -->
 <!-- re-verified: 2026-08-19 - /api/fb-diag?object=<id> tra privacy/status/published/embeddable cua Reel/Post + workflow fb-diag.yml bam tay input ID de soi (khong lo lo secret trong log). -->
 <!-- re-verified: 2026-08-19 - Form Xuong san xuat: bo max-width 720px cua .sx-form + bo gioi han select 320px -> input/select trai het cot cha nhu textarea. Van giu flex:0 0 auto de khong bi cao ngat. -->
 <!-- re-verified: 2026-08-19 - Form Xuong san xuat input/select bi cao ngat vi .note co flex:1 (danh cho .row hang duyet); .sx-field la flex COLUMN nen flex:1 keo chieu cao. Them flex:0 0 auto cho .sx-field .note -> height tu nhien theo padding. -->

@@ -6,6 +6,7 @@ covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
 <!-- re-verified: 2026-08-19 - rotate: tuan TAP TRUNG lay du MOI san pham trong focus moi luot (unused = eligible), khong ap 'da dung trong vong' -> 1 lan kich ra du 2 bai ban (truoc phai kich 3 lan). -->
+<!-- re-verified: 2026-08-19 - fb-diag them field content_category, universal_video_id, post_id, is_crossposting_eligible, no_story. -->
 <!-- re-verified: 2026-08-19 - /api/fb-diag?object=<id> tra privacy/status/published/embeddable cua Reel/Post + workflow fb-diag.yml bam tay input ID de soi (khong lo lo secret trong log). -->
 <!-- re-verified: 2026-08-19 - Form Xuong san xuat: bo max-width 720px cua .sx-form + bo gioi han select 320px -> input/select trai het cot cha nhu textarea. Van giu flex:0 0 auto de khong bi cao ngat. -->
 <!-- re-verified: 2026-08-19 - Form Xuong san xuat input/select bi cao ngat vi .note co flex:1 (danh cho .row hang duyet); .sx-field la flex COLUMN nen flex:1 keo chieu cao. Them flex:0 0 auto cho .sx-field .note -> height tu nhien theo padding. -->

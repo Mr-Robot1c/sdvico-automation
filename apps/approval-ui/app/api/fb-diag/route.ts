@@ -69,7 +69,7 @@ export async function GET(req: Request) {
   const oid = (url.searchParams.get('object') || '').replace(/[^0-9]/g, '');
   if (TOKEN && oid) {
     try {
-      const fields = 'id,description,title,length,created_time,updated_time,privacy,status,published,embeddable,permalink_url,live_status,picture';
+      const fields = 'id,description,title,length,created_time,updated_time,privacy,status,published,embeddable,permalink_url,live_status,picture,content_category,universal_video_id,is_reference_only,is_crossposting_eligible,is_instagram_eligible,no_story,post_id,event';
       const or = await fetch(`https://graph.facebook.com/${VERSION}/${oid}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(TOKEN)}`);
       object = await or.json();
     } catch (e: any) {
