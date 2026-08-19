@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Không tự 308 redirect /privacy/ -> /privacy: TikTok verifier gọi đúng URL đã đăng ký (có "/"
+  // cuối) và KHÔNG follow redirect -> "no signature". Middleware bên dưới rewrite /privacy/ tới
+  // /privacy để cùng trả HTML kèm meta trong <head>. Không đổi UX cho người dùng thường (Next chỉ
+  // bỏ auto-redirect; link nội bộ vẫn không dấu "/" cuối).
+  skipTrailingSlashRedirect: true,
+
   // Native binary (.node / ffmpeg) — để Next require lúc chạy, không nhồi vào bundle webpack.
   // Ghép logo dùng @napi-rs/canvas (external, tự trace như banner) + logo nhúng base64, không cần
   // trace thêm sharp/asset nữa.
