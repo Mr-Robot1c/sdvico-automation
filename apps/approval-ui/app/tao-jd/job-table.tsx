@@ -10,6 +10,7 @@ import {
 } from '../actions';
 import { SubmitButton } from '../submit-button';
 import AutoPostToggle from './auto-post-toggle';
+import RefreshInterval from './refresh-interval';
 import RemoveJobButton from './remove-job-button';
 
 export type JobRow = {
@@ -96,9 +97,7 @@ function JobDetail({ j, extraChannels }: { j: JobRow; extraChannels: { kenh: str
             <dt>Tự động đăng</dt>
             <dd style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <AutoPostToggle jobId={j.id} isOn={j.autoPost} />
-              <span className="muted" style={{ fontSize: '0.85em' }}>
-                Refresh mỗi {j.refreshAfterDays} ngày
-              </span>
+              {j.autoPost ? <RefreshInterval jobId={j.id} current={j.refreshAfterDays} /> : null}
             </dd>
           </div>
         ) : null}

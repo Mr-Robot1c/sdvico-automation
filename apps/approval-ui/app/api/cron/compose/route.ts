@@ -106,7 +106,7 @@ export async function GET(req: Request) {
         continue;
       }
 
-      const refreshDays = Number(job.refresh_after_days) || 4;
+      const refreshDays = Number(job.refresh_after_days) || 30;
       const existingPost = postedByJob.get(jobId);
 
       let isRefresh = false;

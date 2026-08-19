@@ -1979,6 +1979,20 @@ export async function addToAutoQueue(formData: FormData) {
 }
 
 // Bật/tắt chế độ tự động đăng bài định kỳ cho một vị trí. Người bật, worker thực hiện (điều cấm 1).
+// Đổi chu kỳ refresh bài đăng cho 1 vị trí. Sau X ngày kể từ bài đã đăng gần nhất,
+// cron compose sẽ soạn bài mới. Preset: 7/14/30/60/90 hoặc tuỳ chỉnh 1-365.
+export async function setJobRefreshInterval(formData: FormData) {
+  const jobId = String(formData.get('job_id') || '');
+  const days = Math.max(1, Math.min(365, parseInt(String(formData.get('days') || '30'), 10) || 30));
+  if (!jobId) return;
+  const client = getServerClient();
+  const { error } = await client.from('hr_jobs')
+    .update({ refresh_after_days: days })
+    .eq('id', jobId);
+  if (error) throw new Error('Đổi chu kỳ refresh lỗi: ' + error.message);
+  revalidatePath('/tao-jd');
+}
+
 export async function toggleAutoPost(formData: FormData) {
   const jobId = String(formData.get('job_id') || '');
   const current = formData.get('current') === 'true';

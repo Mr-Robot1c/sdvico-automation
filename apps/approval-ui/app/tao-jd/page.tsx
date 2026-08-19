@@ -129,7 +129,7 @@ export default async function Page({ searchParams }: { searchParams?: { filter?:
 
   const rows: JobRow[] = filtered.map((j) => {
     const post = latestPostByJob[j.id];
-    const refresh = j.refresh_after_days ?? 4;
+    const refresh = j.refresh_after_days ?? 30;
     const ps = postStatusLabel(post, pendingPostIds, refresh);
     return {
       id: j.id,
