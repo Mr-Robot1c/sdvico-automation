@@ -162,7 +162,10 @@ export async function GET(req: Request) {
     }
   }
   const usedThisCycle = usedByCycle.get(cycle) || new Set<string>();
-  let unused = eligible.filter((g) => !usedThisCycle.has(g));
+  // Tuần TẬP TRUNG: lấy đủ MỌI sản phẩm trong focus mỗi lượt (user chốt đăng các sản phẩm đó
+  // hằng ngày), không áp "đã dùng trong vòng" — trước đây mỗi lượt chỉ ra 1 sản phẩm, phải kích
+  // 3 lần mới đủ (user 19/8: "tạo bài lâu quá").
+  let unused = focusActive && focusNote?.startsWith('focus:') ? [...eligible] : eligible.filter((g) => !usedThisCycle.has(g));
   if (!unused.length) {
     cycle += 1; // hết vòng, sang vòng mới
     unused = [...eligible];
