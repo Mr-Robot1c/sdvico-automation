@@ -89,6 +89,11 @@ function TiktokComposer({ videoUrl, caption }: { videoUrl?: string | null; capti
             <dialog
               ref={zoomRef}
               className="tt-zoom-dlg"
+              onClose={(e) => {
+                // Dong dialog: PAUSE + reset video de khong chay nen (bug 19/8: chuyen trang xong van nghe am thanh).
+                const v = (e.currentTarget as HTMLDialogElement).querySelector('video');
+                if (v) { v.pause(); v.currentTime = 0; }
+              }}
               onClick={(e) => { if ((e.target as HTMLElement).tagName === 'DIALOG') zoomRef.current?.close(); }}
             >
               <video src={`${videoUrl}#t=2`} controls autoPlay playsInline />
