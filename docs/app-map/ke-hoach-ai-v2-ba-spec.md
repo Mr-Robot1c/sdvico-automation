@@ -5,6 +5,7 @@ covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approv
 last_verified: 2026-08-18
 ttl_days: 90
 <!-- DOC-STATUS: SUSPECT (2026-08-19) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-19 - /api/fb-diag?object=<id> tra privacy/status/published/embeddable cua Reel/Post + workflow fb-diag.yml bam tay input ID de soi (khong lo lo secret trong log). -->
 <!-- re-verified: 2026-08-19 - Form Xuong san xuat: bo max-width 720px cua .sx-form + bo gioi han select 320px -> input/select trai het cot cha nhu textarea. Van giu flex:0 0 auto de khong bi cao ngat. -->
 <!-- re-verified: 2026-08-19 - Form Xuong san xuat input/select bi cao ngat vi .note co flex:1 (danh cho .row hang duyet); .sx-field la flex COLUMN nen flex:1 keo chieu cao. Them flex:0 0 auto cho .sx-field .note -> height tu nhien theo padding. -->
 <!-- re-verified: 2026-08-19 - Form Xuong san xuat: gioi han .sx-form max-width 720px (user: o bu qua), select ngan .sx-field select.note 320px. Chi trong form san xuat. -->

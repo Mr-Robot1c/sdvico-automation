@@ -1,0 +1,26 @@
+name: Soi Reel/Post Facebook (fb-diag)
+# Chay tay tu Actions: nhap ID Reel/Post -> in trang thai privacy/status/published.
+# Chi doc, khong dang gi.
+on:
+  workflow_dispatch:
+    inputs:
+      object:
+        description: 'ID Reel/Post (chi so, khong lay URL). Vd: 1585878646270390'
+        required: true
+        type: string
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Goi /api/fb-diag
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          OBJ: ${{ github.event.inputs.object }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "Thieu CRON_SECRET"; exit 1; fi
+          code=$(curl -s -o /tmp/r.json -w "%{http_code}" \
+            "https://sdvico-mktit.vercel.app/api/fb-diag?secret=$CRON_SECRET&object=$OBJ")
+          echo "HTTP $code"
+          cat /tmp/r.json | python3 -m json.tool 2>/dev/null || cat /tmp/r.json
+          echo

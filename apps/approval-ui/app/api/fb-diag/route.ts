@@ -63,6 +63,20 @@ export async function GET(req: Request) {
     .order('created_at', { ascending: false })
     .limit(10);
 
+  // 3) Soi 1 object cu the (?object=<id>) - Reel/Post - de kiem tai sao bat ky ai KHONG thay
+  //    (privacy, status, published, embeddable, restrictions). Chi doc.
+  let object: any = null;
+  const oid = (url.searchParams.get('object') || '').replace(/[^0-9]/g, '');
+  if (TOKEN && oid) {
+    try {
+      const fields = 'id,description,title,length,created_time,updated_time,privacy,status,published,embeddable,permalink_url,live_status,picture';
+      const or = await fetch(`https://graph.facebook.com/${VERSION}/${oid}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(TOKEN)}`);
+      object = await or.json();
+    } catch (e: any) {
+      object = { error: String(e?.message || e) };
+    }
+  }
+
   if (error) return NextResponse.json({ ok: false, tokenCheck, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, tokenCheck, count: data?.length || 0, logs: data || [] });
+  return NextResponse.json({ ok: true, tokenCheck, object, count: data?.length || 0, logs: data || [] });
 }
