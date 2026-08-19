@@ -34,9 +34,16 @@ export function middleware(req: NextRequest) {
   }
   if (/^\/(privacy|terms)(\/|$)/.test(pth)) return NextResponse.next();
 
-  // File xác minh sở hữu tên miền của TikTok Developer (tiktok<token>.txt ở web root).
-  // TikTok tải file này để xác nhận app điều khiển tên miền -> mở khoá "Verify URL properties".
-  if (/^\/tiktok[A-Za-z0-9]+\.txt$/.test(req.nextUrl.pathname)) return NextResponse.next();
+  // File xác minh TikTok (tiktok<token>.txt): TikTok Developer khi verify method "URL prefix"
+  // GET file tại đúng subpath cua prefix (vd prefix /privacy/ -> GET /privacy/tiktok<token>.txt).
+  // Phục vụ file này ở MỌI path bằng cách rewrite về /tiktok<token>.txt ở root -> khớp mọi prefix.
+  // Miễn basic-auth luôn cho path này.
+  const ttMatch = req.nextUrl.pathname.match(/\/(tiktok[A-Za-z0-9]+\.txt)$/);
+  if (ttMatch) {
+    const target = req.nextUrl.clone();
+    target.pathname = '/' + ttMatch[1];
+    return NextResponse.rewrite(target);
+  }
 
   if (process.env.NODE_ENV !== 'production') return NextResponse.next();
 

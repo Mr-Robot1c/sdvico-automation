@@ -45,8 +45,9 @@ async function publishReelToFacebook(
   client: ReturnType<typeof getServerClient>,
   contentId: string,
   videoUrl: string,
-  description: string
-): Promise<{ ok: boolean; url?: string; error?: string }> {
+  description: string,
+  commentImageUrls: string[] = []
+): Promise<{ ok: boolean; url?: string; error?: string; warn?: string }> {
   const PAGE_ID = process.env.FACEBOOK_PAGE_ID;
   const TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
   const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
@@ -79,8 +80,36 @@ async function publishReelToFacebook(
     if (!f.ok || fj.error || fj.success === false) throw new Error(fj.error?.message || `finish HTTP ${f.status}`);
     const url = `https://www.facebook.com/reel/${videoId}`;
     await client.from('mkt_posts').insert({ content_id: contentId, channel: 'facebook', status: 'published', external_url: url, published_at: new Date().toISOString() });
-    try { await client.from('run_log').insert({ task: 'mkt.publish_facebook_reel', actor: 'decideForm', status: 'ok', detail: { contentId, videoId, url } }); } catch { /* bỏ qua */ }
-    return { ok: true, url };
+
+    // Thả ẢNH sản phẩm xuống BÌNH LUẬN Reel giống Post (user 19/8: "1 bài dọc khi đăng reel phải
+    // có ảnh sản phẩm ở dưới cmt"). Video Reel cần vài giây xử lý xong mới nhận comment; wait rồi
+    // thả từng ảnh. Lỗi comment chỉ ghi warn, KHÔNG đánh hỏng Reel (bài Reel đã lên).
+    let warn: string | undefined;
+    const commentDebug: any[] = [];
+    if (commentImageUrls.length) {
+      const ready = await waitFacebookVideoReady(videoId, VERSION, TOKEN);
+      if (!ready) {
+        warn = 'Reel chưa xử lý kịp nên chưa thả được ảnh vào bình luận.';
+      } else {
+        for (let i = 0; i < commentImageUrls.length; i++) {
+          const cu = commentImageUrls[i];
+          try {
+            const cRes = await fetch(`https://graph.facebook.com/${VERSION}/${videoId}/comments`, {
+              method: 'POST',
+              body: new URLSearchParams({ attachment_url: cu, access_token: TOKEN })
+            });
+            const cJson: any = await cRes.json();
+            commentDebug.push({ step: 'reel_comment', idx: i, httpStatus: cRes.status, response: cJson });
+            if (!cRes.ok || cJson.error) throw new Error(cJson.error?.message || `HTTP ${cRes.status}`);
+          } catch (ce: any) {
+            const m = `Reel ảnh #${i + 1} chưa thả được vào bình luận: ${String(ce?.message || ce)}`;
+            warn = warn ? warn + '; ' + m : m;
+          }
+        }
+      }
+    }
+    try { await client.from('run_log').insert({ task: 'mkt.publish_facebook_reel', actor: 'decideForm', status: warn ? 'error' : 'ok', detail: { contentId, videoId, url, warn: warn || null, commentDebug } }); } catch { /* bỏ qua */ }
+    return { ok: true, url, warn };
   } catch (e: any) {
     const errMsg = String(e?.message || e);
     try { await client.from('run_log').insert({ task: 'mkt.publish_facebook_reel', actor: 'decideForm', status: 'error', detail: { contentId, error: errMsg } }); } catch { /* bỏ qua */ }
@@ -246,11 +275,18 @@ async function publishContentToFacebook(
     if (brief.post_reel && assets.video_v && !scheduledUnix) {
       const reelUrl = await assetUrlOf(assets.video_v);
       if (reelUrl) {
-        const r = await publishReelToFacebook(client, contentId, reelUrl, message);
+        // Ảnh comment cho Reel = giống Post: ảnh chính + ảnh phụ (Xưởng sản xuất chọn nhiều).
+        // Dùng lại imageUrl + extraImageUrls đã resolve ở trên, khỏi tra lại brand_assets.
+        const reelComment: string[] = [];
+        if (imageUrl) reelComment.push(imageUrl);
+        reelComment.push(...extraImageUrls);
+        const r = await publishReelToFacebook(client, contentId, reelUrl, message, reelComment);
         if (!r.ok) {
           const m = 'Reel chưa đăng được: ' + (r.error || 'lỗi không rõ');
           warn = warn ? warn + '; ' + m : m;
           console.error('[facebook] ' + m);
+        } else if (r.warn) {
+          warn = warn ? warn + '; ' + r.warn : r.warn;
         }
       }
     } else if (brief.post_reel && scheduledUnix) {
