@@ -29,8 +29,11 @@ async function findExisting(client, { email, phone }) {
 
 // Ghi hoặc cập nhật ứng viên từ JSON đã chuẩn hóa.
 // cv: { full_name, email, phone, dedup_key, ... } ; cvStoragePath: đường dẫn tệp trên Storage.
+// consented: TRUE khi ứng viên chủ động gửi (mail vào hộp thư công ty, upload qua form);
+//            FALSE cho nguồn ngoài (TopCV crawl, dataset công khai). Mặc định FALSE để không
+//            "auto-consent" nhầm; caller CV chủ động phải khai báo tường minh.
 // Trả về { candidateId, isNew }.
-export async function upsertCandidate(client, cv, { cvStoragePath = null } = {}) {
+export async function upsertCandidate(client, cv, { cvStoragePath = null, consented = false } = {}) {
   const existing = await findExisting(client, { email: cv.email, phone: cv.phone });
 
   if (existing) {
@@ -48,7 +51,8 @@ export async function upsertCandidate(client, cv, { cvStoragePath = null } = {})
     return { candidateId: data.id, isNew: false };
   }
 
-  // Mới. Ghi consent lúc nhận CV (ứng viên chủ động gửi hồ sơ) và thời hạn lưu.
+  // Mới. Chỉ đặt consent_at khi caller khai báo consented=true. Retention_until vẫn ghi
+  // để cron retention-purge có mốc xóa (kể cả hồ sơ không consent cũng cần vòng đời).
   const nowIso = new Date().toISOString();
   const { data, error } = await client
     .from('hr_candidates')
@@ -60,7 +64,7 @@ export async function upsertCandidate(client, cv, { cvStoragePath = null } = {})
       cv_storage_path: cvStoragePath,
       cv_json: cv,
       dedup_key: cv.dedup_key,
-      consent_at: nowIso,
+      consent_at: consented ? nowIso : null,
       retention_until: retentionUntil()
     })
     .select('id')

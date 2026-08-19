@@ -133,17 +133,58 @@ export function composeInterviewLetter({ name, position, slots, cvText = '' }: {
   ].join('\n');
 }
 
+// Ẩn danh CV trước khi gửi Groq (điều cấm 6 + chống thiên vị).
+// Trước đây chỉ regex email/SĐT trên chính raw text; nay:
+//  - che thêm tên đã trích được (full_name), địa chỉ trực tiếp;
+//  - áp dụng cả regex SĐT có dấu cách/chấm/gạch nối;
+//  - bỏ các dòng có nhãn nhạy cảm ("Địa chỉ:", "Ngày sinh:", ...).
+// Trùng ý với anonymizeCv trong packages/hr/src/screen/anonymize.js, giữ ở đây để
+// tránh import chéo package.
+function redactForGroq(cvText: string, pii?: { full_name?: string | null; email?: string | null; phone?: string | null; address?: string | null }): string {
+  let t = cvText || '';
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const [val, tag] of [
+    [pii?.full_name, '[TÊN]'],
+    [pii?.email, '[EMAIL]'],
+    [pii?.phone, '[SĐT]'],
+    [pii?.address, '[ĐỊA CHỈ]'],
+  ] as Array<[string | null | undefined, string]>) {
+    if (val && String(val).trim().length >= 3) {
+      t = t.replace(new RegExp(esc(String(val).trim()), 'gi'), tag);
+    }
+  }
+  t = t.replace(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi, '[EMAIL]');
+  t = t.replace(/(?<!\d)(?:\+?84|0)\d{8,10}(?!\d)/g, '[SĐT]');
+  t = t.replace(/(?<!\d)(?:\+?84|0)[\s.\-]?\d{2,3}[\s.\-]?\d{3,4}[\s.\-]?\d{3,4}(?!\d)/g, '[SĐT]');
+
+  const SENSITIVE = /^\s*(họ và tên|họ tên|ho ten|full name|giới tính|gioi tinh|gender|ngày sinh|ngay sinh|date of birth|dob|birthday|tuổi|tuoi|age|quê quán|que quan|hometown|địa chỉ|dia chi|address|thường trú|thuong tru|nơi ở|noi o|dân tộc|dan toc|tôn giáo|ton giao|nationality|quốc tịch|email|e-mail|điện thoại|dien thoai|phone|mobile|tel|sđt|sdt|facebook|zalo|linkedin)\s*[:\-]/i;
+  t = t.split(/\r?\n/).filter((line, idx) => {
+    if (SENSITIVE.test(line)) return false;
+    // Dòng ở 5 dòng đầu chỉ chữ hoa 2-4 từ → banner tên; bỏ để không lộ.
+    if (idx < 5) {
+      const s = line.trim();
+      if (s.length >= 4 && s.length <= 60 && /^[\p{Lu}\p{M}\s'.-]+$/u.test(s)) {
+        const words = s.split(/\s+/).filter(Boolean);
+        if (words.length >= 2 && words.length <= 4) return false;
+      }
+    }
+    return true;
+  }).join('\n');
+  return t;
+}
+
 // Sinh câu hỏi phỏng vấn bằng Groq (best-effort). Lỗi/không có khóa → trả rỗng, không chặn luồng.
+// pii: các trường đã trích được từ CV để redact TRƯỚC KHI gọi Groq. Truyền càng đủ càng ẩn được sạch.
 export async function generateInterviewQuestions(
   cvText: string,
-  position: string
+  position: string,
+  pii?: { full_name?: string | null; email?: string | null; phone?: string | null; address?: string | null }
 ): Promise<{ cau_hoi_ky_thuat: string; cau_hoi_hanh_vi: string; bai_ve_nha: string }> {
   const empty = { cau_hoi_ky_thuat: '', cau_hoi_hanh_vi: '', bai_ve_nha: '' };
   const text = (cvText || '').trim();
   if (text.length < 20) return empty;
 
-  // Bỏ email/số điện thoại trước khi đưa lên mô hình (điều cấm 6).
-  const anon = text.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]').replace(/(\+?\d[\d\s.\-]{7,}\d)/g, '[sđt]').slice(0, 6000);
+  const anon = redactForGroq(text, pii).slice(0, 6000);
 
   const system = [
     'Bạn là trợ lý chuẩn bị phỏng vấn cho Công ty SDVICO, ngành thiết bị biển và thủy sản.',

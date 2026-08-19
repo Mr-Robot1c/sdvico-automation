@@ -8,20 +8,15 @@ import { groqChat } from '../../../../lib/groq';
 import { fetchUnsplashPhoto } from '../../../../lib/unsplash';
 import { buildRecruitmentPoster, toBullets } from '../../../../lib/poster';
 import { fbIntroSystem, assembleFacebookPost, fallbackIntro } from '../../../../lib/fb-compose';
+import { assertNotStopped } from '../../../../lib/emergency-stop';
+import { verifyCronAuth } from '../../../../lib/cron-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-function verifyAuth(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  // Production bắt buộc có CRON_SECRET (route này đã đi vòng qua cổng Basic Auth).
-  // Thiếu secret ở production thì chặn, tránh mở endpoint ra ngoài.
-  if (!secret) return process.env.NODE_ENV !== 'production';
-  return req.headers.get('authorization') === `Bearer ${secret}`;
-}
-
 export async function GET(req: Request) {
-  if (!verifyAuth(req)) return new Response('Unauthorized', { status: 401 });
+  const auth = verifyCronAuth(req);
+  if (!auth.ok) return auth.response;
 
   const client = getServerClient();
   const queued: string[] = [];
@@ -32,6 +27,8 @@ export async function GET(req: Request) {
   const MAX_PENDING = 10;
 
   try {
+    // P0-2: dừng khẩn phủ cả đường soạn (chặn gọi Groq / Unsplash tốn tiền khi tạm dừng).
+    await assertNotStopped(client);
     // Dừng sớm nếu hàng đợi đã có đủ bài chờ duyệt — tránh soạn thừa.
     const { count: pendingCount } = await client
       .from('approval_queue')

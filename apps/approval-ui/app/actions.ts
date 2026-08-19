@@ -394,6 +394,14 @@ export async function advanceToInterview(formData: FormData) {
     .select('id, stage, candidate_id, job_id')
     .eq('id', appId).maybeSingle();
   if (!app || app.stage !== 'review') { revalidatePath('/ho-so'); return; }
+  // P0-6: chặn sinh câu hỏi + thư mời khi ứng viên chưa có consent (nguồn ngoài).
+  // Phòng Nhân sự phải xác nhận consent thủ công ở trang Hồ sơ trước khi máy soạn thư.
+  {
+    const { data: pre } = await client.from('hr_candidates').select('consent_at').eq('id', app.candidate_id).maybeSingle();
+    if (!pre?.consent_at) {
+      throw new Error('Ứng viên chưa có consent_at. Cập nhật đồng ý xử lý dữ liệu ở trang Hồ sơ trước khi soạn thư mời.');
+    }
+  }
 
   // Đổi stage + cấp token (nếu cột schedule_token chưa migrate thì đổi stage không kèm token).
   const token = randomBytes(18).toString('hex');
@@ -409,7 +417,7 @@ export async function advanceToInterview(formData: FormData) {
   // Soạn thư mời NGAY trong app (không chờ worker hr-interview), nếu chưa có.
   const { data: existingIv } = await client.from('approval_queue').select('id').eq('kind', 'hr_interview').eq('ref_id', appId).maybeSingle();
   if (!existingIv) {
-    const { data: cand } = await client.from('hr_candidates').select('full_name, email, cv_json').eq('id', app.candidate_id).maybeSingle();
+    const { data: cand } = await client.from('hr_candidates').select('full_name, email, phone, cv_json').eq('id', app.candidate_id).maybeSingle();
     let position = 'vị trí đã ứng tuyển';
     if (app.job_id) {
       const { data: job } = await client.from('hr_jobs').select('title').eq('id', app.job_id).maybeSingle();
@@ -424,7 +432,12 @@ export async function advanceToInterview(formData: FormData) {
       .map((rs) => { const [d, t] = rs.split('|'); return formatSlot(d, t); })
       .filter(Boolean);
     const slots = chosen.length ? chosen : await allocateInterviewSlots(client, 3);
-    const q = await generateInterviewQuestions(cvText, position);
+    const q = await generateInterviewQuestions(cvText, position, {
+      full_name: (cand?.full_name as string) || null,
+      email: (cand?.email as string) || null,
+      phone: (cand?.phone as string) || null,
+      address: ((cand?.cv_json as { address?: string } | null)?.address) || null,
+    });
     const thu_moi = composeInterviewLetter({ name, position, slots, cvText });
 
     await client.from('approval_queue').insert({

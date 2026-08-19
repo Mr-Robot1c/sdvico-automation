@@ -66,17 +66,43 @@ export function anonymizeCv(cv) {
 
   // 2. Che mọi email và số điện thoại còn sót bằng mẫu chung.
   text = text.replace(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi, '[EMAIL]');
+  // Số VN 10 số liền (không dấu cách).
   text = text.replace(/(?<!\d)(?:\+?84|0)\d{8,10}(?!\d)/g, '[SĐT]');
+  // Số VN có dấu cách/chấm/gạch nối, kiểu "090 123 4567" hoặc "090.123.4567" hoặc "0901-234-567".
+  // Nới sang cả +84 xxx xxx xxx. Đủ 9-11 chữ số trong toàn chuỗi.
+  text = text.replace(/(?<!\d)(?:\+?84|0)[\s.\-]?\d{2,3}[\s.\-]?\d{3,4}[\s.\-]?\d{3,4}(?!\d)/g, '[SĐT]');
 
   // 3. Bỏ nguyên dòng có nhãn trường nhạy cảm.
+  // 3b. Heuristic: dòng ở 5 dòng đầu chỉ gồm chữ hoa (kèm dấu) 2-4 từ → có khả năng
+  // là banner "NGUYỄN VĂN A" trên header CV. Bỏ đi để không lộ tên khi không có nhãn.
   const kept = [];
-  for (const line of text.split(/\r?\n/)) {
+  const rawLines = text.split(/\r?\n/);
+  rawLines.forEach((line, idx) => {
     if (isSensitiveLabelLine(line)) {
       removed.lines += 1;
-      continue;
+      return;
+    }
+    if (idx < 5 && isLikelyNameBanner(line)) {
+      removed.lines += 1;
+      return;
     }
     kept.push(line);
-  }
+  });
 
   return { text: kept.join('\n').trim(), removed };
+}
+
+// True khi dòng chỉ có 2-4 "từ" toàn chữ hoa (đã bỏ dấu vẫn viết hoa) — banner tên.
+// Bỏ dấu để bắt cả "NGUYỄN VĂN A" và "NGUYEN VAN A".
+function isLikelyNameBanner(line) {
+  const s = (line || '').trim();
+  if (s.length < 4 || s.length > 60) return false;
+  // Cho phép chữ có dấu tiếng Việt (unicode letter class).
+  if (!/^[\p{Lu}\p{M}\s'.-]+$/u.test(s)) return false;
+  const words = s.split(/\s+/).filter(Boolean);
+  if (words.length < 2 || words.length > 4) return false;
+  // Tránh false-positive cho tiêu đề như "CV", "TÓM TẮT" (1 từ đã lọc ở trên);
+  // hoặc "MỤC TIÊU NGHỀ NGHIỆP" (4 từ toàn hoa) — chấp nhận bỏ nhầm theo nguyên tắc
+  // "thà bỏ nhầm một dòng còn hơn để lọt tên" ghi ở đầu file.
+  return true;
 }

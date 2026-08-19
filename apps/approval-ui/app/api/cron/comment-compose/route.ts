@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../../lib/supabase-server';
 import { groqChat } from '../../../../lib/groq';
+import { verifyCronAuth } from '../../../../lib/cron-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -15,12 +16,6 @@ const EMAIL = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
 const HOTLINE = '1900 23 23 49';
 const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
 const REACT_LIMIT = Number(process.env.HR_FB_REACT_MAX_PER_DAY) || 50;
-
-function verifyAuth(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return process.env.NODE_ENV !== 'production';
-  return req.headers.get('authorization') === `Bearer ${secret}`;
-}
 
 const DETAIL_PATTERNS = [
   /\?/, /chi ti[eế]t/i, /gi[aá] (bao nhi[eê]u|c[aả]|nh[uư] th[eế] n[aà]o)/i, /l[uư][oơ]ng/i,
@@ -95,7 +90,8 @@ async function reactLike(fbCommentId: string): Promise<void> {
 }
 
 export async function GET(req: Request) {
-  if (!verifyAuth(req)) return new Response('Unauthorized', { status: 401 });
+  const auth = verifyCronAuth(req);
+  if (!auth.ok) return auth.response;
 
   const client = getServerClient();
   // Email/hotline liên hệ: ưu tiên Cài đặt (brand_config), rồi biến môi trường, cuối cùng mặc định.
@@ -117,6 +113,16 @@ export async function GET(req: Request) {
     if (error) throw new Error('Đọc hr_fb_comments: ' + error.message);
 
     for (const row of rows || []) {
+      // P1-11: atomic claim để 2 cron tick song song không cùng compose 1 bình luận.
+      // Chuyển 'new' → 'classifying'. 0 dòng returning nghĩa là process khác đã claim.
+      const { data: claimed } = await client
+        .from('hr_fb_comments')
+        .update({ trang_thai: 'classifying' })
+        .eq('id', row.id)
+        .eq('trang_thai', 'new')
+        .select('id');
+      if (!claimed || claimed.length === 0) continue;
+
       const nhan = await classifyComment(row.message || '');
 
       if (nhan === 'muon_biet_them') {
@@ -150,12 +156,20 @@ export async function GET(req: Request) {
         await client.from('hr_fb_comments').update({ phan_loai: nhan }).eq('id', row.id);
         try {
           const { data: stopRow } = await client.from('app_config').select('value').eq('key', 'emergency_stop').maybeSingle();
-          if (stopRow?.value === true) continue;
+          if (stopRow?.value === true) {
+            // Trả về 'new' để lần chạy sau xử lý tiếp khi hết dừng khẩn.
+            await client.from('hr_fb_comments').update({ trang_thai: 'new' }).eq('id', row.id);
+            continue;
+          }
 
           const day = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
           const { data: counter } = await client.from('daily_counters').select('count').eq('account', 'fb_comment_react').eq('kind', 'hr_fb_comment_react').eq('day', day).maybeSingle();
           const current = counter?.count || 0;
-          if (current >= REACT_LIMIT) continue;
+          if (current >= REACT_LIMIT) {
+            // Chạm trần: bỏ qua react nhưng đánh dấu 'ignored' để không loop lại.
+            await client.from('hr_fb_comments').update({ trang_thai: 'ignored' }).eq('id', row.id);
+            continue;
+          }
           await client.from('daily_counters').upsert({ account: 'fb_comment_react', kind: 'hr_fb_comment_react', day, count: current + 1 }, { onConflict: 'account,kind,day' });
 
           await reactLike(row.fb_comment_id as string);

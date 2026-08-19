@@ -129,8 +129,10 @@ async function processMessage(client, msg, { dryRun }) {
   }
   cv.attachments = cv.attachments.map((p, i) => ({ ...p, storage_path: storagePaths[i] || null }));
 
+  // Consent = true: ứng viên tự gửi CV vào hộp thư công ty là hành vi đồng ý xử lý dữ liệu.
   const { candidateId, isNew } = await upsertCandidate(client.__db, cv, {
-    cvStoragePath: storagePaths[0] || null
+    cvStoragePath: storagePaths[0] || null,
+    consented: true
   });
   const app = await ensureApplication(client.__db, candidateId);
 
