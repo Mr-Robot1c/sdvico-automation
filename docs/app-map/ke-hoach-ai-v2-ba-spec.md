@@ -5,6 +5,7 @@ covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approv
 last_verified: 2026-08-18
 ttl_days: 90
 <!-- DOC-STATUS: SUSPECT (2026-08-19) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-19 - Form Xuong san xuat: gioi han .sx-form max-width 720px (user: o bu qua), select ngan .sx-field select.note 320px. Chi trong form san xuat. -->
 <!-- re-verified: 2026-08-19 - BUG am thanh chay nen: dialog zoom composer TikTok dong nhung video autoPlay ben trong VAN chay -> chuyen trang khac quay lai van nghe. Fix: onClose pause + currentTime=0. -->
 <!-- re-verified: 2026-08-19 - UI LIGHT MODE (user 19/8: kho thay duong): dam mau chu phu --ink-2 #5b6879 -> #3c4a5c (contrast ~7:1 tren trang), dam --line #dce2ec -> #c7d0dd (card noi bat hon), --ink #1a2230 -> #0f1622. applied-banner tang font 15px + line-height 1.6, border-left day 6px, chu p/div dung --ink dam. Dark mode khong doi. -->
 <!-- re-verified: 2026-08-19 - Xuong san xuat form (san-xuat/form.tsx) input/select dung .note bi max-width 320px cua .note (dung cho o ghi chu hang doi) -> cot phai trong. Scope override .sx-field .note {max-width:none; width:100%} de field lap full cot form. -->
