@@ -452,10 +452,40 @@ export async function advanceToInterview(formData: FormData) {
         ung_vien: name, vi_tri: position, email,
         khung_gio: slots, thu_moi,
         cau_hoi_ky_thuat: q.cau_hoi_ky_thuat, cau_hoi_hanh_vi: q.cau_hoi_hanh_vi, bai_ve_nha: q.bai_ve_nha,
-        luu_y: 'Máy soạn. Người bấm Duyệt = gửi cho ứng viên (điều cấm 1).',
+        luu_y: 'Máy soạn. Người bấm = gửi cho ứng viên (điều cấm 1).',
       },
       ref_table: 'hr_applications', ref_id: appId, status: 'pending',
     });
+  }
+
+  // 1-click gộp: "Soạn & gửi ngay". Người bấm ở /ho-so đồng thời là người bấm gửi
+  // (điều cấm 1 vẫn được tôn trọng — 1 người, 1 quyết định, 1 click). Bỏ được bước
+  // phải mở /Duyệt & gửi để bấm lần 2.
+  const sendNow = String(formData.get('send_now') || '') === '1';
+  if (sendNow) {
+    const { data: iv } = await client
+      .from('approval_queue')
+      .select('id, kind, ref_id, payload, status')
+      .eq('kind', 'hr_interview')
+      .eq('ref_id', appId)
+      .maybeSingle();
+    if (iv && iv.status === 'pending') {
+      const { error: approveErr } = await client
+        .from('approval_queue')
+        .update({ status: 'approved', decided_at: new Date().toISOString(), decided_by: who })
+        .eq('id', iv.id).eq('status', 'pending');
+      if (!approveErr) {
+        const sendError = await sendCandidateEmail(client, iv as QueueItem);
+        if (sendError) {
+          // Gửi hỏng: trả về pending kèm note đỏ để người vận hành thấy ngay ở /
+          await client
+            .from('approval_queue')
+            .update({ status: 'pending', decided_at: null, note: `GỬI MAIL LỖI: ${sendError}` })
+            .eq('id', iv.id);
+          throw new Error(`Đã soạn thư mời nhưng gửi mail lỗi: ${sendError}. Mở trang Duyệt & gửi để thử lại.`);
+        }
+      }
+    }
   }
 
   revalidatePath('/ho-so');

@@ -134,10 +134,22 @@ function InterviewApprove({ appId, name, windows }: { appId: string; name: strin
       ))}
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="btn ghost" style={{ fontSize: '0.85em' }} onClick={() => setRows((rs) => [...rs, { date: '', time: times[0] }])}>+ Thêm khung</button>
+        {/* Nút chính: 1-click soạn + gửi ngay (điều cấm 1 vẫn tôn trọng vì đây là 1 hành động của 1 người) */}
+        <form action={advanceToInterview} style={{ display: 'inline' }}>
+          <input type="hidden" name="appId" value={appId} />
+          <input type="hidden" name="send_now" value="1" />
+          {chosen.map((r, i) => <input key={i} type="hidden" name="slot" value={`${r.date}|${r.time}`} />)}
+          <button className="btn ok" type="submit" title="Soạn thư mời và gửi cho ứng viên trong 1 lần bấm">
+            {chosen.length ? `Soạn & gửi ngay (${chosen.length} khung)` : 'Soạn & gửi ngay (tự chọn giờ)'}
+          </button>
+        </form>
+        {/* Nút phụ: chỉ soạn để rà lại trước khi gửi (giữ luồng cũ cho ai muốn xem thư trước) */}
         <form action={advanceToInterview} style={{ display: 'inline' }}>
           <input type="hidden" name="appId" value={appId} />
           {chosen.map((r, i) => <input key={i} type="hidden" name="slot" value={`${r.date}|${r.time}`} />)}
-          <button className="btn ok" type="submit">{chosen.length ? `Soạn thư mời (${chosen.length} khung)` : 'Soạn thư mời (tự chọn giờ)'}</button>
+          <button className="btn ghost" type="submit" style={{ fontSize: '0.85em' }} title="Chỉ soạn, chưa gửi. Vào trang Duyệt & gửi để rà lại rồi bấm Duyệt">
+            Chỉ soạn, rà lại sau
+          </button>
         </form>
         <button type="button" className="btn ghost" style={{ fontSize: '0.85em' }} onClick={() => setOpen(false)}>Đóng</button>
       </div>
