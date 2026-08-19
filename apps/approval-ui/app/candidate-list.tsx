@@ -290,22 +290,48 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
         {c.appStage === 'interview' && c.appId && c.interviewedAt ? (
           <>
             <span className="muted" style={{ alignSelf: 'center', marginRight: 2 }}>Đã phỏng vấn. Quyết định:</span>
+            {/* Nhận: 1-click soạn thư mời nhận việc + gửi luôn */}
             <form
               action={decideCandidate}
-              onSubmit={(e) => { if (!window.confirm(`Nhận ứng viên này?\n\n${c.name}\n\nMáy soạn thư mời nhận việc, bạn duyệt trên trang Duyệt rồi mới gửi.`)) e.preventDefault(); }}
+              onSubmit={(e) => { if (!window.confirm(`Nhận ứng viên này?\n\n${c.name}\n\nMáy sẽ soạn thư mời nhận việc VÀ gửi luôn cho ứng viên.`)) e.preventDefault(); }}
             >
               <input type="hidden" name="appId" value={c.appId} />
               <input type="hidden" name="decision" value="offer" />
-              <button className="btn ok" type="submit">Nhận</button>
+              <input type="hidden" name="send_now" value="1" />
+              <button className="btn ok" type="submit" title="Soạn thư mời nhận việc và gửi ngay">Nhận & gửi</button>
             </form>
+            {/* Không nhận: 1-click soạn thư từ chối + gửi luôn */}
             <form
               action={decideCandidate}
-              onSubmit={(e) => { if (!window.confirm(`Không nhận ứng viên này?\n\n${c.name}\n\nMáy soạn thư từ chối, bạn duyệt trên trang Duyệt rồi mới gửi.`)) e.preventDefault(); }}
+              onSubmit={(e) => { if (!window.confirm(`Không nhận ứng viên này?\n\n${c.name}\n\nMáy sẽ soạn thư từ chối VÀ gửi luôn cho ứng viên.`)) e.preventDefault(); }}
             >
               <input type="hidden" name="appId" value={c.appId} />
               <input type="hidden" name="decision" value="reject" />
-              <button className="btn no" type="submit">Không nhận</button>
+              <input type="hidden" name="send_now" value="1" />
+              <button className="btn no" type="submit" title="Soạn thư từ chối và gửi ngay">Không nhận & gửi</button>
             </form>
+            {/* Nút phụ: chỉ soạn để rà lại trước khi gửi */}
+            <details style={{ alignSelf: 'center' }}>
+              <summary className="muted" style={{ fontSize: '0.85em', cursor: 'pointer' }}>Soạn để rà lại trước khi gửi</summary>
+              <div className="row" style={{ gap: 6, marginTop: 6 }}>
+                <form
+                  action={decideCandidate}
+                  onSubmit={(e) => { if (!window.confirm(`Soạn thư mời nhận việc CHỜ DUYỆT (chưa gửi)?\n\n${c.name}`)) e.preventDefault(); }}
+                >
+                  <input type="hidden" name="appId" value={c.appId} />
+                  <input type="hidden" name="decision" value="offer" />
+                  <button className="btn ghost" type="submit" style={{ fontSize: '0.85em' }}>Nhận (chỉ soạn)</button>
+                </form>
+                <form
+                  action={decideCandidate}
+                  onSubmit={(e) => { if (!window.confirm(`Soạn thư từ chối CHỜ DUYỆT (chưa gửi)?\n\n${c.name}`)) e.preventDefault(); }}
+                >
+                  <input type="hidden" name="appId" value={c.appId} />
+                  <input type="hidden" name="decision" value="reject" />
+                  <button className="btn ghost" type="submit" style={{ fontSize: '0.85em' }}>Không nhận (chỉ soạn)</button>
+                </form>
+              </div>
+            </details>
           </>
         ) : null}
         {c.appStage === 'offer' && !c.hiredAt ? (

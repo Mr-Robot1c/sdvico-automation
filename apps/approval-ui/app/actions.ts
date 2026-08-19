@@ -221,6 +221,34 @@ export async function decideCandidate(formData: FormData) {
     status: 'pending',
   });
 
+  // 1-click gộp: người bấm ở /ho-so đồng thời là người bấm gửi (điều cấm 1).
+  const sendNow = String(formData.get('send_now') || '') === '1';
+  if (sendNow) {
+    const { data: iv } = await client
+      .from('approval_queue')
+      .select('id, kind, ref_id, payload, status')
+      .eq('kind', kind).eq('ref_id', appId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (iv && iv.status === 'pending') {
+      const { error: approveErr } = await client
+        .from('approval_queue')
+        .update({ status: 'approved', decided_at: new Date().toISOString(), decided_by: who })
+        .eq('id', iv.id).eq('status', 'pending');
+      if (!approveErr) {
+        const sendError = await sendCandidateEmail(client, iv as QueueItem);
+        if (sendError) {
+          await client
+            .from('approval_queue')
+            .update({ status: 'pending', decided_at: null, note: `GỬI MAIL LỖI: ${sendError}` })
+            .eq('id', iv.id);
+          throw new Error(`Đã soạn thư ${decision === 'offer' ? 'mời nhận việc' : 'từ chối'} nhưng gửi mail lỗi: ${sendError}. Mở trang Duyệt & gửi để thử lại.`);
+        }
+      }
+    }
+  }
+
   revalidatePath('/ho-so');
   revalidatePath('/');
 }
