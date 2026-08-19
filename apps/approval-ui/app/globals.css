@@ -170,6 +170,27 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
   font-size: 12px; color: var(--ok); font-weight: 600; white-space: nowrap;
   padding-left: 2px;
 }
+
+/* Khối duyệt: composer TikTok (nếu có) xếp TRÊN hàng ghi chú/hẹn giờ/nút. */
+.decide-wrap { display: flex; flex-direction: column; gap: 10px; }
+/* Màn composer TikTok (yêu cầu audit): xem trước video + caption, ô chọn riêng tư, câu disclosure. */
+.tt-composer {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; max-width: 460px;
+}
+.tt-head { font-size: 13.5px; }
+.tt-prev { width: 100%; max-width: 220px; max-height: 300px; border-radius: 8px; background: #000; }
+.tt-cap {
+  font-size: 12.5px; color: var(--ink-2); margin: 0; white-space: pre-wrap;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.tt-disc { font-size: 12px; color: var(--ink-2); margin: 0; }
+.tt-priv { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); }
+.tt-priv select {
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13.5px;
+  color-scheme: light dark; cursor: pointer;
+}
 /* Badge cặp bài thử A/B (kín đáo, thay prefix 🎯A/🎯B trong tiêu đề). */
 .badge-ab { background: #ede9fe; color: #5b21b6; }
 /* Badge "Đang làm video AI": vàng nhạt + chấm nhấp nháy để biết là đang chờ máy dựng. */

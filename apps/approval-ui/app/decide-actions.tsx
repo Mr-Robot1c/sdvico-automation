@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { decideForm } from './actions';
 
 // Ô ghi chú, ô hẹn giờ đăng (không bắt buộc) và hai nút quyết.
@@ -22,14 +22,107 @@ function humanVN(iso: string): string {
   return `${hh}:${mm} ${buoi} ${dd}/${mo}/${y}`;
 }
 
-export default function DecideActions({ id, title }: { id: string; title: string }) {
+// Nhãn tiếng Việt cho các mức riêng tư TikTok trả về trong creator_info.
+const PRIVACY_LABEL: Record<string, string> = {
+  PUBLIC_TO_EVERYONE: 'Công khai (mọi người xem)',
+  MUTUAL_FOLLOW_FRIENDS: 'Bạn bè (theo dõi lẫn nhau)',
+  FOLLOWER_OF_CREATOR: 'Người theo dõi tôi',
+  SELF_ONLY: 'Chỉ mình tôi (riêng tư)',
+};
+
+type CreatorInfo = {
+  ok: boolean;
+  nickname?: string | null;
+  privacyOptions?: string[];
+  commentDisabled?: boolean;
+  duetDisabled?: boolean;
+  stitchDisabled?: boolean;
+  error?: string;
+};
+
+// MÀN COMPOSER TIKTOK (yêu cầu audit): trước khi đăng, người duyệt thấy rõ video + caption sẽ đăng,
+// tự chọn mức riêng tư (đổ từ creator_info, không bịa), và câu thông báo nội dung sẽ lên TikTok.
+// Giá trị chọn đi kèm form qua input ẩn name="tiktok_privacy".
+function TiktokComposer({ videoUrl, caption }: { videoUrl?: string | null; caption?: string | null }) {
+  const [info, setInfo] = useState<CreatorInfo | null>(null);
+  const [privacy, setPrivacy] = useState<string>('');
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/tiktok/creator-info', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: CreatorInfo | null) => {
+        if (!alive || !j) { setInfo({ ok: false, error: 'không gọi được creator_info' }); return; }
+        setInfo(j);
+        const opts = j.privacyOptions || [];
+        // Mặc định chọn Công khai nếu tài khoản/app cho phép (sau audit), không thì mức đầu tiên.
+        setPrivacy(opts.includes('PUBLIC_TO_EVERYONE') ? 'PUBLIC_TO_EVERYONE' : opts[0] || 'SELF_ONLY');
+      })
+      .catch(() => { if (alive) setInfo({ ok: false, error: 'lỗi mạng' }); });
+    return () => { alive = false; };
+  }, []);
+
+  const opts = info?.ok ? info.privacyOptions || [] : [];
+  const onlySelf = opts.length > 0 && !opts.includes('PUBLIC_TO_EVERYONE');
+
+  return (
+    <div className="tt-composer">
+      <div className="tt-head">🎵 <b>Đăng lên TikTok</b></div>
+      {/* Xác nhận rõ NỘI DUNG sẽ đăng (bắt buộc cho audit). */}
+      {videoUrl ? <video className="tt-prev" src={videoUrl} controls preload="metadata" /> : null}
+      {caption ? <p className="tt-cap">{caption}</p> : null}
+      <p className="tt-disc">Video và mô tả trên sẽ được đăng lên tài khoản TikTok{info?.nickname ? ` @${info.nickname}` : ' của SDVICO'}.</p>
+
+      {!info ? (
+        <p className="sub">Đang lấy cài đặt tài khoản TikTok…</p>
+      ) : !info.ok ? (
+        <>
+          <p className="sub err-note">Chưa lấy được cài đặt TikTok ({info.error || 'chưa nối tài khoản'}). Bài vẫn duyệt được; TikTok sẽ bỏ qua nếu chưa nối.</p>
+          <input type="hidden" name="tiktok_privacy" value="" />
+        </>
+      ) : (
+        <>
+          <label className="tt-priv">
+            <span>Ai xem được:</span>
+            <select name="tiktok_privacy" value={privacy} onChange={(e) => setPrivacy(e.target.value)}>
+              {opts.map((o) => (
+                <option key={o} value={o}>{PRIVACY_LABEL[o] || o}</option>
+              ))}
+            </select>
+          </label>
+          {/* Tôn trọng cài đặt tài khoản: nêu rõ mục nào bị khóa (audit soi điểm này). */}
+          {(info.commentDisabled || info.duetDisabled || info.stitchDisabled) ? (
+            <p className="sub">Tài khoản đang tắt: {[info.commentDisabled && 'bình luận', info.duetDisabled && 'duet', info.stitchDisabled && 'stitch'].filter(Boolean).join(', ')}.</p>
+          ) : null}
+          {onlySelf ? (
+            <p className="sub">Hiện chỉ đăng riêng tư được vì app chưa qua audit TikTok. Sau khi audit đậu, mục này sẽ có "Công khai".</p>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function DecideActions({
+  id,
+  title,
+  hasTiktok = false,
+  videoUrl = null,
+  caption = null,
+}: {
+  id: string;
+  title: string;
+  hasTiktok?: boolean;
+  videoUrl?: string | null;
+  caption?: string | null;
+}) {
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
   const [schedule, setSchedule] = useState('');
   const preview = humanVN(schedule);
 
   return (
     <form
-      className="row"
+      className="decide-wrap"
       action={decideForm}
       onSubmit={(e) => {
         const action = (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value');
@@ -59,24 +152,27 @@ export default function DecideActions({ id, title }: { id: string; title: string
       }}
     >
       <input type="hidden" name="id" value={id} />
-      <input className="note" name="note" placeholder="Ghi chú (không bắt buộc)" aria-label="Ghi chú" />
-      <label className="schedule-lbl" title="Để trống = đăng ngay khi bấm Duyệt. Có giờ = Facebook tự đăng đúng giờ hẹn. Lưu ý AM = sáng/khuya, PM = trưa/chiều/tối.">
-        <span aria-hidden="true">⏰</span>
-        <input
-          type="datetime-local"
-          name="scheduled_at"
-          value={schedule}
-          onChange={(e) => setSchedule(e.target.value)}
-          aria-label="Hẹn giờ đăng (không bắt buộc). AM = sáng, PM = chiều tối"
-        />
-        {preview ? <span className="schedule-preview">→ {preview}</span> : null}
-      </label>
-      <button className="btn ok" name="action" value="approve" disabled={busy !== null}>
-        {busy === 'approve' ? (schedule ? 'Đang hẹn...' : 'Đang duyệt...') : (schedule ? 'Duyệt + Hẹn giờ' : 'Duyệt')}
-      </button>
-      <button className="btn no" name="action" value="reject" disabled={busy !== null}>
-        {busy === 'reject' ? 'Đang từ chối...' : 'Từ chối'}
-      </button>
+      {hasTiktok ? <TiktokComposer videoUrl={videoUrl} caption={caption} /> : null}
+      <div className="row">
+        <input className="note" name="note" placeholder="Ghi chú (không bắt buộc)" aria-label="Ghi chú" />
+        <label className="schedule-lbl" title="Để trống = đăng ngay khi bấm Duyệt. Có giờ = Facebook tự đăng đúng giờ hẹn. Lưu ý AM = sáng/khuya, PM = trưa/chiều/tối.">
+          <span aria-hidden="true">⏰</span>
+          <input
+            type="datetime-local"
+            name="scheduled_at"
+            value={schedule}
+            onChange={(e) => setSchedule(e.target.value)}
+            aria-label="Hẹn giờ đăng (không bắt buộc). AM = sáng, PM = chiều tối"
+          />
+          {preview ? <span className="schedule-preview">→ {preview}</span> : null}
+        </label>
+        <button className="btn ok" name="action" value="approve" disabled={busy !== null}>
+          {busy === 'approve' ? (schedule ? 'Đang hẹn...' : 'Đang duyệt...') : (schedule ? 'Duyệt + Hẹn giờ' : 'Duyệt')}
+        </button>
+        <button className="btn no" name="action" value="reject" disabled={busy !== null}>
+          {busy === 'reject' ? 'Đang từ chối...' : 'Từ chối'}
+        </button>
+      </div>
     </form>
   );
 }

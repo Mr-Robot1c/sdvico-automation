@@ -74,7 +74,7 @@ function ttErr(j: any): string | null {
 
 export async function postVideoToTikTok(
   client: Client,
-  opts: { videoUrl: string; caption: string }
+  opts: { videoUrl: string; caption: string; privacy?: string | null }
 ): Promise<{ ok: boolean; publishId?: string; status?: string; privacy?: string; steps: any; error?: string }> {
   const steps: any = {};
   try {
@@ -95,12 +95,17 @@ export async function postVideoToTikTok(
     // ĐÃ QUA AUDIT — chưa audit thì options chỉ có 'SELF_ONLY' (riêng tư), không ép public được bằng
     // code. env TIKTOK_PRIVACY: 'public'|'auto' = lấy public khi có; 'self' = luôn riêng tư (mặc định
     // auto -> sau khi audit đậu là tự động đăng public, không phải sửa code).
+    // Người duyệt chọn mức riêng tư ở màn composer (opts.privacy) -> ưu tiên NẾU TikTok cho phép mức
+    // đó (tôn trọng creator_info; chọn mức TikTok không trả về là rớt audit). Không chọn thì theo
+    // env TIKTOK_PRIVACY (auto = public khi có, mặc định).
     const pref = (process.env.TIKTOK_PRIVACY || 'auto').toLowerCase();
     const wantPublic = pref === 'public' || pref === 'auto';
-    const privacy = wantPublic && options.includes('PUBLIC_TO_EVERYONE')
-      ? 'PUBLIC_TO_EVERYONE'
-      : options.includes('SELF_ONLY') ? 'SELF_ONLY' : options[0] || 'SELF_ONLY';
+    const picked = opts.privacy && options.includes(opts.privacy) ? opts.privacy : null;
+    const privacy = picked
+      || (wantPublic && options.includes('PUBLIC_TO_EVERYONE') ? 'PUBLIC_TO_EVERYONE' : null)
+      || (options.includes('SELF_ONLY') ? 'SELF_ONLY' : options[0] || 'SELF_ONLY');
     steps.privacyChosen = privacy;
+    steps.privacyRequested = opts.privacy || null;
 
     // 2. Tải video về (từ Supabase). Chuẩn hóa bằng ffmpeg (nướng chiều xoay + H.264/AAC) để TikTok
     //    không hiển thị nghiêng 90 độ; lỗi/thiếu ffmpeg thì dùng file gốc, KHÔNG chặn đăng.

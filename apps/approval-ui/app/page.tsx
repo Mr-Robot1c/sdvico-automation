@@ -354,7 +354,13 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                       </div>
                     ) : null}
                   </ViewModal>
-                  <DecideActions id={item.id} title={cleanTitle} />
+                  <DecideActions
+                    id={item.id}
+                    title={cleanTitle}
+                    hasTiktok={info.channels.includes('tiktok')}
+                    videoUrl={vid?.url ?? null}
+                    caption={draft ?? null}
+                  />
                 </div>
               </li>
             );

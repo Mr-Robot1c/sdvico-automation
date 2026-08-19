@@ -318,7 +318,8 @@ function shortCaptionForTikTok(draft: string, maxLen = 200): string {
 
 async function publishContentToTikTok(
   client: ReturnType<typeof getServerClient>,
-  contentId: string
+  contentId: string,
+  privacy?: string | null
 ): Promise<{ ok: boolean; error?: string; publishId?: string }> {
   // Không đăng lại bài đã đăng thành công.
   const { data: posted } = await client
@@ -354,7 +355,7 @@ async function publishContentToTikTok(
   // Rút gọn cho TikTok để bài dài không bị cắt cụt (giữ hashtag).
   const caption = shortCaptionForTikTok(String((c as any).draft || (c as any).title || ''));
 
-  const result = await postVideoToTikTok(client, { videoUrl, caption });
+  const result = await postVideoToTikTok(client, { videoUrl, caption, privacy: privacy || null });
   try {
     await client.from('run_log').insert({
       task: 'mkt.publish_tiktok',
@@ -397,6 +398,8 @@ export async function decideForm(formData: FormData) {
   // Có -> Facebook nhận scheduled_publish_time, tự đăng đúng giờ. Trống -> đăng ngay như cũ.
   // TikTok API không hỗ trợ hẹn giờ public -> bỏ qua khi có hẹn (chỉ Facebook được hẹn).
   const scheduledAt = String(formData.get('scheduled_at') || '').trim() || null;
+  // Mức riêng tư TikTok người duyệt chọn ở màn composer (rỗng nếu bài không có TikTok / chưa nối).
+  const tiktokPrivacy = String(formData.get('tiktok_privacy') || '').trim() || null;
 
   const decision = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : null;
   if (!id || !decision) return;
@@ -457,7 +460,7 @@ export async function decideForm(formData: FormData) {
             }
           }
           if (ch === 'facebook') jobs.push(publishContentToFacebook(bgClient, contentId, scheduledAt));
-          if (ch === 'tiktok') jobs.push(publishContentToTikTok(bgClient, contentId));
+          if (ch === 'tiktok') jobs.push(publishContentToTikTok(bgClient, contentId, tiktokPrivacy));
         }
         await Promise.allSettled(jobs);
         // Bài vừa đăng thật xong, cập nhật lại trang cho lần render kế tiếp.
