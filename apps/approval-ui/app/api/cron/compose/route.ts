@@ -89,11 +89,13 @@ export async function GET(req: Request) {
 
     // Cài đặt thương hiệu (logo, hotline, email, website).
     const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
-    const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; email?: string; website?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
+    const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; email?: string; website?: string; address?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
 
     // Email liên hệ: ưu tiên Cài đặt (brand_config.email), rồi biến môi trường, cuối cùng mặc định.
     const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'sdvicotuyendung@gmail.com';
     const hotline = brand.hotline || '1900 23 23 49';
+    // Địa chỉ công ty: hiện trong bài đăng + poster. Fallback về địa chỉ chính thức (CLAUDE.md).
+    const companyAddress = brand.address || '283 Nguyễn Hữu Cảnh, Phường Rạch Dừa, TP. HCM';
 
     for (const job of (autoJobs as Record<string, unknown>[]) || []) {
       const jobId = String(job.id);
@@ -166,6 +168,7 @@ export async function GET(req: Request) {
         benefits: benefitsText || null,
         contactEmail,
         hotline,
+        address: companyAddress,
         hashtags,
       });
 
@@ -180,6 +183,7 @@ export async function GET(req: Request) {
         workingHours,
         brandName: brand.company_name || 'SDVICO',
         tagline: brand.tagline,
+        address: companyAddress,
         website: brand.website,
         hotline: brand.hotline || hotline,
         photoUrl: unsplash_url,

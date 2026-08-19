@@ -9,6 +9,10 @@ type DbClient = ReturnType<typeof getServerClient>;
 const WEEKDAYS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 const WORK_TIMES = ['09:00', '10:30', '14:00', '15:30'];
 
+// Địa chỉ + địa điểm phỏng vấn mặc định. Ưu tiên brand_config.address / default_interview_location,
+// fallback về địa chỉ SDVICO chính thức (CLAUDE.md).
+export const DEFAULT_COMPANY_ADDRESS = 'Trụ sở SDVICO — 283 Nguyễn Hữu Cảnh, Phường Rạch Dừa, TP. Hồ Chí Minh';
+
 function slotLabel(day: Date, time: string): string {
   const wd = WEEKDAYS[day.getDay()];
   const dd = String(day.getDate()).padStart(2, '0');
@@ -123,16 +127,19 @@ export function composeInterviewLetter({
   slots,
   cvText = '',
   isReinvite = false,
+  location = '',
 }: {
   name?: string | null;
   position: string;
   slots: string[];
   cvText?: string;
   isReinvite?: boolean;
+  location?: string;
 }): string {
   const xh = xungHoFor(name, cvText);
   const hasName = name && name.trim() && name.trim() !== 'anh/chị';
   const greeting = hasName ? `Kính gửi ${xh} ${name!.trim()},` : `Kính gửi ${xh},`;
+  const loc = (location || '').trim() || DEFAULT_COMPANY_ADDRESS;
 
   const openingLine = isReinvite
     ? `Cảm ơn ${xh} đã gửi hồ sơ ứng tuyển tại SDVICO. Sau khi rà lại các vị trí đang tuyển, chúng tôi nhận thấy hồ sơ của ${xh} phù hợp với ${position}, và trân trọng mời ${xh} tham gia phỏng vấn cho vị trí này.`
@@ -145,6 +152,8 @@ export function composeInterviewLetter({
     '',
     `Đề xuất các khung giờ, ${xh} bấm link cuối thư để xác nhận một khung phù hợp:`,
     ...slots.map((s, i) => `${i + 1}. ${s}`),
+    '',
+    `Địa điểm phỏng vấn: ${loc}`,
     '',
     `Trong trường hợp cả ${slots.length} khung trên không phù hợp, ${xh} bấm link cuối thư và đề xuất giờ khác. Phòng Nhân sự sẽ liên hệ lại để chốt lịch.`,
     '',

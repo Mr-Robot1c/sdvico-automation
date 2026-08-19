@@ -3,7 +3,7 @@ import SlotPicker from './slot-picker';
 
 export const dynamic = 'force-dynamic';
 
-type IvPayload = { ung_vien?: string; vi_tri?: string; khung_gio?: string[] };
+type IvPayload = { ung_vien?: string; vi_tri?: string; khung_gio?: string[]; dia_diem?: string };
 
 const shell = { maxWidth: 560, margin: '0 auto', padding: '28px 20px 48px' } as const;
 const card = { background: '#fff', border: '1px solid #dbe5f1', borderRadius: 16, padding: 24, marginTop: 16 } as const;
@@ -54,9 +54,11 @@ export default async function Page({ params }: { params: { token: string } }) {
     <main style={shell}>
       <Header />
       <div style={card}>
-        <h1 style={{ fontSize: 24, margin: '0 0 6px', color: '#06264d' }}>Chọn giờ phỏng vấn</h1>
-        {payload.vi_tri ? (
-          <p style={{ color: '#5b6b7f', margin: '0 0 18px' }}>Vị trí: <b style={{ color: '#06264d' }}>{payload.vi_tri}</b></p>
+        <h1 style={{ fontSize: 24, margin: '0 0 6px', color: '#06264d' }}>Chọn giờ phỏng vấn</h1>        {payload.vi_tri ? (
+          <p style={{ color: '#5b6b7f', margin: '0 0 8px' }}>Vị trí: <b style={{ color: '#06264d' }}>{payload.vi_tri}</b></p>
+        ) : null}
+        {payload.dia_diem ? (
+          <p style={{ color: '#5b6b7f', margin: '0 0 18px' }}>Địa điểm: <b style={{ color: '#06264d' }}>{payload.dia_diem}</b></p>
         ) : null}
 
         {app.chosen_slot ? (

@@ -136,10 +136,21 @@ function InterviewApprove({ appId, name, windows }: { appId: string; name: strin
           </select>
         </div>
       ))}
+      {/* Địa điểm phỏng vấn — mặc định lấy từ Cài đặt (brand.default_interview_location hoặc brand.address).
+          Bỏ trống ở server nghĩa là dùng fallback config. HR có thể ghi đè (VD "Cà phê Highlands quận 1"). */}
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.85em' }}>
+        <span>Địa điểm phỏng vấn (không bắt buộc — bỏ trống thì dùng địa chỉ công ty ở Cài đặt)</span>
+        <input
+          className="note"
+          name="interview_location"
+          placeholder="VD: Trụ sở SDVICO / Cà phê Highlands quận 1 / Google Meet link..."
+          form="interview-form-primary"
+        />
+      </label>
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="btn ghost" style={{ fontSize: '0.85em' }} onClick={() => setRows((rs) => [...rs, { date: '', time: times[0] }])}>+ Thêm khung</button>
         {/* Nút CHÍNH: chỉ soạn nháp — người vận hành sang / Duyệt & gửi để rà thư trước khi gửi thật */}
-        <form action={advanceToInterview} style={{ display: 'inline' }}>
+        <form id="interview-form-primary" action={advanceToInterview} style={{ display: 'inline' }}>
           <input type="hidden" name="appId" value={appId} />
           {chosen.map((r, i) => <input key={i} type="hidden" name="slot" value={`${r.date}|${r.time}`} />)}
           <button className="btn ok" type="submit" title="Máy soạn thư mời nháp. Vào trang Duyệt & gửi để xem thư, chỉnh sửa xong bấm Duyệt là gửi cho ứng viên.">
@@ -147,9 +158,14 @@ function InterviewApprove({ appId, name, windows }: { appId: string; name: strin
           </button>
         </form>
         {/* Nút phụ: gửi luôn không cần rà — chỉ dùng khi bạn chắc chắn */}
-        <form action={advanceToInterview} style={{ display: 'inline' }}>
+        <form action={advanceToInterview} style={{ display: 'inline' }} onSubmit={(e) => {
+          const loc = (document.querySelector('input[name="interview_location"][form="interview-form-primary"]') as HTMLInputElement | null)?.value || '';
+          const hidden = e.currentTarget.querySelector('input[name="interview_location"]') as HTMLInputElement | null;
+          if (hidden) hidden.value = loc;
+        }}>
           <input type="hidden" name="appId" value={appId} />
           <input type="hidden" name="send_now" value="1" />
+          <input type="hidden" name="interview_location" value="" />
           {chosen.map((r, i) => <input key={i} type="hidden" name="slot" value={`${r.date}|${r.time}`} />)}
           <button
             className="btn ghost"

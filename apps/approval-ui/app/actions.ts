@@ -387,22 +387,28 @@ export async function bossSubmitDecision(formData: FormData) {
     })
     .eq('id', app.id);
 
+  // Địa điểm phỏng vấn: sếp có thể nhập ở form. Fallback theo brand config, cuối cùng CLAUDE default.
+  const locFromBoss = String(formData.get('interview_location') || '').trim();
+  const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
+  const brand = (brandRow?.value || {}) as { address?: string; default_interview_location?: string };
+  const dia_diem = locFromBoss || brand.default_interview_location || brand.address || '';
+
   const q = await generateInterviewQuestions(cvText, position, {
     full_name: name,
     email,
     phone: (cand.phone as string) || null,
     address: ((cand.cv_json as { address?: string } | null)?.address) || null,
   });
-  const thu_moi = composeInterviewLetter({ name, position, slots, cvText });
+  const thu_moi = composeInterviewLetter({ name, position, slots, cvText, location: dia_diem });
 
   await client.from('approval_queue').insert({
     kind: 'hr_interview',
     title: `[Sếp duyệt] Thư mời phỏng vấn: ${name || email || app.id}`,
     payload: {
       ung_vien: name, vi_tri: position, email,
-      khung_gio: slots, thu_moi,
+      khung_gio: slots, thu_moi, dia_diem,
       cau_hoi_ky_thuat: q.cau_hoi_ky_thuat, cau_hoi_hanh_vi: q.cau_hoi_hanh_vi, bai_ve_nha: q.bai_ve_nha,
-      luu_y: `Sếp đã duyệt qua link công khai${note ? ` · Ghi chú: ${note}` : ''}. HR bấm Duyệt để gửi mail.`,
+      luu_y: `Sếp đã duyệt qua link công khai${note ? ` · Ghi chú: ${note}` : ''}${dia_diem ? ` · Địa điểm: ${dia_diem}` : ''}. HR bấm Duyệt để gửi mail.`,
       da_qua_sep_duyet: true,
     },
     ref_table: 'hr_applications', ref_id: app.id, status: 'pending',
@@ -549,10 +555,11 @@ export async function recomposeDraft(formData: FormData) {
   };
 
   const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
-  const brand = (brandRow?.value || {}) as { hotline?: string; email?: string };
+  const brand = (brandRow?.value || {}) as { hotline?: string; email?: string; address?: string };
   // Email/hotline liên hệ: ưu tiên Cài đặt (brand_config), rồi biến môi trường, cuối cùng mặc định.
   const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'sdvicotuyendung@gmail.com';
   const hotline = brand.hotline || '1900 23 23 49';
+  const companyAddress = brand.address || '283 Nguyễn Hữu Cảnh, Phường Rạch Dừa, TP. HCM';
 
   // Chỉ viết lại PHẦN MỞ ĐẦU theo giọng đã chọn. Chi tiết + liên hệ do hệ thống ghép, giữ bố cục.
   const sourceInfo = [
@@ -594,6 +601,7 @@ export async function recomposeDraft(formData: FormData) {
     benefits,
     contactEmail,
     hotline,
+    address: companyAddress,
     hashtags,
   });
 
@@ -654,20 +662,27 @@ export async function advanceToInterview(formData: FormData) {
       .map((rs) => { const [d, t] = rs.split('|'); return formatSlot(d, t); })
       .filter(Boolean);
     const slots = chosen.length ? chosen : await allocateInterviewSlots(client, 3);
+
+    // Địa điểm phỏng vấn: ưu tiên form input, fallback về default_interview_location, rồi address công ty.
+    const locFromForm = String(formData.get('interview_location') || '').trim();
+    const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
+    const brand = (brandRow?.value || {}) as { address?: string; default_interview_location?: string };
+    const dia_diem = locFromForm || brand.default_interview_location || brand.address || '';
+
     const q = await generateInterviewQuestions(cvText, position, {
       full_name: (cand?.full_name as string) || null,
       email: (cand?.email as string) || null,
       phone: (cand?.phone as string) || null,
       address: ((cand?.cv_json as { address?: string } | null)?.address) || null,
     });
-    const thu_moi = composeInterviewLetter({ name, position, slots, cvText, isReinvite });
+    const thu_moi = composeInterviewLetter({ name, position, slots, cvText, isReinvite, location: dia_diem });
 
     await client.from('approval_queue').insert({
       kind: 'hr_interview',
       title: `Thư mời phỏng vấn: ${name || email || appId}`,
       payload: {
         ung_vien: name, vi_tri: position, email,
-        khung_gio: slots, thu_moi,
+        khung_gio: slots, thu_moi, dia_diem,
         cau_hoi_ky_thuat: q.cau_hoi_ky_thuat, cau_hoi_hanh_vi: q.cau_hoi_hanh_vi, bai_ve_nha: q.bai_ve_nha,
         luu_y: 'Máy soạn. Người bấm = gửi cho ứng viên (điều cấm 1).',
       },
@@ -1028,11 +1043,12 @@ export async function queueFacebookPost(formData: FormData) {
 
   // Đọc cài đặt thương hiệu để gắn footer liên hệ và dùng logo khi không có ảnh.
   const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
-  const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; email?: string; website?: string; company_desc?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
+  const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; email?: string; website?: string; address?: string; company_desc?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
 
   // Email liên hệ: ưu tiên Cài đặt (brand_config.email), rồi biến môi trường, cuối cùng mặc định.
   const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'sdvicotuyendung@gmail.com';
   const hotline = brand.hotline || '1900 23 23 49';
+  const companyAddress = brand.address || '283 Nguyễn Hữu Cảnh, Phường Rạch Dừa, TP. HCM';
   const reqText = (job as Record<string, unknown>).requirements as string | null;
 
   // Thông tin gốc để AI viết đúng, không bịa. AI CHỈ viết phần mở đầu; chi tiết ghép nguyên văn.
@@ -1074,6 +1090,7 @@ export async function queueFacebookPost(formData: FormData) {
     benefits,
     contactEmail,
     hotline,
+    address: companyAddress,
     hashtags,
   });
 
@@ -1090,6 +1107,7 @@ export async function queueFacebookPost(formData: FormData) {
     tagline: brand.tagline,
     website: brand.website,
     hotline: brand.hotline || hotline,
+    address: companyAddress,
     photoUrl: unsplash_url,
     logoUrl: brand.logo_url,
     theme: brand.poster,
@@ -1254,7 +1272,8 @@ export async function queueChannelPost(formData: FormData) {
 
   const { email: contactEmail, hotline } = await resolveBrandContact(client);
   const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
-  const brand = (brandRow?.value || {}) as { logo_url?: string; website?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
+  const brand = (brandRow?.value || {}) as { logo_url?: string; website?: string; address?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
+  const companyAddress = brand.address || '283 Nguyễn Hữu Cảnh, Phường Rạch Dừa, TP. HCM';
   const reqText = (job as Record<string, unknown>).requirements as string | null;
 
   // Ưu tiên bản JD đúng độ dài theo kênh; thiếu thì ghép nguyên văn từ thông tin vị trí.
@@ -1286,6 +1305,7 @@ export async function queueChannelPost(formData: FormData) {
       tagline: brand.tagline,
       website: brand.website,
       hotline,
+      address: companyAddress,
       photoUrl: unsplash_url,
       logoUrl: brand.logo_url,
       theme: brand.poster,
@@ -1819,6 +1839,8 @@ export async function saveBrandConfig(formData: FormData) {
     hotline: String(formData.get('hotline') || '').trim() || null,
     email: String(formData.get('email') || '').trim() || null,
     website: String(formData.get('website') || '').trim() || null,
+    address: String(formData.get('address') || '').trim() || null,
+    default_interview_location: String(formData.get('default_interview_location') || '').trim() || null,
     company_desc: String(formData.get('company_desc') || '').trim() || null,
   };
   const { error } = await client.from('app_config').upsert(

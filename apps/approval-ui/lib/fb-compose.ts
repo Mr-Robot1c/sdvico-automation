@@ -30,7 +30,7 @@ export function fbIntroSystem(opts: { styleNote?: string; isRefresh?: boolean } 
   ].filter(Boolean).join('\n');
 }
 
-// Ghép bản chữ hoàn chỉnh: mở đầu → chi tiết nguyên văn → liên hệ → hashtag.
+// Ghép bản chữ hoàn chỉnh: mở đầu → chi tiết nguyên văn → liên hệ + địa chỉ → hashtag.
 export function assembleFacebookPost(opts: {
   intro: string;
   short_desc?: string | null;
@@ -38,6 +38,7 @@ export function assembleFacebookPost(opts: {
   benefits?: string | null;
   contactEmail: string;
   hotline: string;
+  address?: string | null;
   hashtags?: string | null;
 }): string {
   const intro = String(opts.intro || '').trim();
@@ -48,11 +49,14 @@ export function assembleFacebookPost(opts: {
     benefits: opts.benefits,
   });
   const contact = `📞 Liên hệ: gửi CV về ${opts.contactEmail}, hotline/Zalo ${opts.hotline}`;
+  const addr = (opts.address || '').trim();
+  const addressLine = addr ? `🏢 Địa chỉ: ${addr}` : '';
   const tags = String(opts.hashtags || '').trim();
 
   let out = intro;
   out += details;                 // đã kèm sẵn hai dòng trống ngăn cách ở đầu
   out += `\n\n${contact}`;
+  if (addressLine) out += `\n${addressLine}`;
   if (tags) out += `\n\n${tags}`;
   return out.trim();
 }

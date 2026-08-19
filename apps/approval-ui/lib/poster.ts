@@ -25,6 +25,7 @@ export type PosterInput = {
   tagline?: string;
   website?: string;
   hotline?: string;
+  address?: string | null;
   photoUrl?: string | null;
   logoUrl?: string | null;
   theme?: PosterTheme;
@@ -200,10 +201,17 @@ export async function buildRecruitmentPoster(input: PosterInput): Promise<Buffer
       div({ display: 'flex', gap: 40 }, [column('YÊU CẦU', reqs), column('QUYỀN LỢI', bens)]),
     ]);
 
-    const footer = div({ display: 'flex', alignItems: 'center', gap: 14, background: t.red, padding: '22px 50px' }, [
-      imgEl(icon(PHONE), { width: 32, height: 32 }),
-      txt({ color: '#fff', fontSize: 26, fontWeight: 700 }, 'LIÊN HỆ:'),
-      txt({ color: '#fff', fontSize: 38, fontWeight: 700 }, hotline),
+    const addr = (input.address || '').trim();
+    const footer = div({ display: 'flex', flexDirection: 'column', gap: 6, background: t.red, padding: '18px 50px' }, [
+      div({ display: 'flex', alignItems: 'center', gap: 14 }, [
+        imgEl(icon(PHONE), { width: 32, height: 32 }),
+        txt({ color: '#fff', fontSize: 26, fontWeight: 700 }, 'LIÊN HỆ:'),
+        txt({ color: '#fff', fontSize: 38, fontWeight: 700 }, hotline),
+      ]),
+      ...(addr ? [div({ display: 'flex', alignItems: 'center', gap: 10 }, [
+        imgEl(icon(PIN), { width: 22, height: 22 }),
+        txt({ color: '#fff', fontSize: 20, fontWeight: 600 }, addr),
+      ])] : []),
     ]);
 
     const tree = div(

@@ -14,6 +14,8 @@ type BrandConfig = {
   company_desc?: string;
   company_name?: string;
   tagline?: string;
+  address?: string;                     // Địa chỉ công ty — hiện trong bài đăng, poster, thư mời
+  default_interview_location?: string;  // Địa điểm phỏng vấn mặc định — thường = address
   poster?: { navy?: string; red?: string; accent?: string };
 };
 
@@ -93,6 +95,28 @@ function BrandTab({ brand }: { brand: BrandConfig }) {
         <div>
           <label style={{ fontSize: '0.82em', color: 'var(--ink-2)', display: 'block', marginBottom: 3 }}>Email tuyển dụng</label>
           <input className="note" name="email" type="email" defaultValue={brand.email || ''} placeholder="tuyendung@sdvico.vn" style={{ width: '100%', boxSizing: 'border-box' }} />
+        </div>
+        <div>
+          <label style={{ fontSize: '0.82em', color: 'var(--ink-2)', display: 'block', marginBottom: 3 }}>Địa chỉ công ty</label>
+          <input
+            className="note"
+            name="address"
+            defaultValue={brand.address || ''}
+            placeholder="283 Nguyễn Hữu Cảnh, Phường Rạch Dừa, TP. HCM"
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
+          <span style={{ fontSize: '0.78em', color: 'var(--ink-2)' }}>Xuất hiện trong bài đăng, poster tuyển dụng, và mặc định là địa điểm phỏng vấn.</span>
+        </div>
+        <div>
+          <label style={{ fontSize: '0.82em', color: 'var(--ink-2)', display: 'block', marginBottom: 3 }}>Địa điểm phỏng vấn mặc định (không bắt buộc)</label>
+          <input
+            className="note"
+            name="default_interview_location"
+            defaultValue={brand.default_interview_location || ''}
+            placeholder="Để trống = dùng địa chỉ công ty"
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
+          <span style={{ fontSize: '0.78em', color: 'var(--ink-2)' }}>HR hoặc sếp có thể chỉnh riêng cho từng buổi (VD phỏng vấn online, cà phê).</span>
         </div>
         <div>
           <label style={{ fontSize: '0.82em', color: 'var(--ink-2)', display: 'block', marginBottom: 3 }}>Mô tả ngắn công ty (không bắt buộc)</label>

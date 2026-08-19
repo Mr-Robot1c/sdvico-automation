@@ -21,6 +21,7 @@ export default function BossDecisionForm({ token }: { token: string }) {
   const [mode, setMode] = useState<'menu' | 'interview' | 'reject' | 'hold'>('menu');
   const [slots, setSlots] = useState<Slot[]>([{ date: tomorrowIso(), time: DEFAULT_TIMES[0] }]);
   const [note, setNote] = useState('');
+  const [location, setLocation] = useState('');
   const [busy, setBusy] = useState(false);
 
   const btnBase = {
@@ -112,6 +113,19 @@ export default function BossDecisionForm({ token }: { token: string }) {
             + Thêm khung giờ
           </button>
         ) : null}
+
+        <label style={{ fontSize: 14, color: '#33475b', fontWeight: 600 }}>
+          Địa điểm phỏng vấn (không bắt buộc — bỏ trống thì HR dùng địa chỉ công ty)
+          <input
+            type="text"
+            name="interview_location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            maxLength={300}
+            placeholder="VD: Cà phê Highlands 45 Nguyễn Huệ / Google Meet: meet.google.com/xxx-yyy-zzz"
+            style={{ width: '100%', marginTop: 6, padding: '10px 12px', borderRadius: 8, border: '1px solid #c5d0dd', fontSize: 14, fontFamily: 'inherit' }}
+          />
+        </label>
 
         <label style={{ fontSize: 14, color: '#33475b', fontWeight: 600 }}>
           Ghi chú cho HR (không bắt buộc)
