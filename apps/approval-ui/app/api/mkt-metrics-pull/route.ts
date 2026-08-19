@@ -103,6 +103,24 @@ export async function GET(req: Request) {
   // THỨ 2 (kế hoạch tuần) + THỨ 6 (cập nhật lần 1), từ 8h sáng VN, mỗi ngày đúng 1 bản cron.
   // Bản sinh ra TỰ KÈM hướng đi (generateAndStorePlan gọi Gemini directions bên trong).
   let plan: { id: string | null; ranked: number; cadence: string; directions: number } | { skipped: string } | null = null;
+  // ?plan=1 (kèm CRON_SECRET): ép BOSS sinh kế hoạch NGAY + áp dụng, bỏ qua lịch T2/T6 và guard
+  // 1 bản/ngày. Dùng khi người giao việc đổi mục tiêu/sản phẩm tập trung và muốn thấy liền
+  // (GitHub workflow mkt-metrics-pull input force_plan=true).
+  const forcePlan = new URL(req.url).searchParams.get('plan') === '1';
+  if (forcePlan) {
+    try {
+      const { id, plan: p } = await generateAndStorePlan(client, 'manual', { cadence: 'update' });
+      if (id) {
+        await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
+        await client.from('mkt_plans').update({ applied: true, applied_at: new Date().toISOString() }).eq('id', id);
+      }
+      plan = { id, ranked: p.summary.ranked, cadence: 'update', directions: p.content_suggestions?.length || 0 };
+    } catch (e: any) {
+      console.error('[plan] ep sinh ke hoach that bai:', e?.message || e);
+      plan = { skipped: 'loi: ' + String(e?.message || e) };
+    }
+    return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan, forced: true });
+  }
   const slot = planSlotVN(new Date());
   if (slot) {
     const { count: cronToday } = await client

@@ -7,6 +7,22 @@
 
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../../lib/supabase-server';
+import { generateAndStorePlan } from '../../lib/plan';
+
+// NGƯỜI GIAO VIỆC vừa đổi mục tiêu / sản phẩm tập trung -> BOSS sinh lại kế hoạch NGAY và ÁP DỤNG
+// luôn (user 19/8: "đã note mục tiêu mới mà BOSS vẫn giữ kế hoạch cũ không cập nhật"). Đây là
+// quyết định của người (mục tiêu), không phải máy tự quyết; bản mới thay bản đang áp. Lỗi sinh
+// kế hoạch (Gemini) thì vẫn giữ mục tiêu đã lưu, kế hoạch cũ còn nguyên, không chặn người dùng.
+async function regeneratePlanAndApply(client: ReturnType<typeof getServerClient>) {
+  try {
+    const { id } = await generateAndStorePlan(client, 'manual', { cadence: 'update' });
+    if (!id) return;
+    await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
+    await client.from('mkt_plans').update({ applied: true, applied_at: new Date().toISOString() }).eq('id', id);
+  } catch (e: any) {
+    console.error('[goal] sinh lai ke hoach theo muc tieu that bai:', e?.message || e);
+  }
+}
 
 export async function saveWeeklyGoal(formData: FormData) {
   const text = String(formData.get('goal_text') || '').trim().slice(0, 2000);
@@ -17,6 +33,7 @@ export async function saveWeeklyGoal(formData: FormData) {
     updated_at: new Date().toISOString(),
   });
   if (error) throw new Error('Không lưu được mục tiêu: ' + error.message);
+  await regeneratePlanAndApply(client);
   revalidatePath('/ke-hoach');
 }
 
@@ -46,5 +63,6 @@ export async function saveFocus(formData: FormData) {
     updated_at: new Date().toISOString(),
   });
   if (error) throw new Error('Không lưu được sản phẩm tập trung: ' + error.message);
+  await regeneratePlanAndApply(client);
   revalidatePath('/ke-hoach');
 }

@@ -256,12 +256,20 @@ export async function generateAndStorePlan(
   opts: { cadence?: 'weekly' | 'update' } = {}
 ): Promise<{ id: string | null; plan: Plan }> {
   const now = new Date();
-  const [measurement, knowledge, goalRes] = await Promise.all([
+  const [measurement, knowledge, goalRes, focusRes] = await Promise.all([
     loadMeasurement(client),
     loadRecentKnowledge(client, 7, 30),
     client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
+    client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle(),
   ]);
-  const goal = String(((goalRes.data as any)?.value?.text) || '').trim();
+  let goal = String(((goalRes.data as any)?.value?.text) || '').trim();
+  // Sản phẩm TẬP TRUNG tuần (app_config mkt_focus, còn hạn) nối vào mục tiêu để BOSS sinh hướng đi
+  // đúng các sản phẩm đó (rotate cũng lọc theo focus; nhất quán hai đầu).
+  const fv = ((focusRes.data as any)?.value || {}) as { groups?: string[]; until?: string };
+  const fGroups = Array.isArray(fv.groups) ? fv.groups.filter(Boolean) : [];
+  if (fGroups.length && (!fv.until || new Date(fv.until).getTime() > Date.now())) {
+    goal = `${goal ? goal + '\n' : ''}TẬP TRUNG TUẦN NÀY: chỉ đề xuất hướng đi bài bán cho các sản phẩm: ${fGroups.join(', ')} (tới ${fv.until ? new Date(fv.until).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'hết tuần'}). Bài content nuôi trang vẫn giữ.`;
+  }
   const knowledgeUsed: KnowledgeUsed = {
     internal: knowledge.internal.length,
     publicSrc: knowledge.publicSrc.length,

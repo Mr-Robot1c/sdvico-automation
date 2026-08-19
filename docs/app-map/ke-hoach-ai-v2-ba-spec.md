@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-18
 ttl_days: 90
+<!-- re-verified: 2026-08-19 - NGUOI GIAO VIEC doi muc tieu/focus -> BOSS sinh lai ke hoach ngay + ap dung (goal-actions.ts regeneratePlanAndApply; plan.ts noi mkt_focus vao goal). Them ?plan=1 o route metrics-pull + workflow force_plan. -->
 <!-- re-verified: 2026-08-19 - Vong lap kin: phan hoi hien truong (cap tren Zalo) ve bai SEA-40 duoc ghi vao mkt_knowledge_internal (feedback/2026-08-19-sea40-nuoc-dam-tau) + ma hoa thanh product-guard cho Creator. Khong doi NV/AC. -->
 <!-- re-verified: 2026-08-19 - Them co che mkt_focus (tap trung san pham tuan) o /api/rotate: loc eligible + bo qua huong di ke hoach ngoai focus. Khong doi NV/AC; la rang buoc dau vao cho Creator (nguoi giao viec chot san pham tuan). -->
 <!-- re-verified: 2026-08-19 - packages/marketing/src/social.mjs prompt portrait doi sang viet HOAN CHINH voi nhan vat dien hinh (sep chot 19/8, thay khung suon dien tay); rotate-run.mjs portrait weight 1, khong needsGov. Khong dong toi NV/AC ke hoach AI v2. -->
