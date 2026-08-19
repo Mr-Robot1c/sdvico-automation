@@ -1,0 +1,77 @@
+name: HR — Soạn bài tương tác hâm nóng trang
+
+# Mỗi ngày soạn một bài tương tác, đẩy vào approval_queue chờ người bấm Duyệt.
+# Chạy song song với tuyển dụng: bài tương tác không gắn job_id, dùng chung worker
+# publish-facebook.mjs và trần HR_FB_MAX_PER_DAY. Máy soạn, người bấm Duyệt (điều cấm 1).
+#
+# Vì sao mỗi ngày một bài:
+# - Bám docs/bai-tuong-tac-mau.md: "Đăng rải 3 tới 5 ngày, mỗi ngày một bài, đừng dồn."
+# - Trần đăng mặc định 3 bài Facebook mỗi ngày, dùng chung với tin tuyển dụng, không dồn chỗ.
+# - Kho có 9 góc bài rải 3 chủ đề, xoay vòng đủ 9 ngày không lặp.
+#
+# Vì sao 7:30 UTC (14:30 giờ VN):
+# - Đủ để người vận hành đọc và bấm Duyệt trong giờ chiều.
+# - Worker publish-facebook chạy 15 phút một lần (cron-job.org), bài duyệt sẽ đăng vào khung
+#   tối 19-21h là thời điểm tương tác tốt theo hướng dẫn.
+
+on:
+  schedule:
+    - cron: '30 7 * * *'   # 14:30 giờ Việt Nam mỗi ngày
+  workflow_dispatch:
+    inputs:
+      count:
+        description: 'Số bài soạn trong lượt này (mặc định 1)'
+        required: false
+        default: '1'
+      theme:
+        description: 'Lọc chủ đề: doi_song, nganh_bien, hoi_dap (cách bằng dấu phẩy, để trống = xoay vòng cả ba)'
+        required: false
+      dry_run:
+        description: 'Chỉ in, không ghi DB'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+concurrency:
+  group: hr-engage-vong-chay
+  cancel-in-progress: false
+
+jobs:
+  soan-tuong-tac:
+    name: Soạn bài tương tác và đẩy hàng đợi duyệt
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      HR_POST_MODEL: ${{ secrets.HR_POST_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Chỉ cài phụ thuộc của packages/hr, bỏ qua next, react, sharp, satori của approval-ui,
+      # bỏ qua Chromium của Playwright. Script không đụng trình duyệt.
+      - name: Cài phụ thuộc
+        run: npm ci --workspace packages/hr --include-workspace-root
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      - name: Soạn và đẩy hàng đợi duyệt
+        run: |
+          ARGS="--count ${COUNT:-1}"
+          if [ -n "$THEME" ]; then
+            ARGS="$ARGS --theme $THEME"
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          node packages/hr/src/post/queue-engagement.mjs $ARGS
+        env:
+          COUNT: ${{ github.event.inputs.count }}
+          THEME: ${{ github.event.inputs.theme }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}

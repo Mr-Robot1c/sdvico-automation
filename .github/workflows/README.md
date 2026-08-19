@@ -10,6 +10,7 @@ Khóa và mật khẩu đặt trong GitHub Secrets, không viết thẳng vào f
 |---|---|---|
 | `cron.yml` | Đã tắt lịch, chạy tay | Gọi ba endpoint trên Vercel: soạn bài, đăng Facebook đã duyệt, đăng LinkedIn đã duyệt. Lịch 15 phút đã chuyển sang cron-job.org, xem [docs/cron-job-org.md](../../docs/cron-job-org.md) |
 | `hr.yml` | Đầu mỗi giờ | Ba bước nối nhau trong một lượt: nạp CV, chấm CV ẩn danh, soạn câu hỏi và thư mời |
+| `hr-engage.yml` | 14:30 giờ VN mỗi ngày | Soạn một bài tương tác hâm nóng trang, đẩy hàng đợi duyệt. Dùng chung worker đăng Facebook với tin tuyển dụng |
 | `deploy-vercel.yml` | Khi push vào main | Deploy giao diện duyệt lên Vercel |
 | `hr-analyze.yml` | Chạy tay | Phân tích một mô tả công việc thành tiêu chí tuyển dụng |
 | `hr-compose.yml` | Chạy tay | Soạn bài tuyển dụng Facebook cho một vị trí |
@@ -42,6 +43,7 @@ Cách bố trí hiện tại, tính theo sàn một phút mỗi lượt:
 | Việc | Lượt mỗi ngày | Phút mỗi tháng, tối thiểu |
 |---|---|---|
 | `hr.yml`, một giờ một lần | 24 | 720 |
+| `hr-engage.yml`, một ngày một lần | 1 | 30 |
 | `deploy-vercel.yml`, chỉ khi push | vài lượt | không đáng kể |
 | Ba endpoint chạy nền | 0, đã sang cron-job.org | 0 |
 

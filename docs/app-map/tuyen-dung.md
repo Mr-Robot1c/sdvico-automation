@@ -102,4 +102,39 @@ Còn thiếu, xếp theo mức cần kíp:
 - Thời gian soạn một mô tả công việc dưới 20 phút.
 - Tin tuyển dụng đăng lên tài khoản thật một vị trí, có kiểm chứng bằng ảnh chụp.
 
-Cập nhật lần cuối: 15/8/2026.
+## 3. Bài tương tác hâm nóng trang
+
+Trước khi đăng tin tuyển dụng, nên hâm nóng trang bằng vài bài tương tác để trang có tương tác thật, thuật toán Facebook đẩy tin tuyển đi xa hơn. Bài tương tác không gắn với vị trí nào, dùng chung đường ống đăng với tin tuyển dụng.
+
+### Cách hoạt động
+
+- Máy soạn nháp bài tương tác từ kho góc bài, đẩy vào `approval_queue` với `kind='hr_job_post'`, người bấm Duyệt, worker `publish-facebook.mjs` mới đăng. Đúng điều cấm 1, không có đường tự đăng.
+- Bài tương tác lưu trong `hr_job_posts` với `loai='tuong_tac'`, `job_id` để trống, `chu_de` ghi chủ đề. Tin tuyển dụng vẫn là `loai='tuyen_dung'` như cũ.
+- Ba chủ đề trong kho: đời sống công ty (`doi_song`), ngành biển và thủy sản (`nganh_bien`), hỏi đáp và mẹo nghề (`hoi_dap`).
+
+### Lệnh và file
+
+| Tên | Loại | Việc |
+|---|---|---|
+| hr-engage | Slash command | Soạn bài tương tác, đẩy hàng đợi duyệt. Xem `.claude/commands/hr-engage.md` |
+| engagement-topics.js | Kho góc bài | `packages/hr/src/post/engagement-topics.js`, chín góc bài rải ba chủ đề |
+| compose-engagement.js | Module soạn | Groq khi có khóa, lùi về bản có sẵn; soát và làm sạch giọng văn |
+| queue-engagement.mjs | Script | Sinh N bài, chèn `hr_job_posts`, đẩy `approval_queue` |
+
+Chạy nhanh: `node packages/hr/src/post/queue-engagement.mjs` soạn ba bài rải đều ba chủ đề. Thêm `--dry-run` để chỉ in, không ghi.
+
+Lịch tự động: workflow `.github/workflows/hr-engage.yml` chạy 14:30 giờ VN mỗi ngày, soạn 1 bài xoay vòng, đẩy hàng đợi duyệt. Chạy song song với `hr.yml` (tuyển dụng đầu mỗi giờ), dùng chung worker `publish-facebook.mjs` và trần `HR_FB_MAX_PER_DAY`.
+
+### Ràng buộc và an toàn
+
+- Kho góc bài tránh hẳn chủ đề quy định nhà nước và IUU (điều cấm 3). Nếu cần nội dung chạm mấy chủ đề đó thì đi qua luồng duyệt cấp quản lý của Marketing, không dùng lệnh này.
+- Không mô tả phần mềm của hãng như năng lực SDVICO (điều cấm 4). Không bịa số liệu (điều cấm 5).
+- Bài tương tác và tin tuyển dụng dùng chung trần số bài mỗi ngày trên Facebook (`HR_FB_MAX_PER_DAY`, mặc định 3). Đừng dồn nhiều bài một ngày.
+- Cần áp migration `20260819600000_hr_job_posts_loai.sql` trước khi chạy lệnh (thêm cột `loai` và `chu_de`).
+
+### Trạng thái xây dựng
+
+- Kho góc bài, module soạn, script đẩy hàng đợi, lệnh `/hr-engage`, test: xong. Tái dùng worker đăng và giao diện duyệt sẵn có, không sửa worker.
+- Còn tùy chọn: thêm nhãn hoặc bộ lọc riêng cho bài tương tác trong giao diện duyệt và trang Tin đăng (hiện dùng chung nhãn với tin tuyển dụng, phân biệt bằng tiền tố `[Tương tác]` ở tiêu đề duyệt và cột `loai`).
+
+Cập nhật lần cuối: 19/8/2026.
