@@ -116,6 +116,7 @@ export async function allocateInterviewSlots(client: DbClient, n = 3): Promise<s
 // Thư mời phỏng vấn. name có thể null.
 export function composeInterviewLetter({ name, position, slots, cvText = '' }: { name?: string | null; position: string; slots: string[]; cvText?: string }): string {
   const xh = xungHoFor(name, cvText);
+  const Xh = xh.charAt(0).toUpperCase() + xh.slice(1);
   const hasName = name && name.trim() && name.trim() !== 'anh/chị';
   const greeting = hasName ? `Kính gửi ${xh} ${name!.trim()},` : `Kính gửi ${xh},`;
   return [
@@ -123,8 +124,10 @@ export function composeInterviewLetter({ name, position, slots, cvText = '' }: {
     '',
     `Cảm ơn ${xh} đã ứng tuyển ${position} tại Công ty SDVICO. Sau khi xem hồ sơ, chúng tôi trân trọng mời ${xh} tham gia phỏng vấn.`,
     '',
-    `Đề xuất các khung giờ, ${xh} chọn giúp một khung phù hợp:`,
+    `Đề xuất các khung giờ, ${xh} bấm link cuối thư để xác nhận một khung phù hợp:`,
     ...slots.map((s, i) => `${i + 1}. ${s}`),
+    '',
+    `Nếu ${xh} không sắp xếp được khung giờ nào ở trên, vui lòng phản hồi trực tiếp thư này với 2 tới 3 ngày giờ ${xh} sắp xếp được. Phòng Nhân sự sẽ liên hệ lại để chốt lịch.`,
     '',
     `Buổi làm việc gồm phần trao đổi chuyên môn và một bài về nhà ngắn khoảng ba giờ. Chúng tôi sẽ gửi đề bài sau khi ${xh} xác nhận lịch.`,
     '',

@@ -88,22 +88,27 @@ async function sendCandidateEmail(client: ReturnType<typeof getServerClient>, it
   const p = (item.payload || {}) as { email?: string; thu_moi?: string; thu?: string; vi_tri?: string };
   const to = p.email || '';
 
+  // Tránh "vị trí vị trí đã ứng tuyển" khi vi_tri fallback đã có sẵn từ "vị trí".
+  const viTriRaw = (p.vi_tri || '').trim();
+  const viTriSubj = viTriRaw
+    ? (viTriRaw.toLowerCase().startsWith('vị trí') ? viTriRaw : `vị trí ${viTriRaw}`)
+    : '';
   let subject = 'Thông báo tuyển dụng - SDVICO';
   let body = p.thu_moi || p.thu || '';
   if (item.kind === 'hr_interview') {
-    subject = `Thư mời phỏng vấn${p.vi_tri ? ` vị trí ${p.vi_tri}` : ''} - SDVICO`;
+    subject = `Thư mời phỏng vấn${viTriSubj ? ` ${viTriSubj}` : ''} - SDVICO`;
     if (item.ref_id) {
       const { data: app } = await client.from('hr_applications').select('schedule_token').eq('id', item.ref_id).maybeSingle();
       const token = (app as { schedule_token?: string } | null)?.schedule_token;
       if (token) {
         const base = appBaseUrl();
-        if (base) body += `\n\nHoặc bấm link sau để tự chọn nhanh khung giờ phỏng vấn:\n${base}/phong-van/${token}`;
+        if (base) body += `\n\nLink xác nhận khung giờ phỏng vấn:\n${base}/phong-van/${token}`;
       }
     }
   } else if (item.kind === 'hr_offer') {
     subject = 'Thư mời nhận việc - SDVICO';
   } else if (item.kind === 'hr_reject') {
-    subject = `Kết quả ứng tuyển${p.vi_tri ? ` vị trí ${p.vi_tri}` : ''} - SDVICO`;
+    subject = `Kết quả ứng tuyển${viTriSubj ? ` ${viTriSubj}` : ''} - SDVICO`;
   }
 
   try {
