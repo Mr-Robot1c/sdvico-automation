@@ -34,15 +34,17 @@ export function middleware(req: NextRequest) {
   }
   if (/^\/(privacy|terms)(\/|$)/.test(pth)) return NextResponse.next();
 
-  // File xác minh TikTok (tiktok<token>.txt): TikTok Developer khi verify method "URL prefix"
-  // GET file tại đúng subpath cua prefix (vd prefix /privacy/ -> GET /privacy/tiktok<token>.txt).
-  // Phục vụ file này ở MỌI path bằng cách rewrite về /tiktok<token>.txt ở root -> khớp mọi prefix.
-  // Miễn basic-auth luôn cho path này.
-  const ttMatch = req.nextUrl.pathname.match(/\/(tiktok[A-Za-z0-9]+\.txt)$/);
+  // File xác minh TikTok (tiktok<token>.txt): method "URL prefix" GET file tại subpath của prefix
+  // (prefix /privacy/ -> GET /privacy/tiktok<token>.txt). Trả THẲNG nội dung file (đọc từ ENV) ở
+  // MỌI path để khớp mọi prefix, không phụ thuộc trình rewrite của Next tới /public. Nội dung file
+  // dạng "tiktok-developers-site-verification=<token>"; token đặt trong ENV để đổi khỏi phải rebuild.
+  const ttMatch = req.nextUrl.pathname.match(/\/tiktok([A-Za-z0-9]+)\.txt$/);
   if (ttMatch) {
-    const target = req.nextUrl.clone();
-    target.pathname = '/' + ttMatch[1];
-    return NextResponse.rewrite(target);
+    const token = ttMatch[1];
+    return new NextResponse(`tiktok-developers-site-verification=${token}\n`, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=300' },
+    });
   }
 
   if (process.env.NODE_ENV !== 'production') return NextResponse.next();

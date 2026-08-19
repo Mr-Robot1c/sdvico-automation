@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
+<!-- re-verified: 2026-08-19 - TikTok verify FIX v2: middleware rewrite den /public khong hieu luc (404). Sua thanh tra thang response 'tiktok-developers-site-verification=<token>' o middleware voi Content-Type text/plain -> khop MOI path /privacy/tiktok<token>.txt, /terms/tiktok<token>.txt, /tiktok<token>.txt. -->
 <!-- re-verified: 2026-08-19 - TikTok verify URL prefix + Reel comment anh: (1) TikTok verify method 'URL prefix' can SIGNATURE FILE (khong phai meta) tai dung subpath cua prefix (/privacy/tiktok<token>.txt, /terms/tiktok<token>.txt). Middleware rewrite MOI path ket thuc /tiktok<token>.txt ve /tiktok<token>.txt o root -> khop moi prefix. (2) publishReelToFacebook them tham so commentImageUrls, sau finish + wait ready tha tung anh vao /comments cua Reel giong Post (user 19/8: '1 bai doc khi dang reel phai co anh san pham o duoi cmt'). Cho gọi truyen imageUrl + extraImageUrls. tsc+build PASS. -->
 <!-- re-verified: 2026-08-19 - TikTok verify FIX HOAN CHINH: next.config skipTrailingSlashRedirect true de Next KHONG 308 redirect /privacy/ -> /privacy (middleware rewrite khong dep duoc Next internal). Sau do middleware rewrite /privacy/ va /terms/ ve /privacy va /terms tra 200 kem meta. -->
 <!-- re-verified: 2026-08-19 - TikTok verify: URL co '/' cuoi (/privacy/) bi Next 308 redirect, TikTok KHONG follow -> khong thay meta. Middleware.ts rewrite /privacy/ va /terms/ ve /privacy va /terms (khong redirect) de cung URL tra thang HTML kem meta. -->
