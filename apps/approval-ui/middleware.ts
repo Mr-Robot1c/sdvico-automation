@@ -25,6 +25,10 @@ export function middleware(req: NextRequest) {
   // Trang chính sách và điều khoản phải CÔNG KHAI (TikTok/Facebook review + người dùng xem yêu cầu URL mở).
   if (/^\/(privacy|terms)(\/|$)/.test(req.nextUrl.pathname)) return NextResponse.next();
 
+  // File xác minh sở hữu tên miền của TikTok Developer (tiktok<token>.txt ở web root).
+  // TikTok tải file này để xác nhận app điều khiển tên miền -> mở khoá "Verify URL properties".
+  if (/^\/tiktok[A-Za-z0-9]+\.txt$/.test(req.nextUrl.pathname)) return NextResponse.next();
+
   if (process.env.NODE_ENV !== 'production') return NextResponse.next();
 
   // .trim() phòng khi giá trị biến môi trường dính ký tự xuống dòng hoặc khoảng trắng thừa.
