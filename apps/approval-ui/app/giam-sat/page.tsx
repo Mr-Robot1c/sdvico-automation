@@ -39,6 +39,7 @@ const WATCHED_TASKS = [
   { task: 'hr.queue_facebook', label: 'Soạn bài Facebook', threshold: 180 },
   { task: 'hr.queue_comment_replies', label: 'Soạn trả lời bình luận', threshold: 180 },
   { task: 'hr.retention_purge', label: 'Xóa hồ sơ hết hạn', threshold: 30 * 60 },
+  { task: 'hr.reinvite_scan', label: 'Tự mời lại ứng viên', threshold: 26 * 60 },
   { task: 'hr.heartbeat', label: 'Heartbeat', threshold: 120 },
 ];
 

@@ -23,6 +23,7 @@ const WATCH: Array<{ task: string; maxMinutes: number }> = [
   { task: 'hr.queue_facebook',        maxMinutes: 180 },
   { task: 'hr.queue_comment_replies', maxMinutes: 180 },
   { task: 'hr.retention_purge',       maxMinutes: 30 * 60 },
+  { task: 'hr.reinvite_scan',         maxMinutes: 26 * 60 }, // cron 1 lần/ngày, gia hạn 2h
 ];
 
 function todayVN(): string {
