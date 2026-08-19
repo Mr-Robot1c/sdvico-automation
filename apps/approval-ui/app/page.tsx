@@ -26,6 +26,9 @@ type HrPost = {
   noi_dung: string | null;
   image_url: string | null;
   scheduled_at: string | null;
+  needs_gov_review?: boolean | null;
+  gov_reviewed_by?: string | null;
+  gov_reviewed_at?: string | null;
 };
 
 // Lấy đoạn hook (đoạn đầu) từ nội dung để xem trước mà không cuộn.
@@ -107,7 +110,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   if (jobPostIds.length > 0) {
     const { data: hrPosts } = await client
       .from('hr_job_posts')
-      .select('id, tieu_de, noi_dung, image_url, scheduled_at')
+      .select('id, tieu_de, noi_dung, image_url, scheduled_at, needs_gov_review, gov_reviewed_by, gov_reviewed_at')
       .in('id', jobPostIds);
     for (const p of hrPosts || []) hrPostMap[p.id] = p as HrPost;
   }
@@ -370,6 +373,9 @@ function ItemPreview({
         oldFbPostId={(payload?.old_fb_post_id as string) || null}
         oldPostTitle={(payload?.old_post_title as string) || null}
         oldPostedAt={(payload?.old_posted_at as string) || null}
+        needsGovReview={postId ? Boolean(hrPostMap[postId]?.needs_gov_review) : false}
+        govReviewedBy={postId ? (hrPostMap[postId]?.gov_reviewed_by ?? null) : null}
+        govKeywords={(payload?.gov_keywords as string[]) || null}
       />
     </article>
   );

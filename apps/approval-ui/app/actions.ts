@@ -14,7 +14,7 @@ import { sendEmail } from '../lib/mailer';
 import { composeOfferLetter, composeRejectLetter } from '../lib/hr-letters';
 import { allocateInterviewSlots, composeInterviewLetter, generateInterviewQuestions, formatSlot } from '../lib/interview';
 import { linkedinConfigured, postToLinkedIn } from '../lib/linkedin';
-import { getSessionUser } from '../lib/auth';
+import { getSessionUser, authMode } from '../lib/auth';
 import { requireAdmin } from '../lib/hr-users';
 import { requireEmployeeAdmin, EMPLOYEE_DOCS_BUCKET } from '../lib/employees';
 import { getChannel, isManual, channelLabel, resolveChannel } from '../lib/channels';
@@ -1759,10 +1759,14 @@ export async function approveAndPublish(formData: FormData) {
 
   // Đọc bài đăng.
   const { data: post, error: e1 } = await client.from('hr_job_posts')
-    .select('id, tieu_de, noi_dung, trang_thai, image_url, kenh')
+    .select('id, tieu_de, noi_dung, trang_thai, image_url, kenh, needs_gov_review, gov_reviewed_by')
     .eq('id', postId).single();
   if (e1 || !post || post.trang_thai === 'posted') {
     revalidatePath('/'); revalidatePath('/dang-tin'); return;
+  }
+  // P2-17: điều cấm 3. Bài chạm quy định nhà nước phải có cấp quản lý bấm duyệt trước.
+  if (post.needs_gov_review && !post.gov_reviewed_by) {
+    throw new Error('Bài này chạm quy định nhà nước / IUU / Cục Thủy sản / Kiểm ngư. Cần cấp quản lý bấm "Đánh dấu đã duyệt" (điều cấm 3) trước khi đăng.');
   }
 
   // Bài LinkedIn: đăng qua LinkedIn API; chưa nối/hết hạn thì báo rõ, KHÔNG đăng lên Facebook.
@@ -2260,6 +2264,52 @@ export async function confirmCvSourceLegal(formData: FormData) {
     .eq('id', id);
   if (error) throw new Error('Không lưu được xác nhận: ' + error.message);
   revalidatePath('/cai-dat/nguon-cv');
+}
+
+// P2-17: đánh dấu một bài đã được cấp quản lý duyệt về mặt quy định nhà nước / IUU /
+// Cục Thủy sản / Kiểm ngư. Sau khi bấm, cron publish (hoặc nút "Duyệt và đăng") mới
+// cho phép đăng. Trong chế độ AUTH_MODE=supabase yêu cầu role='admin'; chế độ basic
+// ghi decided_by='basic-auth' để vẫn có dấu vết (audit đầy đủ khi bật supabase — P2-18).
+export async function markGovReviewed(formData: FormData) {
+  const postId = String(formData.get('post_id') || '');
+  if (!postId) return;
+
+  if (authMode() === 'supabase') {
+    const ok = await requireAdmin();
+    if ('error' in ok) throw new Error(ok.error);
+  }
+
+  const client = getServerClient();
+  const who = (await currentEmail()) || 'basic-auth';
+  const { error } = await client
+    .from('hr_job_posts')
+    .update({ gov_reviewed_by: who, gov_reviewed_at: new Date().toISOString() })
+    .eq('id', postId)
+    .eq('needs_gov_review', true)
+    .is('gov_reviewed_by', null);
+  if (error) throw new Error('Đánh dấu duyệt cấp quản lý lỗi: ' + error.message);
+  revalidatePath('/');
+  revalidatePath('/dang-tin');
+}
+
+// P2-17: gỡ đánh dấu duyệt cấp quản lý — dùng khi cần rà lại nội dung.
+export async function unmarkGovReviewed(formData: FormData) {
+  const postId = String(formData.get('post_id') || '');
+  if (!postId) return;
+
+  if (authMode() === 'supabase') {
+    const ok = await requireAdmin();
+    if ('error' in ok) throw new Error(ok.error);
+  }
+
+  const client = getServerClient();
+  const { error } = await client
+    .from('hr_job_posts')
+    .update({ gov_reviewed_by: null, gov_reviewed_at: null })
+    .eq('id', postId);
+  if (error) throw new Error('Gỡ duyệt cấp quản lý lỗi: ' + error.message);
+  revalidatePath('/');
+  revalidatePath('/dang-tin');
 }
 
 export async function toggleCvSource(formData: FormData) {

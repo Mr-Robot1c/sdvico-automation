@@ -10,6 +10,7 @@ import { buildRecruitmentPoster, toBullets } from '../../../../lib/poster';
 import { fbIntroSystem, assembleFacebookPost, fallbackIntro } from '../../../../lib/fb-compose';
 import { assertNotStopped } from '../../../../lib/emergency-stop';
 import { verifyCronAuth } from '../../../../lib/cron-auth';
+import { detectGovReviewNeeded, matchedGovKeywords } from '../../../../lib/gov-review';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -199,9 +200,15 @@ export async function GET(req: Request) {
         ? `[Refresh] Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`
         : `Tuyển ${job.title}${job.location ? ' - ' + job.location : ''}`;
 
+      // P2-17: heuristic chốt điều cấm 3 — nội dung chạm quy định nhà nước / IUU / Cục Thủy sản /
+      // Kiểm ngư phải qua duyệt cấp quản lý trước khi publish. Cron publish sẽ SKIP bài này
+      // cho đến khi có người bấm "Đánh dấu đã duyệt cấp quản lý" trong UI.
+      const govBlob = `${tieu_de}\n${noi_dung}`;
+      const needsGov = detectGovReviewNeeded(govBlob);
+
       const { data: post, error: e1 } = await client
         .from('hr_job_posts')
-        .insert({ job_id: jobId, kenh: 'facebook', tieu_de, noi_dung, image_url, trang_thai: 'draft' })
+        .insert({ job_id: jobId, kenh: 'facebook', tieu_de, noi_dung, image_url, trang_thai: 'draft', needs_gov_review: needsGov })
         .select('id').single();
       if (e1) { firstError = firstError || e1.message; continue; }
 
@@ -213,6 +220,8 @@ export async function GET(req: Request) {
         dia_diem: job.location || null,
         body: noi_dung,
         is_refresh: isRefresh,
+        needs_gov_review: needsGov,
+        gov_keywords: needsGov ? matchedGovKeywords(govBlob) : undefined,
       };
       if (isRefresh && existingPost) {
         payload.old_post_id = existingPost.id;

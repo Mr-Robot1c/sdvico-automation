@@ -1,0 +1,21 @@
+# Chạy test bất biến an toàn ở mỗi push/PR vào main.
+# Test dùng node:test (built-in Node 22), không cần cài dep phụ.
+# Điều cấm 1/2/6: cổng duyệt, chống thiên vị, ẩn danh CV — có test cover.
+
+name: Test — Bất biến an toàn
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm test

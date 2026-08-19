@@ -6,7 +6,15 @@
 >
 > Sơ đồ vẽ bằng Mermaid, xem đẹp nhất trên GitHub hoặc trình xem Markdown có hỗ trợ Mermaid.
 >
-> Cập nhật: 10/8/2026.
+> Cập nhật: 19/8/2026.
+>
+> **Kiến trúc thật đã lệch khỏi kế hoạch 7 ngày**. Bản 10/8/2026 nói "bộ não là Claude Code headless" và "điều phối bằng GitHub Actions"; thực tế 19/8/2026:
+> - Bộ não ngôn ngữ = **Groq API** (mặc định `openai/gpt-oss-120b`, có chain fallback qua `GROQ_MODELS`).
+> - Điều phối 15-phút = **cron-job.org** (5 entry publish/compose + 2 entry mới: `retention-purge` 1 lần/ngày, `heartbeat` mỗi 30-60 phút).
+> - Điều phối 1-giờ (HR pipeline: nạp CV → chấm → soạn phỏng vấn) vẫn là **GitHub Actions** (`hr.yml`).
+> - Env `ANTHROPIC_API_KEY` **không còn dùng**; thay bằng `GROQ_API_KEY` + tuỳ chọn `GROQ_MODELS`.
+>
+> Xem chi tiết P0/P1/P2 đã đóng ở [docs/he-thong-phan-tich.md](he-thong-phan-tich.md).
 
 ## Chú thích trạng thái
 
@@ -51,29 +59,32 @@ Bốn khối: nơi khởi động (điều phối), bộ não ngôn ngữ, lõi 
 ```mermaid
 flowchart TB
     subgraph KHOIDONG["Khởi động"]
-        GHA["GitHub Actions, chạy theo lịch"]
-        UI["Giao diện duyệt, người vận hành bấm"]
+        CJ["cron-job.org · 7 entry mỗi 15-30 phút<br/>(publish x3, compose x2, heartbeat, retention-purge)"]
+        GHA["GitHub Actions · hr.yml đầu mỗi giờ<br/>(nạp CV, chấm CV, soạn phỏng vấn)"]
+        UI["Giao diện duyệt · Next.js trên Vercel"]
     end
 
     subgraph BONAO["Bộ não ngôn ngữ"]
-        CC["Claude Code chế độ headless"]
+        GQ["Groq API · openai/gpt-oss-120b<br/>chain fallback qua GROQ_MODELS"]
     end
 
-    subgraph LOI["Lõi dùng chung, packages/core"]
-        GATE["Các cổng an toàn: approval_queue, quota, dừng khẩn, run_log"]
-        BR["Browser runner"]
+    subgraph LOI["Lõi dùng chung"]
+        GATE["Các cổng an toàn: approval_queue, daily_counters,<br/>emergency_stop, needs_gov_review, attempts, run_log"]
+        BR["Browser runner · Playwright"]
     end
 
-    subgraph LUUTRU["Lưu trữ, Supabase"]
-        DB["PostgreSQL, bật RLS"]
-        ST["Storage, tệp CV và ảnh chụp"]
+    subgraph LUUTRU["Lưu trữ · Supabase"]
+        DB["PostgreSQL · RLS theo hr_users (is_hr_user)"]
+        ST["Storage · tệp CV và ảnh"]
     end
 
-    WEB["Sàn tuyển dụng, Facebook, Website"]
+    WEB["Sàn tuyển dụng, Facebook, LinkedIn"]
 
-    GHA --> CC
+    CJ --> UI
+    GHA --> GQ
     UI --> DB
-    CC --> GATE
+    UI --> GQ
+    GQ --> GATE
     GATE --> DB
     BR --> WEB
     GATE --> BR
@@ -559,15 +570,26 @@ Danh sách đầy đủ ở `docs/can-cung-cap.md`. Tóm tắt biến môi trư�
 | Biến | Dùng cho | Bắt buộc |
 |---|---|---|
 | `SUPABASE_URL` | Kết nối cơ sở dữ liệu | Có |
-| `SUPABASE_ANON_KEY` | Giao diện duyệt | Có |
-| `SUPABASE_SERVICE_ROLE_KEY` | Backend và tác vụ theo lịch | Có |
-| `ANTHROPIC_API_KEY` | Claude Code headless | Có |
-| `MAIL_IMAP_HOST`, `MAIL_IMAP_PORT`, `MAIL_IMAP_USER`, `MAIL_IMAP_PASSWORD` | Nạp CV | Có, cho hr-intake |
+| `SUPABASE_ANON_KEY` | Giao diện duyệt (magic link) | Có |
+| `SUPABASE_SERVICE_ROLE_KEY` | Backend, cron routes, GitHub Actions | Có |
+| `GROQ_API_KEY` | Bộ não ngôn ngữ (thay `ANTHROPIC_API_KEY` cũ) | Có |
+| `GROQ_MODELS` | Chain fallback, mặc định `openai/gpt-oss-120b,llama-3.1-8b-instant` | Không |
+| `CRON_SECRET` | Xác thực các route `/api/cron/*` từ cron-job.org (Bearer) | Có |
+| `APP_PASSWORD` + `APP_USER` | Basic auth khi `AUTH_MODE=basic` (mặc định) | Có, hoặc |
+| `AUTH_MODE=supabase` | Chuyển sang magic link + kiểm hr_users | Không |
+| `MAIL_IMAP_HOST`, `MAIL_IMAP_PORT`, `MAIL_IMAP_USER`, `MAIL_IMAP_PASSWORD` | Nạp CV từ hộp thư | Có, cho hr-intake |
 | `MAIL_IMAP_MAILBOX`, `CV_MIN_IMAGE_BYTES` | Tinh chỉnh nạp CV | Không |
 | `CV_BUCKET`, `HR_RETENTION_MONTHS` | Storage và thời hạn lưu | Không, có mặc định |
-| `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN` | Đăng Facebook | Có, cho marketing |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Search Console, Analytics | Có, cho đo lường |
-| `MODEL_BUDGET_VND` | Trần chi phí mô hình | Không, mặc định 3.000.000 |
+| `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`, `FACEBOOK_GRAPH_VERSION` | Đăng bài + trả lời bình luận Facebook | Có, cho marketing |
+| `FACEBOOK_APP_SECRET` | Verify HMAC webhook `/api/webhooks/facebook` | Có, cho webhook |
+| `LINKEDIN_ACCESS_TOKEN`, `LINKEDIN_ORG_URN` | Đăng LinkedIn | Không, worker sẽ ngủ nếu thiếu |
+| `HR_FB_PUBLISH_MAX_PER_DAY` | Trần bài Facebook/ngày, mặc định 20 | Không |
+| `HR_LI_PUBLISH_MAX_PER_DAY` | Trần bài LinkedIn/ngày, mặc định 10 | Không |
+| `HR_FB_COMMENT_REPLY_MAX_PER_DAY` | Trần trả lời bình luận/ngày, mặc định 30 | Không |
+| `HR_FB_REACT_MAX_PER_DAY` | Trần thả react/ngày, mặc định 50 | Không |
+| `HR_PAUSE_BETWEEN_POSTS_MS` | Giãn cách giữa các POST, mặc định 3000 | Không |
+| `HR_CONTACT_EMAIL` | Email tuyển dụng hiển thị trong bài + comment reply | Không |
+| `MODEL_BUDGET_VND` | Trần chi phí mô hình (chưa có tracking `cost_vnd` — P2-15) | Không |
 
 **Nguyên tắc bí mật:** mọi khóa đặt trong `.env` cục bộ hoặc GitHub Secrets. Không dán vào chat, không commit vào Git. Mật khẩu và xác thực hai bước do người vận hành giữ, không giao cho người viết code. Đó là điều cấm 7.
 

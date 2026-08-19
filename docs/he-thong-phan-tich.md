@@ -317,11 +317,11 @@ Dài hạn (mở rộng phạm vi): hoàn thiện mảng Marketing (kho từ kh�
 
 ### P2 — Chất lượng dài hạn
 
-13. Bộ test tự động cho các bất biến an toàn, đưa vào CI (nối P0-5).
+13. **[Đã sửa]** Bộ test tự động cho các bất biến an toàn, đưa vào CI (nối P0-5).
 14. Tách `actions.ts` theo miền và rút một lớp service `publishPost()` dùng chung cho UI lẫn cron.
-15. Dashboard bốn chỉ tiêu nghiệm thu + cộng dồn `cost_vnd` và cảnh báo 80% ngân sách.
-16. Cập nhật lại toàn bộ tài liệu theo code hiện tại (kiến trúc Groq/cron-job.org, bảng biến môi trường, bảng trạng thái), hoặc sinh docs từ code.
-17. Thực thi tự động điều cấm 3 (`needs_gov_review` thành chốt chặn đăng), chuyển bảo vệ prompt injection bằng ranh giới dữ liệu rõ ràng và hậu kiểm đầu ra.
+15. **[Đã sửa — một phần]** Dashboard bốn chỉ tiêu nghiệm thu + cộng dồn `cost_vnd` và cảnh báo 80% ngân sách. Trang `/giam-sat` có 4 KPI + quota + heartbeat + alerts; `cost_vnd` chưa có nguồn (Groq wrapper chưa ghi cost) — TODO.
+16. **[Đã sửa]** Cập nhật lại toàn bộ tài liệu theo code hiện tại (kiến trúc Groq/cron-job.org, bảng biến môi trường, bảng trạng thái), hoặc sinh docs từ code.
+17. **[Đã sửa]** Thực thi tự động điều cấm 3 (`needs_gov_review` thành chốt chặn đăng), chuyển bảo vệ prompt injection bằng ranh giới dữ liệu rõ ràng và hậu kiểm đầu ra.
 18. Bật `AUTH_MODE=supabase` làm mặc định để có audit theo từng người; gate theo vai trò cho hành động nhạy cảm.
 
 ---
@@ -366,3 +366,31 @@ Việc bạn cần tự làm:
 ### Còn nợ (P2, dài hạn)
 
 Chưa động: (13) bộ test tự động cho các bất biến an toàn; (14) tách `actions.ts` theo miền + rút service `publishPost()`; (15) dashboard bốn chỉ tiêu nghiệm thu + cộng dồn `cost_vnd`; (16) đồng bộ lại `docs/tai-lieu-tong-hop.md` với kiến trúc thật; (17) tự động hóa điều cấm 3 (`needs_gov_review` thành chốt chặn đăng); (18) đặt `AUTH_MODE=supabase` làm mặc định + gate theo vai trò. Đây là nợ chất lượng dài hạn, không chặn dữ liệu thật.
+
+## 8. Nhật ký sửa P2 (19/8/2026, đợt 2)
+
+Đóng 4/6 P2 theo yêu cầu người vận hành. Ba mục còn lại (P2-14 refactor `actions.ts`, P2-18 bật `AUTH_MODE=supabase` mặc định, tracking `cost_vnd`) hoãn để có test coverage đầy đủ + rà lại `hr_users` trước.
+
+- **P2-17 · Chốt điều cấm 3 (`needs_gov_review`)** — Migration [supabase/migrations/20260819200000_gov_review_gate.sql](../supabase/migrations/20260819200000_gov_review_gate.sql) thêm 3 cột (`needs_gov_review`, `gov_reviewed_by`, `gov_reviewed_at`) vào `hr_job_posts`. Helper [apps/approval-ui/lib/gov-review.ts](../apps/approval-ui/lib/gov-review.ts) heuristic bắt IUU / Cục Thủy sản / Kiểm ngư / Nghị định / Thông tư / truy xuất nguồn gốc / VMS / giấy phép khai thác / vi phạm hành chính. Compose route [apps/approval-ui/app/api/cron/compose/route.ts](../apps/approval-ui/app/api/cron/compose/route.ts) tự đánh cờ khi soạn; publish + linkedin-publish + `approveAndPublish` SKIP khi cờ bật chưa được `gov_reviewed_by`. UI [apps/approval-ui/app/decide-actions.tsx](../apps/approval-ui/app/decide-actions.tsx) hiện badge "Cần cấp quản lý duyệt" + nút `markGovReviewed`/`unmarkGovReviewed` (yêu cầu role='admin' khi `AUTH_MODE=supabase`; ghi `basic-auth` trong basic mode để không bricking flow).
+- **P2-13 · Test tự động** — Dùng `node --test` built-in (Node 22), không thêm dep. 3 file test:
+  - [packages/hr/test/anonymize.test.mjs](../packages/hr/test/anonymize.test.mjs) — 6 test cho ẩn danh CV (nhãn nhạy cảm, banner tên viết hoa, SĐT có dấu cách, tên đã biết, email dạng nested).
+  - [packages/core/test/approval.test.mjs](../packages/core/test/approval.test.mjs) — 4 test cho cổng duyệt (pushApproval luôn pending, không bypass được, decideApproval chỉ đổi mục pending, từ chối decision không hợp lệ).
+  - [packages/core/test/quota-and-stop.test.mjs](../packages/core/test/quota-and-stop.test.mjs) — 6 test cho quota + emergency stop (chặn khi chạm trần, đọc đúng giá trị, assertNotStopped ném khi bật).
+  - [packages/hr/test/gov-review.test.mjs](../packages/hr/test/gov-review.test.mjs) — 7 test cho heuristic điều cấm 3.
+  - Tổng 23 test, tất cả pass. Chạy tay: `npm test`.
+  - CI: [.github/workflows/test.yml](../.github/workflows/test.yml) chạy `npm test` mỗi push/PR vào main.
+- **P2-15 · Dashboard `/giam-sat`** — Trang mới [apps/approval-ui/app/giam-sat/page.tsx](../apps/approval-ui/app/giam-sat/page.tsx): 4 KPI (bài đăng hôm nay, bình luận trả lời, hồ sơ chấm xong, alert đang mở) + bảng quota theo kênh + bảng nhịp chạy nền (last run + "im lặng bao lâu") + bảng alert đang mở với chi tiết error/attempts/silent_minutes. Nav thêm mục "Giám sát" trong section Công ty. `cost_vnd` chưa có nguồn — chú thích rõ trong page và ở section 11 của `tai-lieu-tong-hop.md`.
+- **P2-16 · Đồng bộ `tai-lieu-tong-hop.md`** — Thêm banner "Kiến trúc thật đã lệch khỏi kế hoạch 7 ngày" ở đầu; cập nhật diagram section 1.2 (Groq thay Claude, cron-job.org thay GitHub Actions cho publish); viết lại bảng biến môi trường section 11 (thêm `GROQ_API_KEY`, `GROQ_MODELS`, `CRON_SECRET`, `AUTH_MODE`, các trần quota, `HR_PAUSE_BETWEEN_POSTS_MS`; bỏ `ANTHROPIC_API_KEY`).
+
+### Việc bạn cần tự làm sau đợt này
+
+1. **Chạy migration mới**: `supabase/migrations/20260819200000_gov_review_gate.sql`.
+2. **Kiểm tra Vercel deploy xanh** rồi vào `/giam-sat` xem bảng — lần chạy đầu có thể trống hết (chưa có run_log hôm nay).
+3. Không cần thêm entry cron-job.org nào — dashboard đọc dữ liệu sẵn có; heartbeat và retention-purge đã thêm ở đợt trước.
+4. Nếu muốn dùng chốt gov review: khi có bài chạm quy định nhà nước, UI sẽ hiện badge — cấp quản lý bấm "Đánh dấu đã duyệt" thì cron mới đăng.
+
+### Còn nợ sau P2 đợt này
+
+- **P2-14** · Refactor `actions.ts` 2271 dòng theo miền + service `publishPost()` dùng chung. Cần thêm test integration trước khi làm để phát hiện regression.
+- **P2-18** · Bật `AUTH_MODE=supabase` mặc định. Cần điền `hr_users` trước (RLS mới sẽ khóa mọi email ngoài whitelist).
+- **`cost_vnd` tracking**: Groq wrapper cần ghi cost vào `run_log` theo bảng giá; dashboard đã sẵn chỗ hiển thị.

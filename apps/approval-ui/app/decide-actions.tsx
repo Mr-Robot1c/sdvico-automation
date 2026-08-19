@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { decideForm, approveAndPublish, approveAndSchedule, dismissQueueItem } from './actions';
+import { decideForm, approveAndPublish, approveAndSchedule, dismissQueueItem, markGovReviewed, unmarkGovReviewed } from './actions';
 
 type Props = {
   id: string;
@@ -14,6 +14,10 @@ type Props = {
   oldFbPostId?: string | null;
   oldPostTitle?: string | null;
   oldPostedAt?: string | null;
+  // P2-17: chốt chặn điều cấm 3.
+  needsGovReview?: boolean;
+  govReviewedBy?: string | null;
+  govKeywords?: string[] | null;
 };
 
 const QUICK_SLOTS = [
@@ -49,7 +53,7 @@ const PEAK_SLOTS = [
 
 // Bộ nút quyết. Với tin tuyển dụng Facebook (hr_job_post) có thêm tuỳ chọn đặt lịch giờ vàng
 // và gỡ bài cũ khi có bài cần refresh. Điều cấm 1: người bấm là cổng kiểm soát.
-export default function DecideActions({ id, title, kind, postId, platform, linkedinReady, oldPostId, oldFbPostId, oldPostTitle, oldPostedAt }: Props) {
+export default function DecideActions({ id, title, kind, postId, platform, linkedinReady, oldPostId, oldFbPostId, oldPostTitle, oldPostedAt, needsGovReview, govReviewedBy, govKeywords }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [customAt, setCustomAt] = useState('');
@@ -72,11 +76,46 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
   };
 
   if (isJobPost) {
+    const govBlocked = Boolean(needsGovReview && !govReviewedBy);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
         {isLinkedIn && !linkedinReady ? (
           <div className="err" role="alert" style={{ fontSize: '0.85em' }}>
             Chưa nối API LinkedIn (hoặc token hết hạn) nên không thể tự đăng lên LinkedIn. Hãy Duyệt rồi dùng nút &quot;Copy nội dung&quot; để đăng tay lên Company Page.
+          </div>
+        ) : null}
+
+        {/* P2-17: chốt chặn điều cấm 3 — nội dung chạm quy định nhà nước / IUU / Cục Thủy sản / Kiểm ngư */}
+        {needsGovReview ? (
+          <div className={govBlocked ? 'err' : 'ok'} role="alert" style={{ fontSize: '0.85em', padding: 10, borderRadius: 6 }}>
+            <strong>{govBlocked ? '⚠ Cần cấp quản lý duyệt' : '✓ Đã có cấp quản lý duyệt'}</strong>
+            <div style={{ marginTop: 4 }}>
+              {govBlocked
+                ? 'Nội dung có từ khóa chạm quy định nhà nước (điều cấm 3). Cấp quản lý bấm "Đánh dấu đã duyệt" trước khi máy đăng.'
+                : `Duyệt bởi: ${govReviewedBy}`}
+            </div>
+            {govKeywords && govKeywords.length > 0 ? (
+              <div style={{ marginTop: 4, fontSize: '0.9em', color: 'var(--ink-2)' }}>
+                Từ khóa khớp: {govKeywords.map((k, i) => <code key={i} style={{ marginRight: 4 }}>{k}</code>)}
+              </div>
+            ) : null}
+            <div className="row" style={{ gap: 6, marginTop: 8 }}>
+              {govBlocked ? (
+                <form action={run(markGovReviewed)} onSubmit={() => setBusy('gov-mark')}>
+                  <input type="hidden" name="post_id" value={postId!} />
+                  <button className="btn ok" disabled={busy !== null} style={{ fontSize: '0.85em' }}>
+                    {busy === 'gov-mark' ? 'Đang đánh dấu...' : 'Đánh dấu đã duyệt cấp quản lý'}
+                  </button>
+                </form>
+              ) : (
+                <form action={run(unmarkGovReviewed)} onSubmit={() => setBusy('gov-unmark')}>
+                  <input type="hidden" name="post_id" value={postId!} />
+                  <button className="btn ghost" disabled={busy !== null} style={{ fontSize: '0.85em' }}>
+                    {busy === 'gov-unmark' ? 'Đang gỡ...' : 'Gỡ đánh dấu (rà lại)'}
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         ) : null}
 
@@ -109,14 +148,14 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
                 <input type="hidden" name="delete_old_fb_post_id" value={oldFbPostId} />
               </>
             ) : null}
-            <button className="btn ok" disabled={busy !== null}>
+            <button className="btn ok" disabled={busy !== null || govBlocked} title={govBlocked ? 'Cần cấp quản lý bấm "Đánh dấu đã duyệt" trước (điều cấm 3)' : undefined}>
               {busy === 'publish' ? 'Đang đăng...' : isLinkedIn ? 'Duyệt & đăng LinkedIn' : 'Duyệt và đăng ngay'}
             </button>
           </form>
 
           {/* Đặt lịch */}
           {!showSchedule ? (
-            <button className="btn ghost" onClick={() => setShowSchedule(true)} disabled={busy !== null}>
+            <button className="btn ghost" onClick={() => setShowSchedule(true)} disabled={busy !== null || govBlocked} title={govBlocked ? 'Cần cấp quản lý bấm "Đánh dấu đã duyệt" trước' : undefined}>
               Duyệt, đặt lịch...
             </button>
           ) : null}

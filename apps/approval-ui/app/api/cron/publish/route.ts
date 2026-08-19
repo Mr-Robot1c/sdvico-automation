@@ -83,7 +83,7 @@ export async function GET(req: Request) {
     const postIds = items.map((j) => j.postId as string);
     const { data: posts, error: e2 } = await client
       .from('hr_job_posts')
-      .select('id, tieu_de, noi_dung, trang_thai, image_url, scheduled_at, fb_post_id, kenh, attempts')
+      .select('id, tieu_de, noi_dung, trang_thai, image_url, scheduled_at, fb_post_id, kenh, attempts, needs_gov_review, gov_reviewed_by')
       .in('id', postIds);
     if (e2) throw new Error('Đọc hr_job_posts: ' + e2.message);
 
@@ -95,7 +95,7 @@ export async function GET(req: Request) {
       const p = byId.get(item.postId as string) as {
         id: string; tieu_de: string; noi_dung: string; trang_thai: string;
         image_url: string | null; scheduled_at: string | null; fb_post_id: string | null; kenh: string | null;
-        attempts: number | null;
+        attempts: number | null; needs_gov_review: boolean | null; gov_reviewed_by: string | null;
       } | undefined;
       if (!p) continue;
       // Worker này chỉ đăng Facebook. Bài LinkedIn do worker linkedin-publish lo.
@@ -108,6 +108,11 @@ export async function GET(req: Request) {
       if (p.fb_post_id && p.trang_thai === 'scheduled') continue;
       // Chưa đến giờ thì bỏ qua, chờ lần tiếp theo.
       if (p.scheduled_at && p.scheduled_at > now) continue;
+      // P2-17: điều cấm 3. Bài chạm quy định nhà nước phải có cấp quản lý bấm duyệt trước.
+      if (p.needs_gov_review && !p.gov_reviewed_by) {
+        try { await client.from('run_log').insert({ task: 'hr.publish_facebook', status: 'ok', detail: { postId: p.id, reason: 'awaiting_gov_review' } }); } catch {}
+        continue;
+      }
 
       // P1-7: enforce trần bài đăng ngày TRƯỚC claim, để không đốt claim khi đã full.
       const quota = await checkAndIncrementDailyQuota(client, {

@@ -142,6 +142,7 @@ const SECTIONS: Section[] = [
     label: 'Công ty',
     items: [
       { href: '/bao-cao', label: 'Báo cáo', icon: 'chart' },
+      { href: '/giam-sat', label: 'Giám sát', icon: 'chart' },
       { href: '/nhan-vien', label: 'Nhân viên', icon: 'employees', adminOnly: true },
     ],
   },

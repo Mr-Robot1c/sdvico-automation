@@ -50,7 +50,7 @@ export async function GET(req: Request) {
     const postIds = items.map((j) => j.postId as string);
     const { data: posts, error: e2 } = await client
       .from('hr_job_posts')
-      .select('id, tieu_de, noi_dung, trang_thai, scheduled_at, fb_post_id, kenh, attempts')
+      .select('id, tieu_de, noi_dung, trang_thai, scheduled_at, fb_post_id, kenh, attempts, needs_gov_review, gov_reviewed_by')
       .in('id', postIds);
     if (e2) throw new Error('Đọc hr_job_posts: ' + e2.message);
     const byId = new Map((posts || []).map((p: { id: string }) => [p.id, p]));
@@ -60,7 +60,7 @@ export async function GET(req: Request) {
     for (const item of items) {
       const p = byId.get(item.postId as string) as {
         id: string; tieu_de: string; noi_dung: string; trang_thai: string; scheduled_at: string | null;
-        kenh: string | null; attempts: number | null;
+        kenh: string | null; attempts: number | null; needs_gov_review: boolean | null; gov_reviewed_by: string | null;
       } | undefined;
       if (!p || p.kenh !== 'linkedin') continue;
       if (p.trang_thai === 'posted' || p.trang_thai === 'cancelled') continue;
@@ -68,6 +68,11 @@ export async function GET(req: Request) {
       if (p.trang_thai === 'failed' && (p.attempts ?? 0) >= MAX_ATTEMPTS) continue;
       if (!p.noi_dung?.trim()) continue;
       if (p.scheduled_at && p.scheduled_at > now) continue;
+      // P2-17: điều cấm 3.
+      if (p.needs_gov_review && !p.gov_reviewed_by) {
+        try { await client.from('run_log').insert({ task: 'hr.publish_linkedin', status: 'ok', detail: { postId: p.id, reason: 'awaiting_gov_review' } }); } catch {}
+        continue;
+      }
 
       // P1-7: enforce trần ngày.
       const quota = await checkAndIncrementDailyQuota(client, {
