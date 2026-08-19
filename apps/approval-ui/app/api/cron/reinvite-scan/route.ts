@@ -118,6 +118,7 @@ export async function GET(req: Request) {
       if (seenPairs.has(`${app.candidate_id}|${matchedJobId}`)) continue; // Đã reinvite trước.
 
       // Đưa hồ sơ về review + đổi job_id. Reset các mốc phỏng vấn / quyết định cũ.
+      // Set reinvited_at để advanceToInterview dùng template thư mời "reinvite".
       const { error: updErr } = await client
         .from('hr_applications')
         .update({
@@ -133,6 +134,7 @@ export async function GET(req: Request) {
           proposed_slot: null,
           proposed_note: null,
           proposed_at: null,
+          reinvited_at: new Date().toISOString(),
         })
         .eq('id', app.id)
         .eq('stage', 'rejected'); // guard race với người bấm reinvite tay

@@ -307,6 +307,7 @@ export async function reinviteForJob(formData: FormData) {
     interviewed_by: null,
     chosen_slot: null,
     slot_chosen_at: null,
+    reinvited_at: new Date().toISOString(),
   }).eq('id', appId);
 
   // Dọn các thư còn treo của hồ sơ này (thư mời/nhận/từ chối cũ hết nghĩa khi mời lại vị trí mới).
@@ -452,9 +453,10 @@ export async function advanceToInterview(formData: FormData) {
   const who = await currentEmail();
   const { data: app } = await client
     .from('hr_applications')
-    .select('id, stage, candidate_id, job_id')
+    .select('id, stage, candidate_id, job_id, reinvited_at')
     .eq('id', appId).maybeSingle();
   if (!app || app.stage !== 'review') { revalidatePath('/ho-so'); return; }
+  const isReinvite = Boolean(app.reinvited_at);
   // P0-6: chặn sinh câu hỏi + thư mời khi ứng viên chưa có consent (nguồn ngoài).
   // Phòng Nhân sự phải xác nhận consent thủ công ở trang Hồ sơ trước khi máy soạn thư.
   {
@@ -499,7 +501,7 @@ export async function advanceToInterview(formData: FormData) {
       phone: (cand?.phone as string) || null,
       address: ((cand?.cv_json as { address?: string } | null)?.address) || null,
     });
-    const thu_moi = composeInterviewLetter({ name, position, slots, cvText });
+    const thu_moi = composeInterviewLetter({ name, position, slots, cvText, isReinvite });
 
     await client.from('approval_queue').insert({
       kind: 'hr_interview',

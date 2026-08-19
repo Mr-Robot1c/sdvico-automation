@@ -20,7 +20,7 @@ async function findExisting(client, { email, phone }) {
   if (ors.length === 0) return null;
   const { data, error } = await client
     .from('hr_candidates')
-    .select('id, cv_json')
+    .select('id, cv_json, consent_at')
     .or(ors.join(','))
     .limit(1);
   if (error) throw new Error('Tìm ứng viên trùng lỗi: ' + error.message);
@@ -37,13 +37,16 @@ export async function upsertCandidate(client, cv, { cvStoragePath = null, consen
   const existing = await findExisting(client, { email: cv.email, phone: cv.phone });
 
   if (existing) {
-    // Đã có. Cập nhật cv_json và đường dẫn tệp mới nhất, giữ nguyên consent và thời hạn lưu cũ.
+    // Đã có. Cập nhật cv_json và đường dẫn tệp mới nhất.
+    // Nếu candidate CHƯA có consent (từng nạp từ nguồn ngoài / crawl) mà lần này caller khai
+    // consented=true (mail chủ động), ghi consent luôn — không mất chance vì đã có id cũ.
+    const patch = { cv_json: cv, cv_storage_path: cvStoragePath ?? undefined };
+    if (consented && !existing.consent_at) {
+      patch.consent_at = new Date().toISOString();
+    }
     const { data, error } = await client
       .from('hr_candidates')
-      .update({
-        cv_json: cv,
-        cv_storage_path: cvStoragePath ?? undefined
-      })
+      .update(patch)
       .eq('id', existing.id)
       .select('id')
       .single();
@@ -73,16 +76,30 @@ export async function upsertCandidate(client, cv, { cvStoragePath = null, consen
   return { candidateId: data.id, isNew: true };
 }
 
-// Bảo đảm ứng viên có ít nhất một hồ sơ ứng tuyển đang mở. Không tạo trùng.
+// Bảo đảm ứng viên có ít nhất một hồ sơ ứng tuyển đang mở.
 // jobId có thể null khi CV gửi chung vào hộp thư, chưa gắn vị trí. Người duyệt gắn sau.
+//
+// Logic tái ứng tuyển (Fix 2):
+//   - Nếu candidate ĐÃ có application ở stage đang mở ('new','review','interview','offer' chưa
+//     hired, 'pool') → reuse existing, không tạo trùng.
+//   - Nếu chỉ có application ở stage TERMINAL ('rejected', hoặc 'offer' đã hired) → CV mới đến
+//     nghĩa là ứng viên gửi lại (VD sau 1 năm CV đã cập nhật). Tạo application MỚI stage='new'
+//     để họ vào luồng tuyển dụng bình thường, không bị kẹt ở "rejected" cũ.
+//   - hr_applications không có unique(candidate_id) nên nhiều app trên cùng candidate là hợp lệ.
 export async function ensureApplication(client, candidateId, { jobId = null } = {}) {
   const { data: existing, error: findErr } = await client
     .from('hr_applications')
-    .select('id')
-    .eq('candidate_id', candidateId)
-    .limit(1);
+    .select('id, stage, hired_at')
+    .eq('candidate_id', candidateId);
   if (findErr) throw new Error('Tìm hồ sơ ứng tuyển lỗi: ' + findErr.message);
-  if (existing && existing.length) return { applicationId: existing[0].id, isNew: false };
+
+  const apps = (existing || []);
+  const active = apps.find((a) => {
+    if (a.stage === 'rejected') return false;
+    if (a.stage === 'offer' && a.hired_at) return false; // đã nhận việc = kết thúc
+    return true;
+  });
+  if (active) return { applicationId: active.id, isNew: false };
 
   const { data, error } = await client
     .from('hr_applications')

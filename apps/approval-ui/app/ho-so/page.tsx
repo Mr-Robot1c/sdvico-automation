@@ -113,9 +113,23 @@ export default async function Page() {
   );
 
   // Chuẩn hóa thành dữ liệu phẳng để đưa xuống component lọc phía trình duyệt.
+  // Với candidate có nhiều applications (do gửi CV lại sau khi từ chối lần trước —
+   // ensureApplication mới tạo app mới thay vì reuse), ưu tiên app ACTIVE (không phải
+   // rejected/hired). Không có active thì lấy mới nhất.
+  const STAGE_PRIORITY: Record<string, number> = { new: 5, review: 5, interview: 5, offer: 5, pool: 3, rejected: 1 };
+  const pickActiveApp = (apps: App[]): App | null => {
+    if (!apps.length) return null;
+    const sorted = [...apps].sort((a, b) => {
+      const pa = STAGE_PRIORITY[a.stage] ?? 2;
+      const pb = STAGE_PRIORITY[b.stage] ?? 2;
+      if (pa !== pb) return pb - pa;
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+    return sorted[0];
+  };
   const candidates: CandView[] = rows.map((c) => {
     const raw = (c.cv_json?.raw_text || '').trim();
-    const app = (c.hr_applications || [])[0] || null;
+    const app = pickActiveApp(c.hr_applications || []);
     const axes = app?.score_json?.diem_tung_truc || {};
     const scoreAxes = Object.entries(axes).map(([k, v]) => ({ label: axisLabel(k), diem: Number(v) || 0 }));
     const ivp = app?.id ? interviews.get(app.id) || null : null;

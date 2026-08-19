@@ -114,20 +114,39 @@ export async function allocateInterviewSlots(client: DbClient, n = 3): Promise<s
 }
 
 // Thư mời phỏng vấn. name có thể null.
-export function composeInterviewLetter({ name, position, slots, cvText = '' }: { name?: string | null; position: string; slots: string[]; cvText?: string }): string {
+// isReinvite = true khi hồ sơ đã ứng tuyển trước đây và giờ được mời lại cho vị trí phù hợp
+// hơn (auto qua cron reinvite-scan hoặc tay qua "Mời lại cho vị trí khác"). Đổi câu mở đầu
+// để ứng viên biết ngay đây là dựa trên hồ sơ đã có, không phải lần đầu bất chợt.
+export function composeInterviewLetter({
+  name,
+  position,
+  slots,
+  cvText = '',
+  isReinvite = false,
+}: {
+  name?: string | null;
+  position: string;
+  slots: string[];
+  cvText?: string;
+  isReinvite?: boolean;
+}): string {
   const xh = xungHoFor(name, cvText);
-  const Xh = xh.charAt(0).toUpperCase() + xh.slice(1);
   const hasName = name && name.trim() && name.trim() !== 'anh/chị';
   const greeting = hasName ? `Kính gửi ${xh} ${name!.trim()},` : `Kính gửi ${xh},`;
+
+  const openingLine = isReinvite
+    ? `Cảm ơn ${xh} đã gửi hồ sơ ứng tuyển tại SDVICO. Sau khi rà lại các vị trí đang tuyển, chúng tôi nhận thấy hồ sơ của ${xh} phù hợp với ${position}, và trân trọng mời ${xh} tham gia phỏng vấn cho vị trí này.`
+    : `Cảm ơn ${xh} đã ứng tuyển ${position} tại Công ty SDVICO. Sau khi xem hồ sơ, chúng tôi trân trọng mời ${xh} tham gia phỏng vấn.`;
+
   return [
     greeting,
     '',
-    `Cảm ơn ${xh} đã ứng tuyển ${position} tại Công ty SDVICO. Sau khi xem hồ sơ, chúng tôi trân trọng mời ${xh} tham gia phỏng vấn.`,
+    openingLine,
     '',
     `Đề xuất các khung giờ, ${xh} bấm link cuối thư để xác nhận một khung phù hợp:`,
     ...slots.map((s, i) => `${i + 1}. ${s}`),
     '',
-    `Trong trường hợp cả 3 khung trên không phù hợp, ${xh} bấm link cuối thư và đề xuất giờ khác. Phòng Nhân sự sẽ liên hệ lại để chốt lịch.`,
+    `Trong trường hợp cả ${slots.length} khung trên không phù hợp, ${xh} bấm link cuối thư và đề xuất giờ khác. Phòng Nhân sự sẽ liên hệ lại để chốt lịch.`,
     '',
     `Buổi phỏng vấn khoảng 60 phút, trao đổi trực tiếp về chuyên môn và kinh nghiệm.`,
     '',
