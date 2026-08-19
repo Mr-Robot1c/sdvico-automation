@@ -30,6 +30,7 @@ SDVICO phân phối thiết bị hàng hải, không sở hữu phần mềm c�
 - Tên model và thông số chưa có trong `product-facts.mjs`, ví dụ chuẩn kháng nước, công suất, dung lượng pin, giao thức tín hiệu, khi chưa được Phòng Kinh doanh xác nhận.
 - Phần mềm của Viettel, VNPT, Vishipel, Thuraya là của SDVICO.
 - Giá, cước, tên khách hàng, đối tác, giải thưởng khi chưa có nguồn xác nhận.
+- **Lợi ích tự suy diễn sai nghề** (phản hồi cấp trên 19/8/2026): KHÔNG nói máy lọc nước giúp "bớt chở nước, nhẹ tàu, giảm tải, tiết kiệm dầu". Tàu cá cố ý chở nước để đằm tàu khi lấy đá, tàu nhẹ quá chạy không được. Chỉ nhóm lọc dầu, xử lý dầu, dầu nhớt mới được nói tiết kiệm dầu. Không tự gán lợi ích vật lý (nhẹ tàu, đỡ tốn chỗ, chạy nhanh hơn) cho bất kỳ sản phẩm nào nếu tài liệu không ghi. Luật này mã hoá ở `product-guard.mjs` (app `lib/gen/` và `packages/marketing/src/`, sửa thì sửa cả hai), chèn vào prompt bài lẫn kịch bản video và quét lại sau khi sinh; dính thì sinh lại, vẫn dính thì gắn cờ "Sai nghề".
 
 ## Khi thiếu dữ liệu
 

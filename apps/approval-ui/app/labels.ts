@@ -128,7 +128,8 @@ export const COMPLIANCE_LABELS: Record<string, string> = {
   partner: 'Nhắc đối tác',
   unverifiedSpecs: 'Thông số chưa xác nhận',
   testSpecs: 'Thông số test',
-  style: 'Lỗi giọng văn'
+  style: 'Lỗi giọng văn',
+  domain: 'Sai nghề'
 };
 
 // Thời gian tương đối, dễ đọc hơn mốc tuyệt đối. Cập nhật mỗi lần trang làm mới.

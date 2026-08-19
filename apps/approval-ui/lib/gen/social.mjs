@@ -92,15 +92,27 @@ export async function generateSocialPost({
     '{"headline": "tiêu đề ngắn 6 tới 12 từ, riêng biệt, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag)"}',
   ].filter(Boolean).join('\n');
 
-  const res = await genWithRetry(ai, {
-    model: MKT_MODEL,
-    contents: user,
-    config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
-  });
-  const parsed = parseJson(res.text || '');
-  const body = String(parsed.body || '').trim();
-  const headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
-  if (!body) throw new Error('Gemini trả rỗng.');
+  const topic = `${productName} ${productGroup}`;
+  let body = '';
+  let headline = '';
+  let violations = [];
+  // Sinh -> quét SỰ THẬT NGHỀ -> dính thì sinh lại 1 lần với lệnh cấm rõ từng cụm (19/8: bài SEA-40
+  // từng bịa "bớt chở nước, nhẹ tàu, tiết kiệm dầu", cấp trên phản hồi sai nghề).
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const extra = !violations.length ? '' :
+      `\n\nLẦN TRƯỚC VIẾT SAI NGHỀ, phải bỏ hẳn các ý: ${violations.map((v) => `"${v.phrase}"`).join(', ')}. ${violations[0].why}`;
+    const res = await genWithRetry(ai, {
+      model: MKT_MODEL,
+      contents: user + extra,
+      config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
+    });
+    const parsed = parseJson(res.text || '');
+    body = String(parsed.body || '').trim();
+    headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
+    if (!body) throw new Error('Gemini trả rỗng.');
+    violations = guardViolations(`${headline}\n${body}`, topic);
+    if (!violations.length) break;
+  }
 
   const tags = hashtagBlock(productGroup);
   const text = `${body}\n\n${tags}`;
@@ -109,6 +121,11 @@ export async function generateSocialPost({
     knownFactValues: knownFactValues(facts),
     testFactValues: testFactValues(facts),
   });
+  // Vẫn dính sau 2 lần: KHÔNG coi là sạch — gắn cờ "Sai nghề" (amber) để người duyệt thấy và sửa.
+  if (violations.length) {
+    assessment.flags = { ...(assessment.flags || {}), domain: violations.map((v) => `${v.phrase} (${v.product})`) };
+    if (assessment.risk === 'none') assessment.risk = 'amber';
+  }
   return { text, body, headline, hashtags: tags, assessment };
 }
 

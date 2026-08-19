@@ -2,6 +2,7 @@
 // Giọng brand-voice, hàng rào product-boundary (không bịa thông số, không nhận vơ phần mềm đối tác).
 import { assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
+import { guardLines, guardViolations } from './product-guard.mjs';
 import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS } from './products.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
@@ -62,7 +63,8 @@ export async function generateSocialPost({ productGroup, productName, channel, h
   const system = [
     'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${productName}". Bắt buộc: nêu rõ tên sản phẩm này, 1 tới 2 lợi ích thật của nó, và MỜI bà con liên hệ SDVICO để mua hoặc lắp đặt (SDVICO phân phối chính hãng, lắp đặt tận bến, bảo hành). Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
-    'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích cụ thể: ra khơi an toàn, tuân thủ quy định, tiết kiệm nhiên liệu và nước ngọt.',
+    'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM ĐANG VIẾT (xem SỰ THẬT NGHỀ bên dưới); KHÔNG gán lợi ích của sản phẩm khác.',
+    ...guardLines(productName + ' ' + productGroup),
     'Chèn vài emoji hợp cảnh biển và thiết bị cho sinh động (ví dụ ⚓ 🚢 🌊 📡 💧 🛟 📞), đừng lạm dụng.',
     'Số theo chuẩn Việt Nam (dấu chấm ngăn hàng nghìn). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung, không nêu số.',
@@ -85,15 +87,27 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     '{"headline": "tiêu đề ngắn 6 tới 12 từ, riêng biệt, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag)"}',
   ].filter(Boolean).join('\n');
 
-  const res = await genWithRetry(ai, {
-    model: MKT_MODEL,
-    contents: user,
-    config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
-  });
-  const parsed = parseJson(res.text || '');
-  const body = String(parsed.body || '').trim();
-  const headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
-  if (!body) throw new Error('Gemini trả rỗng.');
+  const topic = `${productName} ${productGroup}`;
+  let body = '';
+  let headline = '';
+  let violations = [];
+  // Sinh -> quét SỰ THẬT NGHỀ -> dính thì sinh lại 1 lần (19/8: bài SEA-40 từng bịa "bớt chở nước,
+  // nhẹ tàu, tiết kiệm dầu", cấp trên phản hồi sai nghề). Đồng bộ với apps/approval-ui/lib/gen/social.mjs.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const extra = !violations.length ? '' :
+      `\n\nLẦN TRƯỚC VIẾT SAI NGHỀ, phải bỏ hẳn các ý: ${violations.map((v) => `"${v.phrase}"`).join(', ')}. ${violations[0].why}`;
+    const res = await genWithRetry(ai, {
+      model: MKT_MODEL,
+      contents: user + extra,
+      config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
+    });
+    const parsed = parseJson(res.text || '');
+    body = String(parsed.body || '').trim();
+    headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
+    if (!body) throw new Error('Gemini trả rỗng.');
+    violations = guardViolations(`${headline}\n${body}`, topic);
+    if (!violations.length) break;
+  }
 
   const tags = hashtagBlock(productGroup);
   const text = `${body}\n\n${tags}`;
@@ -102,6 +116,10 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     knownFactValues: knownFactValues(facts),
     testFactValues: testFactValues(facts),
   });
+  if (violations.length) {
+    assessment.flags = { ...(assessment.flags || {}), domain: violations.map((v) => `${v.phrase} (${v.product})`) };
+    if (assessment.risk === 'none') assessment.risk = 'amber';
+  }
   return { text, body, headline, hashtags: tags, assessment };
 }
 

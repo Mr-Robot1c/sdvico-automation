@@ -2,6 +2,7 @@
 // Giọng brand-voice + hàng rào product-boundary trong system prompt; quét compliance sau khi sinh.
 import { assessDraft } from '../compliance.mjs';
 import { knownFactValues, testFactValues } from '../product-facts.mjs';
+import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 
@@ -53,7 +54,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
 
   const system = [
     'Bạn dựng kịch bản video ngắn cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
-    'Giọng gần gũi bà con ngư dân, câu ngắn gọn, dễ nghe khi lồng tiếng. Nhấn lợi ích cụ thể: ra khơi an toàn, tuân thủ quy định, tiết kiệm nhiên liệu và nước ngọt.',
+    'Giọng gần gũi bà con ngư dân, câu ngắn gọn, dễ nghe khi lồng tiếng. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM trong bài nguồn (xem SỰ THẬT NGHỀ bên dưới); KHÔNG tự thêm lợi ích không có trong bài.',
+    ...guardLines(`${content.title || ''} ${content.draft || ''} ${content.brief?.rotation_group || ''}`),
     'Số theo chuẩn Việt Nam (dấu chấm ngăn hàng nghìn). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung.',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO; chỉ nói phân phối, lắp đặt, tương thích.',
@@ -93,12 +95,32 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         ]),
   ].filter(Boolean).join('\n');
 
-  const res = await generateWithRetry(ai, {
-    model: MKT_MODEL,
-    contents: user,
-    config: { systemInstruction: system, responseMimeType: 'application/json' },
-  });
-  const parsed = parseJson(res.text || '');
+  // Sinh -> quét SỰ THẬT NGHỀ trên lời thoại -> dính thì sinh lại 1 lần; vẫn dính thì CẮT câu sai
+  // (19/8: thuyết minh video SEA-40 từng đọc "bớt chở nước nhẹ tàu tiết kiệm nhiên liệu" - sai nghề,
+  // cấp trên phản hồi trong nhóm Zalo nội bộ).
+  const topic = `${content.title || ''} ${content.draft || ''} ${content.brief?.rotation_group || ''}`;
+  let parsed = {};
+  let viol = [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const extra = !viol.length ? '' :
+      `\n\nLẦN TRƯỚC LỜI THOẠI SAI NGHỀ, phải bỏ hẳn các ý: ${viol.map((v) => `"${v.phrase}"`).join(', ')}. ${viol[0].why}`;
+    const res = await generateWithRetry(ai, {
+      model: MKT_MODEL,
+      contents: user + extra,
+      config: { systemInstruction: system, responseMimeType: 'application/json' },
+    });
+    parsed = parseJson(res.text || '');
+    const all = [...(parsed.vertical?.scenes || []), ...(parsed.horizontal?.scenes || [])].map((x) => x?.narration || '').join('\n');
+    viol = guardViolations(all, topic);
+    if (!viol.length) break;
+  }
+  if (viol.length) {
+    // Dự phòng: cắt câu sai khỏi từng cảnh, cảnh rỗng sẽ bị fix() loại.
+    for (const k of ['vertical', 'horizontal']) {
+      for (const sc of parsed[k]?.scenes || []) sc.narration = stripViolatingSentences(sc.narration || '', topic);
+    }
+    console.warn('[script] da cat cau SAI NGHE khoi loi thoai:', viol.map((v) => v.phrase).join(', '));
+  }
 
   const ids = new Set(assets.map((a) => a.id));
   const fix = (scenes, kind) => (scenes || [])
