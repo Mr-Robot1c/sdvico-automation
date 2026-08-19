@@ -330,7 +330,7 @@ export async function recomposeDraft(formData: FormData) {
   const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
   const brand = (brandRow?.value || {}) as { hotline?: string; email?: string };
   // Email/hotline liên hệ: ưu tiên Cài đặt (brand_config), rồi biến môi trường, cuối cùng mặc định.
-  const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
+  const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'sdvicotuyendung@gmail.com';
   const hotline = brand.hotline || '1900 23 23 49';
 
   // Chỉ viết lại PHẦN MỞ ĐẦU theo giọng đã chọn. Chi tiết + liên hệ do hệ thống ghép, giữ bố cục.
@@ -748,7 +748,7 @@ export async function queueFacebookPost(formData: FormData) {
   const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; email?: string; website?: string; company_desc?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
 
   // Email liên hệ: ưu tiên Cài đặt (brand_config.email), rồi biến môi trường, cuối cùng mặc định.
-  const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
+  const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'sdvicotuyendung@gmail.com';
   const hotline = brand.hotline || '1900 23 23 49';
   const reqText = (job as Record<string, unknown>).requirements as string | null;
 
@@ -872,7 +872,7 @@ export async function queueLinkedInPost(formData: FormData) {
 
   const { data: brandRow } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
   const brand = (brandRow?.value || {}) as { hotline?: string; email?: string; website?: string; company_name?: string; company_desc?: string };
-  const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
+  const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'sdvicotuyendung@gmail.com';
   const hotline = brand.hotline || '1900 23 23 49';
   const reqText = (job as Record<string, unknown>).requirements as string | null;
   const companyDesc = brand.company_desc || 'SDVICO cung cấp thiết bị và giải pháp công nghệ cho ngành biển và thủy sản, trụ sở tại Vũng Tàu.';
@@ -1427,7 +1427,7 @@ async function resolveBrandContact(client: ReturnType<typeof getServerClient>): 
   const { data } = await client.from('app_config').select('value').eq('key', 'brand_config').maybeSingle();
   const brand = (data?.value || {}) as { email?: string; hotline?: string };
   return {
-    email: brand.email || process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com',
+    email: brand.email || process.env.HR_CONTACT_EMAIL || 'sdvicotuyendung@gmail.com',
     hotline: brand.hotline || '1900 23 23 49',
   };
 }

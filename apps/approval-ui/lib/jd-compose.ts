@@ -16,7 +16,7 @@ export type JobInput = {
 
 // Mặc định khi không truyền liên hệ vào (giữ để lib chạy độc lập). Nơi gọi nên truyền
 // email/hotline từ Cài đặt (brand_config) để ưu tiên cấu hình của công ty.
-const EMAIL = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
+const EMAIL = process.env.HR_CONTACT_EMAIL || 'sdvicotuyendung@gmail.com';
 const HOTLINE = '1900 23 23 49';
 const KEYS = ['website', 'job_board', 'facebook', 'zalo_sms'] as const;
 

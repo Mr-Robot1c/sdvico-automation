@@ -92,7 +92,7 @@ export async function GET(req: Request) {
     const brand = (brandRow?.value || {}) as { logo_url?: string; hotline?: string; email?: string; website?: string; company_name?: string; tagline?: string; poster?: { navy?: string; red?: string; accent?: string } };
 
     // Email liên hệ: ưu tiên Cài đặt (brand_config.email), rồi biến môi trường, cuối cùng mặc định.
-    const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
+    const contactEmail = brand.email || process.env.HR_CONTACT_EMAIL || 'sdvicotuyendung@gmail.com';
     const hotline = brand.hotline || '1900 23 23 49';
 
     for (const job of (autoJobs as Record<string, unknown>[]) || []) {

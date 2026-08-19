@@ -12,7 +12,7 @@ import { verifyCronAuth } from '../../../../lib/cron-auth';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const EMAIL = process.env.HR_CONTACT_EMAIL || 'inoudead@gmail.com';
+const EMAIL = process.env.HR_CONTACT_EMAIL || 'sdvicotuyendung@gmail.com';
 const HOTLINE = '1900 23 23 49';
 const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
 const REACT_LIMIT = Number(process.env.HR_FB_REACT_MAX_PER_DAY) || 50;
