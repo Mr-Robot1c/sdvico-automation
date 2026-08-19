@@ -632,12 +632,10 @@ a.chip:hover { filter: brightness(0.98); }
   padding: 1px 5px; border-radius: 4px;
 }
 
-.sx-form { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
+.sx-form { display: flex; flex-direction: column; gap: 12px; }
 .sx-field { display: flex; flex-direction: column; gap: 6px; }
 .sx-field > span { font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .sx-field textarea { resize: vertical; font-family: inherit; }
-/* Cac select ngan (Do dai text, Loai content) khong can rong bang textarea. */
-.sx-field select.note { max-width: 320px; }
 /* Override .note max-width 320px (dung cho o ghi chu hang doi) khi .note dung trong form Xuong san xuat:
    input/select/textarea phai lap FULL be ngang cot form, khong bo 320px lam trong ben phai (user 19/8). */
 .sx-field .note { max-width: none; width: 100%; flex: 0 0 auto; }
