@@ -47,6 +47,14 @@ export function middleware(req: NextRequest) {
   }
   if (/^\/(privacy|terms)(\/|$)/.test(pth)) return NextResponse.next();
 
+  // SEO public routes (item 2, 20/8): trang bài blog + trang sản phẩm + sitemap + robots là
+  // trang MỞ để Google/Bing/người ngoài xem — bỏ basic-auth. Trang duyệt nội bộ vẫn khóa.
+  //   /blog, /blog/<slug>       — bài đã đăng thật render thành HTML public
+  //   /san-pham, /san-pham/<slug> — danh mục sản phẩm SDVICO (5 nhóm theo CLAUDE.md)
+  //   /sitemap.xml, /robots.txt  — bắt buộc cho SEO
+  if (/^\/(blog|san-pham)(\/|$)/.test(pth)) return NextResponse.next();
+  if (pth === '/sitemap.xml' || pth === '/robots.txt') return NextResponse.next();
+
   if (process.env.NODE_ENV !== 'production') return NextResponse.next();
 
   // .trim() phòng khi giá trị biến môi trường dính ký tự xuống dòng hoặc khoảng trắng thừa.

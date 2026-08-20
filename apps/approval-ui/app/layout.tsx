@@ -1,8 +1,6 @@
 import './globals.css';
 import type { ReactNode } from 'react';
-import Nav from './nav';
-import TopHeader from './top-header';
-import BotChip from './bot-chip';
+import RootShell from './root-shell';
 
 export const metadata = {
   title: 'SDVICO · Duyệt nội dung',
@@ -12,6 +10,9 @@ export const metadata = {
 // Áp theme đã lưu trước khi vẽ, tránh nháy nền.
 const themeScript = `try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}`;
 
+// Root layout tối giản. Toàn bộ shell (sidebar nội bộ vs header public site) chuyển sang
+// RootShell (client) để tự chọn variant theo pathname (item 2, 20/8) — trang /blog và
+// /san-pham dùng layout công khai không lộ nav duyệt nội bộ.
 export default function RootLayout({ children }: { children: ReactNode }) {
   const marketingOnly = process.env.MARKETING_ONLY === 'true' || process.env.MARKETING_ONLY === '1';
   return (
@@ -24,39 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <div className="shell">
-          <aside className="sidebar" aria-label="Thanh điều hướng">
-            <div className="brand">
-              <span className="brand-logo" aria-hidden="true">
-                <svg viewBox="0 0 40 40" width="36" height="36">
-                  <defs>
-                    <linearGradient id="sdvico" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0" stopColor="#1f5fbf" />
-                      <stop offset="1" stopColor="#e23b2e" />
-                    </linearGradient>
-                  </defs>
-                  <circle cx="20" cy="20" r="19" fill="#eef2f7" />
-                  <path
-                    d="M27 13.5c-1.8-1.5-4.2-2.3-6.8-2.3-4.3 0-7.4 2.2-7.4 5.6 0 3 2.3 4.4 6.1 5.2 3.2.7 4 1.2 4 2.3 0 1.1-1.2 1.8-3.1 1.8-2.1 0-4-.8-5.6-2.1"
-                    fill="none" stroke="url(#sdvico)" strokeWidth="3.4" strokeLinecap="round"
-                  />
-                </svg>
-              </span>
-              <span className="brand-text">
-                SDVICO<small>nghề cá thịnh vượng</small>
-              </span>
-            </div>
-            <Nav marketingOnly={marketingOnly} />
-            <div className="sidebar-foot">
-              <p className="foot-note">Máy soạn, người bấm gửi.</p>
-            </div>
-          </aside>
-          <div className="main-col">
-            <TopHeader marketingOnly={marketingOnly} />
-            <div className="content">{children}</div>
-          </div>
-        </div>
-        <BotChip />
+        <RootShell marketingOnly={marketingOnly}>{children}</RootShell>
       </body>
     </html>
   );
