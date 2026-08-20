@@ -85,6 +85,12 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   const history = rows.filter((r) => r.id !== latest?.id);
   const appliedRow = rows.find((r) => r.applied);
 
+  // Đề xuất trọng số từ vòng HỌC TUẦN (learn-weekly, Chủ Nhật 23h) — item 1b (20/8).
+  // Chỉ hiển thị khi có bản chưa áp dụng. Nếu bản này chính là `latest` (mới nhất), khối chính
+  // bên dưới đã render — chỉ khi khác `latest` mới đưa lên khối riêng để không lặp.
+  const learnSuggestion = rows.find((r) => r.data?.origin === 'learn-weekly' && !r.applied);
+  const showLearnBox = learnSuggestion && learnSuggestion.id !== latest?.id;
+
   // Tóm tắt bản đang áp dụng cho banner (hiện ngay sau khi bấm Áp dụng): ưu tiên vòng xoay,
   // số hướng đi còn lại, mục tiêu bản đó bám theo.
   const ap = appliedRow?.data;
@@ -158,6 +164,34 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </form>
       </section>
 
+      {learnSuggestion ? (
+        <div className={`learn-suggestion-banner ${showLearnBox ? '' : 'compact'}`} role="status" style={{ background: 'var(--bg-2, #f0f6ff)', border: '1px solid var(--blue-4, #cfe1ff)', borderLeft: '6px solid var(--blue-6, #1f5fbf)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+              <b>🧪 Đề xuất trọng số từ số liệu tuần vừa xong</b>
+              <p className="sub" style={{ margin: '4px 0' }}>
+                Bot chấm điểm từng bài (tương tác + lượt xem + người thấy + giây xem) rồi đề xuất trọng số sản phẩm cho tuần tới.
+                Sinh lúc {fmtDateTime(learnSuggestion.created_at)}. Chưa áp — bấm bên dưới mới có hiệu lực.
+              </p>
+              {(learnSuggestion.data.narrative || []).slice(0, 2).map((p, i) => (
+                <p key={i} style={{ margin: '4px 0' }}>{p}</p>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {showLearnBox ? (
+                <a className="btn ghost" href={`/ke-hoach?xem=${learnSuggestion.id}`}>Xem chi tiết</a>
+              ) : null}
+              <form action={applyPlanWeights}>
+                <input type="hidden" name="plan_id" value={learnSuggestion.id} />
+                <button className="btn ok" type="submit" title="Vòng xoay sinh bài tuần tới ưu tiên sản phẩm theo trọng số bot đề xuất từ số liệu tuần vừa qua">
+                  Áp dụng đề xuất
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {appliedRow ? (
         <div className="applied-banner" role="status">
           <b>✓ Đang áp dụng kế hoạch sinh lúc {fmtDateTime(appliedRow.created_at)}.</b>
@@ -194,7 +228,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           <section className="plan-card">
             <div className="plan-meta">
               <span className="badge">{latest.generated_by === 'cron' ? '🤖 Tự động' : '✍️ Tạo tay'}</span>
-              {latest.data.cadence === 'weekly' ? (
+              {latest.data.origin === 'learn-weekly' ? (
+                <span className="badge tone-ok">🧪 Học tuần (Chủ nhật)</span>
+              ) : latest.data.cadence === 'weekly' ? (
                 <span className="badge">📅 Kế hoạch tuần (Thứ 2)</span>
               ) : latest.data.cadence === 'update' ? (
                 <span className="badge">🔁 Cập nhật giữa tuần (Thứ 6)</span>

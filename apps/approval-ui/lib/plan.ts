@@ -77,6 +77,10 @@ export type Plan = {
   // v3 (18/8): nhịp bản này — 'weekly' (Thứ 2, kế hoạch tuần), 'update' (Thứ 4, cập nhật lần 1),
   // 'manual' (bấm tay). Bản cũ không có -> undefined.
   cadence?: 'weekly' | 'update' | 'manual';
+  // v4 (20/8, item 1b): nguồn sinh — 'boss' hoặc undefined = BOSS đề xuất từ tri thức + số liệu
+  // (chức năng cũ), 'learn-weekly' = vòng học tự động Chủ nhật, đề xuất trọng số dựa CHỦ YẾU
+  // vào số liệu tuần vừa qua. Khối riêng ở /ke-hoach; khi bấm Áp dụng thì rotate đọc weights.
+  origin?: 'boss' | 'learn-weekly';
   // v2 (18/8): hướng đi cụ thể tuần tới, sinh từ tri thức. Bản cũ không có -> undefined.
   content_suggestions?: ContentDirection[];
   summary: {

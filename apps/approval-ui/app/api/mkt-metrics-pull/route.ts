@@ -5,6 +5,7 @@ import { generateAndStorePlan, planSlotVN, vnDayStartIso } from '../../../lib/pl
 import { importInternalFromBucket } from '../../../lib/knowledge';
 import { learnPublicKnowledge, learnPublicDaily, isSundayVN } from '../../../lib/knowledge-public';
 import { evaluateAbPairs } from '../../../lib/evaluator';
+import { learnWeekly, shouldRunLearnWeekly } from '../../../lib/learn-weekly';
 
 // Kéo số liệu tương tác Facebook về mkt_metrics. Gọi bởi Vercel Cron (Authorization: Bearer
 // CRON_SECRET) hoặc thủ công (?secret=CRON_SECRET).
@@ -140,5 +141,20 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan });
+  // CHỦ NHẬT 23:00+ VN — vòng HỌC TUẦN (item 1b, 20/8). Đọc số liệu tuần vừa kết thúc, đề xuất
+  // trọng số sản phẩm cho tuần tới. Ghi mkt_plans applied=false; người quản lí bấm Áp dụng ở
+  // /ke-hoach mới có hiệu lực (ba-spec NV4/R5). ?learn=1 ép chạy ngoài lịch (dùng khi test).
+  const forceLearn = new URL(req.url).searchParams.get('learn') === '1';
+  let learn: { planId?: string | null; ranked?: number; skipped?: string; error?: string } | null = null;
+  if (forceLearn || shouldRunLearnWeekly(new Date())) {
+    try {
+      const r = await learnWeekly(client, { force: forceLearn });
+      learn = { planId: r.planId, ranked: r.ranked, skipped: r.skipped };
+    } catch (e: any) {
+      console.error('[learn-weekly] that bai:', e?.message || e);
+      learn = { error: String(e?.message || e) };
+    }
+  }
+
+  return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan, learn });
 }

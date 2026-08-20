@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { refreshFacebookMetrics, setConversions, deleteContent, importManualFacebookPost } from '../actions';
 import BarChart from './bar-chart';
@@ -156,6 +157,7 @@ export default async function Page() {
           ) : null}
         </div>
         <div className="head-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link href="/do-luong/tuan" className="btn ghost" title="Báo cáo theo tuần (Thứ 2 đến Chủ Nhật)">📅 Báo cáo tuần</Link>
           <MetricsAuto action={refreshFacebookMetrics} minutes={30} />
           <RefreshButton action={refreshFacebookMetrics} />
         </div>
