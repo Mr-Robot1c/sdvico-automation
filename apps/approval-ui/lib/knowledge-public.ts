@@ -33,6 +33,53 @@ type Finding = {
   summary: string;
 };
 
+// Chuẩn hoá tiêu đề để so trùng: thường hoá, gộp khoảng trắng. Google News RSS đổi URL redirect
+// mã hoá MỖI LẦN lấy cho cùng một bài, nên dedup theo URL không bắt được bài trùng (user 20/8:
+// "AI Data #2 đọc lại bài cũ"). Tiêu đề mới là khoá ổn định để chặn học lại.
+function normTitle(s: string): string {
+  return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Lọc bỏ các finding ĐÃ học trong 30 ngày, chặn theo CẢ url lẫn TIÊU ĐỀ, và dedupe trong lô
+// theo tiêu đề. Dùng chung cho learnPublicDaily (RSS) và learnPublicKnowledge (Gemini).
+async function filterUnseen(client: Client, uniq: Finding[]): Promise<Finding[]> {
+  if (!uniq.length) return [];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // URL đã thấy (30 ngày) — vẫn giữ để chặn nhanh khi URL tình cờ ổn định.
+  const seenUrls = new Set<string>();
+  const urls = uniq.map((f) => f.source_url);
+  const CHUNK = 100;
+  for (let i = 0; i < urls.length; i += CHUNK) {
+    const { data } = await client
+      .from('mkt_knowledge_public')
+      .select('source_url')
+      .in('source_url', urls.slice(i, i + CHUNK))
+      .gte('created_at', thirtyDaysAgo);
+    for (const r of data || []) seenUrls.add((r as any).source_url as string);
+  }
+
+  // Tiêu đề đã thấy (30 ngày) — khoá chính chặn học lại bài cũ.
+  const seenTitles = new Set<string>();
+  const { data: recent } = await client
+    .from('mkt_knowledge_public')
+    .select('source_title')
+    .gte('created_at', thirtyDaysAgo)
+    .limit(3000);
+  for (const r of recent || []) seenTitles.add(normTitle((r as any).source_title || ''));
+
+  const outTitles = new Set<string>();
+  const out: Finding[] = [];
+  for (const f of uniq) {
+    if (seenUrls.has(f.source_url)) continue;
+    const nt = normTitle(f.source_title);
+    if (nt && (seenTitles.has(nt) || outTitles.has(nt))) continue;
+    if (nt) outTitles.add(nt);
+    out.push(f);
+  }
+  return out;
+}
+
 // Gọi Gemini có bật google_search grounding, trả về danh sách nguồn kèm URL.
 async function searchOneTopic(topic: string): Promise<Finding[]> {
   try {
@@ -99,26 +146,11 @@ export async function learnPublicKnowledge(
   for (const f of all) if (!byUrl.has(f.source_url)) byUrl.set(f.source_url, f);
   const uniq = [...byUrl.values()];
 
-  // Bỏ những URL đã tồn tại trong 30 ngày qua (tránh lưu trùng qua các tuần).
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const urls = uniq.map((f) => f.source_url);
-  const seenUrls = new Set<string>();
-  if (urls.length) {
-    const CHUNK = 100;
-    for (let i = 0; i < urls.length; i += CHUNK) {
-      const chunk = urls.slice(i, i + CHUNK);
-      const { data: seen } = await client
-        .from('mkt_knowledge_public')
-        .select('source_url')
-        .in('source_url', chunk)
-        .gte('created_at', thirtyDaysAgo);
-      for (const r of seen || []) seenUrls.add((r as any).source_url as string);
-    }
-  }
+  // Bỏ bài đã học trong 30 ngày (chặn theo url + tiêu đề).
+  const unseen = await filterUnseen(client, uniq);
 
   let inserted = 0;
-  for (const f of uniq) {
-    if (seenUrls.has(f.source_url)) continue;
+  for (const f of unseen) {
     const gov = needsGovReview(f.source_title + ' ' + f.summary);
     const ins = await client.from('mkt_knowledge_public').insert({
       source_url: f.source_url,
@@ -221,25 +253,10 @@ export async function learnPublicDaily(
   for (const f of all) if (!byUrl.has(f.source_url)) byUrl.set(f.source_url, f);
   const uniq = [...byUrl.values()];
 
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const urls = uniq.map((f) => f.source_url);
-  const seenUrls = new Set<string>();
-  if (urls.length) {
-    const CHUNK = 100;
-    for (let i = 0; i < urls.length; i += CHUNK) {
-      const chunk = urls.slice(i, i + CHUNK);
-      const { data: seen } = await client
-        .from('mkt_knowledge_public')
-        .select('source_url')
-        .in('source_url', chunk)
-        .gte('created_at', thirtyDaysAgo);
-      for (const r of seen || []) seenUrls.add((r as any).source_url as string);
-    }
-  }
+  const unseen = await filterUnseen(client, uniq);
 
   let inserted = 0;
-  for (const f of uniq) {
-    if (seenUrls.has(f.source_url)) continue;
+  for (const f of unseen) {
     const gov = needsGovReview(f.source_title + ' ' + f.summary);
     const ins = await client.from('mkt_knowledge_public').insert({
       source_url: f.source_url,
