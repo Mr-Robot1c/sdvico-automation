@@ -4,6 +4,8 @@
 covers: packages/marketing
 last_verified: 2026-08-20
 ttl_days: 180
+<!-- re-verified: 2026-08-20 - Them up-media-kho-tu-lieu.mjs vao day-kho-zalo*.bat (buoc 2b, sau hoc-video + upload bucket): tu phan loai media Zalo vao kho brand-assets, chan giay to ca nhan/screenshot. Test that: 22 file da co -> skip, 2 CCCD -> chan, 3 screenshot -> chan, 3 poster/anh moi -> up dung folder. -->
+<!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- Nhat ky re-verify cu don sang reverify-log.md (20/8/2026). Giu 3 dong moi nhat o day. -->
 <!-- re-verified: 2026-08-14 - build-video RESTORE dung CA 2 ban: horizontal (16:9 cho FB) + vertical (9:16 cho TikTok). Truoc chi ngang -> user thay TikTok khong thay video moi. pushToApprovalQueue upload 2 file -> brand_assets, brief.assets.{video_h,video_v}, channels ['facebook','tiktok'], nhan "[FB 16:9 + TikTok doc] 🎬". Thoi gian dung tang tu ~8p len ~15-20p (danh doi de co ca 2 dinh dang). --skip-whisper van dung. -->
 <!-- re-verified: 2026-08-20 - Content ghi tuoi/nam/ngay bang CHU SO (packages/marketing/src/social.mjs + ban apps): quy tac so + prompt portrait -> 55 tuoi, 30 nam thay vi viet chu. -->

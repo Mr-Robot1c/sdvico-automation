@@ -5,6 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-20
 ttl_days: 180
+<!-- re-verified: 2026-08-20 - Pipeline 16:30 them buoc 2b: packages/marketing/src/up-media-kho-tu-lieu.mjs tu up anh/video Zalo/media len KHO TU LIEU brand-assets (Gemini vision phan loai vao folder san pham; CHAN giay_to_ca_nhan + man_hinh_app - dieu cam 6; idempotent license_note zalo-media:<folder>/<file>; video can ban tom tat hoc-video truoc; fallback flash-lite khi 503). Trang /ke-hoach sap lai GON: Hom nay -> Ke hoach tuan (bang 7 ngay highlight hom nay) -> Huong di bai viet -> Cai dat (details thu gon) -> Chi tiet+lich su (details). -->
+<!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 
 ## Chỉ mục
 

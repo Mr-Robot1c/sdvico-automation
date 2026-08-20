@@ -1,9 +1,12 @@
 @echo off
-rem Ban chay tu dong cho Windows Task Scheduler (khong pause). Task: SDVICO-DayKhoZalo, 16:30 hang ngay.
-rem 1) Day file trong folder Zalo len bucket kho-tri-thuc-noi-bo (sau phien Cowork doc Zalo 16:00).
-rem    upload-zalo-to-bucket tu bo qua tai lieu huong dan, va tao ban co ngay khi noi dung doi.
-rem 2) Cho AI Data 1 hoc NGAY (import bucket -> mkt_knowledge_internal), khong doi cron toi.
+rem Ban chay tu dong cho Windows Task Scheduler 16:30 hang ngay (khong pause, ghi log).
+rem Buoc 1: cho AI "xem" video moi trong Zalo\media, viet tom tat vao Zalo\AI\<ngay>.
+rem Buoc 2: day toan bo file Zalo (tin nhan, insight, hop tha Hoc, nhat ky AI) len bucket.
+rem Buoc 2b (them 20/8, user chot): up anh/video Zalo/media len KHO TU LIEU brand-assets,
+rem          Gemini phan loai vao dung folder san pham; CHAN giay to ca nhan + screenshot.
+rem Buoc 3: nap ngay vao Kho tri thuc — AI hoc khong can cho server.
 cd /d "%~dp0.."
-echo ===== %date% %time% ===== >> Zalo\upload-log.txt
+node packages\marketing\src\hoc-video.mjs >> Zalo\upload-log.txt 2>&1
 node packages\marketing\src\upload-zalo-to-bucket.mjs >> Zalo\upload-log.txt 2>&1
+node packages\marketing\src\up-media-kho-tu-lieu.mjs >> Zalo\upload-log.txt 2>&1
 node apps\approval-ui\scripts\run-knowledge-now.mjs --only-internal >> Zalo\upload-log.txt 2>&1

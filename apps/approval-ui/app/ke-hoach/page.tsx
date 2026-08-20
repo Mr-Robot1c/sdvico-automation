@@ -7,6 +7,13 @@ import GenerateButton from './generate-button';
 
 export const dynamic = 'force-dynamic';
 
+// TRANG KE HOACH sap xep lai 20/8 (user: "gon gang - the hien day du cac plan"):
+//   1. HOM NAY: dang san pham nao may bai, content, chia se nhom nao (tu de xuat song).
+//   2. KE HOACH TUAN: bang 7 ngay + so bai moi san pham.
+//   3. HUONG DI BAI VIET: cac goc bai BOSS de xuat tu tri thuc (dung/chua dung).
+//   4. CAI DAT (thu gon): muc tieu tuan, san pham tap trung, nhom chia se.
+//   5. Chi tiet + lich su: giau trong <details>, bam moi xo ra.
+
 type Row = {
   id: string;
   period_start: string | null;
@@ -22,29 +29,26 @@ const TIER_LABEL: Record<Tier, { text: string; icon: string; cls: string }> = {
   winner: { text: 'Đẩy mạnh', icon: '🏆', cls: 'tone-ok' },
   watch: { text: 'Giữ nhịp', icon: '➖', cls: 'tone-default' },
   weak: { text: 'Đổi góc', icon: '⚠️', cls: 'tone-no' },
-  insufficient: { text: 'Chưa đủ dữ liệu', icon: '⏳', cls: 'tone-default' }
+  insufficient: { text: 'Gom số liệu', icon: '⏳', cls: 'tone-default' }
 };
 
 function fmtDateTime(iso: string | null): string {
   if (!iso) return '';
   try {
     return new Date(iso).toLocaleString('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
     });
-  } catch {
-    return iso;
-  }
+  } catch { return iso; }
 }
 
 function fmtDate(d: string | null): string {
   if (!d) return '';
   const [y, m, day] = d.split('-');
   return day && m && y ? `${day}/${m}/${y}` : d;
+}
+
+function todayVN(): string {
+  return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
 export default async function Page({ searchParams }: { searchParams?: { xem?: string } }) {
@@ -59,19 +63,21 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
     client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle(),
     client.from('app_config').select('value').eq('key', 'mkt_share_groups').maybeSingle()
   ]);
-  const shareGroups = (Array.isArray((sgRow as any)?.value?.groups) ? (sgRow as any).value.groups : []) as string[];
   const goalText = ((goalRow as any)?.value?.text as string) || '';
-  const goalUpdatedAt = ((goalRow as any)?.value?.updated_at as string) || null;
-  // Sản phẩm tập trung tuần (vòng xoay chỉ lấy các folder này tới ngày `until`).
   const focusVal = ((focusRow as any)?.value || {}) as { groups?: string[]; until?: string };
   const focusGroups = Array.isArray(focusVal.groups) ? focusVal.groups : [];
   const focusUntil = focusVal.until ? String(focusVal.until).slice(0, 10) : '';
   const focusActive = focusGroups.length > 0 && (!focusVal.until || new Date(focusVal.until).getTime() > Date.now());
+  const shareGroups = (Array.isArray((sgRow as any)?.value?.groups) ? (sgRow as any).value.groups : []) as string[];
 
   const rows = (data || []) as Row[];
+  const planRows = rows.filter((r) => r.data?.origin !== 'live');
+  const liveProposal = rows.find((r) => r.data?.origin === 'live');
+  const liveData = liveProposal?.data;
+  const appliedRow = rows.find((r) => r.applied);
+  const learnSuggestion = rows.find((r) => r.data?.origin === 'learn-weekly' && !r.applied);
 
-  // ?xem=<id>: xem lại một bản kế hoạch cũ trong thẻ chính (thay vì bản mới nhất).
-  // Bản cũ ngoài 12 dòng đầu thì nạp riêng theo id.
+  // ?xem=<id>: xem lai ban cu trong khoi chi tiet.
   const viewId = searchParams?.xem || null;
   let viewing: Row | null = viewId ? rows.find((r) => r.id === viewId) || null : null;
   if (viewId && !viewing) {
@@ -82,35 +88,17 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       .maybeSingle();
     viewing = (one as Row) || null;
   }
-
-  // Đề xuất SỐNG (origin='live') có thẻ hiển thị riêng bên dưới, KHÔNG lẫn vào thẻ kế hoạch
-  // chính / lịch sử (tránh trùng, tránh rối).
-  const planRows = rows.filter((r) => r.data?.origin !== 'live');
   const latest = viewing || planRows[0];
   const history = planRows.filter((r) => r.id !== latest?.id);
-  const appliedRow = rows.find((r) => r.applied);
 
-  // Đề xuất trọng số từ vòng HỌC TUẦN (learn-weekly, Chủ Nhật 23h) — item 1b (20/8).
-  // Chỉ hiển thị khi có bản chưa áp dụng. Nếu bản này chính là `latest` (mới nhất), khối chính
-  // bên dưới đã render — chỉ khi khác `latest` mới đưa lên khối riêng để không lặp.
-  const learnSuggestion = rows.find((r) => r.data?.origin === 'learn-weekly' && !r.applied);
-  const showLearnBox = learnSuggestion && learnSuggestion.id !== latest?.id;
+  // Hom nay lam gi (tu lich cua de xuat song).
+  const today = todayVN();
+  const todayPlan = liveData?.daily_schedule?.find((d) => d.date === today) || null;
 
-  // Đề xuất SỐNG (origin='live'): BOSS cập nhật mỗi 30 phút, mỗi tối tự áp dụng (user 20/8).
-  // Hiển thị lịch theo ngày + số bài mỗi sản phẩm + nhóm chia sẻ.
-  const liveProposal = rows.find((r) => r.data?.origin === 'live');
-  const liveData = liveProposal?.data;
-
-  // Tóm tắt bản đang áp dụng cho banner (hiện ngay sau khi bấm Áp dụng): ưu tiên vòng xoay,
-  // số hướng đi còn lại, mục tiêu bản đó bám theo.
-  const ap = appliedRow?.data;
-  const apTop = (ap?.products || [])
-    .filter((p) => p.postsPerWeek > 0)
-    .sort((a, b) => b.postsPerWeek - a.postsPerWeek)
-    .slice(0, 3)
-    .map((p) => `${p.product} ${vnInt(p.postsPerWeek)} bài/tuần`);
-  const apSug = ap?.content_suggestions || [];
-  const apSugUsed = apSug.filter((s) => s.used_at).length;
+  // Huong di bai viet tu ban DANG AP (content_suggestions).
+  const suggestions = appliedRow?.data?.content_suggestions || [];
+  const sugFresh = suggestions.filter((s) => !s.used_at);
+  const sugUsed = suggestions.filter((s) => s.used_at);
 
   return (
     <main>
@@ -118,7 +106,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <div>
           <h1>Kế hoạch</h1>
           <p className="sub">
-            BOSS đọc số liệu Đo lường rồi định hướng marketing. Đề xuất tự cập nhật mỗi 30 phút, mỗi tối tự áp dụng trọng số, cuối tuần báo cáo.
+            BOSS đọc số liệu rồi tự cập nhật đề xuất mỗi 30 phút, mỗi tối tự áp trọng số, cuối tuần báo cáo. Bài vẫn chờ người bấm Duyệt mới đăng.
           </p>
         </div>
         <div className="head-actions">
@@ -128,40 +116,144 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
 
-      <section className="goal-card">
-        <form action={saveWeeklyGoal}>
-          <div className="goal-head">
-            <b>🎯 Mục tiêu tuần giao cho BOSS</b>
-            {goalUpdatedAt ? <span className="sub">Cập nhật {fmtDateTime(goalUpdatedAt)}</span> : null}
+      {/* ===== 1. HOM NAY ===== */}
+      <section className="plan-card" style={{ borderLeft: '6px solid var(--accent, #1f5fbf)', marginBottom: 14 }}>
+        <b style={{ fontSize: '1.05rem' }}>📌 Hôm nay ({fmtDate(today)})</b>
+        {todayPlan ? (
+          <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+            <div>
+              <b>Đăng bài bán:</b>{' '}
+              {todayPlan.sales.length
+                ? todayPlan.sales.map((s) => `${s.product} (${vnInt(s.count)} bài)`).join(', ')
+                : 'không có bài bán hôm nay'}
+              {' · '}<b>Bài content:</b> {vnInt(todayPlan.contentCount)}
+            </div>
+            <div>
+              <b>Chia sẻ vào nhóm:</b>{' '}
+              {todayPlan.groups.length ? todayPlan.groups.join(', ') : (shareGroups.length ? 'nghỉ hôm nay' : 'chưa nhập nhóm (mở Cài đặt bên dưới)')}
+            </div>
+            <p className="sub" style={{ margin: 0 }}>
+              Máy tự sinh bài lúc 8h và 13h rồi chờ trong Hàng đợi duyệt. Việc của người: bấm Duyệt, và tự tay chia sẻ bài vào nhóm nêu trên (Facebook không cho máy đăng nhóm).
+            </p>
           </div>
-          <p className="sub" style={{ margin: '4px 0 8px' }}>
-            Viết như giao việc cho nhân viên: ưu tiên sản phẩm nào, cần bao nhiêu cuộc gọi hoặc lượt xem, có chạy quảng cáo không.
-            Bỏ trống cũng được, khi đó BOSS tự định hướng dựa trên dữ liệu các AI đã học.
+        ) : (
+          <p className="sub" style={{ margin: '6px 0 0' }}>
+            Chưa có lịch hôm nay. Đề xuất sống sẽ tự sinh trong vòng 30 phút tới, hoặc lưu lại Cài đặt bên dưới để sinh ngay.
           </p>
-          <textarea
-            name="goal_text"
-            defaultValue={goalText}
-            rows={2}
-            placeholder="Ví dụ: tuần này ưu tiên máy lọc dầu SF-50, cần 20 cuộc gọi về tổng đài, chưa chạy quảng cáo trả phí."
-          />
-          <div style={{ marginTop: 8 }}>
-            <button className="btn ok" type="submit">Lưu mục tiêu</button>
+        )}
+      </section>
+
+      {/* ===== 2. KE HOACH TUAN ===== */}
+      {liveData ? (
+        <section className="plan-card" style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
+            <b style={{ fontSize: '1.05rem' }}>📆 Kế hoạch tuần</b>
+            <span className="sub">Cập nhật {fmtDateTime(liveProposal!.created_at)} · tự làm mới mỗi 30 phút</span>
           </div>
+
+          {liveData.products?.length ? (
+            <div className="tablewrap" style={{ marginTop: 10 }}>
+              <table className="datatable">
+                <thead><tr><th>Sản phẩm</th><th className="num">Bài/tuần</th><th className="num">Tương tác/bài</th><th>Hướng</th></tr></thead>
+                <tbody>
+                  {liveData.products.map((p) => {
+                    const t = TIER_LABEL[p.tier];
+                    return (
+                      <tr key={p.product}>
+                        <td>{p.product}</td>
+                        <td className="num"><b>{vnInt(p.postsPerWeek)}</b></td>
+                        <td className="num">{p.avgEng > 0 ? vnInt(p.avgEng) : '—'}</td>
+                        <td><span className={`badge ${t.cls}`}>{t.icon} {t.text}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {liveData.daily_schedule?.length ? (
+            <div className="tablewrap" style={{ marginTop: 12 }}>
+              <table className="datatable">
+                <thead><tr><th>Ngày</th><th>Bài bán</th><th className="num">Content</th><th>Chia sẻ nhóm</th></tr></thead>
+                <tbody>
+                  {liveData.daily_schedule.map((d) => (
+                    <tr key={d.date} style={d.date === today ? { background: 'var(--bg-2, #f0f6ff)' } : undefined}>
+                      <td>{d.date === today ? '👉 ' : ''}<b>{d.dow}</b> <span className="sub">{fmtDate(d.date)}</span></td>
+                      <td>{d.sales.length ? d.sales.map((s) => `${s.product} (${vnInt(s.count)})`).join(', ') : '—'}</td>
+                      <td className="num">{vnInt(d.contentCount)}</td>
+                      <td className="sub">{d.groups.length ? d.groups.join(', ') : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* ===== 3. HUONG DI BAI VIET ===== */}
+      {suggestions.length ? (
+        <section className="plan-card" style={{ marginBottom: 14 }}>
+          <b style={{ fontSize: '1.05rem' }}>🧭 Hướng đi bài viết ({vnInt(sugFresh.length)} chưa dùng, {vnInt(sugUsed.length)} đã dùng)</b>
+          <p className="sub" style={{ margin: '4px 0 8px' }}>
+            BOSS đề xuất góc bài từ kho tri thức. Mỗi ngày vòng xoay lấy một hướng, sinh cặp bài thử A và B, người duyệt mới đăng.
+          </p>
+          <ul className="directions-list" style={{ margin: 0 }}>
+            {suggestions.map((d, i) => (
+              <li key={i} className="direction-item" style={d.used_at ? { opacity: 0.55 } : undefined}>
+                <div className="direction-head">
+                  <b>{d.title}</b>
+                  <span className="badge tone-default" style={{ marginLeft: 8 }}>{d.product}</span>
+                  {d.used_at ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ đã dùng</span> : null}
+                  {d.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️ cần duyệt QL</span> : null}
+                </div>
+                <p className="sub" style={{ margin: '2px 0 0' }}>{d.why}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* ===== De xuat hoc tuan (Chu nhat) — chi hien khi co ===== */}
+      {learnSuggestion ? (
+        <section className="plan-card" style={{ borderLeft: '6px solid var(--ok, #1a9e6f)', marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 320px' }}>
+              <b>🧪 Đề xuất cuối tuần từ số liệu</b>
+              <p className="sub" style={{ margin: '4px 0' }}>
+                Sinh lúc {fmtDateTime(learnSuggestion.created_at)}. {(learnSuggestion.data.narrative || [])[0] || ''}
+              </p>
+            </div>
+            <form action={applyPlanWeights}>
+              <input type="hidden" name="plan_id" value={learnSuggestion.id} />
+              <button className="btn ok" type="submit">Áp dụng đề xuất</button>
+            </form>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ===== 4. CAI DAT (thu gon) ===== */}
+      <details className="plan-card" style={{ marginBottom: 14 }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1.02rem' }}>
+          ⚙️ Cài đặt cho BOSS
+          <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>
+            {focusActive ? `tập trung: ${focusGroups.join(', ')}` : 'đủ sản phẩm'} · {shareGroups.length} nhóm chia sẻ
+          </span>
+        </summary>
+
+        <form action={saveWeeklyGoal} style={{ marginTop: 12 }}>
+          <b>🎯 Mục tiêu tuần</b>
+          <p className="sub" style={{ margin: '2px 0 6px' }}>Viết như giao việc. Bỏ trống thì BOSS tự định hướng theo dữ liệu.</p>
+          <textarea name="goal_text" defaultValue={goalText} rows={2} placeholder="Ví dụ: tuần này ưu tiên máy lọc dầu SF-50, cần 20 cuộc gọi về tổng đài." />
+          <div style={{ marginTop: 6 }}><button className="btn ok" type="submit">Lưu mục tiêu</button></div>
         </form>
 
-        {/* Tập trung sản phẩm tuần: vòng xoay CHỈ sinh bài cho các sản phẩm này tới ngày hết hạn,
-            rồi tự trở lại đủ sản phẩm (user 19/8: "tuần này up lọc dầu với lọc nước"). */}
         <form action={saveFocus} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-          <div className="goal-head">
-            <b>🎯 Tuần này chỉ đăng sản phẩm</b>
-            {focusGroups.length ? (
-              <span className={`sub ${focusActive ? '' : 'muted'}`}>
-                {focusActive ? `Đang áp: ${focusGroups.join(', ')}${focusUntil ? ` (đến hết ${focusUntil.split('-').reverse().join('/')})` : ''}` : 'Đã hết hạn, vòng xoay đủ sản phẩm'}
-              </span>
-            ) : null}
-          </div>
-          <p className="sub" style={{ margin: '4px 0 8px' }}>
-            Gõ tên sản phẩm cách nhau dấu phẩy (khớp theo tên folder Kho tư liệu, ví dụ: <code>lọc dầu, lọc nước</code>). Để trống và Lưu = bỏ tập trung.
+          <b>🎯 Tuần này chỉ đăng sản phẩm</b>
+          <p className="sub" style={{ margin: '2px 0 6px' }}>
+            Gõ tên cách nhau dấu phẩy (ví dụ <code>lọc dầu, lọc nước</code>). Trống và Lưu = đủ sản phẩm.
+            {focusGroups.length ? ` Đang: ${focusGroups.join(', ')}${focusUntil ? ` (đến ${fmtDate(focusUntil)})` : ''}.` : ''}
           </p>
           <div className="row" style={{ alignItems: 'center' }}>
             <input className="note" name="focus_groups" defaultValue={focusGroups.join(', ')} placeholder="lọc dầu, lọc nước" style={{ maxWidth: 360 }} aria-label="Sản phẩm tập trung" />
@@ -173,282 +265,51 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           </div>
         </form>
 
-        {/* Nhóm Facebook người dùng đang ở (user 20/8). BOSS chia lịch chia sẻ theo ngày trong
-            đề xuất sống. Meta chặn tự đăng group nên đây chỉ là gợi ý cho người chia sẻ tay. */}
         <form action={saveShareGroups} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-          <div className="goal-head">
-            <b>👥 Nhóm chia sẻ (Facebook groups bạn đang ở)</b>
-            {shareGroups.length ? <span className="sub">Đang lưu {shareGroups.length} nhóm</span> : null}
-          </div>
-          <p className="sub" style={{ margin: '4px 0 8px' }}>
-            Gõ tên các nhóm bạn đang ở, cách nhau dấu phẩy. BOSS sẽ xếp lịch mỗi ngày chia sẻ bài vào nhóm nào (xoay vòng cho đều). Ví dụ: <code>Ngư dân Vũng Tàu, Hội tàu cá BRVT, Chợ hải sản Long Hải, Bà con đi biển</code>.
-          </p>
+          <b>👥 Nhóm chia sẻ (Facebook groups bạn đang ở)</b>
+          <p className="sub" style={{ margin: '2px 0 6px' }}>BOSS xếp lịch mỗi ngày chia sẻ nhóm nào (xoay vòng). Người tự tay chia sẻ.</p>
           <div className="row" style={{ alignItems: 'center' }}>
             <input className="note" name="share_groups" defaultValue={shareGroups.join(', ')} placeholder="Ngư dân Vũng Tàu, Hội tàu cá BRVT, ..." style={{ maxWidth: 520 }} aria-label="Nhóm chia sẻ" />
             <button className="btn ok" type="submit">Lưu nhóm</button>
           </div>
         </form>
-      </section>
+      </details>
 
-      {liveData ? (
-        <section className="plan-card" style={{ borderLeft: '6px solid var(--ok, #1a9e6f)', marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <b style={{ fontSize: '1.05rem' }}>📆 Kế hoạch sống của BOSS</b>
-              <p className="sub" style={{ margin: '2px 0 0' }}>
-                Cập nhật lúc {fmtDateTime(liveProposal!.created_at)}. Tự làm mới mỗi 30 phút theo số liệu, mỗi tối tự áp dụng trọng số cho vòng xoay hôm sau.
+      {/* ===== 5. Chi tiet + lich su (giau) ===== */}
+      <details className="plan-card" open={!!viewing}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1.02rem' }}>
+          📋 Bản kế hoạch đầy đủ và lịch sử
+          {appliedRow ? <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>đang áp bản {fmtDateTime(appliedRow.created_at)}</span> : null}
+        </summary>
+
+        {!latest ? (
+          <p className="sub" style={{ marginTop: 10 }}>Chưa có bản kế hoạch nào. Bấm Tạo kế hoạch ngay ở góc trên.</p>
+        ) : (
+          <div style={{ marginTop: 12 }}>
+            {viewing ? (
+              <p className="err" role="status">
+                Đang xem lại bản cũ sinh lúc {fmtDateTime(viewing.created_at)}. <a href="/ke-hoach">Về bản mới nhất</a>
               </p>
-            </div>
-          </div>
-
-          <div className="plan-narrative" style={{ marginTop: 10 }}>
-            {(liveData.narrative || []).map((p, i) => (<p key={i}>{p}</p>))}
-          </div>
-
-          {liveData.products?.length ? (
-            <>
-              <h3 style={{ margin: '14px 0 6px' }}>Số bài bán mỗi sản phẩm trong tuần</h3>
-              <div className="tablewrap">
-                <table className="datatable">
-                  <thead><tr><th>Sản phẩm</th><th className="num">Bài/tuần</th><th className="num">Tương tác/bài</th><th>Hướng</th></tr></thead>
-                  <tbody>
-                    {liveData.products.map((p) => (
-                      <tr key={p.product}>
-                        <td>{p.product}</td>
-                        <td className="num"><b>{vnInt(p.postsPerWeek)}</b></td>
-                        <td className="num">{p.avgEng > 0 ? vnInt(p.avgEng) : '—'}</td>
-                        <td className="sub">{p.tier === 'winner' ? '🏆 Đẩy mạnh' : p.tier === 'weak' ? '⚠️ Đổi góc' : p.tier === 'insufficient' ? '⏳ Gom thêm số liệu' : '➖ Giữ nhịp'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : null}
-
-          {liveData.daily_schedule?.length ? (
-            <>
-              <h3 style={{ margin: '16px 0 6px' }}>Lịch theo ngày (7 ngày tới)</h3>
-              <div className="tablewrap">
-                <table className="datatable">
-                  <thead><tr><th>Ngày</th><th>Bài bán</th><th className="num">Content</th><th>Chia sẻ vào nhóm</th></tr></thead>
-                  <tbody>
-                    {liveData.daily_schedule.map((d) => (
-                      <tr key={d.date}>
-                        <td><b>{d.dow}</b> <span className="sub">{d.date.split('-').reverse().join('/')}</span></td>
-                        <td>{d.sales.length ? d.sales.map((s) => `${s.product} (${vnInt(s.count)})`).join(', ') : '—'}</td>
-                        <td className="num">{vnInt(d.contentCount)}</td>
-                        <td className="sub">{d.groups.length ? d.groups.join(', ') : (shareGroups.length ? '—' : 'chưa nhập nhóm')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : null}
-        </section>
-      ) : null}
-
-      {learnSuggestion ? (
-        <div className={`learn-suggestion-banner ${showLearnBox ? '' : 'compact'}`} role="status" style={{ background: 'var(--bg-2, #f0f6ff)', border: '1px solid var(--blue-4, #cfe1ff)', borderLeft: '6px solid var(--blue-6, #1f5fbf)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 320px', minWidth: 0 }}>
-              <b>🧪 Đề xuất trọng số từ số liệu tuần vừa xong</b>
-              <p className="sub" style={{ margin: '4px 0' }}>
-                Bot chấm điểm từng bài (tương tác + lượt xem + người thấy + giây xem) rồi đề xuất trọng số sản phẩm cho tuần tới.
-                Sinh lúc {fmtDateTime(learnSuggestion.created_at)}. Chưa áp — bấm bên dưới mới có hiệu lực.
-              </p>
-              {(learnSuggestion.data.narrative || []).slice(0, 2).map((p, i) => (
-                <p key={i} style={{ margin: '4px 0' }}>{p}</p>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              {showLearnBox ? (
-                <a className="btn ghost" href={`/ke-hoach?xem=${learnSuggestion.id}`}>Xem chi tiết</a>
-              ) : null}
-              <form action={applyPlanWeights}>
-                <input type="hidden" name="plan_id" value={learnSuggestion.id} />
-                <button className="btn ok" type="submit" title="Vòng xoay sinh bài tuần tới ưu tiên sản phẩm theo trọng số bot đề xuất từ số liệu tuần vừa qua">
-                  Áp dụng đề xuất
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {appliedRow ? (
-        <div className="applied-banner" role="status">
-          <b>✓ Đang áp dụng kế hoạch sinh lúc {fmtDateTime(appliedRow.created_at)}.</b>
-          {apTop.length ? (
-            <p>Vòng xoay sinh bài ưu tiên: {apTop.join(', ')}{(ap?.products?.length || 0) > 3 ? ' và các sản phẩm còn lại giữ nhịp tối thiểu' : ''}.</p>
-          ) : (
-            <p>Chưa có sản phẩm nào đủ số liệu, vòng xoay chọn đều các folder.</p>
-          )}
-          {apSug.length ? (
-            <p>
-              {vnInt(apSug.length - apSugUsed)} hướng đi tuần chưa dùng ({vnInt(apSugUsed)} đã dùng). Mỗi ngày vòng xoay lấy một hướng, sinh cặp bài thử A với B kèm video shorts, người duyệt mới đăng.
-            </p>
-          ) : null}
-          {ap?.goal ? <p className="sub">Bản này bám mục tiêu: {ap.goal}</p> : null}
-        </div>
-      ) : null}
-
-      {viewing ? (
-        <p className="err" role="status">
-          Đang xem lại bản kế hoạch cũ sinh lúc {fmtDateTime(viewing.created_at)}. <a href="/ke-hoach">Về bản mới nhất</a>
-        </p>
-      ) : null}
-
-      {!latest ? (
-        <div className="empty">
-          <div className="empty-icon" aria-hidden="true">🧭</div>
-          <p>Chưa có kế hoạch nào.</p>
-          <p className="sub">
-            Bấm <b>Tạo kế hoạch ngay</b> để bot đọc số liệu Đo lường và đề xuất hướng đi. Cần có bài đã đăng và số liệu rồi kế hoạch mới có căn cứ.
-          </p>
-        </div>
-      ) : (
-        <>
-          <section className="plan-card">
+            ) : null}
             <div className="plan-meta">
               <span className="badge">{latest.generated_by === 'cron' ? '🤖 Tự động' : '✍️ Tạo tay'}</span>
-              {latest.data.origin === 'learn-weekly' ? (
-                <span className="badge tone-ok">🧪 Học tuần (Chủ nhật)</span>
-              ) : latest.data.cadence === 'weekly' ? (
-                <span className="badge">📅 Kế hoạch tuần (Thứ 2)</span>
-              ) : latest.data.cadence === 'update' ? (
-                <span className="badge">🔁 Cập nhật giữa tuần (Thứ 6)</span>
-              ) : null}
+              {latest.data.cadence === 'weekly' ? <span className="badge">📅 Kế hoạch tuần (Thứ 2)</span>
+                : latest.data.cadence === 'update' ? <span className="badge">🔁 Cập nhật</span> : null}
               <span className="sub">Sinh lúc {fmtDateTime(latest.created_at)}</span>
-              {latest.period_start ? (
-                <span className="sub">Tuần {fmtDate(latest.period_start)} đến {fmtDate(latest.period_end)}</span>
-              ) : null}
               {latest.applied ? <span className="badge tone-ok">✓ Đang áp dụng</span> : null}
             </div>
 
-            <div className="plan-top">
-              <div className="plan-narrative">
-                {(latest.data.narrative || []).map((p, i) => (
-                  <p key={i}>{p}</p>
-                ))}
-              </div>
-              <aside className="plan-stats" aria-label="Tóm tắt số liệu">
-                <div className="stat-tile">
-                  <div className="stat-num">{vnInt(latest.data.summary?.totalPosts || 0)}</div>
-                  <div className="stat-lbl">Bài có số liệu</div>
-                </div>
-                <div className="stat-tile">
-                  <div className="stat-num">{vnInt(latest.data.summary?.totalEngagement || 0)}</div>
-                  <div className="stat-lbl">Lượt tương tác</div>
-                </div>
-                <div className="stat-tile">
-                  <div className="stat-num">{vnInt(latest.data.summary?.totalConversions || 0)}</div>
-                  <div className="stat-lbl">Đơn hoặc lead</div>
-                </div>
-                <div className="stat-tile" title="Sản phẩm phải có từ 3 bài trở lên (có số liệu) mới đủ để xếp thắng/thua. Số dưới ngưỡng đang gom thêm dữ liệu.">
-                  <div className="stat-num">{vnInt(latest.data.summary?.ranked || 0)}<span className="stat-sub">/{vnInt(latest.data.summary?.totalProducts || 0)}</span></div>
-                  <div className="stat-lbl">Sản phẩm đủ số liệu để xếp hạng</div>
-                </div>
-                <div className="stat-tile wide">
-                  <div className="stat-num">{vnInt(latest.data.weeklyBudget || 0)} <span className="stat-sub">bài/tuần</span></div>
-                  <div className="stat-lbl">{latest.data.summary?.topProduct ? `Dẫn đầu: ${latest.data.summary.topProduct}` : 'Ngân sách gợi ý tuần tới'}</div>
-                </div>
-                {latest.data.summary?.knowledge ? (
-                  <>
-                    <div className="stat-tile" title="Số bản ghi tri thức nội bộ 7 ngày qua (file thả vào bucket kho-tri-thuc-noi-bo).">
-                      <div className="stat-num">{vnInt(latest.data.summary.knowledge.internal || 0)}</div>
-                      <div className="stat-lbl">Nguồn nội bộ (7 ngày)</div>
-                    </div>
-                    <div className="stat-tile" title="Số nguồn tri thức public bot học từ web mỗi Chủ nhật.">
-                      <div className="stat-num">{vnInt(latest.data.summary.knowledge.publicSrc || 0)}</div>
-                      <div className="stat-lbl">Nguồn public (7 ngày)</div>
-                    </div>
-                  </>
-                ) : null}
-              </aside>
+            <div className="plan-narrative" style={{ marginTop: 8 }}>
+              {(latest.data.narrative || []).map((p, i) => (<p key={i}>{p}</p>))}
             </div>
 
-            {latest.data.content_suggestions?.length ? (
-              <section className="content-directions" style={{ margin: '16px 0' }}>
-                <h2 style={{ marginBottom: 8 }}>Hướng đi tuần tới</h2>
-                <p className="sub" style={{ marginTop: 0 }}>
-                  Bot đọc kho tri thức rồi đề xuất {latest.data.content_suggestions.length} bài đăng cụ thể. Mỗi gợi ý bám nguồn thật, không sinh chung chung.
-                </p>
-                <ul className="directions-list">
-                  {latest.data.content_suggestions.map((d, i) => (
-                    <li key={i} className="direction-item">
-                      <div className="direction-head">
-                        <b>{d.title}</b>
-                        <span className="badge tone-default" style={{ marginLeft: 8 }}>{d.kind}</span>
-                        {d.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️ cần duyệt QL</span> : null}
-                      </div>
-                      <div className="sub">Sản phẩm: {d.product}</div>
-                      <p style={{ margin: '4px 0' }}>{d.why}</p>
-                      <div className="sub">Dựa trên: {(d.sources || []).join(', ')}</div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            {latest.data.summary?.knowledge && (
-              latest.data.summary.knowledge.internalHighlights?.length ||
-              latest.data.summary.knowledge.publicHighlights?.length
-            ) ? (
-              <details className="knowledge-detail" style={{ margin: '12px 0' }}>
-                <summary style={{ cursor: 'pointer' }}>
-                  Xem chi tiết nguồn tri thức đã dùng
-                </summary>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-                  <div>
-                    <b>Nội bộ:</b>
-                    {latest.data.summary.knowledge.internalHighlights?.length ? (
-                      <ul>
-                        {latest.data.summary.knowledge.internalHighlights.map((h) => (
-                          <li key={h.id}>
-                            {h.title || '(không tiêu đề)'}
-                            {h.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️</span> : null}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="sub">chưa có nguồn nội bộ tuần này</p>
-                    )}
-                    <a className="sub" href="/kho-tri-thuc">Mở Kho tri thức</a>
-                  </div>
-                  <div>
-                    <b>Public:</b>
-                    {latest.data.summary.knowledge.publicHighlights?.length ? (
-                      <ul>
-                        {latest.data.summary.knowledge.publicHighlights.map((h) => (
-                          <li key={h.id}>
-                            <a href={h.source_url} target="_blank" rel="noopener noreferrer">
-                              {h.source_title || h.source_url}
-                            </a>
-                            {h.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️</span> : null}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="sub">chưa có nguồn public tuần này</p>
-                    )}
-                  </div>
-                </div>
-              </details>
-            ) : null}
-
-            <div className="plan-actions" style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
+            <div className="plan-actions" style={{ display: 'flex', gap: 8, margin: '10px 0' }}>
               {latest.applied ? (
-                <form action={clearPlanWeights}>
-                  <button className="btn ghost" type="submit">Gỡ áp dụng</button>
-                </form>
+                <form action={clearPlanWeights}><button className="btn ghost" type="submit">Gỡ áp dụng</button></form>
               ) : (
                 <form action={applyPlanWeights}>
                   <input type="hidden" name="plan_id" value={latest.id} />
-                  <button className="btn ok" type="submit" title="Vòng xoay sinh bài sẽ ưu tiên sản phẩm theo trọng số bên dưới">
-                    Áp dụng trọng số
-                  </button>
+                  <button className="btn ok" type="submit">Áp dụng trọng số</button>
                 </form>
               )}
             </div>
@@ -457,15 +318,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               <div className="tablewrap">
                 <table className="datatable">
                   <thead>
-                    <tr>
-                      <th>Sản phẩm</th>
-                      <th className="center">Hướng</th>
-                      <th className="num">Số bài</th>
-                      <th className="num">Tương tác/bài</th>
-                      <th className="num">Đơn/bài</th>
-                      <th className="num">Bài/tuần</th>
-                      <th>Ghi chú</th>
-                    </tr>
+                    <tr><th>Sản phẩm</th><th className="center">Hướng</th><th className="num">Số bài</th><th className="num">Tương tác/bài</th><th className="num">Đơn/bài</th><th className="num">Bài/tuần</th></tr>
                   </thead>
                   <tbody>
                     {latest.data.products.map((p) => {
@@ -478,52 +331,44 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                           <td className="num">{vnInt(p.avgEng)}</td>
                           <td className="num">{p.avgConv > 0 ? vnDec1(p.avgConv) : '—'}</td>
                           <td className="num"><b>{vnInt(p.postsPerWeek)}</b></td>
-                          <td className="sub">{p.note}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="sub">Bản kế hoạch này chưa có sản phẩm nào đủ số liệu để xếp.</p>
-            )}
-          </section>
+            ) : null}
 
-          {history.length ? (
-            <>
-              <h2 style={{ marginTop: 28 }}>Lịch sử kế hoạch</h2>
-              <div className="tablewrap">
-                <table className="datatable">
-                  <thead>
-                    <tr><th>Sinh lúc</th><th>Loại</th><th>Tuần</th><th>Dẫn đầu</th><th className="num">Đủ mẫu</th><th className="center"></th></tr>
-                  </thead>
-                  <tbody>
-                    {history.map((r) => (
-                      <tr key={r.id}>
-                        <td><a href={`/ke-hoach?xem=${r.id}`} title="Xem lại bản kế hoạch này">{fmtDateTime(r.created_at)}</a></td>
-                        <td>{r.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}{r.applied ? ' · đang áp' : ''}</td>
-                        <td className="sub">{r.period_start ? `${fmtDate(r.period_start)}–${fmtDate(r.period_end)}` : '—'}</td>
-                        <td>{r.data?.summary?.topProduct || '—'}</td>
-                        <td className="num">{vnInt(r.data?.summary?.ranked || 0)}</td>
-                        <td className="center">
-                          <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                            <a className="btn ghost sm" href={`/ke-hoach?xem=${r.id}`}>Xem</a>
-                            <form action={deletePlan}>
+            {history.length ? (
+              <>
+                <h3 style={{ margin: '16px 0 6px' }}>Lịch sử</h3>
+                <div className="tablewrap">
+                  <table className="datatable">
+                    <thead>
+                      <tr><th>Sinh lúc</th><th>Loại</th><th>Tuần</th><th className="center"></th></tr>
+                    </thead>
+                    <tbody>
+                      {history.map((r) => (
+                        <tr key={r.id}>
+                          <td><a href={`/ke-hoach?xem=${r.id}`}>{fmtDateTime(r.created_at)}</a></td>
+                          <td>{r.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}{r.applied ? ' · đang áp' : ''}</td>
+                          <td className="sub">{r.period_start ? `${fmtDate(r.period_start)}–${fmtDate(r.period_end)}` : '—'}</td>
+                          <td className="center">
+                            <form action={deletePlan} style={{ display: 'inline' }}>
                               <input type="hidden" name="plan_id" value={r.id} />
                               <button className="btn no sm" type="submit" aria-label="Xóa kế hoạch">Xóa</button>
                             </form>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : null}
-        </>
-      )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : null}
+          </div>
+        )}
+      </details>
     </main>
   );
 }
