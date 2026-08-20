@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import KenhTabs from './kenh-tabs';
@@ -36,7 +37,6 @@ export default async function Page() {
   const jobs = (jobsRes.data || []) as { id: string; title: string; status?: string }[];
   const apps = (appsRes.data || []) as App[];
   const channelViews = await getAllChannels(client);
-  const manualChannels = channelViews.filter((c) => c.enabled && c.method === 'manual');
 
   // Số ứng viên theo từng vị trí — dùng để ước tính "kênh này ra bao nhiêu ứng viên".
   const appsByJob = new Map<string, number>();
@@ -112,101 +112,115 @@ export default async function Page() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.kenh} className={`chan-row${r.enabled ? '' : ' chan-row-off'}`}>
-                <td className="chan-td-name">
-                  <div className="chan-name">{r.ten}</div>
-                  {r.post_url ? (
-                    <a href={r.post_url} target="_blank" rel="noreferrer" className="chan-post-url">
-                      Mở trang đăng ↗
-                    </a>
+            {rows.map((r) => {
+              const canAddPost = r.enabled && r.method === 'manual';
+              return (
+                <Fragment key={r.kenh}>
+                  <tr className={`chan-row${r.enabled ? '' : ' chan-row-off'}`}>
+                    <td className="chan-td-name">
+                      <div className="chan-name">{r.ten}</div>
+                      {r.post_url ? (
+                        <a href={r.post_url} target="_blank" rel="noreferrer" className="chan-post-url">
+                          Mở trang đăng ↗
+                        </a>
+                      ) : null}
+                      {!r.builtin ? <span className="chan-tag">Tự thêm</span> : null}
+                    </td>
+                    <td className="chan-td-method">
+                      <span>{methodLabel(r.kenh)}</span>
+                      <div className="muted chan-method-sub">
+                        {r.method === 'manual'
+                          ? (r.manual_default === 'track_only' ? 'Ưu tiên gắn link' : 'Có hỗ trợ soạn')
+                          : 'Tự đăng sau duyệt'}
+                      </div>
+                    </td>
+                    <td className="chan-td-status">
+                      <span className={`stage tone-${r.enabled ? 'ok' : 'default'}`}>
+                        {r.enabled ? 'Đang bật' : 'Đang tắt'}
+                      </span>
+                    </td>
+                    <td className="chan-td-num">
+                      <span className="chan-num-value">{r.postedCount}</span>
+                      {r.totalPosts > r.postedCount ? (
+                        <span className="muted chan-num-sub"> / {r.totalPosts} tổng</span>
+                      ) : null}
+                    </td>
+                    <td className="chan-td-num">
+                      {r.applicantCount > 0 ? (
+                        <>~<span className="chan-num-value">{r.applicantCount}</span></>
+                      ) : (
+                        <span className="muted">0</span>
+                      )}
+                    </td>
+                    <td className="chan-td-actions">
+                      {canAddPost ? (
+                        // Nút chỉ điều hướng ánh mắt xuống hàng "Thêm bài" ngay bên dưới; details
+                        // ở hàng phụ mới là chỗ mở form. Dùng anchor #add-<kenh> để bấm là scroll tới.
+                        <a href={`#add-${r.kenh}`} className="btn ok" style={{ fontSize: '0.82em', padding: '4px 12px', textDecoration: 'none' }}>
+                          + Thêm bài
+                        </a>
+                      ) : null}
+                      <form action={toggleChannel} style={{ display: 'inline-block', marginLeft: canAddPost ? 4 : 0 }}>
+                        <input type="hidden" name="kenh" value={r.kenh} />
+                        <input type="hidden" name="bat" value={r.enabled ? 'false' : 'true'} />
+                        <SubmitButton
+                          label={r.enabled ? 'Tắt' : 'Bật'}
+                          className={`btn ${r.enabled ? 'ghost' : 'ok'}`}
+                          style={{ fontSize: '0.82em', padding: '4px 12px' }}
+                        />
+                      </form>
+                      {!r.builtin ? (
+                        <form action={removeChannel} style={{ display: 'inline-block', marginLeft: 4 }}>
+                          <input type="hidden" name="kenh" value={r.kenh} />
+                          <SubmitButton
+                            label="Xoá"
+                            className="btn ghost"
+                            style={{ fontSize: '0.82em', padding: '4px 12px', color: 'var(--no)' }}
+                          />
+                        </form>
+                      ) : null}
+                    </td>
+                  </tr>
+                  {canAddPost ? (
+                    // Hàng phụ: form "Thêm bài" gắn cứng với kênh của hàng chính. Ẩn ban đầu qua <details>
+                    // để bảng không dài; click summary sẽ mở form full-width ngay dưới hàng dữ liệu.
+                    <tr className="chan-addpost-row" id={`add-${r.kenh}`}>
+                      <td colSpan={6} style={{ background: 'var(--surface, #fafafa)', padding: '4px 8px 10px' }}>
+                        <details style={{ padding: '2px 0' }}>
+                          <summary style={{ cursor: 'pointer', fontSize: '0.85em', color: 'var(--brand, #2563eb)', padding: '4px 6px', userSelect: 'none' }}>
+                            + Thêm bài đăng lên <b>{r.ten}</b> (dán link bài đã đăng trên sàn)
+                          </summary>
+                          <form action={trackPostedPost} style={{ marginTop: 8, padding: '10px 6px 4px' }}>
+                            <input type="hidden" name="kenh" value={r.kenh} />
+                            <div className="row" style={{ flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                              <select className="note" name="job_id" aria-label="Vị trí (tùy chọn)" defaultValue="">
+                                <option value="">Gắn vị trí (tùy chọn)</option>
+                                {jobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
+                              </select>
+                              <input className="note" type="url" name="url" placeholder="Link bài đã đăng trên sàn" aria-label="Link bài đã đăng" style={{ flex: '1 1 240px' }} />
+                            </div>
+                            <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                              <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ color: 'var(--ink-2)' }}>Ảnh bằng chứng:</span>
+                                <input type="file" name="proof_file" accept="image/*" style={{ fontSize: '0.85em' }} />
+                              </label>
+                              <SubmitButton label="Ghi nhận đã đăng" className="btn ok" style={{ fontSize: '0.85em' }} />
+                            </div>
+                            <p className="muted" style={{ margin: '6px 0 0', fontSize: '0.8em' }}>
+                              Bài sẽ xuất hiện ở <a href="/dang-tin">tab Tin đăng</a> ngay sau khi ghi nhận.
+                              Không qua bước Duyệt (chỉ theo dõi).
+                            </p>
+                          </form>
+                        </details>
+                      </td>
+                    </tr>
                   ) : null}
-                  {!r.builtin ? <span className="chan-tag">Tự thêm</span> : null}
-                </td>
-                <td className="chan-td-method">
-                  <span>{methodLabel(r.kenh)}</span>
-                  <div className="muted chan-method-sub">
-                    {r.method === 'manual'
-                      ? (r.manual_default === 'track_only' ? 'Ưu tiên gắn link' : 'Có hỗ trợ soạn')
-                      : 'Tự đăng sau duyệt'}
-                  </div>
-                </td>
-                <td className="chan-td-status">
-                  <span className={`stage tone-${r.enabled ? 'ok' : 'default'}`}>
-                    {r.enabled ? 'Đang bật' : 'Đang tắt'}
-                  </span>
-                </td>
-                <td className="chan-td-num">
-                  <span className="chan-num-value">{r.postedCount}</span>
-                  {r.totalPosts > r.postedCount ? (
-                    <span className="muted chan-num-sub"> / {r.totalPosts} tổng</span>
-                  ) : null}
-                </td>
-                <td className="chan-td-num">
-                  {r.applicantCount > 0 ? (
-                    <>~<span className="chan-num-value">{r.applicantCount}</span></>
-                  ) : (
-                    <span className="muted">0</span>
-                  )}
-                </td>
-                <td className="chan-td-actions">
-                  <form action={toggleChannel} style={{ display: 'inline-block' }}>
-                    <input type="hidden" name="kenh" value={r.kenh} />
-                    <input type="hidden" name="bat" value={r.enabled ? 'false' : 'true'} />
-                    <SubmitButton
-                      label={r.enabled ? 'Tắt' : 'Bật'}
-                      className={`btn ${r.enabled ? 'ghost' : 'ok'}`}
-                      style={{ fontSize: '0.82em', padding: '4px 12px' }}
-                    />
-                  </form>
-                  {!r.builtin ? (
-                    <form action={removeChannel} style={{ display: 'inline-block', marginLeft: 4 }}>
-                      <input type="hidden" name="kenh" value={r.kenh} />
-                      <SubmitButton
-                        label="Xoá"
-                        className="btn ghost"
-                        style={{ fontSize: '0.82em', padding: '4px 12px', color: 'var(--no)' }}
-                      />
-                    </form>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
-
-      {/* Ghi nhận bài đã đăng lên sàn (track-only). Người tự đăng thẳng trên sàn, chỉ ghi link + ảnh để theo dõi.
-          Cho phép "đăng tiếp tục" nhiều lần trên cùng 1 kênh: mỗi lần submit là 1 bài mới trong hr_job_posts.
-          Bài mới sẽ tự hiện ở tab Tin đăng (trackPostedPost revalidate /dang-tin). */}
-      {manualChannels.length > 0 ? (
-        <form action={trackPostedPost} className="settings-box" style={{ marginTop: 16 }}>
-          <b>Ghi nhận bài đã đăng lên sàn</b>
-          <p className="muted" style={{ margin: '4px 0 8px', fontSize: '0.85em' }}>
-            Dùng khi bạn tự đăng trực tiếp trên sàn (TopCV, JobsGO, VietnamWorks…). Chỉ ghi link + ảnh để
-            theo dõi — không qua bước Duyệt. Có thể ghi nhận nhiều bài trên cùng 1 sàn: mỗi lần điền là 1 bài mới.
-          </p>
-          <div className="row" style={{ marginTop: 4, flexWrap: 'wrap', gap: 8 }}>
-            <select className="note" name="kenh" required aria-label="Kênh">
-              {manualChannels.map((c) => <option key={c.kenh} value={c.kenh}>{c.ten}</option>)}
-            </select>
-            <select className="note" name="job_id" aria-label="Vị trí (tùy chọn)" defaultValue="">
-              <option value="">Gắn vị trí (tùy chọn)</option>
-              {jobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
-            </select>
-          </div>
-          <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            <input className="note" type="url" name="url" placeholder="Link bài đã đăng trên sàn" aria-label="Link bài đã đăng" />
-            <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: 'var(--ink-2)' }}>Ảnh bằng chứng:</span>
-              <input type="file" name="proof_file" accept="image/*" style={{ fontSize: '0.85em' }} />
-            </label>
-          </div>
-          <div className="row" style={{ marginTop: 8 }}>
-            <SubmitButton label="Ghi nhận đã đăng" />
-          </div>
-        </form>
-      ) : null}
 
       {/* Thêm sàn tuyển dụng mới do người dùng nhập. Luôn là kênh đăng thủ công. */}
       <form action={addChannel} className="settings-box" style={{ marginTop: 16 }}>

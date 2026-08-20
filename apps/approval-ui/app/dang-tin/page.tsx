@@ -92,14 +92,18 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Tin đăng</h1>
-          <p className="sub">Danh sách bài tuyển dụng đã soạn: nháp, đặt lịch, đã đăng và bài đăng thủ công chờ ghi nhận.</p>
+          <p className="sub">
+            Danh sách bài tuyển dụng ở <b>mọi kênh</b> (Facebook, TopCV, JobsGO, VietnamWorks…): nháp, đặt lịch,
+            đã đăng và bài đăng thủ công đã ghi nhận. Cột <b>Tương tác</b> chỉ có số cho Facebook — các sàn khác
+            không có API để kéo số về.
+          </p>
         </div>
         <AutoRefresh seconds={30} />
       </header>
 
-      {/* Trạng thái hệ thống tự động */}
+      {/* Trạng thái cron Facebook (chỉ nói về kênh FB — sàn khác đăng tay ở trang Kênh) */}
       <div className="sys-status">
-        <span className="sys-label">Hệ thống tự động:</span>
+        <span className="sys-label">Facebook auto:</span>
         <span className={`sys-chip tone-${compose.tone}`}>
           <span className="sys-dot" />
           Soạn bài: {compose.label}
