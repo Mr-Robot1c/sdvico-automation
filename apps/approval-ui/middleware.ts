@@ -37,6 +37,14 @@ export async function middleware(req: NextRequest) {
   // Trang công khai cho sếp xem CV + ra quyết định qua link do HR cấp (token 48 ký tự).
   if (path.startsWith('/xem-ho-so/')) return NextResponse.next();
 
+  // Feed XML cho Jooble (spec jooble.org/files/xml_feed_specifications.pdf) và các
+  // aggregator khác. JoobleBot crawl mà không đăng nhập được.
+  if (path === '/api/jobs/feed.xml') return NextResponse.next();
+
+  // Trang tuyển dụng public — ứng viên bấm vào từ link Jooble/Google Jobs. Không đụng
+  // dữ liệu ứng viên, chỉ hiển thị tin do HR viết (điều cấm 6).
+  if (path === '/tuyen-dung' || path.startsWith('/tuyen-dung/')) return NextResponse.next();
+
   if (AUTH_MODE === 'supabase') {
     return handleSupabase(req, path);
   }

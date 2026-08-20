@@ -193,6 +193,8 @@ export default function Nav({ pendingCount = 0, user = null }: { pendingCount?: 
 
   // Trang công khai cho ứng viên (chọn giờ phỏng vấn) không hiện điều hướng nội bộ.
   if (path?.startsWith('/phong-van')) return null;
+  // Trang tuyển dụng public (ứng viên xem tin qua Jooble/Google Jobs) không hiện điều hướng nội bộ.
+  if (path === '/tuyen-dung' || path?.startsWith('/tuyen-dung/')) return null;
   // Trang đăng nhập cũng không hiện sidebar cho gọn.
   if (path === '/dang-nhap' || path?.startsWith('/dang-nhap/')) return null;
 
