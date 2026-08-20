@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { getServerClient } from '../lib/supabase-server';
 import { composeJdVersions } from '../lib/jd-compose';
 import { groqChat } from '../lib/groq';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { headers } from 'next/headers';
 import { fetchUnsplashPhoto } from '../lib/unsplash';
 import { fbIntroSystem, assembleFacebookPost, fallbackIntro } from '../lib/fb-compose';
@@ -18,6 +18,50 @@ import { getSessionUser, authMode } from '../lib/auth';
 import { requireAdmin } from '../lib/hr-users';
 import { requireEmployeeAdmin, EMPLOYEE_DOCS_BUCKET } from '../lib/employees';
 import { getChannel, isManual, isFeed, channelLabel, resolveChannel } from '../lib/channels';
+import { makeJobSlug } from '../lib/slug';
+
+// Danh sách kiểu hợp đồng, ánh xạ vào <jobtype> feed Jooble và schema.org JobPosting.
+const EMPLOYMENT_TYPES = ['full-time', 'part-time', 'contract', 'internship', 'temporary'] as const;
+type EmploymentType = (typeof EMPLOYMENT_TYPES)[number];
+
+function normEmploymentType(raw: unknown): EmploymentType {
+  const v = String(raw ?? '').toLowerCase().trim();
+  return (EMPLOYMENT_TYPES as readonly string[]).includes(v) ? (v as EmploymentType) : 'full-time';
+}
+
+// Mở vị trí (draft->open) một cách IDEMPOTENT + set các trường phục vụ feed Jooble +
+// trang canonical /tuyen-dung/[slug]:
+//   - published_at = now() nếu chưa có (giữ mốc "lần đầu mở tin")
+//   - expire_at    = now() + 45 ngày nếu chưa có (khớp giới hạn crawl Jooble)
+//   - updated_at   = now() luôn (để <updated> trong feed đúng)
+//
+// Gọi trên tin ĐÃ open không đảo dữ liệu cũ (chỉ set updated_at + extra). Callers có
+// nhu cầu chặn re-open (chỉ cho draft→open) đặt opts.requireDraft = true.
+async function openJobForFeed(
+  client: ReturnType<typeof getServerClient>,
+  jobId: string,
+  opts: { requireDraft?: boolean; extra?: Record<string, unknown> } = {}
+): Promise<void> {
+  const { data } = await client
+    .from('hr_jobs')
+    .select('published_at, expire_at')
+    .eq('id', jobId)
+    .maybeSingle();
+  const nowIso = new Date().toISOString();
+  const expIso = new Date(Date.now() + 45 * 86400_000).toISOString();
+  const patch: Record<string, unknown> = {
+    status: 'open',
+    updated_at: nowIso,
+    ...(opts.extra || {}),
+  };
+  const prev = data as { published_at: string | null; expire_at: string | null } | null;
+  if (!prev?.published_at) patch.published_at = nowIso;
+  if (!prev?.expire_at) patch.expire_at = expIso;
+  let q = client.from('hr_jobs').update(patch).eq('id', jobId);
+  if (opts.requireDraft) q = q.eq('status', 'draft');
+  const { error } = await q;
+  if (error) throw new Error('Mở vị trí thất bại: ' + error.message);
+}
 
 // Trả email người đang đăng nhập, hoặc null nếu chế độ basic. Bọc try để không rơi luồng cũ.
 async function currentEmail(): Promise<string | null> {
@@ -1365,7 +1409,7 @@ export async function openAndQueueChannelPost(formData: FormData) {
   const jobId = String(formData.get('job_id') || '');
   if (!jobId) return;
   const client = getServerClient();
-  await client.from('hr_jobs').update({ status: 'open' }).eq('id', jobId).eq('status', 'draft');
+  await openJobForFeed(client, jobId, { requireDraft: true });
   await queueChannelPost(formData);
   redirect('/');
 }
@@ -1803,10 +1847,16 @@ export async function createJdDraft(formData: FormData) {
     nhom: String(formData.get('nhom') || '').trim() || undefined
   };
   const image_hint = String(formData.get('image_hint') || '').trim() || null;
+  const salary_display = String(formData.get('salary_display') || '').trim() || null;
+  const employment_type = normEmploymentType(formData.get('employment_type'));
   const client = getServerClient();
   const { versions } = await composeJdVersions(job, await resolveBrandContact(client));
 
+  // Sinh id trước để ghép slug ngay trong INSERT (tránh round-trip UPDATE slug).
+  const jobId = randomUUID();
+  const slug = makeJobSlug(job.title, jobId);
   const { error } = await client.from('hr_jobs').insert({
+    id: jobId,
     title: job.title,
     department: job.department || null,
     location: job.location || null,
@@ -1818,6 +1868,10 @@ export async function createJdDraft(formData: FormData) {
     image_hint,
     headcount,
     status: 'draft',
+    slug,
+    salary_display,
+    employment_type,
+    updated_at: new Date().toISOString(),
   }).select('id').single();
   if (error) throw new Error(error.message);
 
@@ -1834,10 +1888,7 @@ export async function openAndQueueFbPost(formData: FormData) {
   if (!jobId) return;
 
   const client = getServerClient();
-  await client.from('hr_jobs')
-    .update({ status: 'open' })
-    .eq('id', jobId)
-    .eq('status', 'draft');
+  await openJobForFeed(client, jobId, { requireDraft: true });
 
   await queueFacebookPost(formData);
   redirect('/');
@@ -1849,10 +1900,7 @@ export async function openAndQueueLinkedInPost(formData: FormData) {
   if (!jobId) return;
 
   const client = getServerClient();
-  await client.from('hr_jobs')
-    .update({ status: 'open' })
-    .eq('id', jobId)
-    .eq('status', 'draft');
+  await openJobForFeed(client, jobId, { requireDraft: true });
 
   await queueLinkedInPost(formData);
   redirect('/');
@@ -1937,7 +1985,7 @@ export async function editJdVersion(formData: FormData) {
   const { data: job, error: e1 } = await client.from('hr_jobs').select('jd_versions').eq('id', jobId).single();
   if (e1) throw new Error(e1.message);
   const versions = { ...((job.jd_versions || {}) as Record<string, string>), [key]: value };
-  const { error: e2 } = await client.from('hr_jobs').update({ jd_versions: versions }).eq('id', jobId);
+  const { error: e2 } = await client.from('hr_jobs').update({ jd_versions: versions, updated_at: new Date().toISOString() }).eq('id', jobId);
   if (e2) throw new Error(e2.message);
   revalidatePath('/tao-jd');
   revalidatePath('/dang-tin');
@@ -1962,7 +2010,7 @@ export async function regenerateJd(formData: FormData) {
     requirements: job.requirements || undefined,
     nhom: job.nhom || undefined
   }, await resolveBrandContact(client));
-  const { error: e2 } = await client.from('hr_jobs').update({ jd_versions: versions }).eq('id', jobId);
+  const { error: e2 } = await client.from('hr_jobs').update({ jd_versions: versions, updated_at: new Date().toISOString() }).eq('id', jobId);
   if (e2) throw new Error(e2.message);
   revalidatePath('/tao-jd');
   revalidatePath('/dang-tin');
@@ -1973,8 +2021,7 @@ export async function finalizeJd(formData: FormData) {
   const jobId = String(formData.get('job_id') || '');
   if (!jobId) return;
   const client = getServerClient();
-  const { error } = await client.from('hr_jobs').update({ status: 'open' }).eq('id', jobId).eq('status', 'draft');
-  if (error) throw new Error(error.message);
+  await openJobForFeed(client, jobId, { requireDraft: true });
   revalidatePath('/tao-jd');
   revalidatePath('/dang-tin');
 }
@@ -2022,10 +2069,8 @@ export async function addToAutoQueue(formData: FormData) {
   const jobId = String(formData.get('job_id') || '');
   if (!jobId) return;
   const client = getServerClient();
-  const { error } = await client.from('hr_jobs')
-    .update({ status: 'open', auto_post: true })
-    .eq('id', jobId);
-  if (error) throw new Error(error.message);
+  // Không đặt requireDraft: cho phép bật auto_post trên tin đã open (behavior cũ).
+  await openJobForFeed(client, jobId, { extra: { auto_post: true } });
   revalidatePath('/tao-jd');
   redirect('/tao-jd');
 }
@@ -2085,10 +2130,16 @@ export async function createJdDraftForPanel(
     nhom: String(formData.get('nhom') || '').trim() || undefined,
   };
   const image_hint = String(formData.get('image_hint') || '').trim() || null;
+  const salary_display = String(formData.get('salary_display') || '').trim() || null;
+  const employment_type = normEmploymentType(formData.get('employment_type'));
   const client = getServerClient();
   const { versions } = await composeJdVersions(job, await resolveBrandContact(client));
 
+  // Sinh id trước để ghép slug ngay trong INSERT (tránh round-trip UPDATE slug).
+  const jobId = randomUUID();
+  const slug = makeJobSlug(job.title, jobId);
   const { data, error } = await client.from('hr_jobs').insert({
+    id: jobId,
     title: job.title,
     department: job.department || null,
     location: job.location || null,
@@ -2100,6 +2151,10 @@ export async function createJdDraftForPanel(
     image_hint,
     headcount,
     status: 'draft',
+    slug,
+    salary_display,
+    employment_type,
+    updated_at: new Date().toISOString(),
   }).select('id').single();
   if (error) throw new Error(error.message);
 

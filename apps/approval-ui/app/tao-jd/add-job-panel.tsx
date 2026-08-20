@@ -47,6 +47,26 @@ export default function AddJobPanel() {
                     {allPositions.map((p) => <option key={p} value={p} />)}
                   </datalist>
                   <input className="note" name="location" placeholder="Nơi làm việc, ví dụ Vũng Tàu" />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input
+                      className="note"
+                      name="salary_display"
+                      placeholder="Mức lương, ví dụ 10-15 triệu/tháng"
+                      aria-label="Mức lương hiển thị"
+                    />
+                    <select
+                      className="note"
+                      name="employment_type"
+                      defaultValue="full-time"
+                      aria-label="Loại hợp đồng"
+                    >
+                      <option value="full-time">Toàn thời gian</option>
+                      <option value="part-time">Bán thời gian</option>
+                      <option value="contract">Hợp đồng thời vụ</option>
+                      <option value="internship">Thực tập</option>
+                      <option value="temporary">Ngắn hạn</option>
+                    </select>
+                  </div>
                   <textarea name="short_desc" rows={3} placeholder="Mô tả công việc"
                     style={{ width: '100%', boxSizing: 'border-box' }} aria-label="Mô tả công việc" />
                   <textarea name="requirements" rows={3} placeholder="Yêu cầu ứng viên"
