@@ -226,6 +226,14 @@ export function sourceLabel(source?: string | null): string {
   }
 }
 
+// Nhãn nguồn KÊNH của hồ sơ (hr_candidates.nguon_kenh) — CV đến từ kênh đăng tin nào.
+// Hai khóa đặc biệt ngoài registry kênh: 'gioi_thieu' và 'khac'. Rỗng/không rõ gộp "Khác / Không rõ".
+export function recruitSourceLabel(kenh?: string | null): string {
+  if (!kenh || kenh === 'khac') return 'Khác / Không rõ';
+  if (kenh === 'gioi_thieu') return 'Giới thiệu';
+  return channelLabel(kenh);
+}
+
 function safeStringify(v: unknown): string {
   try {
     return JSON.stringify(v, null, 2);

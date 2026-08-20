@@ -1,10 +1,11 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
-import { formatDate, stageMeta, sourceLabel } from './labels';
-import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate, confirmHired, reinviteForJob, assignJobToApplication, createBossReviewLink, revokeBossReviewLink } from './actions';
+import { formatDate, stageMeta, sourceLabel, recruitSourceLabel } from './labels';
+import { advanceToInterview, saveNote, rejectSourced, decideCandidate, markInterviewed, deleteCandidate, confirmHired, reinviteForJob, assignJobToApplication, setCandidateChannel, createBossReviewLink, revokeBossReviewLink } from './actions';
 
 export type JobOption = { id: string; title: string };
+export type SourceOption = { kenh: string; ten: string };
 
 export type CandView = {
   id: string;
@@ -16,6 +17,7 @@ export type CandView = {
   subject: string;
   jobId: string | null;
   viTri: string;
+  nguonKenh: string | null;
   attachments: string;
   consent: string;
   createdAt: string;
@@ -285,6 +287,43 @@ function AssignJobControl({ appId, current, openJobs }: { appId: string; current
   );
 }
 
+// Gán nguồn KÊNH cho hồ sơ (hr_candidates.nguon_kenh). Ứng viên liên hệ qua email/điện thoại nên
+// không tự biết nguồn — người vận hành chọn tay từ danh sách kênh đăng tin (+ Giới thiệu, Khác).
+// Dùng cho báo cáo hiệu quả từng kênh ở Tổng quan và Báo cáo.
+function SourceChannelControl({ candidateId, current, options }: { candidateId: string; current: string | null; options: SourceOption[] }) {
+  const [edit, setEdit] = useState(false);
+  const [kenh, setKenh] = useState(current || '');
+
+  if (!edit) {
+    return (
+      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+        <span>{current ? recruitSourceLabel(current) : <span className="muted">Chưa gán</span>}</span>
+        <button className="btn ghost" type="button" onClick={() => setEdit(true)} style={{ fontSize: '0.85em' }}>
+          {current ? 'Đổi' : 'Gán nguồn'}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form
+      action={setCandidateChannel}
+      className="row"
+      style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}
+      onSubmit={() => setEdit(false)}
+    >
+      <input type="hidden" name="candidateId" value={candidateId} />
+      <select className="note" name="kenh" value={kenh} onChange={(e) => setKenh(e.target.value)} aria-label="Chọn nguồn kênh">
+        <option value="">Bỏ gán (không rõ nguồn)</option>
+        {options.map((o) => (
+          <option key={o.kenh} value={o.kenh}>{o.ten}</option>
+        ))}
+      </select>
+      <button className="btn ok" type="submit" style={{ fontSize: '0.85em' }}>Lưu</button>
+      <button className="btn ghost" type="button" onClick={() => setEdit(false)} style={{ fontSize: '0.85em' }}>Hủy</button>
+    </form>
+  );
+}
+
 // Mời lại một ứng viên đã từ chối (hoặc đã mời/lưu nguồn) cho một vị trí đang tuyển khác.
 // Từ chối không xoá dữ liệu — ứng viên vẫn nằm trong nguồn, chọn vị trí phù hợp là đưa lại vào luồng.
 function ReinviteControl({ appId, jobs }: { appId: string; jobs: JobOption[] }) {
@@ -316,7 +355,7 @@ function ReinviteControl({ appId, jobs }: { appId: string; jobs: JobOption[] }) 
 // Nội dung mở rộng của một hồ sơ: chi tiết, tab CV/điểm/phỏng vấn/ghi chú, nút hành động.
 // Không có wrapper <li>/<div className="card"> nữa — dùng bên trong expand row của bảng,
 // khối bao ngoài do bảng cha chịu trách nhiệm.
-function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: string[]; openJobs: JobOption[] }) {
+function CandidateDetail({ c, windows, openJobs, sourceOptions }: { c: CandView; windows: string[]; openJobs: JobOption[]; sourceOptions: SourceOption[] }) {
   const [tab, setTab] = useState<string | null>(null);
   const toggle = (t: string) => setTab((cur) => (cur === t ? null : t));
 
@@ -337,6 +376,10 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
             <dd><AssignJobControl appId={c.appId} current={c.viTri} openJobs={openJobs} /></dd>
           </div>
         ) : null}
+        <div className="field field-long">
+          <dt>Nguồn (kênh)</dt>
+          <dd><SourceChannelControl candidateId={c.id} current={c.nguonKenh} options={sourceOptions} /></dd>
+        </div>
         {c.appId ? (
           <div className="field field-long">
             <dt>Chia sẻ cho sếp xem</dt>
@@ -515,7 +558,7 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
 // Danh sách hồ sơ: tìm kiếm, lọc theo trạng thái, sắp xếp theo mới nhất hoặc điểm.
 // Bố cục dạng bảng — mỗi hàng gọn (tên, vị trí, điểm, giai đoạn, ngày nhận), bấm mở
 // expand row phía dưới chứa chi tiết + tab + nút hành động.
-export default function CandidateList({ candidates, windows, openJobs }: { candidates: CandView[]; windows: string[]; openJobs: JobOption[] }) {
+export default function CandidateList({ candidates, windows, openJobs, sourceOptions }: { candidates: CandView[]; windows: string[]; openJobs: JobOption[]; sourceOptions: SourceOption[] }) {
   const [q, setQ] = useState('');
   const [stage, setStage] = useState<string | null>(null);
   const [sort, setSort] = useState<'moi' | 'diem'>('moi');
@@ -609,7 +652,7 @@ export default function CandidateList({ candidates, windows, openJobs }: { candi
           {isOpen ? (
             <tr className="cand-expand-row">
               <td colSpan={6}>
-                <CandidateDetail c={c} windows={windows} openJobs={openJobs} />
+                <CandidateDetail c={c} windows={windows} openJobs={openJobs} sourceOptions={sourceOptions} />
               </td>
             </tr>
           ) : null}

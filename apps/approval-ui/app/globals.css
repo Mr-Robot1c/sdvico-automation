@@ -1278,6 +1278,42 @@ select.note { cursor: pointer; }
 .pos-num--warn b { color: #b56800; }
 .pos-num--zero { opacity: 0.45; }
 
+/* ── Thẻ vị trí lớn ở Tổng quan (khối chính) ───────────────────────────────── */
+.dash-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.pos-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.pos-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 4px;
+}
+.pos-card-title { font-size: 1.15rem; font-weight: 700; color: var(--ink); text-decoration: none; line-height: 1.25; }
+.pos-card-title:hover { color: var(--accent); }
+.pos-card-sub { font-size: 0.82rem; margin-bottom: 10px; }
+.pos-card-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: auto; }
+.pos-stat-tile {
+  display: flex; flex-direction: column; gap: 2px; align-items: center;
+  padding: 10px 6px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  text-decoration: none; color: var(--ink);
+  transition: border-color 0.12s, transform 0.08s;
+}
+.pos-stat-tile:hover { border-color: var(--accent); }
+.pos-stat-tile:active { transform: translateY(1px); }
+.pos-stat-n { font-size: 1.7rem; font-weight: 700; line-height: 1; color: var(--ink); }
+.pos-stat-l { font-size: 0.72rem; color: var(--ink-2); text-align: center; line-height: 1.2; }
+/* Ô CV mới nổi bật nhất: nền accent, số to hơn — theo yêu cầu highlight CV mới của vị trí. */
+.pos-stat-tile--accent { background: var(--accent-bg); border-color: var(--accent); }
+.pos-stat-tile--accent .pos-stat-n { font-size: 2.1rem; color: var(--accent); }
+.pos-stat-tile--accent .pos-stat-l { color: var(--accent); font-weight: 600; }
+
+/* ── Danh sách nguồn hồ sơ (Tổng quan) ──────────────────────────────────────── */
+.src-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.src-row { display: grid; grid-template-columns: 150px 1fr auto; gap: 10px; align-items: center; }
+.src-name { font-size: 0.88rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.src-bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.src-bar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.src-n { font-size: 0.85rem; color: var(--ink); white-space: nowrap; }
+@media (max-width: 520px) { .src-row { grid-template-columns: 110px 1fr auto; } }
+
 /* Trang Báo cáo: thẻ số. Không phụ thuộc lib biểu đồ nào, tất cả CSS ở đây. */
 .report-grid {
   display: grid;

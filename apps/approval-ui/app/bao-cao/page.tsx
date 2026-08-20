@@ -1,7 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import DailyChart from './daily-chart';
-import { kindMeta, formatDateTime, formatDate } from '../labels';
+import { kindMeta, formatDateTime, formatDate, recruitSourceLabel } from '../labels';
 import { loadFbMetricsMap } from '../../lib/fb-metrics';
 
 // Nhãn tiếng Việt cho các task hay gặp trong run_log — thay cho mã máy như "hr.publish_facebook".
@@ -102,6 +102,25 @@ export default async function Page() {
     kind: string; status: string; decided_at: string;
     decided_by: string | null; title: string | null;
   }>;
+
+  // Nguồn hồ sơ theo kênh (đo hiệu quả từng kênh). Cột nguon_kenh có thể chưa migrate — đọc
+  // an toàn ở truy vấn riêng để không làm hỏng các số liệu CV khác nếu cột chưa có.
+  const { data: srcData } = await client
+    .from('hr_candidates')
+    .select('created_at, nguon_kenh')
+    .gte('created_at', sinceIso)
+    .limit(2000);
+  const srcRows = (srcData || []) as Array<{ created_at: string; nguon_kenh: string | null }>;
+  const srcSince7 = Date.now() - 7 * ONE_DAY;
+  const sourceStat = new Map<string, { d7: number; d30: number }>();
+  for (const r of srcRows) {
+    const key = r.nguon_kenh || 'khac';
+    const cur = sourceStat.get(key) || { d7: 0, d30: 0 };
+    cur.d30 += 1;
+    if (new Date(r.created_at).getTime() >= srcSince7) cur.d7 += 1;
+    sourceStat.set(key, cur);
+  }
+  const sourceStatRows = [...sourceStat.entries()].sort((a, b) => b[1].d30 - a[1].d30);
 
   const runs = (runsRes.data || []) as Row[];
   const cands = (candRes.data || []) as { id: string; created_at: string }[];
@@ -211,6 +230,39 @@ export default async function Page() {
           Đường xanh: CV nạp về. Đường vàng: bài đăng thành công. Trục dọc là số lượt trong ngày.
         </p>
         <DailyChart cv={cvSeries} posts={postSeries} />
+      </section>
+
+      {/* Hiệu quả nguồn tuyển: số CV theo từng kênh nguồn (gán tay ở trang Hồ sơ). */}
+      <section className="settings-box">
+        <h2 style={{ margin: '0 0 6px', fontSize: '1.02rem' }}>Hiệu quả nguồn tuyển</h2>
+        <p className="muted" style={{ margin: '0 0 10px', fontSize: '0.85em' }}>
+          Số CV nhận được theo từng kênh nguồn. Nguồn do người vận hành gán tay ở trang Hồ sơ;
+          gán càng đầy đủ, số càng sát thực tế.
+        </p>
+        {sourceStatRows.length === 0 ? (
+          <p className="muted">Chưa có dữ liệu nguồn. Mở một hồ sơ ở trang Hồ sơ và bấm &quot;Gán nguồn&quot;.</p>
+        ) : (
+          <div className="table-scroll">
+            <table className="run-log">
+              <thead>
+                <tr>
+                  <th>Nguồn</th>
+                  <th style={{ textAlign: 'right' }}>7 ngày</th>
+                  <th style={{ textAlign: 'right' }}>30 ngày</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sourceStatRows.map(([kenh, v]) => (
+                  <tr key={kenh}>
+                    <td>{recruitSourceLabel(kenh)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{v.d7}</td>
+                    <td style={{ textAlign: 'right' }}>{v.d30}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {/* Tương tác Facebook — cộng dồn số like/bình luận/chia sẻ của các bài đã đăng qua hệ thống.

@@ -2,6 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import CandidateList, { type CandView } from '../candidate-list';
 import { axisLabel, formatDate } from '../labels';
+import { getAllChannels } from '../../lib/channels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 export const dynamic = 'force-dynamic';
@@ -100,6 +101,25 @@ export default async function Page() {
     if (r.hired_at) hiredAt.set(r.id, r.hired_at);
   }
 
+  // Nguồn kênh của hồ sơ (hr_candidates.nguon_kenh). Cột có thể chưa migrate — đọc an toàn,
+  // thiếu cột thì map rỗng, trang vẫn chạy (control gán nguồn sẽ báo cần migration khi bấm lưu).
+  const nguonKenhMap = new Map<string, string>();
+  const candIds = rows.map((c) => c.id);
+  if (candIds.length) {
+    const { data: nkRows } = await client.from('hr_candidates').select('id, nguon_kenh').in('id', candIds);
+    for (const r of (nkRows || []) as Array<{ id: string; nguon_kenh: string | null }>) {
+      if (r.nguon_kenh) nguonKenhMap.set(r.id, r.nguon_kenh);
+    }
+  }
+
+  // Danh sách nguồn để gán tay: mọi kênh đã biết (registry + kênh người dùng thêm) + Giới thiệu + Khác.
+  const allChannelsForSource = await getAllChannels(client);
+  const sourceOptions = [
+    ...allChannelsForSource.map((c) => ({ kenh: c.kenh, ten: c.ten })),
+    { kenh: 'gioi_thieu', ten: 'Giới thiệu' },
+    { kenh: 'khac', ten: 'Khác / Không rõ' },
+  ];
+
   // Vị trí đang tuyển, để mời lại ứng viên đã từ chối cho một việc khác phù hợp.
   const { data: jobRows } = await client.from('hr_jobs').select('id, title').eq('status', 'open').order('created_at', { ascending: false });
   const openJobs = ((jobRows || []) as Array<{ id: string; title: string }>).map((j) => ({ id: j.id, title: j.title }));
@@ -148,6 +168,7 @@ export default async function Page() {
       subject: c.cv_json?.source_message?.subject || '',
       jobId: app?.job_id || null,
       viTri: (app?.job_id && jobTitleMap.get(app.job_id)) || '',
+      nguonKenh: nguonKenhMap.get(c.id) || null,
       attachments: (c.cv_json?.attachments || []).map((a) => a.filename).filter(Boolean).join(', '),
       consent:
         (c.consent_at ? formatDate(c.consent_at) : 'Chưa có') +
@@ -207,7 +228,7 @@ export default async function Page() {
         </div>
       ) : null}
 
-      {!error && candidates.length > 0 ? <CandidateList candidates={candidates} windows={windows} openJobs={openJobs} /> : null}
+      {!error && candidates.length > 0 ? <CandidateList candidates={candidates} windows={windows} openJobs={openJobs} sourceOptions={sourceOptions} /> : null}
     </main>
   );
 }

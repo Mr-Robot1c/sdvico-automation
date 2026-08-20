@@ -490,6 +490,31 @@ export async function assignJobToApplication(formData: FormData) {
   revalidatePath('/lich');
 }
 
+// Gán nguồn KÊNH cho hồ sơ ứng viên (hr_candidates.nguon_kenh). Ứng viên liên hệ qua email/điện
+// thoại nên nguồn không tự suy ra được — người vận hành chọn tay từ danh sách kênh đăng tin.
+// kenh rỗng = bỏ gán (về null). Dùng cho báo cáo hiệu quả từng kênh ở Tổng quan và Báo cáo.
+export async function setCandidateChannel(formData: FormData) {
+  const candidateId = String(formData.get('candidateId') || '');
+  const kenh = String(formData.get('kenh') || '').trim();
+  if (!candidateId) return;
+
+  const client = getServerClient();
+  const { error } = await client
+    .from('hr_candidates')
+    .update({ nguon_kenh: kenh || null })
+    .eq('id', candidateId);
+  if (error) {
+    if (error.code === '42703' || /nguon_kenh/.test(error.message)) {
+      throw new Error('Chưa có cột nguon_kenh. Chạy migration 20260820120000_hr_candidate_source.sql trong Supabase rồi thử lại.');
+    }
+    throw new Error('Gán nguồn lỗi: ' + error.message);
+  }
+
+  revalidatePath('/ho-so');
+  revalidatePath('/');
+  revalidatePath('/bao-cao');
+}
+
 // Mời lại một ứng viên đã kết thúc (từ chối / đã mời / lưu nguồn) cho một vị trí khác.
 // Điều cấm 2 tinh thần: từ chối không xoá dữ liệu, ứng viên vẫn nằm trong nguồn để dùng lại.
 // Đưa hồ sơ về stage 'review' cho vị trí mới, giữ điểm chấm và tóm tắt để tham khảo,

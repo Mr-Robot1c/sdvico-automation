@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
-import { kindMeta, formatRelative, formatDateTime } from '../labels';
+import { kindMeta, formatRelative, formatDateTime, recruitSourceLabel } from '../labels';
 
 // Trang tổng quan — mở đầu ngày làm việc: đủ để biết có việc gì gấp.
 // Không thay trang /: người quen bấm "Duyệt & gửi" vẫn giữ đường cũ, trang này thêm vào,
@@ -198,6 +198,24 @@ export default async function Page() {
   const pendingTotal = queue.length;
   const pendingTopKinds = [...pendingByKind.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
 
+  // Nguồn hồ sơ 30 ngày qua (đo hiệu quả từng kênh). Cột nguon_kenh có thể chưa migrate —
+  // đọc an toàn: thiếu cột thì danh sách rỗng, panel hiện lời nhắc gán nguồn.
+  const cvBySource = new Map<string, number>();
+  {
+    const since30Iso = new Date(Date.now() - 30 * ONE_DAY).toISOString();
+    const { data: srcRows } = await client
+      .from('hr_candidates')
+      .select('nguon_kenh')
+      .gte('created_at', since30Iso)
+      .limit(2000);
+    for (const r of (srcRows || []) as Array<{ nguon_kenh: string | null }>) {
+      const key = r.nguon_kenh || 'khac';
+      cvBySource.set(key, (cvBySource.get(key) || 0) + 1);
+    }
+  }
+  const sourceRows = [...cvBySource.entries()].sort((a, b) => b[1] - a[1]);
+  const sourceTotal = sourceRows.reduce((s, [, n]) => s + n, 0);
+
   return (
     <main>
       <header className="head-row">
@@ -208,102 +226,76 @@ export default async function Page() {
         <AutoRefresh seconds={60} />
       </header>
 
-      {/* 4 KPI chính — vị trí đứng đầu vì đó là gốc. Bấm đi thẳng tới trang xử lý. */}
-      <section className="dash-grid">
-        <Link href="/tao-jd" className="dash-kpi dash-kpi--accent" aria-label="Xem các vị trí đang tuyển">
-          <span className="dash-kpi-label">Đang tuyển</span>
-          <span className="dash-kpi-value">{openJobs.length}</span>
-          <span className="dash-kpi-sub">
-            {openJobs.length === 0
-              ? 'Chưa mở vị trí nào.'
-              : totalHeadcount > 0
-                ? `${openJobs.length} vị trí · cần tuyển ${totalHeadcount} người`
-                : `${openJobs.length} vị trí đang mở`}
-          </span>
-        </Link>
-
-        <Link
-          href="/"
-          className={`dash-kpi${pendingTotal > 0 ? ' dash-kpi--warn' : ''}`}
-          aria-label="Vào trang Duyệt và gửi"
-        >
-          <span className="dash-kpi-label">Đang chờ duyệt</span>
-          <span className="dash-kpi-value">{pendingTotal}</span>
-          <span className="dash-kpi-sub">
-            {pendingTotal === 0
-              ? 'Đã duyệt hết. Không có việc nào chờ bạn.'
-              : pendingTopKinds.length > 0
-                ? pendingTopKinds.map(([k, n]) => `${kindMeta(k).label} ${n}`).join(' · ')
-                : 'Có việc chờ duyệt.'}
-          </span>
-        </Link>
-
-        <Link href="/ho-so" className="dash-kpi">
-          <span className="dash-kpi-label">CV mới hôm nay</span>
-          <span className="dash-kpi-value">{cvToday}</span>
-          <span className="dash-kpi-sub">
-            {cvTodayByJob.size > 0
-              ? `Trải ${cvTodayByJob.size} vị trí · ${reviewCount} hồ sơ chờ xem`
-              : reviewCount > 0 ? `${reviewCount} hồ sơ chờ xem` : 'Chưa có hồ sơ chờ xem'}
-          </span>
-        </Link>
-
-        <Link href="/lich" className={`dash-kpi${interviewsToday.length > 0 ? ' dash-kpi--accent' : ''}`}>
-          <span className="dash-kpi-label">Phỏng vấn hôm nay</span>
-          <span className="dash-kpi-value">{interviewsToday.length}</span>
-          <span className="dash-kpi-sub">
-            {interviewsToday.length === 0 && interviewsTomorrow.length > 0
-              ? `${interviewsTomorrow.length} buổi ngày mai`
-              : interviewsToday.length === 0
-                ? nextInterview
-                  ? `Gần nhất: ${nextInterview.near.label}`
-                  : 'Không có buổi nào sắp tới'
-                : nextInterview
-                  ? `Sớm nhất: ${nextInterview.near.label.replace(/^.+?,\s*/, '')}`
-                  : ''}
-          </span>
-        </Link>
-      </section>
-
-      {/* Trọng tâm: mỗi vị trí đang tuyển kèm số CV mới, hồ sơ chờ xem, phỏng vấn sắp tới.
-          Đây là gốc — các con số CV và phỏng vấn ở trên được tách rõ về từng vị trí ở đây. */}
-      <section className="dash-panel" style={{ marginBottom: 22 }}>
-        <h2 className="dash-panel-title">
-          Vị trí đang tuyển <span className="muted">({openJobs.length})</span>
-        </h2>
+      {/* KHỐI CHÍNH: các vị trí đang tuyển là thẻ lớn, mỗi vị trí highlight CV mới hôm nay cùng
+          hồ sơ chờ xem và phỏng vấn sắp tới. Tín hiệu "chờ duyệt" đã có ở badge mục Duyệt & gửi
+          bên trái nên bỏ hàng KPI phụ phía trên. */}
+      <section style={{ marginBottom: 22 }}>
+        <div className="dash-section-head">
+          <h2 className="dash-panel-title" style={{ margin: 0 }}>
+            Vị trí đang tuyển <span className="muted">({openJobs.length})</span>
+          </h2>
+          {totalHeadcount > 0 ? (
+            <span className="muted" style={{ fontSize: '0.85rem' }}>Cần tuyển tổng {totalHeadcount} người</span>
+          ) : null}
+        </div>
         {openJobs.length === 0 ? (
           <p className="muted dash-empty">
             Chưa có vị trí nào đang tuyển. Sang <Link href="/tao-jd">Vị trí tuyển dụng</Link> để mở tin.
           </p>
         ) : (
-          <ul className="dash-list">
+          <div className="pos-cards">
             {openJobs.map((j) => {
               const cvNew = cvTodayByJob.get(j.id) || 0;
               const review = reviewByJob.get(j.id) || 0;
               const pv = interviewByJob.get(j.id) || 0;
               const meta = [j.department, j.location].filter(Boolean).join(' · ');
               return (
-                <li key={j.id} className="dash-item">
-                  <div className="dash-item-main">
-                    <Link href="/tao-jd" className="dash-item-title" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
-                      {j.title}
-                    </Link>
-                    <span className="muted dash-item-sub">
-                      {j.headcount ? `Cần ${j.headcount} người` : 'Chưa đặt số lượng'}
-                      {meta ? ` · ${meta}` : ''}
-                    </span>
+                <div key={j.id} className="pos-card">
+                  <Link href="/tao-jd" className="pos-card-title">{j.title}</Link>
+                  <div className="pos-card-sub muted">
+                    {j.headcount ? `Cần ${j.headcount} người` : 'Chưa đặt số lượng'}
+                    {meta ? ` · ${meta}` : ''}
                   </div>
-                  <div className="pos-nums">
-                    <Link href="/ho-so" className={`pos-num${cvNew === 0 ? ' pos-num--zero' : ''}`} style={{ textDecoration: 'none' }}>
-                      CV mới <b>{cvNew}</b>
+                  <div className="pos-card-stats">
+                    <Link href="/ho-so" className="pos-stat-tile pos-stat-tile--accent" aria-label="CV mới hôm nay của vị trí này">
+                      <span className="pos-stat-n">{cvNew}</span>
+                      <span className="pos-stat-l">CV mới hôm nay</span>
                     </Link>
-                    <Link href="/ho-so" className={`pos-num pos-num--accent${review === 0 ? ' pos-num--zero' : ''}`} style={{ textDecoration: 'none' }}>
-                      Chờ xem <b>{review}</b>
+                    <Link href="/ho-so" className="pos-stat-tile" aria-label="Hồ sơ chờ xem của vị trí này">
+                      <span className="pos-stat-n">{review}</span>
+                      <span className="pos-stat-l">Chờ xem</span>
                     </Link>
-                    <Link href="/lich" className={`pos-num pos-num--warn${pv === 0 ? ' pos-num--zero' : ''}`} style={{ textDecoration: 'none' }}>
-                      PV sắp tới <b>{pv}</b>
+                    <Link href="/lich" className="pos-stat-tile" aria-label="Phỏng vấn sắp tới của vị trí này">
+                      <span className="pos-stat-n">{pv}</span>
+                      <span className="pos-stat-l">PV sắp tới</span>
                     </Link>
                   </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Nguồn hồ sơ 30 ngày — liếc nhanh hiệu quả từng kênh. Bảng đầy đủ 7/30 ngày ở trang Báo cáo. */}
+      <section className="dash-panel" style={{ marginBottom: 22 }}>
+        <h2 className="dash-panel-title">
+          Nguồn hồ sơ <span className="muted">(30 ngày · {sourceTotal})</span>
+        </h2>
+        {sourceRows.length === 0 ? (
+          <p className="muted dash-empty">
+            Chưa có dữ liệu nguồn. Mở một hồ sơ ở <Link href="/ho-so">Hồ sơ ứng viên</Link> rồi bấm
+            &quot;Gán nguồn&quot; để ghi CV đến từ kênh nào.
+          </p>
+        ) : (
+          <ul className="src-list">
+            {sourceRows.map(([kenh, n]) => {
+              const pct = sourceTotal > 0 ? Math.round((n / sourceTotal) * 100) : 0;
+              return (
+                <li key={kenh} className="src-row">
+                  <span className="src-name">{recruitSourceLabel(kenh)}</span>
+                  <span className="src-bar"><i style={{ width: `${pct}%` }} /></span>
+                  <span className="src-n"><b>{n}</b> <span className="muted">({pct}%)</span></span>
                 </li>
               );
             })}
