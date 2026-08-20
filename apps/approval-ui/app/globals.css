@@ -1095,6 +1095,10 @@ a.chip:hover { filter: brightness(0.98); }
 /* Field co label tren, input duoi (form Quang cao — item 4). */
 .field-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field-col .sub { font-weight: 500; }
+/* .note co flex: 1 1 200px (danh cho .row NGANG hang duyet). Trong .field-col la flex CONG DOC
+   -> flex-basis 200px thanh CHIEU CAO 200px, o nhap to khong lo (trang Quang cao, user 20/8).
+   Cung bay voi .sx-field 19/8: ep ve chieu cao tu nhien. */
+.field-col .note { flex: 0 0 auto; }
 
 /* Nut lien he CTA tren trang public (blog/san-pham) — Messenger + goi + Zalo, co tracking. */
 .contact-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
