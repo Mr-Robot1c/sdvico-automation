@@ -333,9 +333,15 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               {latest.applied ? <span className="badge tone-ok">✓ Đang áp dụng</span> : null}
             </div>
 
-            <div className="plan-narrative" style={{ marginTop: 8 }}>
-              {(latest.data.narrative || []).map((p, i) => (<p key={i}>{p}</p>))}
-            </div>
+            {/* Gọn (user 20/8: "kế hoạch lộn xộn quá"): bỏ các đoạn văn mẫu dài — thông tin
+                chính đã nằm ở các khối phía trên. Chỉ giữ mục tiêu + 1 dòng số liệu. */}
+            {latest.data.goal ? (
+              <p style={{ margin: '8px 0 4px' }}><b>Mục tiêu:</b> {latest.data.goal.split('\n')[0]}</p>
+            ) : null}
+            <p className="sub" style={{ margin: '4px 0 8px' }}>
+              {vnInt(latest.data.summary?.totalPosts || 0)} bài có số liệu · {vnInt(latest.data.summary?.totalEngagement || 0)} tương tác · {vnInt(latest.data.summary?.totalConversions || 0)} đơn/lead
+              {latest.data.summary?.knowledge ? ` · đã học ${vnInt(latest.data.summary.knowledge.internal)} nguồn nội bộ + ${vnInt(latest.data.summary.knowledge.publicSrc)} nguồn public` : ''}
+            </p>
 
             <div className="plan-actions" style={{ display: 'flex', gap: 8, margin: '10px 0' }}>
               {latest.applied ? (

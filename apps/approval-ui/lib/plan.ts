@@ -183,7 +183,11 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
   const latest = new Map<string, FbMetrics>();
   for (const r of mrows || []) {
     const cid = (r as any).entity_ref as string | null;
-    if (cid && !latest.has(cid)) latest.set(cid, ((r as any).metrics || {}) as FbMetrics);
+    // Bỏ dòng PAGE-LEVEL (__page__/__page_real__ = đếm follower, thêm 19/8): không phải id
+    // bài. Trước đây lọt vào danh sách cid làm query .in('id', ...) chết (không phải uuid)
+    // -> tra tên bài về RỖNG -> mọi bài rơi vào "Khác" -> "Dẫn đầu là Khác" (gốc sâu nhất).
+    if (!cid || cid.startsWith('__')) continue;
+    if (!latest.has(cid)) latest.set(cid, ((r as any).metrics || {}) as FbMetrics);
   }
 
   const cids = [...latest.keys()];
@@ -200,14 +204,19 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
     }
   }
 
-  const perPost = cids.map((cid) => {
-    const m = latest.get(cid) || {};
-    const c = contents.get(cid) || { title: '(không rõ)', product: 'Khác', conversions: 0 };
-    const reactions = m.reactions || 0;
-    const comments = m.comments || 0;
-    const shares = m.shares || 0;
-    return { cid, title: c.title, product: c.product, engagement: reactions + comments + shares, conversions: c.conversions };
-  });
+  // CHỈ đếm bài còn tồn tại trong mkt_content. Bài đã XÓA vẫn còn snapshot trong mkt_metrics
+  // (entity_ref mồ côi) — trước đây rơi hết vào nhóm "Khác", đủ 3 bài là BOSS xếp "Dẫn đầu là
+  // Khác" vô nghĩa (user bắt 20/8). Bỏ bài ma khỏi đo lường kế hoạch.
+  const perPost = cids
+    .filter((cid) => contents.has(cid))
+    .map((cid) => {
+      const m = latest.get(cid) || {};
+      const c = contents.get(cid)!;
+      const reactions = m.reactions || 0;
+      const comments = m.comments || 0;
+      const shares = m.shares || 0;
+      return { cid, title: c.title, product: c.product, engagement: reactions + comments + shares, conversions: c.conversions };
+    });
 
   const byProduct = new Map<string, { count: number; engagement: number; conversions: number }>();
   for (const r of perPost) {
@@ -385,10 +394,15 @@ export function buildPlan(
   const goal = opts.goal;
 
   // Xếp sản phẩm đủ mẫu theo đơn/lead trung bình rồi tương tác trung bình.
-  const ranked = m.products
+  // "Khác" (bài không nhận diện được sản phẩm) và "Bài content" (bài nuôi trang, không bán)
+  // KHÔNG phải sản phẩm — cấm vào bảng xếp hạng/trọng số, kẻo ra câu "Dẫn đầu là Khác" vô
+  // nghĩa và weights không khớp folder nào của vòng xoay (user bắt 20/8).
+  const NOT_PRODUCT = new Set(['Khác', 'Bài content']);
+  const realProducts = m.products.filter((p) => !NOT_PRODUCT.has(p.product));
+  const ranked = realProducts
     .filter((p) => p.count >= threshold)
     .sort((a, b) => b.avgConv - a.avgConv || b.avgEng - a.avgEng);
-  const insufficient = m.products.filter((p) => p.count < threshold);
+  const insufficient = realProducts.filter((p) => p.count < threshold);
 
   // Chia bậc: đỉnh 1/3 là winner, đáy 1/3 mà chưa ra đơn là weak, còn lại watch.
   const n = ranked.length;

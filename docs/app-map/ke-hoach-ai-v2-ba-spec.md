@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-20
 ttl_days: 90
+<!-- re-verified: 2026-08-20 - loadMeasurement skip __page__/__page_real__ + bai da xoa; buildPlan/plan-live loai "Khac"+"Bai content" khoi ranked/weights; UI chi tiet bo narrative dai. -->
 <!-- re-verified: 2026-08-20 - DailyPlan.contentKind (rotate lam dung loai ke hoach ghi) + carry-over content_suggestions chua dung khi sinh ban moi + UI bang chung huong da dung hom nay. -->
 <!-- re-verified: 2026-08-20 - Nhom chia se 1 nguon /api/share-groups; /ke-hoach bo form nhap tay nhom (popover Quan ly bai viet la noi quan ly); refill huong di khi can (mkt.suggestions_refill 1 lan/ngay) de Creator luon nhan huong tu BOSS. -->
 <!-- re-verified: 2026-08-20 - /ke-hoach redesign gon (user: "planner gon gang, the hien day du plan"): khoi Hom nay (dang SP nao may bai + nhom chia se) -> Ke hoach tuan -> Huong di bai viet (tu ban dang ap, hien used/fresh) -> Cai dat gop 3 form vao details -> Ban day du + lich su vao details. Khong doi action/logic, chi bo cuc. -->

@@ -58,7 +58,11 @@ function vnDayInfo(now: Date, offsetDays: number): { date: string; dow: string; 
 
 // Xếp bậc sản phẩm theo điểm trung bình tuần rồi gán trọng số 1..3.
 function rankProducts(byProduct: Array<{ product: string; count: number; avgScore: number; avgEng: number; conversions: number }>): PlanProduct[] {
-  const eligible = byProduct.filter((p) => p.count >= MIN_POSTS && p.product !== 'Bài content');
+  // "Khác" (không nhận diện được sản phẩm) và "Bài content" không phải sản phẩm bán — loại
+  // khỏi xếp hạng/trọng số (cùng luật với buildPlan, tránh "Dẫn đầu là Khác").
+  const NOT_PRODUCT = new Set(['Khác', 'Bài content']);
+  const pool = byProduct.filter((p) => !NOT_PRODUCT.has(p.product));
+  const eligible = pool.filter((p) => p.count >= MIN_POSTS);
   const sorted = [...eligible].sort((a, b) => b.avgScore - a.avgScore);
   const n = sorted.length;
   const topCut = n ? Math.max(1, Math.round(n / 3)) : 0;
@@ -70,8 +74,8 @@ function rankProducts(byProduct: Array<{ product: string; count: number; avgScor
     else tier = 'watch';
     return { product: p.product, count: p.count, engagement: 0, conversions: p.conversions, avgEng: p.avgEng, avgConv: 0, tier, weight: WEIGHT_BY_TIER[tier], postsPerWeek: 0, note: '' };
   });
-  const insufficient: PlanProduct[] = byProduct
-    .filter((p) => p.count < MIN_POSTS && p.product !== 'Bài content')
+  const insufficient: PlanProduct[] = pool
+    .filter((p) => p.count < MIN_POSTS)
     .map((p) => ({ product: p.product, count: p.count, engagement: 0, conversions: p.conversions, avgEng: p.avgEng, avgConv: 0, tier: 'insufficient' as Tier, weight: WEIGHT_BY_TIER.insufficient, postsPerWeek: 0, note: '' }));
   return [...ranked, ...insufficient];
 }
