@@ -71,6 +71,10 @@ export type DailyPlan = {
   dow: string;         // "Thứ 2".."Chủ nhật"
   sales: Array<{ product: string; count: number }>;
   contentCount: number;
+  // v6 (20/8, user: "ghi rõ là content gì"): loại bài content BOSS định cho ngày đó
+  // (qa | checklist | glossary | tip | engage | portrait). Rotate đọc để sinh ĐÚNG loại.
+  contentKind?: string;
+  contentKindLabel?: string; // nhãn tiếng Việt hiển thị ("Hỏi Đáp"...)
   groups: string[];    // tên nhóm chia sẻ hôm đó
 };
 
@@ -323,6 +327,25 @@ export async function generateAndStorePlan(
   } catch (e: any) {
     console.error('[plan] sinh huong di that bai (ke hoach van luu):', e?.message || e);
     plan.content_suggestions = [];
+  }
+
+  // GIỮ LẠI hướng đi CHƯA DÙNG của bản đang áp (user 20/8: "tạo hướng đi mà chả thấy dùng"
+  // — trước đây mỗi lần sinh bản mới là vứt hết hướng cũ chưa kịp dùng, đếm reset về 0).
+  // Hướng cũ chưa dùng đứng TRƯỚC (ưu tiên dùng nốt), khử trùng theo tiêu đề, tối đa 12.
+  try {
+    const { data: prevApplied } = await client
+      .from('mkt_plans').select('data').eq('applied', true)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const prevSugs: ContentDirection[] = Array.isArray((prevApplied as any)?.data?.content_suggestions)
+      ? (prevApplied as any).data.content_suggestions : [];
+    const carry = prevSugs.filter((s) => !s.used_at);
+    if (carry.length) {
+      const seen = new Set(carry.map((s) => s.title.toLowerCase().trim()));
+      const fresh = (plan.content_suggestions || []).filter((s) => !seen.has(s.title.toLowerCase().trim()));
+      plan.content_suggestions = [...carry, ...fresh].slice(0, 12);
+    }
+  } catch (e: any) {
+    console.error('[plan] carry-over huong di loi (bo qua):', e?.message || e);
   }
 
   const win = weekWindowVN(now);

@@ -100,6 +100,22 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   const today = todayVN();
   const todayPlan = liveData?.daily_schedule?.find((d) => d.date === today) || null;
 
+  // Bang chung hom nay may DA sinh bai theo huong nao (user 20/8: "tao huong di ma cha thay
+  // dung"): doc mkt_content sinh hom nay co brief.suggestion_title. Huong da dung nam o ban
+  // ke hoach TRUOC (bi thay giua ngay) van hien duoc o day.
+  const dayStartIso = new Date(new Date(today + 'T00:00:00+07:00')).toISOString();
+  const { data: todayGen } = await client
+    .from('mkt_content')
+    .select('brief')
+    .gte('created_at', dayStartIso)
+    .eq('brief->>generator', 'rotation')
+    .limit(20);
+  const usedTodayTitles = [...new Set(
+    (todayGen || [])
+      .map((r: any) => String(r.brief?.suggestion_title || '').trim())
+      .filter(Boolean)
+  )];
+
   // Huong di bai viet tu ban DANG AP (content_suggestions).
   const suggestions = appliedRow?.data?.content_suggestions || [];
   const sugFresh = suggestions.filter((s) => !s.used_at);
@@ -131,12 +147,17 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               {todayPlan.sales.length
                 ? todayPlan.sales.map((s) => `${s.product} (${vnInt(s.count)} bài)`).join(', ')
                 : 'không có bài bán hôm nay'}
-              {' · '}<b>Bài content:</b> {vnInt(todayPlan.contentCount)}
+              {' · '}<b>Bài content:</b> {vnInt(todayPlan.contentCount)}{todayPlan.contentKindLabel ? ` (${todayPlan.contentKindLabel})` : ''}
             </div>
             <div>
               <b>Chia sẻ vào nhóm:</b>{' '}
               {todayPlan.groups.length ? todayPlan.groups.join(', ') : (shareGroups.length ? 'nghỉ hôm nay' : 'chưa nhập nhóm (mở Cài đặt bên dưới)')}
             </div>
+            {usedTodayTitles.length ? (
+              <div>
+                <b>Hôm nay máy đã sinh bài theo hướng:</b> {usedTodayTitles.join(' · ')}
+              </div>
+            ) : null}
             <p className="sub" style={{ margin: 0 }}>
               Máy tự sinh bài lúc 8h và 13h rồi chờ trong Hàng đợi duyệt. Việc của người: bấm Duyệt, và tự tay chia sẻ bài vào nhóm nêu trên (Facebook không cho máy đăng nhóm).
             </p>
@@ -186,7 +207,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                     <tr key={d.date} className={d.date === today ? 'row-today' : undefined}>
                       <td>{d.date === today ? '👉 ' : ''}<b>{d.dow}</b> <span className="sub">{fmtDate(d.date)}</span></td>
                       <td>{d.sales.length ? d.sales.map((s) => `${s.product} (${vnInt(s.count)})`).join(', ') : '—'}</td>
-                      <td className="num">{vnInt(d.contentCount)}</td>
+                      <td>{vnInt(d.contentCount)}{d.contentKindLabel ? <span className="sub"> · {d.contentKindLabel}</span> : null}</td>
                       <td className="sub">{d.groups.length ? d.groups.join(', ') : '—'}</td>
                     </tr>
                   ))}

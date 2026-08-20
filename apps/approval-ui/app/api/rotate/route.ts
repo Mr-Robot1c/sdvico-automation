@@ -433,6 +433,19 @@ export async function GET(req: Request) {
     let r = Math.random() * kindTotal;
     let chosenKind = 'qa';
     for (const [k, w] of Object.entries(KIND_WEIGHT)) { r -= w; if (r <= 0) { chosenKind = k; break; } }
+    // v6 (20/8, user: "ghi rõ content gì"): KẾ HOẠCH SỐNG đã định loại content cho từng ngày
+    // (daily_schedule[hôm nay].contentKind) — máy làm ĐÚNG loại kế hoạch ghi, hết cảnh trang
+    // Kế hoạch nói một đằng máy sinh một nẻo. Không có lịch hôm nay -> giữ random theo weight.
+    try {
+      const { data: liveRow } = await client
+        .from('mkt_plans').select('data').eq('data->>origin', 'live')
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      const todayVNs = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+      const todaySched = (liveRow as any)?.data?.daily_schedule?.find((d: any) => d.date === todayVNs);
+      if (todaySched?.contentKind && KIND_WEIGHT[todaySched.contentKind] !== undefined) {
+        chosenKind = todaySched.contentKind;
+      }
+    } catch { /* giữ random */ }
     const topicsOfKind = (CONTENT_TOPICS as any[]).filter((t) => t.type === chosenKind);
     const chosenTopic = topicsOfKind.length ? pickRandom(topicsOfKind) : undefined;
 

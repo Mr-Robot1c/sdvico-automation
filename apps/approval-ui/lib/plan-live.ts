@@ -30,17 +30,30 @@ const GROUPS_PER_DAY = 2;         // mỗi ngày gợi ý chia sẻ vào 2 nhóm
 
 const DOW_VN = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
+// Loại bài content chia sẵn cho 7 ngày (user 20/8: "ghi rõ content gì"). Tỷ lệ bám
+// KIND_WEIGHT của rotate (qa 2, checklist 2, tip 1, engage 1, portrait 1): chuỗi 7 ngày
+// xoay theo NGÀY TRONG TUẦN (T2 đầu chuỗi) để ổn định giữa các lần refresh, không nhảy loạn.
+const CONTENT_KIND_BY_DOW: Record<number, { kind: string; label: string }> = {
+  1: { kind: 'qa', label: 'Hỏi Đáp' },          // Thứ 2
+  2: { kind: 'checklist', label: 'Checklist' },  // Thứ 3
+  3: { kind: 'tip', label: 'Mẹo' },              // Thứ 4
+  4: { kind: 'qa', label: 'Hỏi Đáp' },           // Thứ 5
+  5: { kind: 'portrait', label: 'Chân dung' },   // Thứ 6
+  6: { kind: 'checklist', label: 'Checklist' },  // Thứ 7
+  0: { kind: 'engage', label: 'Hỏi bà con' },    // Chủ nhật
+};
+
 function joinAnd(items: string[]): string {
   if (!items.length) return '';
   if (items.length === 1) return items[0];
   return items.slice(0, -1).join(', ') + ' và ' + items[items.length - 1];
 }
 
-// Ngày thứ i kể từ hôm nay (giờ VN). Trả { date: 'YYYY-MM-DD', dow: 'Thứ 2' }.
-function vnDayInfo(now: Date, offsetDays: number): { date: string; dow: string } {
+// Ngày thứ i kể từ hôm nay (giờ VN). Trả { date, dow, dowIdx }.
+function vnDayInfo(now: Date, offsetDays: number): { date: string; dow: string; dowIdx: number } {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000 + offsetDays * 24 * 60 * 60 * 1000);
   const date = vn.toISOString().slice(0, 10);
-  return { date, dow: DOW_VN[vn.getUTCDay()] };
+  return { date, dow: DOW_VN[vn.getUTCDay()], dowIdx: vn.getUTCDay() };
 }
 
 // Xếp bậc sản phẩm theo điểm trung bình tuần rồi gán trọng số 1..3.
@@ -69,7 +82,7 @@ function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: str
   const remaining = new Map<string, number>(salesProducts.map((p) => [p.product, p.postsPerWeek]));
   const out: DailyPlan[] = [];
   for (let i = 0; i < 7; i++) {
-    const { date, dow } = vnDayInfo(now, i);
+    const { date, dow, dowIdx } = vnDayInfo(now, i);
     const daysLeft = 7 - i;
     const sales: Array<{ product: string; count: number }> = [];
     for (const p of salesProducts) {
@@ -84,7 +97,8 @@ function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: str
       for (let k = 0; k < GROUPS_PER_DAY; k++) picked.add(groups[(i * GROUPS_PER_DAY + k) % groups.length]);
       dayGroups = [...picked];
     }
-    out.push({ date, dow, sales, contentCount: CONTENT_PER_DAY, groups: dayGroups });
+    const ck = CONTENT_KIND_BY_DOW[dowIdx];
+    out.push({ date, dow, sales, contentCount: CONTENT_PER_DAY, contentKind: ck?.kind, contentKindLabel: ck?.label, groups: dayGroups });
   }
   return out;
 }
