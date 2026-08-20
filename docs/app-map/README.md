@@ -6,6 +6,7 @@ covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
 <!-- re-verified: 2026-08-19 - rotate: tuan TAP TRUNG lay du MOI san pham trong focus moi luot (unused = eligible), khong ap 'da dung trong vong' -> 1 lan kich ra du 2 bai ban (truoc phai kich 3 lan). -->
+<!-- re-verified: 2026-08-19 - fb-diag bo universal_video_id/content_category/is_reference_only/post_id (chi Video Copyright API-enrolled page moi hoi duoc; loi #100 khong phai loi page). -->
 <!-- re-verified: 2026-08-19 - fb-diag bo field FB khong ho tro (no_story, is_crossposting_eligible, event). -->
 <!-- re-verified: 2026-08-19 - fb-diag them field content_category, universal_video_id, post_id, is_crossposting_eligible, no_story. -->
 <!-- re-verified: 2026-08-19 - /api/fb-diag?object=<id> tra privacy/status/published/embeddable cua Reel/Post + workflow fb-diag.yml bam tay input ID de soi (khong lo lo secret trong log). -->

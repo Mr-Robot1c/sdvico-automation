@@ -5,6 +5,7 @@ covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approv
 last_verified: 2026-08-18
 ttl_days: 90
 <!-- DOC-STATUS: SUSPECT (2026-08-19) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-19 - fb-diag bo universal_video_id/content_category/is_reference_only/post_id (chi Video Copyright API-enrolled page moi hoi duoc; loi #100 khong phai loi page). -->
 <!-- re-verified: 2026-08-19 - fb-diag bo field FB khong ho tro (no_story, is_crossposting_eligible, event). -->
 <!-- re-verified: 2026-08-19 - fb-diag them field content_category, universal_video_id, post_id, is_crossposting_eligible, no_story. -->
 <!-- re-verified: 2026-08-19 - /api/fb-diag?object=<id> tra privacy/status/published/embeddable cua Reel/Post + workflow fb-diag.yml bam tay input ID de soi (khong lo lo secret trong log). -->
