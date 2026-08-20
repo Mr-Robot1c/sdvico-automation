@@ -353,6 +353,15 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
   color: var(--ink-2); font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .06em; margin: 0 10px 6px;
 }
+/* Tiêu đề nhóm bấm được để thu gọn (user 20/8). Giữ nguyên phong cách nhãn nhóm cũ. */
+.nav-group-btn {
+  display: flex; align-items: center; gap: 6px; width: calc(100% - 20px);
+  background: none; border: 0; cursor: pointer; text-align: left;
+  padding: 2px 0; font: inherit; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2);
+}
+.nav-group-btn:hover { color: var(--ink); }
+.nav-group-caret { font-size: 9px; width: 10px; display: inline-block; opacity: .8; }
 .tabs { display: flex; flex-direction: column; gap: 2px; }
 .tab {
   display: flex; align-items: center; gap: 10px;
