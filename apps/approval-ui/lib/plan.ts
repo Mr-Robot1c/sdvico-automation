@@ -65,6 +65,15 @@ export type ContentDirection = {
   used_at?: string;                 // Rotate đánh dấu khi hướng này đã sinh cặp bài A/B (không lặp)
 };
 
+// Một ngày trong lịch BOSS đề xuất: sản phẩm bán + số bài, số bài content, nhóm chia sẻ.
+export type DailyPlan = {
+  date: string;        // YYYY-MM-DD (giờ VN)
+  dow: string;         // "Thứ 2".."Chủ nhật"
+  sales: Array<{ product: string; count: number }>;
+  contentCount: number;
+  groups: string[];    // tên nhóm chia sẻ hôm đó
+};
+
 export type Plan = {
   generatedAt: string;
   threshold: number;
@@ -80,7 +89,14 @@ export type Plan = {
   // v4 (20/8, item 1b): nguồn sinh — 'boss' hoặc undefined = BOSS đề xuất từ tri thức + số liệu
   // (chức năng cũ), 'learn-weekly' = vòng học tự động Chủ nhật, đề xuất trọng số dựa CHỦ YẾU
   // vào số liệu tuần vừa qua. Khối riêng ở /ke-hoach; khi bấm Áp dụng thì rotate đọc weights.
-  origin?: 'boss' | 'learn-weekly';
+  // 'live' = đề xuất SỐNG: BOSS cập nhật mỗi 30 phút từ số liệu mới nhất, mỗi tối tự áp dụng
+  // (user 20/8). Kèm lịch theo ngày + phân nhóm chia sẻ.
+  origin?: 'boss' | 'learn-weekly' | 'live';
+  // v5 (20/8): lịch theo NGÀY do BOSS đề xuất (sản phẩm nào mấy bài, chia sẻ vào nhóm nào).
+  // Chỉ để HIỂN THỊ cho người làm, rotate không đọc (rotate vẫn theo slot + focus + weights).
+  daily_schedule?: DailyPlan[];
+  // v5 (20/8): danh sách 4 nhóm Facebook người dùng đang ở, để BOSS chia lịch chia sẻ.
+  share_groups?: string[];
   // v2 (18/8): hướng đi cụ thể tuần tới, sinh từ tri thức. Bản cũ không có -> undefined.
   content_suggestions?: ContentDirection[];
   summary: {

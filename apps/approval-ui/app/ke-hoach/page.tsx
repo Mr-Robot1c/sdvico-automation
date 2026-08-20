@@ -2,7 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import type { Plan, Tier } from '../../lib/plan';
 import { vnInt, vnDec1 } from '../../lib/plan';
 import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
-import { saveWeeklyGoal, saveFocus } from './goal-actions';
+import { saveWeeklyGoal, saveFocus, saveShareGroups } from './goal-actions';
 import GenerateButton from './generate-button';
 
 export const dynamic = 'force-dynamic';
@@ -49,15 +49,17 @@ function fmtDate(d: string | null): string {
 
 export default async function Page({ searchParams }: { searchParams?: { xem?: string } }) {
   const client = getServerClient();
-  const [{ data, error }, { data: goalRow }, { data: focusRow }] = await Promise.all([
+  const [{ data, error }, { data: goalRow }, { data: focusRow }, { data: sgRow }] = await Promise.all([
     client
       .from('mkt_plans')
       .select('id, period_start, period_end, generated_by, data, applied, applied_at, created_at')
       .order('created_at', { ascending: false })
       .limit(12),
     client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
-    client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle()
+    client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle(),
+    client.from('app_config').select('value').eq('key', 'mkt_share_groups').maybeSingle()
   ]);
+  const shareGroups = (Array.isArray((sgRow as any)?.value?.groups) ? (sgRow as any).value.groups : []) as string[];
   const goalText = ((goalRow as any)?.value?.text as string) || '';
   const goalUpdatedAt = ((goalRow as any)?.value?.updated_at as string) || null;
   // Sản phẩm tập trung tuần (vòng xoay chỉ lấy các folder này tới ngày `until`).
@@ -81,8 +83,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
     viewing = (one as Row) || null;
   }
 
-  const latest = viewing || rows[0];
-  const history = rows.filter((r) => r.id !== latest?.id);
+  // Đề xuất SỐNG (origin='live') có thẻ hiển thị riêng bên dưới, KHÔNG lẫn vào thẻ kế hoạch
+  // chính / lịch sử (tránh trùng, tránh rối).
+  const planRows = rows.filter((r) => r.data?.origin !== 'live');
+  const latest = viewing || planRows[0];
+  const history = planRows.filter((r) => r.id !== latest?.id);
   const appliedRow = rows.find((r) => r.applied);
 
   // Đề xuất trọng số từ vòng HỌC TUẦN (learn-weekly, Chủ Nhật 23h) — item 1b (20/8).
@@ -90,6 +95,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   // bên dưới đã render — chỉ khi khác `latest` mới đưa lên khối riêng để không lặp.
   const learnSuggestion = rows.find((r) => r.data?.origin === 'learn-weekly' && !r.applied);
   const showLearnBox = learnSuggestion && learnSuggestion.id !== latest?.id;
+
+  // Đề xuất SỐNG (origin='live'): BOSS cập nhật mỗi 30 phút, mỗi tối tự áp dụng (user 20/8).
+  // Hiển thị lịch theo ngày + số bài mỗi sản phẩm + nhóm chia sẻ.
+  const liveProposal = rows.find((r) => r.data?.origin === 'live');
+  const liveData = liveProposal?.data;
 
   // Tóm tắt bản đang áp dụng cho banner (hiện ngay sau khi bấm Áp dụng): ưu tiên vòng xoay,
   // số hướng đi còn lại, mục tiêu bản đó bám theo.
@@ -108,7 +118,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <div>
           <h1>Kế hoạch</h1>
           <p className="sub">
-            Bot đọc số liệu Đo lường rồi định hướng marketing tuần tới. Tự chạy thứ 4 và chủ nhật. Máy đề xuất, người quyết.
+            BOSS đọc số liệu Đo lường rồi định hướng marketing. Đề xuất tự cập nhật mỗi 30 phút, mỗi tối tự áp dụng trọng số, cuối tuần báo cáo.
           </p>
         </div>
         <div className="head-actions">
@@ -162,7 +172,82 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             <button className="btn ok" type="submit">Lưu</button>
           </div>
         </form>
+
+        {/* Nhóm Facebook người dùng đang ở (user 20/8). BOSS chia lịch chia sẻ theo ngày trong
+            đề xuất sống. Meta chặn tự đăng group nên đây chỉ là gợi ý cho người chia sẻ tay. */}
+        <form action={saveShareGroups} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+          <div className="goal-head">
+            <b>👥 Nhóm chia sẻ (Facebook groups bạn đang ở)</b>
+            {shareGroups.length ? <span className="sub">Đang lưu {shareGroups.length} nhóm</span> : null}
+          </div>
+          <p className="sub" style={{ margin: '4px 0 8px' }}>
+            Gõ tên các nhóm bạn đang ở, cách nhau dấu phẩy. BOSS sẽ xếp lịch mỗi ngày chia sẻ bài vào nhóm nào (xoay vòng cho đều). Ví dụ: <code>Ngư dân Vũng Tàu, Hội tàu cá BRVT, Chợ hải sản Long Hải, Bà con đi biển</code>.
+          </p>
+          <div className="row" style={{ alignItems: 'center' }}>
+            <input className="note" name="share_groups" defaultValue={shareGroups.join(', ')} placeholder="Ngư dân Vũng Tàu, Hội tàu cá BRVT, ..." style={{ maxWidth: 520 }} aria-label="Nhóm chia sẻ" />
+            <button className="btn ok" type="submit">Lưu nhóm</button>
+          </div>
+        </form>
       </section>
+
+      {liveData ? (
+        <section className="plan-card" style={{ borderLeft: '6px solid var(--ok, #1a9e6f)', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <b style={{ fontSize: '1.05rem' }}>📆 Kế hoạch sống của BOSS</b>
+              <p className="sub" style={{ margin: '2px 0 0' }}>
+                Cập nhật lúc {fmtDateTime(liveProposal!.created_at)}. Tự làm mới mỗi 30 phút theo số liệu, mỗi tối tự áp dụng trọng số cho vòng xoay hôm sau.
+              </p>
+            </div>
+          </div>
+
+          <div className="plan-narrative" style={{ marginTop: 10 }}>
+            {(liveData.narrative || []).map((p, i) => (<p key={i}>{p}</p>))}
+          </div>
+
+          {liveData.products?.length ? (
+            <>
+              <h3 style={{ margin: '14px 0 6px' }}>Số bài bán mỗi sản phẩm trong tuần</h3>
+              <div className="tablewrap">
+                <table className="datatable">
+                  <thead><tr><th>Sản phẩm</th><th className="num">Bài/tuần</th><th className="num">Tương tác/bài</th><th>Hướng</th></tr></thead>
+                  <tbody>
+                    {liveData.products.map((p) => (
+                      <tr key={p.product}>
+                        <td>{p.product}</td>
+                        <td className="num"><b>{vnInt(p.postsPerWeek)}</b></td>
+                        <td className="num">{p.avgEng > 0 ? vnInt(p.avgEng) : '—'}</td>
+                        <td className="sub">{p.tier === 'winner' ? '🏆 Đẩy mạnh' : p.tier === 'weak' ? '⚠️ Đổi góc' : p.tier === 'insufficient' ? '⏳ Gom thêm số liệu' : '➖ Giữ nhịp'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+
+          {liveData.daily_schedule?.length ? (
+            <>
+              <h3 style={{ margin: '16px 0 6px' }}>Lịch theo ngày (7 ngày tới)</h3>
+              <div className="tablewrap">
+                <table className="datatable">
+                  <thead><tr><th>Ngày</th><th>Bài bán</th><th className="num">Content</th><th>Chia sẻ vào nhóm</th></tr></thead>
+                  <tbody>
+                    {liveData.daily_schedule.map((d) => (
+                      <tr key={d.date}>
+                        <td><b>{d.dow}</b> <span className="sub">{d.date.split('-').reverse().join('/')}</span></td>
+                        <td>{d.sales.length ? d.sales.map((s) => `${s.product} (${vnInt(s.count)})`).join(', ') : '—'}</td>
+                        <td className="num">{vnInt(d.contentCount)}</td>
+                        <td className="sub">{d.groups.length ? d.groups.join(', ') : (shareGroups.length ? '—' : 'chưa nhập nhóm')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+        </section>
+      ) : null}
 
       {learnSuggestion ? (
         <div className={`learn-suggestion-banner ${showLearnBox ? '' : 'compact'}`} role="status" style={{ background: 'var(--bg-2, #f0f6ff)', border: '1px solid var(--blue-4, #cfe1ff)', borderLeft: '6px solid var(--blue-6, #1f5fbf)', borderRadius: 10, padding: 14, marginBottom: 14 }}>

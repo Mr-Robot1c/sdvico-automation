@@ -6,6 +6,7 @@ import { importInternalFromBucket } from '../../../lib/knowledge';
 import { learnPublicKnowledge, learnPublicDaily, isSundayVN } from '../../../lib/knowledge-public';
 import { evaluateAbPairs } from '../../../lib/evaluator';
 import { learnWeekly, shouldRunLearnWeekly } from '../../../lib/learn-weekly';
+import { refreshLiveProposal, applyLiveEvening } from '../../../lib/plan-live';
 
 // Kéo số liệu tương tác Facebook về mkt_metrics. Gọi bởi Vercel Cron (Authorization: Bearer
 // CRON_SECRET) hoặc thủ công (?secret=CRON_SECRET).
@@ -156,5 +157,19 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan, learn });
+  // ĐỀ XUẤT SỐNG (user 20/8): mỗi 30 phút BOSS cập nhật đề xuất (trọng số + số bài mỗi sản phẩm
+  // + lịch theo ngày + nhóm chia sẻ) từ số liệu mới nhất. Rẻ (không Gemini), cập nhật tại chỗ 1
+  // bản 'live'. Mỗi tối (>=21h VN, 1 lần/ngày) tự GỘP trọng số vào bản đang áp. ?live=1 ép áp ngay.
+  const forceLive = new URL(req.url).searchParams.get('live') === '1';
+  let live: { proposalId?: string | null; applied?: boolean; skipped?: string; error?: string } | null = null;
+  try {
+    const prop = await refreshLiveProposal(client);
+    const ap = await applyLiveEvening(client, { force: forceLive });
+    live = { proposalId: prop.id, applied: ap.applied, skipped: ap.skipped };
+  } catch (e: any) {
+    console.error('[plan-live] that bai:', e?.message || e);
+    live = { error: String(e?.message || e) };
+  }
+
+  return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan, learn, live });
 }
