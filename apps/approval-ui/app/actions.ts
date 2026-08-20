@@ -17,7 +17,7 @@ import { linkedinConfigured, postToLinkedIn } from '../lib/linkedin';
 import { getSessionUser, authMode } from '../lib/auth';
 import { requireAdmin } from '../lib/hr-users';
 import { requireEmployeeAdmin, EMPLOYEE_DOCS_BUCKET } from '../lib/employees';
-import { getChannel, isManual, channelLabel, resolveChannel } from '../lib/channels';
+import { getChannel, isManual, isFeed, channelLabel, resolveChannel } from '../lib/channels';
 
 // Trả email người đang đăng nhập, hoặc null nếu chế độ basic. Bọc try để không rơi luồng cũ.
 async function currentEmail(): Promise<string | null> {
@@ -946,6 +946,35 @@ export async function addChannel(formData: FormData) {
   revalidatePath('/tao-jd');
 }
 
+// Đổi link "Mở trang đăng" của một kênh (post_url). Áp dụng cho cả built-in lẫn kênh tự thêm:
+// built-in mặc định lấy từ code (channels.ts), nhưng ai có row hr_platforms sẽ override lên code.
+// Cho phép nhập rỗng để xoá link (getAllChannels giữ null vì đã có row DB, không fallback code).
+export async function setChannelPostUrl(formData: FormData) {
+  const kenh = String(formData.get('kenh') || '');
+  const rawUrl = String(formData.get('post_url') || '').trim();
+  if (!kenh) return;
+  const post_url = rawUrl || null;
+
+  const client = getServerClient();
+  const ch = getChannel(kenh);
+  const { data: existing } = await client.from('hr_platforms').select('id').eq('kenh', kenh).maybeSingle();
+  if (existing?.id) {
+    await client.from('hr_platforms').update({ post_url }).eq('id', existing.id);
+  } else {
+    // Kênh built-in chưa có row: insert với bat=false (không tự bật lên) + tên/loai từ code.
+    await client.from('hr_platforms').insert({
+      kenh,
+      bat: false,
+      ten: ch?.ten || kenh,
+      loai: ch?.loai || 'job_board',
+      post_url,
+    });
+  }
+  revalidatePath('/kenh');
+  revalidatePath('/dang-tin');
+  revalidatePath('/tao-jd');
+}
+
 // Xóa một sàn do người dùng thêm. KHÔNG xóa kênh built-in (giữ adapter API/nhãn) — chỉ tắt được.
 // Tin đăng cũ vẫn còn, chỉ mất cấu hình kênh (nhãn lùi về khóa kenh).
 export async function removeChannel(formData: FormData) {
@@ -1678,6 +1707,16 @@ export async function publishJobPost(formData: FormData) {
     .single();
   if (e1 || !post) { revalidatePath('/dang-tin'); return; }
   if (post.trang_thai === 'posted') { revalidatePath('/dang-tin'); return; }
+
+  // Kênh feed (Jooble): tin đã open + expire_at còn hạn sẽ tự lộ ra XML feed /api/jobs/feed.xml.
+  // Không có khái niệm đăng per-post, và không nên chạy publish path vì sẽ gọi nhầm API khác.
+  if (isFeed(post.kenh)) {
+    await client.from('hr_job_posts')
+      .update({ ghi_chu: 'Kênh XML feed — tin tự lộ ra /api/jobs/feed.xml khi status=open và còn hạn. Không có luồng đăng per-post.' })
+      .eq('id', postId);
+    revalidatePath('/dang-tin');
+    return;
+  }
 
   // Kênh đăng thủ công (TopCV, VietnamWorks, ...): KHÔNG có API đăng — không gọi Facebook API.
   // Hướng người dùng sang panel "Đăng thủ công": mở kênh -> đăng -> bấm "Đánh dấu đã đăng".

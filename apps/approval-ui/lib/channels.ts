@@ -7,13 +7,16 @@
 //  - 'manual' : không có worker. Hai đường cho người vận hành:
 //       (a) đăng có hỗ trợ  : máy soạn nháp -> duyệt -> người đăng ngoài -> dán link về.
 //       (b) track-only      : người tự đăng thẳng trên nền tảng -> chỉ ghi nhận link + ảnh.
+//  - 'feed'   : không đăng per-post. Aggregator crawl XML feed tổng (Jooble).
+//               Tin cứ status='open' + expire_at còn hạn là tự lộ ra feed.xml.
+//               Không đi qua hr_job_posts, không cần bấm "đăng" cho từng tin.
 //
 // Thêm một sàn mới = thêm một dòng vào CHANNELS + seed hr_platforms (migration) + bật ở trang Kênh.
 // Không phải sửa code lõi.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export type ChannelMethod = 'api' | 'manual';
+export type ChannelMethod = 'api' | 'manual' | 'feed';
 export type ManualDefault = 'assisted' | 'track_only';
 export type ChannelLoai = 'social' | 'job_board' | 'other';
 
@@ -108,6 +111,19 @@ export const CHANNELS: Channel[] = [
     field_hints: ['Tiêu đề tuyển dụng', 'Ngành nghề', 'Khu vực', 'Mức lương', 'Mô tả công việc', 'Yêu cầu', 'Quyền lợi', 'Liên hệ'],
     char_limit: null,
   },
+  {
+    // Jooble aggregator crawl XML feed tại /api/jobs/feed.xml — không đăng per-post.
+    // Bootstrap 1 lần: gửi email xml_support@jooble.com kèm URL feed production.
+    // Xem docs/runbooks/jooble-bootstrap.md.
+    kenh: 'jooble',
+    ten: 'Jooble',
+    loai: 'job_board',
+    method: 'feed',
+    jd_variant: 'job_board', // dùng chung nội dung với các job board khác
+    post_url: 'https://jooble.org/jobs/Vietnam', // trang liệt kê để đối chiếu tin đã lộ chưa
+    field_hints: [],
+    char_limit: null,
+  },
 ];
 
 const BY_KENH = new Map(CHANNELS.map((c) => [c.kenh, c]));
@@ -132,6 +148,12 @@ export function isManual(kenh?: string | null): boolean {
   return channelMethod(kenh) === 'manual';
 }
 
+// Kênh feed (Jooble và tương tự): tin tự động lộ ra XML feed, không có luồng
+// bấm đăng cho từng tin. UI không nên hiện nút "Đăng" hay "Đánh dấu đã đăng".
+export function isFeed(kenh?: string | null): boolean {
+  return channelMethod(kenh) === 'feed';
+}
+
 // Nhãn hiển thị. Ưu tiên registry, rồi nhãn cũ, cuối cùng trả nguyên mã.
 export function channelLabel(kenh?: string | null): string {
   if (!kenh) return 'Khác';
@@ -148,7 +170,10 @@ export function manualDefault(kenh?: string | null): ManualDefault {
 }
 
 export function methodLabel(kenh?: string | null): string {
-  return channelMethod(kenh) === 'api' ? 'Tự động (API)' : 'Đăng thủ công';
+  const m = channelMethod(kenh);
+  if (m === 'api') return 'Tự động (API)';
+  if (m === 'feed') return 'Tự động (XML feed)';
+  return 'Đăng thủ công';
 }
 
 // Kênh do người dùng THÊM từ web chỉ nằm trong hr_platforms (không có trong CHANNELS code).
@@ -192,12 +217,15 @@ async function readPlatforms(client: SupabaseClient): Promise<PlatformRow[]> {
 
 // TẤT CẢ kênh: built-in (code) trước, rồi kênh người dùng tự thêm (chỉ trong DB).
 // Built-in lấy method/jd_variant... từ code (code thắng), chỉ mượn trạng thái bật/tắt từ DB.
+// post_url: nếu có row DB thì dùng DB (kể cả null — user cố ý xoá), chưa có row thì fallback code.
 export async function getAllChannels(client: SupabaseClient): Promise<ChannelView[]> {
   const rows = await readPlatforms(client);
   const byKenh = new Map(rows.map((r) => [r.kenh as string, r]));
   const views: ChannelView[] = [];
   for (const c of CHANNELS) {
-    views.push({ ...c, builtin: true, enabled: !!byKenh.get(c.kenh)?.bat });
+    const dbRow = byKenh.get(c.kenh);
+    const post_url = dbRow ? (dbRow.post_url ?? null) : c.post_url;
+    views.push({ ...c, builtin: true, enabled: !!dbRow?.bat, post_url });
   }
   for (const r of rows) {
     if (BY_KENH.has(r.kenh as string)) continue; // đã có ở built-in

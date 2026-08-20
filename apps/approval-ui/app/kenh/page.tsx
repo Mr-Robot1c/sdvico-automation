@@ -2,8 +2,8 @@ import { Fragment } from 'react';
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import KenhTabs from './kenh-tabs';
-import { getAllChannels, methodLabel } from '../../lib/channels';
-import { toggleChannel, addChannel, removeChannel, trackPostedPost } from '../actions';
+import { getAllChannels, methodLabel, type ChannelMethod, type ManualDefault } from '../../lib/channels';
+import { toggleChannel, addChannel, removeChannel, trackPostedPost, setChannelPostUrl } from '../actions';
 import { SubmitButton } from '../submit-button';
 
 export const dynamic = 'force-dynamic';
@@ -14,8 +14,8 @@ type App = { id: string; job_id: string | null };
 type ChannelRow = {
   kenh: string;
   ten: string;
-  method: 'api' | 'manual';
-  manual_default?: 'assisted' | 'track_only';
+  method: ChannelMethod;
+  manual_default?: ManualDefault;
   builtin: boolean;
   post_url: string | null;
   enabled: boolean;
@@ -128,6 +128,30 @@ export default async function Page() {
                         </a>
                       ) : null}
                       {!r.builtin ? <span className="chan-tag">Tự thêm</span> : null}
+                      {/* Cho phép sửa link "Mở trang đăng" cho MỌI kênh (built-in + tự thêm).
+                          Kênh built-in mặc định lấy post_url từ code; user sửa xong DB sẽ override. */}
+                      <details style={{ marginTop: 4 }}>
+                        <summary style={{ cursor: 'pointer', fontSize: '0.78em', color: 'var(--ink-2)', userSelect: 'none' }}>
+                          {r.post_url ? 'Sửa link' : 'Đặt link'}
+                        </summary>
+                        <form action={setChannelPostUrl} style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                          <input type="hidden" name="kenh" value={r.kenh} />
+                          <input
+                            className="note"
+                            type="url"
+                            name="post_url"
+                            defaultValue={r.post_url || ''}
+                            placeholder="https://... (để trống = bỏ link)"
+                            aria-label={`Link trang đăng cho ${r.ten}`}
+                            style={{ fontSize: '0.82em', minWidth: 220, flex: '1 1 220px' }}
+                          />
+                          <SubmitButton
+                            label="Lưu"
+                            className="btn ok"
+                            style={{ fontSize: '0.78em', padding: '3px 10px' }}
+                          />
+                        </form>
+                      </details>
                     </td>
                     <td className="chan-td-method">
                       <span>{methodLabel(r.kenh)}</span>
