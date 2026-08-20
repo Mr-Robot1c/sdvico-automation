@@ -146,6 +146,7 @@ export default async function Page() {
       source: c.source,
       dedupKey: c.dedup_key || '',
       subject: c.cv_json?.source_message?.subject || '',
+      jobId: app?.job_id || null,
       viTri: (app?.job_id && jobTitleMap.get(app.job_id)) || '',
       attachments: (c.cv_json?.attachments || []).map((a) => a.filename).filter(Boolean).join(', '),
       consent:
@@ -188,6 +189,10 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Hồ sơ ứng viên</h1>
+          <p className="sub">
+            Gom theo từng vị trí tuyển dụng — bấm tên vị trí để xổ danh sách ứng viên của vị trí đó.
+            Bộ lọc giai đoạn và tìm kiếm áp cho tất cả vị trí.
+          </p>
         </div>
         <AutoRefresh seconds={30} />
       </header>

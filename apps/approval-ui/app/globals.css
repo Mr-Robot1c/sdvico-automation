@@ -949,11 +949,16 @@ select.note { cursor: pointer; }
   background: var(--surface-2);
 }
 .job-th-title  { width: auto; }
-.job-th-loc    { width: 22%; }
+.job-th-cand   { width: 150px; }
+.job-th-loc    { width: 18%; }
 .job-th-status { width: 110px; }
 .job-th-post   { width: 140px; }
 .job-th-auto   { width: 80px; }
 .job-th-caret  { width: 32px; }
+.job-td-cand   { font-size: 13.5px; white-space: nowrap; }
+.job-cand-link { color: var(--accent); text-decoration: none; }
+.job-cand-link:hover { text-decoration: underline; }
+.job-cand-link .muted { font-size: 0.9em; }
 
 .job-row {
   cursor: pointer;
@@ -997,11 +1002,13 @@ select.note { cursor: pointer; }
   }
   .job-td-title  { grid-column: 1 / 2; grid-row: 1; }
   .job-td-caret  { grid-column: 2 / 3; grid-row: 1; align-self: start; }
-  .job-td-loc    { grid-column: 1 / -1; grid-row: 2; font-size: 12px; }
+  .job-td-cand   { grid-column: 1 / -1; grid-row: 2; font-size: 12px; white-space: normal; }
+  .job-td-cand::before { content: 'Ứng viên: '; color: var(--ink-2); }
+  .job-td-loc    { grid-column: 1 / -1; grid-row: 3; font-size: 12px; }
   .job-td-loc::before { content: 'Địa điểm: '; color: var(--ink-2); }
-  .job-td-status { grid-column: 1 / 2; grid-row: 3; }
-  .job-td-post   { grid-column: 2 / 3; grid-row: 3; text-align: right; }
-  .job-td-auto   { grid-column: 1 / -1; grid-row: 4; font-size: 12px; }
+  .job-td-status { grid-column: 1 / 2; grid-row: 4; }
+  .job-td-post   { grid-column: 2 / 3; grid-row: 4; text-align: right; }
+  .job-td-auto   { grid-column: 1 / -1; grid-row: 5; font-size: 12px; }
   .job-td-auto::before { content: 'Tự động: '; color: var(--ink-2); }
   .job-row.is-open { border-color: var(--accent); background: var(--accent-bg); }
   .job-expand-row { display: block; }
@@ -1239,6 +1246,37 @@ select.note { cursor: pointer; }
 .dash-item-time--today { color: var(--accent); font-weight: 600; }
 .dash-item-time--ok { color: var(--ok); }
 .dash-item-time--no { color: var(--no); }
+
+/* ── Nhóm theo vị trí tuyển dụng (Tin đăng, Hồ sơ) ──────────────────────────
+   Mỗi vị trí là một khối gập/mở <details>. Header là summary có mũi ▸ xoay khi mở,
+   tên vị trí bên trái và cụm số/nhãn bên phải. Thân chứa đúng bảng bài/ứng viên cũ. */
+.pos-group { border: 1px solid var(--line); border-radius: 10px; margin: 0 0 12px; background: var(--surface); overflow: hidden; }
+.pos-group[open] { box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
+.pos-group > summary {
+  list-style: none; cursor: pointer;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 14px; background: var(--surface-2);
+}
+.pos-group > summary::-webkit-details-marker { display: none; }
+.pos-group > summary::before {
+  content: '▸'; color: var(--ink-2); font-size: 0.8em; flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.pos-group[open] > summary::before { transform: rotate(90deg); }
+.pos-group > summary:hover { background: var(--chip); }
+.pos-group-title { font-weight: 700; color: var(--ink); font-size: 0.98rem; }
+.pos-group-meta { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pos-group-body { padding: 8px 10px 10px; }
+.pos-group-body .table-scroll { margin: 0; }
+.pos-group-empty { padding: 12px 14px; color: var(--ink-2); font-size: 0.88rem; }
+
+/* Cụm số theo vị trí — dùng ở header nhóm và ở khối "Vị trí đang tuyển" (Tổng quan). */
+.pos-nums { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.pos-num { font-size: 0.8rem; color: var(--ink-2); white-space: nowrap; }
+.pos-num b { color: var(--ink); font-weight: 700; }
+.pos-num--accent b { color: var(--accent); }
+.pos-num--warn b { color: #b56800; }
+.pos-num--zero { opacity: 0.45; }
 
 /* Trang Báo cáo: thẻ số. Không phụ thuộc lib biểu đồ nào, tất cả CSS ở đây. */
 .report-grid {

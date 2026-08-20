@@ -71,7 +71,7 @@ export default async function Page({ searchParams }: { searchParams?: { filter?:
   const filter = searchParams?.filter || 'all';
   const client = getServerClient();
 
-  const [jobsRes, postsRes] = await Promise.all([
+  const [jobsRes, postsRes, appsRes] = await Promise.all([
     client
       .from('hr_jobs')
       .select('id, title, department, location, short_desc, requirements, jd_versions, nhom, status, headcount, created_at, auto_post, refresh_after_days')
@@ -83,11 +83,22 @@ export default async function Page({ searchParams }: { searchParams?: { filter?:
       .select('id, job_id, trang_thai, scheduled_at, posted_at, created_at, fb_post_id')
       .in('trang_thai', ['draft', 'scheduled', 'posted'])
       .order('created_at', { ascending: false }),
+    // Đếm ứng viên theo vị trí: tổng hồ sơ và số đang chờ xem — để hiện ngay trên bảng vị trí.
+    client.from('hr_applications').select('job_id, stage').limit(2000),
   ]);
 
   const allJobs = (jobsRes.data || []) as Job[];
   const allPosts = (postsRes.data || []) as PostRow[];
   const colMissing = jobsRes.error?.code === '42703';
+
+  // Bản đồ job_id → số ứng viên (tổng và chờ xem).
+  const candCountByJob = new Map<string, number>();
+  const reviewCountByJob = new Map<string, number>();
+  for (const a of ((appsRes.data || []) as Array<{ job_id: string | null; stage: string }>)) {
+    if (!a.job_id) continue;
+    candCountByJob.set(a.job_id, (candCountByJob.get(a.job_id) || 0) + 1);
+    if (a.stage === 'review') reviewCountByJob.set(a.job_id, (reviewCountByJob.get(a.job_id) || 0) + 1);
+  }
 
   // Kênh đang bật ngoài Facebook/LinkedIn (đã có nút riêng) — nút "Soạn [Kênh]" theo vị trí.
   const extraChannels = (await enabledChannels(client))
@@ -143,6 +154,8 @@ export default async function Page({ searchParams }: { searchParams?: { filter?:
       nhom: j.nhom,
       jdVersions: j.jd_versions || {},
       createdAt: j.created_at,
+      candCount: candCountByJob.get(j.id) || 0,
+      reviewCount: reviewCountByJob.get(j.id) || 0,
       postStatusText: ps.text,
       postStatusTone: ps.tone,
       composeLabel: ps.composeLabel,

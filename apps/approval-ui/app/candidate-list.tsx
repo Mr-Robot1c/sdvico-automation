@@ -14,6 +14,7 @@ export type CandView = {
   source: string | null;
   dedupKey: string;
   subject: string;
+  jobId: string | null;
   viTri: string;
   attachments: string;
   consent: string;
@@ -543,7 +544,78 @@ export default function CandidateList({ candidates, windows, openJobs }: { candi
     });
   }, [candidates, q, stage, sort]);
 
+  // Gom hồ sơ (đã lọc) theo vị trí tuyển dụng. Mỗi vị trí một khối gập/mở; thứ tự sắp xếp
+  // bên trong nhóm giữ nguyên theo bộ lọc. Nhóm "chưa gắn vị trí" luôn xuống cuối.
+  const groups = useMemo(() => {
+    const map = new Map<string, { key: string; title: string; cands: CandView[] }>();
+    for (const c of filtered) {
+      const key = c.jobId || '__none__';
+      const title = c.viTri || (c.jobId ? 'Vị trí đã đóng' : 'Chưa gắn vị trí');
+      if (!map.has(key)) map.set(key, { key, title, cands: [] });
+      map.get(key)!.cands.push(c);
+    }
+    const arr = [...map.values()];
+    arr.sort((a, b) => {
+      if (a.key === '__none__') return 1;
+      if (b.key === '__none__') return -1;
+      return a.title.localeCompare(b.title, 'vi');
+    });
+    return arr;
+  }, [filtered]);
+
   const toggleRow = (id: string) => setOpenId((cur) => (cur === id ? null : id));
+
+  // Một hàng hồ sơ + hàng chi tiết mở rộng. Tách hàm để tái dùng trong từng nhóm vị trí.
+  const renderCandRows = (list: CandView[]) =>
+    list.map((c) => {
+      const isOpen = openId === c.id;
+      const hasScore = c.score !== null;
+      const stagePrimary = c.appStage || c.stages[0] || null;
+      const meta = stagePrimary ? stageMeta(stagePrimary) : null;
+      return (
+        <Fragment key={c.id}>
+          <tr
+            className={`cand-row${isOpen ? ' is-open' : ''}`}
+            onClick={() => toggleRow(c.id)}
+          >
+            <td className="cand-td-name">
+              <div className="cand-row-name">{c.name}</div>
+              <div className="muted cand-row-contact">
+                {c.email || c.phone || 'Chưa có liên hệ'}
+              </div>
+            </td>
+            <td className="cand-td-vitri">
+              {c.viTri || <span className="muted">Chưa gắn</span>}
+            </td>
+            <td className="cand-td-score">
+              {hasScore && (c.score ?? 0) > 0 ? (
+                <span className="score" title="Điểm chấm tự động">{c.score}/100</span>
+              ) : (
+                <span className="muted" title="Máy chưa chấm hồ sơ này">Chưa chấm</span>
+              )}
+            </td>
+            <td className="cand-td-stage">
+              {meta ? (
+                <span className={`stage tone-${meta.tone}`}>{meta.label}</span>
+              ) : (
+                <span className="stage tone-default">Chưa ứng tuyển</span>
+              )}
+            </td>
+            <td className="cand-td-date muted" suppressHydrationWarning>{formatDate(c.createdAt)}</td>
+            <td className="cand-td-caret">
+              <span className={`caret${isOpen ? ' open' : ''}`} aria-hidden="true">›</span>
+            </td>
+          </tr>
+          {isOpen ? (
+            <tr className="cand-expand-row">
+              <td colSpan={6}>
+                <CandidateDetail c={c} windows={windows} openJobs={openJobs} />
+              </td>
+            </tr>
+          ) : null}
+        </Fragment>
+      );
+    });
 
   return (
     <>
@@ -583,71 +655,33 @@ export default function CandidateList({ candidates, windows, openJobs }: { candi
       {filtered.length === 0 ? (
         <p className="muted">Không có hồ sơ khớp bộ lọc.</p>
       ) : (
-        <div className="table-scroll">
-          <table className="cand-table">
-            <thead>
-              <tr>
-                <th className="cand-th-name">Ứng viên</th>
-                <th className="cand-th-vitri">Vị trí</th>
-                <th className="cand-th-score">Điểm</th>
-                <th className="cand-th-stage">Giai đoạn</th>
-                <th className="cand-th-date">Nhận</th>
-                <th className="cand-th-caret" aria-hidden="true"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => {
-                const isOpen = openId === c.id;
-                const hasScore = c.score !== null;
-                const stagePrimary = c.appStage || c.stages[0] || null;
-                const meta = stagePrimary ? stageMeta(stagePrimary) : null;
-                return (
-                  <Fragment key={c.id}>
-                    <tr
-                      className={`cand-row${isOpen ? ' is-open' : ''}`}
-                      onClick={() => toggleRow(c.id)}
-                    >
-                      <td className="cand-td-name">
-                        <div className="cand-row-name">{c.name}</div>
-                        <div className="muted cand-row-contact">
-                          {c.email || c.phone || 'Chưa có liên hệ'}
-                        </div>
-                      </td>
-                      <td className="cand-td-vitri">
-                        {c.viTri || <span className="muted">Chưa gắn</span>}
-                      </td>
-                      <td className="cand-td-score">
-                        {hasScore && (c.score ?? 0) > 0 ? (
-                          <span className="score" title="Điểm chấm tự động">{c.score}/100</span>
-                        ) : (
-                          <span className="muted" title="Máy chưa chấm hồ sơ này">Chưa chấm</span>
-                        )}
-                      </td>
-                      <td className="cand-td-stage">
-                        {meta ? (
-                          <span className={`stage tone-${meta.tone}`}>{meta.label}</span>
-                        ) : (
-                          <span className="stage tone-default">Chưa ứng tuyển</span>
-                        )}
-                      </td>
-                      <td className="cand-td-date muted" suppressHydrationWarning>{formatDate(c.createdAt)}</td>
-                      <td className="cand-td-caret">
-                        <span className={`caret${isOpen ? ' open' : ''}`} aria-hidden="true">›</span>
-                      </td>
+        groups.map((g) => (
+          <details key={g.key} className="pos-group" open>
+            <summary>
+              <span className="pos-group-title">{g.title}</span>
+              <span className="pos-group-meta">
+                <span className="pos-num"><b>{g.cands.length}</b> hồ sơ</span>
+              </span>
+            </summary>
+            <div className="pos-group-body">
+              <div className="table-scroll">
+                <table className="cand-table">
+                  <thead>
+                    <tr>
+                      <th className="cand-th-name">Ứng viên</th>
+                      <th className="cand-th-vitri">Vị trí</th>
+                      <th className="cand-th-score">Điểm</th>
+                      <th className="cand-th-stage">Giai đoạn</th>
+                      <th className="cand-th-date">Nhận</th>
+                      <th className="cand-th-caret" aria-hidden="true"></th>
                     </tr>
-                    {isOpen ? (
-                      <tr className="cand-expand-row">
-                        <td colSpan={6}>
-                          <CandidateDetail c={c} windows={windows} openJobs={openJobs} />
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                  </thead>
+                  <tbody>{renderCandRows(g.cands)}</tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+        ))
       )}
     </>
   );

@@ -22,6 +22,8 @@ type Post = {
   // Các trường tùy chọn — nếu component nhận post cũ (không có 2 field này), vẫn chạy bình thường.
   loai?: string | null;
   video_url?: string | null;
+  // Tên vị trí tuyển dụng của bài (từ hr_jobs.title). Dùng để gom bài theo vị trí.
+  jobTitle?: string | null;
   // Số tương tác kéo về từ Facebook Graph (cron /api/cron/fb-metrics). Optional để các
   // trang chưa join bảng hr_fb_post_metrics vẫn render được. Undefined = chưa có snapshot.
   metrics?: PostMetrics | null;
@@ -45,6 +47,36 @@ const TT: Record<string, { label: string; tone: string }> = {
   failed: { label: 'Lỗi', tone: 'no' },
   cancelled: { label: 'Đã huỷ', tone: 'no' },
 };
+
+type PostGroup = { key: string; title: string; posts: Post[] };
+
+// Gom bài theo vị trí tuyển dụng (job_id). Bài không gắn vị trí gom vào nhóm cuối.
+// Sắp xếp: vị trí theo tên (tiếng Việt), nhóm "chưa gắn" luôn xuống cuối.
+function groupByJob(posts: Post[]): PostGroup[] {
+  const map = new Map<string, PostGroup>();
+  for (const p of posts) {
+    const key = p.job_id || '__none__';
+    const title = p.jobTitle || (p.job_id ? 'Vị trí đã xoá' : 'Chưa gắn vị trí');
+    if (!map.has(key)) map.set(key, { key, title, posts: [] });
+    map.get(key)!.posts.push(p);
+  }
+  const groups = [...map.values()];
+  groups.sort((a, b) => {
+    if (a.key === '__none__') return 1;
+    if (b.key === '__none__') return -1;
+    return a.title.localeCompare(b.title, 'vi');
+  });
+  return groups;
+}
+
+// Tóm tắt trạng thái các bài trong một vị trí: "2 Đã đăng · 1 Nháp".
+function statusSummary(list: Post[]): React.ReactNode {
+  const c: Record<string, number> = {};
+  for (const p of list) c[p.trang_thai] = (c[p.trang_thai] || 0) + 1;
+  const order = ['posted', 'scheduled', 'draft', 'failed'];
+  const parts = order.filter((k) => c[k]).map((k) => `${c[k]} ${TT[k]?.label ?? k}`);
+  return parts.length ? <span className="pos-num">{parts.join(' · ')}</span> : null;
+}
 
 // Định dạng số kiểu Việt Nam: 1.234, dấu chấm ngăn cách hàng nghìn (CLAUDE.md giọng văn).
 function fmtNum(n: number): string {
@@ -133,22 +165,11 @@ export default function PostListClient({
     );
   }
 
-  return (
-    <>
-      <div className="table-scroll">
-        <table className="post-table-v2">
-          <thead>
-            <tr>
-              <th className="post-th-title">Tiêu đề</th>
-              <th className="post-th-kenh">Kênh</th>
-              <th className="post-th-status">Trạng thái</th>
-              <th className="post-th-metrics" title="Số tương tác cập nhật mỗi giờ từ Facebook">Tương tác</th>
-              <th className="post-th-time">Lịch / Đăng</th>
-              <th className="post-th-caret" aria-hidden="true"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {posts.map((p) => {
+  // Mỗi vị trí một khối gập/mở. Thân khối là đúng bảng bài cũ, chỉ chứa bài của vị trí đó.
+  const groups = groupByJob(posts);
+
+  const renderRows = (list: Post[]) =>
+    list.map((p) => {
               const tt = TT[p.trang_thai] || { label: p.trang_thai, tone: 'default' };
               const isApproved = approved.has(p.id);
               const canEdit = p.trang_thai !== 'posted' && p.trang_thai !== 'cancelled';
@@ -483,10 +504,38 @@ export default function PostListClient({
                   ) : null}
                 </Fragment>
               );
-            })}
-          </tbody>
-        </table>
-      </div>
+            });
+
+  return (
+    <>
+      {groups.map((g) => (
+        <details key={g.key} className="pos-group" open>
+          <summary>
+            <span className="pos-group-title">{g.title}</span>
+            <span className="pos-group-meta">
+              <span className="pos-num"><b>{g.posts.length}</b> bài</span>
+              {statusSummary(g.posts)}
+            </span>
+          </summary>
+          <div className="pos-group-body">
+            <div className="table-scroll">
+              <table className="post-table-v2">
+                <thead>
+                  <tr>
+                    <th className="post-th-title">Tiêu đề</th>
+                    <th className="post-th-kenh">Kênh</th>
+                    <th className="post-th-status">Trạng thái</th>
+                    <th className="post-th-metrics" title="Số tương tác cập nhật mỗi giờ từ Facebook">Tương tác</th>
+                    <th className="post-th-time">Lịch / Đăng</th>
+                    <th className="post-th-caret" aria-hidden="true"></th>
+                  </tr>
+                </thead>
+                <tbody>{renderRows(g.posts)}</tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+      ))}
 
       {deleteTarget ? (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteTarget(null)}>

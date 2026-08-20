@@ -25,6 +25,8 @@ export type JobRow = {
   nhom: string | null;
   jdVersions: Record<string, string>;
   createdAt: string;
+  candCount: number;
+  reviewCount: number;
   postStatusText: string;
   postStatusTone: string;
   composeLabel: string;
@@ -190,6 +192,7 @@ export default function JobTable({ jobs, extraChannels }: Props) {
         <thead>
           <tr>
             <th className="job-th-title">Vị trí</th>
+            <th className="job-th-cand">Ứng viên</th>
             <th className="job-th-loc">Địa điểm</th>
             <th className="job-th-status">Trạng thái</th>
             <th className="job-th-post">Bài đăng</th>
@@ -213,6 +216,16 @@ export default function JobTable({ jobs, extraChannels }: Props) {
                       {j.headcount && j.nhom ? ' · ' : ''}
                       {j.nhom ? `Nhóm ${j.nhom}` : ''}
                     </div>
+                  </td>
+                  <td className="job-td-cand" onClick={(e) => e.stopPropagation()}>
+                    {j.candCount > 0 ? (
+                      <Link href="/ho-so" className="job-cand-link">
+                        <b>{j.candCount}</b> hồ sơ
+                        {j.reviewCount > 0 ? <span className="muted"> · {j.reviewCount} chờ xem</span> : null}
+                      </Link>
+                    ) : (
+                      <span className="muted">Chưa có</span>
+                    )}
                   </td>
                   <td className="job-td-loc">{j.location || <span className="muted">Chưa gắn</span>}</td>
                   <td className="job-td-status">
@@ -238,7 +251,7 @@ export default function JobTable({ jobs, extraChannels }: Props) {
                 </tr>
                 {isOpen ? (
                   <tr className="job-expand-row">
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <JobDetail j={j} extraChannels={extraChannels} />
                     </td>
                   </tr>

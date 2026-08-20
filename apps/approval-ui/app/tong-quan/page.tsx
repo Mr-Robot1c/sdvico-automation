@@ -51,14 +51,23 @@ export default async function Page() {
   const startTodayIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
   const inThreeDaysIso = new Date(Date.now() + 3 * ONE_DAY).toISOString();
 
-  const [queueRes, cvTodayRes, applicationsRes, interviewsRes, upcomingPostsRes, incidentsRes, recentDecidedRes] =
+  const [queueRes, cvTodayRes, applicationsRes, appsTodayRes, openJobsRes, interviewsRes, upcomingPostsRes, incidentsRes, recentDecidedRes] =
     await Promise.all([
       // Chờ duyệt: đếm theo kind (loại alert — có trang giám sát riêng)
       client.from('approval_queue').select('kind').eq('status', 'pending').neq('kind', 'alert'),
       // CV mới hôm nay
       client.from('hr_candidates').select('id').gte('created_at', startTodayIso),
-      // Ứng viên đang chờ xem (đã chấm, chưa quyết định mời hay không)
-      client.from('hr_applications').select('id').eq('stage', 'review'),
+      // Ứng viên đang chờ xem (đã chấm, chưa quyết định mời hay không) — kèm job_id để tách theo vị trí
+      client.from('hr_applications').select('id, job_id').eq('stage', 'review'),
+      // Hồ sơ ứng tuyển tạo hôm nay — để đếm "CV mới hôm nay" theo từng vị trí
+      client.from('hr_applications').select('job_id').gte('created_at', startTodayIso).limit(500),
+      // Vị trí đang tuyển — gốc của trang tổng quan
+      client
+        .from('hr_jobs')
+        .select('id, title, headcount, department, location')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+        .limit(100),
       // Phỏng vấn sắp tới: đọc từ approval_queue kind=hr_interview, lọc ở JS theo chosen_slot/khung_gio
       client
         .from('approval_queue')
@@ -93,7 +102,12 @@ export default async function Page() {
 
   const queue = (queueRes.data || []) as Array<{ kind: string }>;
   const cvToday = (cvTodayRes.data || []).length;
-  const reviewCount = (applicationsRes.data || []).length;
+  const reviewApps = (applicationsRes.data || []) as Array<{ id: string; job_id: string | null }>;
+  const reviewCount = reviewApps.length;
+  const openJobs = (openJobsRes.data || []) as Array<{
+    id: string; title: string; headcount: number | null; department: string | null; location: string | null;
+  }>;
+  const appsToday = (appsTodayRes.data || []) as Array<{ job_id: string | null }>;
   const interviewsRaw = (interviewsRes.data || []) as Array<{
     id: string;
     status: string;
@@ -123,12 +137,15 @@ export default async function Page() {
   }>;
 
   // Chọn khung gần nhất của mỗi phỏng vấn (ưu tiên chosen_slot nếu ứng viên đã chọn).
+  // Lấy thêm job_id để quy mỗi buổi phỏng vấn về đúng vị trí (thay vì chỉ chuỗi tên).
   const refIds = interviewsRaw.map((r) => r.ref_id).filter(Boolean) as string[];
   const chosenMap = new Map<string, string | null>();
+  const jobIdByApp = new Map<string, string | null>();
   if (refIds.length) {
-    const { data: apps } = await client.from('hr_applications').select('id, chosen_slot').in('id', refIds);
-    for (const a of (apps || []) as Array<{ id: string; chosen_slot: string | null }>) {
+    const { data: apps } = await client.from('hr_applications').select('id, chosen_slot, job_id').in('id', refIds);
+    for (const a of (apps || []) as Array<{ id: string; chosen_slot: string | null; job_id: string | null }>) {
       chosenMap.set(a.id, a.chosen_slot);
+      jobIdByApp.set(a.id, a.job_id);
     }
   }
 
@@ -144,6 +161,7 @@ export default async function Page() {
         id: r.id,
         candName: r.payload?.ung_vien || r.title,
         viTri: r.payload?.vi_tri || '',
+        jobId: r.ref_id ? jobIdByApp.get(r.ref_id) || null : null,
         chosen,
         near: upcoming,
       };
@@ -152,6 +170,7 @@ export default async function Page() {
       id: string;
       candName: string;
       viTri: string;
+      jobId: string | null;
       chosen: string | null;
       near: { label: string; ts: number };
     }>;
@@ -159,6 +178,20 @@ export default async function Page() {
   const interviewsToday = interviews.filter((iv) => isToday(iv.near.ts));
   const interviewsTomorrow = interviews.filter((iv) => isTomorrow(iv.near.ts));
   const nextInterview = interviews.sort((a, b) => a.near.ts - b.near.ts)[0] || null;
+
+  // Gộp số liệu theo từng vị trí đang tuyển: CV mới hôm nay, hồ sơ chờ xem, phỏng vấn sắp tới.
+  const countByJob = (rows: Array<{ job_id?: string | null; jobId?: string | null }>) => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      const id = (r.job_id ?? r.jobId) || null;
+      if (id) m.set(id, (m.get(id) || 0) + 1);
+    }
+    return m;
+  };
+  const cvTodayByJob = countByJob(appsToday);
+  const reviewByJob = countByJob(reviewApps);
+  const interviewByJob = countByJob(interviews);
+  const totalHeadcount = openJobs.reduce((s, j) => s + (j.headcount || 0), 0);
 
   const pendingByKind = new Map<string, number>();
   for (const q of queue) pendingByKind.set(q.kind, (pendingByKind.get(q.kind) || 0) + 1);
@@ -175,8 +208,20 @@ export default async function Page() {
         <AutoRefresh seconds={60} />
       </header>
 
-      {/* 4 KPI chính — bấm đi thẳng tới trang xử lý */}
+      {/* 4 KPI chính — vị trí đứng đầu vì đó là gốc. Bấm đi thẳng tới trang xử lý. */}
       <section className="dash-grid">
+        <Link href="/tao-jd" className="dash-kpi dash-kpi--accent" aria-label="Xem các vị trí đang tuyển">
+          <span className="dash-kpi-label">Đang tuyển</span>
+          <span className="dash-kpi-value">{openJobs.length}</span>
+          <span className="dash-kpi-sub">
+            {openJobs.length === 0
+              ? 'Chưa mở vị trí nào.'
+              : totalHeadcount > 0
+                ? `${openJobs.length} vị trí · cần tuyển ${totalHeadcount} người`
+                : `${openJobs.length} vị trí đang mở`}
+          </span>
+        </Link>
+
         <Link
           href="/"
           className={`dash-kpi${pendingTotal > 0 ? ' dash-kpi--warn' : ''}`}
@@ -197,7 +242,9 @@ export default async function Page() {
           <span className="dash-kpi-label">CV mới hôm nay</span>
           <span className="dash-kpi-value">{cvToday}</span>
           <span className="dash-kpi-sub">
-            {reviewCount > 0 ? `${reviewCount} hồ sơ chờ xem` : 'Chưa có hồ sơ chờ xem'}
+            {cvTodayByJob.size > 0
+              ? `Trải ${cvTodayByJob.size} vị trí · ${reviewCount} hồ sơ chờ xem`
+              : reviewCount > 0 ? `${reviewCount} hồ sơ chờ xem` : 'Chưa có hồ sơ chờ xem'}
           </span>
         </Link>
 
@@ -216,17 +263,52 @@ export default async function Page() {
                   : ''}
           </span>
         </Link>
+      </section>
 
-        <Link
-          href="/bao-cao"
-          className={`dash-kpi${incidents.length > 0 ? ' dash-kpi--danger' : ''}`}
-        >
-          <span className="dash-kpi-label">Sự cố 24h</span>
-          <span className="dash-kpi-value">{incidents.length}</span>
-          <span className="dash-kpi-sub">
-            {incidents.length === 0 ? 'Không có lỗi hệ thống.' : 'Xem Nhật ký chạy để chi tiết.'}
-          </span>
-        </Link>
+      {/* Trọng tâm: mỗi vị trí đang tuyển kèm số CV mới, hồ sơ chờ xem, phỏng vấn sắp tới.
+          Đây là gốc — các con số CV và phỏng vấn ở trên được tách rõ về từng vị trí ở đây. */}
+      <section className="dash-panel" style={{ marginBottom: 22 }}>
+        <h2 className="dash-panel-title">
+          Vị trí đang tuyển <span className="muted">({openJobs.length})</span>
+        </h2>
+        {openJobs.length === 0 ? (
+          <p className="muted dash-empty">
+            Chưa có vị trí nào đang tuyển. Sang <Link href="/tao-jd">Vị trí tuyển dụng</Link> để mở tin.
+          </p>
+        ) : (
+          <ul className="dash-list">
+            {openJobs.map((j) => {
+              const cvNew = cvTodayByJob.get(j.id) || 0;
+              const review = reviewByJob.get(j.id) || 0;
+              const pv = interviewByJob.get(j.id) || 0;
+              const meta = [j.department, j.location].filter(Boolean).join(' · ');
+              return (
+                <li key={j.id} className="dash-item">
+                  <div className="dash-item-main">
+                    <Link href="/tao-jd" className="dash-item-title" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
+                      {j.title}
+                    </Link>
+                    <span className="muted dash-item-sub">
+                      {j.headcount ? `Cần ${j.headcount} người` : 'Chưa đặt số lượng'}
+                      {meta ? ` · ${meta}` : ''}
+                    </span>
+                  </div>
+                  <div className="pos-nums">
+                    <Link href="/ho-so" className={`pos-num${cvNew === 0 ? ' pos-num--zero' : ''}`} style={{ textDecoration: 'none' }}>
+                      CV mới <b>{cvNew}</b>
+                    </Link>
+                    <Link href="/ho-so" className={`pos-num pos-num--accent${review === 0 ? ' pos-num--zero' : ''}`} style={{ textDecoration: 'none' }}>
+                      Chờ xem <b>{review}</b>
+                    </Link>
+                    <Link href="/lich" className={`pos-num pos-num--warn${pv === 0 ? ' pos-num--zero' : ''}`} style={{ textDecoration: 'none' }}>
+                      PV sắp tới <b>{pv}</b>
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section className="dash-two-col">

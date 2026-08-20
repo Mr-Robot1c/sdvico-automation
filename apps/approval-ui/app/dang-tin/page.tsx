@@ -15,6 +15,7 @@ type Post = {
   fb_post_id: string | null; proof_path: string | null;
   loai: string | null;
   created_at: string;
+  jobTitle?: string | null;
   metrics?: PostMetrics | null;
 };
 
@@ -31,7 +32,7 @@ function runAge(entry: RunEntry | undefined): { label: string; tone: string } {
 export default async function Page() {
   const client = getServerClient();
 
-  const [jRes, aqRes, logRes] = await Promise.all([
+  const [jRes, aqRes, logRes, jobsRes] = await Promise.all([
     // Chỉ hiển thị bài tuyển dụng ở trang này. Bài tương tác có tab riêng /tuong-tac.
     // Dùng or() với loai is null để bài cũ trước khi migration đã áp (chưa có cột loai
     // hoặc loai=null) vẫn được coi là tuyển dụng và hiện đúng chỗ.
@@ -52,9 +53,15 @@ export default async function Page() {
       .in('task', ['hr.queue_facebook', 'hr.publish_facebook'])
       .order('created_at', { ascending: false })
       .limit(20),
+    // Tên vị trí để gom bài đăng theo vị trí (gồm cả vị trí đã đóng, để bài cũ vẫn có nhãn).
+    client.from('hr_jobs').select('id, title'),
   ]);
 
   const rawPosts = (jRes.data || []) as Post[];
+  const jobTitleMap = new Map<string, string>();
+  for (const j of ((jobsRes.data || []) as Array<{ id: string; title: string }>)) {
+    jobTitleMap.set(j.id, j.title);
+  }
   // Kéo số tương tác Facebook cho các bài đã đăng: nếu snapshot mới thì dùng cache,
   // cũ hơn TTL (mặc định 15 phút) thì tự gọi Graph API rồi upsert. Không cần cron.
   const jobPostMap = new Map<string, string>();
@@ -64,6 +71,7 @@ export default async function Page() {
   const metricsMap = await refreshStaleMetrics(client, jobPostMap);
   const posts: Post[] = rawPosts.map((p) => ({
     ...p,
+    jobTitle: p.job_id ? jobTitleMap.get(p.job_id) || null : null,
     metrics: p.fb_post_id ? metricsMap.get(p.fb_post_id) || null : null,
   }));
   const approvedPostIds = new Set((aqRes.data || []).map((r) => r.ref_id as string));
@@ -93,9 +101,9 @@ export default async function Page() {
         <div>
           <h1>Tin đăng</h1>
           <p className="sub">
-            Danh sách bài tuyển dụng ở <b>mọi kênh</b> (Facebook, TopCV, JobsGO, VietnamWorks…): nháp, đặt lịch,
-            đã đăng và bài đăng thủ công đã ghi nhận. Cột <b>Tương tác</b> chỉ có số cho Facebook — các sàn khác
-            không có API để kéo số về.
+            Bài đăng <b>gom theo từng vị trí tuyển dụng</b> — bấm tên vị trí để xổ danh sách bài của vị trí đó, ở
+            <b> mọi kênh</b> (Facebook, TopCV, JobsGO, VietnamWorks…): nháp, đặt lịch, đã đăng và bài đăng thủ công đã
+            ghi nhận. Cột <b>Tương tác</b> chỉ có số cho Facebook — các sàn khác không có API để kéo số về.
           </p>
         </div>
         <AutoRefresh seconds={30} />
