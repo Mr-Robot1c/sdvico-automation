@@ -424,8 +424,81 @@ async function publishContentToTikTok(
   return { ok: false, error: result.error };
 }
 
+// Đăng video bài (bản dọc 9:16) lên YouTube Shorts. Cần 3 env vars YOUTUBE_CLIENT_ID +
+// YOUTUBE_CLIENT_SECRET + YOUTUBE_REFRESH_TOKEN (xem docs/runbook-youtube-setup.md).
+// Bài không có video -> bỏ qua. Bài có video ngang (không có bản dọc) -> vẫn upload nhưng
+// YouTube sẽ hiển thị dạng video thường thay vì Shorts.
+async function publishContentToYoutube(
+  client: ReturnType<typeof getServerClient>,
+  contentId: string
+): Promise<{ ok: boolean; error?: string; videoId?: string }> {
+  const { data: posted } = await client
+    .from('mkt_posts')
+    .select('id')
+    .eq('channel', 'youtube')
+    .eq('content_id', contentId)
+    .eq('status', 'published')
+    .limit(1);
+  if (posted && posted.length) return { ok: true };
+
+  const { data: c } = await client
+    .from('mkt_content')
+    .select('id, title, draft, brief')
+    .eq('id', contentId)
+    .single();
+  if (!c) return { ok: false, error: 'khong tim thay noi dung' };
+  const ytAssets = (c as any).brief?.assets || {};
+  const videoId = (ytAssets.video_v || ytAssets.video) as string | undefined;
+  if (!videoId) {
+    await client.from('mkt_posts').insert({ content_id: contentId, channel: 'youtube', status: 'failed' });
+    return { ok: false, error: 'bai khong co video nen YouTube bo qua' };
+  }
+  const { data: a } = await client.from('brand_assets').select('storage_path').eq('id', videoId).single();
+  const sp = (a as { storage_path?: string } | null)?.storage_path;
+  if (!sp) {
+    await client.from('mkt_posts').insert({ content_id: contentId, channel: 'youtube', status: 'failed' });
+    return { ok: false, error: 'khong thay file video trong kho' };
+  }
+  const videoUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  const title = String((c as any).title || 'Video SDVICO');
+  const caption = String((c as any).draft || (c as any).title || '');
+  const productGroup = ((c as any).brief?.rotation_group || '').replace(/^\s*\d+\.\s*/, '').trim();
+  const tags = ['SDVICO', 'tauca', 'thietbitauca', 'nguoi_di_bien'];
+  if (productGroup) tags.push(productGroup.replace(/\s+/g, ''));
+
+  const { postVideoToYouTube } = await import('../lib/youtube-publish');
+  const result = await postVideoToYouTube({ videoUrl, title, caption, tags });
+  try {
+    await client.from('run_log').insert({
+      task: 'mkt.publish_youtube',
+      actor: 'decideForm',
+      status: result.ok ? 'ok' : 'error',
+      detail: {
+        contentId,
+        videoId: result.videoId || null,
+        url: result.url || null,
+        error: result.error || null,
+        steps: result.steps
+      }
+    });
+  } catch { /* bo qua loi ghi log */ }
+  if (result.ok && result.videoId) {
+    await client.from('mkt_posts').insert({
+      content_id: contentId,
+      channel: 'youtube',
+      status: 'published',
+      external_url: result.url || `https://youtube.com/shorts/${result.videoId}`,
+      published_at: new Date().toISOString()
+    });
+    await client.from('mkt_content').update({ status: 'published' }).eq('id', contentId);
+    return { ok: true, videoId: result.videoId };
+  }
+  await client.from('mkt_posts').insert({ content_id: contentId, channel: 'youtube', status: 'failed' });
+  return { ok: false, error: result.error };
+}
+
 // Người quyết. Đọc từ form, cập nhật trạng thái, chỉ đổi mục còn pending.
-// Duyệt bài marketing thì đăng NGAY lên các kênh đã chọn (Facebook, TikTok — nếu đã cấu hình).
+// Duyệt bài marketing thì đăng NGAY lên các kênh đã chọn (Facebook, TikTok, YouTube — nếu đã cấu hình).
 export async function decideForm(formData: FormData) {
   const id = String(formData.get('id') || '');
   const action = String(formData.get('action') || '');
@@ -497,6 +570,7 @@ export async function decideForm(formData: FormData) {
           }
           if (ch === 'facebook') jobs.push(publishContentToFacebook(bgClient, contentId, scheduledAt));
           if (ch === 'tiktok') jobs.push(publishContentToTikTok(bgClient, contentId, tiktokPrivacy));
+          if (ch === 'youtube') jobs.push(publishContentToYoutube(bgClient, contentId));
         }
         await Promise.allSettled(jobs);
         // Bài vừa đăng thật xong, cập nhật lại trang cho lần render kế tiếp.

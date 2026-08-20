@@ -319,7 +319,10 @@ export async function GET(req: Request) {
         try { logoActions.push({ group, ...(await ensureLogoForPost(client, img.id)) }); }
         catch (e) { logoActions.push({ group, action: 'error', reason: String((e as any)?.message || e) }); }
       }
+      // YouTube: bat khi da cau hinh YOUTUBE_REFRESH_TOKEN (xem runbook YouTube). Chi them
+      // vao channels khi folder co CLIP (video AI se dung ban doc video_v). Bai chi anh -> bo qua.
       const channels = ['facebook'];
+      if (wantVideo && process.env.YOUTUBE_REFRESH_TOKEN) channels.push('youtube');
       const assets = { image: img.id, video: null };
 
       // A bám góc tri thức (sug.why + tiêu đề gợi ý). B dùng góc đối chứng, tự do tiêu đề.
