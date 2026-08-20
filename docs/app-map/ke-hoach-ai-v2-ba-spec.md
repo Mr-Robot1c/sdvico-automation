@@ -4,7 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-18
 ttl_days: 90
-<!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-20 - So lieu views cho Reel/video: xac nhan qua fb-diag insights probe: post_media_view=29 khop UI 27; post_video_views=8 chi so cu; blue_reels_play_count=null. Doi thu tu grabFirst: post_media_view UP dau. -->
 <!-- re-verified: 2026-08-20 - fb-diag them ?scope=insights + ?post=PAGEID_POSTID: do het metric video+post de tim field khop UI FB 27 views. Workflow fb-diag them 2 input post + scope. -->
 <!-- re-verified: 2026-08-20 - facebookObjectIdFromLink nhan them dang /photo/?fbid=<id> (URL moi FB 2024+): coi nhu post, kind=post; buoc do so lieu se resolve page_story_id neu can. build-video-all.mjs them log debug SUPABASE_URL prefix + so bai video_requested chua co video de soi CI miss. -->
 <!-- re-verified: 2026-08-20 - So lieu views cho Reel/Post video sai (FB UI 27, app 8): total_video_views (video_insights) khong khop UI. Uu tien blue_reels_play_count (Reels metric moi Meta 2024) roi post_video_views tren node bai, cuoi cung fallback total_video_views. Dedupe theo cid uu tien /videos/ hon /reel/ (thay vi skip reel han) -> bai chi co reel (import tay page thuc) van do duoc. -->

@@ -209,9 +209,9 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
         // node VIDEO (objId); dự phòng bằng chỉ số bài (postId = PAGEID_VIDEOID) nếu Meta bỏ tên cũ.
         await grabFirst('views', [
           ...(postId ? [
+            { path: pi('post_media_view'), name: 'post_media_view' },
             { path: pi('blue_reels_play_count'), name: 'blue_reels_play_count' },
             { path: pi('post_video_views'), name: 'post_video_views' },
-            { path: pi('post_media_view'), name: 'post_media_view' },
           ] : []),
           { path: vi('total_video_views'), name: 'total_video_views' },
         ]);
