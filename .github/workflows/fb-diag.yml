@@ -1,26 +1,33 @@
 name: Soi Reel/Post Facebook (fb-diag)
-# Chay tay tu Actions: nhap ID Reel/Post -> in trang thai privacy/status/published.
-# Chi doc, khong dang gi.
 on:
   workflow_dispatch:
     inputs:
       object:
-        description: 'ID Reel/Post (chi so, khong lay URL). Vd: 1585878646270390'
+        description: 'ID Reel/Post (chi so). Vd: 1585878646270390'
         required: true
         type: string
-
+      post:
+        description: '(tuy chon) PAGEID_POSTID de hoi post-level insights'
+        required: false
+        type: string
+      scope:
+        description: 'insights = do het metric video+post; empty = kiem privacy'
+        required: false
+        default: ''
+        type: string
 jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
-      - name: Goi /api/fb-diag
-        env:
+      - env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           OBJ: ${{ github.event.inputs.object }}
+          POST: ${{ github.event.inputs.post }}
+          SCOPE: ${{ github.event.inputs.scope }}
         run: |
           if [ -z "$CRON_SECRET" ]; then echo "Thieu CRON_SECRET"; exit 1; fi
-          code=$(curl -s -o /tmp/r.json -w "%{http_code}" \
-            "https://sdvico-mktit.vercel.app/api/fb-diag?secret=$CRON_SECRET&object=$OBJ")
-          echo "HTTP $code"
+          URL="https://sdvico-mktit.vercel.app/api/fb-diag?secret=$CRON_SECRET&object=$OBJ"
+          [ -n "$POST" ] && URL="$URL&post=$POST"
+          [ -n "$SCOPE" ] && URL="$URL&scope=$SCOPE"
+          curl -s -o /tmp/r.json -w "HTTP %{http_code}\n" "$URL"
           cat /tmp/r.json | python3 -m json.tool 2>/dev/null || cat /tmp/r.json
-          echo

@@ -63,15 +63,40 @@ export async function GET(req: Request) {
     .order('created_at', { ascending: false })
     .limit(10);
 
-  // 3) Soi 1 object cu the (?object=<id>) - Reel/Post - de kiem tai sao bat ky ai KHONG thay
-  //    (privacy, status, published, embeddable, restrictions). Chi doc.
+  // 3) Soi object + insights de tim chi so nao khop UI FB (user 20/8: FB UI 27, app luu 8).
   let object: any = null;
   const oid = (url.searchParams.get('object') || '').replace(/[^0-9]/g, '');
+  const scope = url.searchParams.get('scope') || '';
   if (TOKEN && oid) {
     try {
       const fields = 'id,description,title,length,created_time,updated_time,privacy,status,published,embeddable,permalink_url,live_status,picture';
       const or = await fetch(`https://graph.facebook.com/${VERSION}/${oid}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(TOKEN)}`);
       object = await or.json();
+      if (scope === 'insights') {
+        // Thu tat ca metric quan tam cho video/reel + tren post node "PAGEID_VIDEOID" (video node
+        // co pageid trong URL nhung caller can truyen ?post=<pageid>_<videoid>).
+        const post = url.searchParams.get('post') || '';
+        const metrics = [
+          'total_video_views','total_video_impressions','total_video_views_unique',
+          'total_video_10s_views','total_video_avg_time_watched','total_video_view_total_time',
+          'total_video_complete_views','total_video_reactions_by_type_total',
+        ];
+        const postMetrics = ['post_video_views','post_video_views_organic','post_video_views_paid',
+          'post_media_view','post_impressions','post_impressions_organic','post_impressions_unique',
+          'post_video_views_unique','blue_reels_play_count','blue_reels_play_count_60s_v2',
+          'post_engaged_users','post_clicks',
+        ];
+        const insights: any = { video: {}, post: {} };
+        for (const m of metrics) {
+          try { const r = await (await fetch(`https://graph.facebook.com/${VERSION}/${oid}/video_insights?metric=${m}&access_token=${encodeURIComponent(TOKEN)}`)).json(); insights.video[m] = r?.data?.[0]?.values?.[0]?.value ?? r?.error?.message ?? null; } catch (e: any) { insights.video[m] = String(e?.message||e); }
+        }
+        if (post) {
+          for (const m of postMetrics) {
+            try { const r = await (await fetch(`https://graph.facebook.com/${VERSION}/${post}/insights?metric=${m}&access_token=${encodeURIComponent(TOKEN)}`)).json(); insights.post[m] = r?.data?.[0]?.values?.[0]?.value ?? r?.error?.message ?? null; } catch (e: any) { insights.post[m] = String(e?.message||e); }
+          }
+        }
+        object.insights = insights;
+      }
     } catch (e: any) {
       object = { error: String(e?.message || e) };
     }
