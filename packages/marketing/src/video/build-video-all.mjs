@@ -47,6 +47,9 @@ async function runOnce(client, { requested, limit, extra }) {
     .not('draft', 'is', null)
     .order('created_at', { ascending: false });
   const rows = contents || [];
+  console.log(`[debug] SUPABASE_URL=${(process.env.SUPABASE_URL||"").slice(0,40)}... rows=${rows.length}`);
+  const reqCount = rows.filter((c) => c.brief?.video_requested === true && !c.brief?.assets?.video_h).length;
+  console.log(`[debug] video_requested=true chua co video: ${reqCount} bai`);
   // Bỏ qua chính các bài video-pipeline sinh ra; và bài NGUỒN đã được dựng video rồi.
   const doneSources = new Set(
     rows.filter((c) => c.brief?.generator === 'video-pipeline' && c.brief?.source_content).map((c) => c.brief.source_content)

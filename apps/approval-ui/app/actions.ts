@@ -568,6 +568,9 @@ function facebookObjectIdFromLink(raw: string): { id: string; kind: 'video' | 'r
   const sf = q.get('story_fbid'); const pid = q.get('id');
   if (sf) return { id: /^\d+$/.test(sf) && pid && /^\d+$/.test(pid) ? `${pid}_${sf}` : sf, kind: 'post' };
   const v = q.get('v'); if (v && /^\d+$/.test(v)) return { id: v, kind: 'video' };
+  // URL /photo/?fbid=<id> hoac /photo.php?fbid=<id> (dang moi FB 2024+): fbid = id anh, coi nhu post
+  // vi FB Graph khi hoi <id>?fields=... thuong tra ca meta bai (page_story_id se resolve o buoc do so lieu).
+  const fbid = q.get('fbid'); if (fbid && /^\d+$/.test(fbid)) return { id: fbid, kind: 'post' };
   const seg = u.pathname.split('/').filter(Boolean);
   const idx = (k: string) => seg.findIndex((s) => s === k);
   const iV = idx('videos'); if (iV >= 0 && seg[iV + 1]) return { id: seg[iV + 1], kind: 'video' };
