@@ -1076,3 +1076,19 @@ a.chip:hover { filter: brightness(0.98); }
   .public-nav { gap: 14px; }
   .blog-article h1 { font-size: 1.5rem; }
 }
+
+/* Field co label tren, input duoi (form Quang cao — item 4). */
+.field-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field-col .sub { font-weight: 500; }
+
+/* Nut lien he CTA tren trang public (blog/san-pham) — Messenger + goi + Zalo, co tracking. */
+.contact-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.contact-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 16px; border-radius: 10px; font-weight: 600; text-decoration: none;
+  border: 1px solid var(--line); background: var(--bg-2, #fff); color: var(--ink);
+  transition: background .15s, transform .1s;
+}
+.contact-btn:hover { transform: translateY(-1px); }
+.contact-btn.primary { background: var(--accent, #1f5fbf); color: #fff; border-color: transparent; }
+.contact-btn.zalo { background: #0068ff; color: #fff; border-color: transparent; }

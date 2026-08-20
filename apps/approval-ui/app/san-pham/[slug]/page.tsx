@@ -4,6 +4,8 @@ import type { Metadata } from 'next';
 import { findProductBySlug, PRODUCT_CATALOG } from '../../../lib/product-catalog';
 import { siteUrl } from '../../../lib/seo';
 import { getServerClient } from '../../../lib/supabase-server';
+import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
+import ContactButtons from '../../contact-buttons';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 600;
@@ -54,7 +56,7 @@ export default async function ProductDetailPage({ params }: Props) {
   const p = findProductBySlug(params.slug);
   if (!p) notFound();
 
-  const [images, related] = await Promise.all([loadImages(p.productGroup), loadRelatedPosts(p.productGroup)]);
+  const [images, related, ads] = await Promise.all([loadImages(p.productGroup), loadRelatedPosts(p.productGroup), loadAdsConfig()]);
 
   const url = `${siteUrl()}/san-pham/${p.slug}`;
   const jsonLd = {
@@ -120,10 +122,14 @@ export default async function ProductDetailPage({ params }: Props) {
 
         <div className="sp-cta">
           <b>Muốn lắp đặt sản phẩm này?</b>
-          <p style={{ margin: '6px 0 0' }}>
-            Nhắn tin cho <a href="https://www.facebook.com/sdvico.tbtc" target="_blank" rel="noopener noreferrer">Page SDVICO</a>{' '}
-            hoặc gọi tổng đài <a href="tel:19002323 49">1900 23 23 49</a> để được tư vấn, báo giá và lắp đặt tận bến.
+          <p style={{ margin: '6px 0 10px' }}>
+            Nhắn tin cho Page SDVICO hoặc gọi tổng đài để được tư vấn, báo giá và lắp đặt tận bến.
           </p>
+          <ContactButtons
+            messengerUrl={messengerUrl(ads.messengerUsername, { source: 'san_pham', campaign: p.slug })}
+            zaloUrl={zaloUrl(ads.zaloOaId)}
+            campaign={`san_pham:${p.slug}`}
+          />
         </div>
       </article>
     </>

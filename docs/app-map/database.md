@@ -9,7 +9,8 @@ ttl_days: 180
 <!-- re-verified: 2026-08-14 - Migration 20260814100000: them cot brand_assets.product_group (folder san pham theo STT) + index. Phuc vu vong xoay dang bai hang ngay theo folder. -->
 <!-- re-verified: 2026-08-14 - Migration 20260814120000: them bang mkt_plans (con bot dinh huong ke hoach tu so lieu Do luong, cron T4 & CN). RLS bat, policy staff. Them 1 hang bang. -->
 <!-- re-verified: 2026-08-18 - Migration 20260818120000_kho_tri_thuc: them 2 bang mkt_knowledge_internal + mkt_knowledge_public cho Ke hoach AI v2 (dac ta docs/app-map/ke-hoach-ai-v2-ba-spec.md). Them bucket Storage kho-tri-thuc-noi-bo (private, RLS authenticated). CHI la nguyen lieu dinh huong, KHONG tu tao bai/hang cho duyet. Da ap len live jwisiccphcepgpabyyco qua db-apply.mjs. -->
-<!-- LUU Y: DATABASE_URL trong .env tro NHAM project cu (schema khac). Migration phai ap len project live jwisiccphcepgpabyyco qua SQL Editor hoac sau khi sua DATABASE_URL. db-apply.mjs da co chot chan ap nham DB. -->
+<!-- re-verified: 2026-08-20 - Migration 20260820000000_mkt_ads (item 4 do luong quang cao): them bang mkt_ads (chien dich AD nguoi quan ly khai bao: platform, UTM, budget, results jsonb; bot KHONG tu chay AD) + 4 key app_config (mkt_meta_pixel_id, mkt_ga4_measurement_id, mkt_messenger_username, mkt_zalo_oa_id, gia tri cong khai khong phai secret). RLS bat policy staff. Da ap len live jwisiccphcepgpabyyco qua DATABASE_URL (pooler). App doc bang OK trong preview. -->
+<!-- LUU Y: DATABASE_URL trong .env tro NHAM project cu (schema khac). Migration phai ap len project live jwisiccphcepgpabyyco qua SQL Editor hoac sau khi sua DATABASE_URL. db-apply.mjs da co chot chan ap nham DB. (20/8: DATABASE_URL hien tro dung jwisiccphcepgpabyyco - da ap mkt_ads thanh cong qua pooler.) -->
 
 Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp dụng: `supabase/README.md`.
 

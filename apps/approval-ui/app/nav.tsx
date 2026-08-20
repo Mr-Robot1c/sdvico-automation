@@ -31,7 +31,8 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
       { href: '/do-luong', label: 'Đo lường', icon: '📈' },
-      { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' }
+      { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' },
+      { href: '/quang-cao', label: 'Quảng cáo', icon: '📣' }
     ]
   };
   // Nhóm AI (user 18/8): Nguồn = tri thức các AI đã học (nội bộ + public); Dữ liệu = 5 AI

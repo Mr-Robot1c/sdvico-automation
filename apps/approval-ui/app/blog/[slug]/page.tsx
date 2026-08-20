@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getServerClient } from '../../../lib/supabase-server';
 import { loadPublicPost, siteUrl } from '../../../lib/seo';
+import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
+import ContactButtons from '../../contact-buttons';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 300;
@@ -42,7 +44,7 @@ function fmtDate(iso: string | null): string {
 
 export default async function BlogDetailPage({ params }: Props) {
   const client = getServerClient();
-  const post = await loadPublicPost(client, params.slug);
+  const [post, ads] = await Promise.all([loadPublicPost(client, params.slug), loadAdsConfig()]);
   if (!post) notFound();
 
   const url = `${siteUrl()}/blog/${post.slug}`;
@@ -84,10 +86,14 @@ export default async function BlogDetailPage({ params }: Props) {
         ) : null}
         <div className="sp-cta">
           <b>Cần tư vấn thiết bị tàu cá?</b>
-          <p style={{ margin: '6px 0 0' }}>
-            Nhắn tin cho <a href="https://www.facebook.com/sdvico.tbtc" target="_blank" rel="noopener noreferrer">Page SDVICO</a>{' '}
-            hoặc gọi tổng đài <a href="tel:19002323 49">1900 23 23 49</a> để được tư vấn, báo giá và lắp đặt tận bến.
+          <p style={{ margin: '6px 0 10px' }}>
+            Nhắn tin cho Page SDVICO hoặc gọi tổng đài để được tư vấn, báo giá và lắp đặt tận bến.
           </p>
+          <ContactButtons
+            messengerUrl={messengerUrl(ads.messengerUsername, { source: 'blog', campaign: post.slug })}
+            zaloUrl={zaloUrl(ads.zaloOaId)}
+            campaign={`blog:${post.product}`}
+          />
         </div>
       </article>
     </>

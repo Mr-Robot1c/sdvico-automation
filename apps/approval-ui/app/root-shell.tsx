@@ -13,14 +13,16 @@ import { usePathname } from 'next/navigation';
 import Nav from './nav';
 import TopHeader from './top-header';
 import BotChip from './bot-chip';
+import Tracking from './tracking';
 
-export default function RootShell({ children, marketingOnly }: { children: ReactNode; marketingOnly: boolean }) {
+export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: { children: ReactNode; marketingOnly: boolean; pixelId?: string | null; ga4Id?: string | null }) {
   const path = usePathname() || '/';
   const isPublic = /^\/(blog|san-pham)(\/|$)/.test(path);
 
   if (isPublic) {
     return (
       <div className="public-shell">
+        <Tracking pixelId={pixelId} ga4Id={ga4Id} />
         <header className="public-header">
           <Link href="/" className="public-brand" aria-label="Về trang chủ SDVICO">
             <span className="brand-logo" aria-hidden="true">
@@ -49,7 +51,7 @@ export default function RootShell({ children, marketingOnly }: { children: React
         <footer className="public-footer">
           <p>SDVICO — Công nghệ số cho ngành biển và thủy sản.</p>
           <p>
-            <a href="tel:19002323 49">Hotline 1900 23 23 49</a>
+            <a href="tel:1900232349">Hotline 1900 23 23 49</a>
             {' · '}
             <a href="https://sdvico.vn" target="_blank" rel="noopener noreferrer">sdvico.vn</a>
             {' · '}
