@@ -113,7 +113,10 @@ export default async function Page() {
           </thead>
           <tbody>
             {rows.map((r) => {
-              const canAddPost = r.enabled && r.method === 'manual';
+              // Mọi kênh đăng tay đều có nút "+ Thêm bài", kể cả kênh built-in chưa bật.
+              // Nếu kênh đang tắt, user vẫn ghi nhận được bài đã đăng lâu rồi ở đó.
+              // Facebook/LinkedIn (method='api') không có nút — chúng đăng qua worker sau khi duyệt.
+              const canAddPost = r.method === 'manual';
               return (
                 <Fragment key={r.kenh}>
                   <tr className={`chan-row${r.enabled ? '' : ' chan-row-off'}`}>
