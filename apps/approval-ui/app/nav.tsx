@@ -14,7 +14,8 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
     title: 'Kết nối',
     items: [
       { href: '/facebook', label: 'Kết nối Facebook', icon: '📘' },
-      { href: '/tiktok', label: 'Kết nối TikTok', icon: '🎵' }
+      { href: '/tiktok', label: 'Kết nối TikTok', icon: '🎵' },
+      { href: '/youtube', label: 'Kết nối YouTube', icon: '▶️' }
     ]
   };
   const quyTac: Group = {

@@ -4,7 +4,6 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-18
 ttl_days: 90
-<!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- re-verified: 2026-08-20 - Bao cao tuan /do-luong/tuan (item 1a): lib/week-report.ts gom mkt_metrics theo tuan ISO VN (T2-CN), KPI+top5+phan bo theo product/kind+delta vs tuan truoc+nut Sao chep bao cao text. Diem composite = engagement + views*0.1 + watchSec*0.02 + reach*0.05. -->
 <!-- re-verified: 2026-08-20 - Vong hoc tuan (item 1b, NV4/R5): lib/learn-weekly.ts chay Chu Nhat 23h+ VN qua /api/mkt-metrics-pull, sinh mkt_plans data.origin='learn-weekly' applied=false; /ke-hoach hien banner rieng "De xuat trong so tu so lieu tuan vua xong" - nguoi bam Ap dung moi co hieu luc. KHONG tu doi KIND_WEIGHT. Guard alreadyRanThisWeek 24h chan trung; ?learn=1 ep test. Plan.origin them truong ('boss' | 'learn-weekly'). -->
 <!-- re-verified: 2026-08-20 - CTA: prompt bai social (2 ban) + outro video doc them NHẮN TIN cho Page SDVICO ngoai gọi tong dai. -->

@@ -58,6 +58,29 @@ async function getAccessToken(): Promise<string> {
   return String(j.access_token);
 }
 
+// Kiem tra ket noi YouTube cho trang /youtube: da cau hinh du 3 env chua, va neu co thi
+// goi API lay ten kenh de hien "Da ket noi kenh X". Loi khong nem ra ngoai (trang van hien).
+export async function getYouTubeChannelInfo(): Promise<{ configured: boolean; channelTitle: string | null; error: string | null }> {
+  const configured = !!(
+    (process.env.YOUTUBE_CLIENT_ID || '').trim() &&
+    (process.env.YOUTUBE_CLIENT_SECRET || '').trim() &&
+    (process.env.YOUTUBE_REFRESH_TOKEN || '').trim()
+  );
+  if (!configured) return { configured: false, channelTitle: null, error: null };
+  try {
+    const at = await getAccessToken();
+    const r = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', {
+      headers: { Authorization: `Bearer ${at}` }
+    });
+    const j: any = await r.json();
+    if (!r.ok) return { configured: true, channelTitle: null, error: j?.error?.message || `HTTP ${r.status}` };
+    const title = j?.items?.[0]?.snippet?.title || null;
+    return { configured: true, channelTitle: title, error: title ? null : 'khong doc duoc ten kenh' };
+  } catch (e: any) {
+    return { configured: true, channelTitle: null, error: String(e?.message || e) };
+  }
+}
+
 // Sanitize tieu de/mo ta cho YouTube (100 ky tu title, 5000 ky tu description).
 function truncate(s: string, max: number): string {
   const t = String(s || '').trim();
