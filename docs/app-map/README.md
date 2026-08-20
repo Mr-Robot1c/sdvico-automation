@@ -5,8 +5,8 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-20
 ttl_days: 180
+<!-- re-verified: 2026-08-20 - FIX 4 loi user bao: (1) textarea muc tieu to lai (.plan-card textarea min-height 88px, rows 4); (2) hang HOM NAY bang lich dung class .row-today (var --surface-2, theme-safe) thay inline #f0f6ff lam dark mode trang xoa; (3) NHOM CHIA SE dong bo 1 nguon: /api/share-groups (app_config mkt_share_groups {id,label,url}) - popover noi-dung doc/ghi server + migrate localStorage cu 1 lan, /ke-hoach chi HIEN THI + tro ve popover, bo form nhap tay saveShareGroups; (4) Creator luon co huong tu BOSS: cron nap lai content_suggestions khi ban dang ap can (generateContentDirections tu tri thuc, guard run_log mkt.suggestions_refill 1 lan/ngay). -->
 <!-- re-verified: 2026-08-20 - Pipeline 16:30 them buoc 2b: packages/marketing/src/up-media-kho-tu-lieu.mjs tu up anh/video Zalo/media len KHO TU LIEU brand-assets (Gemini vision phan loai vao folder san pham; CHAN giay_to_ca_nhan + man_hinh_app - dieu cam 6; idempotent license_note zalo-media:<folder>/<file>; video can ban tom tat hoc-video truoc; fallback flash-lite khi 503). Trang /ke-hoach sap lai GON: Hom nay -> Ke hoach tuan (bang 7 ngay highlight hom nay) -> Huong di bai viet -> Cai dat (details thu gon) -> Chi tiet+lich su (details). -->
-<!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 
 ## Chỉ mục
 

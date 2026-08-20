@@ -821,11 +821,17 @@ a.chip:hover { filter: brightness(0.98); }
   border-radius: 12px; padding: 14px 16px; margin: 12px 0;
 }
 .goal-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.goal-card textarea {
+.goal-card textarea,
+.plan-card textarea {
   width: 100%; resize: vertical; padding: 8px 10px; border-radius: 8px;
   border: 1px solid var(--line); background: var(--surface); color: var(--ink);
-  font-family: inherit; font-size: 0.92rem; line-height: 1.5;
+  font-family: inherit; font-size: 0.92rem; line-height: 1.5; min-height: 88px;
 }
+
+/* Hang HOM NAY trong bang lich tuan (/ke-hoach). Dung bien theme (truoc dung inline
+   #f0f6ff sang -> dark mode chu trang nen trang, khong doc duoc - user bao 20/8). */
+.row-today td { background: var(--surface-2); }
+.row-today td:first-child { border-left: 3px solid #d97706; }
 
 /* BOT chip - noi bat goc duoi phai, hien thi trang thai AI da hoc. */
 .bot-chip-wrap { position: fixed; right: 20px; bottom: 20px; z-index: 9998; }

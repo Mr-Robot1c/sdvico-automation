@@ -5,20 +5,34 @@ import { useEffect, useRef, useState } from 'react';
 // Nut "Chia se vao group" cho bai da dang len Facebook Page (user 20/8: Groups API bi Meta dong
 // tu 2020 -> khong the tu dong post vao group; giai phap: rut gon con 2 click/group). Bam nut:
 // - Hop popover hien LINK bai Post + nut Copy (auto sao chep san sang dan)
-// - Danh sach GROUP nguoi dung tu luu (localStorage 'fb_share_groups' — moi tab tu quan; khong luu
-//   len server vi group ID/URL la thong tin ca nhan cua nguoi vao Facebook)
+// - Danh sach GROUP: tu 20/8 luu SERVER (app_config 'mkt_share_groups' qua /api/share-groups)
+//   de dung CHUNG voi lich chia se theo ngay o trang Ke hoach (truoc luu localStorage rieng ->
+//   hai noi lech nhau, user bao "nhom cua t dang bi sai"). localStorage cu duoc MIGRATE len
+//   server mot lan khi server con trong.
 // - Moi group co nut "Mo group" (target=_blank) + nut "X" xoa. O nhap them group moi bat ky.
-// Luong 2 click/group: (1) Copy link; (2) Bam "Mo group" -> paste + Post. Khong dang tay duoc
-// nhung nhanh hon vao Facebook go tay chon Share.
+// Luong 2 click/group: (1) Copy link; (2) Bam "Mo group" -> paste + Post.
 type SavedGroup = { id: string; label: string; url: string };
 
-const KEY = 'fb_share_groups';
+const KEY = 'fb_share_groups'; // localStorage cu — chi con dung de migrate
 
-function loadGroups(): SavedGroup[] {
-  try { const s = localStorage.getItem(KEY); return s ? JSON.parse(s) : []; } catch { return []; }
+async function loadGroupsServer(): Promise<SavedGroup[]> {
+  try {
+    const r = await fetch('/api/share-groups', { cache: 'no-store' });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j?.groups) ? j.groups : [];
+  } catch { return []; }
 }
-function saveGroups(gs: SavedGroup[]) {
-  try { localStorage.setItem(KEY, JSON.stringify(gs)); } catch { /* bo qua */ }
+async function saveGroupsServer(gs: SavedGroup[]) {
+  try {
+    await fetch('/api/share-groups', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groups: gs }),
+    });
+  } catch { /* bo qua — lan luu sau se ghi lai */ }
+}
+function loadGroupsLocal(): SavedGroup[] {
+  try { const s = localStorage.getItem(KEY); return s ? JSON.parse(s) : []; } catch { return []; }
 }
 function normalizeGroupUrl(input: string): { id: string; url: string } | null {
   const t = input.trim(); if (!t) return null;
@@ -36,7 +50,19 @@ export default function ShareGroups({ postUrl }: { postUrl: string }) {
   const [copied, setCopied] = useState(false);
   const popRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => { setGroups(loadGroups()); }, []);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let gs = await loadGroupsServer();
+      // Migrate mot lan: server trong ma localStorage co nhom that -> day len server.
+      if (!gs.length) {
+        const local = loadGroupsLocal();
+        if (local.length) { gs = local; await saveGroupsServer(local); }
+      }
+      if (alive) setGroups(gs);
+    })();
+    return () => { alive = false; };
+  }, []);
   // Dong khi bam ra ngoai popover.
   useEffect(() => {
     if (!open) return;
@@ -65,16 +91,18 @@ export default function ShareGroups({ postUrl }: { postUrl: string }) {
       if (r.ok) { const j = await r.json(); if (j?.name) label = String(j.name).slice(0, 60); }
     } catch { /* giu ID */ }
     const next = [...groups, { id: norm.id, label, url: norm.url }];
-    setGroups(next); saveGroups(next); setNewG('');
+    setGroups(next); saveGroupsServer(next); setNewG('');
   };
   const removeGroup = (id: string) => {
     const next = groups.filter((g) => g.id !== id);
-    setGroups(next); saveGroups(next);
+    setGroups(next); saveGroupsServer(next);
   };
+  // Go ten chi doi state local; roi khoi o (blur) moi luu server 1 lan — tranh moi phim go
+  // ban 1 POST (route con lam moi de xuat song, nang).
   const renameGroup = (id: string, label: string) => {
-    const next = groups.map((g) => g.id === id ? { ...g, label: label || g.id } : g);
-    setGroups(next); saveGroups(next);
+    setGroups((prev) => prev.map((g) => g.id === id ? { ...g, label: label || g.id } : g));
   };
+  const commitRename = () => { saveGroupsServer(groups); };
 
   return (
     <span style={{ marginLeft: 8, position: 'relative', display: 'inline-block' }} ref={popRef}>
@@ -124,6 +152,7 @@ export default function ShareGroups({ postUrl }: { postUrl: string }) {
                   <input
                     value={g.label}
                     onChange={(e) => renameGroup(g.id, e.target.value)}
+                    onBlur={commitRename}
                     placeholder="Đặt tên gợi nhớ..."
                     style={{ flex: 1, minWidth: 0, padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 4, fontSize: 12, background: 'var(--surface)', color: 'var(--ink)', fontStyle: g.label === g.id ? 'italic' : 'normal', opacity: g.label === g.id ? 0.8 : 1 }}
                     title={`ID: ${g.id} — ${g.url}

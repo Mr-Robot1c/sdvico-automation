@@ -112,12 +112,16 @@ function buildLiveNarrative(salesProducts: PlanProduct[], groups: string[], tota
   return paras;
 }
 
-// Đọc danh sách nhóm chia sẻ từ app_config.
+// Đọc danh sách nhóm chia sẻ từ app_config. Từ 20/8 nguồn chung với popover Quản lý bài viết
+// (/api/share-groups) nên phần tử có thể là object {id,label,url} — lấy label làm tên hiển thị.
 async function loadShareGroups(client: Client): Promise<string[]> {
   const { data } = await client.from('app_config').select('value').eq('key', 'mkt_share_groups').maybeSingle();
   const v = (data as any)?.value;
   const arr = Array.isArray(v?.groups) ? v.groups : Array.isArray(v) ? v : [];
-  return arr.map((x: any) => String(x).trim()).filter(Boolean).slice(0, 12);
+  return arr
+    .map((x: any) => typeof x === 'string' ? x.trim() : String(x?.label || x?.id || '').trim())
+    .filter(Boolean)
+    .slice(0, 12);
 }
 
 // Đọc focus (sản phẩm tập trung) còn hạn.

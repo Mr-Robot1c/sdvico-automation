@@ -4,8 +4,9 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-20
 ttl_days: 90
-<!-- re-verified: 2026-08-20 - /ke-hoach redesign gon (user: "planner gon gang, the hien day du plan"): khoi Hom nay (dang SP nao may bai + nhom chia se) -> Ke hoach tuan -> Huong di bai viet (tu ban dang ap, hien used/fresh) -> Cai dat gop 3 form vao details -> Ban day du + lich su vao details. Khong doi action/logic, chi bo cuc. -->
+<!-- re-verified: 2026-08-20 - Nhom chia se 1 nguon /api/share-groups; /ke-hoach bo form nhap tay nhom (popover Quan ly bai viet la noi quan ly); refill huong di khi can (mkt.suggestions_refill 1 lan/ngay) de Creator luon nhan huong tu BOSS. -->
 <!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-20 - /ke-hoach redesign gon (user: "planner gon gang, the hien day du plan"): khoi Hom nay (dang SP nao may bai + nhom chia se) -> Ke hoach tuan -> Huong di bai viet (tu ban dang ap, hien used/fresh) -> Cai dat gop 3 form vao details -> Ban day du + lich su vao details. Khong doi action/logic, chi bo cuc. -->
 <!-- Nhat ky re-verify cu don sang reverify-log.md (20/8/2026). Giu 3 dong moi nhat o day. -->
 <!-- re-verified: 2026-08-20 - Bao cao tuan /do-luong/tuan (item 1a): lib/week-report.ts gom mkt_metrics theo tuan ISO VN (T2-CN), KPI+top5+phan bo theo product/kind+delta vs tuan truoc+nut Sao chep bao cao text. Diem composite = engagement + views*0.1 + watchSec*0.02 + reach*0.05. -->
 <!-- re-verified: 2026-08-20 - Vong hoc tuan (item 1b, NV4/R5): lib/learn-weekly.ts chay Chu Nhat 23h+ VN qua /api/mkt-metrics-pull, sinh mkt_plans data.origin='learn-weekly' applied=false; /ke-hoach hien banner rieng "De xuat trong so tu so lieu tuan vua xong" - nguoi bam Ap dung moi co hieu luc. KHONG tu doi KIND_WEIGHT. Guard alreadyRanThisWeek 24h chan trung; ?learn=1 ep test. Plan.origin them truong ('boss' | 'learn-weekly'). -->

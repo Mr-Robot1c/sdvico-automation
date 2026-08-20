@@ -69,20 +69,6 @@ export async function saveFocus(formData: FormData) {
   revalidatePath('/ke-hoach');
 }
 
-// Danh sách NHÓM Facebook người dùng đang ở (user 20/8: "t đang ở trong 4 group"). Lưu app_config
-// 'mkt_share_groups' = { groups: [...tên nhóm] }. BOSS đọc để xếp lịch chia sẻ theo ngày trong
-// đề xuất sống (lib/plan-live.ts). Chỉ là gợi ý cho người chia sẻ tay (Meta chặn tự đăng group).
-export async function saveShareGroups(formData: FormData) {
-  const raw = String(formData.get('share_groups') || '');
-  const groups = raw.split(/[,\n;]+/).map((s) => s.trim()).filter(Boolean).slice(0, 12);
-  const client = getServerClient();
-  const { error } = await client.from('app_config').upsert({
-    key: 'mkt_share_groups',
-    value: { groups, updated_at: new Date().toISOString() },
-    updated_at: new Date().toISOString(),
-  });
-  if (error) throw new Error('Không lưu được nhóm chia sẻ: ' + error.message);
-  // Cập nhật đề xuất sống ngay để lịch theo ngày có nhóm mới.
-  try { await refreshLiveProposal(client); } catch (e: any) { console.error('[groups] refresh live loi:', e?.message || e); }
-  revalidatePath('/ke-hoach');
-}
+// Nhóm chia sẻ: từ 20/8 quản lý DUY NHẤT qua popover 📣 ở Quản lý bài viết (/api/share-groups,
+// app_config 'mkt_share_groups' dạng {groups: [{id,label,url}]}). Trang Kế hoạch chỉ hiển thị.
+// (saveShareGroups nhập tay cũ đã bỏ — hai nguồn từng lệch nhau, user bắt lỗi 20/8.)

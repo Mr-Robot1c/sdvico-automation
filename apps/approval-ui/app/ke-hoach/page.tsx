@@ -2,7 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import type { Plan, Tier } from '../../lib/plan';
 import { vnInt, vnDec1 } from '../../lib/plan';
 import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
-import { saveWeeklyGoal, saveFocus, saveShareGroups } from './goal-actions';
+import { saveWeeklyGoal, saveFocus } from './goal-actions';
 import GenerateButton from './generate-button';
 
 export const dynamic = 'force-dynamic';
@@ -68,7 +68,12 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   const focusGroups = Array.isArray(focusVal.groups) ? focusVal.groups : [];
   const focusUntil = focusVal.until ? String(focusVal.until).slice(0, 10) : '';
   const focusActive = focusGroups.length > 0 && (!focusVal.until || new Date(focusVal.until).getTime() > Date.now());
-  const shareGroups = (Array.isArray((sgRow as any)?.value?.groups) ? (sgRow as any).value.groups : []) as string[];
+  // Nhóm chia sẻ: nguồn CHUNG với popover 📣 ở Quản lý bài viết (app_config qua /api/share-groups).
+  // Phần tử có thể là object {id,label,url} — lấy label hiển thị.
+  const shareGroupsRaw = Array.isArray((sgRow as any)?.value?.groups) ? (sgRow as any).value.groups : [];
+  const shareGroups: string[] = shareGroupsRaw
+    .map((x: any) => (typeof x === 'string' ? x.trim() : String(x?.label || x?.id || '').trim()))
+    .filter(Boolean);
 
   const rows = (data || []) as Row[];
   const planRows = rows.filter((r) => r.data?.origin !== 'live');
@@ -178,7 +183,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 <thead><tr><th>Ngày</th><th>Bài bán</th><th className="num">Content</th><th>Chia sẻ nhóm</th></tr></thead>
                 <tbody>
                   {liveData.daily_schedule.map((d) => (
-                    <tr key={d.date} style={d.date === today ? { background: 'var(--bg-2, #f0f6ff)' } : undefined}>
+                    <tr key={d.date} className={d.date === today ? 'row-today' : undefined}>
                       <td>{d.date === today ? '👉 ' : ''}<b>{d.dow}</b> <span className="sub">{fmtDate(d.date)}</span></td>
                       <td>{d.sales.length ? d.sales.map((s) => `${s.product} (${vnInt(s.count)})`).join(', ') : '—'}</td>
                       <td className="num">{vnInt(d.contentCount)}</td>
@@ -245,7 +250,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <form action={saveWeeklyGoal} style={{ marginTop: 12 }}>
           <b>🎯 Mục tiêu tuần</b>
           <p className="sub" style={{ margin: '2px 0 6px' }}>Viết như giao việc. Bỏ trống thì BOSS tự định hướng theo dữ liệu.</p>
-          <textarea name="goal_text" defaultValue={goalText} rows={2} placeholder="Ví dụ: tuần này ưu tiên máy lọc dầu SF-50, cần 20 cuộc gọi về tổng đài." />
+          <textarea name="goal_text" defaultValue={goalText} rows={4} placeholder="Ví dụ: tuần này ưu tiên máy lọc dầu SF-50, cần 20 cuộc gọi về tổng đài." />
           <div style={{ marginTop: 6 }}><button className="btn ok" type="submit">Lưu mục tiêu</button></div>
         </form>
 
@@ -265,14 +270,22 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           </div>
         </form>
 
-        <form action={saveShareGroups} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
           <b>👥 Nhóm chia sẻ (Facebook groups bạn đang ở)</b>
-          <p className="sub" style={{ margin: '2px 0 6px' }}>BOSS xếp lịch mỗi ngày chia sẻ nhóm nào (xoay vòng). Người tự tay chia sẻ.</p>
-          <div className="row" style={{ alignItems: 'center' }}>
-            <input className="note" name="share_groups" defaultValue={shareGroups.join(', ')} placeholder="Ngư dân Vũng Tàu, Hội tàu cá BRVT, ..." style={{ maxWidth: 520 }} aria-label="Nhóm chia sẻ" />
-            <button className="btn ok" type="submit">Lưu nhóm</button>
-          </div>
-        </form>
+          <p className="sub" style={{ margin: '2px 0 6px' }}>
+            Dùng CHUNG danh sách với nút <b>📣 Chia sẻ vào group</b> ở trang Quản lý bài viết — thêm, xóa, đổi tên nhóm ở đó.
+            BOSS đọc danh sách này để xếp lịch chia sẻ theo ngày.
+          </p>
+          {shareGroups.length ? (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
+            </div>
+          ) : (
+            <p className="sub" style={{ margin: 0 }}>
+              Chưa có nhóm nào. Mở <a href="/noi-dung">Quản lý bài viết</a>, bấm 📣 Chia sẻ vào group ở một bài đã đăng rồi thêm nhóm — danh sách tự đồng bộ về đây.
+            </p>
+          )}
+        </div>
       </details>
 
       {/* ===== 5. Chi tiet + lich su (giau) ===== */}

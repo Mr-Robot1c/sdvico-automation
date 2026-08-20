@@ -157,6 +157,46 @@ export async function GET(req: Request) {
     }
   }
 
+  // NẠP LẠI HƯỚNG ĐI khi cạn (user 20/8: "Creator nhớ nhận hướng từ BOSS, học song song"):
+  // bản đang áp hết suggestion chưa dùng -> Creator sẽ rơi về vòng xoay random. Mỗi ngày tối đa
+  // 1 lần (guard run_log mkt.suggestions_refill), BOSS sinh thêm hướng đi MỚI từ tri thức mới
+  // nhất (Gemini) nối vào bản đang áp — Creator luôn có hướng tươi bám tri thức.
+  let refill: { added?: number; skipped?: string; error?: string } | null = null;
+  try {
+    const { data: ap } = await client
+      .from('mkt_plans').select('id, data').eq('applied', true)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const sugs: any[] = Array.isArray((ap as any)?.data?.content_suggestions) ? (ap as any).data.content_suggestions : [];
+    const fresh = sugs.filter((s) => !s.used_at).length;
+    if (ap && fresh === 0) {
+      const { count: doneToday } = await client
+        .from('run_log').select('id', { count: 'exact', head: true })
+        .eq('task', 'mkt.suggestions_refill').eq('status', 'ok')
+        .gte('created_at', vnDayStartIso(new Date()));
+      if (doneToday && doneToday > 0) {
+        refill = { skipped: 'da nap hom nay' };
+      } else {
+        const { loadRecentKnowledge } = await import('../../../lib/knowledge');
+        const { generateContentDirections } = await import('../../../lib/plan-directions');
+        const knowledge = await loadRecentKnowledge(client, 7, 30);
+        const { data: goalRow } = await client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle();
+        const goal = String(((goalRow as any)?.value?.text) || '').trim();
+        const fresh2 = await generateContentDirections({ internal: knowledge.internal, publicSrc: knowledge.publicSrc }, goal);
+        if (fresh2.length) {
+          const newData = { ...(ap as any).data, content_suggestions: [...sugs, ...fresh2] };
+          await client.from('mkt_plans').update({ data: newData }).eq('id', (ap as any).id);
+          try { await client.from('run_log').insert({ task: 'mkt.suggestions_refill', actor: 'cron', status: 'ok', detail: { added: fresh2.length } }); } catch { /* bo qua */ }
+          refill = { added: fresh2.length };
+        } else {
+          refill = { skipped: 'gemini khong sinh duoc huong nao' };
+        }
+      }
+    }
+  } catch (e: any) {
+    console.error('[refill] nap huong di that bai:', e?.message || e);
+    refill = { error: String(e?.message || e) };
+  }
+
   // ĐỀ XUẤT SỐNG (user 20/8): mỗi 30 phút BOSS cập nhật đề xuất (trọng số + số bài mỗi sản phẩm
   // + lịch theo ngày + nhóm chia sẻ) từ số liệu mới nhất. Rẻ (không Gemini), cập nhật tại chỗ 1
   // bản 'live'. Mỗi tối (>=21h VN, 1 lần/ngày) tự GỘP trọng số vào bản đang áp. ?live=1 ép áp ngay.
@@ -171,5 +211,5 @@ export async function GET(req: Request) {
     live = { error: String(e?.message || e) };
   }
 
-  return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan, learn, live });
+  return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan, learn, live, refill });
 }
