@@ -4,8 +4,10 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-18
 ttl_days: 90
+<!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- re-verified: 2026-08-20 - Bao cao tuan /do-luong/tuan (item 1a): lib/week-report.ts gom mkt_metrics theo tuan ISO VN (T2-CN), KPI+top5+phan bo theo product/kind+delta vs tuan truoc+nut Sao chep bao cao text. Diem composite = engagement + views*0.1 + watchSec*0.02 + reach*0.05. -->
 <!-- re-verified: 2026-08-20 - Vong hoc tuan (item 1b, NV4/R5): lib/learn-weekly.ts chay Chu Nhat 23h+ VN qua /api/mkt-metrics-pull, sinh mkt_plans data.origin='learn-weekly' applied=false; /ke-hoach hien banner rieng "De xuat trong so tu so lieu tuan vua xong" - nguoi bam Ap dung moi co hieu luc. KHONG tu doi KIND_WEIGHT. Guard alreadyRanThisWeek 24h chan trung; ?learn=1 ep test. Plan.origin them truong ('boss' | 'learn-weekly'). -->
+<!-- re-verified: 2026-08-20 - Content ghi tuoi/nam/ngay bang CHU SO (prompt social.mjs 2 ban) -> 55 tuoi, 30 nam thay vi viet chu. -->
 <!-- re-verified: 2026-08-20 - CTA: prompt bai social (2 ban) + outro video doc them NHẮN TIN cho Page SDVICO ngoai gọi tong dai. -->
 <!-- re-verified: 2026-08-20 - ShareGroups them auto-fetch ten group qua /api/fb-group-name (best-effort, Meta hay chan fields=name cua group), fail thi giu ID; UI input ten group italic + opacity khi label==id, hint bam de doi ten, placeholder ro. Nhac trong popover: khong tu dang duoc, luong 2 click. -->
 <!-- re-verified: 2026-08-20 - Feature Chia se vao group (Meta dong Groups API tu 2020, khong dang tay tu dong duoc): noi-dung/share-groups.tsx popover cho bai Facebook Post - hien link + nut Copy + danh sach group luu localStorage (fb_share_groups) + nut Mo group. Rut gon 2 click/group. Chi hien cho FB Post khong phai /reel/. -->

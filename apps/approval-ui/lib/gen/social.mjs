@@ -72,7 +72,7 @@ export async function generateSocialPost({
     'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM ĐANG VIẾT (xem SỰ THẬT NGHỀ bên dưới); KHÔNG gán lợi ích của sản phẩm khác.',
     ...guardLines(productName + ' ' + productGroup),
     'Chèn vài emoji hợp cảnh biển và thiết bị cho sinh động (ví dụ ⚓ 🚢 🌊 📡 💧 🛟 📞), đừng lạm dụng.',
-    'Số theo chuẩn Việt Nam (dấu chấm ngăn hàng nghìn). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
+    'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn (3.000.000 đồng). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung, không nêu số.',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO; chỉ nói phân phối, lắp đặt, tương thích.',
     isTikTok
@@ -144,7 +144,7 @@ const CONTENT_TYPE_INSTRUCTION = {
   engage:
     'Bài dạng ĐẶT CÂU HỎI để bà con bình luận. Rất ngắn: 2 tới 3 câu dẫn dắt cảm xúc/kỷ niệm, rồi KẾT bằng câu hỏi mở (dấu ? cuối) mời bà con kể chuyện trong bình luận. Không nêu sản phẩm, không nhắc SDVICO trong bài này.',
   portrait:
-    'Bài dạng CHÂN DUNG NGƯỜI TRONG NGHỀ, viết HOÀN CHỈNH để đăng ngay (sếp chốt 19/8: điền sẵn, không để ô trống). Nhân vật là NGƯỜI ĐIỂN HÌNH: gọi thân mật kiểu "bác Ba", "chú Bảy", "anh Tư" (KHÔNG họ tên đầy đủ), tuổi khoảng 45-65 (hoặc 28-35 nếu ngư dân trẻ), địa phương ven biển Bà Rịa Vũng Tàu (Long Hải, Phước Tỉnh, Bình Châu, Lộc An, Bến Đá) hoặc miền Trung, số năm bám biển. Cấu trúc: 1 câu mở giới thiệu (tên gọi + tuổi + địa phương + số năm đi biển), 2-3 câu bối cảnh nghề, 1 câu NÓI của nhân vật trong ngoặc kép (giọng chân chất, đúng đời sống ngư dân, không sáo), 1 câu kết chúc bà con. KHÔNG dùng ngoặc vuông, KHÔNG để chỗ trống, KHÔNG ghi chú "khung sườn"; KHÔNG gán số liệu doanh thu/sản lượng cụ thể cho nhân vật.',
+    'Bài dạng CHÂN DUNG NGƯỜI TRONG NGHỀ, viết HOÀN CHỈNH để đăng ngay (sếp chốt 19/8: điền sẵn, không để ô trống). Nhân vật là NGƯỜI ĐIỂN HÌNH: gọi thân mật kiểu "bác Ba", "chú Bảy", "anh Tư" (KHÔNG họ tên đầy đủ), tuổi khoảng 45-65 (hoặc 28-35 nếu ngư dân trẻ), địa phương ven biển Bà Rịa Vũng Tàu (Long Hải, Phước Tỉnh, Bình Châu, Lộc An, Bến Đá) hoặc miền Trung, số năm bám biển. Cấu trúc: 1 câu mở giới thiệu (tên gọi + tuổi + địa phương + số năm đi biển; tuổi và số năm viết bằng CHỮ SỐ, ví dụ "bác Ba 55 tuổi", "30 năm bám biển", KHÔNG viết "năm mươi lăm tuổi"), 2-3 câu bối cảnh nghề, 1 câu NÓI của nhân vật trong ngoặc kép (giọng chân chất, đúng đời sống ngư dân, không sáo), 1 câu kết chúc bà con. KHÔNG dùng ngoặc vuông, KHÔNG để chỗ trống, KHÔNG ghi chú "khung sườn"; KHÔNG gán số liệu doanh thu/sản lượng cụ thể cho nhân vật.',
   news:
     'Bài dạng NHỊP THỜI SỰ NGÀNH - CHỜ CẤP QUẢN LÝ DUYỆT. Viết TRUNG THỰC, KHÔNG nêu con số/ngày tháng/mốc quy định cụ thể (điều cấm 5). Dùng ngôn ngữ chung: "quy định mới", "gần đây", "theo cập nhật của cơ quan quản lý". Cấu trúc: 1 câu nêu chủ đề, 2-3 câu bối cảnh chung mà bà con cần biết, 1 dòng khuyên bà con theo dõi kênh chính thức của Cục Thủy sản/địa phương. Chèn đầu bài: "⚠️ CẦN CẤP QUẢN LÝ DUYỆT - nội dung chạm quy định nhà nước (điều cấm 3)".',
 };
@@ -171,7 +171,7 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {})
     'Bạn viết bài cộng đồng cho trang của Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     'Đây KHÔNG phải bài bán hàng. Mục tiêu là hữu ích thật cho bà con ngư dân đọc là học được điều gì đó, hoặc để lại bình luận.',
     'Giọng ấm áp, gần gũi, câu ngắn, đọc trên điện thoại. Chèn vài emoji hợp cảnh biển (⚓ 🚢 🌊 🐟 🎣), đừng lạm dụng.',
-    'Số theo chuẩn Việt Nam. KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
+    'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn. KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'KHÔNG bịa tin tức, số liệu, sự kiện, quy định cụ thể. Nói chung, đúng, không phịa chi tiết.',
     'KHÔNG mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO.',
     'Chỉ nhắc SDVICO đồng hành nếu hợp cảnh, tối đa 1 lần cuối bài. Bài dạng ĐẶT CÂU HỎI thì tuyệt đối không nhắc thương hiệu.',
