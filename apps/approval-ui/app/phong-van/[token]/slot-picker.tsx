@@ -13,13 +13,7 @@ export default function SlotPicker({ token, slots }: { token: string; slots: str
         <form
           key={i}
           action={chooseInterviewSlot}
-          onSubmit={(e) => {
-            if (!window.confirm(`Xác nhận chọn khung giờ:\n\n${s}\n\nBạn có chắc không?`)) {
-              e.preventDefault();
-              return;
-            }
-            setBusy(s);
-          }}
+          onSubmit={() => setBusy(s)}
         >
           <input type="hidden" name="token" value={token} />
           <input type="hidden" name="slot" value={s} />
@@ -58,9 +52,6 @@ export default function SlotPicker({ token, slots }: { token: string; slots: str
               const form = e.currentTarget as HTMLFormElement;
               const proposal = (form.elements.namedItem('proposal') as HTMLInputElement)?.value?.trim();
               if (!proposal) { e.preventDefault(); return; }
-              if (!window.confirm(`Gửi đề xuất giờ khác?\n\n"${proposal}"\n\nPhòng Nhân sự sẽ liên hệ lại qua email để chốt lịch cụ thể.`)) {
-                e.preventDefault(); return;
-              }
               setBusy('propose');
             }}
             style={{ display: 'flex', flexDirection: 'column', gap: 10 }}

@@ -172,11 +172,6 @@ function InterviewApprove({ appId, name, windows }: { appId: string; name: strin
             type="submit"
             style={{ fontSize: '0.85em' }}
             title="Gửi thư mời cho ứng viên NGAY, không cần rà lại. Chỉ dùng khi bạn đã chắc nội dung."
-            onClick={(e) => {
-              if (!window.confirm('Gửi thư mời NGAY cho ứng viên?\n\nMáy sẽ soạn thư và gửi trong 1 lần bấm, không có bước rà lại. Bấm OK nếu đã chắc chắn.')) {
-                e.preventDefault();
-              }
-            }}
           >
             Soạn & gửi ngay
           </button>
@@ -243,7 +238,6 @@ function BossReviewLinkControl({ appId, token, expiresAt, reviewedAt, decision }
         <form
           action={revokeBossReviewLink}
           style={{ display: 'inline' }}
-          onSubmit={(e) => { if (!window.confirm('Thu hồi link này? Sếp mở link sẽ không xem được nữa.')) e.preventDefault(); }}
         >
           <input type="hidden" name="appId" value={appId} />
           <button className="btn ghost" type="submit" style={{ fontSize: '0.85em' }}>Thu hồi</button>
@@ -431,10 +425,7 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
         {c.appStage === 'interview' && c.appId && !c.interviewedAt ? (
           <>
             <span className="muted" style={{ alignSelf: 'center' }}>Đã đưa vào phỏng vấn, thư mời ở tab Duyệt</span>
-            <form
-              action={markInterviewed}
-              onSubmit={(e) => { if (!window.confirm(`Đánh dấu ĐÃ PHỎNG VẤN XONG cho:\n\n${c.name}\n\nSau bước này mới hiện nút Nhận / Không nhận.`)) e.preventDefault(); }}
-            >
+            <form action={markInterviewed}>
               <input type="hidden" name="appId" value={c.appId} />
               <button className="btn ghost" type="submit">Đánh dấu đã phỏng vấn xong</button>
             </form>
@@ -444,20 +435,14 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
           <>
             <span className="muted" style={{ alignSelf: 'center', marginRight: 2 }}>Đã phỏng vấn. Quyết định:</span>
             {/* Nhận: 1-click soạn thư mời nhận việc + gửi luôn */}
-            <form
-              action={decideCandidate}
-              onSubmit={(e) => { if (!window.confirm(`Nhận ứng viên này?\n\n${c.name}\n\nMáy sẽ soạn thư mời nhận việc VÀ gửi luôn cho ứng viên.`)) e.preventDefault(); }}
-            >
+            <form action={decideCandidate}>
               <input type="hidden" name="appId" value={c.appId} />
               <input type="hidden" name="decision" value="offer" />
               <input type="hidden" name="send_now" value="1" />
               <button className="btn ok" type="submit" title="Soạn thư mời nhận việc và gửi ngay">Nhận & gửi</button>
             </form>
             {/* Không nhận: 1-click soạn thư từ chối + gửi luôn */}
-            <form
-              action={decideCandidate}
-              onSubmit={(e) => { if (!window.confirm(`Không nhận ứng viên này?\n\n${c.name}\n\nMáy sẽ soạn thư từ chối VÀ gửi luôn cho ứng viên.`)) e.preventDefault(); }}
-            >
+            <form action={decideCandidate}>
               <input type="hidden" name="appId" value={c.appId} />
               <input type="hidden" name="decision" value="reject" />
               <input type="hidden" name="send_now" value="1" />
@@ -467,18 +452,12 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
             <details style={{ alignSelf: 'center' }}>
               <summary className="muted" style={{ fontSize: '0.85em', cursor: 'pointer' }}>Soạn để rà lại trước khi gửi</summary>
               <div className="row" style={{ gap: 6, marginTop: 6 }}>
-                <form
-                  action={decideCandidate}
-                  onSubmit={(e) => { if (!window.confirm(`Soạn thư mời nhận việc CHỜ DUYỆT (chưa gửi)?\n\n${c.name}`)) e.preventDefault(); }}
-                >
+                <form action={decideCandidate}>
                   <input type="hidden" name="appId" value={c.appId} />
                   <input type="hidden" name="decision" value="offer" />
                   <button className="btn ghost" type="submit" style={{ fontSize: '0.85em' }}>Nhận (chỉ soạn)</button>
                 </form>
-                <form
-                  action={decideCandidate}
-                  onSubmit={(e) => { if (!window.confirm(`Soạn thư từ chối CHỜ DUYỆT (chưa gửi)?\n\n${c.name}`)) e.preventDefault(); }}
-                >
+                <form action={decideCandidate}>
                   <input type="hidden" name="appId" value={c.appId} />
                   <input type="hidden" name="decision" value="reject" />
                   <button className="btn ghost" type="submit" style={{ fontSize: '0.85em' }}>Không nhận (chỉ soạn)</button>
@@ -488,10 +467,7 @@ function CandidateDetail({ c, windows, openJobs }: { c: CandView; windows: strin
           </>
         ) : null}
         {c.appStage === 'offer' && !c.hiredAt ? (
-          <form
-            action={confirmHired}
-            onSubmit={(e) => { if (!window.confirm(`Xác nhận ${c.name} đã thật sự nhận việc và đi làm?\n\nSẽ tạo hồ sơ nhân viên ở trang Nhân viên.`)) e.preventDefault(); }}
-          >
+          <form action={confirmHired}>
             <input type="hidden" name="appId" value={c.appId || ''} />
             <button className="btn ok" type="submit">Xác nhận đã nhận việc</button>
           </form>

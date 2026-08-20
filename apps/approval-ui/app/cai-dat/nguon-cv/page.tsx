@@ -113,12 +113,7 @@ export default async function Page() {
                               <button className="btn ghost" style={{ fontSize: '0.82em' }} type="submit">Xác nhận đã rà pháp lý</button>
                             </form>
                           ) : (
-                            <form
-                              action={toggleCvSource}
-                              onSubmit={(e) => {
-                                if (!s.bat && !window.confirm(`Bật nguồn "${s.ten}"? Chỉ bật khi chắc chắn công ty có quyền dùng theo cách này.`)) e.preventDefault();
-                              }}
-                            >
+                            <form action={toggleCvSource}>
                               <input type="hidden" name="id" value={s.id} />
                               <button className={`btn ${s.bat ? 'no' : 'ok'}`} style={{ fontSize: '0.82em' }} type="submit">
                                 {s.bat ? 'Tắt' : 'Bật'}

@@ -164,10 +164,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
               chỉ cần Duyệt hoặc Xóa; "Từ chối" giữ nguyên bản nháp làm kẹt vị trí) */}
           <form
             action={run(dismissQueueItem)}
-            onSubmit={(e) => {
-              if (!window.confirm(`Xóa mục này khỏi hàng đợi?\n\n"${title}"\n\nBài nháp sẽ bị hủy và worker sẽ soạn lại.`)) { e.preventDefault(); return; }
-              setBusy('dismiss');
-            }}
+            onSubmit={() => setBusy('dismiss')}
           >
             <input type="hidden" name="id" value={id} />
             <input type="hidden" name="post_id" value={postId || ''} />
@@ -277,9 +274,6 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
         action={run(decideForm)}
         onSubmit={(e) => {
           const action = (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value');
-          if (action === 'reject') {
-            if (!window.confirm(`Từ chối mục này?\n\n"${title}"`)) { e.preventDefault(); return; }
-          }
           setBusy(action as string);
         }}
       >
@@ -294,10 +288,7 @@ export default function DecideActions({ id, title, kind, postId, platform, linke
       </form>
       <form
         action={run(dismissQueueItem)}
-        onSubmit={(e) => {
-          if (!window.confirm(`Xóa mục này khỏi hàng đợi?\n\n"${title}"`)) { e.preventDefault(); return; }
-          setBusy('dismiss');
-        }}
+        onSubmit={() => setBusy('dismiss')}
       >
         <input type="hidden" name="id" value={id} />
         <button className="btn ghost" disabled={busy !== null} style={{ fontSize: '0.85em', color: 'var(--ink-2)' }}>

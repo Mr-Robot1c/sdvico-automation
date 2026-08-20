@@ -46,7 +46,7 @@ function CopyButton({ text }: { text: string }) {
           setDone(true);
           setTimeout(() => setDone(false), 2000);
         } catch {
-          alert('Không copy tự động được. Bạn bôi đen phần nội dung bài rồi copy nhé.');
+          // clipboard bị chặn thì im lặng, user bôi đen copy tay
         }
       }}
     >

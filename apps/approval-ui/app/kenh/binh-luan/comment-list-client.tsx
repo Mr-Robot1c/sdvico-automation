@@ -61,10 +61,7 @@ function CommentDetail({ item }: { item: PendingReply }) {
         </form>
         <form
           action={run(ignoreCommentReply)}
-          onSubmit={(e) => {
-            if (!window.confirm('Bỏ qua bình luận này, không trả lời?')) e.preventDefault();
-            else setBusy('ignore');
-          }}
+          onSubmit={() => setBusy('ignore')}
         >
           <input type="hidden" name="queue_id" value={item.queueId} />
           <input type="hidden" name="comment_id" value={item.commentId} />

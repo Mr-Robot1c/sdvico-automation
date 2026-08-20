@@ -59,11 +59,6 @@ export default function BossDecisionForm({ token }: { token: string }) {
         onSubmit={(e) => {
           if (slots.filter((s) => s.date && s.time).length === 0) {
             e.preventDefault();
-            alert('Vui lòng chọn ít nhất 1 khung giờ.');
-            return;
-          }
-          if (!window.confirm(`Xác nhận HẸN PHỎNG VẤN với ${slots.length} khung giờ?\n\nHR sẽ nhận thư mời trong hàng đợi để bấm gửi cho ứng viên. Link này sẽ được thu hồi.`)) {
-            e.preventDefault();
             return;
           }
           setBusy(true);
@@ -159,15 +154,7 @@ export default function BossDecisionForm({ token }: { token: string }) {
   return (
     <form
       action={bossSubmitDecision}
-      onSubmit={(e) => {
-        if (!window.confirm(isReject
-          ? 'Xác nhận đánh giá ứng viên này KHÔNG PHÙ HỢP?\n\nHR sẽ được thông báo. Link này sẽ được thu hồi.'
-          : 'Xác nhận CHỜ THÊM THÔNG TIN?\n\nGhi chú sẽ chuyển cho HR. Link này sẽ được thu hồi.')) {
-          e.preventDefault();
-          return;
-        }
-        setBusy(true);
-      }}
+      onSubmit={() => setBusy(true)}
       style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
     >
       <input type="hidden" name="token" value={token} />

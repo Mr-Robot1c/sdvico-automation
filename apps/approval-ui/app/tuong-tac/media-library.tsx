@@ -36,7 +36,7 @@ function CopyUrlButton({ url }: { url: string }) {
           setDone(true);
           setTimeout(() => setDone(false), 1500);
         } catch {
-          alert('Không copy được URL, mở lên rồi copy tay nhé.');
+          // clipboard bị chặn thì im lặng
         }
       }}
     >
