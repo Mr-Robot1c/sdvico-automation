@@ -86,6 +86,8 @@ INPUT  →  PROCESS  →  OUTPUT  →  (số liệu quay lại INPUT)
 
 Chi tiết cột + RLS: [database.md](database.md).
 
+<!-- re-verified: 2026-08-20 - Logo THAT (public/logo-sdvico.png, decode tu LOGO_B64 logo-data.mjs) thay SVG chu S tu ve o ca 2 shell (root-shell.tsx). Nav gop: bo 2 group Ket noi (3 muc) + Quy tac (2 muc), thay bang group He thong 2 muc -> trang gop /ket-noi (status 3 kenh + link chi tiet) va /quy-tac (link privacy/terms); bo accordion (khong can nua). FIX Next Data Cache dong bang response 401 thoang qua cua YouTube channels GET -> moi request sau an lai loi cu; them cache no-store vao youtube-publish + fb fetch trang ket-noi. Kho tu lieu: nap 20 file backlog-tkkd tu Zalo (10 anh + 10 video, phan product_group SEA-40/SF-50/S-Tracking/Thuraya/Content); LOAI 4 file (2 CCCD nguoi that - dieu cam 6, 2 screenshot). -->
+
 ## Nhật ký thay đổi
 
 Lịch sử re-verify chi tiết ở [reverify-log.md](reverify-log.md). Từ đây, các dòng `<!-- re-verified -->` mới do hook doc-health sinh ra sẽ nằm bên dưới; định kỳ dồn sang file nhật ký khi phình.

@@ -2,32 +2,21 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
 
 type Tab = { href: string; label: string; icon: string };
-type Group = { title: string; items: Tab[]; defaultCollapsed?: boolean };
+type Group = { title: string; items: Tab[] };
 
-// Sidebar chia nhóm theo dòng chảy công việc. Nhóm ÍT DÙNG (Kết nối, Quy tắc) thu gọn mặc định
-// cho gọn (user 20/8: "gôm 3 cái kết nối + quy tắc lại cho gọn"). Bấm tiêu đề nhóm để mở/đóng,
-// nhớ trạng thái trong localStorage. Nhóm chứa trang đang mở luôn tự bung.
+// Sidebar chia nhóm theo dòng chảy công việc. Sếp chốt 20/8: Kết nối (3 kênh) và Quy tắc
+// (2 trang) mỗi thứ GỘP thành 1 mục duy nhất — trang gộp /ket-noi và /quy-tac, trang chi
+// tiết cũ vẫn sống làm trang con.
 export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean }) {
   const path = usePathname();
 
-  const ketNoi: Group = {
-    title: 'Kết nối',
-    defaultCollapsed: true,
+  const heThong: Group = {
+    title: 'Hệ thống',
     items: [
-      { href: '/facebook', label: 'Facebook', icon: '📘' },
-      { href: '/tiktok', label: 'TikTok', icon: '🎵' },
-      { href: '/youtube', label: 'YouTube', icon: '▶️' }
-    ]
-  };
-  const quyTac: Group = {
-    title: 'Quy tắc',
-    defaultCollapsed: true,
-    items: [
-      { href: '/privacy', label: 'Quyền riêng tư', icon: '🔒' },
-      { href: '/terms', label: 'Điều khoản', icon: '📄' }
+      { href: '/ket-noi', label: 'Kết nối', icon: '🔌' },
+      { href: '/quy-tac', label: 'Quy tắc', icon: '📜' }
     ]
   };
   const quanLySanXuat: Group = {
@@ -59,7 +48,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   };
 
   const groups: Group[] = marketingOnly
-    ? [hangDoi, quanLySanXuat, ai, ketNoi, quyTac]
+    ? [hangDoi, quanLySanXuat, ai, heThong]
     : [
         hangDoi,
         quanLySanXuat,
@@ -71,59 +60,24 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
             { href: '/vi-tri', label: 'Vị trí tuyển dụng', icon: '📋' }
           ]
         },
-        ketNoi,
-        quyTac
+        heThong
       ];
-
-  // Nhóm nào người dùng đã tự đóng (ghi đè mặc định). Đọc localStorage sau khi mount để tránh
-  // lệch server/client.
-  const [closed, setClosed] = useState<Set<string>>(() => new Set(groups.filter((g) => g.defaultCollapsed).map((g) => g.title)));
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('nav-closed-groups');
-      if (raw) setClosed(new Set(JSON.parse(raw)));
-    } catch { /* bỏ qua */ }
-  }, []);
-
-  const toggle = (title: string) => {
-    setClosed((prev) => {
-      const next = new Set(prev);
-      if (next.has(title)) next.delete(title); else next.add(title);
-      try { localStorage.setItem('nav-closed-groups', JSON.stringify([...next])); } catch { /* bỏ qua */ }
-      return next;
-    });
-  };
 
   return (
     <nav className="nav-groups" aria-label="Điều hướng chính">
-      {groups.map((g) => {
-        const hasActive = g.items.some((t) => t.href === path);
-        // Nhóm chứa trang đang mở luôn bung, dù người dùng có đóng.
-        const isOpen = hasActive || !closed.has(g.title);
-        return (
-          <div className="nav-block" key={g.title}>
-            <button
-              type="button"
-              className="nav-group nav-group-btn"
-              aria-expanded={isOpen}
-              onClick={() => toggle(g.title)}
-            >
-              <span className="nav-group-caret" aria-hidden="true">{isOpen ? '▾' : '▸'}</span>
-              <span>{g.title}</span>
-            </button>
-            {isOpen ? (
-              <div className="tabs">
-                {g.items.map((t) => (
-                  <Link key={t.href} href={t.href} className={`tab ${path === t.href ? 'on' : ''}`}>
-                    <span className="tab-icon" aria-hidden="true">{t.icon}</span>
-                    <span>{t.label}</span>
-                  </Link>
-                ))}
-              </div>
-            ) : null}
+      {groups.map((g) => (
+        <div className="nav-block" key={g.title}>
+          <div className="nav-group">{g.title}</div>
+          <div className="tabs">
+            {g.items.map((t) => (
+              <Link key={t.href} href={t.href} className={`tab ${path === t.href ? 'on' : ''}`}>
+                <span className="tab-icon" aria-hidden="true">{t.icon}</span>
+                <span>{t.label}</span>
+              </Link>
+            ))}
           </div>
-        );
-      })}
+        </div>
+      ))}
     </nav>
   );
 }

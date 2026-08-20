@@ -49,7 +49,8 @@ async function getAccessToken(): Promise<string> {
       client_secret: clientSecret,
       refresh_token: refreshToken,
       grant_type: 'refresh_token'
-    })
+    }),
+    cache: 'no-store'
   });
   const j: any = await res.json();
   if (!res.ok || !j.access_token) {
@@ -69,8 +70,11 @@ export async function getYouTubeChannelInfo(): Promise<{ configured: boolean; ch
   if (!configured) return { configured: false, channelTitle: null, error: null };
   try {
     const at = await getAccessToken();
+    // cache: 'no-store' BAT BUOC — Next Data Cache tung dong bang mot response 401 thoang qua
+    // cua request nay va tra lai loi do mai (bug bat duoc 20/8 khi lam trang /ket-noi).
     const r = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', {
-      headers: { Authorization: `Bearer ${at}` }
+      headers: { Authorization: `Bearer ${at}` },
+      cache: 'no-store'
     });
     const j: any = await r.json();
     if (!r.ok) return { configured: true, channelTitle: null, error: j?.error?.message || `HTTP ${r.status}` };
