@@ -4,8 +4,9 @@
 covers: packages/marketing
 last_verified: 2026-08-14
 ttl_days: 180
-<!-- DOC-STATUS: SUSPECT (2026-08-19) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- re-verified: 2026-08-14 - build-video RESTORE dung CA 2 ban: horizontal (16:9 cho FB) + vertical (9:16 cho TikTok). Truoc chi ngang -> user thay TikTok khong thay video moi. pushToApprovalQueue upload 2 file -> brand_assets, brief.assets.{video_h,video_v}, channels ['facebook','tiktok'], nhan "[FB 16:9 + TikTok doc] 🎬". Thoi gian dung tang tu ~8p len ~15-20p (danh doi de co ca 2 dinh dang). --skip-whisper van dung. -->
+<!-- re-verified: 2026-08-20 - Bug am thanh tu chay khi vao hang doi: 4 composer x 4 dialog dong (nhung ton tai trong DOM) chua <video autoPlay src> -> Chrome cho autoplay video trong dialog closed. Fix: chi mount <video> khi zoomOpen=true (state). Dong dialog onClose set false -> unmount video hoan toan. -->
 <!-- re-verified: 2026-08-19 - fb-diag bo universal_video_id/content_category/is_reference_only/post_id (chi Video Copyright API-enrolled page moi hoi duoc; loi #100 khong phai loi page). -->
 <!-- re-verified: 2026-08-19 - fb-diag bo field FB khong ho tro (no_story, is_crossposting_eligible, event). -->
 <!-- re-verified: 2026-08-19 - fb-diag them field content_category, universal_video_id, post_id, is_crossposting_eligible, no_story. -->

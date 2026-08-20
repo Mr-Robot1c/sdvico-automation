@@ -47,6 +47,7 @@ function TiktokComposer({ videoUrl, caption }: { videoUrl?: string | null; capti
   const [info, setInfo] = useState<CreatorInfo | null>(null);
   const [privacy, setPrivacy] = useState<string>('');
   const zoomRef = useRef<HTMLDialogElement | null>(null);
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -84,20 +85,20 @@ function TiktokComposer({ videoUrl, caption }: { videoUrl?: string | null; capti
               className="tt-zoom"
               title="Xem to"
               aria-label="Xem video to"
-              onClick={() => zoomRef.current?.showModal()}
+              onClick={() => { setZoomOpen(true); requestAnimationFrame(() => zoomRef.current?.showModal()); }}
             >🔍</button>
             <dialog
               ref={zoomRef}
               className="tt-zoom-dlg"
-              onClose={(e) => {
-                // Dong dialog: PAUSE + reset video de khong chay nen (bug 19/8: chuyen trang xong van nghe am thanh).
-                const v = (e.currentTarget as HTMLDialogElement).querySelector('video');
-                if (v) { v.pause(); v.currentTime = 0; }
-              }}
+              onClose={() => setZoomOpen(false)}
               onClick={(e) => { if ((e.target as HTMLElement).tagName === 'DIALOG') zoomRef.current?.close(); }}
             >
-              <video src={`${videoUrl}#t=2`} controls autoPlay playsInline />
-              <button type="button" className="tt-zoom-x" aria-label="Đóng" onClick={() => zoomRef.current?.close()}>×</button>
+              {zoomOpen ? (
+                <>
+                  <video src={`${videoUrl}#t=2`} controls autoPlay playsInline />
+                  <button type="button" className="tt-zoom-x" aria-label="Đóng" onClick={() => zoomRef.current?.close()}>×</button>
+                </>
+              ) : null}
             </dialog>
           </div>
         ) : null}
