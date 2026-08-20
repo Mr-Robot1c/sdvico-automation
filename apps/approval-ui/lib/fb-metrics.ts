@@ -103,19 +103,23 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
     .order('published_at', { ascending: false })
     .limit(80);
 
-  // Khử trùng theo bài (một bài có thể đăng nhiều lần) — chỉ lấy bản mới nhất, đỡ gọi thừa.
-  // Bài đăng dạng Reel (/reel/) đi kèm bài Post gộp: bỏ qua ở đây, đo Post là chính.
-  const seen = new Set<string>();
-  const targets: { rowId: string; cid: string; objId: string; url: string; kind: NodeKind; pageId: string | null }[] = [];
+  // Khử trùng theo bài: mỗi cid chỉ đo 1 URL. Ưu tiên /videos/ (Post video) hơn /reel/ (Reel ghép,
+  // ít chỉ số hơn). Bài chỉ có /reel/ (import tay từ page thật, hoặc bị Post) VẪN được đo.
+  const byCid = new Map<string, any>();
   for (const p of posts || []) {
     const cid = (p as any).content_id as string | null;
     const url = (p as any).external_url as string | null;
     const objId = objectIdFromUrl(url);
-    if (!cid || !objId || !url || seen.has(cid)) continue;
-    if (/\/reel\//.test(url)) continue;
-    seen.add(cid);
-    const { kind, pageId } = classify(url, objId);
-    targets.push({ rowId: (p as any).id, cid, objId, url, kind, pageId });
+    if (!cid || !objId || !url) continue;
+    const isReel = /\/reel\//.test(url);
+    const cur = byCid.get(cid);
+    if (!cur) { byCid.set(cid, { row: p, url, objId, isReel }); continue; }
+    if (cur.isReel && !isReel) byCid.set(cid, { row: p, url, objId, isReel });
+  }
+  const targets: { rowId: string; cid: string; objId: string; url: string; kind: NodeKind; pageId: string | null }[] = [];
+  for (const [cid, x] of byCid) {
+    const { kind, pageId } = classify(x.url, x.objId);
+    targets.push({ rowId: (x.row as any).id, cid, objId: x.objId, url: x.url, kind, pageId });
   }
 
   const day = todayVN();
@@ -204,8 +208,12 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
         // Lượt xem video + tổng thời gian xem (ms -> giây) + số NGƯỜI xem. video_insights nằm trên
         // node VIDEO (objId); dự phòng bằng chỉ số bài (postId = PAGEID_VIDEOID) nếu Meta bỏ tên cũ.
         await grabFirst('views', [
+          ...(postId ? [
+            { path: pi('blue_reels_play_count'), name: 'blue_reels_play_count' },
+            { path: pi('post_video_views'), name: 'post_video_views' },
+            { path: pi('post_media_view'), name: 'post_media_view' },
+          ] : []),
           { path: vi('total_video_views'), name: 'total_video_views' },
-          ...(postId ? [{ path: pi('post_video_views'), name: 'post_video_views' }, { path: pi('post_media_view'), name: 'post_media_view' }] : []),
         ]);
         await grabFirst('watchSec', [
           { path: vi('total_video_view_total_time'), name: 'total_video_view_total_time', scale: 1 / 1000 },
