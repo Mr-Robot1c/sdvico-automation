@@ -6,6 +6,7 @@ covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
 <!-- re-verified: 2026-08-19 - rotate: tuan TAP TRUNG lay du MOI san pham trong focus moi luot (unused = eligible), khong ap 'da dung trong vong' -> 1 lan kich ra du 2 bai ban (truoc phai kich 3 lan). -->
+<!-- re-verified: 2026-08-20 - Feature Chia se vao group (Meta dong Groups API tu 2020, khong dang tay tu dong duoc): noi-dung/share-groups.tsx popover cho bai Facebook Post - hien link + nut Copy + danh sach group luu localStorage (fb_share_groups) + nut Mo group. Rut gon 2 click/group. Chi hien cho FB Post khong phai /reel/. -->
 <!-- re-verified: 2026-08-20 - So lieu views cho Reel/video: xac nhan qua fb-diag insights probe: post_media_view=29 khop UI 27; post_video_views=8 chi so cu; blue_reels_play_count=null. Doi thu tu grabFirst: post_media_view UP dau. -->
 <!-- re-verified: 2026-08-20 - fb-diag them ?scope=insights + ?post=PAGEID_POSTID: do het metric video+post de tim field khop UI FB 27 views. Workflow fb-diag them 2 input post + scope. -->
 <!-- re-verified: 2026-08-20 - facebookObjectIdFromLink nhan them dang /photo/?fbid=<id> (URL moi FB 2024+): coi nhu post, kind=post; buoc do so lieu se resolve page_story_id neu can. build-video-all.mjs them log debug SUPABASE_URL prefix + so bai video_requested chua co video de soi CI miss. -->

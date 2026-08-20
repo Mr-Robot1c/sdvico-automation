@@ -3,6 +3,7 @@ import AutoRefresh from '../auto-refresh';
 import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
 import DeleteButton from './delete-button';
+import ShareGroups from './share-groups';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 
 export const dynamic = 'force-dynamic';
@@ -331,16 +332,12 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                         ) : null}
                       </ViewModal>
                       {(publishedByContent.get(c.id) || []).map((p, i) => (
-                        <a
-                          key={i}
-                          className="src"
-                          href={p.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ marginLeft: 8, whiteSpace: 'nowrap' }}
-                        >
-                          ↗ Xem bài{p.channel === 'facebook' ? ' (FB)' : p.channel ? ` (${p.channel})` : ''}
-                        </a>
+                        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
+                          <a className="src" href={p.url} target="_blank" rel="noreferrer" style={{ whiteSpace: 'nowrap' }}>
+                            ↗ Xem bài{p.channel === 'facebook' ? ' (FB)' : p.channel ? ` (${p.channel})` : ''}
+                          </a>
+                          {p.channel === 'facebook' && !/\/reel\//.test(p.url) ? <ShareGroups postUrl={p.url} /> : null}
+                        </span>
                       ))}
                       {/* Nút "Làm video" đã chuyển sang trang /san-xuat (nút "Xong + Làm video"). */}
                       {c.brief?.video_requested ? (

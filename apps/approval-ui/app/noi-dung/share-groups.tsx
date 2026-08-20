@@ -1,0 +1,143 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+
+// Nut "Chia se vao group" cho bai da dang len Facebook Page (user 20/8: Groups API bi Meta dong
+// tu 2020 -> khong the tu dong post vao group; giai phap: rut gon con 2 click/group). Bam nut:
+// - Hop popover hien LINK bai Post + nut Copy (auto sao chep san sang dan)
+// - Danh sach GROUP nguoi dung tu luu (localStorage 'fb_share_groups' — moi tab tu quan; khong luu
+//   len server vi group ID/URL la thong tin ca nhan cua nguoi vao Facebook)
+// - Moi group co nut "Mo group" (target=_blank) + nut "X" xoa. O nhap them group moi bat ky.
+// Luong 2 click/group: (1) Copy link; (2) Bam "Mo group" -> paste + Post. Khong dang tay duoc
+// nhung nhanh hon vao Facebook go tay chon Share.
+type SavedGroup = { id: string; label: string; url: string };
+
+const KEY = 'fb_share_groups';
+
+function loadGroups(): SavedGroup[] {
+  try { const s = localStorage.getItem(KEY); return s ? JSON.parse(s) : []; } catch { return []; }
+}
+function saveGroups(gs: SavedGroup[]) {
+  try { localStorage.setItem(KEY, JSON.stringify(gs)); } catch { /* bo qua */ }
+}
+function normalizeGroupUrl(input: string): { id: string; url: string } | null {
+  const t = input.trim(); if (!t) return null;
+  // Chap nhan: URL day du, hoac chi id, hoac /groups/xxxx
+  const m = t.match(/facebook\.com\/groups\/([^/?#]+)/i) || t.match(/^\/?groups\/([^/?#]+)/i);
+  const id = m ? m[1] : /^[a-z0-9._-]+$/i.test(t) ? t : null;
+  if (!id) return null;
+  return { id, url: `https://www.facebook.com/groups/${id}` };
+}
+
+export default function ShareGroups({ postUrl }: { postUrl: string }) {
+  const [open, setOpen] = useState(false);
+  const [groups, setGroups] = useState<SavedGroup[]>([]);
+  const [newG, setNewG] = useState('');
+  const [copied, setCopied] = useState(false);
+  const popRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => { setGroups(loadGroups()); }, []);
+  // Dong khi bam ra ngoai popover.
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (popRef.current && !popRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  const doCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(postUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* bo qua */ }
+  };
+  const addGroup = () => {
+    const norm = normalizeGroupUrl(newG);
+    if (!norm) { alert('Không nhận ra link/ID group. Ví dụ: https://www.facebook.com/groups/ngudan.vungtau hoặc ngudan.vungtau'); return; }
+    if (groups.some((g) => g.id === norm.id)) { setNewG(''); return; }
+    const label = norm.id; // hien thi bang id, user tu doi ten neu can
+    const next = [...groups, { id: norm.id, label, url: norm.url }];
+    setGroups(next); saveGroups(next); setNewG('');
+  };
+  const removeGroup = (id: string) => {
+    const next = groups.filter((g) => g.id !== id);
+    setGroups(next); saveGroups(next);
+  };
+  const renameGroup = (id: string, label: string) => {
+    const next = groups.map((g) => g.id === id ? { ...g, label: label || g.id } : g);
+    setGroups(next); saveGroups(next);
+  };
+
+  return (
+    <span style={{ marginLeft: 8, position: 'relative', display: 'inline-block' }} ref={popRef}>
+      <button
+        type="button"
+        className="btn ghost sm"
+        onClick={() => setOpen((v) => !v)}
+        title="Chia sẻ vào group (rút gọn thao tác)"
+      >
+        📣 Chia sẻ vào group
+      </button>
+      {open ? (
+        <div
+          role="dialog"
+          aria-label="Chia sẻ vào group"
+          style={{
+            position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 100,
+            background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10,
+            padding: 12, width: 360, boxShadow: '0 10px 28px rgba(0,0,0,.18)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 8 }}>
+            Facebook không cho tự đăng vào group qua API. Rút gọn:
+            <b> (1) Copy link → (2) mở group → dán + Post</b>.
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <input
+              readOnly
+              value={postUrl}
+              onFocus={(e) => e.target.select()}
+              style={{ flex: 1, minWidth: 0, padding: '6px 8px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 12, fontFamily: 'monospace', background: 'var(--surface-2)', color: 'var(--ink)' }}
+            />
+            <button type="button" className={`btn sm ${copied ? 'ok' : ''}`} onClick={doCopy}>
+              {copied ? '✓ Đã copy' : 'Copy'}
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 6 }}>Group của bạn:</div>
+          {groups.length === 0 ? (
+            <p className="sub" style={{ margin: '0 0 8px' }}>Chưa có group nào. Thêm bên dưới.</p>
+          ) : (
+            <ul style={{ listStyle: 'none', margin: '0 0 8px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {groups.map((g) => (
+                <li key={g.id} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <input
+                    value={g.label}
+                    onChange={(e) => renameGroup(g.id, e.target.value)}
+                    style={{ flex: 1, minWidth: 0, padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 4, fontSize: 12, background: 'var(--surface)', color: 'var(--ink)' }}
+                    title={g.url}
+                  />
+                  <a className="btn ok sm" href={g.url} target="_blank" rel="noreferrer" title="Mở group (đã copy link ở trên, dán vào ô Tạo bài viết)">Mở</a>
+                  <button type="button" className="btn no sm" onClick={() => removeGroup(g.id)} aria-label="Xoá" title="Xoá khỏi danh sách">✕</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              placeholder="Dán link group hoặc ID (vd ngudan.vungtau)"
+              value={newG}
+              onChange={(e) => setNewG(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addGroup(); } }}
+              style={{ flex: 1, minWidth: 0, padding: '6px 8px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 12, background: 'var(--surface)', color: 'var(--ink)' }}
+            />
+            <button type="button" className="btn ok sm" onClick={addGroup}>Thêm</button>
+          </div>
+        </div>
+      ) : null}
+    </span>
+  );
+}
