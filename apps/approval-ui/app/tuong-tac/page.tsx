@@ -2,9 +2,10 @@ import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { queueEngagementNow, uploadBrandAsset } from '../actions';
 import { SubmitButton } from '../submit-button';
-import PostListClient from '../post-list-client';
+import PostListClient, { type PostMetrics } from '../post-list-client';
 import MediaLibrary, { type MediaItem } from './media-library';
 import { getAllChannels } from '../../lib/channels';
+import { refreshStaleMetrics } from '../../lib/fb-metrics';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,7 @@ type Post = {
   video_url: string | null;
   ghi_chu: string | null; fb_post_id: string | null; proof_path: string | null;
   loai: string | null; chu_de: string | null; created_at: string;
+  metrics?: PostMetrics | null;
 };
 
 const THEME_LABEL: Record<string, string> = {
@@ -53,7 +55,16 @@ export default async function Page() {
   const missingMedia = ['PGRST205', '42P01', '42703'].includes(String(mediaRes.error?.code || ''));
   const needMigration = missingPosts || missingMedia;
 
-  const posts = (postsRes.data || []) as Post[];
+  const rawPosts = (postsRes.data || []) as Post[];
+  const jobPostMap = new Map<string, string>();
+  for (const p of rawPosts) {
+    if (p.fb_post_id && p.trang_thai === 'posted') jobPostMap.set(p.fb_post_id, p.id);
+  }
+  const metricsMap = await refreshStaleMetrics(client, jobPostMap);
+  const posts: Post[] = rawPosts.map((p) => ({
+    ...p,
+    metrics: p.fb_post_id ? metricsMap.get(p.fb_post_id) || null : null,
+  }));
   const approvedPostIds = new Set((aqRes.data || []).map((r) => r.ref_id as string));
   const media = (mediaRes.data || []) as MediaItem[];
 

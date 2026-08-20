@@ -22,6 +22,20 @@ type Post = {
   // Các trường tùy chọn — nếu component nhận post cũ (không có 2 field này), vẫn chạy bình thường.
   loai?: string | null;
   video_url?: string | null;
+  // Số tương tác kéo về từ Facebook Graph (cron /api/cron/fb-metrics). Optional để các
+  // trang chưa join bảng hr_fb_post_metrics vẫn render được. Undefined = chưa có snapshot.
+  metrics?: PostMetrics | null;
+};
+
+export type PostMetrics = {
+  reactions: number;
+  comments: number;
+  shares: number;
+  impressions: number | null;
+  reach: number | null;
+  clicks: number | null;
+  insights_available: boolean;
+  fetched_at: string;
 };
 
 const TT: Record<string, { label: string; tone: string }> = {
@@ -31,6 +45,35 @@ const TT: Record<string, { label: string; tone: string }> = {
   failed: { label: 'Lỗi', tone: 'no' },
   cancelled: { label: 'Đã huỷ', tone: 'no' },
 };
+
+// Định dạng số kiểu Việt Nam: 1.234, dấu chấm ngăn cách hàng nghìn (CLAUDE.md giọng văn).
+function fmtNum(n: number): string {
+  return new Intl.NumberFormat('vi-VN').format(n);
+}
+
+// Ô số tương tác trong bảng: like/bình luận/chia sẻ. Chỉ hiện cho bài đã đăng lên Facebook,
+// và có snapshot metrics. Bài chưa đăng hoặc chưa kịp kéo về hiện gạch nối muted.
+function MetricsCell({ metrics, isPosted, kenh }: {
+  metrics: PostMetrics | null | undefined;
+  isPosted: boolean;
+  kenh: string | null;
+}) {
+  const isFb = !kenh || kenh === 'facebook';
+  if (!isPosted || !isFb) {
+    return <span className="muted" style={{ fontSize: '0.85em' }}>—</span>;
+  }
+  if (!metrics) {
+    return <span className="muted" style={{ fontSize: '0.85em' }} title="Cron chưa kéo về, thử lại sau">Chưa có số</span>;
+  }
+  const title = metrics.insights_available && metrics.reach !== null
+    ? `Cập nhật lúc ${new Date(metrics.fetched_at).toLocaleString('vi-VN')}\nTiếp cận: ${fmtNum(metrics.reach)} người\nLượt xem: ${metrics.impressions !== null ? fmtNum(metrics.impressions) : '—'}\nLượt click: ${metrics.clicks !== null ? fmtNum(metrics.clicks) : '—'}`
+    : `Cập nhật lúc ${new Date(metrics.fetched_at).toLocaleString('vi-VN')}\n(Chưa có số tiếp cận/xem — token thiếu quyền Page Insights)`;
+  return (
+    <span title={title} style={{ fontSize: '13px', color: 'var(--ink)' }}>
+      <b>{fmtNum(metrics.reactions)}</b> like · <b>{fmtNum(metrics.comments)}</b> bl · <b>{fmtNum(metrics.shares)}</b> chia sẻ
+    </span>
+  );
+}
 
 // Nút copy nội dung bài để dán tay vào Nhóm Facebook (FB đã chặn API đăng Nhóm).
 function CopyButton({ text }: { text: string }) {
@@ -99,6 +142,7 @@ export default function PostListClient({
               <th className="post-th-title">Tiêu đề</th>
               <th className="post-th-kenh">Kênh</th>
               <th className="post-th-status">Trạng thái</th>
+              <th className="post-th-metrics" title="Số tương tác cập nhật mỗi giờ từ Facebook">Tương tác</th>
               <th className="post-th-time">Lịch / Đăng</th>
               <th className="post-th-caret" aria-hidden="true"></th>
             </tr>
@@ -157,6 +201,9 @@ export default function PostListClient({
                     <td className="post-td-status">
                       <span className={`stage tone-${tt.tone}`}>{tt.label}</span>
                     </td>
+                    <td className="post-td-metrics">
+                      <MetricsCell metrics={p.metrics} isPosted={p.trang_thai === 'posted'} kenh={p.kenh} />
+                    </td>
                     <td className="post-td-time" suppressHydrationWarning>{timeCell}</td>
                     <td className="post-td-caret">
                       <span className={`caret${isOpen ? ' open' : ''}`} aria-hidden="true">›</span>
@@ -164,7 +211,7 @@ export default function PostListClient({
                   </tr>
                   {isOpen ? (
                     <tr className="post-expand-row">
-                      <td colSpan={5}>
+                      <td colSpan={6}>
                         <div className="post-detail">
                           {/* Thanh chuyển view/edit */}
                           {canEdit ? (
@@ -204,6 +251,31 @@ export default function PostListClient({
                                 </div>
                                 {p.posted_at ? (
                                   <div className="field"><dt>Đã đăng lúc</dt><dd>{formatDateTime(p.posted_at)}</dd></div>
+                                ) : null}
+                                {p.trang_thai === 'posted' && (!p.kenh || p.kenh === 'facebook') ? (
+                                  <div className="field">
+                                    <dt>Tương tác</dt>
+                                    <dd>
+                                      {p.metrics ? (
+                                        <>
+                                          {fmtNum(p.metrics.reactions)} like · {fmtNum(p.metrics.comments)} bình luận · {fmtNum(p.metrics.shares)} chia sẻ
+                                          {p.metrics.insights_available ? (
+                                            <>
+                                              {' · '}
+                                              {p.metrics.reach !== null ? `${fmtNum(p.metrics.reach)} người tiếp cận` : ''}
+                                              {p.metrics.impressions !== null ? ` · ${fmtNum(p.metrics.impressions)} lượt xem` : ''}
+                                              {p.metrics.clicks !== null ? ` · ${fmtNum(p.metrics.clicks)} click` : ''}
+                                            </>
+                                          ) : null}
+                                          <span className="muted" style={{ fontSize: '0.82em', marginLeft: 6 }}>
+                                            (cập nhật {formatDateTime(p.metrics.fetched_at)})
+                                          </span>
+                                        </>
+                                      ) : (
+                                        <span className="muted">Chưa có số — cron sẽ kéo về trong lượt tới</span>
+                                      )}
+                                    </dd>
+                                  </div>
                                 ) : null}
                                 {p.url ? (
                                   <div className="field">

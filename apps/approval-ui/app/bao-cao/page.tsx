@@ -1,7 +1,8 @@
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import DailyChart from './daily-chart';
-import { kindMeta, formatDateTime } from '../labels';
+import { kindMeta, formatDateTime, formatDate } from '../labels';
+import { loadFbMetricsMap } from '../../lib/fb-metrics';
 
 // Nhãn tiếng Việt cho các task hay gặp trong run_log — thay cho mã máy như "hr.publish_facebook".
 const TASK_LABELS: Record<string, string> = {
@@ -17,6 +18,7 @@ const TASK_LABELS: Record<string, string> = {
   'hr.publish_linkedin': 'Đăng bài LinkedIn',
   'hr.queue_facebook': 'Soạn bài Facebook',
   'hr.publish_facebook_ui': 'Đăng bài Facebook (từ UI)',
+  'hr.fb_metrics': 'Kéo số tương tác Facebook',
 };
 
 function taskLabel(task: string): string {
@@ -83,7 +85,7 @@ export default async function Page() {
     client.from('run_log').select('task, status, created_at').gte('created_at', sinceIso).limit(5000),
     client.from('hr_candidates').select('id, created_at').gte('created_at', sinceIso).limit(2000),
     client.from('hr_applications').select('id, stage'),
-    client.from('hr_job_posts').select('id, kenh, trang_thai, posted_at').eq('trang_thai', 'posted').gte('posted_at', sinceIso),
+    client.from('hr_job_posts').select('id, tieu_de, kenh, trang_thai, posted_at, fb_post_id, url').eq('trang_thai', 'posted').gte('posted_at', sinceIso),
     client.from('approval_queue').select('kind, status').eq('status', 'pending').neq('kind', 'alert'),
   ]);
 
@@ -104,7 +106,10 @@ export default async function Page() {
   const runs = (runsRes.data || []) as Row[];
   const cands = (candRes.data || []) as { id: string; created_at: string }[];
   const apps = (appsRes.data || []) as { id: string; stage: string }[];
-  const posts = (postsRes.data || []) as { id: string; kenh: string | null; trang_thai: string; posted_at: string }[];
+  const posts = (postsRes.data || []) as {
+    id: string; tieu_de: string; kenh: string | null; trang_thai: string;
+    posted_at: string; fb_post_id: string | null; url: string | null;
+  }[];
   const queue = (queueRes.data || []) as { kind: string; status: string }[];
 
   const intake7 = count(runs, 7, ['hr-intake', 'hr.intake']);
@@ -129,6 +134,35 @@ export default async function Page() {
 
   const cvSeries = series30(cands);
   const postSeries = series30(posts.map((p) => ({ created_at: p.posted_at })));
+
+  // Tương tác Facebook. Kéo snapshot mới nhất cho các bài đã đăng trong 30 ngày, tính tổng
+  // like/comment/share theo 7 và 30 ngày, và top 5 bài có tương tác cao nhất.
+  const fbIds = posts.map((p) => p.fb_post_id).filter((x): x is string => !!x);
+  const metricsMap = await loadFbMetricsMap(client, fbIds);
+  const now = Date.now();
+  const since7 = now - 7 * ONE_DAY;
+  let fbReact7 = 0, fbComm7 = 0, fbShare7 = 0;
+  let fbReact30 = 0, fbComm30 = 0, fbShare30 = 0;
+  const enriched: Array<{
+    id: string; tieu_de: string; posted_at: string; url: string | null;
+    reactions: number; comments: number; shares: number; total: number;
+  }> = [];
+  for (const p of posts) {
+    if (!p.fb_post_id) continue;
+    const m = metricsMap.get(p.fb_post_id);
+    if (!m) continue;
+    fbReact30 += m.reactions; fbComm30 += m.comments; fbShare30 += m.shares;
+    if (new Date(p.posted_at).getTime() >= since7) {
+      fbReact7 += m.reactions; fbComm7 += m.comments; fbShare7 += m.shares;
+    }
+    enriched.push({
+      id: p.id, tieu_de: p.tieu_de, posted_at: p.posted_at, url: p.url,
+      reactions: m.reactions, comments: m.comments, shares: m.shares,
+      total: m.reactions + m.comments + m.shares,
+    });
+  }
+  const topPosts = [...enriched].sort((a, b) => b.total - a.total).slice(0, 5);
+  const fbTotalPosts = enriched.length;
 
   const recentRuns = [...runs].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 20);
 
@@ -178,6 +212,61 @@ export default async function Page() {
         </p>
         <DailyChart cv={cvSeries} posts={postSeries} />
       </section>
+
+      {/* Tương tác Facebook — cộng dồn số like/bình luận/chia sẻ của các bài đã đăng qua hệ thống.
+          Snapshot do cron /api/cron/fb-metrics kéo về mỗi giờ, chỉ tính các bài có fb_post_id. */}
+      <section className="report-grid" aria-label="Tương tác Facebook">
+        <Stat
+          label="Lượt like Facebook"
+          value7={fbReact7} value30={fbReact30}
+          sub={fbTotalPosts > 0 ? `Cộng từ ${fbTotalPosts} bài đã đăng có số liệu` : 'Chưa có snapshot — chờ cron kéo về'}
+        />
+        <Stat
+          label="Bình luận Facebook"
+          value7={fbComm7} value30={fbComm30}
+          sub="Tổng bình luận công khai trên các bài đã đăng"
+        />
+        <Stat
+          label="Chia sẻ Facebook"
+          value7={fbShare7} value30={fbShare30}
+          sub="Tổng lượt chia sẻ trên các bài đã đăng"
+        />
+      </section>
+
+      {topPosts.length > 0 ? (
+        <section className="settings-box">
+          <h2 style={{ margin: '0 0 6px', fontSize: '1.02rem' }}>Top bài tương tác cao nhất</h2>
+          <p className="muted" style={{ margin: '0 0 10px', fontSize: '0.85em' }}>
+            5 bài đã đăng trong 30 ngày qua có tổng like + bình luận + chia sẻ cao nhất.
+          </p>
+          <div className="table-scroll">
+            <table className="run-log">
+              <thead>
+                <tr>
+                  <th>Ngày đăng</th>
+                  <th>Tiêu đề</th>
+                  <th style={{ textAlign: 'right' }}>Like</th>
+                  <th style={{ textAlign: 'right' }}>Bình luận</th>
+                  <th style={{ textAlign: 'right' }}>Chia sẻ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topPosts.map((p) => (
+                  <tr key={p.id}>
+                    <td className="muted nowrap">{formatDate(p.posted_at)}</td>
+                    <td className="cell-ellipsis">
+                      {p.url ? <a href={p.url} target="_blank" rel="noreferrer">{p.tieu_de}</a> : p.tieu_de}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{new Intl.NumberFormat('vi-VN').format(p.reactions)}</td>
+                    <td style={{ textAlign: 'right' }}>{new Intl.NumberFormat('vi-VN').format(p.comments)}</td>
+                    <td style={{ textAlign: 'right' }}>{new Intl.NumberFormat('vi-VN').format(p.shares)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="report-grid">
         {stages.map((s) => (

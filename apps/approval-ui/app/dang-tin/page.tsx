@@ -2,8 +2,9 @@ import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import { addJobPost, trackPostedPost } from '../actions';
 import { SubmitButton } from '../submit-button';
-import PostListClient from '../post-list-client';
+import PostListClient, { type PostMetrics } from '../post-list-client';
 import { getAllChannels, isManual } from '../../lib/channels';
+import { refreshStaleMetrics } from '../../lib/fb-metrics';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,7 @@ type Post = {
   fb_post_id: string | null; proof_path: string | null;
   loai: string | null;
   created_at: string;
+  metrics?: PostMetrics | null;
 };
 
 type RunEntry = { task: string; status: string; created_at: string };
@@ -58,7 +60,18 @@ export default async function Page() {
       .in('status', ['open', 'draft']),
   ]);
 
-  const posts = (jRes.data || []) as Post[];
+  const rawPosts = (jRes.data || []) as Post[];
+  // Kéo số tương tác Facebook cho các bài đã đăng: nếu snapshot mới thì dùng cache,
+  // cũ hơn TTL (mặc định 15 phút) thì tự gọi Graph API rồi upsert. Không cần cron.
+  const jobPostMap = new Map<string, string>();
+  for (const p of rawPosts) {
+    if (p.fb_post_id && p.trang_thai === 'posted') jobPostMap.set(p.fb_post_id, p.id);
+  }
+  const metricsMap = await refreshStaleMetrics(client, jobPostMap);
+  const posts: Post[] = rawPosts.map((p) => ({
+    ...p,
+    metrics: p.fb_post_id ? metricsMap.get(p.fb_post_id) || null : null,
+  }));
   const approvedPostIds = new Set((aqRes.data || []).map((r) => r.ref_id as string));
   const logs = (logRes.data || []) as RunEntry[];
 

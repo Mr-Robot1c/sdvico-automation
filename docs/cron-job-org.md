@@ -80,6 +80,13 @@ Hai job trả lời bình luận chỉ có việc khi webhook Facebook đã cấ
 `docs/facebook-test-setup.md`) và có bình luận thật gửi tới `/api/webhooks/facebook`. Chưa
 cấu hình webhook thì hai job này chạy vẫn trả 200, chỉ là không có gì để làm.
 
+Số tương tác Facebook (like/bình luận/chia sẻ) không có job cron riêng. Trang Đăng tin và
+Bài tương tác tự kiểm cache mỗi lần mở: nếu snapshot cũ hơn 15 phút thì server tự gọi
+Graph API rồi upsert vào bảng `hr_fb_post_metrics`. Muốn đổi ngưỡng thì đặt
+`HR_FB_METRICS_TTL_MINUTES` (mặc định 15) hoặc `HR_FB_METRICS_MAX_PER_RUN` (mặc định 20 bài
+mỗi lần refresh) trên Vercel. Trang Báo cáo chỉ đọc snapshot có sẵn, không tự gọi Graph
+— muốn số mới thì mở Đăng tin trước.
+
 3. Với mỗi job, mở tab **Advanced** rồi đặt:
 
    - **Request method**: GET.

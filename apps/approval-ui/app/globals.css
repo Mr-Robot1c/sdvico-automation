@@ -710,11 +710,12 @@ select.note { cursor: pointer; }
   border-bottom: 1px solid var(--line);
   background: var(--surface-2);
 }
-.post-th-title  { width: auto; }
-.post-th-kenh   { width: 130px; }
-.post-th-status { width: 110px; }
-.post-th-time   { width: 180px; }
-.post-th-caret  { width: 32px; }
+.post-th-title   { width: auto; }
+.post-th-kenh    { width: 130px; }
+.post-th-status  { width: 110px; }
+.post-th-metrics { width: 200px; }
+.post-th-time    { width: 180px; }
+.post-th-caret   { width: 32px; }
 
 .post-row {
   cursor: pointer;
@@ -737,6 +738,7 @@ select.note { cursor: pointer; }
   overflow: hidden;
 }
 .post-td-kenh, .post-td-time { font-size: 13.5px; }
+.post-td-metrics { font-size: 13px; color: var(--ink-2); white-space: nowrap; }
 .post-td-caret { text-align: center; color: var(--ink-2); }
 
 .post-expand-row > td {
@@ -770,6 +772,8 @@ select.note { cursor: pointer; }
   .post-td-kenh::before { content: 'Kênh: '; color: var(--ink-2); }
   .post-td-status { grid-column: 1 / 2; grid-row: 3; }
   .post-td-time   { grid-column: 2 / 3; grid-row: 3; text-align: right; font-size: 12px; }
+  .post-td-metrics { grid-column: 1 / -1; grid-row: 4; font-size: 12px; white-space: normal; }
+  .post-td-metrics:empty { display: none; }
   .post-row.is-open { border-color: var(--accent); background: var(--accent-bg); }
   .post-expand-row { display: block; }
   .post-expand-row > td { display: block; padding: 0; border: 0; }
