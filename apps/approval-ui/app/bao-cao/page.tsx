@@ -84,7 +84,7 @@ export default async function Page() {
     client.from('hr_candidates').select('id, created_at').gte('created_at', sinceIso).limit(2000),
     client.from('hr_applications').select('id, stage'),
     client.from('hr_job_posts').select('id, kenh, trang_thai, posted_at').eq('trang_thai', 'posted').gte('posted_at', sinceIso),
-    client.from('approval_queue').select('kind, status').eq('status', 'pending'),
+    client.from('approval_queue').select('kind, status').eq('status', 'pending').neq('kind', 'alert'),
   ]);
 
   // Nhật ký duyệt gần đây: 20 mục approval_queue mới bấm nhất, có ghi decided_by (cột mới,

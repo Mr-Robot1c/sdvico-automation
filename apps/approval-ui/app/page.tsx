@@ -52,10 +52,13 @@ function buildUrl(base: { kind?: string | null; platform?: string | null; id?: s
 
 export default async function Page({ searchParams }: { searchParams: { kind?: string; platform?: string; id?: string } }) {
   const client = getServerClient();
+  // Ẩn kind='alert' (dead-letter từ cron heartbeat/publish) khỏi trang duyệt.
+  // Chúng có trang giám sát riêng /giam-sat, đưa vào đây chỉ tạo nhiễu.
   const { data, error } = await client
     .from('approval_queue')
     .select('id, kind, title, payload, created_at, ref_id, note')
     .eq('status', 'pending')
+    .neq('kind', 'alert')
     .order('created_at', { ascending: true });
 
   const raw = (data || []) as Item[];

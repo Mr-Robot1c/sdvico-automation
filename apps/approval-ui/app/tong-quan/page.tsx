@@ -53,8 +53,8 @@ export default async function Page() {
 
   const [queueRes, cvTodayRes, applicationsRes, interviewsRes, upcomingPostsRes, incidentsRes, recentDecidedRes] =
     await Promise.all([
-      // Chờ duyệt: đếm theo kind
-      client.from('approval_queue').select('kind').eq('status', 'pending'),
+      // Chờ duyệt: đếm theo kind (loại alert — có trang giám sát riêng)
+      client.from('approval_queue').select('kind').eq('status', 'pending').neq('kind', 'alert'),
       // CV mới hôm nay
       client.from('hr_candidates').select('id').gte('created_at', startTodayIso),
       // Ứng viên đang chờ xem (đã chấm, chưa quyết định mời hay không)

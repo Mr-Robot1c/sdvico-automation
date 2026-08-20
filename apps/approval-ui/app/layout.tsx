@@ -18,7 +18,8 @@ async function getPendingCount(): Promise<number> {
     const { count } = await client
       .from('approval_queue')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .neq('kind', 'alert');
     return count ?? 0;
   } catch {
     return 0;
