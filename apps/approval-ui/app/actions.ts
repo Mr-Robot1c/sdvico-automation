@@ -960,20 +960,6 @@ export async function removeChannel(formData: FormData) {
   revalidatePath('/tao-jd');
 }
 
-// Tạo một tin đăng ở trạng thái nháp hoặc đặt lịch.
-export async function addJobPost(formData: FormData) {
-  const tieu_de = String(formData.get('tieu_de') || '').trim();
-  const platform_id = String(formData.get('platform_id') || '') || null;
-  const scheduledRaw = String(formData.get('scheduled_at') || '').trim();
-  if (!tieu_de) return;
-  const scheduled_at = scheduledRaw ? parseVNTime(scheduledRaw) : null;
-  const trang_thai = scheduled_at ? 'scheduled' : 'draft';
-  const client = getServerClient();
-  const { error } = await client.from('hr_job_posts').insert({ tieu_de, platform_id, scheduled_at, trang_thai });
-  if (error) throw new Error(error.message);
-  revalidatePath('/dang-tin');
-}
-
 // Đổi trạng thái tin đăng: đánh dấu đã đăng, huỷ, hoặc xoá.
 export async function updateJobPost(formData: FormData) {
   const id = String(formData.get('id') || '');
@@ -1457,6 +1443,7 @@ export async function trackPostedPost(formData: FormData) {
   try { await client.from('run_log').insert({ task: 'hr.track_posted', status: 'ok', detail: { postId: inserted.id, jobId, kenh, url, by: email } }); } catch {}
 
   revalidatePath('/dang-tin');
+  revalidatePath('/kenh');
   revalidatePath('/vi-tri');
   revalidatePath('/');
 }

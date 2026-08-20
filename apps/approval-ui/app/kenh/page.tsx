@@ -2,7 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import KenhTabs from './kenh-tabs';
 import { getAllChannels, methodLabel } from '../../lib/channels';
-import { toggleChannel, addChannel, removeChannel } from '../actions';
+import { toggleChannel, addChannel, removeChannel, trackPostedPost } from '../actions';
 import { SubmitButton } from '../submit-button';
 
 export const dynamic = 'force-dynamic';
@@ -28,14 +28,15 @@ export default async function Page() {
 
   const [postsRes, jobsRes, appsRes] = await Promise.all([
     client.from('hr_job_posts').select('id, job_id, kenh, trang_thai').is('deleted_at', null),
-    client.from('hr_jobs').select('id, title'),
+    client.from('hr_jobs').select('id, title, status'),
     client.from('hr_applications').select('id, job_id'),
   ]);
 
   const posts = (postsRes.data || []) as Post[];
-  const jobs = (jobsRes.data || []) as { id: string; title: string }[];
+  const jobs = (jobsRes.data || []) as { id: string; title: string; status?: string }[];
   const apps = (appsRes.data || []) as App[];
   const channelViews = await getAllChannels(client);
+  const manualChannels = channelViews.filter((c) => c.enabled && c.method === 'manual');
 
   // Số ứng viên theo từng vị trí — dùng để ước tính "kênh này ra bao nhiêu ứng viên".
   const appsByJob = new Map<string, number>();
@@ -174,6 +175,38 @@ export default async function Page() {
           </tbody>
         </table>
       </div>
+
+      {/* Ghi nhận bài đã đăng lên sàn (track-only). Người tự đăng thẳng trên sàn, chỉ ghi link + ảnh để theo dõi.
+          Cho phép "đăng tiếp tục" nhiều lần trên cùng 1 kênh: mỗi lần submit là 1 bài mới trong hr_job_posts.
+          Bài mới sẽ tự hiện ở tab Tin đăng (trackPostedPost revalidate /dang-tin). */}
+      {manualChannels.length > 0 ? (
+        <form action={trackPostedPost} className="settings-box" style={{ marginTop: 16 }}>
+          <b>Ghi nhận bài đã đăng lên sàn</b>
+          <p className="muted" style={{ margin: '4px 0 8px', fontSize: '0.85em' }}>
+            Dùng khi bạn tự đăng trực tiếp trên sàn (TopCV, JobsGO, VietnamWorks…). Chỉ ghi link + ảnh để
+            theo dõi — không qua bước Duyệt. Có thể ghi nhận nhiều bài trên cùng 1 sàn: mỗi lần điền là 1 bài mới.
+          </p>
+          <div className="row" style={{ marginTop: 4, flexWrap: 'wrap', gap: 8 }}>
+            <select className="note" name="kenh" required aria-label="Kênh">
+              {manualChannels.map((c) => <option key={c.kenh} value={c.kenh}>{c.ten}</option>)}
+            </select>
+            <select className="note" name="job_id" aria-label="Vị trí (tùy chọn)" defaultValue="">
+              <option value="">Gắn vị trí (tùy chọn)</option>
+              {jobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
+            </select>
+          </div>
+          <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <input className="note" type="url" name="url" placeholder="Link bài đã đăng trên sàn" aria-label="Link bài đã đăng" />
+            <label style={{ fontSize: '0.82em', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: 'var(--ink-2)' }}>Ảnh bằng chứng:</span>
+              <input type="file" name="proof_file" accept="image/*" style={{ fontSize: '0.85em' }} />
+            </label>
+          </div>
+          <div className="row" style={{ marginTop: 8 }}>
+            <SubmitButton label="Ghi nhận đã đăng" />
+          </div>
+        </form>
+      ) : null}
 
       {/* Thêm sàn tuyển dụng mới do người dùng nhập. Luôn là kênh đăng thủ công. */}
       <form action={addChannel} className="settings-box" style={{ marginTop: 16 }}>
