@@ -141,7 +141,7 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
   const wa = await whisperArtifact(sceneAudios, fdir, format);
   // TTS cho outro: đọc "Gọi ngay tổng đài 1900 23 23 49" (spellPhones sẽ đọc từng chữ số).
   const outroAudio = join(fdir, 'outro.mp3');
-  try { await tts('Gọi ngay tổng đài 1900 23 23 49 để được hỗ trợ.', outroAudio, voice, fdir, 'outro'); } catch { /* bo qua */ }
+  try { await tts('Nhắn tin cho Page SDVICO hoặc gọi tổng đài 1900 23 23 49 để được hỗ trợ.', outroAudio, voice, fdir, 'outro'); } catch { /* bo qua */ }
   const out = join(outDir, `sdvico_${contentId.slice(0, 8)}_${format}.mp4`);
   await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio });
   const totalDur = await probeDuration(out);

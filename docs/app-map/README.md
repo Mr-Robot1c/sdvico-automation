@@ -6,6 +6,7 @@ covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-14
 ttl_days: 180
 <!-- re-verified: 2026-08-19 - rotate: tuan TAP TRUNG lay du MOI san pham trong focus moi luot (unused = eligible), khong ap 'da dung trong vong' -> 1 lan kich ra du 2 bai ban (truoc phai kich 3 lan). -->
+<!-- re-verified: 2026-08-20 - CTA: prompt bai social (2 ban) + outro video doc them NHẮN TIN cho Page SDVICO ngoai gọi tong dai. -->
 <!-- re-verified: 2026-08-20 - ShareGroups them auto-fetch ten group qua /api/fb-group-name (best-effort, Meta hay chan fields=name cua group), fail thi giu ID; UI input ten group italic + opacity khi label==id, hint bam de doi ten, placeholder ro. Nhac trong popover: khong tu dang duoc, luong 2 click. -->
 <!-- re-verified: 2026-08-20 - Feature Chia se vao group (Meta dong Groups API tu 2020, khong dang tay tu dong duoc): noi-dung/share-groups.tsx popover cho bai Facebook Post - hien link + nut Copy + danh sach group luu localStorage (fb_share_groups) + nut Mo group. Rut gon 2 click/group. Chi hien cho FB Post khong phai /reel/. -->
 <!-- re-verified: 2026-08-20 - So lieu views cho Reel/video: xac nhan qua fb-diag insights probe: post_media_view=29 khop UI 27; post_video_views=8 chi so cu; blue_reels_play_count=null. Doi thu tu grabFirst: post_media_view UP dau. -->

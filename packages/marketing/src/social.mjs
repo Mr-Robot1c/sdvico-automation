@@ -72,7 +72,7 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     isTikTok
       ? 'Đây là chú thích cho video TikTok: 2 tới 4 câu thật ngắn, cuốn, kết bằng mời gọi.'
       : 'Đây là bài Facebook: 4 tới 6 câu, có thể có 2 tới 3 dòng gạch đầu lợi ích (dùng emoji làm đầu dòng, không dùng dấu chấm tròn).',
-    'Kết bằng lời mời rõ ràng, đúng kiểu bán hàng: liên hệ SDVICO hoặc gọi tổng đài 1900 23 23 49 để được tư vấn, báo giá và lắp đặt. KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.',
+    'Kết bằng lời mời rõ ràng, đúng kiểu bán hàng: NHẮN TIN cho Page SDVICO ở đây hoặc gọi tổng đài 1900 23 23 49 để được tư vấn, báo giá và lắp đặt tận bến. KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.',
     'Mỗi bài phải KHÁC các bài trước: khác câu mở đầu, khác cách triển khai, khác tiêu đề.',
     '',
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số được duyệt: nói chung chung, không nêu số cụ thể.',
