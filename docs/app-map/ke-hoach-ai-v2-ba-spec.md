@@ -5,6 +5,7 @@ covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approv
 last_verified: 2026-08-18
 ttl_days: 90
 <!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-20 - NHIP 2 DOT/NGAY (user 20/8): /api/rotate them ?slot=sang|chieu, guard per-slot. Slot sang=2 ban 0 content; chieu=1 ban 1 content. Ep it nhat 1 folder ban co CLIP moi dot (video AI dung duoc); neu khong co, thay 1 folder khong-clip bang folder co-clip. vercel.json 2 cron: sang 1h UTC (8h VN), chieu 6h UTC (13h VN). GitHub cron */30 goi ca 2 slot theo gio VN (luoi an toan). Bo cron Vercel metrics-pull (Hobby 2 cron); GitHub */30 phu. -->
 <!-- re-verified: 2026-08-20 - Bug am thanh tu chay khi vao hang doi: 4 composer x 4 dialog dong (nhung ton tai trong DOM) chua <video autoPlay src> -> Chrome cho autoplay video trong dialog closed. Fix: chi mount <video> khi zoomOpen=true (state). Dong dialog onClose set false -> unmount video hoan toan. -->
 <!-- re-verified: 2026-08-19 - fb-diag bo universal_video_id/content_category/is_reference_only/post_id (chi Video Copyright API-enrolled page moi hoi duoc; loi #100 khong phai loi page). -->
 <!-- re-verified: 2026-08-19 - fb-diag bo field FB khong ho tro (no_story, is_crossposting_eligible, event). -->

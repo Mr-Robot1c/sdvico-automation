@@ -80,22 +80,42 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, created: 0, note: 'emergency_stop' });
   }
 
-  // GUARD 1 LẦN/NGÀY: cron tin cậy (metrics-pull 30 phút/lần) sẽ gọi route này để bù khi cron Vercel
-  // trượt; guard đảm bảo chỉ sinh 1 đợt bài mỗi ngày VN dù bị gọi nhiều lần. ?force=1 để bỏ qua guard
-  // (chạy tay khi cần thêm). Đếm bài generator=rotation tạo từ đầu ngày VN.
+  // NHIP 2 DOT/NGAY (user 20/8): 8h sang = 2 bai BAN; 13h chieu = 1 bai ban + 1 content. Guard theo
+  // SLOT (mỗi slot chỉ chạy 1 lần trong ngày VN). ?slot=sang|chieu de ep slot (Vercel cron truyen).
+  // Khong co ?slot: giu hanh vi cu (guard 1 lan/ngay). ?force=1 bỏ mọi guard.
+  const slotParam = (new URL(req.url).searchParams.get('slot') || '').toLowerCase();
+  const slot: 'sang' | 'chieu' | null = slotParam === 'sang' ? 'sang' : slotParam === 'chieu' ? 'chieu' : null;
+  const vn = new Date(Date.now() + 7 * 3600 * 1000);
+  const dayStartIso = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - 7 * 3600 * 1000).toISOString();
   if (!forced) {
-    const vn = new Date(Date.now() + 7 * 3600 * 1000);
-    const dayStartIso = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - 7 * 3600 * 1000).toISOString();
-    const { count: madeToday } = await client
-      .from('mkt_content')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', dayStartIso)
-      .eq('brief->>generator', 'rotation');
-    if (madeToday && madeToday > 0) {
-      await logRotate('skipped', { reason: 'da sinh hom nay', madeToday });
-      return NextResponse.json({ ok: true, created: 0, note: `da sinh ${madeToday} bai hom nay (guard 1 lan/ngay; ?force=1 de ep)` });
+    if (slot) {
+      // Slot: dem bai tao trong slot nay hom nay (rotation_slot = slot).
+      const { count: madeSlot } = await client
+        .from('mkt_content')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', dayStartIso)
+        .eq('brief->>generator', 'rotation')
+        .eq('brief->>rotation_slot', slot);
+      if (madeSlot && madeSlot > 0) {
+        await logRotate('skipped', { reason: `da sinh slot ${slot} hom nay`, madeSlot, slot });
+        return NextResponse.json({ ok: true, created: 0, note: `da sinh ${madeSlot} bai slot ${slot} hom nay` });
+      }
+    } else {
+      // Khong truyen slot: dem tong bai hom nay (guard cu, cho cac tinh huong thu cong).
+      const { count: madeToday } = await client
+        .from('mkt_content')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', dayStartIso)
+        .eq('brief->>generator', 'rotation');
+      if (madeToday && madeToday > 0) {
+        await logRotate('skipped', { reason: 'da sinh hom nay', madeToday });
+        return NextResponse.json({ ok: true, created: 0, note: `da sinh ${madeToday} bai hom nay (guard 1 lan/ngay; ?force=1 de ep)` });
+      }
     }
   }
+  // So bai ban + co content theo slot. Slot sang: 2 ban, 0 content. Slot chieu: 1 ban + 1 content.
+  const salesCount = slot === 'chieu' ? 1 : slot === 'sang' ? 2 : FOLDERS_PER_RUN;
+  const contentCount = slot === 'sang' ? 0 : CONTENT_PER_RUN;
 
   // 1. Gom tư liệu đã gán folder theo product_group.
   //    videos = CLIP GỐC do người upload (loại video-pipeline đã dựng ra) — dùng để quyết
@@ -229,9 +249,26 @@ export async function GET(req: Request) {
   if (!pickedFolders.length) {
     const remaining = unused.filter((g) => !usedInThisRun.has(g));
     const extra = hasWeights
-      ? weightedSample(remaining, (g) => weights[productName(g)] ?? 1, FOLDERS_PER_RUN)
-      : shuffle(remaining).slice(0, FOLDERS_PER_RUN);
+      ? weightedSample(remaining, (g) => weights[productName(g)] ?? 1, salesCount)
+      : shuffle(remaining).slice(0, salesCount);
     for (const g of extra) pickedFolders.push({ group: g });
+  }
+
+  // User 20/8: MOI DOT phai co it nhat 1 bai ban tu folder co CLIP NGUON (video AI dung duoc).
+  // Neu pickedFolders khong co folder nao co clip, THAY 1 folder bang folder khac co clip (con trong
+  // vong / trong eligible neu vong het). Giu ke hoach neu suggestion.product khop folder co clip.
+  const hasClipFolder = (g: string) => (folders.get(g)?.videos.length || 0) > 0;
+  if (pickedFolders.length && !pickedFolders.some((pf) => hasClipFolder(pf.group))) {
+    const pool = (unused.length ? unused : eligible).filter((g) => hasClipFolder(g) && !usedInThisRun.has(g));
+    if (pool.length) {
+      const replacement = pickRandom(pool);
+      // Uu tien thay folder khong-clip khong bam suggestion (bai fallback), giu bai bam ke hoach.
+      const idx = pickedFolders.findIndex((pf) => !pf.suggestion) ;
+      const swapAt = idx >= 0 ? idx : pickedFolders.length - 1;
+      const old = pickedFolders[swapAt];
+      pickedFolders[swapAt] = { group: replacement };
+      usedInThisRun.delete(old.group); usedInThisRun.add(replacement);
+    }
   }
 
   // @ts-ignore — module JS thuần
@@ -321,7 +358,7 @@ export async function GET(req: Request) {
             assets,
             channels,
             generator: 'rotation',
-            rotation: true,
+            rotation: true, rotation_slot: slot || null,
             rotation_cycle: cycle,
             rotation_group: group,
             // Chỉ yêu cầu dựng video AI khi folder có clip gốc (SEA-40, SF-50, Ắc quy...).
@@ -376,7 +413,7 @@ export async function GET(req: Request) {
   // tàu cá chung chung".
   // @ts-ignore — module JS thuần
   const { pickImageForContent } = await import('../../../lib/gen/pick-image.mjs');
-  for (let i = 0; i < CONTENT_PER_RUN; i++) {
+  for (let i = 0; i < contentCount; i++) {
     // Chọn CỤM CONTENT theo tỷ lệ đề xuất Phòng KD (tuần 5 bài content):
     //   qa=2, checklist=2, glossary=1, tip=1, engage=1, portrait=1, news=1 -> tổng 9 lượt/vòng.
     //   Weight cao = chọn dày. news/portrait vẫn xuất hiện nhưng ít hơn vì cần chuẩn bị thật.
@@ -439,7 +476,7 @@ export async function GET(req: Request) {
           assets,
           channels,
           generator: 'rotation',
-          rotation: true,
+          rotation: true, rotation_slot: slot || null,
           rotation_group: 'Bài content',
           post_kind: 'content',
           topic: gen.topic,

@@ -47,18 +47,23 @@ jobs:
           echo "metrics-pull HTTP $code"
           head -c 800 /tmp/resp.json; echo
           test "$code" = "200"
-      - name: Sinh nội dung A/B chờ duyệt (guard 1 lần/ngày; force_rotate=true để ép)
-        if: always() # chạy kể cả bước trên lỗi, để không lỡ đợt bài trong ngày
+      - name: Sinh nội dung 2 slot/ngày (sang 8h + chieu 13h VN) - luoi an toan neu cron Vercel truot
+        if: always()
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           FORCE_ROTATE: ${{ github.event.inputs.force_rotate }}
         run: |
           if [ -z "$CRON_SECRET" ]; then echo "Thieu CRON_SECRET"; exit 0; fi
-          Q=""
-          if [ "$FORCE_ROTATE" = "true" ]; then Q="?force=1"; echo "FORCE mode: bo qua guard"; fi
-          code=$(curl -s -o /tmp/rot.json -w "%{http_code}" \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "https://sdvico-mktit.vercel.app/api/rotate$Q")
-          echo "rotate HTTP $code"
-          head -c 800 /tmp/rot.json; echo
-          # KHÔNG fail workflow nếu rotate lỗi (số liệu vẫn tính là chạy); run_log mkt.rotate ghi lý do.
+          H=$(TZ=Asia/Ho_Chi_Minh date +%H); H=$((10#$H))
+          call_rotate() {
+            local Q="$1"; local NAME="$2"
+            local code=$(curl -s -o /tmp/rot_${NAME}.json -w "%{http_code}"  -H "Authorization: Bearer $CRON_SECRET"  "https://sdvico-mktit.vercel.app/api/rotate$Q")
+            echo "rotate $NAME HTTP $code"
+            head -c 500 /tmp/rot_${NAME}.json; echo
+          }
+          if [ "$FORCE_ROTATE" = "true" ]; then
+            call_rotate "?force=1" "force"
+          else
+            if [ $H -ge 8 ]; then call_rotate "?slot=sang" "sang"; fi
+            if [ $H -ge 13 ]; then call_rotate "?slot=chieu" "chieu"; fi
+          fi
