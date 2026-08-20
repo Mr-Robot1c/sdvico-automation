@@ -54,11 +54,16 @@ export default function ShareGroups({ postUrl }: { postUrl: string }) {
       setTimeout(() => setCopied(false), 1500);
     } catch { /* bo qua */ }
   };
-  const addGroup = () => {
+  const addGroup = async () => {
     const norm = normalizeGroupUrl(newG);
     if (!norm) { alert('Không nhận ra link/ID group. Ví dụ: https://www.facebook.com/groups/ngudan.vungtau hoặc ngudan.vungtau'); return; }
     if (groups.some((g) => g.id === norm.id)) { setNewG(''); return; }
-    const label = norm.id; // hien thi bang id, user tu doi ten neu can
+    // Thu lay ten group qua Graph API (Meta hay chan Groups API tu 2020; fail -> giu ID lam ten).
+    let label = norm.id;
+    try {
+      const r = await fetch(`/api/fb-group-name?id=${encodeURIComponent(norm.id)}`, { cache: 'no-store' });
+      if (r.ok) { const j = await r.json(); if (j?.name) label = String(j.name).slice(0, 60); }
+    } catch { /* giu ID */ }
     const next = [...groups, { id: norm.id, label, url: norm.url }];
     setGroups(next); saveGroups(next); setNewG('');
   };
@@ -111,20 +116,25 @@ export default function ShareGroups({ postUrl }: { postUrl: string }) {
           {groups.length === 0 ? (
             <p className="sub" style={{ margin: '0 0 8px' }}>Chưa có group nào. Thêm bên dưới.</p>
           ) : (
+            <>
+            <p className="sub" style={{ margin: '0 0 6px', fontSize: 11 }}>💡 Bấm vào ô tên để đặt lại (Meta chặn API lấy tên group tự động).</p>
             <ul style={{ listStyle: 'none', margin: '0 0 8px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {groups.map((g) => (
                 <li key={g.id} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <input
                     value={g.label}
                     onChange={(e) => renameGroup(g.id, e.target.value)}
-                    style={{ flex: 1, minWidth: 0, padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 4, fontSize: 12, background: 'var(--surface)', color: 'var(--ink)' }}
-                    title={g.url}
+                    placeholder="Đặt tên gợi nhớ..."
+                    style={{ flex: 1, minWidth: 0, padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 4, fontSize: 12, background: 'var(--surface)', color: 'var(--ink)', fontStyle: g.label === g.id ? 'italic' : 'normal', opacity: g.label === g.id ? 0.8 : 1 }}
+                    title={`ID: ${g.id} — ${g.url}
+Bấm để đặt tên gợi nhớ`}
                   />
                   <a className="btn ok sm" href={g.url} target="_blank" rel="noreferrer" title="Mở group (đã copy link ở trên, dán vào ô Tạo bài viết)">Mở</a>
                   <button type="button" className="btn no sm" onClick={() => removeGroup(g.id)} aria-label="Xoá" title="Xoá khỏi danh sách">✕</button>
                 </li>
               ))}
             </ul>
+            </>
           )}
           <div style={{ display: 'flex', gap: 6 }}>
             <input
