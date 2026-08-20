@@ -30,28 +30,41 @@ Nếu SDVICO đã có kênh, bỏ qua bước này.
 4. Menu bên trái → APIs & Services → Library → tìm "YouTube Data API v3" → Enable.
 5. Chờ 30 giây cho Google kích hoạt.
 
-## Bước 3: OAuth Consent Screen
+## Bước 3: OAuth Consent Screen (giao diện mới "Google Auth Platform")
 
-1. Menu bên trái → APIs & Services → OAuth consent screen.
-2. Chọn User Type: **External** (bên ngoài). Bấm Create.
-3. App name: `SDVICO Marketing`; User support email: chọn email của bạn; Developer contact: cùng email.
-4. Bấm Save and Continue → tới Scopes → bấm Add or Remove Scopes → tìm và tick:
-   - `.../auth/youtube.upload`
-   - `.../auth/youtube`
-   Bấm Update → Save and Continue.
-5. Test users → Add users → thêm email chủ kênh (email bước 1). Save and Continue.
-6. Summary → Back to Dashboard.
+Cập nhật 20/8/2026: Google đã đổi giao diện. Luồng "OAuth consent screen" cũ (một wizard nhiều trang) giờ tách thành các mục ở menu trái: Overview, Branding, Audience, Clients, Data Access, Verification Center, Settings. Không còn nút Scopes trong một wizard nữa. Làm theo giao diện mới:
 
-Lưu ý: app đang trong chế độ Testing → refresh_token sẽ hết hạn sau **7 ngày**. Nếu muốn dùng lâu dài, cuối cùng bấm "Publish app" ở màn OAuth consent screen (Google sẽ xét đơn giản vì scope youtube.upload không thuộc nhạy cảm nhất). Nếu chưa muốn publish, cứ 7 ngày chạy lại script bước 4 để làm mới refresh_token.
+Bản đồ nhanh (mục cũ nằm ở đâu trong giao diện mới):
 
-## Bước 4: Tạo OAuth Credentials
+| Việc cần làm | Bấm vào menu trái |
+| --- | --- |
+| Tên app, email hỗ trợ | Branding |
+| Chọn External + thêm Test users | Audience |
+| Chọn Scopes (quyền) | Data Access |
+| Tạo OAuth credentials | Clients |
 
-1. Menu bên trái → APIs & Services → Credentials.
-2. Bấm "Create Credentials" → "OAuth client ID".
+Các bước:
+
+1. Vào `console.cloud.google.com`, tìm ô "Google Auth Platform" (hoặc gõ "OAuth" ở ô tìm kiếm trên cùng). Nếu chưa cấu hình lần nào, bấm Get Started rồi điền App name `SDVICO Marketing` + email hỗ trợ + chọn Audience là External + email liên hệ. Xong sẽ thấy toast "OAuth configuration created!".
+2. Menu trái bấm **Data Access** để chọn quyền (Scopes):
+   - Bấm **Add or Remove Scopes**.
+   - Ô lọc gõ `youtube`.
+   - Tick 2 dòng: `.../auth/youtube.upload` và `.../auth/youtube`.
+   - Bấm **Update**, rồi **Save**.
+3. Menu trái bấm **Audience** để thêm người test:
+   - Kéo xuống phần **Test users**, bấm **Add users**.
+   - Thêm email chủ kênh YouTube (email đang đăng nhập, bước 1), bấm **Save**.
+
+Lưu ý: app đang chế độ Testing thì refresh_token hết hạn sau **7 ngày**. Muốn dùng lâu dài, vào **Audience** bấm **Publish app** (Google xét đơn giản vì scope youtube.upload không thuộc loại nhạy cảm nhất). Chưa muốn publish thì cứ 7 ngày chạy lại script bước 5 để làm mới refresh_token.
+
+## Bước 4: Tạo OAuth Credentials (mục Clients)
+
+1. Menu bên trái bấm **Clients** (hoặc nút **Create OAuth client** ở màn Overview).
+2. Bấm **Create client** (hoặc Create OAuth client).
 3. Application type: **Desktop app**.
 4. Name: `SDVICO desktop`.
 5. Bấm Create.
-6. Cửa sổ hiện `Client ID` + `Client secret` → bấm **Download JSON** để tải file `client_secret_*.json` về máy.
+6. Cửa sổ hiện `Client ID` + `Client secret`, bấm **Download JSON** để tải file `client_secret_*.json` về máy (nếu không có nút Download thì copy tay 2 giá trị này).
 7. Mở file JSON đó bằng Notepad, thấy:
 
 ```json
@@ -131,7 +144,7 @@ Nếu Vercel deploy báo lỗi "invalid_grant" khi đăng YouTube:
 2. Vào Vercel → cập nhật biến `YOUTUBE_REFRESH_TOKEN` với giá trị mới.
 3. Redeploy.
 
-Để tránh phiền phức, publish OAuth consent screen (Bước 3, mục cuối) — sau khi Google phê duyệt, refresh_token bền vĩnh viễn.
+Để tránh phiền phức, vào Google Auth Platform, mục **Audience**, bấm **Publish app** (đưa app từ Testing sang In production). Sau khi Google phê duyệt, refresh_token bền lâu dài.
 
 ## Ghi chú kỹ thuật
 
