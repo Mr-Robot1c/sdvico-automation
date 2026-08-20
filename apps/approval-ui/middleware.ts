@@ -80,6 +80,18 @@ export function middleware(req: NextRequest) {
     }
   }
 
+  // Request PREFETCH/RSC (Next tu tai truoc khi hover Link, hoac tai RSC payload) tra 401
+  // KHONG kem WWW-Authenticate: header do la thu BAT popup dang nhap cua trinh duyet. Neu mot
+  // trang cong khai lo prefetch route noi bo, ta khong muon popup bung tren trang cong khai
+  // (20/8 - trieu chung "web crash hoai"). Voi navigation THAT (nguoi bam vao) thi van gui
+  // WWW-Authenticate de hien hop dang nhap binh thuong.
+  const isPrefetch = req.headers.get('next-router-prefetch') === '1'
+    || req.headers.get('purpose') === 'prefetch'
+    || req.headers.get('rsc') === '1';
+  if (isPrefetch) {
+    return new NextResponse(null, { status: 401 });
+  }
+
   return new NextResponse('Cần đăng nhập để xem giao diện duyệt SDVICO.', {
     status: 401,
     headers: { 'WWW-Authenticate': 'Basic realm="SDVICO Duyet", charset="UTF-8"' }

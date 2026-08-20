@@ -17,14 +17,19 @@ import Tracking from './tracking';
 
 export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: { children: ReactNode; marketingOnly: boolean; pixelId?: string | null; ga4Id?: string | null }) {
   const path = usePathname() || '/';
-  const isPublic = /^\/(blog|san-pham)(\/|$)/.test(path);
+  // Trang CONG KHAI (khong sidebar noi bo): blog, san-pham, va ca privacy/terms. Truoc day
+  // privacy/terms dung shell noi bo -> hien sidebar day link can dang nhap, Next prefetch cac
+  // route do -> loi 401 dồn dập tren console + co the bat popup dang nhap tren trang cong khai
+  // (20/8: user bao "web crash hoai"). Dua het ve public shell, KHONG link vao route noi bo.
+  const isPublic = /^\/(blog|san-pham|privacy|terms)(\/|$)/.test(path);
 
   if (isPublic) {
     return (
       <div className="public-shell">
         <Tracking pixelId={pixelId} ga4Id={ga4Id} />
         <header className="public-header">
-          <Link href="/" className="public-brand" aria-label="Về trang chủ SDVICO">
+          {/* Brand tro /blog (trang cong khai), KHONG tro '/' (trang duyet noi bo can dang nhap). */}
+          <Link href="/blog" className="public-brand" aria-label="Trang bài viết SDVICO">
             <span className="brand-logo" aria-hidden="true">
               <svg viewBox="0 0 40 40" width="32" height="32">
                 <defs>
