@@ -269,10 +269,13 @@ async function publishContentToFacebook(
     await client.from('mkt_content').update({ status: 'published' }).eq('id', contentId);
 
     // REEL: bài bán hàng có video AI gộp (brief.post_reel) -> đăng thêm bản DỌC lên Reel.
+    // MẶC ĐỊNH TẮT từ 21/8 (user: "đăng FB cả 16:9 lẫn bản dọc là lỗi" — trùng lặp trên cùng
+    // Page; bản dọc dành cho TikTok + YouTube Shorts). Muốn bật lại: env FACEBOOK_ALSO_REEL=1.
     // Không áp cho bài hẹn giờ (Reels API không hỗ trợ scheduled_publish_time như /videos).
     // Lỗi Reel chỉ cảnh báo, Post đã lên vẫn tính thành công.
+    const alsoReel = process.env.FACEBOOK_ALSO_REEL === '1';
     const brief = (c as any).brief || {};
-    if (brief.post_reel && assets.video_v && !scheduledUnix) {
+    if (alsoReel && brief.post_reel && assets.video_v && !scheduledUnix) {
       const reelUrl = await assetUrlOf(assets.video_v);
       if (reelUrl) {
         // Ảnh comment cho Reel = giống Post: ảnh chính + ảnh phụ (Xưởng sản xuất chọn nhiều).

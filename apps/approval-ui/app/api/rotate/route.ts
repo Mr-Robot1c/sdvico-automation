@@ -530,11 +530,35 @@ export async function GET(req: Request) {
     await client.from('mkt_plans').update({ data: newData }).eq('id', appliedPlan.id);
   }
 
+  // KÍCH DỰNG VIDEO NGAY khi có bài cần video (user 21/8: "bài lâu quá") — không chờ cron
+  // GitHub 10 phút quét. Dispatch workflow video-build.yml trực tiếp; thiếu env/lỗi thì bỏ
+  // qua, cron 10 phút vẫn là lưới an toàn.
+  let videoTriggered = false;
+  if (results.some((r) => r.video_requested)) {
+    try {
+      const repo = process.env.GITHUB_REPO;
+      const ghToken = process.env.GITHUB_TOKEN;
+      if (repo && ghToken) {
+        const gh = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/video-build.yml/dispatches`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${ghToken}`,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+          body: JSON.stringify({ ref: 'main', inputs: { limit: '3' } }),
+        });
+        videoTriggered = gh.status === 204;
+      }
+    } catch { /* cron 10 phut van quet */ }
+  }
+
   await logRotate(results.length > 0 ? 'ok' : 'skipped', {
     created: results.length,
     folders: pickedFolders.map((pf) => pf.group),
     fromPlan: suggestionsTouched.length,
     focus: focusNote,
+    videoTriggered,
   });
   return NextResponse.json({
     ok: true, cycle,
