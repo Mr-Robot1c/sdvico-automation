@@ -259,9 +259,10 @@ export default async function BangSection() {
                   const m = metricsByContent.get(it.cid);
                   const fbPost = posts.find((x) => x.channel === 'facebook' && /^https?:/.test(x.url) && !/\/reel\//.test(x.url));
                   const lastAt = posts[0]?.at || '';
+                  const ab = (brief.ab_variant as string | undefined) || (p.ab_variant as string | undefined);
                   return (
                     <div key={it.qid} className="card tone-web" style={{ display: 'grid', gap: 6, padding: 12 }}>
-                      <b>{title}</b>
+                      <b>{title}{ab ? <span className="badge badge-ab" style={{ marginLeft: 6 }} title="Bài thử của cặp A/B theo hướng đi kế hoạch.">🧪 Thử {ab}</span> : null}</b>
                       {lastAt ? <span className="muted" style={{ fontSize: '.8rem' }}>Đăng {formatRelative(lastAt)}</span> : null}
                       <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: '.85rem' }}>
                         {posts.filter((x) => /^https?:/.test(x.url)).map((x, i) => (

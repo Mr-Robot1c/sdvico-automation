@@ -37,7 +37,7 @@ function formatDate(iso: string): string {
 
 type Flags = Record<string, string[] | undefined>;
 type Assets = { image?: string | null; video?: string | null } | null;
-type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[]; video_requested?: boolean; post_reel?: boolean } | null;
+type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[]; video_requested?: boolean; post_reel?: boolean; ab_variant?: string; suggestion_title?: string } | null;
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
 export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
@@ -341,7 +341,12 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                   <tr key={c.id} id={`row-${c.id}`}>
                     <td className="cell-code">{shortCode(c.id)}</td>
                     <td className="cell-title">
-                      <div className="cell-title-main">{c.title}</div>
+                      <div className="cell-title-main">
+                        {c.title}
+                        {c.brief?.ab_variant ? (
+                          <span className="badge badge-ab" style={{ marginLeft: 8 }} title={`Bài thử ${c.brief.ab_variant} của cặp A/B theo hướng đi kế hoạch${c.brief?.suggestion_title ? `: ${c.brief.suggestion_title}` : ''}. Bot đo bản nào bà con thích hơn rồi học cho vòng sau.`}>🧪 Thử {c.brief.ab_variant}</span>
+                        ) : null}
+                      </div>
                       {c.brief?.keyword ? (
                         <div className="cell-title-sub">từ khóa: {c.brief.keyword}</div>
                       ) : null}

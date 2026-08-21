@@ -80,12 +80,12 @@ if (!internal?.length && !publicSrc?.length) {
 
 // San pham SDVICO (dong bo voi products.mjs)
 const PRODUCTS = [
-  '1. Thiet bi giam sat hanh trinh S-Tracking (Viettel VMS)',
-  '2. Thiet bi lien lac ve tinh Thuraya MarineStar MNB-01 (nghe goi)',
-  '3. Dien thoai ve tinh XT-Pro',
-  '4. May loc nuoc bien thanh nuoc ngot',
-  '5. Thiet bi loc dau SF-50 (tiet kiem dau diesel)',
-  '6. Dau nhot PVOIL Nano Graphene',
+  '1. Thiết bị giám sát hành trình S-Tracking (Viettel VMS)',
+  '2. Thiết bị liên lạc vệ tinh Thuraya MarineStar MNB-01 (nghe gọi)',
+  '3. Điện thoại vệ tinh XT-Pro',
+  '4. Máy lọc nước biển thành nước ngọt',
+  '5. Thiết bị lọc dầu SF-50 (tiết kiệm dầu diesel)',
+  '6. Dầu nhớt PVOIL Nano Graphene',
 ];
 
 // Build prompt cho Claude
@@ -114,6 +114,8 @@ Nhiem vu: dua vao NHUNG GI DANG XAY RA (tri thuc trên), de xuat 5-7 huong bai d
 - Cho biet loai bai (checklist / hoi-dap / meo / chia se / tin nganh)
 - Neu ro TAI SAO tuan nay dang la thoi diem tot cho chu de nay
 - Neu tri thuc goc co co "can duyet QL" thi bai theo huong nay cung co "needs_gov_review: true"
+
+BAT BUOC viet tieng Viet CO DAU day du trong moi truong (title, why, product), tuyet doi khong viet khong dau.
 
 Van phong: cau ngan, gan gui ba con ngu dan, KHONG dung gach dai, KHONG dung mui ten, so theo chuan Viet Nam.
 

@@ -12,13 +12,15 @@ import type { ContentDirection } from './plan';
 const MKT_MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
 
 // Danh mục sản phẩm SDVICO — đồng bộ scripts/generate-plan-directions.mjs.
+// CÓ DẤU đầy đủ (user 21/8: hướng đi hiện không dấu khó đọc — prompt không dấu thì
+// Gemini bắt chước trả không dấu theo).
 const PRODUCTS = [
-  '1. Thiet bi giam sat hanh trinh S-Tracking (Viettel VMS)',
-  '2. Thiet bi lien lac ve tinh Thuraya MarineStar MNB-01 (nghe goi)',
-  '3. Dien thoai ve tinh XT-Pro',
-  '4. May loc nuoc bien thanh nuoc ngot',
-  '5. Thiet bi loc dau SF-50 (tiet kiem dau diesel)',
-  '6. Dau nhot PVOIL Nano Graphene',
+  '1. Thiết bị giám sát hành trình S-Tracking (Viettel VMS)',
+  '2. Thiết bị liên lạc vệ tinh Thuraya MarineStar MNB-01 (nghe gọi)',
+  '3. Điện thoại vệ tinh XT-Pro',
+  '4. Máy lọc nước biển thành nước ngọt',
+  '5. Thiết bị lọc dầu SF-50 (tiết kiệm dầu diesel)',
+  '6. Dầu nhớt PVOIL Nano Graphene',
 ];
 
 type KnowledgeInput = {
@@ -64,36 +66,36 @@ export async function generateContentDirections(
     ...knowledge.publicSrc.map((k, i) => `${i + 1}. ${k.source_title || ''}${k.needs_gov_review ? ' [can duyet QL]' : ''}\n   ${k.summary}\n   Nguon: ${k.source_url}`),
   ].join('\n');
 
-  const prompt = `Ban la chuyen gia marketing cho SDVICO, cong ty phan phoi thiet bi cho ngu dan va tau ca Viet Nam.
+  const prompt = `Bạn là chuyên gia marketing cho SDVICO, công ty phân phối thiết bị cho ngư dân và tàu cá Việt Nam.
 
 ${goal
-  ? `MUC TIEU TUAN TU NGUOI QUAN LY (bam sat khi chon huong): ${goal}\n`
-  : 'Tuan nay KHONG co muc tieu cu the tu quan ly. Hay TU de xuat huong di tot nhat dua tren tri thuc va so lieu ben duoi (uu tien chu de dang nong va san pham co phan hoi khach that).\n'}
-Danh muc san pham cua cong ty:
+  ? `MỤC TIÊU TUẦN TỪ NGƯỜI QUẢN LÝ (bám sát khi chọn hướng): ${goal}\n`
+  : 'Tuần này KHÔNG có mục tiêu cụ thể từ quản lý. Hãy TỰ đề xuất hướng đi tốt nhất dựa trên tri thức và số liệu bên dưới (ưu tiên chủ đề đang nóng và sản phẩm có phản hồi khách thật).\n'}
+Danh mục sản phẩm của công ty:
 ${PRODUCTS.map((p) => '- ' + p).join('\n')}
 
-Nguyen lieu tri thuc tuan nay:
+Nguyên liệu tri thức tuần này:
 ${knowledgeBlock}
 
-Nhiem vu: dua vao NHUNG GI DANG XAY RA (tri thuc tren), de xuat 5-7 huong bai dang cu the cho tuan toi tren Facebook/TikTok cua SDVICO. Moi huong phai:
-- Bam vao mot nguon tri thuc that (noi ro dua vao muc noi bo so N hay public so N)
-- Goi ten mot san pham cu the trong danh muc, khong noi chung chung
-- Cho biet loai bai (checklist / hoi-dap / meo / chia se / tin nganh)
-- Neu ro TAI SAO tuan nay dang la thoi diem tot cho chu de nay
-- Neu tri thuc goc co co "can duyet QL" thi bai theo huong nay cung co "needs_gov_review: true"
-- Neu co ket luan danh gia A/B vong truoc, uu tien cach viet cua ban thang
+Nhiệm vụ: dựa vào NHỮNG GÌ ĐANG XẢY RA (tri thức trên), đề xuất 5-7 hướng bài đăng cụ thể cho tuần tới trên Facebook/TikTok của SDVICO. Mỗi hướng phải:
+- Bám vào một nguồn tri thức thật (nói rõ dựa vào mục nội bộ số N hay public số N)
+- Gọi tên một sản phẩm cụ thể trong danh mục, không nói chung chung
+- Cho biết loại bài (checklist / hỏi đáp / mẹo / chia sẻ / tin ngành)
+- Nêu rõ TẠI SAO tuần này đang là thời điểm tốt cho chủ đề này
+- Nếu tri thức gốc có cờ "cần duyệt QL" thì bài theo hướng này cũng có "needs_gov_review: true"
+- Nếu có kết luận đánh giá A/B vòng trước, ưu tiên cách viết của bản thắng
 
-Van phong: cau ngan, gan gui ba con ngu dan, KHONG dung gach dai, KHONG dung mui ten, so theo chuan Viet Nam.
+Văn phong: câu ngắn, gần gũi bà con ngư dân, KHÔNG dùng gạch dài, KHÔNG dùng mũi tên, số theo chuẩn Việt Nam. BẮT BUỘC viết tiếng Việt CÓ DẤU đầy đủ trong mọi trường (title, why, product), tuyệt đối không viết không dấu.
 
-Tra JSON dung dang, khong them chu ngoai JSON:
+Trả JSON đúng dạng, không thêm chữ ngoài JSON:
 {
   "directions": [
     {
-      "title": "Tieu de goi y (5-10 chu)",
-      "why": "1-2 cau giai thich tai sao tuan nay nen dang chu de nay, dua vao tri thuc nao",
-      "product": "Ten san pham chinh xac trong danh muc",
+      "title": "Tiêu đề gợi ý (5-10 chữ, tiếng Việt có dấu)",
+      "why": "1-2 câu giải thích tại sao tuần này nên đăng chủ đề này, dựa vào tri thức nào (có dấu)",
+      "product": "Tên sản phẩm chính xác trong danh mục",
       "kind": "checklist|qa|tip|engage|glossary|news",
-      "sources": ["noi bo #N", "public #N"],
+      "sources": ["nội bộ #N", "public #N"],
       "needs_gov_review": false
     }
   ]

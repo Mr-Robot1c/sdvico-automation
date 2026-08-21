@@ -158,7 +158,10 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   // Huong di bai viet tu ban DANG AP (content_suggestions).
   const suggestions = appliedRow?.data?.content_suggestions || [];
   const sugFresh = suggestions.filter((s) => !s.used_at);
-  const sugUsed = suggestions.filter((s) => s.used_at);
+  // Hướng bị TỪ CHỐI bản thử (rejected) tách khỏi "xong cặp" — user 21/8: hướng vừa bị
+  // loại mà hiện "✓ xong cặp A + B" là sai bản chất.
+  const sugRejected = suggestions.filter((s) => s.used_at && (s as any).rejected === true);
+  const sugUsed = suggestions.filter((s) => s.used_at && (s as any).rejected !== true);
 
   return (
     <main>
@@ -292,7 +295,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       {/* ===== 3. HUONG DI BAI VIET ===== */}
       {suggestions.length ? (
         <section className="plan-card" style={{ marginBottom: 14 }}>
-          <b style={{ fontSize: '1.05rem' }}>🧭 Hướng đi bài viết ({vnInt(sugFresh.filter((s) => !(s as any).pending_variant).length)} chưa dùng, {vnInt(sugFresh.filter((s) => (s as any).pending_variant).length)} đang thử, {vnInt(sugUsed.length)} xong cặp)</b>
+          <b style={{ fontSize: '1.05rem' }}>🧭 Hướng đi bài viết ({vnInt(sugFresh.filter((s) => !(s as any).pending_variant).length)} chưa dùng, {vnInt(sugFresh.filter((s) => (s as any).pending_variant).length)} đang thử, {vnInt(sugUsed.length)} xong cặp{sugRejected.length ? `, ${vnInt(sugRejected.length)} đã loại` : ''})</b>
           <p className="sub" style={{ margin: '4px 0 8px' }}>
             BOSS đề xuất góc bài từ kho tri thức. Mỗi hướng chạy 2 ngày: bản thử A trước, hôm sau bản B; đủ cặp thì Evaluator so xem bản nào ăn hơn.
           </p>
@@ -303,7 +306,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                   <b>{d.title}</b>
                   <span className="badge tone-default" style={{ marginLeft: 8 }}>{d.product}</span>
                   {d.used_at
-                    ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ xong cặp A + B</span>
+                    ? ((d as any).rejected === true
+                      ? <span className="badge tone-no" style={{ marginLeft: 6 }} title="Bản thử của hướng này bị từ chối nên hướng bị loại, không sinh tiếp bản B.">⛔ đã loại (bản thử bị từ chối)</span>
+                      : <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ xong cặp A + B</span>)
                     : (d as any).pending_variant
                       ? <span className="badge" style={{ marginLeft: 6 }}>🧪 đã ra bản A, chờ bản B</span>
                       : null}

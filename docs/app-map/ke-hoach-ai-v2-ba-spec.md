@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-21
 ttl_days: 90
+<!-- re-verified: 2026-08-21 - Huong di BOSS viet CO DAU (prompt plan-directions co dau + rang buoc); /ke-hoach huong rejected hien "da loai" thay vi "xong cap"; data plan dang ap viet lai co dau. Khong doi flow NV nao. -->
 <!-- re-verified: 2026-08-21 - bumpers.mjs (packages/marketing/src/video) fit chu khung doc — khong doi hanh vi NV nao cua ba-spec (chi trinh bay intro/outro video). -->
 <!-- re-verified: 2026-08-21 - Commit upload-zalo-to-bucket.mjs (ban 131 dong) + hoc-video.mjs vao git (NV1 nap tri thuc noi bo — script van hanh khong doi hanh vi). -->
 <!-- re-verified: 2026-08-21 - Rotate 7h/12h30 VN; lich hom nay hien huong da sinh that; huong 3 trang thai; generateContentDirections + avoidTitles chong lap chu de. -->
