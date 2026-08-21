@@ -35,7 +35,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--text-file", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--voice", default="vi-VN-HoaiMyNeural")
+    ap.add_argument("--voice", default="vi-VN-NamMinhNeural")
     ap.add_argument("--rate", default="+0%")
     ap.add_argument("--volume", default="+0%")
     ap.add_argument("--pitch", default="+0Hz")

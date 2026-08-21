@@ -312,8 +312,8 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
 async function main() {
   const env = loadRealEnv();
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-  // Giong mac dinh doi sang NU HoaiMy (user 21/8: 'voice chuyen sang nu'). Env TTS_VOICE ep khac.
-  const voice = arg('voice', process.env.TTS_VOICE || 'vi-VN-HoaiMyNeural');
+  // Giong mac dinh: NAM NamMinh (user 21/8 chieu doi lai sau khi nghe thu ca hai). Env TTS_VOICE ep khac.
+  const voice = arg('voice', process.env.TTS_VOICE || 'vi-VN-NamMinhNeural');
   const outDir = arg('out', join(HERE, '..', '..', '..', '..', 'out', 'video'));
   await mkdir(outDir, { recursive: true });
 
