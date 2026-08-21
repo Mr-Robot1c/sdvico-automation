@@ -91,12 +91,63 @@ async function ttsChunk(text, outPath, voice, workDir, tag, rate, pitch) {
   await python('tts.py', ['--text-file', txt, '--out', outPath, '--voice', voice, '--rate', rate, '--pitch', pitch]);
 }
 
-async function tts(text, outPath, voice, workDir, tag) {
+// ===== GIỌNG CHÍNH: Gemini TTS (user chốt 21/8 sau khi nghe demo) =====
+// Cùng họ giọng NotebookLM nhưng có API + dùng GEMINI_API_KEY sẵn có. Đọc NGUYÊN VĂN kịch bản,
+// cảm xúc chỉ đạo bằng câu lệnh (không cần tách câu chỉnh rate/pitch như edge-tts). Trả PCM
+// s16le -> ffmpeg sang mp3. Env: GEMINI_TTS_MODEL, GEMINI_TTS_VOICE (Puck nam / Leda nữ...),
+// GEMINI_TTS_STYLE; TTS_ENGINE=edge để tắt hẳn. Lỗi/hết hạn mức -> caller tự lùi edge-tts.
+const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview';
+const GEMINI_TTS_VOICE = process.env.GEMINI_TTS_VOICE || 'Puck';
+const GEMINI_TTS_STYLE = process.env.GEMINI_TTS_STYLE
+  || 'Đọc bằng tiếng Việt, giọng TikToker trẻ trung hào hứng, ngữ điệu lên xuống tự nhiên, nhấn nhá chỗ quan trọng, câu cảm thán thì phấn khích: ';
+async function geminiTTS(cleanText, outPath, workDir, tag) {
+  const body = {
+    contents: [{ parts: [{ text: GEMINI_TTS_STYLE + '\n\n' + cleanText }] }],
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: GEMINI_TTS_VOICE } } },
+    },
+  };
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`gemini-tts HTTP ${res.status}: ${JSON.stringify(json.error || json).slice(0, 200)}`);
+  const part = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
+  if (!part) throw new Error('gemini-tts khong tra audio: ' + JSON.stringify(json).slice(0, 200));
+  const mime = part.inlineData.mimeType || '';
+  const rate = (mime.match(/rate=(\d+)/) || [])[1] || '24000';
+  const ch = (mime.match(/channels=(\d+)/) || [])[1] || '1';
+  const pcm = join(workDir, `${tag}_gem.pcm`);
+  await writeFile(pcm, Buffer.from(part.inlineData.data, 'base64'));
+  await ffmpeg(['-y', '-f', 's16le', '-ar', rate, '-ac', ch, '-i', pcm, '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
+  return probeDuration(outPath);
+}
+
+// engine 'gemini': đọc bằng Gemini TTS, THROW khi hỏng (caller quyết làm lại cả bản bằng edge —
+// tránh video lẫn 2 giọng giữa chừng). engine 'edge': đường cũ, tự chống chịu, không bao giờ throw.
+async function tts(text, outPath, voice, workDir, tag, engine = 'edge') {
   // Đọc số điện thoại/tổng đài từng chữ số (chỉ cho giọng đọc, phụ đề giữ số gốc).
   const clean = spellPhones(cleanNarration(text));
   // Thời lượng dự phòng theo số ký tự (~14 ký tự/giây tiếng Việt), tối thiểu 2 giây.
   const estSec = Math.max(2, Math.round(clean.length / 14));
   if (!clean) return silentAudio(outPath, estSec);
+
+  if (engine === 'gemini') {
+    // Đọc cả đoạn một lần (Gemini tự lên xuống ngữ điệu, không cần tách câu chỉnh rate/pitch).
+    // 429 (hết hạn mức phút) thì nghỉ 21 giây rồi thử lại 1 lần; vẫn hỏng thì THROW cho caller.
+    let lastGemErr;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await geminiTTS(clean, outPath, workDir, tag);
+      } catch (e) {
+        lastGemErr = e;
+        if (/429/.test(String(e?.message)) && attempt === 0) await new Promise((r) => setTimeout(r, 21000));
+      }
+    }
+    throw lastGemErr || new Error('gemini-tts loi');
+  }
 
   // LÊN XUỐNG GIỌNG: nhiều câu thì synth từng câu với ngữ điệu riêng rồi ghép. Một câu lỗi
   // sau 3 lần thử, hoặc chỉ có 1 câu -> rơi về cách cũ đọc cả đoạn một giọng bên dưới.
@@ -173,29 +224,48 @@ async function whisperArtifact(sceneAudios, workDir, tag) {
   }
 }
 
+const OUTRO_TEXT = 'Nhắn tin cho Page SDVICO hoặc gọi số 0939 243 222 để được hỗ trợ.';
+
 async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, contentId) {
   const fdir = join(workDir, format);
   await mkdir(fdir, { recursive: true });
-  const built = [];
-  const sceneAudios = [];
-  for (let i = 0; i < scenes.length; i++) {
-    const s = scenes[i];
-    const audio = join(fdir, `sc${i}.mp3`);
-    const dur = await tts(s.narration, audio, voice, fdir, `t${i}`);
-    sceneAudios.push(audio);
-    const asset = assetPaths.get(s.assetId);
-    built.push({
-      videoPath: asset.local,
-      audioPath: audio,
-      durationSec: dur,
-      text: s.narration,
-      kind: asset.kind === 'image' ? 'image' : 'video',
-    });
-  }
-  const wa = await whisperArtifact(sceneAudios, fdir, format);
-  // TTS cho outro: đọc "Gọi ngay cho SDVICO 0939 243 222" (spellPhones sẽ đọc từng chữ số).
+  // GIỌNG NGUYÊN KHỐI: thử Gemini TTS cho TOÀN BỘ cảnh + outro của bản này; bất kỳ cảnh nào
+  // hỏng (hết hạn mức...) thì làm lại HẾT bằng edge-tts — không để video lẫn 2 giọng giữa chừng.
+  const engines = process.env.TTS_ENGINE !== 'edge' && process.env.GEMINI_API_KEY ? ['gemini', 'edge'] : ['edge'];
   const outroAudio = join(fdir, 'outro.mp3');
-  try { await tts('Nhắn tin cho Page SDVICO hoặc gọi số 0939 243 222 để được hỗ trợ.', outroAudio, voice, fdir, 'outro'); } catch { /* bo qua */ }
+  let built = [];
+  let sceneAudios = [];
+  let engineUsed = 'edge';
+  for (const engine of engines) {
+    try {
+      built = [];
+      sceneAudios = [];
+      for (let i = 0; i < scenes.length; i++) {
+        const s = scenes[i];
+        const audio = join(fdir, `sc${i}.mp3`);
+        const dur = await tts(s.narration, audio, voice, fdir, `t${i}`, engine);
+        sceneAudios.push(audio);
+        const asset = assetPaths.get(s.assetId);
+        built.push({
+          videoPath: asset.local,
+          audioPath: audio,
+          durationSec: dur,
+          text: s.narration,
+          kind: asset.kind === 'image' ? 'image' : 'video',
+        });
+      }
+      // Outro đọc số 0939 243 222 (spellPhones đọc từng chữ số). Đường edge tự chống chịu
+      // (không throw); đường gemini throw thì cả bản rơi xuống edge cùng nhau.
+      await tts(OUTRO_TEXT, outroAudio, voice, fdir, 'outro', engine);
+      engineUsed = engine;
+      break;
+    } catch (e) {
+      if (engine !== 'gemini') throw e;
+      console.warn(`  (bản ${format}: Gemini TTS không trọn bộ "${String(e?.message || e).slice(0, 140)}" — làm lại toàn bộ bằng edge-tts)`);
+    }
+  }
+  console.log(`  Giọng bản ${format}: ${engineUsed === 'gemini' ? `Gemini TTS (${GEMINI_TTS_VOICE})` : 'edge-tts'}`);
+  const wa = await whisperArtifact(sceneAudios, fdir, format);
   const out = join(outDir, `sdvico_${contentId.slice(0, 8)}_${format}.mp4`);
   await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio });
   const totalDur = await probeDuration(out);
