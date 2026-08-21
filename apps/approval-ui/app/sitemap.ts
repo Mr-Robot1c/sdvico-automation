@@ -30,6 +30,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   for (const p of PRODUCT_CATALOG) {
     items.push({ url: `${base}/san-pham/${p.slug}`, changeFrequency: 'weekly', priority: 0.8, lastModified: now });
+    // Trang chủ đề (topic hub) gom bài theo sản phẩm — SEO cụm nội dung (20/8).
+    items.push({ url: `${base}/blog/chu-de/${p.slug}`, changeFrequency: 'daily', priority: 0.8, lastModified: now });
   }
   for (const p of posts) {
     items.push({

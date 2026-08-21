@@ -43,6 +43,20 @@ const CONTENT_KIND_BY_DOW: Record<number, { kind: string; label: string }> = {
   0: { kind: 'engage', label: 'Hỏi bà con' },    // Chủ nhật
 };
 
+// Cấu trúc 1 dòng của từng loại content — hiển thị trong lịch để người đọc biết bài sẽ
+// trông ra sao (bám CONTENT_TYPE_INSTRUCTION trong lib/gen/social.mjs).
+const CONTENT_STRUCTURE: Record<string, string> = {
+  qa: '❓ 1 câu hỏi bà con hay gặp → 💡 đáp gọn 3-5 câu',
+  checklist: '📋 mở 1 câu → 4-6 gạch ✅ việc cần làm',
+  tip: '⚠️ 2-3 thói quen sai → ✅ 2-3 cách xử đúng',
+  engage: '💬 2-3 câu gợi chuyện → kết bằng câu hỏi mở, không bán hàng',
+  portrait: '👤 nhân vật điển hình + tuổi + quê → câu nói thật → lời chúc',
+  glossary: '📖 1 thuật ngữ nghề → giải thích dễ hiểu + ví dụ',
+};
+
+// Cấu trúc bài BÁN (chung cho mọi hướng — bám prompt generateSocialPost).
+export const SALES_STRUCTURE = 'mở bằng nỗi lo thật của bà con → 1-2 lợi ích đúng sản phẩm → mời nhắn Page hoặc gọi 1900 23 23 49';
+
 function joinAnd(items: string[]): string {
   if (!items.length) return '';
   if (items.length === 1) return items[0];
@@ -80,9 +94,24 @@ function rankProducts(byProduct: Array<{ product: string; count: number; avgScor
   return [...ranked, ...insufficient];
 }
 
+// Dự kiến HƯỚNG ĐI cho từng ngày tới, mô phỏng đúng thứ tự vòng xoay sẽ rút (v7):
+// hướng đang chờ bản B đi trước (1 ngày), rồi mỗi hướng chưa dùng chiếm 2 ngày (A rồi B).
+type DayDirection = { title: string; product: string; variant: 'A' | 'B' };
+function buildDirectionQueue(suggestions: any[]): DayDirection[] {
+  const out: DayDirection[] = [];
+  const pendingB = suggestions.filter((s) => !s.used_at && s.pending_variant === 'B');
+  const fresh = suggestions.filter((s) => !s.used_at && !s.pending_variant);
+  for (const s of pendingB) out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'B' });
+  for (const s of fresh) {
+    out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'A' });
+    out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'B' });
+  }
+  return out.slice(0, 7);
+}
+
 // Chia lịch 7 ngày tới: mỗi sản phẩm bán rải đều số bài/tuần ra các ngày; content 1 bài/ngày;
-// nhóm chia sẻ xoay vòng GROUPS_PER_DAY nhóm/ngày.
-function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: string[]): DailyPlan[] {
+// nhóm chia sẻ xoay vòng GROUPS_PER_DAY nhóm/ngày; hướng đi dự kiến theo hàng đợi vòng xoay.
+function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: string[], dirQueue: DayDirection[] = []): DailyPlan[] {
   const remaining = new Map<string, number>(salesProducts.map((p) => [p.product, p.postsPerWeek]));
   const out: DailyPlan[] = [];
   for (let i = 0; i < 7; i++) {
@@ -102,7 +131,14 @@ function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: str
       dayGroups = [...picked];
     }
     const ck = CONTENT_KIND_BY_DOW[dowIdx];
-    out.push({ date, dow, sales, contentCount: CONTENT_PER_DAY, contentKind: ck?.kind, contentKindLabel: ck?.label, groups: dayGroups });
+    out.push({
+      date, dow, sales,
+      contentCount: CONTENT_PER_DAY,
+      contentKind: ck?.kind, contentKindLabel: ck?.label,
+      contentStructure: ck ? CONTENT_STRUCTURE[ck.kind] : undefined,
+      direction: dirQueue[i] || null,
+      groups: dayGroups,
+    });
   }
   return out;
 }
@@ -186,7 +222,17 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
   const weights: Record<string, number> = {};
   for (const p of salesProducts) weights[p.product] = p.weight;
 
-  const daily = buildDailySchedule(now, salesProducts, shareGroups);
+  // Hướng đi dự kiến từng ngày: đọc content_suggestions của bản ĐANG ÁP (nguồn vòng xoay rút).
+  let dirQueue: DayDirection[] = [];
+  try {
+    const { data: apRow } = await client
+      .from('mkt_plans').select('data').eq('applied', true)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const sugs = Array.isArray((apRow as any)?.data?.content_suggestions) ? (apRow as any).data.content_suggestions : [];
+    dirQueue = buildDirectionQueue(sugs);
+  } catch { /* không có bản áp -> lịch không ghi hướng */ }
+
+  const daily = buildDailySchedule(now, salesProducts, shareGroups, dirQueue);
   const narrative = buildLiveNarrative(salesProducts, shareGroups, { posts: report.totals.posts, engagement: report.totals.engagement, views: report.totals.views }, focusActive);
 
   const win = weekWindowVN(now);

@@ -75,6 +75,11 @@ export type DailyPlan = {
   // (qa | checklist | glossary | tip | engage | portrait). Rotate đọc để sinh ĐÚNG loại.
   contentKind?: string;
   contentKindLabel?: string; // nhãn tiếng Việt hiển thị ("Hỏi Đáp"...)
+  // v7 (20/8, user: "kế hoạch phải chi tiết hơn — hướng đi gì, cấu trúc ra sao"):
+  // hướng đi DỰ KIẾN cho bài bán ngày đó (map từ content_suggestions chưa dùng của bản đang
+  // áp, theo đúng thứ tự vòng xoay sẽ rút). Chỉ để hiển thị; rotate vẫn tự rút lúc chạy.
+  direction?: { title: string; product: string; variant: 'A' | 'B' } | null;
+  contentStructure?: string; // cấu trúc 1 dòng của bài content ("❓ Hỏi 1 câu → 💡 Đáp 3-5 câu")
   groups: string[];    // tên nhóm chia sẻ hôm đó
 };
 

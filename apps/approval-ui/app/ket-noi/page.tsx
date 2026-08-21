@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
+import { zaloOaStatus } from '../../lib/zalo-oa';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,8 @@ async function tiktokStatus(): Promise<{ ok: boolean; text: string }> {
 }
 
 export default async function Page() {
-  const [fb, tt, yt] = await Promise.all([fbStatus(), tiktokStatus(), getYouTubeChannelInfo()]);
+  const client = getServerClient();
+  const [fb, tt, yt, za] = await Promise.all([fbStatus(), tiktokStatus(), getYouTubeChannelInfo(), zaloOaStatus(client)]);
   const rows = [
     { icon: '📘', name: 'Facebook', status: fb.ok, text: fb.text, href: '/facebook' },
     { icon: '🎵', name: 'TikTok', status: tt.ok, text: tt.text, href: '/tiktok' },
@@ -61,7 +63,8 @@ export default async function Page() {
           ? `Token lỗi: ${yt.error || 'không rõ'}. Có thể hết hạn (7 ngày ở chế độ Testing) — lấy token mới theo runbook.`
           : 'Chưa cấu hình 3 biến YOUTUBE_* trên Vercel (xem docs/runbook-youtube-setup.md).',
       href: '/youtube'
-    }
+    },
+    { icon: '💬', name: 'Zalo OA', status: za.configured, text: za.text, href: '/ket-noi' }
   ];
 
   return (

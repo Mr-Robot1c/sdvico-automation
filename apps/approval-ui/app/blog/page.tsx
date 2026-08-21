@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getServerClient } from '../../lib/supabase-server';
 import { loadPublicPosts, siteUrl } from '../../lib/seo';
+import { PRODUCT_CATALOG } from '../../lib/product-catalog';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 300; // 5 phut — bai moi hien nhanh, khong go tay
@@ -43,6 +44,13 @@ export default async function BlogListPage() {
           Kinh nghiệm dùng thiết bị tàu cá, câu chuyện thực tế và mẹo hay từ SDVICO. Cập nhật liên tục theo bài đăng chính thức của công ty.
         </p>
       </header>
+
+      {/* Chủ đề (topic hub SEO): mỗi sản phẩm một trang gom bài — Google index theo cụm. */}
+      <nav aria-label="Chủ đề" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '0 0 18px' }}>
+        {PRODUCT_CATALOG.map((t) => (
+          <Link key={t.slug} href={`/blog/chu-de/${t.slug}`} className="btn ghost sm">{t.name}</Link>
+        ))}
+      </nav>
 
       {posts.length === 0 ? (
         <div className="empty" style={{ padding: 32, textAlign: 'center', color: 'var(--ink-2)' }}>

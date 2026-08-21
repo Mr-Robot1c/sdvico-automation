@@ -116,6 +116,45 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       .filter(Boolean)
   )];
 
+  // ĐĂNG LẠI BÀI CŨ ĂN KHÁCH (user 20/8: "máy tự đề xuất đăng lại bài cũ ăn khách"):
+  // bài đã đăng từ 7 ngày trước trở lên, lấy tương tác từ snapshot metric mới nhất, chọn top 3.
+  // Máy chỉ ĐỀ XUẤT — người mở bài, copy, chia sẻ lại (nút 📣 ở Quản lý bài viết).
+  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const { data: oldPosts } = await client
+    .from('mkt_posts')
+    .select('content_id, external_url, published_at')
+    .eq('status', 'published').eq('channel', 'facebook')
+    .not('external_url', 'is', null)
+    .lt('published_at', sevenDaysAgoIso)
+    .order('published_at', { ascending: false })
+    .limit(60);
+  const oldCids = [...new Set((oldPosts || []).map((p: any) => p.content_id).filter(Boolean))] as string[];
+  let repostSuggestions: Array<{ title: string; url: string; publishedAt: string; engagement: number }> = [];
+  if (oldCids.length) {
+    const [{ data: oldMetrics }, { data: oldContents }] = await Promise.all([
+      client.from('mkt_metrics').select('entity_ref, metrics, created_at')
+        .eq('source', 'facebook').in('entity_ref', oldCids)
+        .order('created_at', { ascending: false }).limit(300),
+      client.from('mkt_content').select('id, title').in('id', oldCids)
+    ]);
+    const engOf = new Map<string, number>();
+    for (const r of oldMetrics || []) {
+      const cid = (r as any).entity_ref as string;
+      if (!engOf.has(cid)) engOf.set(cid, Number((r as any).metrics?.engagement) || 0);
+    }
+    const titleOf = new Map((oldContents || []).map((c: any) => [c.id, String(c.title || '(không tên)')]));
+    const urlOf = new Map<string, { url: string; at: string }>();
+    for (const p of oldPosts || []) {
+      const cid = (p as any).content_id as string;
+      if (cid && !urlOf.has(cid)) urlOf.set(cid, { url: String((p as any).external_url), at: String((p as any).published_at || '') });
+    }
+    repostSuggestions = oldCids
+      .filter((cid) => titleOf.has(cid) && (engOf.get(cid) || 0) > 0)
+      .map((cid) => ({ title: titleOf.get(cid)!, url: urlOf.get(cid)!.url, publishedAt: urlOf.get(cid)!.at, engagement: engOf.get(cid) || 0 }))
+      .sort((a, b) => b.engagement - a.engagement)
+      .slice(0, 3);
+  }
+
   // Huong di bai viet tu ban DANG AP (content_suggestions).
   const suggestions = appliedRow?.data?.content_suggestions || [];
   const sugFresh = suggestions.filter((s) => !s.used_at);
@@ -143,11 +182,15 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         {todayPlan ? (
           <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
             <div>
-              <b>Đăng bài bán:</b>{' '}
+              <b>🕗 8h + 🕐 13h — bài bán:</b>{' '}
               {todayPlan.sales.length
                 ? todayPlan.sales.map((s) => `${s.product} (${vnInt(s.count)} bài)`).join(', ')
                 : 'không có bài bán hôm nay'}
-              {' · '}<b>Bài content:</b> {vnInt(todayPlan.contentCount)}{todayPlan.contentKindLabel ? ` (${todayPlan.contentKindLabel})` : ''}
+              {todayPlan.direction ? <> · <b>hướng:</b> {todayPlan.direction.title} (thử {todayPlan.direction.variant})</> : null}
+            </div>
+            <div>
+              <b>🕐 13h — content:</b> {todayPlan.contentKindLabel || vnInt(todayPlan.contentCount)}
+              {todayPlan.contentStructure ? <span className="sub"> — {todayPlan.contentStructure}</span> : null}
             </div>
             <div>
               <b>Chia sẻ vào nhóm:</b>{' '}
@@ -201,13 +244,35 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           {liveData.daily_schedule?.length ? (
             <div className="tablewrap" style={{ marginTop: 12 }}>
               <table className="datatable">
-                <thead><tr><th>Ngày</th><th>Bài bán</th><th className="num">Content</th><th>Chia sẻ nhóm</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Ngày</th>
+                    <th>🕗 8h sáng — bài bán</th>
+                    <th>Hướng đi dự kiến</th>
+                    <th>🕐 13h chiều — content</th>
+                    <th>📣 Sau khi đăng, chia sẻ vào</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {liveData.daily_schedule.map((d) => (
                     <tr key={d.date} className={d.date === today ? 'row-today' : undefined}>
-                      <td>{d.date === today ? '👉 ' : ''}<b>{d.dow}</b> <span className="sub">{fmtDate(d.date)}</span></td>
-                      <td>{d.sales.length ? d.sales.map((s) => `${s.product} (${vnInt(s.count)})`).join(', ') : '—'}</td>
-                      <td>{vnInt(d.contentCount)}{d.contentKindLabel ? <span className="sub"> · {d.contentKindLabel}</span> : null}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{d.date === today ? '👉 ' : ''}<b>{d.dow}</b><br /><span className="sub">{fmtDate(d.date)}</span></td>
+                      <td>
+                        {d.sales.length ? d.sales.map((s) => `${s.product} (${vnInt(s.count)} bài)`).join(' + ') : '—'}
+                        <div className="sub" style={{ marginTop: 2 }}>Cấu trúc: mở nỗi lo thật, 1-2 lợi ích đúng sản phẩm, mời nhắn Page / gọi 1900 23 23 49</div>
+                      </td>
+                      <td>
+                        {d.direction ? (
+                          <>
+                            <b>{d.direction.title}</b>
+                            <div className="sub">{d.direction.product} · bản thử {d.direction.variant}</div>
+                          </>
+                        ) : <span className="sub">vòng xoay tự chọn</span>}
+                      </td>
+                      <td>
+                        {d.contentKindLabel ? <b>{d.contentKindLabel}</b> : vnInt(d.contentCount)}
+                        {d.contentStructure ? <div className="sub" style={{ marginTop: 2 }}>{d.contentStructure}</div> : null}
+                      </td>
                       <td className="sub">{d.groups.length ? d.groups.join(', ') : '—'}</td>
                     </tr>
                   ))}
@@ -215,6 +280,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               </table>
             </div>
           ) : null}
+          <p className="sub" style={{ margin: '8px 0 0' }}>
+            Hướng đi dự kiến là thứ tự vòng xoay sẽ rút; nếu sếp đổi mục tiêu giữa tuần thì hướng tự xếp lại. Bài luôn chờ người bấm Duyệt mới đăng.
+          </p>
         </section>
       ) : null}
 
@@ -238,6 +306,31 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               </li>
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {/* ===== Dang lai bai cu an khach (may de xuat, nguoi chia se) ===== */}
+      {repostSuggestions.length ? (
+        <section className="plan-card" style={{ marginBottom: 14 }}>
+          <b style={{ fontSize: '1.05rem' }}>🔁 Nên đăng lại — bài cũ ăn khách</b>
+          <p className="sub" style={{ margin: '4px 0 8px' }}>
+            Bài đăng từ 7 ngày trước có tương tác tốt nhất. Mở bài, bấm Chia sẻ trên Facebook hoặc dùng nút 📣 ở Quản lý bài viết để đưa vào nhóm.
+          </p>
+          <div className="tablewrap">
+            <table className="datatable">
+              <thead><tr><th>Bài</th><th className="num">Tương tác</th><th>Đã đăng</th><th></th></tr></thead>
+              <tbody>
+                {repostSuggestions.map((r) => (
+                  <tr key={r.url}>
+                    <td>{r.title}</td>
+                    <td className="num"><b>{vnInt(r.engagement)}</b></td>
+                    <td className="sub">{fmtDateTime(r.publishedAt)}</td>
+                    <td><a className="btn ghost sm" href={r.url} target="_blank" rel="noopener noreferrer">Mở bài ↗</a></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       ) : null}
 
