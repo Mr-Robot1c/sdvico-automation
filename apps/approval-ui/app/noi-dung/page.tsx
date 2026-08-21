@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { redirect } from 'next/navigation';
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
@@ -34,6 +35,14 @@ function shortCode(id: string): string {
 // Ngày + giờ theo giờ VN (user 18/8: "thêm luôn giờ để biết chính xác khi nào").
 function formatDate(iso: string): string {
   return formatDateTimeVN(iso);
+}
+
+// Nhãn kênh NGẮN cho ô bảng (bản đầy đủ để ở tooltip) — nhãn dài "Facebook (Post + Reel) +
+// YouTube + TikTok" từng gãy thành 5 dòng làm hàng bảng rất cao (user chê 21/8).
+function channelsShort(channels?: string[] | null, postReel?: boolean): string {
+  const map: Record<string, string> = { facebook: postReel ? 'FB Post, Reel' : 'Facebook', tiktok: 'TikTok', website: 'Web', youtube: 'YouTube' };
+  const arr = Array.isArray(channels) && channels.length ? channels : ['facebook'];
+  return arr.map((c) => map[c] || c).join(', ');
 }
 
 type Flags = Record<string, string[] | undefined>;
@@ -155,7 +164,8 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
   // "YYYY-MM-DDTHH:mm" (giờ máy người duyệt = giờ VN) -> "HH:mm dd/mm/yyyy". Không đổi múi giờ.
   const fmtSchedule = (s: string): string => {
     const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-    return m ? `${m[4]}:${m[5]} ${m[3]}/${m[2]}/${m[1]}` : s;
+    // Bỏ năm cho gọn badge (hẹn giờ luôn trong vài ngày tới) — hàng bảng đỡ cao.
+    return m ? `${m[4]}:${m[5]} ${m[3]}/${m[2]}` : s;
   };
   // Giờ hẹn còn ở tương lai (so theo giờ VN) thì mới là "đợi", qua rồi thì FB đã tự đăng.
   const isFuture = (s: string): boolean => {
@@ -316,7 +326,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
 
       {!error && items.length > 0 ? (
         <div className="tablewrap">
-          <table className="datatable">
+          <table className="datatable posts-table">
             <thead>
               <tr>
                 <th scope="col">Mã</th>
@@ -343,7 +353,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                   <tr key={c.id} id={`row-${c.id}`}>
                     <td className="cell-code">{shortCode(c.id)}</td>
                     <td className="cell-title">
-                      <div className="cell-title-main">
+                      <div className="cell-title-main" title={c.title}>
                         {c.title}
                         {c.brief?.ab_variant ? (
                           <span className="badge badge-ab" style={{ marginLeft: 8 }} title={`Bài thử ${c.brief.ab_variant} của cặp A/B theo hướng đi kế hoạch${c.brief?.suggestion_title ? `: ${c.brief.suggestion_title}` : ''}. Bot đo bản nào bà con thích hơn rồi học cho vòng sau.`}>🧪 Thử {c.brief.ab_variant}</span>
@@ -354,16 +364,19 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                       ) : null}
                     </td>
                     <td>{lengthLabel(c.kind)}</td>
-                    <td>{channelsLabel(c.brief?.channels, c.brief?.post_reel === true)}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
+                    <td className="cell-chan" title={channelsLabel(c.brief?.channels, c.brief?.post_reel === true)}>
+                      {channelsShort(c.brief?.channels, c.brief?.post_reel === true)}
+                    </td>
+                    <td>
                       {(() => {
                         const m = metricsByContent.get(c.id);
                         if (!m) return <span className="muted">—</span>;
                         return (
-                          <span title="Like, comment, share và lượt xem mới nhất từ Facebook. Chi tiết ở tab Đo lường.">
-                            👍 {m.reactions} <span style={{ marginLeft: 6 }}>💬 {m.comments}</span>
-                            {m.shares ? <span style={{ marginLeft: 6 }}>🔁 {m.shares}</span> : null}
-                            {m.views != null ? <span style={{ marginLeft: 6 }}>👁 {Number(m.views).toLocaleString('vi-VN')}</span> : null}
+                          <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 6 }} title="Like, comment, share và lượt xem mới nhất từ Facebook. Chi tiết ở tab Đo lường.">
+                            <span>👍 {m.reactions}</span>
+                            <span>💬 {m.comments}</span>
+                            {m.shares ? <span>🔁 {m.shares}</span> : null}
+                            {m.views != null ? <span>👁 {Number(m.views).toLocaleString('vi-VN')}</span> : null}
                           </span>
                         );
                       })()}
@@ -372,7 +385,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                     <td>
                       {effStatus(c) === 'approved' && scheduledAt.get(c.id) && isFuture(scheduledAt.get(c.id)!) ? (
                         <span className="badge tone-demo" title="Bài đã được duyệt và Facebook sẽ tự đăng đúng giờ hẹn.">
-                          ⏰ Đã duyệt, đợi hẹn giờ {fmtSchedule(scheduledAt.get(c.id)!)}
+                          ⏰ Đợi đăng {fmtSchedule(scheduledAt.get(c.id)!)}
                         </span>
                       ) : effStatus(c) === 'approved' && scheduledAt.get(c.id) ? (
                         <span className={`badge tone-${st.tone}`} title={`Đã hẹn ${fmtSchedule(scheduledAt.get(c.id)!)}, đến giờ Facebook đã tự đăng.`}>
@@ -388,6 +401,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                       ) : null}
                     </td>
                     <td className="col-actions">
+                      <div className="row-actions">
                       <ViewModal title={c.title} label="Xem bài viết">
                         <div className="badges">
                           <span className="badge badge-format">{lengthLabel(c.kind)}</span>
@@ -428,20 +442,26 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                         ) : null}
                       </ViewModal>
                       {(publishedByContent.get(c.id) || []).map((p, i) => (
-                        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
-                          <a className="src" href={p.url} target="_blank" rel="noreferrer" style={{ whiteSpace: 'nowrap' }}>
-                            ↗ Xem bài{p.channel === 'facebook' ? ' (FB)' : p.channel ? ` (${p.channel})` : ''}
+                        <Fragment key={i}>
+                          <a
+                            className="src"
+                            href={p.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ whiteSpace: 'nowrap' }}
+                            title={`Xem bài đã đăng${p.channel ? ` trên ${p.channel === 'facebook' ? 'Facebook' : p.channel === 'youtube' ? 'YouTube' : p.channel === 'tiktok' ? 'TikTok' : p.channel}` : ''}`}
+                          >
+                            ↗ {p.channel === 'facebook' ? 'FB' : p.channel === 'youtube' ? 'YouTube' : p.channel === 'tiktok' ? 'TikTok' : 'Bài'}
                           </a>
                           {p.channel === 'facebook' && !/\/reel\//.test(p.url) ? <ShareGroups postUrl={p.url} /> : null}
-                        </span>
+                        </Fragment>
                       ))}
                       {/* Nút "Làm video" đã chuyển sang trang /san-xuat (nút "Xong + Làm video"). */}
                       {c.brief?.video_requested ? (
-                        <span className="badge tone-demo" style={{ marginLeft: 8 }} title="Đã đánh dấu — đang dựng video">🎬 Đã yêu cầu video</span>
+                        <span className="badge tone-demo" title="Đã bấm dựng video — máy đang dựng, xong sẽ tự tắt nhãn này">🎬 Đang dựng video</span>
                       ) : null}
-                      <span style={{ marginLeft: 8 }}>
-                        <DeleteButton contentId={c.id} title={c.title} />
-                      </span>
+                      <DeleteButton contentId={c.id} title={c.title} />
+                      </div>
                     </td>
                   </tr>
                 );

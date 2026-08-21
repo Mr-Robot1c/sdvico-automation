@@ -692,6 +692,18 @@ a.chip:hover { filter: brightness(0.98); }
 .cell-title-sub { color: var(--ink-2); font-size: 12.5px; margin-top: 2px; }
 .col-actions { text-align: right; white-space: nowrap; }
 
+/* ===== 21/8 chiều: bảng Bài viết GỌN (user chê hàng quá cao, nút tràn mép phải) =====
+   Tên bài tối đa 2 dòng (rê chuột xem đủ), cột kênh nhãn ngắn, thao tác cho phép xuống hàng
+   trong ô thay vì đẩy bảng tràn ngang. Chỉ áp cho bảng có class .posts-table. */
+.posts-table thead th { padding: 10px 12px; }
+.posts-table tbody td { padding: 10px 12px; }
+.posts-table .cell-title { min-width: 210px; }
+.posts-table .cell-title-main { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.posts-table .cell-title-sub { max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.posts-table .cell-chan { min-width: 105px; }
+.posts-table .col-actions { white-space: normal; min-width: 200px; max-width: 320px; }
+.posts-table .row-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
+
 /* ===== Nút icon tròn (mắt xem, đóng modal, thao tác gọn) ===== */
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -1153,10 +1165,16 @@ a.chip:hover { filter: brightness(0.98); }
 .lib-name { font-weight: 600; font-size: .87rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-sub { font-size: .76rem; color: var(--ink-2); }
 .lib-more summary { cursor: pointer; font-size: .78rem; color: var(--ink-2); margin-top: 4px; }
-.lib-more[open] { background: var(--surface-2); border-radius: 8px; padding: 8px; margin-top: 4px; }
-.lib-more form { margin-top: 6px; }
-.lib-more .rename-form { display: flex; gap: 6px; }
-.lib-more .rename-form input[name='title'] { flex: 1 1 auto; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: .82rem; }
+.lib-more[open] { background: var(--surface-2); border-radius: 8px; padding: 10px; margin-top: 4px; }
+.lib-more form { margin-top: 8px; }
+/* 21/8 chiều (user báo lần 2): panel sửa trong card hẹp làm input tên cụt + nút "Đổi tên" bị cắt
+   mép phải, không sửa tên được. Xếp DỌC: input full width một hàng, nút nằm hàng dưới; select
+   folder cũng full width — mọi control nằm trọn trong panel, không tràn. */
+.lib-more .rename-form { display: grid; gap: 6px; }
+.lib-more .rename-form input[name='title'] { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: .84rem; }
+.lib-more .rename-form .btn { justify-self: start; }
+.lib-more .pg-form select { width: 100%; max-width: 100%; }
+.lib-more .btn { max-width: 100%; }
 .lib-empty { border: 1px dashed var(--line); border-radius: 12px; padding: 34px 16px; text-align: center; color: var(--ink-2); margin-top: 14px; }
 @media (max-width: 760px) { .lib-layout { flex-direction: column; } .lib-side { position: static; flex: 1 1 auto; width: 100%; } }
 
