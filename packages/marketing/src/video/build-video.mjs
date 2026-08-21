@@ -100,7 +100,14 @@ const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-p
 const GEMINI_TTS_VOICE = process.env.GEMINI_TTS_VOICE || 'Puck';
 const GEMINI_TTS_STYLE = process.env.GEMINI_TTS_STYLE
   || 'Đọc bằng tiếng Việt, giọng TikToker trẻ trung hào hứng, ngữ điệu lên xuống tự nhiên, nhấn nhá chỗ quan trọng, câu cảm thán thì phấn khích: ';
+// Hạn mức PHÚT của TTS free tier chặt (build 21/8: bản ngang dính 429 giữa chừng, bản dọc chạy
+// sau lại êm) -> giãn nhịp giữa các lần gọi để cả 2 bản đều được giọng Gemini. Env chỉnh được.
+const GEMINI_TTS_GAP_MS = Number(process.env.GEMINI_TTS_GAP_MS || 20000);
+let geminiLastCallAt = 0;
 async function geminiTTS(cleanText, outPath, workDir, tag) {
+  const gap = geminiLastCallAt + GEMINI_TTS_GAP_MS - Date.now();
+  if (gap > 0) await new Promise((r) => setTimeout(r, gap));
+  geminiLastCallAt = Date.now();
   const body = {
     contents: [{ parts: [{ text: GEMINI_TTS_STYLE + '\n\n' + cleanText }] }],
     generationConfig: {
@@ -136,14 +143,17 @@ async function tts(text, outPath, voice, workDir, tag, engine = 'edge') {
 
   if (engine === 'gemini') {
     // Đọc cả đoạn một lần (Gemini tự lên xuống ngữ điệu, không cần tách câu chỉnh rate/pitch).
-    // 429 (hết hạn mức phút) thì nghỉ 21 giây rồi thử lại 1 lần; vẫn hỏng thì THROW cho caller.
+    // 429 (hết hạn mức phút) đợi lâu dần 25s rồi 40s; vẫn hỏng thì THROW cho caller lùi cả bản.
     let lastGemErr;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    const backoff = [25000, 40000];
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         return await geminiTTS(clean, outPath, workDir, tag);
       } catch (e) {
         lastGemErr = e;
-        if (/429/.test(String(e?.message)) && attempt === 0) await new Promise((r) => setTimeout(r, 21000));
+        if (/429/.test(String(e?.message)) && attempt < backoff.length) {
+          await new Promise((r) => setTimeout(r, backoff[attempt]));
+        } else if (attempt >= 1) break;
       }
     }
     throw lastGemErr || new Error('gemini-tts loi');
