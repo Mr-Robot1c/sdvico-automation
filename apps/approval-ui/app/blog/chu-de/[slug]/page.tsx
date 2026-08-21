@@ -2,16 +2,18 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getServerClient } from '../../../../lib/supabase-server';
-import { loadPublicPosts, siteUrl } from '../../../../lib/seo';
+import { isProductOf, loadPublicPosts, siteUrl } from '../../../../lib/seo';
 import { findProductBySlug, PRODUCT_CATALOG } from '../../../../lib/product-catalog';
+import PostCard from '../../post-card';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 600;
 
 // TRANG CHỦ ĐỀ (topic hub) cho SEO — user 20/8: "trang tổng hợp theo từ khóa".
-// Mỗi sản phẩm một trang /blog/chu-de/<slug> gom: đoạn giới thiệu theo từ khóa + toàn bộ
-// bài viết thuộc sản phẩm + link trang sản phẩm. Google thích cụm trang cùng chủ đề nội bộ
-// liên kết chặt (bài -> hub -> trang sản phẩm) hơn là bài rời rạc.
+// Mỗi sản phẩm một trang /blog/chu-de/<slug> gom toàn bộ bài thuộc sản phẩm + link trang sản
+// phẩm. Google thích cụm trang cùng chủ đề liên kết chặt (bài -> hub -> trang sản phẩm).
+// 21/8: khớp bài theo isProductOf (khóa chuẩn hóa) thay vì so chuỗi; hàng chip giữ nguyên ở
+// trên với chip hiện tại sáng (design-spec màn 3).
 
 type Props = { params: { slug: string } };
 
@@ -34,8 +36,7 @@ export default async function TopicHubPage({ params }: Props) {
 
   const client = getServerClient();
   const posts = await loadPublicPosts(client, 300);
-  const key = p.productGroup.toLowerCase();
-  const matched = posts.filter((x) => x.product.toLowerCase() === key || x.product.toLowerCase().includes(key.replace(/^\d+\.\s*/, '')));
+  const matched = posts.filter((x) => isProductOf(p, x.product));
 
   const url = `${siteUrl()}/blog/chu-de/${p.slug}`;
   const jsonLd = {
@@ -47,54 +48,38 @@ export default async function TopicHubPage({ params }: Props) {
     hasPart: matched.slice(0, 20).map((m) => ({ '@type': 'BlogPosting', headline: m.title, url: `${siteUrl()}/blog/${m.slug}` }))
   };
 
-  function fmtDate(iso: string | null): string {
-    if (!iso) return '';
-    try { return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }); } catch { return ''; }
-  }
-
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <main className="blog-article" style={{ maxWidth: 'none' }}>
-        <nav aria-label="Đường dẫn" style={{ fontSize: '.85rem', color: 'var(--ink-2)', marginBottom: 8 }}>
-          <Link href="/blog" style={{ color: 'var(--ink-2)' }}>Bài viết</Link> · Chủ đề: {p.name}
+      <main>
+        <nav className="pub-crumb" aria-label="Đường dẫn">
+          <Link href="/blog">Bài viết</Link>
+          <span aria-hidden="true">/</span>
+          <span>{p.shortName}</span>
         </nav>
-        <header className="sp-hero">
-          <h1>{p.name}: bài viết và kinh nghiệm</h1>
-          <p style={{ color: 'var(--ink-2)', margin: 0 }}>
-            {p.short} Xem <Link href={`/san-pham/${p.slug}`}>trang sản phẩm {p.name}</Link> để biết lợi ích và cách lắp đặt.
-          </p>
+        <header className="pub-head">
+          <h1>{p.name}</h1>
+          <p>{p.short} <Link href={`/san-pham/${p.slug}`}>Xem trang sản phẩm</Link></p>
         </header>
 
+        <nav className="pub-chips" aria-label="Chủ đề">
+          {PRODUCT_CATALOG.map((t) => (
+            <Link key={t.slug} href={`/blog/chu-de/${t.slug}`} className={t.slug === p.slug ? 'on' : ''} aria-current={t.slug === p.slug ? 'page' : undefined}>
+              {t.shortName}
+            </Link>
+          ))}
+        </nav>
+
         {matched.length === 0 ? (
-          <p className="sub">Chưa có bài viết nào cho chủ đề này. Quay lại sau nhé.</p>
+          <div className="pub-empty">
+            <p>Chưa có bài viết về {p.shortName}</p>
+            <Link href={`/san-pham/${p.slug}`}>Xem trang sản phẩm</Link>
+          </div>
         ) : (
-          <div className="blog-list">
-            {matched.map((m) => (
-              <article key={m.contentId} className="blog-card">
-                {m.imageUrl ? (
-                  <Link href={`/blog/${m.slug}`} aria-label={m.title}>
-                    <img className="blog-card-img" src={m.imageUrl} alt={m.title} loading="lazy" />
-                  </Link>
-                ) : null}
-                <div className="blog-card-body">
-                  <Link href={`/blog/${m.slug}`} className="blog-card-title">{m.title}</Link>
-                  <div className="blog-card-meta">{fmtDate(m.publishedAt)}</div>
-                  <p className="blog-card-excerpt">{m.excerpt}</p>
-                </div>
-              </article>
-            ))}
+          <div className="pub-grid">
+            {matched.map((m) => <PostCard key={m.contentId} post={m} hideProduct />)}
           </div>
         )}
-
-        <section style={{ marginTop: 28 }}>
-          <h2 style={{ fontSize: '1.2rem' }}>Chủ đề khác</h2>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {PRODUCT_CATALOG.filter((x) => x.slug !== p.slug).map((x) => (
-              <Link key={x.slug} href={`/blog/chu-de/${x.slug}`} className="btn ghost sm">{x.name}</Link>
-            ))}
-          </div>
-        </section>
       </main>
     </>
   );

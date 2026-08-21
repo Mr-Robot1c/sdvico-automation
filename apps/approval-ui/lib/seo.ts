@@ -12,6 +12,7 @@
 // đã qua cổng — không cần lọc lại ở đây.
 
 import type { getServerClient } from './supabase-server';
+import { PRODUCT_CATALOG, type ProductItem } from './product-catalog';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -160,4 +161,38 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
 export async function loadPublicPost(client: Client, slug: string): Promise<PublicPost | null> {
   const posts = await loadPublicPosts(client, 500);
   return posts.find((p) => p.slug === slug) || null;
+}
+
+// ===== Khớp sản phẩm theo KHÓA CHUẨN HÓA (21/8, design-spec-trang-cong-khai) =====
+// Tên nhóm lệch nhau giữa các nơi: brand_assets/rotation_group có số thứ tự ("6. Thiết bị lọc
+// dầu SF-50"), danh mục public không số, Thuraya viết "Marine Star" / "MarineStar"... So sánh
+// chuỗi thẳng làm trang sản phẩm KHÔNG lấy được ảnh và đếm bài sai. Khóa = slugify bỏ gạch:
+// "thurayamarinestarmnb01" — khớp nếu chuỗi cần xét CHỨA khóa của danh mục (hoặc ngược lại
+// khi chuỗi xét đủ dài, tránh "sdvico" khớp bừa).
+export function normKey(s: string): string {
+  return slugify(String(s || '')).replace(/-/g, '');
+}
+export function isProductOf(item: Pick<ProductItem, 'productGroup' | 'name' | 'aliases'>, value: string): boolean {
+  const k = normKey(value);
+  if (!k || k === 'baicontent' || k === 'baiviet') return false;
+  const keys = [item.productGroup, item.name, ...(item.aliases || [])].map(normKey).filter(Boolean);
+  return keys.some((c) => k.includes(c) || (k.length >= 8 && c.includes(k)));
+}
+export function catalogItemOf(value: string): ProductItem | undefined {
+  return PRODUCT_CATALOG.find((c) => isProductOf(c, value));
+}
+// Tên sản phẩm ĐỂ HIỂN THỊ trên UI công khai: tên ngắn khi khớp danh mục; bài content hoặc bài
+// nhập tay (product rơi về keyword/tiêu đề) trả '' để card không lặp lại tiêu đề.
+export function displayProduct(product: string): string {
+  return catalogItemOf(product)?.shortName || '';
+}
+// Ngày dd/mm/yyyy giờ VN. Tự ghép từ formatToParts — toLocaleDateString('vi-VN') trên Node
+// trả "21-08-2026" (gạch) sai chuẩn Việt.
+export function fmtDateVN(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).formatToParts(d);
+  const get = (t: string) => parts.find((x) => x.type === t)?.value || '';
+  return `${get('day')}/${get('month')}/${get('year')}`;
 }

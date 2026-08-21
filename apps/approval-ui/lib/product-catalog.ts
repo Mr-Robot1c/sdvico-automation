@@ -14,6 +14,8 @@
 export type ProductItem = {
   slug: string;            // /san-pham/<slug>
   name: string;            // Tên hiển thị
+  shortName: string;       // Tên NGẮN ≤ 3 từ cho chip/badge (design-spec-trang-cong-khai: nhóm ngang hàng cùng 1 dòng)
+  aliases?: string[];      // Tên khác của nhóm trong brand_assets / rotation_group (khớp ảnh + đếm bài)
   productGroup: string;    // Khớp brand_assets.product_group (không STT)
   role: 'san-xuat' | 'phan-phoi';  // SDVICO phát triển hay phân phối
   hangGoc: string | null;  // Hãng gốc nếu là phân phối (null nếu SDVICO tự làm)
@@ -27,6 +29,7 @@ export const PRODUCT_CATALOG: ProductItem[] = [
   {
     slug: 'may-loc-nuoc-bien-sea-40',
     name: 'Máy lọc nước biển SEA-40',
+    shortName: 'Máy lọc nước SEA-40',
     productGroup: 'Máy lọc nước biển SEA-40',
     role: 'san-xuat',
     hangGoc: null,
@@ -42,6 +45,7 @@ export const PRODUCT_CATALOG: ProductItem[] = [
   {
     slug: 'thiet-bi-loc-dau-sf-50',
     name: 'Thiết bị lọc dầu SF-50',
+    shortName: 'Lọc dầu SF-50',
     productGroup: 'Thiết bị lọc dầu SF-50',
     role: 'san-xuat',
     hangGoc: null,
@@ -57,6 +61,7 @@ export const PRODUCT_CATALOG: ProductItem[] = [
   {
     slug: 'thiet-bi-giam-sat-hanh-trinh-viettel-s-tracking',
     name: 'Thiết bị giám sát hành trình Viettel S-Tracking',
+    shortName: 'Viettel S-Tracking',
     productGroup: 'Viettel S-Tracking',
     role: 'phan-phoi',
     hangGoc: 'Viettel',
@@ -72,6 +77,8 @@ export const PRODUCT_CATALOG: ProductItem[] = [
   {
     slug: 'thuraya-marinestar-mnb-01',
     name: 'Thuraya MarineStar MNB-01',
+    shortName: 'Thuraya MNB-01',
+    aliases: ['Thuraya Marine Star MNB-01'],
     productGroup: 'Thuraya MarineStar MNB-01',
     role: 'phan-phoi',
     hangGoc: 'Thuraya',
@@ -87,6 +94,7 @@ export const PRODUCT_CATALOG: ProductItem[] = [
   {
     slug: 'dien-thoai-ve-tinh-xt-pro',
     name: 'Điện thoại vệ tinh XT-Pro',
+    shortName: 'Điện thoại XT-Pro',
     productGroup: 'XT-Pro',
     role: 'phan-phoi',
     hangGoc: 'Thuraya',
@@ -102,6 +110,8 @@ export const PRODUCT_CATALOG: ProductItem[] = [
   {
     slug: 'dau-nhot-pvoil-nano-graphene',
     name: 'Dầu nhớt PVOIL Nano Graphene',
+    shortName: 'Dầu nhớt PVOIL',
+    aliases: ['PV Engine RMI Nano Graphene', 'PVOIL Nano Graphene'],
     productGroup: 'PVOIL Nano Graphene',
     role: 'phan-phoi',
     hangGoc: 'PVOIL',

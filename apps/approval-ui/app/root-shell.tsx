@@ -27,30 +27,45 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
     return (
       <div className="public-shell">
         <Tracking pixelId={pixelId} ga4Id={ga4Id} />
-        <header className="public-header">
-          {/* Brand tro /blog (trang cong khai), KHONG tro '/' (trang duyet noi bo can dang nhap).
-              Logo THAT cua cong ty (public/logo-sdvico.png) — sep chot 20/8, bo SVG chu S tu ve. */}
-          <Link href="/blog" className="public-brand" aria-label="Trang bài viết SDVICO">
-            <img src="/logo-sdvico.png" alt="" width={34} height={34} style={{ objectFit: 'contain' }} aria-hidden="true" />
-            <span className="public-brand-text">SDVICO</span>
-          </Link>
-          <nav className="public-nav" aria-label="Menu công khai">
-            <Link href="/blog" className={path.startsWith('/blog') ? 'on' : ''}>Bài viết</Link>
-            <Link href="/san-pham" className={path.startsWith('/san-pham') ? 'on' : ''}>Sản phẩm</Link>
-          </nav>
+        {/* 21/8 lam lai theo docs/app-map/design-spec-trang-cong-khai.md: header dinh, brand +
+            2 muc nav + nut Goi (outline, mobile thu thanh icon 44px). Brand tro /blog, KHONG
+            tro '/' (trang duyet noi bo can dang nhap). Logo that public/logo-sdvico.png. */}
+        <header className="pub-header">
+          <div className="pub-header-in">
+            <Link href="/blog" className="pub-brand" aria-label="SDVICO, trang bài viết">
+              <img src="/logo-sdvico.png" alt="" width={40} height={40} aria-hidden="true" />
+              <span>
+                <b>SDVICO</b>
+                <small>Công nghệ số cho ngành biển và thủy sản</small>
+              </span>
+            </Link>
+            <nav className="pub-nav" aria-label="Menu công khai">
+              <Link href="/blog" className={path.startsWith('/blog') ? 'on' : ''} aria-current={path.startsWith('/blog') ? 'page' : undefined}>Bài viết</Link>
+              <Link href="/san-pham" className={path.startsWith('/san-pham') ? 'on' : ''} aria-current={path.startsWith('/san-pham') ? 'page' : undefined}>Sản phẩm</Link>
+            </nav>
+            <a className="pub-call" href="tel:1900232349" aria-label="Gọi 1900 23 23 49">
+              <span aria-hidden="true">📞</span>
+              <span className="pub-call-txt">1900 23 23 49</span>
+            </a>
+          </div>
         </header>
-        <div className="public-content">{children}</div>
-        <footer className="public-footer">
-          <p>SDVICO — Công nghệ số cho ngành biển và thủy sản.</p>
-          <p>
-            <a href="tel:1900232349">Hotline 1900 23 23 49</a>
-            {' · '}
-            <a href="https://sdvico.vn" target="_blank" rel="noopener noreferrer">sdvico.vn</a>
-            {' · '}
-            <Link href="/privacy">Chính sách</Link>
-            {' · '}
-            <Link href="/terms">Điều khoản</Link>
-          </p>
+        <div className="pub-content">{children}</div>
+        <footer className="pub-footer">
+          <div className="pub-footer-in">
+            <div className="pub-footer-brand">
+              <img src="/logo-sdvico.png" alt="" width={36} height={36} aria-hidden="true" />
+              <div>
+                <b>SDVICO</b>
+                <p>Công nghệ số cho ngành biển và thủy sản</p>
+              </div>
+            </div>
+            <nav className="pub-footer-links" aria-label="Liên kết chân trang">
+              <a href="tel:1900232349">Hotline 1900 23 23 49</a>
+              <a href="https://sdvico.vn" target="_blank" rel="noopener noreferrer">sdvico.vn</a>
+              <Link href="/privacy">Chính sách</Link>
+              <Link href="/terms">Điều khoản</Link>
+            </nav>
+          </div>
         </footer>
       </div>
     );

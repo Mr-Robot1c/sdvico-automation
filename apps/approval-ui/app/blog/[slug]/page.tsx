@@ -2,9 +2,10 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getServerClient } from '../../../lib/supabase-server';
-import { loadPublicPost, siteUrl } from '../../../lib/seo';
+import { catalogItemOf, fmtDateVN, isProductOf, loadPublicPost, loadPublicPosts, siteUrl } from '../../../lib/seo';
 import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
 import ContactButtons from '../../contact-buttons';
+import PostCard from '../post-card';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 300;
@@ -33,19 +34,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return '';
-  try {
-    return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' });
-  } catch {
-    return '';
-  }
-}
-
+// Trang đọc bài (design-spec-trang-cong-khai màn 2): đa số vào từ link share Facebook bằng
+// điện thoại -> tiêu đề + ảnh trên fold, thân bài ~68 ký tự/dòng, 1 khối CTA (primary duy nhất)
+// rồi 3 bài khác (cùng sản phẩm trước, không có thì bài mới nhất).
 export default async function BlogDetailPage({ params }: Props) {
   const client = getServerClient();
-  const [post, ads] = await Promise.all([loadPublicPost(client, params.slug), loadAdsConfig()]);
+  const [posts, ads] = await Promise.all([loadPublicPosts(client, 500), loadAdsConfig()]);
+  const post = posts.find((p) => p.slug === params.slug);
   if (!post) notFound();
+
+  const item = catalogItemOf(post.product);
+  const others = posts.filter((p) => p.contentId !== post.contentId);
+  const related = [
+    ...(item ? others.filter((p) => isProductOf(item, p.product)) : []),
+    ...others
+  ].filter((p, i, arr) => arr.findIndex((x) => x.contentId === p.contentId) === i).slice(0, 3);
 
   const url = `${siteUrl()}/blog/${post.slug}`;
   // JSON-LD BlogPosting cho Google hiểu bài là bài viết + tác giả + ngày đăng.
@@ -67,28 +70,32 @@ export default async function BlogDetailPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <article className="blog-article">
-        <nav aria-label="Đường dẫn" style={{ fontSize: '.85rem', color: 'var(--ink-2)', marginBottom: 8 }}>
-          <Link href="/blog" style={{ color: 'var(--ink-2)' }}>Bài viết</Link>
-          {post.product && post.product !== 'Bài content' ? <> · {post.product}</> : null}
+      <article className="pub-read">
+        <nav className="pub-crumb" aria-label="Đường dẫn">
+          <Link href="/blog">Bài viết</Link>
+          {item ? (
+            <>
+              <span aria-hidden="true">/</span>
+              <Link href={`/blog/chu-de/${item.slug}`}>{item.shortName}</Link>
+            </>
+          ) : null}
         </nav>
         <h1>{post.title}</h1>
-        <div className="blog-meta">Đăng ngày {fmtDate(post.publishedAt)}</div>
+        <div className="pub-read-meta">
+          {item ? <span className="pub-chip">{item.shortName}</span> : null}
+          {post.publishedAt ? <time dateTime={post.publishedAt}>{fmtDateVN(post.publishedAt)}</time> : null}
+          {post.fbUrl ? (
+            <a href={post.fbUrl} target="_blank" rel="noopener noreferrer">Xem trên Facebook</a>
+          ) : null}
+        </div>
         {post.imageUrl ? (
-          <img className="blog-hero" src={post.imageUrl} alt={post.title} />
+          <img className="pub-read-hero" src={post.imageUrl} alt={post.title} />
         ) : null}
-        <div className="blog-body">{post.body}</div>
-        {post.fbUrl ? (
-          <p style={{ marginTop: 20, fontSize: '.9rem' }}>
-            Xem bài này trên{' '}
-            <a href={post.fbUrl} target="_blank" rel="noopener noreferrer">Facebook</a>.
-          </p>
-        ) : null}
-        <div className="sp-cta">
-          <b>Cần tư vấn thiết bị tàu cá?</b>
-          <p style={{ margin: '6px 0 10px' }}>
-            Nhắn tin cho Page SDVICO hoặc gọi tổng đài để được tư vấn, báo giá và lắp đặt tận bến.
-          </p>
+        <div className="pub-read-body">{post.body}</div>
+
+        <div className="pub-cta">
+          <h2>Cần tư vấn thiết bị tàu cá?</h2>
+          <p>Nhắn tin cho Page hoặc gọi tổng đài, SDVICO tư vấn, báo giá và lắp đặt tận bến.</p>
           <ContactButtons
             messengerUrl={messengerUrl(ads.messengerUsername, { source: 'blog', campaign: post.slug })}
             zaloUrl={zaloUrl(ads.zaloOaId)}
@@ -96,6 +103,15 @@ export default async function BlogDetailPage({ params }: Props) {
           />
         </div>
       </article>
+
+      {related.length ? (
+        <section className="pub-section" aria-label="Bài khác">
+          <h2>Bài khác</h2>
+          <div className="pub-grid">
+            {related.map((p) => <PostCard key={p.contentId} post={p} />)}
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }
