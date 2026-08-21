@@ -1111,3 +1111,51 @@ a.chip:hover { filter: brightness(0.98); }
 .contact-btn:hover { transform: translateY(-1px); }
 .contact-btn.primary { background: var(--accent, #1f5fbf); color: #fff; border-color: transparent; }
 .contact-btn.zalo { background: #0068ff; color: #fff; border-color: transparent; }
+
+/* ===== 21/8 tối: Tổng quan gộp — board theo mẫu user (stat card, cột kanban có khối, panel kênh) ===== */
+.board-top { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.board-stat { flex: 1 1 150px; min-width: 140px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+.board-stat .stat-lbl { margin: 0 0 4px; }
+.board-ops { flex: 1.6 1 260px; min-width: 240px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: grid; gap: 6px; align-content: center; }
+.board-body { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.kanban-wrap { flex: 1 1 640px; min-width: 0; overflow-x: auto; padding-bottom: 8px; }
+.kanban { display: grid; grid-template-columns: repeat(4, minmax(250px, 1fr)); gap: 12px; min-width: 1040px; align-items: start; }
+.kanban-col { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 10px; align-content: start; }
+.kanban-col .card { box-shadow: none; }
+.kanban-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .9rem; padding: 6px 12px; border-radius: 999px; }
+.kanban-head .n { margin-left: auto; font-weight: 600; font-size: .8rem; opacity: .85; }
+.kanban-head.tone-pending { background: color-mix(in srgb, var(--tone-mkt) 16%, transparent); color: var(--tone-mkt); }
+.kanban-head.tone-approved { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.kanban-head.tone-published { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+.kanban-head.tone-rejected { background: color-mix(in srgb, var(--no) 14%, transparent); color: var(--no); }
+.kanban-empty { border: 1px dashed var(--line); border-radius: 10px; padding: 20px 10px; text-align: center; color: var(--ink-2); font-size: .85rem; }
+.chan-panel { flex: 0 1 235px; min-width: 210px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
+.chan-item { display: flex; gap: 10px; align-items: center; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; text-decoration: none; color: inherit; transition: border-color .12s ease; }
+.chan-item:hover { border-color: var(--accent); }
+.chan-icon { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; background: var(--chip); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+
+/* ===== 21/8 tối: Kho tư liệu kiểu trình quản lý file (cây folder trái + lưới thumbnail phải) ===== */
+.lib-layout { display: flex; gap: 16px; align-items: flex-start; margin-top: 14px; }
+.lib-side { flex: 0 0 250px; position: sticky; top: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 2px; max-height: calc(100vh - 40px); overflow-y: auto; }
+.lib-side-title { font-size: .78rem; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; padding: 4px 10px 6px; }
+.lib-folder { display: flex; gap: 8px; align-items: center; padding: 7px 10px; border-radius: 8px; text-decoration: none; color: var(--ink); font-size: .9rem; }
+.lib-folder:hover { background: var(--surface-2); }
+.lib-folder.on { background: var(--accent); color: #fff; font-weight: 600; }
+.lib-folder .n { margin-left: auto; font-size: .78rem; color: var(--ink-2); }
+.lib-folder.on .n { color: rgba(255, 255, 255, .85); }
+.lib-main { flex: 1 1 480px; min-width: 0; }
+.lib-grid { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 14px; }
+.lib-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+.lib-thumb { aspect-ratio: 4 / 3; background: var(--surface-2); position: relative; }
+.lib-thumb .asset-preview-btn { width: 100%; height: 100%; display: block; border: 0; padding: 0; background: none; cursor: zoom-in; position: relative; }
+.lib-thumb img, .lib-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lib-meta { padding: 8px 10px 10px; display: grid; gap: 2px; }
+.lib-name { font-weight: 600; font-size: .87rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-sub { font-size: .76rem; color: var(--ink-2); }
+.lib-more summary { cursor: pointer; font-size: .78rem; color: var(--ink-2); margin-top: 4px; }
+.lib-more[open] { background: var(--surface-2); border-radius: 8px; padding: 8px; margin-top: 4px; }
+.lib-more form { margin-top: 6px; }
+.lib-more .rename-form { display: flex; gap: 6px; }
+.lib-more .rename-form input[name='title'] { flex: 1 1 auto; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: .82rem; }
+.lib-empty { border: 1px dashed var(--line); border-radius: 12px; padding: 34px 16px; text-align: center; color: var(--ink-2); margin-top: 14px; }
+@media (max-width: 760px) { .lib-layout { flex-direction: column; } .lib-side { position: static; flex: 1 1 auto; width: 100%; } }

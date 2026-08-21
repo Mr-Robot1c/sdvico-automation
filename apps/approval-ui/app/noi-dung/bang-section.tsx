@@ -154,10 +154,10 @@ export default async function BangSection() {
   const REJ_CAP = 8;
 
   const columns: { key: string; label: string; icon: string; tone: string; items: QItem[]; cap: number; moreHref?: string }[] = [
-    { key: 'pending', label: 'Chờ duyệt', icon: '📥', tone: 'demo', items: pending, cap: 50 },
-    { key: 'approved', label: 'Đã duyệt', icon: '✅', tone: 'ok', items: approvedWaiting, cap: 10 },
-    { key: 'published', label: 'Đã đăng', icon: '🌐', tone: 'web', items: published, cap: PUB_CAP, moreHref: '/noi-dung?loai=bai-viet' },
-    { key: 'rejected', label: 'Từ chối', icon: '⛔', tone: 'no', items: rejected, cap: REJ_CAP, moreHref: '/noi-dung?loai=bai-viet&trangthai=rejected' }
+    { key: 'pending', label: 'Chờ duyệt', icon: '📥', tone: 'pending', items: pending, cap: 50 },
+    { key: 'approved', label: 'Đã duyệt', icon: '✅', tone: 'approved', items: approvedWaiting, cap: 10 },
+    { key: 'published', label: 'Đã đăng', icon: '🌐', tone: 'published', items: published, cap: PUB_CAP, moreHref: '/noi-dung?loai=bai-viet' },
+    { key: 'rejected', label: 'Từ chối', icon: '⛔', tone: 'rejected', items: rejected, cap: REJ_CAP, moreHref: '/noi-dung?loai=bai-viet&trangthai=rejected' }
   ];
 
   // Tổng tương tác của các bài trên board (Facebook + YouTube, bản snapshot mới nhất mỗi bài).
@@ -176,71 +176,69 @@ export default async function BangSection() {
 
   return (
     <section>
-      {/* Hàng thống kê nhanh (mẫu user: Total Posts, Engagements, Pending, System Status). */}
-      <div className="kpi-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 12 }}>
-        <div className="stat-tile">
-          <div className="stat-num">{fmtVN(totalPosted)}</div>
+      {/* Hàng trên theo mẫu user: 4 thẻ thống kê + ô vận hành (dừng khẩn, hạn mức) bên phải. */}
+      <div className="board-top">
+        <div className="board-stat">
           <div className="stat-lbl">Bài đã đăng</div>
+          <div className="stat-num">{fmtVN(totalPosted)}</div>
         </div>
-        <div className="stat-tile">
-          <div className="stat-num">{fmtVN(boardEngagement)}</div>
+        <div className="board-stat">
           <div className="stat-lbl">Tổng tương tác</div>
+          <div className="stat-num">{fmtVN(boardEngagement)}</div>
         </div>
-        <div className="stat-tile">
-          <div className="stat-num">{fmtVN(pending.length)}</div>
+        <div className="board-stat">
           <div className="stat-lbl">Bài chờ duyệt</div>
+          <div className="stat-num" style={pending.length ? { color: 'var(--tone-mkt)' } : undefined}>{fmtVN(pending.length)}</div>
         </div>
-        <div className="stat-tile">
-          <div className="stat-num" style={stopped ? { color: 'var(--no, #e23b2e)' } : undefined}>{stopped ? '🔴 Dừng' : '🟢 Chạy'}</div>
+        <div className="board-stat">
           <div className="stat-lbl">Hệ thống</div>
+          <div className="stat-num" style={{ color: stopped ? 'var(--no)' : 'var(--ok)' }}>{stopped ? 'Dừng khẩn' : 'Đang chạy'}</div>
+        </div>
+        <div className="board-ops">
+          <form action={toggleEmergencyStop}>
+            <input type="hidden" name="on" value={stopped ? '0' : '1'} />
+            <button className={`btn sm ${stopped ? 'ok' : 'no'}`} type="submit">{stopped ? '▶ Bật lại (cho phép đăng)' : '🛑 Dừng khẩn'}</button>
+          </form>
+          <span className="muted" style={{ fontSize: '.82rem' }}>Hôm nay: FB <b>{fbCount}{quotaOff ? '' : `/${limit}`}</b>, TikTok <b>{ttCount}{quotaOff ? '' : `/${limit}`}</b>{quotaOff ? ' (đang bỏ hạn mức)' : ''}</span>
+          <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: '.85rem' }}>
+            {otherPending ? (
+              <Link className="src" href="/hang-doi" title="Hồ sơ HR và cảnh báo hệ thống chờ xử lý">⚠ {otherPending.toLocaleString('vi-VN')} mục chờ khác</Link>
+            ) : null}
+            <Link className="src" href="/van-hanh">Vận hành chi tiết</Link>
+          </span>
         </div>
       </div>
 
-      {/* Thanh vận hành gọn: dừng khẩn + hạn mức + hàng đợi khác. Bản đầy đủ ở /van-hanh. */}
-      <div className={`card ${stopped ? 'tone-no' : ''}`} style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', padding: '10px 14px', marginBottom: 14 }}>
-        <form action={toggleEmergencyStop} style={{ display: 'inline' }}>
-          <input type="hidden" name="on" value={stopped ? '0' : '1'} />
-          <button className={`btn sm ${stopped ? 'ok' : 'no'}`} type="submit">{stopped ? '▶ Bật lại (cho phép đăng)' : '🛑 Dừng khẩn'}</button>
-        </form>
-        <span className="muted">Hôm nay: FB <b>{fbCount}{quotaOff ? '' : `/${limit}`}</b>, TikTok <b>{ttCount}{quotaOff ? '' : `/${limit}`}</b>{quotaOff ? ' (đang bỏ hạn mức)' : ''}</span>
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {otherPending ? (
-            <Link className="src" href="/hang-doi" title="Hồ sơ HR và cảnh báo hệ thống chờ xử lý">⚠ {otherPending.toLocaleString('vi-VN')} mục chờ khác</Link>
-          ) : null}
-          <Link className="src" href="/van-hanh">Vận hành chi tiết</Link>
-        </span>
-      </div>
-
-      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div className="board-body">
         {/* Cột trái: Kênh kết nối. */}
-        <div className="card" style={{ flex: '0 1 230px', minWidth: 200, display: 'grid', gap: 10, padding: 14 }}>
+        <div className="chan-panel">
           <b>Kênh kết nối</b>
           {channels.map((ch) => (
-            <Link key={ch.name} href={ch.href} style={{ display: 'flex', gap: 8, alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
-              <span aria-hidden="true" style={{ fontSize: 18 }}>{ch.icon}</span>
+            <Link key={ch.name} href={ch.href} className="chan-item">
+              <span className="chan-icon" aria-hidden="true">{ch.icon}</span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <b style={{ display: 'block', fontSize: '.9rem' }}>{ch.name}</b>
-                <span className="muted" style={{ fontSize: '.78rem' }}>{ch.note}</span>
+                <b style={{ display: 'block', fontSize: '.88rem' }}>{ch.name}</b>
+                <span className="muted" style={{ fontSize: '.76rem' }}>{ch.note}</span>
               </span>
               <span aria-hidden="true">{ch.ok ? '✅' : '🕓'}</span>
             </Link>
           ))}
-          <Link className="src" href="/do-luong" style={{ fontSize: '.85rem' }}>📈 Đo lường chi tiết</Link>
+          <Link className="src" href="/do-luong" style={{ fontSize: '.85rem', justifySelf: 'start' }}>📈 Đo lường chi tiết</Link>
         </div>
 
         {/* Cột phải: board 4 cột theo dòng chảy bài viết. */}
-        <div style={{ flex: '1 1 640px', minWidth: 0, overflowX: 'auto', paddingBottom: 8 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(250px, 1fr))', gap: 12, minWidth: 1040, alignItems: 'start' }}>
+        <div className="kanban-wrap">
+        <div className="kanban">
           {columns.map((col) => (
-            <div key={col.key} style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px' }}>
+            <div key={col.key} className="kanban-col">
+              <div className={`kanban-head tone-${col.tone}`}>
                 <span aria-hidden="true">{col.icon}</span>
-                <b>{col.label}</b>
-                <span className="badge tone-default">{col.items.length}</span>
+                <span>{col.label}</span>
+                <span className="n">{col.items.length}</span>
               </div>
 
               {col.items.length === 0 ? (
-                <p className="muted" style={{ fontSize: '.85rem', padding: '2px 2px' }}>Trống.</p>
+                <div className="kanban-empty">Chưa có bài nào ở bước này.</div>
               ) : null}
 
               {col.items.slice(0, col.cap).map((it) => {

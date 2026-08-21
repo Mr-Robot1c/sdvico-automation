@@ -7,9 +7,10 @@ import ProductGroupSelect from './product-group-select';
 // @ts-ignore — module JS thuần
 import { PRODUCTS, CONTENT_GROUP } from '../../lib/gen/products.mjs';
 
-// 8 folder sản phẩm + 1 folder "Content" cho tư liệu bài nội dung (ảnh biển, đời sống ngư
-// dân...) không gắn sản phẩm nào cụ thể. Rotate ưu tiên ảnh trong folder Content khi sinh bài
-// content, hết mới dùng ảnh sản phẩm bất kỳ.
+// KHO TƯ LIỆU kiểu trình quản lý file (user 21/8 gửi mẫu): cây folder bên TRÁI (bấm chọn),
+// lưới thumbnail bên PHẢI với tên + loại + ngày. Thao tác đổi tên / chuyển folder / xóa nằm
+// gọn trong nút "chi tiết" của từng ô, không choán chỗ như bản cũ.
+// 8 folder sản phẩm + folder Content; vòng xoay hằng ngày vẫn đọc theo product_group như cũ.
 const PRODUCT_GROUPS: string[] = [
   ...(PRODUCTS as { group: string }[]).map((p) => p.group),
   CONTENT_GROUP as string,
@@ -36,7 +37,22 @@ type Asset = {
 
 const UNASSIGNED = '__chua_gan__';
 
-export default async function Page() {
+// Nhãn hiển thị: bỏ tiền tố số thứ tự "N. " cho gọn sidebar (dữ liệu vẫn giữ tên đầy đủ).
+function folderLabel(group: string): string {
+  if (group === UNASSIGNED) return 'Chưa gán folder';
+  return group.replace(/^\s*\d+\.\s*/, '');
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  // Tự ghép dd/mm — toLocaleDateString('vi-VN') trên Node trả "21-08" (gạch) sai chuẩn Việt.
+  const p = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }).formatToParts(d);
+  const get = (t: string) => p.find((x) => x.type === t)?.value || '';
+  return `${get('day')}/${get('month')}`;
+}
+
+export default async function Page({ searchParams }: { searchParams: { folder?: string } }) {
   const client = getServerClient();
   const { data, error } = await client
     .from('brand_assets')
@@ -46,10 +62,9 @@ export default async function Page() {
 
   const rows = (data || []) as Asset[];
   const urlOf = (p: string) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
-  const kindLabelOf = (kind: string) => KIND_LABEL[kind] || kind;
   const isVideo = (k: string) => k === 'video' || k === 'clip';
 
-  // Gom tư liệu theo folder sản phẩm. Giữ đúng thứ tự 8 folder, cuối là nhóm chưa gán.
+  // Gom theo folder. Giữ đúng thứ tự 8 folder + Content, cuối là nhóm chưa gán (nếu có).
   const byGroup = new Map<string, Asset[]>();
   for (const g of PRODUCT_GROUPS) byGroup.set(g, []);
   byGroup.set(UNASSIGNED, []);
@@ -58,73 +73,102 @@ export default async function Page() {
     if (!byGroup.has(key)) byGroup.set(key, []);
     byGroup.get(key)!.push(a);
   }
-  // Luôn hiện đủ 8 folder (kể cả trống để nhắc bổ sung), nhóm chưa gán chỉ hiện khi có.
-  const ordered: [string, Asset[]][] = [
-    ...PRODUCT_GROUPS.map((g) => [g, byGroup.get(g) || []] as [string, Asset[]]),
-    ...(byGroup.get(UNASSIGNED)!.length ? [[UNASSIGNED, byGroup.get(UNASSIGNED)!] as [string, Asset[]]] : []),
+  const folderKeys: string[] = [
+    ...PRODUCT_GROUPS,
+    ...[...byGroup.keys()].filter((k) => !PRODUCT_GROUPS.includes(k) && k !== UNASSIGNED),
+    ...(byGroup.get(UNASSIGNED)!.length ? [UNASSIGNED] : []),
   ];
 
-  const renderCard = (a: Asset) => (
-    <li key={a.id} className="assetcard">
-      <div className="asset-preview">
-        <AssetViewer url={urlOf(a.storage_path)} kind={a.kind} title={a.title} />
-      </div>
-      <div className="asset-meta">
-        <span className="badge badge-format">{kindLabelOf(a.kind)}</span>
-        <form action={renameAsset} className="rename-form">
-          <input type="hidden" name="id" value={a.id} />
-          <input name="title" defaultValue={a.title} aria-label="Tên tư liệu" title="Đặt tên mô tả rõ để AI sinh text bám theo" />
-          <button className="btn ghost sm" type="submit">Đổi tên</button>
-        </form>
-        <ProductGroupSelect id={a.id} value={a.product_group || ''} options={PRODUCT_GROUPS} action={setAssetProductGroup} />
-        {a.kind === 'image' ? <LogoButton id={a.id} /> : null}
-        {a.source ? <div className="metaline">Nguồn: {a.source}</div> : null}
-        <div className="metaline">{a.license === 'licensed' ? 'Có giấy phép' : 'Công ty sở hữu'}</div>
-        <form action={deleteAsset}>
-          <input type="hidden" name="id" value={a.id} />
-          <input type="hidden" name="storage_path" value={a.storage_path} />
-          <button className="btn no sm" type="submit" aria-label="Xóa tư liệu">Xóa</button>
-        </form>
-      </div>
-    </li>
-  );
+  // Folder đang chọn từ URL (?folder=...). Mặc định: Tất cả.
+  const rawSel = searchParams?.folder || '';
+  const selected = rawSel && (folderKeys.includes(rawSel) || rawSel === UNASSIGNED) ? rawSel : '';
+  const shown = selected ? (byGroup.get(selected) || []) : rows;
+  const shownLabel = selected ? folderLabel(selected) : 'Tất cả tư liệu';
 
   return (
     <main>
       <header className="head-row">
         <div>
-          <h1>Kho tư liệu theo folder sản phẩm</h1>
+          <h1>Kho tư liệu</h1>
           <p className="sub">Mỗi folder là một sản phẩm. Vòng xoay hằng ngày chọn 1 folder rồi đăng Facebook và TikTok. Folder cần ít nhất 1 ảnh; muốn đăng TikTok thì cần video.</p>
         </div>
       </header>
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
 
-      <LibUploader />
+      <div className="lib-layout">
+        {/* Cây folder bên trái */}
+        <nav className="lib-side" aria-label="Folder tư liệu">
+          <div className="lib-side-title">Thư viện</div>
+          <a className={`lib-folder ${!selected ? 'on' : ''}`} href="/tu-lieu">
+            <span aria-hidden="true">🗂️</span> Tất cả <span className="n">{rows.length}</span>
+          </a>
+          {folderKeys.map((g) => {
+            const list = byGroup.get(g) || [];
+            return (
+              <a
+                key={g}
+                className={`lib-folder ${selected === g ? 'on' : ''}`}
+                href={`/tu-lieu?folder=${encodeURIComponent(g)}`}
+                title={g === UNASSIGNED ? 'Tư liệu chưa gán vào folder nào' : g}
+              >
+                <span aria-hidden="true">📁</span> {folderLabel(g)} <span className="n">{list.length || ''}</span>
+              </a>
+            );
+          })}
+        </nav>
 
-      {ordered.map(([group, list]) => {
-        const imgs = list.filter((a) => a.kind === 'image').length;
-        const vids = list.filter((a) => isVideo(a.kind)).length;
-        const label = group === UNASSIGNED ? 'Chưa gán folder' : group;
-        // Folder có tư liệu -> mở sẵn (open). Folder trống -> gấp lại, đỡ chật trang.
-        const openByDefault = list.length > 0;
-        return (
-          <details key={group} className="folder-section" open={openByDefault}>
-            <summary className="folder-head" style={{ cursor: 'pointer', listStyle: 'revert' }}>
-              <h2 style={{ display: 'inline', marginRight: 10 }}>📁 {label}</h2>
-              <span className="folder-count">
-                {list.length === 0 ? 'trống' : `${imgs} ảnh · ${vids} video`}
-                {group !== UNASSIGNED && vids === 0 && list.length > 0 ? ' · chưa đăng TikTok được' : ''}
-              </span>
-            </summary>
-            {list.length === 0 ? (
-              <p className="sub folder-empty">Chưa có tư liệu. Tải ảnh/video lên rồi gán vào folder này.</p>
-            ) : (
-              <ul className="assetgrid">{list.map(renderCard)}</ul>
-            )}
-          </details>
-        );
-      })}
+        {/* Lưới thumbnail bên phải */}
+        <div className="lib-main">
+          <LibUploader />
+          <p className="sub" style={{ margin: '12px 0 0' }}>
+            <b>{shownLabel}</b>: {shown.filter((a) => a.kind === 'image').length} ảnh, {shown.filter((a) => isVideo(a.kind)).length} video
+            {selected && selected !== UNASSIGNED && shown.length > 0 && !shown.some((a) => isVideo(a.kind)) ? ' (chưa đăng TikTok được vì thiếu video)' : ''}
+          </p>
+
+          {shown.length === 0 ? (
+            <div className="lib-empty">
+              <div style={{ fontSize: 30 }} aria-hidden="true">📁</div>
+              <p style={{ margin: '6px 0 0' }}>Folder này chưa có tư liệu.</p>
+              <p className="sub" style={{ margin: '2px 0 0' }}>Tải ảnh hoặc video lên rồi gán vào folder này.</p>
+            </div>
+          ) : (
+            <ul className="lib-grid">
+              {shown.map((a) => (
+                <li key={a.id} className="lib-card">
+                  <div className="lib-thumb">
+                    <AssetViewer url={urlOf(a.storage_path)} kind={a.kind} title={a.title} />
+                  </div>
+                  <div className="lib-meta">
+                    <span className="lib-name" title={a.title}>{a.title}</span>
+                    <span className="lib-sub">
+                      {KIND_LABEL[a.kind] || a.kind} · {fmtDate(a.created_at)}
+                      {!selected && a.product_group ? ` · ${folderLabel(a.product_group)}` : ''}
+                    </span>
+                    <details className="lib-more">
+                      <summary>Sửa, chuyển folder, xóa</summary>
+                      <form action={renameAsset} className="rename-form">
+                        <input type="hidden" name="id" value={a.id} />
+                        <input name="title" defaultValue={a.title} aria-label="Tên tư liệu" title="Đặt tên mô tả rõ để AI sinh text bám theo" />
+                        <button className="btn ghost sm" type="submit">Đổi tên</button>
+                      </form>
+                      <ProductGroupSelect id={a.id} value={a.product_group || ''} options={PRODUCT_GROUPS} action={setAssetProductGroup} />
+                      {a.kind === 'image' ? <LogoButton id={a.id} /> : null}
+                      {a.source ? <div className="metaline">Nguồn: {a.source}</div> : null}
+                      <div className="metaline">{a.license === 'licensed' ? 'Có giấy phép' : 'Công ty sở hữu'}</div>
+                      <form action={deleteAsset}>
+                        <input type="hidden" name="id" value={a.id} />
+                        <input type="hidden" name="storage_path" value={a.storage_path} />
+                        <button className="btn no sm" type="submit" aria-label="Xóa tư liệu">Xóa</button>
+                      </form>
+                    </details>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </main>
   );
 }
