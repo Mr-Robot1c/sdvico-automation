@@ -614,7 +614,7 @@ export async function decideForm(formData: FormData) {
         }
         await Promise.allSettled(jobs);
         // Bài vừa đăng thật xong, cập nhật lại trang cho lần render kế tiếp.
-        revalidatePath('/');
+        revalidatePath('/hang-doi');
         revalidatePath('/noi-dung');
       })();
       // Vercel giữ function chạy tới khi bgJob xong, dù response về UI đã trả.
@@ -622,7 +622,7 @@ export async function decideForm(formData: FormData) {
     }
   }
 
-  revalidatePath('/');
+  revalidatePath('/hang-doi');
   revalidatePath('/noi-dung');
 }
 
@@ -638,7 +638,8 @@ export async function toggleEmergencyStop(formData: FormData) {
     detail: { stopped: on }
   });
   revalidatePath('/van-hanh');
-  revalidatePath('/');
+  revalidatePath('/hang-doi');
+  revalidatePath('/noi-dung');
 }
 
 // Bật/tắt "bỏ hạn mức" — khi bật thì đăng không kiểm trần ngày (dùng để test).
@@ -648,6 +649,7 @@ export async function toggleQuotaDisabled(formData: FormData) {
   await setQuotaDisabled(client, off);
   await client.from('run_log').insert({ task: 'ops.quota_disabled', actor: 'ui', status: 'ok', detail: { disabled: off } });
   revalidatePath('/van-hanh');
+  revalidatePath('/noi-dung');
 }
 
 // Ghi tay số đơn/lead cho một bài (conversion). Lưu vào mkt_content.brief.conversions.
@@ -1254,7 +1256,8 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
   // Chỉ revalidate 2 trang HIỂN THỊ bài vừa tạo. KHÔNG revalidate /san-xuat: trang đó chỉ đọc
   // brand_assets (không đổi ở đây), revalidate làm serverless phải render lại nặng -> nút "Xong"
   // treo lâu ở client.
-  revalidatePath('/');
+  revalidatePath('/hang-doi');
+  revalidatePath('/noi-dung');
   revalidatePath('/noi-dung');
 
   // Đã yêu cầu video: kích hoạt GitHub Actions dựng ngay (thay vì chờ cron 10 phút). Không chờ
@@ -1311,7 +1314,8 @@ export async function editDraft(formData: FormData) {
   const client = getServerClient();
   const { error } = await client.from('mkt_content').update({ draft }).eq('id', contentId);
   if (error) throw new Error(error.message);
-  revalidatePath('/');
+  revalidatePath('/hang-doi');
+  revalidatePath('/noi-dung');
   revalidatePath('/noi-dung');
 }
 

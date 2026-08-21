@@ -34,10 +34,11 @@ export default function TopHeader({ marketingOnly = false }: { marketingOnly?: b
 
 function crumbFor(path: string): string {
   const map: Record<string, string> = {
-    '/': 'Hàng đợi duyệt',
+    '/': 'Tổng quan',
+    '/hang-doi': 'Hàng đợi duyệt',
     '/van-hanh': 'Vận hành',
-    '/tong-quan': 'Tổng quan kênh',
-    '/noi-dung': 'Quản lý bài viết',
+    '/tong-quan': 'Tổng quan',
+    '/noi-dung': 'Bảng bài viết',
     '/san-xuat': 'Xưởng sản xuất',
     '/do-luong': 'Đo lường',
     '/do-luong/tuan': 'Báo cáo tuần',

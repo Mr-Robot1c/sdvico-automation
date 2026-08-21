@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-21
 ttl_days: 180
+<!-- DOC-STATUS: SUSPECT (2026-08-21) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- re-verified: 2026-08-21 - BAN DOC CHE CHU (user gui anh TikTok): bumpers.mjs tinh font slogan theo base=H (doc: 1920) nhung khung chi rong 1080 -> tran 2 mep. Them fitFontPx + drawText nhan maxWidth (W*0.92), ap cho slogan intro, "Goi ngay tong dai", slogan outro (so tong dai da co san logic fit W*0.88). Preview frame doc/ngang kiem tra chu nam gon khung. -->
 <!-- re-verified: 2026-08-21 - DO LUONG thanh TAB trong Quan ly bai viet (/noi-dung?loai=do-luong, section app/noi-dung/do-luong-section.tsx; /do-luong redirect, /do-luong/tuan giu nguyen). Trang moi /tong-quan (Tong quan kenh): 4 the FB/YouTube/TikTok/Zalo + stat tong. Buoc 8 workflow cap nhat theo. -->
 <!-- re-verified: 2026-08-21 - Commit 2 script chay that ma chua tung vao git: upload-zalo-to-bucket.mjs (ban 131 dong day du HOP THA TAY Zalo/Hoc + NHAT KY AI Zalo/AI — vua khoi phuc sau su co checkout nham) + hoc-video.mjs (Gemini xem video, viet tom tat vao Zalo/AI/<ngay>). -->

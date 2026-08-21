@@ -19,13 +19,15 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/quy-tac', label: 'Quy tắc', icon: '📜' }
     ]
   };
-  // 21/8: thêm Tổng quan kênh (nhìn nhanh các nền tảng, đỡ rối mắt); Đo lường gộp vào
-  // Quản lý bài viết thành tab (/noi-dung?loai=do-luong) nên bỏ mục riêng.
+  // 21/8 gộp lớn (user): Tổng quan đứng ĐẦU; Hàng đợi duyệt + Vận hành + Quản lý bài viết
+  // gộp thành MỘT mục "Bảng bài viết" (/noi-dung, tab Bảng kiểu board là mặc định; Đo lường
+  // cũng là tab trong đó). Trang /hang-doi (hàng đợi đầy đủ HR + cảnh báo) và /van-hanh vẫn
+  // sống, đi vào từ thanh vận hành trên board.
   const quanLySanXuat: Group = {
     title: 'Quản lí và Sản xuất',
     items: [
-      { href: '/tong-quan', label: 'Tổng quan kênh', icon: '📊' },
-      { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
+      { href: '/tong-quan', label: 'Tổng quan', icon: '📊' },
+      { href: '/noi-dung', label: 'Bảng bài viết', icon: '📋' },
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
       { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' },
@@ -41,23 +43,15 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/du-lieu-ai', label: 'Dữ liệu', icon: '🤖' }
     ]
   };
-  const hangDoi: Group = {
-    title: 'Hàng đợi',
-    items: [
-      { href: '/', label: 'Hàng đợi duyệt', icon: '📥' },
-      { href: '/van-hanh', label: 'Vận hành', icon: '🛑' }
-    ]
-  };
-
   const groups: Group[] = marketingOnly
-    ? [hangDoi, quanLySanXuat, ai, heThong]
+    ? [quanLySanXuat, ai, heThong]
     : [
-        hangDoi,
         quanLySanXuat,
         ai,
         {
           title: 'Tuyển dụng',
           items: [
+            { href: '/hang-doi', label: 'Hàng đợi HR', icon: '📥' },
             { href: '/ho-so', label: 'Hồ sơ ứng viên', icon: '👤' },
             { href: '/vi-tri', label: 'Vị trí tuyển dụng', icon: '📋' }
           ]

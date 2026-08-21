@@ -5,6 +5,7 @@ import { editDraft } from '../actions';
 import DeleteButton from './delete-button';
 import ShareGroups from './share-groups';
 import DoLuongSection from './do-luong-section';
+import BangSection from './bang-section';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 
 export const dynamic = 'force-dynamic';
@@ -40,17 +41,21 @@ type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Fl
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
 export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
-  // Tab thứ 3 "Đo lường" (user 21/8): gộp trang /do-luong cũ vào đây cho cụ thể, dễ kiểm soát.
-  const tab = searchParams?.loai === 'video' ? 'video' : searchParams?.loai === 'do-luong' ? 'do-luong' : 'baiviet';
+  // 21/8 gộp lớn (user): mục nav "Bảng bài viết" = duyệt + vận hành + quản lý bài viết trong
+  // MỘT trang. Tab mặc định là Bảng (board 4 cột theo dòng chảy); Bài viết (danh sách chi
+  // tiết), Video, Đo lường là các tab còn lại.
+  const loai = searchParams?.loai || '';
+  const tab = loai === 'video' ? 'video' : loai === 'do-luong' ? 'do-luong' : loai === 'bai-viet' ? 'baiviet' : 'bang';
   const kinds = tab === 'video' ? ['video'] : ['article', 'social'];
   const statusFilter = searchParams?.trangthai && STATUS[searchParams.trangthai] ? searchParams.trangthai : null;
 
   // Giữ nguyên loại khi đổi trạng thái, và ngược lại.
   const withParams = (patch: { loai?: string | null; trangthai?: string | null }) => {
-    const loai = patch.loai !== undefined ? patch.loai : (tab === 'video' ? 'video' : tab === 'do-luong' ? 'do-luong' : null);
+    const keep = tab === 'video' ? 'video' : tab === 'do-luong' ? 'do-luong' : tab === 'baiviet' ? 'bai-viet' : null;
+    const l = patch.loai !== undefined ? patch.loai : keep;
     const tt = patch.trangthai !== undefined ? patch.trangthai : statusFilter;
     const qs = new URLSearchParams();
-    if (loai) qs.set('loai', loai);
+    if (l) qs.set('loai', l);
     if (tt) qs.set('trangthai', tt);
     const s = qs.toString();
     return s ? `/noi-dung?${s}` : '/noi-dung';
@@ -65,7 +70,10 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
 
   const typeChips = (
     <nav className="filters" aria-label="Loại nội dung">
-      <a className={`chip ${tab === 'baiviet' ? 'on' : ''}`} href={withParams({ loai: null, trangthai: null })}>
+      <a className={`chip ${tab === 'bang' ? 'on' : ''}`} href="/noi-dung">
+        <span aria-hidden="true">📋</span> Bảng
+      </a>
+      <a className={`chip ${tab === 'baiviet' ? 'on' : ''}`} href={withParams({ loai: 'bai-viet', trangthai: null })}>
         <span aria-hidden="true">📝</span> Bài viết <span className="n">{cBai ?? 0}</span>
       </a>
       <a className={`chip ${tab === 'video' ? 'on' : ''}`} href={withParams({ loai: 'video', trangthai: null })}>
@@ -77,6 +85,25 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     </nav>
   );
 
+  // Tab Bảng (mặc định): board duyệt + vận hành, không cần tải danh sách phía dưới.
+  if (tab === 'bang') {
+    return (
+      <main>
+        <header className="head-row">
+          <div>
+            <h1>Bảng bài viết</h1>
+            <p className="sub">Bài chạy từ trái sang phải: chờ duyệt, đã duyệt, đã đăng. Duyệt ngay trên thẻ.</p>
+          </div>
+          <div className="head-actions">
+            <AutoRefresh seconds={30} />
+          </div>
+        </header>
+        {typeChips}
+        <BangSection />
+      </main>
+    );
+  }
+
   // Tab Đo lường: toàn bộ biểu đồ + bảng số liệu nằm trong section riêng, không cần tải
   // danh sách bài phía dưới.
   if (tab === 'do-luong') {
@@ -84,7 +111,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       <main>
         <header className="head-row">
           <div>
-            <h1>Quản lý bài viết</h1>
+            <h1>Bảng bài viết</h1>
             <p className="sub">Số liệu tương tác từng bài và theo sản phẩm. Muốn xem theo tuần thì bấm Báo cáo tuần.</p>
           </div>
         </header>
@@ -240,7 +267,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     <main>
       <header className="head-row">
         <div>
-          <h1>Quản lý bài viết</h1>
+          <h1>Bảng bài viết</h1>
           <p className="sub">Danh sách bài đã sinh, đã duyệt, đã từ chối, đã đăng. Bấm mắt để xem nội dung.</p>
         </div>
         <div className="head-actions">
