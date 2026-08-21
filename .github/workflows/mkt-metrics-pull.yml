@@ -64,6 +64,6 @@ jobs:
           if [ "$FORCE_ROTATE" = "true" ]; then
             call_rotate "?force=1" "force"
           else
-            if [ $H -ge 8 ]; then call_rotate "?slot=sang" "sang"; fi
-            if [ $H -ge 13 ]; then call_rotate "?slot=chieu" "chieu"; fi
+            if [ $H -ge 7 ]; then call_rotate "?slot=sang" "sang"; fi
+            if [ $H -ge 12 ]; then call_rotate "?slot=chieu" "chieu"; fi
           fi

@@ -49,7 +49,10 @@ async function callGemini(prompt: string): Promise<string> {
 // để không đọc lặp). goal rỗng = BOSS tự định hướng. Lỗi LLM -> ném, chỗ gọi tự quyết ([]).
 export async function generateContentDirections(
   knowledge: KnowledgeInput,
-  goal: string
+  goal: string,
+  // Tieu de huong DA DUNG gan day — cam Gemini sinh huong trung/na na (user 21/8: BOSS regen
+  // ra huong "Lap dat may loc dau kip chuyen bien" gan giong huong vua chay hom truoc).
+  avoidTitles: string[] = []
 ): Promise<ContentDirection[]> {
   if (!knowledge.internal.length && !knowledge.publicSrc.length) return [];
 

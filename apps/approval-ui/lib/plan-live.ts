@@ -96,7 +96,7 @@ function rankProducts(byProduct: Array<{ product: string; count: number; avgScor
 
 // Dự kiến HƯỚNG ĐI cho từng ngày tới, mô phỏng đúng thứ tự vòng xoay sẽ rút (v7):
 // hướng đang chờ bản B đi trước (1 ngày), rồi mỗi hướng chưa dùng chiếm 2 ngày (A rồi B).
-type DayDirection = { title: string; product: string; variant: 'A' | 'B' };
+type DayDirection = { title: string; product: string; variant: 'A' | 'B'; done?: boolean };
 function buildDirectionQueue(suggestions: any[]): DayDirection[] {
   const out: DayDirection[] = [];
   const pendingB = suggestions.filter((s) => !s.used_at && s.pending_variant === 'B');
@@ -223,13 +223,41 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
   for (const p of salesProducts) weights[p.product] = p.weight;
 
   // Hướng đi dự kiến từng ngày: đọc content_suggestions của bản ĐANG ÁP (nguồn vòng xoay rút).
-  let dirQueue: DayDirection[] = [];
+  // NGÀY HÔM NAY: nếu vòng xoay ĐÃ sinh bài theo hướng nào thì hiển thị đúng hướng + biến thể
+  // ĐÃ SINH (user 21/8: "lịch ghi bản B mà bài ra bản A" — vì queue dự kiến tính cả hôm nay
+  // trong khi hôm nay đã chạy rồi). Queue dự kiến khi đó bắt đầu từ NGÀY MAI.
+  let dirQueue: (DayDirection & { done?: boolean })[] = [];
   try {
     const { data: apRow } = await client
       .from('mkt_plans').select('data').eq('applied', true)
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
     const sugs = Array.isArray((apRow as any)?.data?.content_suggestions) ? (apRow as any).data.content_suggestions : [];
     dirQueue = buildDirectionQueue(sugs);
+
+    // Bài BÁN đã sinh hôm nay theo hướng nào (brief.suggestion_title + ab_variant)?
+    const vnToday = new Date(now.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    const dayStartIso = new Date(new Date(vnToday + 'T00:00:00+07:00')).toISOString();
+    const { data: todayRows } = await client
+      .from('mkt_content').select('brief')
+      .gte('created_at', dayStartIso)
+      .eq('brief->>generator', 'rotation')
+      .limit(20);
+    const doneToday = (todayRows || [])
+      .map((r: any) => r.brief || {})
+      .filter((b: any) => b.suggestion_title);
+    if (doneToday.length) {
+      const b = doneToday[doneToday.length - 1];
+      const doneDir: DayDirection & { done: boolean } = {
+        title: String(b.suggestion_title || ''),
+        product: String(b.keyword || ''),
+        variant: (b.ab_variant === 'B' ? 'B' : 'A'),
+        done: true,
+      };
+      // Bỏ mục trùng (hướng hôm nay) khỏi đầu queue nếu nó chính là mục kế tiếp, rồi chèn
+      // hướng đã sinh vào vị trí hôm nay; phần còn lại dời sang từ ngày mai.
+      const rest = dirQueue.filter((d, i) => !(i === 0 && d.title === doneDir.title && d.variant === doneDir.variant));
+      dirQueue = [doneDir, ...rest];
+    }
   } catch { /* không có bản áp -> lịch không ghi hướng */ }
 
   const daily = buildDailySchedule(now, salesProducts, shareGroups, dirQueue);

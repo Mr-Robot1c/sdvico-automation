@@ -78,7 +78,7 @@ export type DailyPlan = {
   // v7 (20/8, user: "kế hoạch phải chi tiết hơn — hướng đi gì, cấu trúc ra sao"):
   // hướng đi DỰ KIẾN cho bài bán ngày đó (map từ content_suggestions chưa dùng của bản đang
   // áp, theo đúng thứ tự vòng xoay sẽ rút). Chỉ để hiển thị; rotate vẫn tự rút lúc chạy.
-  direction?: { title: string; product: string; variant: 'A' | 'B' } | null;
+  direction?: { title: string; product: string; variant: 'A' | 'B'; done?: boolean } | null;
   contentStructure?: string; // cấu trúc 1 dòng của bài content ("❓ Hỏi 1 câu → 💡 Đáp 3-5 câu")
   groups: string[];    // tên nhóm chia sẻ hôm đó
 };
@@ -255,6 +255,24 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
   return { products, totals, topPosts };
 }
 
+// Tiêu đề hướng đi ĐÃ DÙNG 7 ngày qua (bài máy sinh có brief.suggestion_title) — đưa vào
+// prompt sinh hướng mới để Gemini KHÔNG lặp lại chủ đề na ná (21/8: hướng "Lap dat may loc
+// dau kip chuyen bien" trùng ý hướng vừa chạy hôm trước, dedupe theo title không bắt được).
+export async function loadRecentDirectionTitles(client: Client): Promise<string[]> {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const { data } = await client
+    .from('mkt_content')
+    .select('brief')
+    .gte('created_at', sevenDaysAgo)
+    .eq('brief->>generator', 'rotation')
+    .limit(100);
+  return [...new Set(
+    (data || [])
+      .map((r: any) => String(r.brief?.suggestion_title || '').trim())
+      .filter(Boolean)
+  )].slice(0, 20);
+}
+
 // Thứ 4 (3) hoặc chủ nhật (0) theo giờ Việt Nam. Nhịp CŨ, giữ cho tương thích chỗ khác gọi.
 export function isPlanDayVN(now: Date): boolean {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
@@ -332,11 +350,14 @@ export async function generateAndStorePlan(
 
   // Chỉ đạo cho AI Creator: sinh hướng đi từ chính tri thức vừa nạp. Lỗi -> bản kế hoạch
   // vẫn lưu, hướng đi trống (chạy tay scripts/generate-plan-directions.mjs bù).
+  // Kèm danh sách hướng ĐÃ DÙNG 7 ngày để Gemini không sinh lại chủ đề na ná (21/8).
   try {
     const { generateContentDirections } = await import('./plan-directions');
+    const avoidTitles = await loadRecentDirectionTitles(client);
     plan.content_suggestions = await generateContentDirections(
       { internal: knowledge.internal, publicSrc: knowledge.publicSrc },
-      goal
+      goal,
+      avoidTitles
     );
   } catch (e: any) {
     console.error('[plan] sinh huong di that bai (ke hoach van luu):', e?.message || e);

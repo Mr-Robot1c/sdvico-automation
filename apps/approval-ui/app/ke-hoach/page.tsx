@@ -265,7 +265,10 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                         {d.direction ? (
                           <>
                             <b>{d.direction.title}</b>
-                            <div className="sub">{d.direction.product} · bản thử {d.direction.variant}</div>
+                            <div className="sub">
+                              {d.direction.product} · bản thử {d.direction.variant}
+                              {d.direction.done ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ đã sinh</span> : null}
+                            </div>
                           </>
                         ) : <span className="sub">vòng xoay tự chọn</span>}
                       </td>
@@ -289,9 +292,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       {/* ===== 3. HUONG DI BAI VIET ===== */}
       {suggestions.length ? (
         <section className="plan-card" style={{ marginBottom: 14 }}>
-          <b style={{ fontSize: '1.05rem' }}>🧭 Hướng đi bài viết ({vnInt(sugFresh.length)} chưa dùng, {vnInt(sugUsed.length)} đã dùng)</b>
+          <b style={{ fontSize: '1.05rem' }}>🧭 Hướng đi bài viết ({vnInt(sugFresh.filter((s) => !(s as any).pending_variant).length)} chưa dùng, {vnInt(sugFresh.filter((s) => (s as any).pending_variant).length)} đang thử, {vnInt(sugUsed.length)} xong cặp)</b>
           <p className="sub" style={{ margin: '4px 0 8px' }}>
-            BOSS đề xuất góc bài từ kho tri thức. Mỗi ngày vòng xoay lấy một hướng, sinh cặp bài thử A và B, người duyệt mới đăng.
+            BOSS đề xuất góc bài từ kho tri thức. Mỗi hướng chạy 2 ngày: bản thử A trước, hôm sau bản B; đủ cặp thì Evaluator so xem bản nào ăn hơn.
           </p>
           <ul className="directions-list" style={{ margin: 0 }}>
             {suggestions.map((d, i) => (
@@ -299,7 +302,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 <div className="direction-head">
                   <b>{d.title}</b>
                   <span className="badge tone-default" style={{ marginLeft: 8 }}>{d.product}</span>
-                  {d.used_at ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ đã dùng</span> : null}
+                  {d.used_at
+                    ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ xong cặp A + B</span>
+                    : (d as any).pending_variant
+                      ? <span className="badge" style={{ marginLeft: 6 }}>🧪 đã ra bản A, chờ bản B</span>
+                      : null}
                   {d.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️ cần duyệt QL</span> : null}
                 </div>
                 <p className="sub" style={{ margin: '2px 0 0' }}>{d.why}</p>

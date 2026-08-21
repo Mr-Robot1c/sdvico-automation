@@ -178,10 +178,12 @@ export async function GET(req: Request) {
       } else {
         const { loadRecentKnowledge } = await import('../../../lib/knowledge');
         const { generateContentDirections } = await import('../../../lib/plan-directions');
+        const { loadRecentDirectionTitles } = await import('../../../lib/plan');
         const knowledge = await loadRecentKnowledge(client, 7, 30);
         const { data: goalRow } = await client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle();
         const goal = String(((goalRow as any)?.value?.text) || '').trim();
-        const fresh2 = await generateContentDirections({ internal: knowledge.internal, publicSrc: knowledge.publicSrc }, goal);
+        const avoidTitles = await loadRecentDirectionTitles(client);
+        const fresh2 = await generateContentDirections({ internal: knowledge.internal, publicSrc: knowledge.publicSrc }, goal, avoidTitles);
         if (fresh2.length) {
           const newData = { ...(ap as any).data, content_suggestions: [...sugs, ...fresh2] };
           await client.from('mkt_plans').update({ data: newData }).eq('id', (ap as any).id);
