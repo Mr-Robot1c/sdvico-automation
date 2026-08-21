@@ -533,6 +533,41 @@ export async function decideForm(formData: FormData) {
     .select('id');
   if (error) throw new Error(error.message);
 
+  // TỪ CHỐI bài thử A/B = LOẠI HƯỚNG ĐI đó luôn (user 21/8: từ chối bài "Lắp đặt máy lọc dầu"
+  // Thử A vì trùng chủ đề). Đánh dấu suggestion used_at + rejected trong bản kế hoạch để vòng
+  // xoay KHÔNG sinh tiếp bản B của hướng bị chê, và carry-over cũng không mang nó sang bản mới.
+  const justRejected = decision === 'rejected' && (updated?.length || 0) > 0;
+  if (justRejected && (row as any)?.kind === 'mkt_publish_content') {
+    const p = (row as any)?.payload || {};
+    if (p.ab_pair_id && p.from_plan_direction) {
+      try {
+        const contentId2 = p.content_id as string | undefined;
+        let sugIdx: number | null = null;
+        let planId: string | null = null;
+        if (contentId2) {
+          const { data: c2 } = await client.from('mkt_content').select('brief').eq('id', contentId2).maybeSingle();
+          const b2 = (c2 as any)?.brief || {};
+          if (typeof b2.suggestion_index === 'number') sugIdx = b2.suggestion_index;
+          if (b2.plan_id) planId = String(b2.plan_id);
+        }
+        if (planId && sugIdx !== null) {
+          const { data: planRow } = await client.from('mkt_plans').select('id, data').eq('id', planId).maybeSingle();
+          const sugs = Array.isArray((planRow as any)?.data?.content_suggestions) ? (planRow as any).data.content_suggestions : null;
+          if (sugs && sugs[sugIdx]) {
+            const nowIso = new Date().toISOString();
+            const upd = sugs.map((s: any, i: number) => i === sugIdx
+              ? { ...s, used_at: nowIso, rejected: true, pending_variant: undefined }
+              : s);
+            await client.from('mkt_plans').update({ data: { ...(planRow as any).data, content_suggestions: upd } }).eq('id', planId);
+            await client.from('run_log').insert({ task: 'mkt.direction_rejected', actor: 'decideForm', status: 'ok', detail: { planId, sugIdx, title: sugs[sugIdx]?.title } });
+          }
+        }
+      } catch (e: any) {
+        console.error('[reject] loai huong di loi (bo qua):', e?.message || e);
+      }
+    }
+  }
+
   // Chỉ đăng khi vừa chuyển pending -> approved lần đầu, và đúng là bài marketing.
   // Chạy publish trong after(): response về UI NGAY (người dùng không phải chờ 20-40s cho FB
   // xử lý video). Việc đăng thật lên FB/TikTok tiếp tục ở nền cùng invocation.
