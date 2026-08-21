@@ -49,6 +49,11 @@ export default function ShareGroups({ postUrl }: { postUrl: string }) {
   const [newG, setNewG] = useState('');
   const [copied, setCopied] = useState(false);
   const popRef = useRef<HTMLDivElement | null>(null);
+  // Ref giữ bản groups MỚI NHẤT cho các chỗ lưu chạy ngoài vòng render (timer, đóng popover)
+  // — closure cũ từng lưu thiếu ký tự cuối khi gõ nhanh rồi bấm ra ngoài.
+  const groupsRef = useRef<SavedGroup[]>(groups);
+  useEffect(() => { groupsRef.current = groups; }, [groups]);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -63,11 +68,17 @@ export default function ShareGroups({ postUrl }: { postUrl: string }) {
     })();
     return () => { alive = false; };
   }, []);
-  // Dong khi bam ra ngoai popover.
+  // Dong khi bam ra ngoai popover. LUU TEN TRUOC khi dong (user 21/8: "doi ten group het
+  // duoc") — mousedown ngoai lam popover unmount TRUOC khi input kip blur, nen onBlur khong
+  // bao gio chay va ten moi go bi roi mat.
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (popRef.current && !popRef.current.contains(e.target as Node)) setOpen(false);
+      if (popRef.current && !popRef.current.contains(e.target as Node)) {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveGroupsServer(groupsRef.current);
+        setOpen(false);
+      }
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
@@ -97,12 +108,21 @@ export default function ShareGroups({ postUrl }: { postUrl: string }) {
     const next = groups.filter((g) => g.id !== id);
     setGroups(next); saveGroupsServer(next);
   };
-  // Go ten chi doi state local; roi khoi o (blur) moi luu server 1 lan — tranh moi phim go
-  // ban 1 POST (route con lam moi de xuat song, nang).
+  // Go ten: doi state ngay, LUU SERVER sau 800ms ngung go (debounce — tranh moi phim 1 POST,
+  // route con lam moi de xuat song). Blur hoac dong popover thi luu lien khong cho.
   const renameGroup = (id: string, label: string) => {
-    setGroups((prev) => prev.map((g) => g.id === id ? { ...g, label: label || g.id } : g));
+    setGroups((prev) => {
+      const next = prev.map((g) => (g.id === id ? { ...g, label: label || g.id } : g));
+      groupsRef.current = next;
+      return next;
+    });
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => saveGroupsServer(groupsRef.current), 800);
   };
-  const commitRename = () => { saveGroupsServer(groups); };
+  const commitRename = () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveGroupsServer(groupsRef.current);
+  };
 
   return (
     <span style={{ marginLeft: 8, position: 'relative', display: 'inline-block' }} ref={popRef}>

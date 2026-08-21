@@ -8,6 +8,9 @@ import { getServerClient } from '../../../lib/supabase-server';
 // Route nằm sau basic-auth? /api/* được middleware miễn basic-auth — nhưng dữ liệu nhóm
 // không nhạy cảm (tên + link group công khai), và POST chỉ đổi app_config danh sách nhóm.
 export const dynamic = 'force-dynamic';
+// POST còn làm mới đề xuất sống (nhiều query) — nới thời gian chạy để lưu tên nhóm không
+// bị đứt giữa chừng trên Vercel.
+export const maxDuration = 60;
 
 type SavedGroup = { id: string; label: string; url: string };
 
