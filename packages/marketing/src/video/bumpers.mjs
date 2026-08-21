@@ -197,7 +197,7 @@ async function drawIntroFrame(W, H, t, dur) {
   return cv.toBuffer('image/png');
 }
 
-// Vẽ 1 frame OUTRO tại t. Timeline: 0-0.7s logo pop + fade; 0.6-1.4s "Gọi ngay tổng đài" slide;
+// Vẽ 1 frame OUTRO tại t. Timeline: 0-0.7s logo pop + fade; 0.6-1.4s "Gọi ngay cho SDVICO" slide;
 // 1.3-2.0s số điện thoại scale-in + PULSE nhẹ liên tục; 1.8-2.5s slogan fade.
 async function drawOutroFrame(W, H, t, dur) {
   const cv = createCanvas(W, H);
@@ -224,7 +224,7 @@ async function drawOutroFrame(W, H, t, dur) {
   const headT = easeOut((t - 0.6) / 0.8);
   if (headT > 0) {
     const offset = -120 * (1 - headT);
-    drawText(ctx, 'Gọi ngay tổng đài', W / 2 + offset, H * pos.headY, {
+    drawText(ctx, 'Gọi ngay cho SDVICO', W / 2 + offset, H * pos.headY, {
       font: `${Math.round(base * 0.045)}px BVP-Black`, alpha: Math.min(1, headT),
       maxWidth: W * 0.92
     });
@@ -239,7 +239,7 @@ async function drawOutroFrame(W, H, t, dur) {
     const finalScale = scaleIn * pulse;
 
     const phoneBase = Math.round(base * (isPortrait ? 0.095 : 0.09));
-    const phoneText = '1900 23 23 49';
+    const phoneText = '0939 243 222';
     // Tính font tối đa fit W*0.88
     let f = phoneBase;
     ctx.font = `${f}px BVP-Black`;
@@ -312,7 +312,7 @@ export async function previewFrame(kind, W, H, t, dur) {
 
 export async function buildBumpers({ workDir, fmt, outroAudioPath = null, introDurSec = 2.8, outroDurSec = 4 }) {
   registerFontsFromWorkdir(workDir);
-  // Outro dài đủ đọc hết TTS (đọc "1900 23 23 49" từng số ~6s).
+  // Outro dài đủ đọc hết TTS (đọc "0939 243 222" từng số ~6s).
   let outroActualDur = outroDurSec;
   if (outroAudioPath) {
     try {

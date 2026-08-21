@@ -8,7 +8,7 @@ export const WHISPER_PROMPT =
   'SDVICO, ngư dân, tàu cá, ra khơi, ngành biển và thủy sản, ' +
   'giám sát hành trình, S-Tracking, Thuraya, MarineStar, điện thoại vệ tinh XT-Pro, ' +
   'máy lọc nước biển thành nước ngọt, thiết bị lọc dầu, dầu diesel, ' +
-  'PVOil Nano Graphene, PV Engine RMI, hải lý, IUU, hotline 1900 23 23 49.';
+  'PVOil Nano Graphene, PV Engine RMI, hải lý, IUU, hotline 0939 243 222, 0974 669 649.';
 
 // Sửa lỗi chính tả thuật ngữ hay gặp khi máy nghe (trái sang phải: sai -> đúng).
 // Chỉ sửa an toàn, không đổi nghĩa. Khớp không phân biệt hoa thường, biên từ.

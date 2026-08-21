@@ -18,7 +18,8 @@ import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const BRAND_LINE = 'SDVICO • Hotline 1900 23 23 49';
+// So lien he doi 21/8 theo sep: 0939 243 222 (du phong 0974 669 649 — doi tay o day + bumpers.mjs).
+const BRAND_LINE = 'SDVICO • Hotline 0939 243 222';
 
 function arg(name, def) {
   const i = process.argv.indexOf(`--${name}`);
@@ -81,6 +82,10 @@ async function tts(text, outPath, voice, workDir, tag) {
   // Rate mac dinh +8% cho tuoi (user 19/8: "giong doc buon ngu"). Env TTS_RATE ep khac. Cac
   // lan retry giu +8% roi lui rate cham dan neu edge-tts bao "No audio received".
   const baseRate = process.env.TTS_RATE || '+8%';
+  // Pitch nhích nhẹ cho giọng tươi hơn (sếp 21/8: "giọng chưa có cảm xúc"). Env TTS_PITCH đổi
+  // được, vd '+4Hz' tươi hơn nữa, '+0Hz' về giọng cũ. Cảm xúc chính vẫn đến từ dấu câu trong
+  // kịch bản (script.mjs đã yêu cầu câu hỏi, câu cảm, ngắt nhịp).
+  const pitch = process.env.TTS_PITCH || '+2Hz';
   const attempts = [
     { voice, rate: baseRate },
     { voice, rate: '+0%' },
@@ -90,7 +95,7 @@ async function tts(text, outPath, voice, workDir, tag) {
   let lastErr;
   for (const a of attempts) {
     try {
-      await python('tts.py', ['--text-file', txt, '--out', outPath, '--voice', a.voice, '--rate', a.rate]);
+      await python('tts.py', ['--text-file', txt, '--out', outPath, '--voice', a.voice, '--rate', a.rate, '--pitch', pitch]);
       if (a.voice !== voice || a.rate !== '+0%') {
         console.log(`  (cảnh ${tag}: TTS đổi qua ${a.voice} rate ${a.rate})`);
       }
@@ -139,9 +144,9 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
     });
   }
   const wa = await whisperArtifact(sceneAudios, fdir, format);
-  // TTS cho outro: đọc "Gọi ngay tổng đài 1900 23 23 49" (spellPhones sẽ đọc từng chữ số).
+  // TTS cho outro: đọc "Gọi ngay cho SDVICO 0939 243 222" (spellPhones sẽ đọc từng chữ số).
   const outroAudio = join(fdir, 'outro.mp3');
-  try { await tts('Nhắn tin cho Page SDVICO hoặc gọi tổng đài 1900 23 23 49 để được hỗ trợ.', outroAudio, voice, fdir, 'outro'); } catch { /* bo qua */ }
+  try { await tts('Nhắn tin cho Page SDVICO hoặc gọi số 0939 243 222 để được hỗ trợ.', outroAudio, voice, fdir, 'outro'); } catch { /* bo qua */ }
   const out = join(outDir, `sdvico_${contentId.slice(0, 8)}_${format}.mp4`);
   await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio });
   const totalDur = await probeDuration(out);
@@ -172,7 +177,7 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   const { guessGroup, productHashtags, DEFAULT_HASHTAGS } = await import('../products.mjs');
   const grp = guessGroup(`${content.title || ''} ${title}`);
   const tags = [...DEFAULT_HASHTAGS, ...(grp ? productHashtags(grp) : [])].join(' ');
-  const caption = `${title}\n\nGọi tổng đài 1900 23 23 49 để được tư vấn tận nơi.\n\n${tags}`;
+  const caption = `${title}\n\nGọi 0939 243 222 để được tư vấn tận nơi.\n\n${tags}`;
   const risk = script.assessment?.risk === 'red' ? 'red' : script.assessment?.risk === 'amber' ? 'amber' : 'none';
 
   // Chọn 1 ẢNH SẢN PHẨM để thả vào bình luận đầu của bài video (bà con thấy sản phẩm rõ,

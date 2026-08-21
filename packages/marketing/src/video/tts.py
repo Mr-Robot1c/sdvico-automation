@@ -14,12 +14,12 @@ import sys
 import edge_tts
 
 
-async def synth(text: str, out: str, voice: str, rate: str, volume: str) -> None:
+async def synth(text: str, out: str, voice: str, rate: str, volume: str, pitch: str) -> None:
     # edge-tts thỉnh thoảng lỗi mạng/NoAudioReceived -> thử lại vài lần.
     last = None
     for i in range(4):
         try:
-            communicate = edge_tts.Communicate(text, voice, rate=rate, volume=volume)
+            communicate = edge_tts.Communicate(text, voice, rate=rate, volume=volume, pitch=pitch)
             await communicate.save(out)
             import os
             if os.path.getsize(out) > 0:
@@ -38,6 +38,7 @@ def main() -> int:
     ap.add_argument("--voice", default="vi-VN-NamMinhNeural")
     ap.add_argument("--rate", default="+0%")
     ap.add_argument("--volume", default="+0%")
+    ap.add_argument("--pitch", default="+0Hz")
     args = ap.parse_args()
 
     with open(args.text_file, "r", encoding="utf-8") as f:
@@ -47,7 +48,7 @@ def main() -> int:
         return 1
 
     try:
-        asyncio.run(synth(text, args.out, args.voice, args.rate, args.volume))
+        asyncio.run(synth(text, args.out, args.voice, args.rate, args.volume, args.pitch))
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"ok": False, "error": str(e)}), flush=True)
         return 1
