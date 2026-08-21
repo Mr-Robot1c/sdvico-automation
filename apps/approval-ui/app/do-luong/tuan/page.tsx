@@ -44,7 +44,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
           </p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Link href="/noi-dung?loai=do-luong" className="btn ghost">← Đo lường</Link>
+          <Link href="/do-luong" className="btn ghost">← Đo lường</Link>
           <CopyReport text={narrative} />
         </div>
       </header>

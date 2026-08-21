@@ -42,6 +42,15 @@ export async function GET(req: Request) {
   } catch (e: any) {
     res = { pulled: 0, results: [{ error: String(e?.message || e) }] };
   }
+  // YouTube Shorts (user 21/8): kéo view/like/comment các video đã đăng, ghi source='youtube'.
+  // Lỗi không đánh hỏng phần Facebook.
+  let yt: { pulled: number; errors: string[] } = { pulled: 0, errors: [] };
+  try {
+    const { pullYouTubeMetrics } = await import('../../../lib/youtube-metrics');
+    yt = await pullYouTubeMetrics(client);
+  } catch (e: any) {
+    yt = { pulled: 0, errors: [String(e?.message || e).slice(0, 160)] };
+  }
   // GHI run_log mỗi lần chạy (18/8: mkt_metrics trống suốt mà không ai biết cron có chạy không
   // vì route này im lặng). Trang Dữ liệu AI + /api/fb-diag đọc được để chẩn đoán.
   try {
@@ -58,7 +67,7 @@ export async function GET(req: Request) {
       task: 'mkt.metrics_pull',
       actor: 'cron',
       status: errs.length && !(res?.pulled > 0) ? 'error' : 'ok',
-      detail: { pulled: res?.pulled ?? 0, errors: errs.slice(0, 5), insightErrs, notes, ms: Date.now() - startedAt },
+      detail: { pulled: res?.pulled ?? 0, errors: errs.slice(0, 5), insightErrs, notes, ytPulled: yt.pulled, ytErrors: yt.errors.slice(0, 3), ms: Date.now() - startedAt },
     });
   } catch { /* không để lỗi ghi log làm hỏng cron */ }
 

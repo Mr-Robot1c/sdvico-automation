@@ -4,6 +4,8 @@
 covers: packages/marketing
 last_verified: 2026-08-21
 ttl_days: 180
+<!-- DOC-STATUS: SUSPECT (2026-08-21) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-21 - Buoc 8 doi lai: Do luong la TRANG RIENG /do-luong (user chieu 21/8 dao quyet dinh buoi sang) + them so lieu YouTube Shorts (lib/youtube-metrics.ts, source=youtube trong mkt_metrics, keo moi 30p). vClip giong Adam = wrapper ElevenLabs -> giu ElevenLabs (runbook-elevenlabs-voice.md giai thich). -->
 <!-- re-verified: 2026-08-21 - GIONG DOC ElevenLabs Adam (user muon theo trend TikTok): build-video.mjs ham elevenLabsTTS chay TRUOC edge-tts khi co ELEVENLABS_API_KEY (voice mac dinh Adam, doi bang ELEVENLABS_VOICE_ID, model eleven_multilingual_v2); loi/het quota tu lui edge-tts. Secret khai o video-build.yml; huong dan docs/runbook-elevenlabs-voice.md — CHO USER lay key. Prompt sinh huong di (plan-directions + scripts ban mjs) doi sang tieng Viet CO DAU. -->
 <!-- re-verified: 2026-08-21 - BAN DOC CHE CHU (user gui anh TikTok): bumpers.mjs tinh font slogan theo base=H (doc: 1920) nhung khung chi rong 1080 -> tran 2 mep. Them fitFontPx + drawText nhan maxWidth (W*0.92), ap cho slogan intro, "Goi ngay tong dai", slogan outro (so tong dai da co san logic fit W*0.88). Preview frame doc/ngang kiem tra chu nam gon khung. -->
 <!-- re-verified: 2026-08-21 - DO LUONG thanh TAB trong Quan ly bai viet (/noi-dung?loai=do-luong, section app/noi-dung/do-luong-section.tsx; /do-luong redirect, /do-luong/tuan giu nguyen). Trang moi /tong-quan (Tong quan kenh): 4 the FB/YouTube/TikTok/Zalo + stat tong. Buoc 8 workflow cap nhat theo. -->
@@ -48,7 +50,7 @@ Diễn giải từng bước:
 
 7. Video. Sinh kịch bản từ bài đã đăng, ghép hình từ kho tư liệu, phụ đề bằng Whisper có từ điển thuật ngữ chuyên ngành, chèn nhận diện, xuất bản dọc 60 giây và bản ngang ba tới năm phút. Chỉ dùng tư liệu công ty sở hữu hoặc có giấy phép ghi trong `brand_assets`.
 
-8. Đo lường. Kéo số liệu Google Search Console, Analytics, Facebook Insights, YouTube về `mkt_metrics`. Từ 21/8 Đo lường là tab trong Quản lý bài viết (`/noi-dung?loai=do-luong`, section `app/noi-dung/do-luong-section.tsx`) so sánh tương tác và đơn theo sản phẩm; route cũ `/do-luong` chỉ redirect, báo cáo tuần vẫn ở `/do-luong/tuan`. Trang `/tong-quan` (Tổng quan kênh) nhìn nhanh 4 nền tảng: trạng thái chạy, số bài đã đăng, tổng tương tác Facebook.
+8. Đo lường. Kéo số liệu Google Search Console, Analytics, Facebook Insights, YouTube về `mkt_metrics`. Trang `/do-luong` (section `app/do-luong/do-luong-section.tsx`) so sánh tương tác và đơn theo sản phẩm, kèm bảng số liệu YouTube Shorts (`lib/youtube-metrics.ts` kéo view, like, comment mỗi 30 phút, ghi `mkt_metrics` source youtube); báo cáo tuần ở `/do-luong/tuan`. Trang `/tong-quan` (Tổng quan kênh) nhìn nhanh 4 nền tảng: trạng thái chạy, số bài đã đăng, tổng tương tác Facebook.
 
 9. Con bot định hướng (AI Planner, BOSS). Nhịp từ 20/8: đề xuất SỐNG cập nhật mỗi 30 phút trong cron `mkt-metrics-pull` (trọng số + số bài mỗi sản phẩm + lịch theo ngày + nhóm chia sẻ, xem `lib/plan-live.ts`), mỗi tối từ 21h tự gộp trọng số vào bản đang áp (giữ hướng đi A/B); Chủ nhật 23h học tuần (`lib/learn-weekly.ts`) sinh đề xuất tuần cho người bấm; Thứ 2 và Thứ 6 BOSS sinh bản kế hoạch kèm hướng đi từ tri thức (Gemini, `lib/plan.ts`). Trang `/ke-hoach` để người đọc và chỉnh mục tiêu/focus/nhóm. Vòng 5 AI tổng thể ở [README.md](README.md).
 

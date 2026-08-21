@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { isEmergencyStopped, getPostCount, isQuotaDisabled } from '../../lib/safety';
+import { fbStatus, tiktokStatus } from '../../lib/platform-status';
+import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
+import { zaloOaStatus } from '../../lib/zalo-oa';
 import { toggleEmergencyStop, editDraft } from '../actions';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
@@ -34,11 +37,13 @@ function isFutureVN(s: string): boolean {
   return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 7, +m[5]) > Date.now();
 }
 
+const fmtVN = (n: number) => (n || 0).toLocaleString('vi-VN');
+
 export default async function BangSection() {
   const client = getServerClient();
   const limit = Number(process.env.MKT_MAX_POSTS_PER_DAY) || 3;
 
-  const [stopped, quotaOff, fbCount, ttCount, queueRes, alertRes] = await Promise.all([
+  const [stopped, quotaOff, fbCount, ttCount, queueRes, alertRes, fb, tt, yt, za, allPostsRes] = await Promise.all([
     isEmergencyStopped(client),
     isQuotaDisabled(client),
     getPostCount(client, 'facebook'),
@@ -53,11 +58,24 @@ export default async function BangSection() {
       .from('approval_queue')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending')
-      .neq('kind', 'mkt_publish_content')
+      .neq('kind', 'mkt_publish_content'),
+    fbStatus(),
+    tiktokStatus(),
+    getYouTubeChannelInfo(),
+    zaloOaStatus(client),
+    client.from('mkt_posts').select('channel').eq('status', 'published').limit(1000)
   ]);
 
   const queue = (queueRes.data || []) as any[];
   const otherPending = alertRes.count || 0;
+
+  // Số bài đã đăng theo kênh (cho panel Kênh kết nối + ô thống kê).
+  const postedByChannel = new Map<string, number>();
+  for (const p of allPostsRes.data || []) {
+    const ch = (p as any).channel as string;
+    postedByChannel.set(ch, (postedByChannel.get(ch) || 0) + 1);
+  }
+  const totalPosted = [...postedByChannel.values()].reduce((s, n) => s + n, 0);
 
   // Gom queue theo content_id (bản ghi mới nhất thắng — mỗi bài 1 thẻ).
   type QItem = { qid: string; cid: string; title: string; status: string; createdAt: string; decidedAt: string; scheduledAt: string; payload: any };
@@ -137,14 +155,45 @@ export default async function BangSection() {
     { key: 'rejected', label: 'Từ chối', icon: '⛔', tone: 'no', items: rejected, cap: REJ_CAP, moreHref: '/noi-dung?loai=bai-viet&trangthai=rejected' }
   ];
 
+  // Tổng tương tác Facebook của các bài trên board (bản snapshot mới nhất mỗi bài).
+  let boardEngagement = 0;
+  for (const m of metricsByContent.values()) boardEngagement += (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
+
+  // Panel Kênh kết nối (bố cục theo mẫu user 21/8: kênh bên trái, dòng chảy bài bên phải).
+  const channels = [
+    { icon: '📘', name: 'Facebook', ok: fb.ok, note: fb.ok ? `${fmtVN(postedByChannel.get('facebook') || 0)} bài đã đăng` : 'Cần cấu hình', href: '/facebook' },
+    { icon: '▶️', name: 'YouTube', ok: !!(yt.configured && yt.channelTitle), note: yt.configured && yt.channelTitle ? `${fmtVN(postedByChannel.get('youtube') || 0)} video Shorts` : 'Cần cấu hình', href: '/youtube' },
+    { icon: '🎵', name: 'TikTok', ok: tt.ok, note: tt.ok ? `${fmtVN(postedByChannel.get('tiktok') || 0)} video, chờ audit` : 'Cần cấu hình', href: '/tiktok' },
+    { icon: '💬', name: 'Zalo OA', ok: za.configured, note: za.configured ? 'Sẵn sàng' : 'Chờ thiết lập', href: '/ket-noi' }
+  ];
+
   return (
     <section>
+      {/* Hàng thống kê nhanh (mẫu user: Total Posts, Engagements, Pending, System Status). */}
+      <div className="kpi-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 12 }}>
+        <div className="stat-tile">
+          <div className="stat-num">{fmtVN(totalPosted)}</div>
+          <div className="stat-lbl">Bài đã đăng</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-num">{fmtVN(boardEngagement)}</div>
+          <div className="stat-lbl">Tổng tương tác</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-num">{fmtVN(pending.length)}</div>
+          <div className="stat-lbl">Bài chờ duyệt</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-num" style={stopped ? { color: 'var(--no, #e23b2e)' } : undefined}>{stopped ? '🔴 Dừng' : '🟢 Chạy'}</div>
+          <div className="stat-lbl">Hệ thống</div>
+        </div>
+      </div>
+
       {/* Thanh vận hành gọn: dừng khẩn + hạn mức + hàng đợi khác. Bản đầy đủ ở /van-hanh. */}
       <div className={`card ${stopped ? 'tone-no' : ''}`} style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', padding: '10px 14px', marginBottom: 14 }}>
-        <span>{stopped ? <b style={{ color: 'var(--no, #e23b2e)' }}>🔴 ĐANG DỪNG KHẨN — bài Duyệt sẽ không đăng</b> : <span>🟢 Đang chạy</span>}</span>
         <form action={toggleEmergencyStop} style={{ display: 'inline' }}>
           <input type="hidden" name="on" value={stopped ? '0' : '1'} />
-          <button className={`btn sm ${stopped ? 'ok' : 'no'}`} type="submit">{stopped ? '▶ Bật lại' : '🛑 Dừng khẩn'}</button>
+          <button className={`btn sm ${stopped ? 'ok' : 'no'}`} type="submit">{stopped ? '▶ Bật lại (cho phép đăng)' : '🛑 Dừng khẩn'}</button>
         </form>
         <span className="muted">Hôm nay: FB <b>{fbCount}{quotaOff ? '' : `/${limit}`}</b>, TikTok <b>{ttCount}{quotaOff ? '' : `/${limit}`}</b>{quotaOff ? ' (đang bỏ hạn mức)' : ''}</span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -155,9 +204,26 @@ export default async function BangSection() {
         </span>
       </div>
 
-      {/* Board 4 cột theo dòng chảy bài viết. */}
-      <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(260px, 1fr))', gap: 12, minWidth: 1080, alignItems: 'start' }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* Cột trái: Kênh kết nối. */}
+        <div className="card" style={{ flex: '0 1 230px', minWidth: 200, display: 'grid', gap: 10, padding: 14 }}>
+          <b>Kênh kết nối</b>
+          {channels.map((ch) => (
+            <Link key={ch.name} href={ch.href} style={{ display: 'flex', gap: 8, alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
+              <span aria-hidden="true" style={{ fontSize: 18 }}>{ch.icon}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <b style={{ display: 'block', fontSize: '.9rem' }}>{ch.name}</b>
+                <span className="muted" style={{ fontSize: '.78rem' }}>{ch.note}</span>
+              </span>
+              <span aria-hidden="true">{ch.ok ? '✅' : '🕓'}</span>
+            </Link>
+          ))}
+          <Link className="src" href="/tong-quan" style={{ fontSize: '.85rem' }}>Tổng quan đầy đủ</Link>
+        </div>
+
+        {/* Cột phải: board 4 cột theo dòng chảy bài viết. */}
+        <div style={{ flex: '1 1 640px', minWidth: 0, overflowX: 'auto', paddingBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(250px, 1fr))', gap: 12, minWidth: 1040, alignItems: 'start' }}>
           {columns.map((col) => (
             <div key={col.key} style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px' }}>
@@ -296,6 +362,7 @@ export default async function BangSection() {
               ) : null}
             </div>
           ))}
+        </div>
         </div>
       </div>
     </section>

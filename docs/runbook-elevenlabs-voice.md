@@ -3,6 +3,10 @@
 > Load khi: muốn video dùng giọng Adam theo trend TikTok, hoặc giọng ElevenLabs không kêu, hoặc muốn đổi giọng khác.
 > Trạng thái: code đã sẵn trong `packages/marketing/src/video/build-video.mjs` (21/8). Chỉ chờ secret.
 
+## Vì sao ElevenLabs mà không phải tts.vclip.io
+
+User chỉ video trend dùng tts.vclip.io. Đã tra kỹ (21/8): vClip KHÔNG có API công khai (không docs, không trang API key; backend khóa sau đăng nhập Firebase + reCAPTCHA Enterprise nên không tự động hóa sạch được, lách qua là phạm điều "gặp rào chắn thì dừng"). Quan trọng hơn: giọng "Adam" trên vClip chính là voice **Adam của ElevenLabs** được bọc lại (nhiều nguồn Việt xác nhận, vd anonyviet.com, viettablet.com). Tích hợp thẳng ElevenLabs = lấy đúng giọng đó, hợp lệ, có API chính thức. Nếu nghe thử thấy lệch tông so với video trend thì đổi `ELEVENLABS_VOICE_ID` (Adam có vài biến thể id, xem mục Đổi giọng bên dưới).
+
 ## Cách hoạt động
 
 - Có secret `ELEVENLABS_API_KEY` trong GitHub Actions thì mọi lời thoại video (cả bản ngang lẫn bản dọc) đọc bằng ElevenLabs, giọng mặc định **Adam** (voice id `pNInz6obpgDQGcFmaJgB`), model `eleven_multilingual_v2` (đọc được tiếng Việt).

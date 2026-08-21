@@ -1,10 +1,10 @@
+import { redirect } from 'next/navigation';
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
 import DeleteButton from './delete-button';
 import ShareGroups from './share-groups';
-import DoLuongSection from './do-luong-section';
 import BangSection from './bang-section';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 
@@ -43,15 +43,17 @@ type Content = { id: string; kind: string; title: string; brief: Brief; draft: s
 export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
   // 21/8 gộp lớn (user): mục nav "Bảng bài viết" = duyệt + vận hành + quản lý bài viết trong
   // MỘT trang. Tab mặc định là Bảng (board 4 cột theo dòng chảy); Bài viết (danh sách chi
-  // tiết), Video, Đo lường là các tab còn lại.
+  // tiết) và Video là các tab còn lại. Đo lường tách thành trang riêng /do-luong (user 21/8
+  // chiều) — link cũ ?loai=do-luong chuyển hướng qua đó.
   const loai = searchParams?.loai || '';
-  const tab = loai === 'video' ? 'video' : loai === 'do-luong' ? 'do-luong' : loai === 'bai-viet' ? 'baiviet' : 'bang';
+  if (loai === 'do-luong') redirect('/do-luong');
+  const tab = loai === 'video' ? 'video' : loai === 'bai-viet' ? 'baiviet' : 'bang';
   const kinds = tab === 'video' ? ['video'] : ['article', 'social'];
   const statusFilter = searchParams?.trangthai && STATUS[searchParams.trangthai] ? searchParams.trangthai : null;
 
   // Giữ nguyên loại khi đổi trạng thái, và ngược lại.
   const withParams = (patch: { loai?: string | null; trangthai?: string | null }) => {
-    const keep = tab === 'video' ? 'video' : tab === 'do-luong' ? 'do-luong' : tab === 'baiviet' ? 'bai-viet' : null;
+    const keep = tab === 'video' ? 'video' : tab === 'baiviet' ? 'bai-viet' : null;
     const l = patch.loai !== undefined ? patch.loai : keep;
     const tt = patch.trangthai !== undefined ? patch.trangthai : statusFilter;
     const qs = new URLSearchParams();
@@ -79,9 +81,6 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       <a className={`chip ${tab === 'video' ? 'on' : ''}`} href={withParams({ loai: 'video', trangthai: null })}>
         <span aria-hidden="true">🎬</span> Video <span className="n">{cVid ?? 0}</span>
       </a>
-      <a className={`chip ${tab === 'do-luong' ? 'on' : ''}`} href={withParams({ loai: 'do-luong', trangthai: null })}>
-        <span aria-hidden="true">📈</span> Đo lường
-      </a>
     </nav>
   );
 
@@ -100,23 +99,6 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
         </header>
         {typeChips}
         <BangSection />
-      </main>
-    );
-  }
-
-  // Tab Đo lường: toàn bộ biểu đồ + bảng số liệu nằm trong section riêng, không cần tải
-  // danh sách bài phía dưới.
-  if (tab === 'do-luong') {
-    return (
-      <main>
-        <header className="head-row">
-          <div>
-            <h1>Bảng bài viết</h1>
-            <p className="sub">Số liệu tương tác từng bài và theo sản phẩm. Muốn xem theo tuần thì bấm Báo cáo tuần.</p>
-          </div>
-        </header>
-        {typeChips}
-        <DoLuongSection />
       </main>
     );
   }

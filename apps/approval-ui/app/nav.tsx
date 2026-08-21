@@ -28,6 +28,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
     items: [
       { href: '/tong-quan', label: 'Tổng quan', icon: '📊' },
       { href: '/noi-dung', label: 'Bảng bài viết', icon: '📋' },
+      { href: '/do-luong', label: 'Đo lường', icon: '📈' },
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
       { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' },

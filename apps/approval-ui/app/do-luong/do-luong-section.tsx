@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { refreshFacebookMetrics, setConversions, deleteContent, importManualFacebookPost } from '../actions';
-import BarChart from '../do-luong/bar-chart';
-import PostTitle from '../do-luong/post-title';
-import MetricsAuto from '../do-luong/metrics-auto';
-import RefreshButton from '../do-luong/refresh-button';
+import BarChart from './bar-chart';
+import PostTitle from './post-title';
+import MetricsAuto from './metrics-auto';
+import RefreshButton from './refresh-button';
 // @ts-ignore — module JS thuần
 import { guessGroup } from '../../lib/gen/products.mjs';
 
@@ -50,6 +50,22 @@ export default async function DoLuongSection() {
   const pageMetrics = pageLevel.get('__page_real__') || pageLevel.get('__page__') || null;
   const pageFollowers = Number(pageMetrics?.followers) || 0;
 
+  // Số liệu YouTube Shorts (user 21/8): cron 30 phút ghi source='youtube' (view, like,
+  // comment theo content id). Lấy bản snapshot mới nhất của mỗi bài, hiện bảng riêng.
+  const { data: ytRows } = await client
+    .from('mkt_metrics')
+    .select('entity_ref, metrics, created_at')
+    .eq('source', 'youtube')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  const ytLatest = new Map<string, { views: number; reactions: number; comments: number; videoId?: string }>();
+  for (const r of ytRows || []) {
+    const cid = (r as any).entity_ref as string | null;
+    if (!cid || cid.startsWith('__') || ytLatest.has(cid)) continue;
+    const m = ((r as any).metrics || {}) as any;
+    ytLatest.set(cid, { views: m.views || 0, reactions: m.reactions || 0, comments: m.comments || 0, videoId: m.videoId });
+  }
+
   // Tên sản phẩm của một bài. Ưu tiên: rotation_group folder chuẩn -> guessGroup(rot+kw+title+draft)
   // -> keyword thô -> title thô. Thêm draft (300 ký tự đầu) để bắt bài Xưởng sản xuất tay có title
   // không nêu tên SP nhưng thân bài có (vd "Chạy máy khoẻ..." + thân "Thiết bị lọc dầu SF-50 giúp...").
@@ -67,9 +83,11 @@ export default async function DoLuongSection() {
   };
 
   const cids = [...latest.keys()];
+  // Nạp tên bài cho CẢ bài Facebook lẫn bài chỉ có số liệu YouTube.
+  const allCids = [...new Set([...cids, ...ytLatest.keys()])];
   const contents = new Map<string, { title: string; product: string; conversions: number; draft: string }>();
-  if (cids.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, title, brief, draft').in('id', cids);
+  if (allCids.length) {
+    const { data: cs } = await client.from('mkt_content').select('id, title, brief, draft').in('id', allCids);
     for (const c of cs || []) {
       const brief = (c as any).brief || {};
       contents.set((c as any).id, {
@@ -192,11 +210,11 @@ export default async function DoLuongSection() {
         ) : null}
       </section>
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && ytLatest.size === 0 ? (
         <div className="empty">
           <div className="empty-icon" aria-hidden="true">📊</div>
           <p>Chưa có số liệu.</p>
-          <p className="sub">Đăng bài lên Facebook, chờ có tương tác, rồi bấm <b>Cập nhật số liệu</b>. (TikTok chưa lấy được vì app chưa audit.)</p>
+          <p className="sub">Đăng bài lên Facebook hoặc YouTube, chờ có tương tác, rồi bấm <b>Cập nhật số liệu</b>. (TikTok chưa lấy được vì app chưa audit.)</p>
         </div>
       ) : (
         <>
@@ -276,9 +294,38 @@ export default async function DoLuongSection() {
               </tbody>
             </table>
           </div>
+          {ytLatest.size ? (
+            <>
+              <h2 style={{ marginTop: 24 }}>▶️ YouTube Shorts</h2>
+              <div className="tablewrap">
+                <table className="datatable">
+                  <thead>
+                    <tr><th>Tên bài</th><th>Lượt xem</th><th>Like</th><th>Comment</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {[...ytLatest.entries()]
+                      .sort((a, b) => b[1].views - a[1].views)
+                      .map(([cid, m]) => (
+                        <tr key={cid}>
+                          <td className="cell-title">{contents.get(cid)?.title || '(không rõ)'}</td>
+                          <td>{fmt(m.views)}</td>
+                          <td>{m.reactions}</td>
+                          <td>{m.comments}</td>
+                          <td>
+                            {m.videoId ? (
+                              <a className="src" href={`https://youtube.com/shorts/${m.videoId}`} target="_blank" rel="noreferrer">↗ Mở video</a>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
           <p className="muted" style={{ marginTop: 10, fontSize: '.85rem' }}>
             <b>Lượt xem</b>, <b>Người xem</b> và <b>Giây xem</b> (video) cần quyền <b>read_insights</b> trên trang Facebook. Chưa cấp thì
-            các cột này để trống, còn Like/Comment/Share vẫn có. TikTok chưa lấy được số liệu vì app chưa qua audit.
+            các cột này để trống, còn Like/Comment/Share vẫn có. Số liệu YouTube Shorts kéo qua YouTube API mỗi 30 phút. TikTok chưa lấy được số liệu vì app chưa qua audit.
           </p>
         </>
       )}

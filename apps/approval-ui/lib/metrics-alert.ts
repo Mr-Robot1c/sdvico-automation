@@ -32,11 +32,11 @@ export async function metricsAlert(client: Client): Promise<{ alert: MetricsAler
   let message: string;
   if (!pull) {
     message = hM == null
-      ? 'Chưa có lượt kéo số liệu Facebook nào được ghi nhận. Cron mkt-metrics-pull (Vercel 20h VN / GitHub 30 phút) chưa chạy — kiểm tra GitHub Actions, hoặc bấm "Cập nhật số liệu" ở tab Đo lường trong Quản lý bài viết để chạy tay.'
+      ? 'Chưa có lượt kéo số liệu Facebook nào được ghi nhận. Cron mkt-metrics-pull (Vercel 20h VN / GitHub 30 phút) chưa chạy — kiểm tra GitHub Actions, hoặc bấm "Cập nhật số liệu" ở trang Đo lường để chạy tay.'
       : `Đã ${Math.floor(hM)} giờ không có số liệu Facebook mới và không thấy lượt kéo nào được ghi nhận — cron có thể đã dừng.`;
   } else if (pull.status === 'error' || pulled === 0) {
     const why = errs.length ? errs[0] : 'không kéo được bài nào';
-    message = `Lượt kéo gần nhất lúc ${fmtVN(pull.created_at)} CÓ chạy nhưng không lấy được số liệu — Facebook trả: "${why}". ${errs.length > 1 ? `(và ${errs.length - 1} lỗi khác) ` : ''}Bấm "Cập nhật số liệu" ở tab Đo lường trong Quản lý bài viết để chạy lại sau khi sửa.`;
+    message = `Lượt kéo gần nhất lúc ${fmtVN(pull.created_at)} CÓ chạy nhưng không lấy được số liệu — Facebook trả: "${why}". ${errs.length > 1 ? `(và ${errs.length - 1} lỗi khác) ` : ''}Bấm "Cập nhật số liệu" ở trang Đo lường để chạy lại sau khi sửa.`;
   } else {
     message = `Lượt kéo gần nhất lúc ${fmtVN(pull.created_at)} lấy được ${pulled} bài nhưng bảng Đo lường ${hM == null ? 'vẫn trống' : `đã ${Math.floor(hM)} giờ chưa có dòng mới`} — cần kiểm tra lại.`;
   }

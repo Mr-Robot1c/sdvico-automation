@@ -48,10 +48,10 @@ export default async function Page() {
       .limit(1000),
     client
       .from('mkt_metrics')
-      .select('entity_ref, metrics, created_at')
-      .eq('source', 'facebook')
+      .select('source, entity_ref, metrics, created_at')
+      .in('source', ['facebook', 'youtube'])
       .order('created_at', { ascending: false })
-      .limit(500),
+      .limit(600),
     client
       .from('approval_queue')
       .select('*', { count: 'exact', head: true })
@@ -70,15 +70,18 @@ export default async function Page() {
     byChannel.set(ch, e);
   }
 
-  // Tổng số liệu Facebook: bản snapshot mới nhất của từng bài. entity_ref '__page__' và
-  // '__page_real__' là số liệu page-level (follower), chặn theo tiền tố (bài học lib/plan.ts).
+  // Tổng số liệu theo kênh: bản snapshot mới nhất của từng bài, tách Facebook / YouTube.
+  // entity_ref '__page__' và '__page_real__' là số liệu page-level (follower), chặn theo
+  // tiền tố (bài học lib/plan.ts).
   const latest = new Map<string, M>();
+  const ytLatest = new Map<string, M>();
   const pageLevel = new Map<string, any>();
   for (const r of metricsRes.data || []) {
     const cid = (r as any).entity_ref as string | null;
     if (!cid) continue;
     if (cid.startsWith('__')) { if (!pageLevel.has(cid)) pageLevel.set(cid, (r as any).metrics || {}); continue; }
-    if (!latest.has(cid)) latest.set(cid, ((r as any).metrics || {}) as M);
+    const bag = (r as any).source === 'youtube' ? ytLatest : latest;
+    if (!bag.has(cid)) bag.set(cid, ((r as any).metrics || {}) as M);
   }
   const pageMetrics = pageLevel.get('__page_real__') || pageLevel.get('__page__') || null;
   const followers = Number(pageMetrics?.followers) || 0;
@@ -90,6 +93,12 @@ export default async function Page() {
     tViews += m.views || 0;
   }
   const tEngagement = tReactions + tComments + tShares;
+  let yViews = 0, yLikes = 0, yComments = 0;
+  for (const m of ytLatest.values()) {
+    yViews += m.views || 0;
+    yLikes += m.reactions || 0;
+    yComments += m.comments || 0;
+  }
 
   const pendingCount = pendingRes.count || 0;
   const totalPosted = [...byChannel.values()].reduce((s, e) => s + e.count, 0);
@@ -128,7 +137,7 @@ export default async function Page() {
         ...(followers ? [{ label: 'Người theo dõi', value: fmt(followers) }] : [])
       ],
       statsNote: null,
-      detailHref: '/noi-dung?loai=do-luong',
+      detailHref: '/do-luong',
       detailLabel: '📈 Số liệu từng bài',
       connectHref: '/facebook'
     },
@@ -141,10 +150,16 @@ export default async function Page() {
         : yt.configured
           ? `Token lỗi: ${yt.error || 'không rõ'}. Chế độ Testing hết hạn sau 7 ngày, lấy token mới theo runbook.`
           : 'Chưa cấu hình 3 biến YOUTUBE_* trên Vercel.',
-      stats: null,
-      statsNote: 'Số liệu xem trực tiếp trên YouTube Studio, hệ thống chưa kéo tự động.',
-      detailHref: '/youtube',
-      detailLabel: 'Chi tiết kết nối',
+      stats: ytLatest.size
+        ? [
+            { label: 'Lượt xem', value: fmt(yViews) },
+            { label: 'Like', value: fmt(yLikes) },
+            { label: 'Comment', value: fmt(yComments) }
+          ]
+        : null,
+      statsNote: ytLatest.size ? null : 'Chưa có số liệu, cron 30 phút sẽ kéo sau khi video đầu tiên đăng.',
+      detailHref: '/do-luong',
+      detailLabel: '📈 Số liệu từng bài',
       connectHref: '/youtube'
     },
     {

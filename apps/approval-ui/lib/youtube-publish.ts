@@ -32,7 +32,8 @@ export type YouTubeUploadResult = {
 
 // Doi refresh_token lay access_token moi. Google access_token song 1h; refresh_token vinh
 // vien voi app "In production" (7 ngay voi app "Testing" — luu y trong runbook).
-async function getAccessToken(): Promise<string> {
+// export (21/8): lib/youtube-metrics.ts dung chung de keo so lieu videos.list.
+export async function getAccessToken(): Promise<string> {
   const clientId = (process.env.YOUTUBE_CLIENT_ID || '').trim();
   const clientSecret = (process.env.YOUTUBE_CLIENT_SECRET || '').trim();
   const refreshToken = (process.env.YOUTUBE_REFRESH_TOKEN || '').trim();

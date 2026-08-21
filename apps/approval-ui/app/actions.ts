@@ -662,14 +662,18 @@ export async function setConversions(formData: FormData) {
   const brief = (((c as any)?.brief as Record<string, unknown>) || {}) as Record<string, unknown>;
   brief.conversions = n;
   await client.from('mkt_content').update({ brief }).eq('id', contentId);
-  revalidatePath('/noi-dung');
+  revalidatePath('/do-luong');
 }
 
-// Cập nhật số liệu Facebook thủ công (nút trên trang Đo lường).
+// Cập nhật số liệu thủ công (nút trên trang Đo lường): Facebook + YouTube Shorts.
 export async function refreshFacebookMetrics() {
   const client = getServerClient();
   await pullFacebookMetrics(client);
-  revalidatePath('/noi-dung');
+  try {
+    const { pullYouTubeMetrics } = await import('../lib/youtube-metrics');
+    await pullYouTubeMetrics(client);
+  } catch { /* YouTube loi khong chan phan Facebook */ }
+  revalidatePath('/do-luong');
 }
 
 // Bóc id đối tượng Graph từ mọi dạng link Facebook người dùng dán vào (bài đăng TAY trên Page).
@@ -713,12 +717,12 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   const say = async (status: 'ok' | 'error', msg: string, extra: any = {}) => {
     try { await client.from('run_log').insert({ task: 'mkt.import_manual_post', actor: 'do-luong', status, detail: { link, msg, ...extra } }); } catch { /* bỏ qua */ }
   };
-  if (!link) { await say('error', 'thiếu link'); revalidatePath('/noi-dung'); return; }
+  if (!link) { await say('error', 'thiếu link'); revalidatePath('/do-luong'); return; }
   // Ưu tiên token page CHÍNH THỨC (bài đăng tay thường ở page chính thức), rồi tới page test.
   const tokens = [...fbPageTokens()].sort((a, b) => (a.label === 'real' ? -1 : 1) - (b.label === 'real' ? -1 : 1));
-  if (!tokens.length) { await say('error', 'chưa cấu hình Facebook token'); revalidatePath('/noi-dung'); return; }
+  if (!tokens.length) { await say('error', 'chưa cấu hình Facebook token'); revalidatePath('/do-luong'); return; }
   const parsed = facebookObjectIdFromLink(link);
-  if (!parsed) { await say('error', 'không nhận ra dạng link Facebook'); revalidatePath('/noi-dung'); return; }
+  if (!parsed) { await say('error', 'không nhận ra dạng link Facebook'); revalidatePath('/do-luong'); return; }
 
   // Kiểm bài có thật + tìm token của page SỞ HỮU bài (thử lần lượt; Graph trả lỗi nếu token không
   // có quyền đọc bài đó). Token nào đọc được là token đúng page -> dùng luôn pageId của token đó.
@@ -732,7 +736,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   }
   if (!j || !usedToken) {
     await say('error', 'Facebook không trả bài này. Nếu là bài trên page chính thức, cần cấu hình FACEBOOK_REAL_PAGE_ACCESS_TOKEN (token page đó, có quyền read_insights). Lỗi cuối: ' + lastErr);
-    revalidatePath('/noi-dung');
+    revalidatePath('/do-luong');
     return;
   }
   const pageId = usedToken.pageId || process.env.FACEBOOK_PAGE_ID || '';
@@ -743,7 +747,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
 
   // Đã nhập rồi thì thôi (khử trùng theo external_url).
   const { data: dup } = await client.from('mkt_posts').select('content_id').eq('channel', 'facebook').eq('external_url', externalUrl).limit(1);
-  if (dup && dup.length) { await say('ok', 'bài đã có trong hệ thống', { content_id: dup[0].content_id }); await pullFacebookMetrics(client); revalidatePath('/noi-dung'); return; }
+  if (dup && dup.length) { await say('ok', 'bài đã có trong hệ thống', { content_id: dup[0].content_id }); await pullFacebookMetrics(client); revalidatePath('/do-luong'); return; }
 
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: parsed.kind === 'post' ? 'social' : 'video',
@@ -753,7 +757,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
     status: 'published',
     needs_gov_review: false,
   }).select('id').single();
-  if (ce || !ins) { await say('error', 'không lưu được bài: ' + (ce?.message || '')); revalidatePath('/noi-dung'); return; }
+  if (ce || !ins) { await say('error', 'không lưu được bài: ' + (ce?.message || '')); revalidatePath('/do-luong'); return; }
   await client.from('mkt_posts').insert({
     content_id: (ins as any).id, channel: 'facebook', status: 'published', external_url: externalUrl,
     published_at: j.created_time ? new Date(j.created_time).toISOString() : new Date().toISOString(),
@@ -761,7 +765,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   // Kéo số liệu ngay để người dùng thấy liền.
   await pullFacebookMetrics(client);
   await say('ok', `đã nhập + kéo số liệu (page ${usedToken.label === 'real' ? 'chính thức' : 'test'})`, { content_id: (ins as any).id, graphId, page: usedToken.label });
-  revalidatePath('/noi-dung');
+  revalidatePath('/do-luong');
 }
 
 // Thêm một từ khóa vào kho.
@@ -1147,9 +1151,9 @@ export async function deleteContent(formData: FormData) {
     client.from('mkt_metrics').delete().eq('entity_ref', id)
   ]);
   await client.from('mkt_content').delete().eq('id', id);
-  // Chỉ revalidate trang đang đứng (/noi-dung); các trang khác (/, /do-luong) đều force-dynamic
-  // nên tự lấy dữ liệu mới khi mở. Bớt 2 lần revalidate = phản hồi nhanh hơn khi xoá liên tiếp.
+  // Xoá được gọi từ cả Bảng bài viết lẫn trang Đo lường -> revalidate cả hai.
   revalidatePath('/noi-dung');
+  revalidatePath('/do-luong');
 }
 
 // Sinh text cho khung sản xuất: nhập từ khóa (kèm intent/landing_url tùy chọn), trả bản nháp
@@ -1258,7 +1262,6 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
   // treo lâu ở client.
   revalidatePath('/hang-doi');
   revalidatePath('/noi-dung');
-  revalidatePath('/noi-dung');
 
   // Đã yêu cầu video: kích hoạt GitHub Actions dựng ngay (thay vì chờ cron 10 phút). Không chờ
   // response - "fire and forget" (workflow chạy ~8 phút, client sẽ tự polling checkVideoDone).
@@ -1315,7 +1318,6 @@ export async function editDraft(formData: FormData) {
   const { error } = await client.from('mkt_content').update({ draft }).eq('id', contentId);
   if (error) throw new Error(error.message);
   revalidatePath('/hang-doi');
-  revalidatePath('/noi-dung');
   revalidatePath('/noi-dung');
 }
 
