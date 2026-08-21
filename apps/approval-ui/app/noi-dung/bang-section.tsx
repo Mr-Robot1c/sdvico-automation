@@ -1,9 +1,6 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { isEmergencyStopped, getPostCount, isQuotaDisabled } from '../../lib/safety';
-import { fbStatus, tiktokStatus } from '../../lib/platform-status';
-import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
-import { zaloOaStatus } from '../../lib/zalo-oa';
 import { toggleEmergencyStop, editDraft } from '../actions';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
@@ -43,7 +40,7 @@ export default async function BangSection() {
   const client = getServerClient();
   const limit = Number(process.env.MKT_MAX_POSTS_PER_DAY) || 3;
 
-  const [stopped, quotaOff, fbCount, ttCount, queueRes, alertRes, fb, tt, yt, za, allPostsRes] = await Promise.all([
+  const [stopped, quotaOff, fbCount, ttCount, queueRes, alertRes] = await Promise.all([
     isEmergencyStopped(client),
     isQuotaDisabled(client),
     getPostCount(client, 'facebook'),
@@ -58,24 +55,11 @@ export default async function BangSection() {
       .from('approval_queue')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending')
-      .neq('kind', 'mkt_publish_content'),
-    fbStatus(),
-    tiktokStatus(),
-    getYouTubeChannelInfo(),
-    zaloOaStatus(client),
-    client.from('mkt_posts').select('channel').eq('status', 'published').limit(1000)
+      .neq('kind', 'mkt_publish_content')
   ]);
 
   const queue = (queueRes.data || []) as any[];
   const otherPending = alertRes.count || 0;
-
-  // Số bài đã đăng theo kênh (cho panel Kênh kết nối + ô thống kê).
-  const postedByChannel = new Map<string, number>();
-  for (const p of allPostsRes.data || []) {
-    const ch = (p as any).channel as string;
-    postedByChannel.set(ch, (postedByChannel.get(ch) || 0) + 1);
-  }
-  const totalPosted = [...postedByChannel.values()].reduce((s, n) => s + n, 0);
 
   // Gom queue theo content_id (bản ghi mới nhất thắng — mỗi bài 1 thẻ).
   type QItem = { qid: string; cid: string; title: string; status: string; createdAt: string; decidedAt: string; scheduledAt: string; payload: any };
@@ -160,74 +144,26 @@ export default async function BangSection() {
     { key: 'rejected', label: 'Từ chối', icon: '⛔', tone: 'rejected', items: rejected, cap: REJ_CAP, moreHref: '/noi-dung?loai=bai-viet&trangthai=rejected' }
   ];
 
-  // Tổng tương tác của các bài trên board (Facebook + YouTube, bản snapshot mới nhất mỗi bài).
-  let boardEngagement = 0;
-  for (const m of metricsByContent.values()) boardEngagement += (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
-  let ytViews = 0;
-  for (const m of ytByContent.values()) { boardEngagement += (m.reactions || 0) + (m.comments || 0); ytViews += m.views || 0; }
-
-  // Panel Kênh kết nối (bố cục theo mẫu user 21/8: kênh bên trái, dòng chảy bài bên phải).
-  const channels = [
-    { icon: '📘', name: 'Facebook', ok: fb.ok, note: fb.ok ? `${fmtVN(postedByChannel.get('facebook') || 0)} bài đã đăng` : 'Cần cấu hình', href: '/facebook' },
-    { icon: '▶️', name: 'YouTube', ok: !!(yt.configured && yt.channelTitle), note: yt.configured && yt.channelTitle ? `${fmtVN(postedByChannel.get('youtube') || 0)} video${ytViews ? `, ${fmtVN(ytViews)} lượt xem` : ''}` : 'Cần cấu hình', href: '/youtube' },
-    { icon: '🎵', name: 'TikTok', ok: tt.ok, note: tt.ok ? `${fmtVN(postedByChannel.get('tiktok') || 0)} video, chờ audit` : 'Cần cấu hình', href: '/tiktok' },
-    { icon: '💬', name: 'Zalo OA', ok: za.configured, note: za.configured ? 'Sẵn sàng' : 'Chờ thiết lập', href: '/ket-noi' }
-  ];
-
   return (
     <section>
-      {/* Hàng trên theo mẫu user: 4 thẻ thống kê + ô vận hành (dừng khẩn, hạn mức) bên phải. */}
-      <div className="board-top">
-        <div className="board-stat">
-          <div className="stat-lbl">Bài đã đăng</div>
-          <div className="stat-num">{fmtVN(totalPosted)}</div>
-        </div>
-        <div className="board-stat">
-          <div className="stat-lbl">Tổng tương tác</div>
-          <div className="stat-num">{fmtVN(boardEngagement)}</div>
-        </div>
-        <div className="board-stat">
-          <div className="stat-lbl">Bài chờ duyệt</div>
-          <div className="stat-num" style={pending.length ? { color: 'var(--tone-mkt)' } : undefined}>{fmtVN(pending.length)}</div>
-        </div>
-        <div className="board-stat">
-          <div className="stat-lbl">Hệ thống</div>
-          <div className="stat-num" style={{ color: stopped ? 'var(--no)' : 'var(--ok)' }}>{stopped ? 'Dừng khẩn' : 'Đang chạy'}</div>
-        </div>
-        <div className="board-ops">
-          <form action={toggleEmergencyStop}>
-            <input type="hidden" name="on" value={stopped ? '0' : '1'} />
-            <button className={`btn sm ${stopped ? 'ok' : 'no'}`} type="submit">{stopped ? '▶ Bật lại (cho phép đăng)' : '🛑 Dừng khẩn'}</button>
-          </form>
-          <span className="muted" style={{ fontSize: '.82rem' }}>Hôm nay: FB <b>{fbCount}{quotaOff ? '' : `/${limit}`}</b>, TikTok <b>{ttCount}{quotaOff ? '' : `/${limit}`}</b>{quotaOff ? ' (đang bỏ hạn mức)' : ''}</span>
-          <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: '.85rem' }}>
-            {otherPending ? (
-              <Link className="src" href="/hang-doi" title="Hồ sơ HR và cảnh báo hệ thống chờ xử lý">⚠ {otherPending.toLocaleString('vi-VN')} mục chờ khác</Link>
-            ) : null}
-            <Link className="src" href="/van-hanh">Vận hành chi tiết</Link>
-          </span>
-        </div>
+      {/* Thanh vận hành: dừng khẩn + hạn mức ngày. Bản đầy đủ ở /van-hanh. */}
+      <div className={`card ${stopped ? 'tone-no' : ''}`} style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', padding: '10px 14px', marginBottom: 14 }}>
+        <span>{stopped ? <b style={{ color: 'var(--no)' }}>🔴 ĐANG DỪNG KHẨN — bài Duyệt sẽ không đăng</b> : <span>🟢 Đang chạy</span>}</span>
+        <form action={toggleEmergencyStop} style={{ display: 'inline' }}>
+          <input type="hidden" name="on" value={stopped ? '0' : '1'} />
+          <button className={`btn sm ${stopped ? 'ok' : 'no'}`} type="submit">{stopped ? '▶ Bật lại (cho phép đăng)' : '🛑 Dừng khẩn'}</button>
+        </form>
+        <span className="muted" style={{ fontSize: '.85rem' }}>Hôm nay: FB <b>{fbCount}{quotaOff ? '' : `/${limit}`}</b>, TikTok <b>{ttCount}{quotaOff ? '' : `/${limit}`}</b>{quotaOff ? ' (đang bỏ hạn mức)' : ''}</span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: '.85rem' }}>
+          {otherPending ? (
+            <Link className="src" href="/hang-doi" title="Hồ sơ HR và cảnh báo hệ thống chờ xử lý">⚠ {otherPending.toLocaleString('vi-VN')} mục chờ khác</Link>
+          ) : null}
+          <Link className="src" href="/van-hanh">Vận hành chi tiết</Link>
+        </span>
       </div>
 
-      <div className="board-body">
-        {/* Cột trái: Kênh kết nối. */}
-        <div className="chan-panel">
-          <b>Kênh kết nối</b>
-          {channels.map((ch) => (
-            <Link key={ch.name} href={ch.href} className="chan-item">
-              <span className="chan-icon" aria-hidden="true">{ch.icon}</span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <b style={{ display: 'block', fontSize: '.88rem' }}>{ch.name}</b>
-                <span className="muted" style={{ fontSize: '.76rem' }}>{ch.note}</span>
-              </span>
-              <span aria-hidden="true">{ch.ok ? '✅' : '🕓'}</span>
-            </Link>
-          ))}
-          <Link className="src" href="/do-luong" style={{ fontSize: '.85rem', justifySelf: 'start' }}>📈 Đo lường chi tiết</Link>
-        </div>
-
-        {/* Cột phải: board 4 cột theo dòng chảy bài viết. */}
-        <div className="kanban-wrap">
+      {/* Board 4 cột theo dòng chảy bài viết, chiếm trọn chiều ngang. */}
+      <div className="kanban-wrap">
         <div className="kanban">
           {columns.map((col) => (
             <div key={col.key} className="kanban-col">
@@ -374,7 +310,6 @@ export default async function BangSection() {
               ) : null}
             </div>
           ))}
-        </div>
         </div>
       </div>
     </section>

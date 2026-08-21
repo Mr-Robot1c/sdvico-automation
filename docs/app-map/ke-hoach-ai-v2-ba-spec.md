@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-21
 ttl_days: 90
+<!-- re-verified: 2026-08-21 - NV11 A/B: ban B CHI sinh tu ngay hom sau (rotate loc pending B theo dayVN(a_at) != hom nay) — truoc slot chieu sinh B cung ngay voi A (user bat 21/8). Bai B sai lich da xoa, huong tra ve cho B. -->
 <!-- re-verified: 2026-08-21 - Bo giong ElevenLabs khoi build-video.mjs (user doi y) — TTS ve edge-tts, khong doi hanh vi NV nao. -->
 <!-- re-verified: 2026-08-21 - Huong di BOSS viet CO DAU (prompt plan-directions co dau + rang buoc); /ke-hoach huong rejected hien "da loai" thay vi "xong cap"; data plan dang ap viet lai co dau. Khong doi flow NV nao. -->
 <!-- re-verified: 2026-08-21 - bumpers.mjs (packages/marketing/src/video) fit chu khung doc — khong doi hanh vi NV nao cua ba-spec (chi trinh bay intro/outro video). -->

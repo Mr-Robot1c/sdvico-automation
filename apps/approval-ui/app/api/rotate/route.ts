@@ -215,14 +215,18 @@ export async function GET(req: Request) {
   // vẫn so được cặp (cùng ab_pair_id). Bài bán từ kế hoạch: 1/ngày + 1 bài content.
   type Suggestion = {
     title: string; why: string; product: string; kind: string;
-    sources?: string[]; needs_gov_review?: boolean; used_at?: string; pending_variant?: 'B';
+    sources?: string[]; needs_gov_review?: boolean; used_at?: string; pending_variant?: 'B'; a_at?: string;
   };
   const allSuggestions: Suggestion[] = Array.isArray(appliedPlan?.data?.content_suggestions)
     ? appliedPlan!.data.content_suggestions
     : [];
   // Ưu tiên hướng đang chờ bản B (đã có A hôm trước), rồi mới tới hướng chưa dùng.
+  // BẢN B CHỈ SINH TỪ NGÀY HÔM SAU (user 21/8: slot chiều rút pending B sinh B ngay cùng
+  // ngày với A sáng — sai quy tắc "A hôm nay, hôm sau bản B"). So theo ngày giờ VN của a_at.
+  const dayVNOf = (iso?: string) => (iso ? new Date(new Date(iso).getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10) : '');
+  const todayVNStr = dayVNOf(new Date().toISOString());
   const candidateSuggestions = [
-    ...allSuggestions.filter((s) => !s.used_at && s.pending_variant === 'B'),
+    ...allSuggestions.filter((s) => !s.used_at && s.pending_variant === 'B' && dayVNOf(s.a_at) !== todayVNStr),
     ...allSuggestions.filter((s) => !s.used_at && !s.pending_variant),
   ];
 

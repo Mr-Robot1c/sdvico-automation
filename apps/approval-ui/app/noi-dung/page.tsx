@@ -6,6 +6,7 @@ import { editDraft } from '../actions';
 import DeleteButton from './delete-button';
 import ShareGroups from './share-groups';
 import BangSection from './bang-section';
+import TongQuanSection from './tong-quan-section';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 
 export const dynamic = 'force-dynamic';
@@ -41,13 +42,12 @@ type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Fl
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
 export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
-  // 21/8 gộp lớn (user): mục nav "Bảng bài viết" = duyệt + vận hành + quản lý bài viết trong
-  // MỘT trang. Tab mặc định là Bảng (board 4 cột theo dòng chảy); Bài viết (danh sách chi
-  // tiết) và Video là các tab còn lại. Đo lường tách thành trang riêng /do-luong (user 21/8
-  // chiều) — link cũ ?loai=do-luong chuyển hướng qua đó.
+  // 21/8 đêm (user chốt lại): tab MẶC ĐỊNH là Tổng quan — mỗi nền tảng một thẻ, thoáng, bấm
+  // vào xem chi tiết. Kanban duyệt + vận hành nằm ở tab "Bảng bài viết" (?loai=bang); Bài
+  // viết / Video là danh sách chi tiết. Đo lường là trang riêng /do-luong.
   const loai = searchParams?.loai || '';
   if (loai === 'do-luong') redirect('/do-luong');
-  const tab = loai === 'video' ? 'video' : loai === 'bai-viet' ? 'baiviet' : 'bang';
+  const tab = loai === 'video' ? 'video' : loai === 'bai-viet' ? 'baiviet' : loai === 'bang' ? 'bang' : 'tong-quan';
   const kinds = tab === 'video' ? ['video'] : ['article', 'social'];
   const statusFilter = searchParams?.trangthai && STATUS[searchParams.trangthai] ? searchParams.trangthai : null;
 
@@ -72,8 +72,11 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
 
   const typeChips = (
     <nav className="filters" aria-label="Loại nội dung">
-      <a className={`chip ${tab === 'bang' ? 'on' : ''}`} href="/noi-dung">
-        <span aria-hidden="true">📋</span> Bảng
+      <a className={`chip ${tab === 'tong-quan' ? 'on' : ''}`} href="/noi-dung">
+        <span aria-hidden="true">📊</span> Tổng quan
+      </a>
+      <a className={`chip ${tab === 'bang' ? 'on' : ''}`} href={withParams({ loai: 'bang', trangthai: null })}>
+        <span aria-hidden="true">📋</span> Bảng bài viết
       </a>
       <a className={`chip ${tab === 'baiviet' ? 'on' : ''}`} href={withParams({ loai: 'bai-viet', trangthai: null })}>
         <span aria-hidden="true">📝</span> Bài viết <span className="n">{cBai ?? 0}</span>
@@ -84,14 +87,33 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     </nav>
   );
 
-  // Tab Bảng (mặc định): board duyệt + vận hành, không cần tải danh sách phía dưới.
-  if (tab === 'bang') {
+  // Tab Tổng quan (mặc định): các nền tảng đang làm tốt cỡ nào, bấm thẻ xem chi tiết.
+  if (tab === 'tong-quan') {
     return (
       <main>
         <header className="head-row">
           <div>
             <h1>Tổng quan</h1>
-            <p className="sub">Kênh bên trái, bài chạy từ trái sang phải: chờ duyệt, đã duyệt, đã đăng. Duyệt ngay trên thẻ.</p>
+            <p className="sub">Mỗi nền tảng đang chạy tới đâu, số liệu ra sao. Bấm vào thẻ để xem chi tiết.</p>
+          </div>
+          <div className="head-actions">
+            <AutoRefresh seconds={60} />
+          </div>
+        </header>
+        {typeChips}
+        <TongQuanSection />
+      </main>
+    );
+  }
+
+  // Tab Bảng bài viết: board duyệt + vận hành.
+  if (tab === 'bang') {
+    return (
+      <main>
+        <header className="head-row">
+          <div>
+            <h1>Bảng bài viết</h1>
+            <p className="sub">Bài chạy từ trái sang phải: chờ duyệt, đã duyệt, đã đăng. Duyệt ngay trên thẻ.</p>
           </div>
           <div className="head-actions">
             <AutoRefresh seconds={30} />

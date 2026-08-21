@@ -4,7 +4,6 @@
 covers: packages/marketing
 last_verified: 2026-08-21
 ttl_days: 180
-<!-- DOC-STATUS: SUSPECT (2026-08-21) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- re-verified: 2026-08-21 - BO GIONG ADAM (user doi y): go elevenLabsTTS khoi build-video.mjs, TTS ve edge-tts NamMinh nhu cu; xoa runbook + env workflow. UI: Tong quan GOP voi Bang bai viet tai /noi-dung theo mau user. -->
 <!-- re-verified: 2026-08-21 - Buoc 8 doi lai: Do luong la TRANG RIENG /do-luong (user chieu 21/8 dao quyet dinh buoi sang) + them so lieu YouTube Shorts (lib/youtube-metrics.ts, source=youtube trong mkt_metrics, keo moi 30p). vClip giong Adam = wrapper ElevenLabs -> giu ElevenLabs (runbook-elevenlabs-voice.md giai thich). -->
 <!-- re-verified: 2026-08-21 - GIONG DOC ElevenLabs Adam (user muon theo trend TikTok): build-video.mjs ham elevenLabsTTS chay TRUOC edge-tts khi co ELEVENLABS_API_KEY (voice mac dinh Adam, doi bang ELEVENLABS_VOICE_ID, model eleven_multilingual_v2); loi/het quota tu lui edge-tts. Secret khai o video-build.yml; huong dan docs/runbook-elevenlabs-voice.md — CHO USER lay key. Prompt sinh huong di (plan-directions + scripts ban mjs) doi sang tieng Viet CO DAU. -->
