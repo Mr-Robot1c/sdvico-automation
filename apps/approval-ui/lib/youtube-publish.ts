@@ -103,16 +103,19 @@ function makeTitle(rawTitle: string, caption: string): string {
 
 function makeDescription(caption: string): string {
   const body = String(caption || '').trim();
-  // #Shorts + kem CTA + link Page/website (tuan brand-voice, khong gach dai/mui ten).
-  const tail = [
-    '',
-    '',
-    'Nhan tin cho Page SDVICO hoac goi tong dai 1900 23 23 49 de duoc tu van, bao gia va lap dat tan ben.',
-    'Website: https://sdvico.vn',
-    '',
-    '#Shorts #SDVICO #tauca #thietbitauca'
-  ].join('\n');
-  return truncate(body + tail, 5000);
+  const parts: string[] = [body];
+  // Caption bài thường ĐÃ có sẵn câu mời nhắn Page + số tổng đài — chỉ thêm khi chưa có,
+  // tránh mô tả lặp 2 lần cùng một ý (user bắt 21/8 trên video Shorts đầu tiên). Câu thêm
+  // viết CÓ DẤU cho tử tế.
+  if (!/1900\s*23\s*23\s*49/.test(body) && !/nhắn tin cho page/i.test(body)) {
+    parts.push('', 'Nhắn tin cho Page SDVICO hoặc gọi tổng đài 1900 23 23 49 để được tư vấn, báo giá và lắp đặt tận bến.');
+  }
+  if (!/sdvico\.vn/i.test(body)) parts.push('Website: https://sdvico.vn');
+  // #Shorts bắt buộc để YouTube nhận dạng Shorts; các thẻ khác chỉ thêm nếu caption chưa có.
+  const lower = body.toLowerCase();
+  const tags = ['#Shorts', '#SDVICO', '#tauca', '#thietbitauca'].filter((t) => !lower.includes(t.toLowerCase()));
+  if (tags.length) parts.push('', tags.join(' '));
+  return truncate(parts.join('\n'), 5000);
 }
 
 // Upload video theo cach RESUMABLE: (1) POST metadata + header X-Upload-Content-Type ->
