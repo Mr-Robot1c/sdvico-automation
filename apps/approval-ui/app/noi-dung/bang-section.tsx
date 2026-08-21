@@ -137,9 +137,10 @@ export default async function BangSection() {
   const PUB_CAP = 12;
   const REJ_CAP = 8;
 
+  // Bỏ cột "Đã duyệt" (user 21/8: "dù sao có đã đăng rồi") — board còn 3 bước. Bài đã duyệt
+  // mà chưa lên kênh (hẹn giờ, kẹt) hiện thành dòng cảnh ở thanh vận hành, không mất dấu.
   const columns: { key: string; label: string; icon: string; tone: string; items: QItem[]; cap: number; moreHref?: string }[] = [
     { key: 'pending', label: 'Chờ duyệt', icon: '📥', tone: 'pending', items: pending, cap: 50 },
-    { key: 'approved', label: 'Đã duyệt', icon: '✅', tone: 'approved', items: approvedWaiting, cap: 10 },
     { key: 'published', label: 'Đã đăng', icon: '🌐', tone: 'published', items: published, cap: PUB_CAP, moreHref: '/noi-dung?loai=bai-viet' },
     { key: 'rejected', label: 'Từ chối', icon: '⛔', tone: 'rejected', items: rejected, cap: REJ_CAP, moreHref: '/noi-dung?loai=bai-viet&trangthai=rejected' }
   ];
@@ -154,6 +155,11 @@ export default async function BangSection() {
           <button className={`btn sm ${stopped ? 'ok' : 'no'}`} type="submit">{stopped ? '▶ Bật lại (cho phép đăng)' : '🛑 Dừng khẩn'}</button>
         </form>
         <span className="muted" style={{ fontSize: '.85rem' }}>Hôm nay: FB <b>{fbCount}{quotaOff ? '' : `/${limit}`}</b>, TikTok <b>{ttCount}{quotaOff ? '' : `/${limit}`}</b>{quotaOff ? ' (đang bỏ hạn mức)' : ''}</span>
+        {approvedWaiting.length ? (
+          <span className="badge tone-demo" title="Bài đã duyệt nhưng chưa thấy trên kênh (đang đăng, hẹn giờ, hoặc kẹt — xem Vận hành chi tiết).">
+            ⏳ {approvedWaiting.length} bài đã duyệt chưa lên kênh
+          </span>
+        ) : null}
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: '.85rem' }}>
           {otherPending ? (
             <Link className="src" href="/hang-doi" title="Hồ sơ HR và cảnh báo hệ thống chờ xử lý">⚠ {otherPending.toLocaleString('vi-VN')} mục chờ khác</Link>
@@ -238,25 +244,6 @@ export default async function BangSection() {
                         videoUrl={vidUrl ?? null}
                         caption={c?.draft ?? null}
                       />
-                    </div>
-                  );
-                }
-
-                if (col.key === 'approved') {
-                  const sched = it.scheduledAt;
-                  // Duyệt quá 1 giờ mà chưa có bài đăng thật thì không phải "đang đăng" nữa,
-                  // báo rõ để người vận hành soi run_log (bị chặn hạn mức, lỗi kênh...).
-                  const staleMs = it.decidedAt ? Date.now() - new Date(it.decidedAt).getTime() : 0;
-                  const stale = staleMs > 60 * 60 * 1000;
-                  return (
-                    <div key={it.qid} className="card tone-ok" style={{ display: 'grid', gap: 6, padding: 12 }}>
-                      <b>{title}</b>
-                      {sched && isFutureVN(sched)
-                        ? <span className="badge tone-demo">⏰ Hẹn {fmtSchedule(sched)}</span>
-                        : stale
-                          ? <span className="muted" style={{ fontSize: '.85rem' }}>Đã duyệt {it.decidedAt ? formatRelative(it.decidedAt) : ''} nhưng chưa thấy bài trên kênh, xem Vận hành chi tiết.</span>
-                          : <span className="muted" style={{ fontSize: '.85rem' }}>Đã duyệt {it.decidedAt ? formatRelative(it.decidedAt) : ''}, đang đăng lên kênh…</span>}
-                      <span className="muted" style={{ fontSize: '.8rem' }}>📍 {channelsLabel(chans, p.post_reel === true)}</span>
                     </div>
                   );
                 }

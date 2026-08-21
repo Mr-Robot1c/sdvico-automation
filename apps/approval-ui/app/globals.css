@@ -1119,7 +1119,7 @@ a.chip:hover { filter: brightness(0.98); }
 .board-ops { flex: 1.6 1 260px; min-width: 240px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: grid; gap: 6px; align-content: center; }
 .board-body { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 .kanban-wrap { flex: 1 1 640px; min-width: 0; overflow-x: auto; padding-bottom: 8px; }
-.kanban { display: grid; grid-template-columns: repeat(4, minmax(250px, 1fr)); gap: 12px; min-width: 1040px; align-items: start; }
+.kanban { display: grid; grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 12px; min-width: 820px; align-items: start; }
 .kanban-col { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 10px; align-content: start; }
 .kanban-col .card { box-shadow: none; }
 .kanban-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .9rem; padding: 6px 12px; border-radius: 999px; }

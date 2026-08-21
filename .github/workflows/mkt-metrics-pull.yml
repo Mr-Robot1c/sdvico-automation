@@ -61,9 +61,12 @@ jobs:
             echo "rotate $NAME HTTP $code"
             head -c 500 /tmp/rot_${NAME}.json; echo
           }
+          M=$(TZ=Asia/Ho_Chi_Minh date +%M); M=$((10#$M))
           if [ "$FORCE_ROTATE" = "true" ]; then
             call_rotate "?force=1" "force"
           else
             if [ $H -ge 7 ]; then call_rotate "?slot=sang" "sang"; fi
-            if [ $H -ge 12 ]; then call_rotate "?slot=chieu" "chieu"; fi
+            # Slot chieu tu 12h30 (truoc: H>=12 lam luoi goi tu 12h00 -> bai chieu sinh som
+            # 28 phut, user bat 21/8 "bai B ra 12:02").
+            if [ $H -gt 12 ] || { [ $H -eq 12 ] && [ $M -ge 30 ]; }; then call_rotate "?slot=chieu" "chieu"; fi
           fi
