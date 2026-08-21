@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-21
 ttl_days: 180
+<!-- re-verified: 2026-08-21 - GIONG LEN XUONG (user: "giong doc ngang qua"): tts() tach loi thoai thanh TUNG CAU (splitSentences), moi cau synth rieng voi ngu dieu theo loai (hoi +7Hz cham lai, cam than +13% +5Hz, thuong dao dong xen ke) roi ffmpeg concat; cau loi 3 lan hoac chi 1 cau -> ve doc ca doan mot giong nhu cu. Demo demo-giong-lenxuong.mp4 da gui user duyet truoc. -->
 <!-- re-verified: 2026-08-21 - LOI THOAI THEO TREND GIOI TRE (user: "hello cac anh em/cac con vo"): script.mjs canh dau BAT BUOC mo bang loi chao trend ("Hello anh em di bien oi!", "Alo alo ba con oi!"...), ca video tone TikToker tre (chem nha/ne/luon a) nhung khong lo/khong chui bay; rate +10%, pitch +3Hz. Demo demo-giong-trend.mp4 da gui user. -->
 <!-- re-verified: 2026-08-21 - GIONG DOC DOI SANG NU HoaiMy (user): default build-video.mjs + tts.py; TTS_VOICE ep khac duoc. -->
 <!-- re-verified: 2026-08-21 - SO LIEN HE VIDEO doi 1900 23 23 49 -> 0939 243 222 (sep chot; du phong 0974 669 649 ghi trong comment build-video.mjs): BRAND_LINE dau video, outro man hinh + TTS ("Goi ngay cho SDVICO"), caption queue, whisper dict, prompt script. GIONG CAM XUC (sep che deu deu): script.mjs them yeu cau cau hoi tu tu + cau cam + ngat nhip (TTS len xuong giong theo dau cau); tts.py them --pitch, mac dinh +2Hz (env TTS_PITCH doi). Bai viet/social + YouTube description VAN dung 1900 (user chi yeu cau outro video). -->

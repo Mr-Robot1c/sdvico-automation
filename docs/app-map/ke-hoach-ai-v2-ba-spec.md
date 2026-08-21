@@ -6,6 +6,7 @@ last_verified: 2026-08-21
 ttl_days: 90
 <!-- re-verified: 2026-08-21 - NV5/NV11: trong so BOSS gio quyet THU TU rut huong (rotate + plan-live sort fresh theo weights qua guessGroup) — duong truyen BOSS->Creator kin; lich ngay co huong hien dung cap A/B cua huong. -->
 <!-- re-verified: 2026-08-21 - /ke-hoach nhan "Cap nhat" doc data.generatedAt cua ban live (row update tai cho, created_at dung im); nhan gio doi 7h/12h30. Chi hien thi, khong doi flow. -->
+<!-- re-verified: 2026-08-21 - TTS doc tung cau voi ngu dieu rieng roi ghep (len xuong giong) — khong doi flow NV. -->
 <!-- re-verified: 2026-08-21 - Loi thoai video tone trend gioi tre + rate/pitch tang nhe — khong doi flow NV. -->
 <!-- re-verified: 2026-08-21 - Giong doc video doi sang NU HoaiMy (default) — khong doi flow NV. -->
 <!-- re-verified: 2026-08-21 - Video pipeline: so lien he doi 0939 243 222 + prompt kich ban them cam xuc + tts pitch +2Hz — khong doi flow NV nao. -->

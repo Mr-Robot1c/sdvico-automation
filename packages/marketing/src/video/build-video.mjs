@@ -69,12 +69,61 @@ function spellPhones(text) {
     .replace(/\b0\d(?:[\s.]*\d){8}\b/g, (m) => m.split(/[\s.]+/).filter(Boolean).map(digitsToWords).join(', '));
 }
 
+// Tách lời thoại thành từng câu (theo . ! ? …) để đọc mỗi câu một ngữ điệu.
+function splitSentences(text) {
+  const parts = String(text || '').match(/[^.!?…]+[.!?…]+|[^.!?…]+$/g) || [];
+  return parts.map((s) => s.trim()).filter(Boolean);
+}
+
+// Ngữ điệu theo LOẠI câu (user 21/8: "giọng đọc ngang quá, có thể lên xuống được không"):
+// câu hỏi lên giọng chậm lại chút, câu cảm hào hứng nhanh hơn, câu thường dao động nhẹ xen
+// kẽ — mỗi câu synth riêng rồi ghép, nghe có nhịp thật thay vì một đường thẳng.
+function prosodyFor(sentence, idx) {
+  if (/\?$/.test(sentence)) return { rate: '+8%', pitch: '+7Hz' };
+  if (/!$/.test(sentence)) return { rate: '+13%', pitch: '+5Hz' };
+  return idx % 2 === 0 ? { rate: '+10%', pitch: '+1Hz' } : { rate: '+8%', pitch: '+4Hz' };
+}
+
+// Synth MỘT khúc với rate/pitch cho trước (throw khi lỗi — caller tự retry/fallback).
+async function ttsChunk(text, outPath, voice, workDir, tag, rate, pitch) {
+  const txt = join(workDir, `${tag}.txt`);
+  await writeFile(txt, text, 'utf8');
+  await python('tts.py', ['--text-file', txt, '--out', outPath, '--voice', voice, '--rate', rate, '--pitch', pitch]);
+}
+
 async function tts(text, outPath, voice, workDir, tag) {
   // Đọc số điện thoại/tổng đài từng chữ số (chỉ cho giọng đọc, phụ đề giữ số gốc).
   const clean = spellPhones(cleanNarration(text));
   // Thời lượng dự phòng theo số ký tự (~14 ký tự/giây tiếng Việt), tối thiểu 2 giây.
   const estSec = Math.max(2, Math.round(clean.length / 14));
   if (!clean) return silentAudio(outPath, estSec);
+
+  // LÊN XUỐNG GIỌNG: nhiều câu thì synth từng câu với ngữ điệu riêng rồi ghép. Một câu lỗi
+  // sau 3 lần thử, hoặc chỉ có 1 câu -> rơi về cách cũ đọc cả đoạn một giọng bên dưới.
+  const sentences = splitSentences(clean);
+  if (sentences.length > 1) {
+    try {
+      const parts = [];
+      for (let i = 0; i < sentences.length; i++) {
+        const pro = prosodyFor(sentences[i], i);
+        const piece = join(workDir, `${tag}_c${i}.mp3`);
+        let done = false;
+        let err;
+        for (let attempt = 0; attempt < 3 && !done; attempt++) {
+          try { await ttsChunk(sentences[i], piece, voice, workDir, `${tag}_c${i}`, pro.rate, pro.pitch); done = true; } catch (e) { err = e; }
+        }
+        if (!done) throw err || new Error('tts cau ' + i + ' loi');
+        parts.push(`${tag}_c${i}.mp3`);
+      }
+      const list = join(workDir, `${tag}_cat.txt`);
+      await writeFile(list, parts.map((p) => `file ${p}`).join('\n'), 'utf8');
+      await ffmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c:a', 'libmp3lame', '-q:a', '4', outPath], { cwd: workDir });
+      return probeDuration(outPath);
+    } catch (e) {
+      console.warn(`  (cảnh ${tag}: đọc theo từng câu lỗi "${String(e?.message || e).slice(0, 100)}", lùi về đọc cả đoạn một giọng)`);
+    }
+  }
+
   const txt = join(workDir, `${tag}.txt`);
   await writeFile(txt, clean, 'utf8');
   // GIỮ NGUYÊN 1 GIỌNG cho toàn video (không đổi giọng giữa chừng). edge-tts hay bị
