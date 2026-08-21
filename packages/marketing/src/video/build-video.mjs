@@ -96,7 +96,14 @@ async function ttsChunk(text, outPath, voice, workDir, tag, rate, pitch) {
 // cảm xúc chỉ đạo bằng câu lệnh (không cần tách câu chỉnh rate/pitch như edge-tts). Trả PCM
 // s16le -> ffmpeg sang mp3. Env: GEMINI_TTS_MODEL, GEMINI_TTS_VOICE (Puck nam / Leda nữ...),
 // GEMINI_TTS_STYLE; TTS_ENGINE=edge để tắt hẳn. Lỗi/hết hạn mức -> caller tự lùi edge-tts.
-const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview';
+// DANH SÁCH model nối tiếp: free tier hết hạn mức NGÀY của model này thì tự sang model kế
+// (build 21/8 chiều: 3.1 cạn RPD sau demo + 2 lượt build -> cả video rơi về edge oan). Đặt
+// env GEMINI_TTS_MODEL thì chỉ dùng đúng model đó. Hạn mức reset nửa đêm giờ Mỹ = 14h VN,
+// nên build 7h sáng VN vẫn nằm trong "ngày" hôm trước — dự phòng model là bắt buộc.
+const GEMINI_TTS_MODELS = process.env.GEMINI_TTS_MODEL
+  ? [process.env.GEMINI_TTS_MODEL]
+  : ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'];
+let geminiModelIdx = 0; // model đang dùng; 429 cạn ngày thì nhích lên, các cảnh sau đi thẳng model sống
 const GEMINI_TTS_VOICE = process.env.GEMINI_TTS_VOICE || 'Puck';
 const GEMINI_TTS_STYLE = process.env.GEMINI_TTS_STYLE
   || 'Đọc bằng tiếng Việt, giọng TikToker trẻ trung hào hứng, ngữ điệu lên xuống tự nhiên, nhấn nhá chỗ quan trọng, câu cảm thán thì phấn khích: ';
@@ -104,7 +111,7 @@ const GEMINI_TTS_STYLE = process.env.GEMINI_TTS_STYLE
 // sau lại êm) -> giãn nhịp giữa các lần gọi để cả 2 bản đều được giọng Gemini. Env chỉnh được.
 const GEMINI_TTS_GAP_MS = Number(process.env.GEMINI_TTS_GAP_MS || 20000);
 let geminiLastCallAt = 0;
-async function geminiTTS(cleanText, outPath, workDir, tag) {
+async function geminiTTS(cleanText, outPath, workDir, tag, model) {
   const gap = geminiLastCallAt + GEMINI_TTS_GAP_MS - Date.now();
   if (gap > 0) await new Promise((r) => setTimeout(r, gap));
   geminiLastCallAt = Date.now();
@@ -116,7 +123,7 @@ async function geminiTTS(cleanText, outPath, workDir, tag) {
     },
   };
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
   );
   const json = await res.json().catch(() => ({}));
@@ -143,18 +150,27 @@ async function tts(text, outPath, voice, workDir, tag, engine = 'edge') {
 
   if (engine === 'gemini') {
     // Đọc cả đoạn một lần (Gemini tự lên xuống ngữ điệu, không cần tách câu chỉnh rate/pitch).
-    // 429 (hết hạn mức phút) đợi lâu dần 25s rồi 40s; vẫn hỏng thì THROW cho caller lùi cả bản.
+    // 429: đợi 25s thử lại (hạn mức PHÚT); vẫn 429 coi như model cạn hạn mức NGÀY -> sang model
+    // kế trong danh sách (idx giữ ở module, các cảnh sau đi thẳng model sống). Hết model thì
+    // THROW cho caller làm lại cả bản bằng edge.
     let lastGemErr;
-    const backoff = [25000, 40000];
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        return await geminiTTS(clean, outPath, workDir, tag);
-      } catch (e) {
-        lastGemErr = e;
-        if (/429/.test(String(e?.message)) && attempt < backoff.length) {
-          await new Promise((r) => setTimeout(r, backoff[attempt]));
-        } else if (attempt >= 1) break;
+    for (; geminiModelIdx < GEMINI_TTS_MODELS.length; geminiModelIdx++) {
+      const model = GEMINI_TTS_MODELS[geminiModelIdx];
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          return await geminiTTS(clean, outPath, workDir, tag, model);
+        } catch (e) {
+          lastGemErr = e;
+          if (/429/.test(String(e?.message)) && attempt === 0) await new Promise((r) => setTimeout(r, 25000));
+        }
       }
+      if (/429/.test(String(lastGemErr?.message))) {
+        if (geminiModelIdx + 1 < GEMINI_TTS_MODELS.length) {
+          console.warn(`  (gemini-tts: ${model} hết hạn mức, chuyển ${GEMINI_TTS_MODELS[geminiModelIdx + 1]})`);
+        }
+        continue; // 429 dai dẳng: thử model kế
+      }
+      break; // lỗi khác 429: không đổi model, cho caller lùi edge
     }
     throw lastGemErr || new Error('gemini-tts loi');
   }
@@ -274,7 +290,7 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
       console.warn(`  (bản ${format}: Gemini TTS không trọn bộ "${String(e?.message || e).slice(0, 140)}" — làm lại toàn bộ bằng edge-tts)`);
     }
   }
-  console.log(`  Giọng bản ${format}: ${engineUsed === 'gemini' ? `Gemini TTS (${GEMINI_TTS_VOICE})` : 'edge-tts'}`);
+  console.log(`  Giọng bản ${format}: ${engineUsed === 'gemini' ? `Gemini TTS (${GEMINI_TTS_VOICE}, ${GEMINI_TTS_MODELS[Math.min(geminiModelIdx, GEMINI_TTS_MODELS.length - 1)]})` : 'edge-tts'}`);
   const wa = await whisperArtifact(sceneAudios, fdir, format);
   const out = join(outDir, `sdvico_${contentId.slice(0, 8)}_${format}.mp4`);
   await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio });

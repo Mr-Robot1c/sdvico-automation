@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-21
 ttl_days: 90
+<!-- re-verified: 2026-08-21 17:05 - Gemini TTS du phong 3 model noi tiep chong can han muc ngay (chi tiet marketing.md) — khong doi flow NV. -->
 <!-- re-verified: 2026-08-21 16:50 - Gemini TTS gian nhip 20s + backoff 429 (chi tiet marketing.md) — khong doi flow NV. -->
 <!-- re-verified: 2026-08-21 16:40 - Giong video chinh doi sang Gemini TTS (fallback edge-tts, nguyen khoi theo ban dung) — khong doi flow NV nao cua ba-spec. -->
 <!-- re-verified: 2026-08-21 16:15 - Hen gio FB ep +07:00 (fix lech 7 tieng) + video content remap folder Content — khong doi flow NV nao cua ba-spec. -->
