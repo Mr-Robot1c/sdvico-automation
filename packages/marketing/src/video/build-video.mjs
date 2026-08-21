@@ -4,7 +4,7 @@
 // KHÔNG tự đăng: đầu ra để người duyệt (điều cấm 1). Chỉ dùng tư liệu brand_assets (điều cấm 5).
 //
 // Chạy:
-//   node packages/marketing/src/video/build-video.mjs [contentId] [--voice vi-VN-NamMinhNeural] [--out DIR]
+//   node packages/marketing/src/video/build-video.mjs [contentId] [--voice vi-VN-HoaiMyNeural] [--out DIR]
 import { createClient } from '@supabase/supabase-js';
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
@@ -77,7 +77,7 @@ async function tts(text, outPath, voice, workDir, tag) {
   if (!clean) return silentAudio(outPath, estSec);
   const txt = join(workDir, `${tag}.txt`);
   await writeFile(txt, clean, 'utf8');
-  // GIỮ NGUYÊN 1 GIỌNG NAM cho toàn video (không đổi qua giọng nữ giữa chừng). edge-tts hay bị
+  // GIỮ NGUYÊN 1 GIỌNG cho toàn video (không đổi giọng giữa chừng). edge-tts hay bị
   // "No audio received" -> thử lại vài lần với rate khác nhau. Hết mới lùi tiếng lặng.
   // Rate mac dinh +8% cho tuoi (user 19/8: "giong doc buon ngu"). Env TTS_RATE ep khac. Cac
   // lan retry giu +8% roi lui rate cham dan neu edge-tts bao "No audio received".
@@ -263,7 +263,8 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
 async function main() {
   const env = loadRealEnv();
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-  const voice = arg('voice', process.env.TTS_VOICE || 'vi-VN-NamMinhNeural');
+  // Giong mac dinh doi sang NU HoaiMy (user 21/8: 'voice chuyen sang nu'). Env TTS_VOICE ep khac.
+  const voice = arg('voice', process.env.TTS_VOICE || 'vi-VN-HoaiMyNeural');
   const outDir = arg('out', join(HERE, '..', '..', '..', '..', 'out', 'video'));
   await mkdir(outDir, { recursive: true });
 

@@ -103,10 +103,25 @@ export default async function TongQuanSection() {
   const ttPosts = byChannel.get('tiktok') || { count: 0, lastAt: '' };
   const ytOk = !!(yt.configured && yt.channelTitle);
 
-  // BÀI NỔI BẬT: top 3 theo tương tác Facebook (bản snapshot mới nhất), kèm lượt xem YouTube.
-  const topIds = [...latest.entries()]
-    .map(([cid, m]) => ({ cid, eng: (m.reactions || 0) + (m.comments || 0) + (m.shares || 0), views: m.views }))
-    .sort((a, b) => b.eng - a.eng)
+  // BÀI NỔI BẬT: gộp CẢ Facebook lẫn YouTube của cùng một bài (user 21/8: "xếp hạng sai sai"
+  // — bài có 200 lượt xem YouTube mà hiện 5 và thua bài 45). Xếp theo tương tác, bằng nhau
+  // thì bài nhiều lượt xem đứng trên.
+  const scoreByCid = new Map<string, { eng: number; views: number }>();
+  for (const [cid, m] of latest) {
+    const e = scoreByCid.get(cid) || { eng: 0, views: 0 };
+    e.eng += (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
+    e.views += m.views || 0;
+    scoreByCid.set(cid, e);
+  }
+  for (const [cid, m] of ytLatest) {
+    const e = scoreByCid.get(cid) || { eng: 0, views: 0 };
+    e.eng += (m.reactions || 0) + (m.comments || 0);
+    e.views += m.views || 0;
+    scoreByCid.set(cid, e);
+  }
+  const topIds = [...scoreByCid.entries()]
+    .map(([cid, e]) => ({ cid, eng: e.eng, views: e.views }))
+    .sort((a, b) => b.eng - a.eng || b.views - a.views)
     .slice(0, 3);
   const topTitles = new Map<string, string>();
   if (topIds.length) {
@@ -263,7 +278,7 @@ export default async function TongQuanSection() {
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span className="tq-item-title">{topTitles.get(t.cid) || '(không tên)'}</span>
                     <span className="sub" style={{ display: 'block', fontSize: '.78rem' }}>
-                      {fmt(t.eng)} tương tác{t.views != null ? `, ${fmt(t.views || 0)} lượt xem` : ''}
+                      {fmt(t.eng)} tương tác, {fmt(t.views)} lượt xem
                     </span>
                   </span>
                 </Link>
@@ -289,9 +304,6 @@ export default async function TongQuanSection() {
         </div>
       </div>
 
-      <p className="muted" style={{ marginTop: 14, fontSize: '.85rem' }}>
-        Số liệu kéo tự động mỗi 30 phút từ Facebook và YouTube. TikTok chờ audit, Zalo OA đang thiết lập. Duyệt bài và vận hành nằm ở tab Bảng bài viết.
-      </p>
     </section>
   );
 }

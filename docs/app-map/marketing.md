@@ -5,6 +5,7 @@ covers: packages/marketing
 last_verified: 2026-08-21
 ttl_days: 180
 <!-- DOC-STATUS: SUSPECT (2026-08-21) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-21 - GIONG DOC DOI SANG NU HoaiMy (user): default build-video.mjs + tts.py; TTS_VOICE ep khac duoc. -->
 <!-- re-verified: 2026-08-21 - SO LIEN HE VIDEO doi 1900 23 23 49 -> 0939 243 222 (sep chot; du phong 0974 669 649 ghi trong comment build-video.mjs): BRAND_LINE dau video, outro man hinh + TTS ("Goi ngay cho SDVICO"), caption queue, whisper dict, prompt script. GIONG CAM XUC (sep che deu deu): script.mjs them yeu cau cau hoi tu tu + cau cam + ngat nhip (TTS len xuong giong theo dau cau); tts.py them --pitch, mac dinh +2Hz (env TTS_PITCH doi). Bai viet/social + YouTube description VAN dung 1900 (user chi yeu cau outro video). -->
 <!-- re-verified: 2026-08-21 - BO GIONG ADAM (user doi y): go elevenLabsTTS khoi build-video.mjs, TTS ve edge-tts NamMinh nhu cu; xoa runbook + env workflow. UI: Tong quan GOP voi Bang bai viet tai /noi-dung theo mau user. -->
 <!-- re-verified: 2026-08-21 - Buoc 8 doi lai: Do luong la TRANG RIENG /do-luong (user chieu 21/8 dao quyet dinh buoi sang) + them so lieu YouTube Shorts (lib/youtube-metrics.ts, source=youtube trong mkt_metrics, keo moi 30p). vClip giong Adam = wrapper ElevenLabs -> giu ElevenLabs (runbook-elevenlabs-voice.md giai thich). -->

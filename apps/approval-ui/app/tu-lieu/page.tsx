@@ -90,7 +90,6 @@ export default async function Page({ searchParams }: { searchParams: { folder?: 
       <header className="head-row">
         <div>
           <h1>Kho tư liệu</h1>
-          <p className="sub">Mỗi folder là một sản phẩm. Vòng xoay hằng ngày chọn 1 folder rồi đăng Facebook và TikTok. Folder cần ít nhất 1 ảnh; muốn đăng TikTok thì cần video.</p>
         </div>
       </header>
 
