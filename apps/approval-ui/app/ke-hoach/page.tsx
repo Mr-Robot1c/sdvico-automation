@@ -199,27 +199,27 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         {todayPlan ? (
           <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
             <div>
-              <b>🕗 7h + 🕐 12h30 — bài bán:</b>{' '}
-              {todayPlan.sales.length
+              <b>🕗 Bài bán:</b>{' '}
+              {todayPlan.direction ? (
+                <>
+                  {todayPlan.direction.title}
+                  <span className="sub"> — {todayPlan.direction.variant === 'AB' ? 'bản A ra 7h, bản B ra 12h30' : `bản thử ${todayPlan.direction.variant}`}</span>
+                  {todayPlan.direction.done ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ đã sinh</span> : null}
+                </>
+              ) : (todayPlan.sales.length
                 ? todayPlan.sales.map((s) => `${s.product} (${vnInt(s.count)} bài)`).join(', ')
-                : 'không có bài bán hôm nay'}
-              {todayPlan.direction ? <> · <b>hướng:</b> {todayPlan.direction.title} ({todayPlan.direction.variant === 'AB' ? 'A sáng, B chiều' : `thử ${todayPlan.direction.variant}`})</> : null}
+                : 'không có bài bán hôm nay')}
             </div>
             <div>
-              <b>🕐 12h30 — content:</b> {todayPlan.contentKindLabel || vnInt(todayPlan.contentCount)}
+              <b>🕐 Content 12h30:</b> {todayPlan.contentKindLabel || vnInt(todayPlan.contentCount)}
               {todayPlan.contentStructure ? <span className="sub"> — {todayPlan.contentStructure}</span> : null}
             </div>
             <div>
-              <b>Chia sẻ vào nhóm:</b>{' '}
+              <b>📣 Chia sẻ vào nhóm:</b>{' '}
               {todayPlan.groups.length ? todayPlan.groups.join(', ') : (shareGroups.length ? 'nghỉ hôm nay' : 'chưa nhập nhóm (mở Cài đặt bên dưới)')}
             </div>
-            {usedTodayTitles.length ? (
-              <div>
-                <b>Hôm nay máy đã sinh bài theo hướng:</b> {usedTodayTitles.join(' · ')}
-              </div>
-            ) : null}
             <p className="sub" style={{ margin: 0 }}>
-              Máy tự sinh bài lúc 7h và 12h30 rồi chờ trong Hàng đợi duyệt. Việc của người: bấm Duyệt, và tự tay chia sẻ bài vào nhóm nêu trên (Facebook không cho máy đăng nhóm).
+              Máy tự sinh rồi chờ trong Hàng đợi duyệt. Người bấm Duyệt và tự tay chia sẻ vào nhóm (Facebook không cho máy đăng nhóm).
             </p>
           </div>
         ) : (
@@ -241,15 +241,18 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
 
           {liveData.products?.length ? (
             <div className="tablewrap" style={{ marginTop: 10 }}>
+              {/* Cột "Bài/tuần" cũ (phân bổ lý thuyết) gây hiểu lầm "lịch bảo 2 bài SEA-40 mà
+                  máy sinh 1 bài lọc dầu" — thay bằng Ưu tiên (trọng số BOSS chấm): trọng số
+                  cao thì HƯỚNG của sản phẩm đó được rút trước trong hàng đợi bên dưới. */}
               <table className="datatable">
-                <thead><tr><th>Sản phẩm</th><th className="num">Bài/tuần</th><th className="num">Tương tác/bài</th><th>Hướng</th></tr></thead>
+                <thead><tr><th>Sản phẩm</th><th className="num">Ưu tiên</th><th className="num">Tương tác/bài</th><th>Hướng</th></tr></thead>
                 <tbody>
                   {liveData.products.map((p) => {
                     const t = TIER_LABEL[p.tier];
                     return (
                       <tr key={p.product}>
                         <td>{p.product}</td>
-                        <td className="num"><b>{vnInt(p.postsPerWeek)}</b></td>
+                        <td className="num" title="Trọng số BOSS chấm từ số liệu. Cao hơn thì hướng đi của sản phẩm này được xếp chạy trước."><b>×{vnInt(p.weight)}</b></td>
                         <td className="num">{p.avgEng > 0 ? vnInt(p.avgEng) : '—'}</td>
                         <td><span className={`badge ${t.cls}`}>{t.icon} {t.text}</span></td>
                       </tr>
@@ -262,14 +265,16 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
 
           {liveData.daily_schedule?.length ? (
             <div className="tablewrap" style={{ marginTop: 12 }}>
+              {/* Gọn (user 21/8: "UI kế hoạch quá rối"): gộp cột bài bán + hướng đi làm một
+                  (bài bán trong ngày CHÍNH LÀ cặp A/B của hướng), bỏ dòng cấu trúc lặp 7 lần
+                  — cấu trúc chung nêu 1 lần ở chú thích dưới bảng. */}
               <table className="datatable">
                 <thead>
                   <tr>
                     <th>Ngày</th>
-                    <th>🕗 7h sáng — bài bán</th>
-                    <th>Hướng đi dự kiến</th>
-                    <th>🕐 12h30 chiều — content</th>
-                    <th>📣 Sau khi đăng, chia sẻ vào</th>
+                    <th>🕗 Bài bán — hướng đi trong ngày</th>
+                    <th>🕐 Content 12h30</th>
+                    <th>📣 Chia sẻ vào nhóm</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -277,23 +282,23 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                     <tr key={d.date} className={d.date === today ? 'row-today' : undefined}>
                       <td style={{ whiteSpace: 'nowrap' }}>{d.date === today ? '👉 ' : ''}<b>{d.dow}</b><br /><span className="sub">{fmtDate(d.date)}</span></td>
                       <td>
-                        {d.sales.length ? d.sales.map((s) => `${s.product} (${vnInt(s.count)} bài)`).join(' + ') : '—'}
-                        <div className="sub" style={{ marginTop: 2 }}>Cấu trúc: mở nỗi lo thật, 1-2 lợi ích đúng sản phẩm, mời nhắn Page / gọi 1900 23 23 49</div>
-                      </td>
-                      <td>
                         {d.direction ? (
                           <>
                             <b>{d.direction.title}</b>
-                            <div className="sub">
-                              {d.direction.product} · {d.direction.variant === 'AB' ? 'A sáng, B chiều' : `bản thử ${d.direction.variant}`}
-                              {d.direction.done ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ đã sinh</span> : null}
+                            {d.direction.done ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ đã sinh</span> : null}
+                            <div className="sub" style={{ marginTop: 2 }}>
+                              {d.direction.product}{d.direction.variant === 'AB' ? ' · bản A ra 7h, bản B ra 12h30' : ` · bản thử ${d.direction.variant}`}
                             </div>
                           </>
-                        ) : <span className="sub">vòng xoay tự chọn</span>}
+                        ) : (
+                          <>
+                            {d.sales.length ? d.sales.map((s) => `${s.product} (${vnInt(s.count)} bài)`).join(' + ') : '—'}
+                            <div className="sub" style={{ marginTop: 2 }}>vòng xoay tự chọn theo ưu tiên</div>
+                          </>
+                        )}
                       </td>
                       <td>
-                        {d.contentKindLabel ? <b>{d.contentKindLabel}</b> : vnInt(d.contentCount)}
-                        {d.contentStructure ? <div className="sub" style={{ marginTop: 2 }}>{d.contentStructure}</div> : null}
+                        <span title={d.contentStructure || ''}>{d.contentKindLabel ? <b>{d.contentKindLabel}</b> : vnInt(d.contentCount)}</span>
                       </td>
                       <td className="sub">{d.groups.length ? d.groups.join(', ') : '—'}</td>
                     </tr>
@@ -303,7 +308,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             </div>
           ) : null}
           <p className="sub" style={{ margin: '8px 0 0' }}>
-            Hướng đi dự kiến là thứ tự vòng xoay sẽ rút; nếu sếp đổi mục tiêu giữa tuần thì hướng tự xếp lại. Bài luôn chờ người bấm Duyệt mới đăng.
+            Bài bán viết theo khung: mở nỗi lo thật, 1-2 lợi ích đúng sản phẩm, mời nhắn Page hoặc gọi 1900 23 23 49. Hướng của sản phẩm được ưu tiên cao xếp chạy trước; sếp đổi mục tiêu giữa tuần thì lịch tự xếp lại. Bài luôn chờ người bấm Duyệt mới đăng.
           </p>
         </section>
       ) : null}

@@ -99,12 +99,23 @@ function rankProducts(byProduct: Array<{ product: string; count: number; avgScor
 // mỗi hướng chưa dùng chiếm MỘT ngày (variant 'AB'). Hướng đang treo bản B (hôm trước lỡ
 // nhịp) chiếm ngày đầu chỉ với bản B.
 type DayDirection = { title: string; product: string; variant: 'A' | 'B' | 'AB'; done?: boolean };
-function buildDirectionQueue(suggestions: any[]): DayDirection[] {
+// Tên sản phẩm chuẩn (bỏ số thứ tự folder) để tra trọng số — suggestion.product ghi theo
+// danh mục prompt, weights ghi theo tên folder, phải quy về một mối qua guessGroup.
+function productNameOf(raw: string): string {
+  const g = (guessGroup as (t: string) => string | null)(String(raw || ''));
+  return String(g || raw || '').replace(/^\s*\d+\.\s*/, '').trim();
+}
+function buildDirectionQueue(suggestions: any[], weights: Record<string, number> = {}): DayDirection[] {
   const out: DayDirection[] = [];
   const pendingB = suggestions.filter((s) => !s.used_at && s.pending_variant === 'B');
   const fresh = suggestions.filter((s) => !s.used_at && !s.pending_variant);
+  // BOSS truyền cho Creator (user 21/8: "BOSS có học và truyền cho Creator không?"): hướng
+  // của sản phẩm đang được đánh trọng số cao (đang thắng) kéo lên đầu hàng — không chạy
+  // lần lượt theo thứ tự Gemini sinh nữa. Sort ổn định: cùng trọng số giữ thứ tự cũ.
+  const wOf = (s: any) => weights[productNameOf(s.product)] ?? 1;
+  const freshSorted = [...fresh].sort((a, b) => wOf(b) - wOf(a));
   for (const s of pendingB) out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'B' });
-  for (const s of fresh) out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'AB' });
+  for (const s of freshSorted) out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'AB' });
   return out.slice(0, 7);
 }
 
@@ -116,12 +127,24 @@ function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: str
   for (let i = 0; i < 7; i++) {
     const { date, dow, dowIdx } = vnDayInfo(now, i);
     const daysLeft = 7 - i;
+    // Ngày CÓ hướng đi: bài bán trong ngày chính là cặp A/B của hướng đó (2 bài, hoặc 1 nếu
+    // chỉ còn bản B mồ côi) — hiển thị đúng cái máy sẽ làm (user 21/8: "lịch bảo 2 bài SEA-40
+    // + 1 lọc dầu mà sáng nay chỉ tạo 1 bản lọc dầu"). Không hướng mới rơi về chia trọng số.
+    const dir = dirQueue[i] || null;
     const sales: Array<{ product: string; count: number }> = [];
-    for (const p of salesProducts) {
-      const rem = remaining.get(p.product) || 0;
-      if (rem <= 0) continue;
-      const todayCount = Math.max(0, Math.round(rem / daysLeft));
-      if (todayCount > 0) { sales.push({ product: p.product, count: todayCount }); remaining.set(p.product, rem - todayCount); }
+    if (dir) {
+      const name = productNameOf(dir.product);
+      const cnt = dir.variant === 'AB' ? 2 : 1;
+      sales.push({ product: name, count: cnt });
+      const rem = remaining.get(name);
+      if (rem != null) remaining.set(name, Math.max(0, rem - cnt));
+    } else {
+      for (const p of salesProducts) {
+        const rem = remaining.get(p.product) || 0;
+        if (rem <= 0) continue;
+        const todayCount = Math.max(0, Math.round(rem / daysLeft));
+        if (todayCount > 0) { sales.push({ product: p.product, count: todayCount }); remaining.set(p.product, rem - todayCount); }
+      }
     }
     let dayGroups: string[] = [];
     if (groups.length) {
@@ -231,7 +254,7 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
       .from('mkt_plans').select('data').eq('applied', true)
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
     const sugs = Array.isArray((apRow as any)?.data?.content_suggestions) ? (apRow as any).data.content_suggestions : [];
-    dirQueue = buildDirectionQueue(sugs);
+    dirQueue = buildDirectionQueue(sugs, weights);
 
     // Bài BÁN đã sinh hôm nay theo hướng nào (brief.suggestion_title + ab_variant)?
     const vnToday = new Date(now.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);

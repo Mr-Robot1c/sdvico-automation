@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-21
 ttl_days: 90
+<!-- re-verified: 2026-08-21 - NV5/NV11: trong so BOSS gio quyet THU TU rut huong (rotate + plan-live sort fresh theo weights qua guessGroup) — duong truyen BOSS->Creator kin; lich ngay co huong hien dung cap A/B cua huong. -->
 <!-- re-verified: 2026-08-21 - /ke-hoach nhan "Cap nhat" doc data.generatedAt cua ban live (row update tai cho, created_at dung im); nhan gio doi 7h/12h30. Chi hien thi, khong doi flow. -->
 <!-- re-verified: 2026-08-21 - Huong carry-over gan carried=true (plan.ts) de /ke-hoach hien badge "moi" + dong thoi gian ban ap; plan-live giu muc B mo coi trong lich du kien. Khong doi hanh vi rut huong cua rotate. -->
 <!-- re-verified: 2026-08-21 - NV11 A/B DOI LAI LAN 2 (user chot dem 21/8): cap A/B chay CUNG NGAY — A slot sang, B slot chieu; slot chieu khong mo huong moi. Ghi de quyet dinh "B hom sau" ban sang. -->

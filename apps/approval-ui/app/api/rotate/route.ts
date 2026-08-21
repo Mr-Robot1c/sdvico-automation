@@ -227,7 +227,15 @@ export async function GET(req: Request) {
   // vòng xoay thường. Slot sáng: ưu tiên B mồ côi (hôm trước lỡ nhịp), rồi mở hướng mới.
   const pendingBs = allSuggestions.filter((s) => !s.used_at && s.pending_variant === 'B');
   const freshSugs = allSuggestions.filter((s) => !s.used_at && !s.pending_variant);
-  const candidateSuggestions = slot === 'chieu' ? pendingBs : [...pendingBs, ...freshSugs];
+  // BOSS truyền cho Creator (user 21/8): hướng của sản phẩm trọng số cao (đang thắng) được
+  // rút TRƯỚC — trước đây thứ tự hướng theo Gemini sinh, trọng số chỉ ảnh hưởng fallback
+  // vòng xoay nên "đẩy mạnh SEA-40" mà toàn chạy hướng lọc dầu. Sort ổn định.
+  const weightOfSug = (s: Suggestion) => {
+    const g = (guessGroup as (t: string) => string | null)(s.product);
+    return weights[productName(g || s.product)] ?? 1;
+  };
+  const freshSorted = [...freshSugs].sort((a, b) => weightOfSug(b) - weightOfSug(a));
+  const candidateSuggestions = slot === 'chieu' ? pendingBs : [...pendingBs, ...freshSorted];
 
   type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number; variant?: 'A' | 'B' };
   const pickedFolders: PickedFolder[] = [];
