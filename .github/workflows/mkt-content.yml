@@ -3,13 +3,12 @@ name: Sinh nội dung marketing
 # Bốc từ khóa, sinh 3 định dạng (website, Facebook, video), đẩy vào hàng đợi duyệt.
 # KHÔNG đăng gì. Người duyệt bấm Duyệt thì worker mới đăng.
 #
-# LỊCH: mỗi ngày 1 lần lúc 1h UTC (8h VN). Đã giãn từ '*/5' (thử nghiệm, quá dày, mỗi lần còn
-# npm install nên tốn nhiều phút Actions của repo private, mỗi tháng chỉ 2.000 phút). Cần thêm
-# bài thì bấm "Run workflow" chạy tay, hoặc tăng tần suất lại ở dòng cron dưới.
+# TẮT LỊCH 21/8/2026: đây là ĐƯỜNG SINH BÀI CŨ theo từ khóa (1 từ khóa x 3 định dạng), đã bị
+# thay bằng vòng xoay /api/rotate (2 slot/ngày, theo kế hoạch BOSS). Trước nó "im" vì cạn từ
+# khóa; 20/8 kho mkt_keywords được nạp 152 mục nên nó SỐNG DẬY sinh 3 bài trùng lúc 9h22 —
+# user bắt lỗi. Giữ workflow_dispatch để chạy tay khi thật sự cần bài theo từ khóa.
 
 on:
-  schedule:
-    - cron: '0 1 * * *'
   workflow_dispatch:
 
 # Không chạy chồng nếu lần trước chưa xong.
