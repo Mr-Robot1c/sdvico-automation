@@ -7,9 +7,10 @@ name: Đăng Facebook bài đã duyệt
 #   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, FACEBOOK_PAGE_ID, FACEBOOK_PAGE_ACCESS_TOKEN
 # Chưa đặt token thì workflow sẽ báo thiếu và dừng an toàn, không đăng gì.
 
+# TẮT LỊCH 21/8/2026: từ 12/8 nút Duyệt trên web đã ĐĂNG THẲNG (decideForm) — worker này
+# thành đường đăng THỨ HAI chạy song song, có nguy cơ đăng trùng bài hẹn giờ. Giữ
+# workflow_dispatch làm dự phòng khi đường đăng chính hỏng.
 on:
-  schedule:
-    - cron: '0 * * * *' # mỗi giờ 1 lần (giãn từ */30 để tiết kiệm phút Actions). Bài đã duyệt lên trong vòng 1 giờ; cần lên ngay thì bấm Duyệt ở trang web (đăng thẳng) hoặc "Run workflow"
   workflow_dispatch:
 
 concurrency:

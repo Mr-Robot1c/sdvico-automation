@@ -5,9 +5,10 @@ name: daily-demo
 # theo tốc độ người duyệt bấm, nên không cần chạy dày. Chạy thưa để tiết kiệm
 # phút chạy miễn phí của repo private, dành hạn mức cho hr-intake.
 # Script tự giới hạn: đủ 10 thì không thêm.
+# TẮT LỊCH 21/8/2026: đây là tác vụ BÙ DEMO thời chạy thử — hệ thống đã chạy thật, hàng đợi
+# nhận bài từ /api/rotate. Nếu để lịch, khi hàng đợi thật rút dưới 10 nó sẽ BƠM bài demo vào.
+# Giữ workflow_dispatch phòng khi cần demo lại.
 on:
-  schedule:
-    - cron: '0 */4 * * *'   # 4 giờ một lần, mọi ngày
   workflow_dispatch: {}
 
 # Không chạy chồng lượt.
