@@ -34,10 +34,13 @@ const TIER_LABEL: Record<Tier, { text: string; icon: string; cls: string }> = {
 
 function fmtDateTime(iso: string | null): string {
   if (!iso) return '';
+  // Tự ghép "HH:mm dd/mm" — toLocaleString('vi-VN') trên Node trả "16:10 20-08" (gạch).
   try {
-    return new Date(iso).toLocaleString('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-    });
+    const p = new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(new Date(iso));
+    const g = (t: string) => p.find((x) => x.type === t)?.value || '';
+    return `${g('hour')}:${g('minute')} ${g('day')}/${g('month')}`;
   } catch { return iso; }
 }
 
@@ -196,14 +199,14 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         {todayPlan ? (
           <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
             <div>
-              <b>🕗 8h + 🕐 13h — bài bán:</b>{' '}
+              <b>🕗 7h + 🕐 12h30 — bài bán:</b>{' '}
               {todayPlan.sales.length
                 ? todayPlan.sales.map((s) => `${s.product} (${vnInt(s.count)} bài)`).join(', ')
                 : 'không có bài bán hôm nay'}
               {todayPlan.direction ? <> · <b>hướng:</b> {todayPlan.direction.title} ({todayPlan.direction.variant === 'AB' ? 'A sáng, B chiều' : `thử ${todayPlan.direction.variant}`})</> : null}
             </div>
             <div>
-              <b>🕐 13h — content:</b> {todayPlan.contentKindLabel || vnInt(todayPlan.contentCount)}
+              <b>🕐 12h30 — content:</b> {todayPlan.contentKindLabel || vnInt(todayPlan.contentCount)}
               {todayPlan.contentStructure ? <span className="sub"> — {todayPlan.contentStructure}</span> : null}
             </div>
             <div>
@@ -216,7 +219,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               </div>
             ) : null}
             <p className="sub" style={{ margin: 0 }}>
-              Máy tự sinh bài lúc 8h và 13h rồi chờ trong Hàng đợi duyệt. Việc của người: bấm Duyệt, và tự tay chia sẻ bài vào nhóm nêu trên (Facebook không cho máy đăng nhóm).
+              Máy tự sinh bài lúc 7h và 12h30 rồi chờ trong Hàng đợi duyệt. Việc của người: bấm Duyệt, và tự tay chia sẻ bài vào nhóm nêu trên (Facebook không cho máy đăng nhóm).
             </p>
           </div>
         ) : (
@@ -231,7 +234,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <section className="plan-card" style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
             <b style={{ fontSize: '1.05rem' }}>📆 Kế hoạch tuần</b>
-            <span className="sub">Cập nhật {fmtDateTime(liveProposal!.created_at)} · tự làm mới mỗi 30 phút</span>
+            {/* Bản live UPDATE TẠI CHỖ nên created_at của row đứng im từ lần tạo đầu — phải
+                đọc data.generatedAt mới ra giờ làm mới thật (user 21/8: "chỗ này hết cập nhật"). */}
+            <span className="sub">Cập nhật {fmtDateTime((liveData as any).generatedAt || liveProposal!.created_at)} · tự làm mới mỗi 30 phút</span>
           </div>
 
           {liveData.products?.length ? (
@@ -261,9 +266,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 <thead>
                   <tr>
                     <th>Ngày</th>
-                    <th>🕗 8h sáng — bài bán</th>
+                    <th>🕗 7h sáng — bài bán</th>
                     <th>Hướng đi dự kiến</th>
-                    <th>🕐 13h chiều — content</th>
+                    <th>🕐 12h30 chiều — content</th>
                     <th>📣 Sau khi đăng, chia sẻ vào</th>
                   </tr>
                 </thead>
