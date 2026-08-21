@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-20
 ttl_days: 180
+<!-- re-verified: 2026-08-21 - Commit 2 script chay that ma chua tung vao git: upload-zalo-to-bucket.mjs (ban 131 dong day du HOP THA TAY Zalo/Hoc + NHAT KY AI Zalo/AI — vua khoi phuc sau su co checkout nham) + hoc-video.mjs (Gemini xem video, viet tom tat vao Zalo/AI/<ngay>). -->
 <!-- re-verified: 2026-08-20 - Them up-media-kho-tu-lieu.mjs vao day-kho-zalo*.bat (buoc 2b, sau hoc-video + upload bucket): tu phan loai media Zalo vao kho brand-assets, chan giay to ca nhan/screenshot. Test that: 22 file da co -> skip, 2 CCCD -> chan, 3 screenshot -> chan, 3 poster/anh moi -> up dung folder. -->
 <!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- Nhat ky re-verify cu don sang reverify-log.md (20/8/2026). Giu 3 dong moi nhat o day. -->

@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-20
 ttl_days: 90
+<!-- re-verified: 2026-08-21 - Commit upload-zalo-to-bucket.mjs (ban 131 dong) + hoc-video.mjs vao git (NV1 nap tri thuc noi bo — script van hanh khong doi hanh vi). -->
 <!-- re-verified: 2026-08-21 - Rotate 7h/12h30 VN; lich hom nay hien huong da sinh that; huong 3 trang thai; generateContentDirections + avoidTitles chong lap chu de. -->
 <!-- re-verified: 2026-08-21 - DailyPlan v7 direction+contentStructure; bang lich 5 cot; khoi Nen dang lai; topic hub SEO; khung Zalo OA (NV theo whiteboard Social/Zalo). -->
 <!-- re-verified: 2026-08-20 - loadMeasurement skip __page__/__page_real__ + bai da xoa; buildPlan/plan-live loai "Khac"+"Bai content" khoi ranked/weights; UI chi tiet bo narrative dai. -->

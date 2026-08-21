@@ -21,6 +21,7 @@ function ctype(name) {
   if (n.endsWith('.txt')) return 'text/plain';
   if (n.endsWith('.png')) return 'image/png';
   if (n.endsWith('.jpg') || n.endsWith('.jpeg')) return 'image/jpeg';
+  if (n.endsWith('.webp')) return 'image/webp';
   return 'application/octet-stream';
 }
 
@@ -30,7 +31,7 @@ catch (e) { console.error('Khong doc duoc thu muc', localDir, ':', e.message); p
 
 // Bo qua tai lieu HUONG DAN / bi kip cua phien doc Zalo (khong phai tri thuc noi bo -> AI hoc
 // nham, nhieu Nguon - bat duoc 18/8). Bo qua ca file khong phai du lieu.
-const SKIP_PATTERNS = [/^prompt-/i, /^readme/i, /^huong-dan/i, /^bi-kip/i, /^upload-log/i, /\.(log|bat|sh|ps1|exe)$/i];
+const SKIP_PATTERNS = [/^prompt-/i, /^readme/i, /^huong-dan/i, /^bi-kip/i, /^upload-log/i, /^doc-truoc/i, /\.(log|bat|sh|ps1|exe)$/i];
 
 // File hay bi GHI DE moi ngay (cung ten, noi dung moi): zalo-messages.jsonl, zalo-summary.md,
 // zalo-groups-*.json. Neu chi upsert cung ten thi import bo qua vi source_path da co ->
@@ -76,4 +77,54 @@ for (const name of items) {
     if (!up2.error) console.log(`    + ban ngay: ${bucketPrefix}/${dated} (de AI hoc noi dung moi)`);
   }
 }
+// HOP THA TAY: ./Zalo/Học — nguoi dung chep tay tu lieu vao day de AI hoc (doi ten 19/8,
+// truoc la Downloads). Chi upload loai file bo nap kho tri thuc doc duoc: .txt .md .markdown
+// .html .htm .json va anh jpg/jpeg/png/webp (Gemini vision trich chu). Gioi han 10MB.
+// docx/pdf/xlsx bo nap CHUA doc duoc -> bao ro va de lai, khong upload lang phi.
+// Video khong hoc duoc noi dung -> bo vao Zalo/media, script hoc-video.mjs se xem.
+// Luu y: file da upload cung ten se KHONG duoc hoc lai (idempotent theo duong dan) —
+// cap nhat noi dung thi doi ten file (them ngay) roi tha lai.
+const dropDir = join(localDir, 'Học');
+const LEARNABLE = /\.(txt|md|markdown|html|htm|json|jpg|jpeg|png|webp)$/i;
+let dropItems = [];
+try { dropItems = readdirSync(dropDir); } catch { /* chua co folder hop tha */ }
+for (const name of dropItems) {
+  const full = join(dropDir, name);
+  const st = statSync(full);
+  if (!st.isFile()) continue;
+  if (SKIP_PATTERNS.some((re) => re.test(name))) { skipped += 1; continue; }
+  if (/^video-tom-tat-/i.test(name)) { skipped += 1; continue; } // ban tom tat cu con sot, da co ben Zalo/AI
+  if (!LEARNABLE.test(name)) { skipped += 1; console.log(`  - hop tha: ${name} — loai file bo nap chua hoc duoc (docx/pdf/xlsx/video...), de lai`); continue; }
+  if (st.size > 10 * 1024 * 1024) { skipped += 1; console.log(`  - hop tha: ${name} qua 10MB, bo qua`); continue; }
+  const remote = `${bucketPrefix}/thu-cong/${name}`;
+  const buf = readFileSync(full);
+  const up = await client.storage.from('kho-tri-thuc-noi-bo').upload(remote, buf, { contentType: ctype(name), upsert: true });
+  if (up.error) { console.error(`  X ${remote}: ${up.error.message}`); errors += 1; continue; }
+  uploaded += 1;
+  console.log(`  ✓ hop tha: ${remote}  (${Math.round(buf.length / 1024)} KB)`);
+}
+
+// NHAT KY AI: ./Zalo/AI/<ngay>/ — ban tom tat video (va cac ban ghi "AI da hoc") do
+// hoc-video.mjs sinh ra. Day len bucket zalo/ai/<ngay>/ de importer nap (them 19/8).
+const aiDir = join(localDir, 'AI');
+let aiDays = [];
+try { aiDays = readdirSync(aiDir); } catch { /* chua co folder AI */ }
+for (const day of aiDays) {
+  const dayDir = join(aiDir, day);
+  let st;
+  try { st = statSync(dayDir); } catch { continue; }
+  if (!st.isDirectory()) continue;
+  for (const name of readdirSync(dayDir)) {
+    const full = join(dayDir, name);
+    if (!statSync(full).isFile()) continue;
+    if (!/\.(md|txt)$/i.test(name)) continue;
+    const remote = `${bucketPrefix}/ai/${day}/${name}`;
+    const buf = readFileSync(full);
+    const up = await client.storage.from('kho-tri-thuc-noi-bo').upload(remote, buf, { contentType: ctype(name), upsert: true });
+    if (up.error) { console.error(`  X ${remote}: ${up.error.message}`); errors += 1; continue; }
+    uploaded += 1;
+    console.log(`  ✓ nhat ky AI: ${remote}  (${Math.round(buf.length / 1024)} KB)`);
+  }
+}
+
 console.log(`\nUpload xong: ${uploaded} moi, ${skipped} bo qua, ${errors} loi.`);
