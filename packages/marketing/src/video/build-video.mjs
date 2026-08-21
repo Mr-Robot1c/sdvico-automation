@@ -344,10 +344,14 @@ async function main() {
   // video SEA-40, không lẫn S-Tracking hay sơn (điều cấm 5 - không nhận vơ, và tránh sai lệch nội dung).
   // Sản phẩm: ưu tiên brief.rotation_group (rotation tự đặt), rồi guessGroup từ tiêu đề + từ khóa +
   // draft (bài Xưởng sản xuất người tự soạn thường không có rotation_group).
-  const { guessGroup } = await import('../products.mjs');
+  const { guessGroup, CONTENT_GROUP } = await import('../products.mjs');
   const brief = content.brief || {};
-  const productGroup = brief.rotation_group
+  let productGroup = brief.rotation_group
     || guessGroup(`${content.title || ''} ${brief.keyword || ''} ${String(content.draft || '').slice(0, 300)}`);
+  // Bài content nuôi trang: kế hoạch gọi nhóm là 'Bài content' nhưng tư liệu nằm ở folder
+  // 'Content' của Kho tư liệu (user 21/8: folder Content có video biển khơi, dùng dựng video
+  // content được) — đổi sang folder thật để lấy được ảnh/clip.
+  if (productGroup === 'Bài content' || brief.post_kind === 'content') productGroup = CONTENT_GROUP;
   if (!productGroup) throw new Error('Bài chưa gán sản phẩm (không đoán được từ tiêu đề/nội dung). Gán product_group ở /tu-lieu hoặc đặt tiêu đề rõ hơn.');
   const { data: assets } = await client.from('brand_assets')
     .select('id, kind, title, storage_path')

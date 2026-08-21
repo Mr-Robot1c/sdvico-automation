@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-21
 ttl_days: 180
+<!-- re-verified: 2026-08-21 16:15 - VIDEO BAI CONTENT dung folder Content: build-video.mjs remap productGroup 'Bai content'/post_kind content -> CONTENT_GROUP 'Content' (folder that co 8 video + 25 anh bien khoi) — truoc lech ten nen bai content fail "chua co tu lieu". Claim "chi dung tu lieu brand_assets" van dung (folder Content la tu lieu cong ty/da co giay phep). -->
 <!-- re-verified: 2026-08-21 - Giong mac dinh DOI LAI NAM NamMinh (user nghe thu ca hai ban demo len-xuong roi chon nam). TTS_VOICE ep khac duoc. -->
 <!-- re-verified: 2026-08-21 - GIONG LEN XUONG (user: "giong doc ngang qua"): tts() tach loi thoai thanh TUNG CAU (splitSentences), moi cau synth rieng voi ngu dieu theo loai (hoi +7Hz cham lai, cam than +13% +5Hz, thuong dao dong xen ke) roi ffmpeg concat; cau loi 3 lan hoac chi 1 cau -> ve doc ca doan mot giong nhu cu. Demo demo-giong-lenxuong.mp4 da gui user duyet truoc. -->
 <!-- re-verified: 2026-08-21 - LOI THOAI THEO TREND GIOI TRE (user: "hello cac anh em/cac con vo"): script.mjs canh dau BAT BUOC mo bang loi chao trend ("Hello anh em di bien oi!", "Alo alo ba con oi!"...), ca video tone TikToker tre (chem nha/ne/luon a) nhung khong lo/khong chui bay; rate +10%, pitch +3Hz. Demo demo-giong-trend.mp4 da gui user. -->

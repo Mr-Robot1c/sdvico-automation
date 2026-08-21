@@ -197,7 +197,13 @@ async function publishContentToFacebook(
     // -> FB tự đăng đúng giờ (min 10 phút, max 6 tháng - đã kiểm ở decide-actions.tsx).
     // Áp cho cả /videos, /photos, /feed. Bài hẹn giờ KHÔNG thả ảnh comment ngay (không có post_id
     // để comment vì bài chưa đăng); ảnh dư/comment sẽ bỏ qua với warn.
-    const scheduledUnix = scheduledAt ? Math.floor(new Date(scheduledAt).getTime() / 1000) : 0;
+    // MÚI GIỜ (bug 21/8): chuỗi datetime-local "YYYY-MM-DDTHH:mm" KHÔNG kèm múi giờ; server Vercel
+    // chạy UTC nên new Date() từng hiểu 15:26 thành 15:26 UTC = 22:26 VN -> bài lên trễ 7 tiếng.
+    // Người duyệt luôn nhập giờ VN -> ép +07:00 khi đổi sang unix.
+    const schedMatch = String(scheduledAt || '').match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::(\d{2}))?/);
+    const scheduledUnix = schedMatch
+      ? Math.floor(new Date(`${schedMatch[1]}:${schedMatch[2] || '00'}+07:00`).getTime() / 1000)
+      : 0;
     if (scheduledUnix) {
       body.set('published', 'false');
       body.set('scheduled_publish_time', String(scheduledUnix));
