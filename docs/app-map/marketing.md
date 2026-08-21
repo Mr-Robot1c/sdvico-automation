@@ -2,11 +2,11 @@
 
 > Đọc khi làm phần Marketing. Phụ trách Bạn B. Nền chung ở [README.md](README.md), điều cấm và giọng văn ở CLAUDE.md.
 covers: packages/marketing
-last_verified: 2026-08-20
+last_verified: 2026-08-21
 ttl_days: 180
+<!-- re-verified: 2026-08-21 - DO LUONG thanh TAB trong Quan ly bai viet (/noi-dung?loai=do-luong, section app/noi-dung/do-luong-section.tsx; /do-luong redirect, /do-luong/tuan giu nguyen). Trang moi /tong-quan (Tong quan kenh): 4 the FB/YouTube/TikTok/Zalo + stat tong. Buoc 8 workflow cap nhat theo. -->
 <!-- re-verified: 2026-08-21 - Commit 2 script chay that ma chua tung vao git: upload-zalo-to-bucket.mjs (ban 131 dong day du HOP THA TAY Zalo/Hoc + NHAT KY AI Zalo/AI — vua khoi phuc sau su co checkout nham) + hoc-video.mjs (Gemini xem video, viet tom tat vao Zalo/AI/<ngay>). -->
 <!-- re-verified: 2026-08-20 - Them up-media-kho-tu-lieu.mjs vao day-kho-zalo*.bat (buoc 2b, sau hoc-video + upload bucket): tu phan loai media Zalo vao kho brand-assets, chan giay to ca nhan/screenshot. Test that: 22 file da co -> skip, 2 CCCD -> chan, 3 screenshot -> chan, 3 poster/anh moi -> up dung folder. -->
-<!-- DOC-STATUS: SUSPECT (2026-08-20) — code 'packages/marketing' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- Nhat ky re-verify cu don sang reverify-log.md (20/8/2026). Giu 3 dong moi nhat o day. -->
 <!-- re-verified: 2026-08-14 - build-video RESTORE dung CA 2 ban: horizontal (16:9 cho FB) + vertical (9:16 cho TikTok). Truoc chi ngang -> user thay TikTok khong thay video moi. pushToApprovalQueue upload 2 file -> brand_assets, brief.assets.{video_h,video_v}, channels ['facebook','tiktok'], nhan "[FB 16:9 + TikTok doc] 🎬". Thoi gian dung tang tu ~8p len ~15-20p (danh doi de co ca 2 dinh dang). --skip-whisper van dung. -->
 <!-- re-verified: 2026-08-20 - Content ghi tuoi/nam/ngay bang CHU SO (packages/marketing/src/social.mjs + ban apps): quy tac so + prompt portrait -> 55 tuoi, 30 nam thay vi viet chu. -->
@@ -46,7 +46,7 @@ Diễn giải từng bước:
 
 7. Video. Sinh kịch bản từ bài đã đăng, ghép hình từ kho tư liệu, phụ đề bằng Whisper có từ điển thuật ngữ chuyên ngành, chèn nhận diện, xuất bản dọc 60 giây và bản ngang ba tới năm phút. Chỉ dùng tư liệu công ty sở hữu hoặc có giấy phép ghi trong `brand_assets`.
 
-8. Đo lường. Kéo số liệu Google Search Console, Analytics, Facebook Insights, YouTube về `mkt_metrics`. Trang `/do-luong` so sánh tương tác và đơn theo sản phẩm.
+8. Đo lường. Kéo số liệu Google Search Console, Analytics, Facebook Insights, YouTube về `mkt_metrics`. Từ 21/8 Đo lường là tab trong Quản lý bài viết (`/noi-dung?loai=do-luong`, section `app/noi-dung/do-luong-section.tsx`) so sánh tương tác và đơn theo sản phẩm; route cũ `/do-luong` chỉ redirect, báo cáo tuần vẫn ở `/do-luong/tuan`. Trang `/tong-quan` (Tổng quan kênh) nhìn nhanh 4 nền tảng: trạng thái chạy, số bài đã đăng, tổng tương tác Facebook.
 
 9. Con bot định hướng (AI Planner, BOSS). Nhịp từ 20/8: đề xuất SỐNG cập nhật mỗi 30 phút trong cron `mkt-metrics-pull` (trọng số + số bài mỗi sản phẩm + lịch theo ngày + nhóm chia sẻ, xem `lib/plan-live.ts`), mỗi tối từ 21h tự gộp trọng số vào bản đang áp (giữ hướng đi A/B); Chủ nhật 23h học tuần (`lib/learn-weekly.ts`) sinh đề xuất tuần cho người bấm; Thứ 2 và Thứ 6 BOSS sinh bản kế hoạch kèm hướng đi từ tri thức (Gemini, `lib/plan.ts`). Trang `/ke-hoach` để người đọc và chỉnh mục tiêu/focus/nhóm. Vòng 5 AI tổng thể ở [README.md](README.md).
 
@@ -110,4 +110,4 @@ Diễn giải từng bước:
 - Bài Facebook năm bài trên Page nháp và một bài trên Page thật.
 - Video một bản dọc và một bản ngang, đăng chế độ không công khai.
 
-Cập nhật lần cuối: 20/8/2026.
+Cập nhật lần cuối: 21/8/2026.

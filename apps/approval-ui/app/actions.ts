@@ -658,14 +658,14 @@ export async function setConversions(formData: FormData) {
   const brief = (((c as any)?.brief as Record<string, unknown>) || {}) as Record<string, unknown>;
   brief.conversions = n;
   await client.from('mkt_content').update({ brief }).eq('id', contentId);
-  revalidatePath('/do-luong');
+  revalidatePath('/noi-dung');
 }
 
 // Cập nhật số liệu Facebook thủ công (nút trên trang Đo lường).
 export async function refreshFacebookMetrics() {
   const client = getServerClient();
   await pullFacebookMetrics(client);
-  revalidatePath('/do-luong');
+  revalidatePath('/noi-dung');
 }
 
 // Bóc id đối tượng Graph từ mọi dạng link Facebook người dùng dán vào (bài đăng TAY trên Page).
@@ -709,12 +709,12 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   const say = async (status: 'ok' | 'error', msg: string, extra: any = {}) => {
     try { await client.from('run_log').insert({ task: 'mkt.import_manual_post', actor: 'do-luong', status, detail: { link, msg, ...extra } }); } catch { /* bỏ qua */ }
   };
-  if (!link) { await say('error', 'thiếu link'); revalidatePath('/do-luong'); return; }
+  if (!link) { await say('error', 'thiếu link'); revalidatePath('/noi-dung'); return; }
   // Ưu tiên token page CHÍNH THỨC (bài đăng tay thường ở page chính thức), rồi tới page test.
   const tokens = [...fbPageTokens()].sort((a, b) => (a.label === 'real' ? -1 : 1) - (b.label === 'real' ? -1 : 1));
-  if (!tokens.length) { await say('error', 'chưa cấu hình Facebook token'); revalidatePath('/do-luong'); return; }
+  if (!tokens.length) { await say('error', 'chưa cấu hình Facebook token'); revalidatePath('/noi-dung'); return; }
   const parsed = facebookObjectIdFromLink(link);
-  if (!parsed) { await say('error', 'không nhận ra dạng link Facebook'); revalidatePath('/do-luong'); return; }
+  if (!parsed) { await say('error', 'không nhận ra dạng link Facebook'); revalidatePath('/noi-dung'); return; }
 
   // Kiểm bài có thật + tìm token của page SỞ HỮU bài (thử lần lượt; Graph trả lỗi nếu token không
   // có quyền đọc bài đó). Token nào đọc được là token đúng page -> dùng luôn pageId của token đó.
@@ -728,7 +728,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   }
   if (!j || !usedToken) {
     await say('error', 'Facebook không trả bài này. Nếu là bài trên page chính thức, cần cấu hình FACEBOOK_REAL_PAGE_ACCESS_TOKEN (token page đó, có quyền read_insights). Lỗi cuối: ' + lastErr);
-    revalidatePath('/do-luong');
+    revalidatePath('/noi-dung');
     return;
   }
   const pageId = usedToken.pageId || process.env.FACEBOOK_PAGE_ID || '';
@@ -739,7 +739,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
 
   // Đã nhập rồi thì thôi (khử trùng theo external_url).
   const { data: dup } = await client.from('mkt_posts').select('content_id').eq('channel', 'facebook').eq('external_url', externalUrl).limit(1);
-  if (dup && dup.length) { await say('ok', 'bài đã có trong hệ thống', { content_id: dup[0].content_id }); await pullFacebookMetrics(client); revalidatePath('/do-luong'); return; }
+  if (dup && dup.length) { await say('ok', 'bài đã có trong hệ thống', { content_id: dup[0].content_id }); await pullFacebookMetrics(client); revalidatePath('/noi-dung'); return; }
 
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: parsed.kind === 'post' ? 'social' : 'video',
@@ -749,7 +749,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
     status: 'published',
     needs_gov_review: false,
   }).select('id').single();
-  if (ce || !ins) { await say('error', 'không lưu được bài: ' + (ce?.message || '')); revalidatePath('/do-luong'); return; }
+  if (ce || !ins) { await say('error', 'không lưu được bài: ' + (ce?.message || '')); revalidatePath('/noi-dung'); return; }
   await client.from('mkt_posts').insert({
     content_id: (ins as any).id, channel: 'facebook', status: 'published', external_url: externalUrl,
     published_at: j.created_time ? new Date(j.created_time).toISOString() : new Date().toISOString(),
@@ -757,7 +757,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   // Kéo số liệu ngay để người dùng thấy liền.
   await pullFacebookMetrics(client);
   await say('ok', `đã nhập + kéo số liệu (page ${usedToken.label === 'real' ? 'chính thức' : 'test'})`, { content_id: (ins as any).id, graphId, page: usedToken.label });
-  revalidatePath('/do-luong');
+  revalidatePath('/noi-dung');
 }
 
 // Thêm một từ khóa vào kho.

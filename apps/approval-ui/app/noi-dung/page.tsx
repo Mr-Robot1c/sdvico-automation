@@ -4,6 +4,7 @@ import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
 import DeleteButton from './delete-button';
 import ShareGroups from './share-groups';
+import DoLuongSection from './do-luong-section';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 
 export const dynamic = 'force-dynamic';
@@ -39,11 +40,60 @@ type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Fl
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
 export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
-  const tab = searchParams?.loai === 'video' ? 'video' : 'baiviet';
+  // Tab thứ 3 "Đo lường" (user 21/8): gộp trang /do-luong cũ vào đây cho cụ thể, dễ kiểm soát.
+  const tab = searchParams?.loai === 'video' ? 'video' : searchParams?.loai === 'do-luong' ? 'do-luong' : 'baiviet';
   const kinds = tab === 'video' ? ['video'] : ['article', 'social'];
   const statusFilter = searchParams?.trangthai && STATUS[searchParams.trangthai] ? searchParams.trangthai : null;
 
+  // Giữ nguyên loại khi đổi trạng thái, và ngược lại.
+  const withParams = (patch: { loai?: string | null; trangthai?: string | null }) => {
+    const loai = patch.loai !== undefined ? patch.loai : (tab === 'video' ? 'video' : tab === 'do-luong' ? 'do-luong' : null);
+    const tt = patch.trangthai !== undefined ? patch.trangthai : statusFilter;
+    const qs = new URLSearchParams();
+    if (loai) qs.set('loai', loai);
+    if (tt) qs.set('trangthai', tt);
+    const s = qs.toString();
+    return s ? `/noi-dung?${s}` : '/noi-dung';
+  };
+
   const client = getServerClient();
+
+  const [{ count: cBai }, { count: cVid }] = await Promise.all([
+    client.from('mkt_content').select('*', { count: 'exact', head: true }).in('kind', ['article', 'social']),
+    client.from('mkt_content').select('*', { count: 'exact', head: true }).eq('kind', 'video')
+  ]);
+
+  const typeChips = (
+    <nav className="filters" aria-label="Loại nội dung">
+      <a className={`chip ${tab === 'baiviet' ? 'on' : ''}`} href={withParams({ loai: null, trangthai: null })}>
+        <span aria-hidden="true">📝</span> Bài viết <span className="n">{cBai ?? 0}</span>
+      </a>
+      <a className={`chip ${tab === 'video' ? 'on' : ''}`} href={withParams({ loai: 'video', trangthai: null })}>
+        <span aria-hidden="true">🎬</span> Video <span className="n">{cVid ?? 0}</span>
+      </a>
+      <a className={`chip ${tab === 'do-luong' ? 'on' : ''}`} href={withParams({ loai: 'do-luong', trangthai: null })}>
+        <span aria-hidden="true">📈</span> Đo lường
+      </a>
+    </nav>
+  );
+
+  // Tab Đo lường: toàn bộ biểu đồ + bảng số liệu nằm trong section riêng, không cần tải
+  // danh sách bài phía dưới.
+  if (tab === 'do-luong') {
+    return (
+      <main>
+        <header className="head-row">
+          <div>
+            <h1>Quản lý bài viết</h1>
+            <p className="sub">Số liệu tương tác từng bài và theo sản phẩm. Muốn xem theo tuần thì bấm Báo cáo tuần.</p>
+          </div>
+        </header>
+        {typeChips}
+        <DoLuongSection />
+      </main>
+    );
+  }
+
   const { data, error } = await client
     .from('mkt_content')
     .select('id, kind, title, brief, draft, status, created_at')
@@ -146,6 +196,27 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     }
   }
 
+  // Số liệu mới nhất (like, comment, share, lượt xem) của bài ĐÃ ĐĂNG — hiện gọn ngay trong
+  // bảng (user 21/8: gộp đo lường vào đây cho dễ kiểm soát). mkt_metrics là chuỗi snapshot
+  // nên lấy bản mới nhất theo content id. Chi tiết đầy đủ nằm ở tab Đo lường.
+  const metricsByContent = new Map<string, { reactions: number; comments: number; shares: number; views?: number }>();
+  const pubIds = [...publishedByContent.keys()];
+  if (pubIds.length) {
+    const { data: mrows } = await client
+      .from('mkt_metrics')
+      .select('entity_ref, metrics, created_at')
+      .eq('source', 'facebook')
+      .in('entity_ref', pubIds)
+      .order('created_at', { ascending: false })
+      .limit(600);
+    for (const m of mrows || []) {
+      const cid = (m as any).entity_ref as string | null;
+      if (!cid || metricsByContent.has(cid)) continue;
+      const mm = ((m as any).metrics || {}) as any;
+      metricsByContent.set(cid, { reactions: mm.reactions || 0, comments: mm.comments || 0, shares: mm.shares || 0, views: mm.views });
+    }
+  }
+
   // Lý do bị chặn khi đăng (vượt hạn mức ngày / dừng khẩn) — hiện ở cột Trạng thái.
   const blockedReason = new Map<string, string>();
   if (itemIds.length) {
@@ -165,22 +236,6 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     }
   }
 
-  const [{ count: cBai }, { count: cVid }] = await Promise.all([
-    client.from('mkt_content').select('*', { count: 'exact', head: true }).in('kind', ['article', 'social']),
-    client.from('mkt_content').select('*', { count: 'exact', head: true }).eq('kind', 'video')
-  ]);
-
-  // Giữ nguyên loại khi đổi trạng thái, và ngược lại.
-  const withParams = (patch: { loai?: string | null; trangthai?: string | null }) => {
-    const loai = patch.loai !== undefined ? patch.loai : (tab === 'video' ? 'video' : null);
-    const tt = patch.trangthai !== undefined ? patch.trangthai : statusFilter;
-    const qs = new URLSearchParams();
-    if (loai) qs.set('loai', loai);
-    if (tt) qs.set('trangthai', tt);
-    const s = qs.toString();
-    return s ? `/noi-dung?${s}` : '/noi-dung';
-  };
-
   return (
     <main>
       <header className="head-row">
@@ -193,14 +248,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
         </div>
       </header>
 
-      <nav className="filters" aria-label="Loại nội dung">
-        <a className={`chip ${tab === 'baiviet' ? 'on' : ''}`} href={withParams({ loai: null })}>
-          <span aria-hidden="true">📝</span> Bài viết <span className="n">{cBai ?? 0}</span>
-        </a>
-        <a className={`chip ${tab === 'video' ? 'on' : ''}`} href={withParams({ loai: 'video' })}>
-          <span aria-hidden="true">🎬</span> Video <span className="n">{cVid ?? 0}</span>
-        </a>
-      </nav>
+      {typeChips}
 
       <nav className="filters" aria-label="Lọc theo trạng thái">
         <a className={`chip ${!statusFilter ? 'on' : ''}`} href={withParams({ trangthai: null })}>
@@ -246,6 +294,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                 <th scope="col">Tên bài viết</th>
                 <th scope="col">Loại</th>
                 <th scope="col">Kênh</th>
+                <th scope="col">Số liệu</th>
                 <th scope="col">Ngày tạo</th>
                 <th scope="col">Trạng thái</th>
                 <th scope="col" className="col-actions">Thao tác</th>
@@ -272,6 +321,19 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                     </td>
                     <td>{lengthLabel(c.kind)}</td>
                     <td>{channelsLabel(c.brief?.channels, c.brief?.post_reel === true)}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {(() => {
+                        const m = metricsByContent.get(c.id);
+                        if (!m) return <span className="muted">—</span>;
+                        return (
+                          <span title="Like, comment, share và lượt xem mới nhất từ Facebook. Chi tiết ở tab Đo lường.">
+                            👍 {m.reactions} <span style={{ marginLeft: 6 }}>💬 {m.comments}</span>
+                            {m.shares ? <span style={{ marginLeft: 6 }}>🔁 {m.shares}</span> : null}
+                            {m.views != null ? <span style={{ marginLeft: 6 }}>👁 {Number(m.views).toLocaleString('vi-VN')}</span> : null}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td>{formatDate(c.created_at)}</td>
                     <td>
                       {effStatus(c) === 'approved' && scheduledAt.get(c.id) && isFuture(scheduledAt.get(c.id)!) ? (

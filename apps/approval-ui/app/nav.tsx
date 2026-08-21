@@ -19,13 +19,15 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/quy-tac', label: 'Quy tắc', icon: '📜' }
     ]
   };
+  // 21/8: thêm Tổng quan kênh (nhìn nhanh các nền tảng, đỡ rối mắt); Đo lường gộp vào
+  // Quản lý bài viết thành tab (/noi-dung?loai=do-luong) nên bỏ mục riêng.
   const quanLySanXuat: Group = {
     title: 'Quản lí và Sản xuất',
     items: [
+      { href: '/tong-quan', label: 'Tổng quan kênh', icon: '📊' },
       { href: '/noi-dung', label: 'Quản lý bài viết', icon: '📝' },
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
-      { href: '/do-luong', label: 'Đo lường', icon: '📈' },
       { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' },
       { href: '/quang-cao', label: 'Quảng cáo', icon: '📣' }
     ]
