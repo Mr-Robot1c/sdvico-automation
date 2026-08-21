@@ -1317,7 +1317,21 @@ export async function editDraft(formData: FormData) {
 // Bot ĐỀ XUẤT, người quyết (điều cấm 1 và 2). Bản mới applied = false, chưa tác động vòng xoay.
 export async function generatePlanNow() {
   const client = getServerClient();
-  await generateAndStorePlan(client, 'manual');
+  // Sinh + ÁP DỤNG NGAY (21/8, user hỏi "bấm tạo thì các con AI có áp dụng không?" — trước
+  // đây chỉ sinh, phải bấm thêm "Áp dụng trọng số" mà nút đó nằm khuất; người đã bấm Tạo tức
+  // là đã quyết -> áp luôn, giống saveWeeklyGoal). Vòng xoay lần chạy kế tiếp đọc bản này.
+  const { id } = await generateAndStorePlan(client, 'manual');
+  if (id) {
+    await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
+    await client.from('mkt_plans').update({ applied: true, applied_at: new Date().toISOString() }).eq('id', id);
+    // Làm mới đề xuất sống để lịch 7 ngày + hướng đi dự kiến bám ngay bản mới.
+    try {
+      const { refreshLiveProposal } = await import('../lib/plan-live');
+      await refreshLiveProposal(client);
+    } catch (e: any) {
+      console.error('[plan-now] refresh live loi (bo qua):', e?.message || e);
+    }
+  }
   revalidatePath('/ke-hoach');
 }
 
