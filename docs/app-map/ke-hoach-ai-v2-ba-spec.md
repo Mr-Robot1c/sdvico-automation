@@ -5,6 +5,7 @@ covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approv
 last_verified: 2026-08-21
 ttl_days: 90
 <!-- DOC-STATUS: SUSPECT (2026-08-21) — code 'packages/marketing/src' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-21 - Huong carry-over gan carried=true (plan.ts) de /ke-hoach hien badge "moi" + dong thoi gian ban ap; plan-live giu muc B mo coi trong lich du kien. Khong doi hanh vi rut huong cua rotate. -->
 <!-- re-verified: 2026-08-21 - NV11 A/B DOI LAI LAN 2 (user chot dem 21/8): cap A/B chay CUNG NGAY — A slot sang, B slot chieu; slot chieu khong mo huong moi. Ghi de quyet dinh "B hom sau" ban sang. -->
 <!-- re-verified: 2026-08-21 - NV11 A/B: ban B CHI sinh tu ngay hom sau (rotate loc pending B theo dayVN(a_at) != hom nay) — truoc slot chieu sinh B cung ngay voi A (user bat 21/8). Bai B sai lich da xoa, huong tra ve cho B. -->
 <!-- re-verified: 2026-08-21 - Bo giong ElevenLabs khoi build-video.mjs (user doi y) — TTS ve edge-tts, khong doi hanh vi NV nao. -->

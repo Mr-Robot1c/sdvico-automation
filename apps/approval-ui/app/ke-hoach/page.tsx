@@ -158,6 +158,17 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   // Huong di bai viet tu ban DANG AP (content_suggestions).
   const suggestions = appliedRow?.data?.content_suggestions || [];
   const sugFresh = suggestions.filter((s) => !s.used_at);
+  // Hướng MỚI của bản đang áp = chưa dùng và KHÔNG mang cờ carried (giữ lại từ bản trước).
+  // Bấm "Tạo kế hoạch ngay" xong nhìn số này + badge ✨ là biết có gì mới (user 21/8).
+  const sugNew = sugFresh.filter((s) => (s as any).carried !== true && !(s as any).pending_variant);
+  const appliedGeneratedAt = String(appliedRow?.data?.generatedAt || '');
+  const fmtGenAt = (() => {
+    const d = new Date(appliedGeneratedAt);
+    if (Number.isNaN(d.getTime())) return '';
+    const p = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hourCycle: 'h23' }).formatToParts(d);
+    const g = (t: string) => p.find((x) => x.type === t)?.value || '';
+    return `${g('hour')}:${g('minute')} ${g('day')}/${g('month')}`;
+  })();
   // Hướng bị TỪ CHỐI bản thử (rejected) tách khỏi "xong cặp" — user 21/8: hướng vừa bị
   // loại mà hiện "✓ xong cặp A + B" là sai bản chất.
   const sugRejected = suggestions.filter((s) => s.used_at && (s as any).rejected === true);
@@ -296,6 +307,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       {suggestions.length ? (
         <section className="plan-card" style={{ marginBottom: 14 }}>
           <b style={{ fontSize: '1.05rem' }}>🧭 Hướng đi bài viết ({vnInt(sugFresh.filter((s) => !(s as any).pending_variant).length)} chưa dùng, {vnInt(sugFresh.filter((s) => (s as any).pending_variant).length)} đang thử, {vnInt(sugUsed.length)} xong cặp{sugRejected.length ? `, ${vnInt(sugRejected.length)} đã loại` : ''})</b>
+          {fmtGenAt ? (
+            <p className="sub" style={{ margin: '2px 0 0' }}>
+              Bản kế hoạch đang áp tạo lúc <b>{fmtGenAt}</b>{sugNew.length ? <> — có <b>{vnInt(sugNew.length)} hướng mới ✨</b>, các hướng cũ chưa dùng được giữ lại chạy trước</> : null}.
+            </p>
+          ) : null}
           <p className="sub" style={{ margin: '4px 0 8px' }}>
             BOSS đề xuất góc bài từ kho tri thức. Mỗi hướng chạy trong một ngày: bản thử A ra 7h sáng, bản B ra 12h30 chiều; đủ cặp thì Evaluator so xem bản nào ăn hơn.
           </p>
@@ -304,6 +320,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               <li key={i} className="direction-item" style={d.used_at ? { opacity: 0.55 } : undefined}>
                 <div className="direction-head">
                   <b>{d.title}</b>
+                  {!d.used_at && (d as any).carried !== true && !(d as any).pending_variant ? (
+                    <span className="badge tone-ok" style={{ marginLeft: 8 }} title="Hướng mới của bản kế hoạch đang áp.">✨ mới</span>
+                  ) : null}
                   <span className="badge tone-default" style={{ marginLeft: 8 }}>{d.product}</span>
                   {d.used_at
                     ? ((d as any).rejected === true

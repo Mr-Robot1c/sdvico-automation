@@ -63,6 +63,7 @@ export type ContentDirection = {
   sources: string[];                // Nguồn tri thức đã dùng, vd ["public #7", "noi bo #2"]
   needs_gov_review: boolean;        // Nguồn chạm quy định thì bài theo hướng này cũng cần duyệt QL
   used_at?: string;                 // Rotate đánh dấu khi hướng này đã sinh cặp bài A/B (không lặp)
+  carried?: boolean;                // Hướng giữ lại từ bản trước (chưa dùng); thiếu cờ = hướng MỚI của bản này
 };
 
 // Một ngày trong lịch BOSS đề xuất: sản phẩm bán + số bài, số bài content, nhóm chia sẻ.
@@ -377,7 +378,9 @@ export async function generateAndStorePlan(
     if (carry.length) {
       const seen = new Set(carry.map((s) => s.title.toLowerCase().trim()));
       const fresh = (plan.content_suggestions || []).filter((s) => !seen.has(s.title.toLowerCase().trim()));
-      plan.content_suggestions = [...carry, ...fresh].slice(0, 12);
+      // Đánh dấu carried để UI phân biệt hướng giữ lại với hướng ✨ MỚI của bản này (user
+      // 21/8: "bấm tạo kế hoạch sao không thấy mới gì" — hướng mới nằm cuối, không ai biết).
+      plan.content_suggestions = [...carry.map((s) => ({ ...s, carried: true })), ...fresh].slice(0, 12);
     }
   } catch (e: any) {
     console.error('[plan] carry-over huong di loi (bo qua):', e?.message || e);

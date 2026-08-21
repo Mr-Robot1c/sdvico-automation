@@ -255,8 +255,9 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
         done: true,
       };
       // Bỏ mục trùng (hướng hôm nay) khỏi đầu queue nếu nó chính là mục kế tiếp, rồi chèn
-      // hướng đã sinh vào vị trí hôm nay; phần còn lại dời sang từ ngày mai.
-      const rest = dirQueue.filter((d, i) => !(i === 0 && d.title === doneDir.title));
+      // hướng đã sinh vào vị trí hôm nay; phần còn lại dời sang từ ngày mai. GIỮ mục 'B' mồ
+      // côi cùng title (hôm nay mới ra A, bản B còn chờ ngày mai) — bỏ nó là lịch mai mất B.
+      const rest = dirQueue.filter((d, i) => !(i === 0 && d.title === doneDir.title && d.variant !== 'B'));
       dirQueue = [doneDir, ...rest];
     }
   } catch { /* không có bản áp -> lịch không ghi hướng */ }
