@@ -3,8 +3,9 @@
 > Load khi / Load when: cần hiểu hệ thống chạy thế nào, con AI nào làm gì, file nào ở đâu, hoặc trước khi sửa code chạm nhiều mảng. Đây là trang chỉ mục + bản đồ tổng.
 > Nguồn sự thật khác: `CLAUDE.md` (bảy điều cấm + giọng văn), `supabase/migrations` (lược đồ), các file bên dưới cho chi tiết từng mảng.
 covers: packages/core, apps/approval-ui, supabase/migrations
-last_verified: 2026-08-20
+last_verified: 2026-08-21
 ttl_days: 180
+<!-- re-verified: 2026-08-21 - DISPATCH VIDEO FAIL het im lang: bai 09:20 21/8 treo 39p vi env GITHUB_REPO/GITHUB_TOKEN tren Vercel SAI -> GitHub 404 ma run_log chi co videoTriggered:false. Da sua env (repo Mr-Robot1c + token scope workflow, qua vercel env add --force --sensitive) + redeploy + test {ok:true}. rotate gio ghi videoTriggerError (status+body GitHub hoac 'thieu env') vao run_log mkt.rotate. -->
 <!-- re-verified: 2026-08-21 - generatePlanNow (nut Tao ke hoach ngay) gio SINH + AP DUNG NGAY + refresh live proposal (truoc chi sinh, phai bam them "Ap dung trong so" nam khuat trong details -> user bam Tao ma Creator van chay ban cu). Nguoi bam Tao = nguoi quyet, khong pham dieu cam 2. -->
 <!-- DOC-STATUS: SUSPECT (2026-08-21) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- re-verified: 2026-08-21 - TAT lich mkt-content.yml (duong sinh bai theo TU KHOA cu, 1 keyword x 3 dinh dang): truoc "im" vi can keyword, 20/8 mkt_keywords nap 152 muc nen SONG DAY sinh 3 bai trung 9h22 (generator=gemini, run_log mkt.content_run). Chi con workflow_dispatch chay tay. Da xoa 3 bai rac + 3 queue item. Duong sinh bai chinh thuc duy nhat: /api/rotate. -->

@@ -534,6 +534,7 @@ export async function GET(req: Request) {
   // GitHub 10 phút quét. Dispatch workflow video-build.yml trực tiếp; thiếu env/lỗi thì bỏ
   // qua, cron 10 phút vẫn là lưới an toàn.
   let videoTriggered = false;
+  let videoTriggerError: string | null = null;
   if (results.some((r) => r.video_requested)) {
     try {
       const repo = process.env.GITHUB_REPO;
@@ -549,8 +550,16 @@ export async function GET(req: Request) {
           body: JSON.stringify({ ref: 'main', inputs: { limit: '3' } }),
         });
         videoTriggered = gh.status === 204;
+        // 21/8 tung dinh: env sai -> 404 im lang, bai treo 39 phut. Ghi ro ly do de lan sau
+        // nhin run_log la biet ngay, khong phai do tay.
+        if (!videoTriggered) {
+          const txt = await gh.text().catch(() => '');
+          videoTriggerError = `GitHub API ${gh.status}: ${txt.slice(0, 160)}`;
+        }
+      } else {
+        videoTriggerError = 'thieu env GITHUB_REPO / GITHUB_TOKEN';
       }
-    } catch { /* cron 10 phut van quet */ }
+    } catch (e) { videoTriggerError = String(e).slice(0, 160); /* cron 10 phut van quet */ }
   }
 
   await logRotate(results.length > 0 ? 'ok' : 'skipped', {
@@ -559,6 +568,7 @@ export async function GET(req: Request) {
     fromPlan: suggestionsTouched.length,
     focus: focusNote,
     videoTriggered,
+    ...(videoTriggerError ? { videoTriggerError } : {}),
   });
   return NextResponse.json({
     ok: true, cycle,
