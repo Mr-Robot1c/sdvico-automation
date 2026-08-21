@@ -79,13 +79,13 @@ async function tts(text, outPath, voice, workDir, tag) {
   await writeFile(txt, clean, 'utf8');
   // GIỮ NGUYÊN 1 GIỌNG cho toàn video (không đổi giọng giữa chừng). edge-tts hay bị
   // "No audio received" -> thử lại vài lần với rate khác nhau. Hết mới lùi tiếng lặng.
-  // Rate mac dinh +8% cho tuoi (user 19/8: "giong doc buon ngu"). Env TTS_RATE ep khac. Cac
+  // Rate mac dinh +10% cho nhip tre trung (user 21/8: theo trend gioi tre; 19/8 tung +8%). Cac
   // lan retry giu +8% roi lui rate cham dan neu edge-tts bao "No audio received".
-  const baseRate = process.env.TTS_RATE || '+8%';
+  const baseRate = process.env.TTS_RATE || '+10%';
   // Pitch nhích nhẹ cho giọng tươi hơn (sếp 21/8: "giọng chưa có cảm xúc"). Env TTS_PITCH đổi
   // được, vd '+4Hz' tươi hơn nữa, '+0Hz' về giọng cũ. Cảm xúc chính vẫn đến từ dấu câu trong
   // kịch bản (script.mjs đã yêu cầu câu hỏi, câu cảm, ngắt nhịp).
-  const pitch = process.env.TTS_PITCH || '+2Hz';
+  const pitch = process.env.TTS_PITCH || '+3Hz';
   const attempts = [
     { voice, rate: baseRate },
     { voice, rate: '+0%' },
