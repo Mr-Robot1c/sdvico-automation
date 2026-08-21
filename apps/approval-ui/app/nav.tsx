@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-type Tab = { href: string; label: string; icon: string };
+type Tab = { href: string; label: string; icon: string; external?: boolean };
 type Group = { title: string; items: Tab[] };
 
 // Sidebar chia nhóm theo dòng chảy công việc. Sếp chốt 20/8: Kết nối (3 kênh) và Quy tắc
@@ -31,7 +31,10 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
       { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' },
-      { href: '/quang-cao', label: 'Quảng cáo', icon: '📣' }
+      { href: '/quang-cao', label: 'Quảng cáo', icon: '📣' },
+      // 21/8 (user: "trang SEO đâu, giấu à?"): trang công khai /blog + /san-pham dựng 20/8 nhưng
+      // không có lối vào từ menu nội bộ -> thêm mục này, mở tab mới (shell công khai riêng).
+      { href: '/blog', label: 'Trang công khai', icon: '🌐', external: true }
     ]
   };
   // Nhóm AI (user 18/8): Nguồn = tri thức các AI đã học (nội bộ + public); Dữ liệu = 5 AI
@@ -65,12 +68,19 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
         <div className="nav-block" key={g.title}>
           <div className="nav-group">{g.title}</div>
           <div className="tabs">
-            {g.items.map((t) => (
-              <Link key={t.href} href={t.href} className={`tab ${path === t.href ? 'on' : ''}`}>
-                <span className="tab-icon" aria-hidden="true">{t.icon}</span>
-                <span>{t.label}</span>
-              </Link>
-            ))}
+            {g.items.map((t) =>
+              t.external ? (
+                <a key={t.href} href={t.href} className="tab" target="_blank" rel="noreferrer" title="Mở trang công khai ở tab mới (người ngoài xem được, không cần đăng nhập)">
+                  <span className="tab-icon" aria-hidden="true">{t.icon}</span>
+                  <span>{t.label} ↗</span>
+                </a>
+              ) : (
+                <Link key={t.href} href={t.href} className={`tab ${path === t.href ? 'on' : ''}`}>
+                  <span className="tab-icon" aria-hidden="true">{t.icon}</span>
+                  <span>{t.label}</span>
+                </Link>
+              )
+            )}
           </div>
         </div>
       ))}
