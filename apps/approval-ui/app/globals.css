@@ -1181,3 +1181,13 @@ a.chip:hover { filter: brightness(0.98); }
 .pf-foot { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; font-size: .85rem; color: var(--accent); font-weight: 600; }
 .pf-foot .muted { font-weight: 400; }
 .pending-callout { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: color-mix(in srgb, var(--tone-mkt) 12%, transparent); border: 1px solid color-mix(in srgb, var(--tone-mkt) 35%, transparent); color: var(--ink); border-radius: 12px; padding: 10px 14px; margin-top: 14px; }
+
+/* ===== 21/8: khối lấp dưới trang Tổng quan — bài nổi bật + nhật ký máy ===== */
+.tq-cols { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; align-items: stretch; }
+.tq-panel { flex: 1 1 340px; min-width: 280px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+.tq-item { display: flex; gap: 10px; align-items: center; text-decoration: none; color: inherit; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; transition: border-color .12s ease; }
+.tq-item:hover { border-color: var(--accent); }
+.tq-rank { flex: 0 0 24px; width: 24px; height: 24px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 700; font-size: .8rem; display: flex; align-items: center; justify-content: center; }
+.tq-item-title { display: block; font-weight: 600; font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tq-act { display: flex; gap: 10px; align-items: baseline; font-size: .88rem; padding: 5px 2px; border-bottom: 1px dashed var(--line); }
+.tq-act:last-child { border-bottom: 0; }

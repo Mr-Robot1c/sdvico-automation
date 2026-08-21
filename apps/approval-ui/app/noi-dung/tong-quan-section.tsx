@@ -3,6 +3,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import { fbStatus, tiktokStatus } from '../../lib/platform-status';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
 import { zaloOaStatus } from '../../lib/zalo-oa';
+import PlatformLogo from './platform-logo';
 
 // TỔNG QUAN thiết kế lại (user 21/8 đêm, nhắc lại yêu cầu gốc): một trang tổng quát để xem
 // cho đỡ rối mắt — mỗi NỀN TẢNG một thẻ: đang làm tốt cỡ nào (thông số react, cmt, view),
@@ -25,7 +26,7 @@ function fmtVNDateTime(iso: string): string {
 export default async function TongQuanSection() {
   const client = getServerClient();
 
-  const [fb, tt, yt, za, postsRes, metricsRes, pendingRes] = await Promise.all([
+  const [fb, tt, yt, za, postsRes, metricsRes, pendingRes, logRes] = await Promise.all([
     fbStatus(),
     tiktokStatus(),
     getYouTubeChannelInfo(),
@@ -46,7 +47,13 @@ export default async function TongQuanSection() {
       .from('approval_queue')
       .select('*', { count: 'exact', head: true })
       .eq('kind', 'mkt_publish_content')
-      .eq('status', 'pending')
+      .eq('status', 'pending'),
+    client
+      .from('run_log')
+      .select('task, status, detail, created_at')
+      .in('task', ['mkt.rotate', 'mkt.publish_facebook_ui', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull', 'mkt.live_apply', 'mkt.direction_rejected'])
+      .order('created_at', { ascending: false })
+      .limit(40)
   ]);
 
   // Bài đã đăng theo kênh + lần đăng gần nhất.
@@ -96,6 +103,33 @@ export default async function TongQuanSection() {
   const ttPosts = byChannel.get('tiktok') || { count: 0, lastAt: '' };
   const ytOk = !!(yt.configured && yt.channelTitle);
 
+  // BÀI NỔI BẬT: top 3 theo tương tác Facebook (bản snapshot mới nhất), kèm lượt xem YouTube.
+  const topIds = [...latest.entries()]
+    .map(([cid, m]) => ({ cid, eng: (m.reactions || 0) + (m.comments || 0) + (m.shares || 0), views: m.views }))
+    .sort((a, b) => b.eng - a.eng)
+    .slice(0, 3);
+  const topTitles = new Map<string, string>();
+  if (topIds.length) {
+    const { data: cs } = await client.from('mkt_content').select('id, title').in('id', topIds.map((t) => t.cid));
+    for (const c of cs || []) topTitles.set((c as any).id, (c as any).title || '(không tên)');
+  }
+
+  // HOẠT ĐỘNG GẦN ĐÂY: dịch run_log ra câu người đọc được, bỏ các lượt trống.
+  const activity: Array<{ at: string; text: string }> = [];
+  for (const r of (logRes.data || []) as any[]) {
+    if (activity.length >= 6) break;
+    const d = r.detail || {};
+    let text = '';
+    if (r.task === 'mkt.rotate' && r.status === 'ok' && (d.created || 0) > 0) text = `🤖 Máy sinh ${d.created} bài mới${d.videoTriggered ? ', đã kích dựng video' : ''}`;
+    else if (r.task === 'mkt.publish_facebook_ui' && r.status === 'ok') text = '📘 Đăng bài lên Facebook';
+    else if (r.task === 'mkt.publish_youtube' && r.status === 'ok') text = '▶️ Đăng video lên YouTube Shorts';
+    else if (r.task === 'mkt.publish_tiktok' && r.status === 'ok') text = '🎵 Đăng video lên TikTok';
+    else if (r.task === 'mkt.metrics_pull' && r.status === 'ok' && ((d.pulled || 0) > 0 || (d.ytPulled || 0) > 0)) text = `📈 Kéo số liệu (${d.pulled || 0} bài Facebook${d.ytPulled ? `, ${d.ytPulled} video YouTube` : ''})`;
+    else if (r.task === 'mkt.live_apply' && r.status === 'ok') text = '🧭 BOSS áp trọng số buổi tối';
+    else if (r.task === 'mkt.direction_rejected') text = '⛔ Loại một hướng đi (bản thử bị từ chối)';
+    if (text) activity.push({ at: r.created_at, text });
+  }
+
   return (
     <section>
       {/* Hàng số tổng, nhìn 3 giây biết sức khỏe hệ thống. */}
@@ -130,7 +164,7 @@ export default async function TongQuanSection() {
       <div className="pf-grid">
         <Link className="pf-card" href="/do-luong" title="Bấm xem số liệu chi tiết từng bài">
           <div className="pf-head">
-            <span className="pf-icon facebook" aria-hidden="true">📘</span>
+            <span className="pf-icon facebook" aria-hidden="true"><PlatformLogo platform="facebook" size={24} /></span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span className="pf-name">Facebook</span>
             </span>
@@ -153,7 +187,7 @@ export default async function TongQuanSection() {
 
         <Link className="pf-card" href="/do-luong" title="Bấm xem số liệu chi tiết từng video">
           <div className="pf-head">
-            <span className="pf-icon youtube" aria-hidden="true">▶️</span>
+            <span className="pf-icon youtube" aria-hidden="true"><PlatformLogo platform="youtube" size={24} /></span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span className="pf-name">YouTube Shorts</span>
             </span>
@@ -176,7 +210,7 @@ export default async function TongQuanSection() {
 
         <Link className="pf-card" href="/tiktok" title="Bấm xem trạng thái kết nối TikTok">
           <div className="pf-head">
-            <span className="pf-icon tiktok" aria-hidden="true">🎵</span>
+            <span className="pf-icon tiktok" aria-hidden="true"><PlatformLogo platform="tiktok" size={24} /></span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span className="pf-name">TikTok</span>
             </span>
@@ -197,7 +231,7 @@ export default async function TongQuanSection() {
 
         <Link className="pf-card" href="/ket-noi" title="Bấm xem hướng dẫn thiết lập Zalo OA">
           <div className="pf-head">
-            <span className="pf-icon zalo" aria-hidden="true">💬</span>
+            <span className="pf-icon zalo" aria-hidden="true"><PlatformLogo platform="zalo" size={24} /></span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span className="pf-name">Zalo OA</span>
             </span>
@@ -213,6 +247,46 @@ export default async function TongQuanSection() {
           </div>
           <div className="pf-foot"><span>Xem thiết lập</span><span aria-hidden="true">→</span></div>
         </Link>
+      </div>
+
+      {/* Lấp phần dưới trang (user 21/8: "còn dư 1 khúc trống trải"): bài nổi bật + nhật ký máy. */}
+      <div className="tq-cols">
+        <div className="tq-panel">
+          <b>🔥 Bài nổi bật</b>
+          {topIds.length === 0 ? (
+            <p className="sub" style={{ margin: '8px 0 0' }}>Chưa có bài nào có số liệu.</p>
+          ) : (
+            <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+              {topIds.map((t, i) => (
+                <Link key={t.cid} href="/do-luong" className="tq-item" title="Bấm xem số liệu chi tiết">
+                  <span className="tq-rank" aria-hidden="true">{i + 1}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span className="tq-item-title">{topTitles.get(t.cid) || '(không tên)'}</span>
+                    <span className="sub" style={{ display: 'block', fontSize: '.78rem' }}>
+                      {fmt(t.eng)} tương tác{t.views != null ? `, ${fmt(t.views || 0)} lượt xem` : ''}
+                    </span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="tq-panel">
+          <b>🕒 Máy vừa làm gì</b>
+          {activity.length === 0 ? (
+            <p className="sub" style={{ margin: '8px 0 0' }}>Chưa có hoạt động nào được ghi.</p>
+          ) : (
+            <div style={{ display: 'grid', gap: 7, marginTop: 10 }}>
+              {activity.map((a, i) => (
+                <div key={i} className="tq-act">
+                  <span>{a.text}</span>
+                  <span className="muted" style={{ marginLeft: 'auto', whiteSpace: 'nowrap', fontSize: '.78rem' }}>{fmtVNDateTime(a.at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <Link className="src" href="/du-lieu-ai" style={{ display: 'inline-block', marginTop: 10, fontSize: '.85rem' }}>Xem các AI đang học gì</Link>
+        </div>
       </div>
 
       <p className="muted" style={{ marginTop: 14, fontSize: '.85rem' }}>
