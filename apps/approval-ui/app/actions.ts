@@ -592,7 +592,9 @@ export async function decideForm(formData: FormData) {
         }
         const quotaOff = await isQuotaDisabled(bgClient);
         const jobs: Promise<unknown>[] = [];
-        for (const ch of ['facebook', 'tiktok']) {
+        // 21/8: vòng lặp từng thiếu 'youtube' -> nhánh youtube phía dưới KHÔNG BAO GIỜ chạy,
+        // bài duyệt xong chỉ lên FB + TikTok dù channels có youtube (user báo).
+        for (const ch of ['facebook', 'tiktok', 'youtube']) {
           if (!channels.includes(ch)) continue;
           if (!quotaOff) {
             const q = await reservePostQuota(bgClient, ch, LIMIT);

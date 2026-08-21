@@ -104,13 +104,30 @@ function drawBackground(ctx, W, H, t = 0) {
 const easeOut = (t) => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
+// Thu cỡ chữ tới khi vừa maxWidth (user 21/8: bản dọc 1080x1920 bị che chữ — slogan tính
+// font theo base=H=1920 nhưng khung chỉ rộng 1080 nên tràn 2 mép). Cùng cách với số tổng đài.
+function fitFontPx(ctx, text, px, family, maxWidth) {
+  let f = px;
+  ctx.font = `${f}px ${family}`;
+  while (ctx.measureText(text).width > maxWidth && f > 24) {
+    f = Math.round(f * 0.94);
+    ctx.font = `${f}px ${family}`;
+  }
+  return f;
+}
+
 function drawText(ctx, text, x, y, opts = {}) {
-  const { color = '#ffffff', font, align = 'center', alpha = 1 } = opts;
+  const { color = '#ffffff', font, align = 'center', alpha = 1, maxWidth = 0 } = opts;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
   ctx.font = font;
+  // maxWidth > 0: tự thu font cho vừa (giữ nguyên family trong chuỗi font "NNpx Family").
+  if (maxWidth > 0) {
+    const m = String(font).match(/^(\d+)px\s+(.+)$/);
+    if (m) ctx.font = `${fitFontPx(ctx, text, Number(m[1]), m[2], maxWidth)}px ${m[2]}`;
+  }
   ctx.shadowColor = 'rgba(0,0,0,0.5)';
   ctx.shadowBlur = 12;
   ctx.shadowOffsetY = 3;
@@ -166,7 +183,8 @@ async function drawIntroFrame(W, H, t, dur) {
   const sloganT = easeOut((t - 1.2) / 0.8);
   if (sloganT > 0) {
     drawText(ctx, 'Công nghệ số cho ngành biển và thủy sản', W / 2, H * pos.sloganY, {
-      font: `${Math.round(base * 0.032)}px BVP`, color: 'rgba(255,255,255,0.92)', alpha: Math.min(1, sloganT)
+      font: `${Math.round(base * 0.032)}px BVP`, color: 'rgba(255,255,255,0.92)', alpha: Math.min(1, sloganT),
+      maxWidth: W * 0.92
     });
   }
 
@@ -207,7 +225,8 @@ async function drawOutroFrame(W, H, t, dur) {
   if (headT > 0) {
     const offset = -120 * (1 - headT);
     drawText(ctx, 'Gọi ngay tổng đài', W / 2 + offset, H * pos.headY, {
-      font: `${Math.round(base * 0.045)}px BVP-Black`, alpha: Math.min(1, headT)
+      font: `${Math.round(base * 0.045)}px BVP-Black`, alpha: Math.min(1, headT),
+      maxWidth: W * 0.92
     });
   }
 
@@ -246,7 +265,8 @@ async function drawOutroFrame(W, H, t, dur) {
   const sloganT = easeOut((t - 1.8) / 0.7);
   if (sloganT > 0) {
     drawText(ctx, 'SDVICO đồng hành cùng ngư dân', W / 2, H * pos.sloganY, {
-      font: `${Math.round(base * 0.028)}px BVP`, color: 'rgba(255,255,255,0.9)', alpha: Math.min(1, sloganT)
+      font: `${Math.round(base * 0.028)}px BVP`, color: 'rgba(255,255,255,0.9)', alpha: Math.min(1, sloganT),
+      maxWidth: W * 0.92
     });
   }
 
