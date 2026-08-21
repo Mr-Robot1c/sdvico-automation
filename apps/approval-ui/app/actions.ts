@@ -2408,6 +2408,77 @@ export async function changeHrUserRole(formData: FormData) {
   revalidatePath('/cai-dat/nguoi-dung');
 }
 
+// ===== LINK ĐĂNG NHẬP NHANH ============================================================
+// Admin tạo cho một người trong hr_users một link "bấm là vào", không phải nhập email,
+// không phải chờ mail. Dùng cho sếp: gửi link qua Zalo, sếp bấm là vào thẳng giao diện.
+//
+// Đây KHÔNG phải cửa hậu vĩnh viễn. Link chỉ dùng để VÀO lần đầu: sếp bấm một lần, trình
+// duyệt của sếp nhận phiên đăng nhập, và từ đó về sau mở app là vào thẳng (như máy đã quen).
+// Link dùng MỘT LẦN và hết hạn theo cấu hình OTP của Supabase (mặc định 1 giờ), nên nếu
+// lọt ra ngoài cũng không thành chìa mở mãi. Vì nó mở thẳng vào tài khoản người đó, chỉ
+// admin tạo được và phải gửi riêng cho đúng người.
+//
+// Cơ chế: Admin API generateLink('magiclink') sinh token_hash, ghép vào /api/auth/callback.
+// Callback đã có sẵn nhánh xử lý token_hash (verifyOtp một lần), không qua PKCE nên không cần
+// code verifier ở trình duyệt — đúng để bấm từ Zalo trên máy sếp.
+
+function siteOrigin(): string {
+  const h = headers();
+  const host = h.get('x-forwarded-host') || h.get('host') || '';
+  const proto = h.get('x-forwarded-proto') || 'https';
+  if (host) return `${proto}://${host}`;
+  return (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/+$/, '');
+}
+
+export async function createQuickLoginLink(userId: string): Promise<{ url: string } | { error: string }> {
+  const ok = await requireAdmin();
+  if ('error' in ok) return { error: ok.error };
+
+  const id = String(userId || '').trim();
+  if (!id) return { error: 'Thiếu mã người dùng.' };
+
+  const client = getServerClient();
+  const { data: row, error: readErr } = await client
+    .from('hr_users')
+    .select('email, disabled_at')
+    .eq('id', id)
+    .maybeSingle();
+  if (readErr) return { error: 'Đọc người dùng lỗi: ' + readErr.message };
+  if (!row) return { error: 'Không tìm thấy người dùng.' };
+  if (row.disabled_at) return { error: 'Tài khoản này đang bị khóa. Mở khóa trước khi tạo link.' };
+
+  const email = String(row.email || '').trim().toLowerCase();
+  if (!email) return { error: 'Người dùng chưa có email định danh.' };
+
+  const origin = siteOrigin();
+  if (!origin) return { error: 'Không xác định được địa chỉ trang. Đặt biến NEXT_PUBLIC_SITE_URL.' };
+
+  // Đảm bảo tài khoản tồn tại trong Supabase Auth trước khi sinh magic link. Người vừa được
+  // thêm vào hr_users chưa từng đăng nhập nên chưa có trong auth.users; createUser là idempotent,
+  // nếu đã tồn tại thì trả lỗi trùng và ta bỏ qua (email_confirm để khỏi đòi xác nhận mail).
+  await client.auth.admin.createUser({ email, email_confirm: true });
+
+  const { data, error } = await client.auth.admin.generateLink({ type: 'magiclink', email });
+  if (error || !data?.properties?.hashed_token) {
+    return { error: 'Không tạo được link: ' + (error?.message || 'thiếu token trả về') };
+  }
+
+  const url = `${origin}/api/auth/callback?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink`;
+
+  // Audit: ghi lại ai tạo chìa vào tài khoản ai. Không chặn nếu ghi log lỗi.
+  try {
+    await client.from('run_log').insert({
+      task: 'hr.quick_login_link',
+      status: 'ok',
+      detail: { for: email, by: ok.email },
+    });
+  } catch {
+    // eo
+  }
+
+  return { url };
+}
+
 // --- Quản lý nhân viên (sau khi đã nhận việc thật) ---
 // Toàn bộ hàm dưới đây kiểm requireEmployeeAdmin() trước, vì hr_employees/hr_employee_documents
 // không cấp policy RLS cho authenticated (dữ liệu nhạy cảm hơn hồ sơ ứng viên, xem

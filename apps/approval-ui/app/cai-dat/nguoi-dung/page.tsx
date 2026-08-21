@@ -2,6 +2,7 @@ import { getSessionUser } from '../../../lib/auth';
 import { listUsers } from '../../../lib/hr-users';
 import { addHrUser, changeHrUserRole, toggleHrUserDisabled } from '../../actions';
 import { SubmitButton } from '../../submit-button';
+import QuickLoginLink from './quick-login-link';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +105,7 @@ export default async function Page() {
                     {new Date(u.created_at).toLocaleDateString('vi-VN')}
                   </td>
                   <td>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
                     <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
                       {/* Đổi vai trò. Không cho tự hạ chính mình từ admin → staff (server chặn). */}
                       <form action={changeHrUserRole}>
@@ -132,6 +134,11 @@ export default async function Page() {
                           {u.disabled_at ? 'Mở khóa' : 'Khóa'}
                         </button>
                       </form>
+                    </div>
+                    {/* Link đăng nhập nhanh cho người này. Chỉ hiện với tài khoản đang hoạt động. */}
+                    {!u.disabled_at ? (
+                      <QuickLoginLink userId={u.id} label={u.full_name || u.email} />
+                    ) : null}
                     </div>
                   </td>
                 </tr>
