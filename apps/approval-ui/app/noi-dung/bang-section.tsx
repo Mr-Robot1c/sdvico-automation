@@ -95,11 +95,12 @@ export default async function BangSection() {
   const contents = new Map<string, { title: string; draft: string; brief: any }>();
   const postsByContent = new Map<string, { channel: string; url: string; at: string }[]>();
   const metricsByContent = new Map<string, M>();
+  const ytByContent = new Map<string, { views: number; reactions: number; comments: number }>();
   if (cids.length) {
     const [{ data: cs }, { data: ps }, { data: ms }] = await Promise.all([
       client.from('mkt_content').select('id, title, draft, brief').in('id', cids),
       client.from('mkt_posts').select('content_id, channel, external_url, published_at').eq('status', 'published').in('content_id', cids),
-      client.from('mkt_metrics').select('entity_ref, metrics, created_at').eq('source', 'facebook').in('entity_ref', cids).order('created_at', { ascending: false }).limit(600)
+      client.from('mkt_metrics').select('source, entity_ref, metrics, created_at').in('source', ['facebook', 'youtube']).in('entity_ref', cids).order('created_at', { ascending: false }).limit(700)
     ]);
     for (const c of cs || []) contents.set((c as any).id, { title: (c as any).title || '', draft: String((c as any).draft || ''), brief: (c as any).brief || {} });
     for (const p of ps || []) {
@@ -110,9 +111,13 @@ export default async function BangSection() {
     }
     for (const m of ms || []) {
       const cid = (m as any).entity_ref as string | null;
-      if (!cid || metricsByContent.has(cid)) continue;
+      if (!cid) continue;
       const mm = ((m as any).metrics || {}) as any;
-      metricsByContent.set(cid, { reactions: mm.reactions || 0, comments: mm.comments || 0, shares: mm.shares || 0, views: mm.views });
+      if ((m as any).source === 'youtube') {
+        if (!ytByContent.has(cid)) ytByContent.set(cid, { views: mm.views || 0, reactions: mm.reactions || 0, comments: mm.comments || 0 });
+      } else if (!metricsByContent.has(cid)) {
+        metricsByContent.set(cid, { reactions: mm.reactions || 0, comments: mm.comments || 0, shares: mm.shares || 0, views: mm.views });
+      }
     }
   }
 
@@ -155,14 +160,16 @@ export default async function BangSection() {
     { key: 'rejected', label: 'Từ chối', icon: '⛔', tone: 'no', items: rejected, cap: REJ_CAP, moreHref: '/noi-dung?loai=bai-viet&trangthai=rejected' }
   ];
 
-  // Tổng tương tác Facebook của các bài trên board (bản snapshot mới nhất mỗi bài).
+  // Tổng tương tác của các bài trên board (Facebook + YouTube, bản snapshot mới nhất mỗi bài).
   let boardEngagement = 0;
   for (const m of metricsByContent.values()) boardEngagement += (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
+  let ytViews = 0;
+  for (const m of ytByContent.values()) { boardEngagement += (m.reactions || 0) + (m.comments || 0); ytViews += m.views || 0; }
 
   // Panel Kênh kết nối (bố cục theo mẫu user 21/8: kênh bên trái, dòng chảy bài bên phải).
   const channels = [
     { icon: '📘', name: 'Facebook', ok: fb.ok, note: fb.ok ? `${fmtVN(postedByChannel.get('facebook') || 0)} bài đã đăng` : 'Cần cấu hình', href: '/facebook' },
-    { icon: '▶️', name: 'YouTube', ok: !!(yt.configured && yt.channelTitle), note: yt.configured && yt.channelTitle ? `${fmtVN(postedByChannel.get('youtube') || 0)} video Shorts` : 'Cần cấu hình', href: '/youtube' },
+    { icon: '▶️', name: 'YouTube', ok: !!(yt.configured && yt.channelTitle), note: yt.configured && yt.channelTitle ? `${fmtVN(postedByChannel.get('youtube') || 0)} video${ytViews ? `, ${fmtVN(ytViews)} lượt xem` : ''}` : 'Cần cấu hình', href: '/youtube' },
     { icon: '🎵', name: 'TikTok', ok: tt.ok, note: tt.ok ? `${fmtVN(postedByChannel.get('tiktok') || 0)} video, chờ audit` : 'Cần cấu hình', href: '/tiktok' },
     { icon: '💬', name: 'Zalo OA', ok: za.configured, note: za.configured ? 'Sẵn sàng' : 'Chờ thiết lập', href: '/ket-noi' }
   ];
@@ -218,7 +225,7 @@ export default async function BangSection() {
               <span aria-hidden="true">{ch.ok ? '✅' : '🕓'}</span>
             </Link>
           ))}
-          <Link className="src" href="/tong-quan" style={{ fontSize: '.85rem' }}>Tổng quan đầy đủ</Link>
+          <Link className="src" href="/do-luong" style={{ fontSize: '.85rem' }}>📈 Đo lường chi tiết</Link>
         </div>
 
         {/* Cột phải: board 4 cột theo dòng chảy bài viết. */}
@@ -336,11 +343,18 @@ export default async function BangSection() {
                         ))}
                         {posts.some((x) => x.channel === 'tiktok' && !/^https?:/.test(x.url)) ? <span className="muted">🎵 tiktok</span> : null}
                       </span>
-                      {m ? (
+                      {m || ytByContent.get(it.cid) ? (
                         <span style={{ fontSize: '.85rem' }}>
-                          👍 {m.reactions} <span style={{ marginLeft: 6 }}>💬 {m.comments}</span>
-                          {m.shares ? <span style={{ marginLeft: 6 }}>🔁 {m.shares}</span> : null}
-                          {m.views != null ? <span style={{ marginLeft: 6 }}>👁 {Number(m.views).toLocaleString('vi-VN')}</span> : null}
+                          {m ? (
+                            <>
+                              👍 {m.reactions} <span style={{ marginLeft: 6 }}>💬 {m.comments}</span>
+                              {m.shares ? <span style={{ marginLeft: 6 }}>🔁 {m.shares}</span> : null}
+                              {m.views != null ? <span style={{ marginLeft: 6 }}>👁 {Number(m.views).toLocaleString('vi-VN')}</span> : null}
+                            </>
+                          ) : null}
+                          {ytByContent.get(it.cid) ? (
+                            <span style={{ marginLeft: m ? 6 : 0 }} title="Lượt xem trên YouTube Shorts">▶️ {fmtVN(ytByContent.get(it.cid)!.views)} xem</span>
+                          ) : null}
                         </span>
                       ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
                       {fbPost ? <span><ShareGroups postUrl={fbPost.url} /></span> : null}

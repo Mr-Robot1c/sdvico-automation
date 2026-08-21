@@ -19,15 +19,14 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/quy-tac', label: 'Quy tắc', icon: '📜' }
     ]
   };
-  // 21/8 gộp lớn (user): Tổng quan đứng ĐẦU; Hàng đợi duyệt + Vận hành + Quản lý bài viết
-  // gộp thành MỘT mục "Bảng bài viết" (/noi-dung, tab Bảng kiểu board là mặc định; Đo lường
-  // cũng là tab trong đó). Trang /hang-doi (hàng đợi đầy đủ HR + cảnh báo) và /van-hanh vẫn
-  // sống, đi vào từ thanh vận hành trên board.
+  // 21/8 gộp lớn (user): Tổng quan GỘP với Bảng bài viết thành MỘT mục /noi-dung theo mẫu
+  // (stat + kênh kết nối trái + kanban phải; tab Bài viết/Video là danh sách chi tiết).
+  // Hàng đợi duyệt + Vận hành cũng nằm trong đó; /hang-doi (HR + cảnh báo) và /van-hanh
+  // vẫn sống, đi vào từ thanh vận hành trên board. Đo lường là trang riêng.
   const quanLySanXuat: Group = {
     title: 'Quản lí và Sản xuất',
     items: [
-      { href: '/tong-quan', label: 'Tổng quan', icon: '📊' },
-      { href: '/noi-dung', label: 'Bảng bài viết', icon: '📋' },
+      { href: '/noi-dung', label: 'Tổng quan', icon: '📊' },
       { href: '/do-luong', label: 'Đo lường', icon: '📈' },
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },

@@ -68,47 +68,12 @@ function spellPhones(text) {
     .replace(/\b0\d(?:[\s.]*\d){8}\b/g, (m) => m.split(/[\s.]+/).filter(Boolean).map(digitsToWords).join(', '));
 }
 
-// Giọng ElevenLabs (user 21/8: muốn giọng "Adam" như video trend TikTok để dễ đu trend).
-// Bật khi có ELEVENLABS_API_KEY (secret GitHub Actions); voice đổi bằng ELEVENLABS_VOICE_ID
-// (mặc định Adam), model đa ngôn ngữ đọc được tiếng Việt. Lỗi hay hết quota thì trả lỗi để
-// tts() tự lùi về edge-tts như cũ, video không bao giờ kẹt vì thiếu giọng.
-async function elevenLabsTTS(text, outPath) {
-  const key = (process.env.ELEVENLABS_API_KEY || '').trim();
-  if (!key) return null;
-  const voiceId = (process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB').trim(); // Adam
-  const modelId = (process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2').trim();
-  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
-    method: 'POST',
-    headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text,
-      model_id: modelId,
-      voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-    }),
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => '');
-    throw new Error(`ElevenLabs HTTP ${res.status}: ${t.slice(0, 160)}`);
-  }
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (!buf.length) throw new Error('ElevenLabs tra file rong');
-  await writeFile(outPath, buf);
-  return probeDuration(outPath);
-}
-
 async function tts(text, outPath, voice, workDir, tag) {
   // Đọc số điện thoại/tổng đài từng chữ số (chỉ cho giọng đọc, phụ đề giữ số gốc).
   const clean = spellPhones(cleanNarration(text));
   // Thời lượng dự phòng theo số ký tự (~14 ký tự/giây tiếng Việt), tối thiểu 2 giây.
   const estSec = Math.max(2, Math.round(clean.length / 14));
   if (!clean) return silentAudio(outPath, estSec);
-  // Ưu tiên ElevenLabs khi có key (giọng Adam theo trend); lỗi thì lùi edge-tts bên dưới.
-  try {
-    const d = await elevenLabsTTS(clean, outPath);
-    if (d != null) return d;
-  } catch (e) {
-    console.warn(`  (cảnh ${tag}: ElevenLabs lỗi "${String(e?.message || e).slice(0, 120)}", lùi về edge-tts)`);
-  }
   const txt = join(workDir, `${tag}.txt`);
   await writeFile(txt, clean, 'utf8');
   // GIỮ NGUYÊN 1 GIỌNG NAM cho toàn video (không đổi qua giọng nữ giữa chừng). edge-tts hay bị

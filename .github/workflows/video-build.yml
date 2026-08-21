@@ -54,10 +54,6 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           MKT_MODEL: ${{ secrets.MKT_MODEL }}
-          # Giong doc ElevenLabs (Adam) theo trend TikTok — user 21/8. Chua co secret thi
-          # pipeline tu dung edge-tts nhu cu, khong loi.
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}
         run: |
           LIMIT="${{ github.event.inputs.limit || '3' }}"
           node packages/marketing/src/video/build-video-all.mjs \

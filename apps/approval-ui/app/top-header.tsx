@@ -38,7 +38,7 @@ function crumbFor(path: string): string {
     '/hang-doi': 'Hàng đợi duyệt',
     '/van-hanh': 'Vận hành',
     '/tong-quan': 'Tổng quan',
-    '/noi-dung': 'Bảng bài viết',
+    '/noi-dung': 'Tổng quan',
     '/san-xuat': 'Xưởng sản xuất',
     '/do-luong': 'Đo lường',
     '/do-luong/tuan': 'Báo cáo tuần',

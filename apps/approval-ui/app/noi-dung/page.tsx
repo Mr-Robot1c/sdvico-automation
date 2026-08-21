@@ -90,8 +90,8 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       <main>
         <header className="head-row">
           <div>
-            <h1>Bảng bài viết</h1>
-            <p className="sub">Bài chạy từ trái sang phải: chờ duyệt, đã duyệt, đã đăng. Duyệt ngay trên thẻ.</p>
+            <h1>Tổng quan</h1>
+            <p className="sub">Kênh bên trái, bài chạy từ trái sang phải: chờ duyệt, đã duyệt, đã đăng. Duyệt ngay trên thẻ.</p>
           </div>
           <div className="head-actions">
             <AutoRefresh seconds={30} />
@@ -249,7 +249,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     <main>
       <header className="head-row">
         <div>
-          <h1>Bảng bài viết</h1>
+          <h1>Tổng quan</h1>
           <p className="sub">Danh sách bài đã sinh, đã duyệt, đã từ chối, đã đăng. Bấm mắt để xem nội dung.</p>
         </div>
         <div className="head-actions">
