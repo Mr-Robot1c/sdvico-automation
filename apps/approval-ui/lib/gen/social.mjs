@@ -4,6 +4,7 @@ import { assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
 import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS } from './products.mjs';
+import { insightBrief } from './insights.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -56,6 +57,7 @@ export async function generateSocialPost({
   productGroup, productName, channel, hasVideo,
   facts = PRODUCT_FACTS,
   angleOverride = null, preferredHeadline = null,
+  insight = null,
 }) {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -80,15 +82,18 @@ export async function generateSocialPost({
       : 'Đây là bài Facebook: 4 tới 6 câu, có thể có 2 tới 3 dòng gạch đầu lợi ích (dùng emoji làm đầu dòng, không dùng dấu chấm tròn).',
     'Kết bằng lời mời rõ ràng, đúng kiểu bán hàng: NHẮN TIN cho Page SDVICO ở đây hoặc gọi tổng đài 1900 23 23 49 để được tư vấn, báo giá và lắp đặt tận bến. KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.',
     'Mỗi bài phải KHÁC các bài trước: khác câu mở đầu, khác cách triển khai, khác tiêu đề.',
+    'Bài phải CÓ Ý NGHĨA, xoáy vào MỘT nỗi thật của bà con (không sáo rỗng, không liệt kê tính năng khô khan). Khi có insight bên dưới thì bám đúng insight đó.',
     '',
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số được duyệt: nói chung chung, không nêu số cụ thể.',
   ].join('\n');
 
+  const insightText = insight ? insightBrief(insight) : '';
   const user = [
     `Sản phẩm: "${productName}".`,
     features.length ? 'Đặc điểm sản phẩm (nêu đúng, chọn vài ý nổi bật, không thêm thông số ngoài danh sách này):\n- ' + features.join('\n- ') : '',
     hasVideo ? 'Bài có kèm video minh họa.' : 'Bài dùng ảnh minh họa.',
-    `Góc tiếp cận lần này: ${angle}.`,
+    insightText,
+    insightText ? `Phụ trợ giọng nếu hợp: ${angle}.` : `Góc tiếp cận lần này: ${angle}.`,
     preferredHeadline ? `Nếu phù hợp, giữ hoặc bám gần tiêu đề gợi ý: "${preferredHeadline}" (đây là hướng đi tuần từ Kế hoạch AI). Không bắt buộc chép nguyên, nhưng nội dung phải khớp hướng đi này.` : '',
     'Trả về JSON đúng dạng, không thêm chữ ngoài JSON:',
     '{"headline": "tiêu đề ngắn 6 tới 12 từ, riêng biệt, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag)"}',
@@ -128,7 +133,7 @@ export async function generateSocialPost({
     assessment.flags = { ...(assessment.flags || {}), domain: violations.map((v) => `${v.phrase} (${v.product})`) };
     if (assessment.risk === 'none') assessment.risk = 'amber';
   }
-  return { text, body, headline, hashtags: tags, assessment };
+  return { text, body, headline, hashtags: tags, assessment, insightId: insight?.id || null };
 }
 
 // Chỉ dẫn cấu trúc bài cho từng LOẠI content. AI phải theo đúng dạng để bài hữu ích, không sáo rỗng.

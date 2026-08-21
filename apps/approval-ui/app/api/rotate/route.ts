@@ -285,6 +285,22 @@ export async function GET(req: Request) {
   // @ts-ignore — module JS thuần
   const { generateSocialPost, generateContentPost } = await import('../../../lib/gen/social.mjs');
   // @ts-ignore — module JS thuần
+  const { pickInsights } = await import('../../../lib/gen/insights.mjs');
+  // Insight/painpoint đã dùng gần đây theo nhóm sản phẩm (30 bài gần nhất) -> chọn insight MỚI
+  // cho mỗi bài, chống lặp thông điệp; bản B của cặp tự khác bản A vì A vừa lưu insight_id.
+  const usedInsights = new Map<string, Set<string>>();
+  try {
+    const { data: recent } = await client
+      .from('mkt_content').select('brief').eq('kind', 'social')
+      .order('created_at', { ascending: false }).limit(30);
+    for (const r of (recent || []) as any[]) {
+      const g = r.brief?.rotation_group; const iid = r.brief?.insight_id;
+      if (!g || !iid) continue;
+      if (!usedInsights.has(g)) usedInsights.set(g, new Set());
+      usedInsights.get(g)!.add(iid);
+    }
+  } catch { /* thiếu thì coi như chưa dùng insight nào */ }
+  // @ts-ignore — module JS thuần
   const { ensureLogoForPost } = await import('../../../lib/gen/ensure-logo.mjs');
 
   const results: any[] = [];
@@ -341,6 +357,12 @@ export async function GET(req: Request) {
         ? (variant === 'A' ? sug.why : pickRandom(CONTRAST_ANGLES))
         : null;
       const preferredHeadline = sug && variant === 'A' ? sug.title : null;
+      // Chọn insight/painpoint MỚI cho nhóm này (né các insight đã dùng gần đây + đã dùng trong
+      // chính run này) — mỗi bài xoáy vào một nỗi thật khác nhau (user 21/8: content phải có ý
+      // nghĩa, không lặp). Nhóm chưa có insight trong thư viện -> null, bài viết như cũ.
+      const usedSet = usedInsights.get(group) || new Set<string>();
+      const chosenInsight = pickInsights(group, 1, [...usedSet])[0] || null;
+      if (chosenInsight) { usedSet.add(chosenInsight.id); usedInsights.set(group, usedSet); }
 
       let gen: any;
       try {
@@ -351,6 +373,7 @@ export async function GET(req: Request) {
           hasVideo: false,
           angleOverride,
           preferredHeadline,
+          insight: chosenInsight,
         });
       } catch (e) {
         skipped.push({ group, variant, reason: 'gen loi: ' + (e as any)?.message });
@@ -375,6 +398,8 @@ export async function GET(req: Request) {
             rotation: true, rotation_slot: slot || null,
             rotation_cycle: cycle,
             rotation_group: group,
+            // Insight/painpoint bài này xoáy vào (STMI) — để chống lặp + hiện cho người duyệt.
+            ...(chosenInsight ? { insight_id: chosenInsight.id, insight_situation: chosenInsight.situation, insight_line: chosenInsight.insight } : {}),
             // Chỉ yêu cầu dựng video AI khi folder có clip gốc (SEA-40, SF-50, Ắc quy...).
             // Folder chỉ ảnh (S-Tracking, Thuraya, XT-Pro...) -> bài ảnh, không dựng.
             video_requested: wantVideo,

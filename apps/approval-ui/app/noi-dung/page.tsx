@@ -47,7 +47,7 @@ function channelsShort(channels?: string[] | null, postReel?: boolean): string {
 
 type Flags = Record<string, string[] | undefined>;
 type Assets = { image?: string | null; video?: string | null } | null;
-type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[]; video_requested?: boolean; post_reel?: boolean; ab_variant?: string; suggestion_title?: string } | null;
+type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[]; video_requested?: boolean; post_reel?: boolean; ab_variant?: string; suggestion_title?: string; insight_line?: string; insight_situation?: string } | null;
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
 export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
@@ -417,6 +417,12 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                             {flagRows.map((x) => (
                               <span className="flagchip" key={x.label}>{x.label}: {x.items.join(', ')}</span>
                             ))}
+                          </div>
+                        ) : null}
+                        {c.brief?.insight_line ? (
+                          <div className="insight-line" style={{ marginBottom: 10 }} title="Thông điệp/insight khách hàng bài này xoáy vào">
+                            <span aria-hidden="true">🎯</span> {c.brief.insight_line}
+                            {c.brief.insight_situation ? <span style={{ display: 'block', marginTop: 2, opacity: .85 }}>{c.brief.insight_situation}</span> : null}
                           </div>
                         ) : null}
                         {c.draft ? (

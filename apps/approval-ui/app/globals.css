@@ -1222,3 +1222,13 @@ a.chip:hover { filter: brightness(0.98); }
 .tq-item-title { display: block; font-weight: 600; font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tq-act { display: flex; gap: 10px; align-items: baseline; font-size: .88rem; padding: 5px 2px; border-bottom: 1px dashed var(--line); }
 .tq-act:last-child { border-bottom: 0; }
+
+/* Pill link kênh đã đăng trên thẻ board (21/8: thay emoji thô facebook/youtube/tiktok cho gọn). */
+.ch-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.ch-link { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: .8rem; font-weight: 600; line-height: 1; text-decoration: none; white-space: nowrap; transition: border-color .12s ease, background .12s ease; }
+.ch-link svg { display: block; flex: 0 0 auto; border-radius: 4px; }
+.ch-link:hover { border-color: var(--accent); background: var(--surface-2); }
+.ch-link.is-off { color: var(--ink-2); opacity: .75; cursor: default; }
+
+/* Dòng insight/painpoint bài xoáy vào (21/8: content phải có ý nghĩa, hiện cho người duyệt thấy). */
+.insight-line { margin: 0; font-size: .82rem; line-height: 1.45; color: var(--ink-2); background: var(--accent-bg); border-left: 3px solid var(--accent); border-radius: 6px; padding: 6px 10px; display: block; }

@@ -6,6 +6,7 @@ import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import ShareGroups from './share-groups';
 import { channelsLabel, riskMeta, formatRelative, formatDateTimeVN } from '../labels';
+import PlatformLogo, { type PlatformKey } from './platform-logo';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -133,7 +134,9 @@ export default async function BangSection() {
     .filter((it) => it.status === 'rejected')
     .sort((a, b) => (b.decidedAt || '').localeCompare(a.decidedAt || ''));
 
-  const CH_ICON: Record<string, string> = { facebook: '📘', youtube: '▶️', tiktok: '🎵', website: '🌐' };
+  // Nhãn kênh chuẩn (thay emoji thô); logo brthật vẽ bằng PlatformLogo.
+  const CH_LABEL: Record<string, string> = { facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok', zalo: 'Zalo', website: 'Website' };
+  const isPlat = (c: string): c is PlatformKey => c === 'facebook' || c === 'youtube' || c === 'tiktok' || c === 'zalo';
   const PUB_CAP = 12;
   const REJ_CAP = 8;
 
@@ -205,6 +208,11 @@ export default async function BangSection() {
                         {brief.video_requested === true ? <span className="badge badge-video-pending">🎬 Đang làm video AI</span> : null}
                         <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
                       </div>
+                      {(brief as any).insight_line ? (
+                        <p className="insight-line" title={(brief as any).insight_situation || 'Insight/painpoint bài này xoáy vào'}>
+                          <span aria-hidden="true">🎯</span> {(brief as any).insight_line}
+                        </p>
+                      ) : null}
                       {imgUrl || vidUrl ? (
                         <div className="card-media">
                           {imgUrl ? <img src={imgUrl} alt="" loading="lazy" /> : null}
@@ -257,13 +265,22 @@ export default async function BangSection() {
                   return (
                     <div key={it.qid} className="card tone-web" style={{ display: 'grid', gap: 6, padding: 12 }}>
                       <b>{title}{ab ? <span className="badge badge-ab" style={{ marginLeft: 6 }} title="Bài thử của cặp A/B theo hướng đi kế hoạch.">🧪 Thử {ab}</span> : null}</b>
+                      {(brief as any).insight_line ? <span className="insight-line" title={(brief as any).insight_situation || ''}><span aria-hidden="true">🎯</span> {(brief as any).insight_line}</span> : null}
                       {lastAt ? <span className="muted" style={{ fontSize: '.8rem' }}>Đăng {formatRelative(lastAt)}</span> : null}
-                      <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: '.85rem' }}>
+                      <div className="ch-links">
                         {posts.filter((x) => /^https?:/.test(x.url)).map((x, i) => (
-                          <a key={i} className="src" href={x.url} target="_blank" rel="noreferrer">{CH_ICON[x.channel] || '🔗'} {x.channel}</a>
+                          <a key={i} className="ch-link" href={x.url} target="_blank" rel="noreferrer" title={`Xem bài trên ${CH_LABEL[x.channel] || x.channel}`}>
+                            {isPlat(x.channel) ? <PlatformLogo platform={x.channel} size={15} /> : <span aria-hidden="true">🔗</span>}
+                            <span>{CH_LABEL[x.channel] || x.channel}</span>
+                          </a>
                         ))}
-                        {posts.some((x) => x.channel === 'tiktok' && !/^https?:/.test(x.url)) ? <span className="muted">🎵 tiktok</span> : null}
-                      </span>
+                        {posts.some((x) => x.channel === 'tiktok' && !/^https?:/.test(x.url)) ? (
+                          <span className="ch-link is-off" title="Đã đăng TikTok ở chế độ riêng tư (chờ duyệt ứng dụng), chưa có link công khai">
+                            <PlatformLogo platform="tiktok" size={15} />
+                            <span>TikTok</span>
+                          </span>
+                        ) : null}
+                      </div>
                       {m || ytByContent.get(it.cid) ? (
                         <span style={{ fontSize: '.85rem' }}>
                           {m ? (
