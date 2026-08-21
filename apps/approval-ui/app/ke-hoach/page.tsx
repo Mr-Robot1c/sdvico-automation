@@ -189,7 +189,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               {todayPlan.sales.length
                 ? todayPlan.sales.map((s) => `${s.product} (${vnInt(s.count)} bài)`).join(', ')
                 : 'không có bài bán hôm nay'}
-              {todayPlan.direction ? <> · <b>hướng:</b> {todayPlan.direction.title} (thử {todayPlan.direction.variant})</> : null}
+              {todayPlan.direction ? <> · <b>hướng:</b> {todayPlan.direction.title} ({todayPlan.direction.variant === 'AB' ? 'A sáng, B chiều' : `thử ${todayPlan.direction.variant}`})</> : null}
             </div>
             <div>
               <b>🕐 13h — content:</b> {todayPlan.contentKindLabel || vnInt(todayPlan.contentCount)}
@@ -269,7 +269,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                           <>
                             <b>{d.direction.title}</b>
                             <div className="sub">
-                              {d.direction.product} · bản thử {d.direction.variant}
+                              {d.direction.product} · {d.direction.variant === 'AB' ? 'A sáng, B chiều' : `bản thử ${d.direction.variant}`}
                               {d.direction.done ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ đã sinh</span> : null}
                             </div>
                           </>
@@ -297,7 +297,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <section className="plan-card" style={{ marginBottom: 14 }}>
           <b style={{ fontSize: '1.05rem' }}>🧭 Hướng đi bài viết ({vnInt(sugFresh.filter((s) => !(s as any).pending_variant).length)} chưa dùng, {vnInt(sugFresh.filter((s) => (s as any).pending_variant).length)} đang thử, {vnInt(sugUsed.length)} xong cặp{sugRejected.length ? `, ${vnInt(sugRejected.length)} đã loại` : ''})</b>
           <p className="sub" style={{ margin: '4px 0 8px' }}>
-            BOSS đề xuất góc bài từ kho tri thức. Mỗi hướng chạy 2 ngày: bản thử A trước, hôm sau bản B; đủ cặp thì Evaluator so xem bản nào ăn hơn.
+            BOSS đề xuất góc bài từ kho tri thức. Mỗi hướng chạy trong một ngày: bản thử A ra 7h sáng, bản B ra 12h30 chiều; đủ cặp thì Evaluator so xem bản nào ăn hơn.
           </p>
           <ul className="directions-list" style={{ margin: 0 }}>
             {suggestions.map((d, i) => (

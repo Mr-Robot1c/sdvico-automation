@@ -94,18 +94,17 @@ function rankProducts(byProduct: Array<{ product: string; count: number; avgScor
   return [...ranked, ...insufficient];
 }
 
-// Dự kiến HƯỚNG ĐI cho từng ngày tới, mô phỏng đúng thứ tự vòng xoay sẽ rút (v7):
-// hướng đang chờ bản B đi trước (1 ngày), rồi mỗi hướng chưa dùng chiếm 2 ngày (A rồi B).
-type DayDirection = { title: string; product: string; variant: 'A' | 'B'; done?: boolean };
+// Dự kiến HƯỚNG ĐI cho từng ngày tới, mô phỏng đúng thứ tự vòng xoay sẽ rút.
+// v8 (user chốt 21/8 đêm): cặp A/B chạy TRONG CÙNG NGÀY — A slot sáng, B slot chiều, nên
+// mỗi hướng chưa dùng chiếm MỘT ngày (variant 'AB'). Hướng đang treo bản B (hôm trước lỡ
+// nhịp) chiếm ngày đầu chỉ với bản B.
+type DayDirection = { title: string; product: string; variant: 'A' | 'B' | 'AB'; done?: boolean };
 function buildDirectionQueue(suggestions: any[]): DayDirection[] {
   const out: DayDirection[] = [];
   const pendingB = suggestions.filter((s) => !s.used_at && s.pending_variant === 'B');
   const fresh = suggestions.filter((s) => !s.used_at && !s.pending_variant);
   for (const s of pendingB) out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'B' });
-  for (const s of fresh) {
-    out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'A' });
-    out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'B' });
-  }
+  for (const s of fresh) out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'AB' });
   return out.slice(0, 7);
 }
 
@@ -247,15 +246,17 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
       .filter((b: any) => b.suggestion_title);
     if (doneToday.length) {
       const b = doneToday[doneToday.length - 1];
+      // Hôm nay có thể đã ra cả A lẫn B (nhịp cùng-ngày) — gom biến thể đã sinh của hướng đó.
+      const variantsDone = new Set(doneToday.map((x: any) => (x.ab_variant === 'B' ? 'B' : 'A')));
       const doneDir: DayDirection & { done: boolean } = {
         title: String(b.suggestion_title || ''),
         product: String(b.keyword || ''),
-        variant: (b.ab_variant === 'B' ? 'B' : 'A'),
+        variant: variantsDone.size >= 2 ? 'AB' : (variantsDone.has('B') ? 'B' : 'A'),
         done: true,
       };
       // Bỏ mục trùng (hướng hôm nay) khỏi đầu queue nếu nó chính là mục kế tiếp, rồi chèn
       // hướng đã sinh vào vị trí hôm nay; phần còn lại dời sang từ ngày mai.
-      const rest = dirQueue.filter((d, i) => !(i === 0 && d.title === doneDir.title && d.variant === doneDir.variant));
+      const rest = dirQueue.filter((d, i) => !(i === 0 && d.title === doneDir.title));
       dirQueue = [doneDir, ...rest];
     }
   } catch { /* không có bản áp -> lịch không ghi hướng */ }

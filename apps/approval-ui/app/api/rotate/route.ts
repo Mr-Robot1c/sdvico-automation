@@ -220,15 +220,14 @@ export async function GET(req: Request) {
   const allSuggestions: Suggestion[] = Array.isArray(appliedPlan?.data?.content_suggestions)
     ? appliedPlan!.data.content_suggestions
     : [];
-  // Ưu tiên hướng đang chờ bản B (đã có A hôm trước), rồi mới tới hướng chưa dùng.
-  // BẢN B CHỈ SINH TỪ NGÀY HÔM SAU (user 21/8: slot chiều rút pending B sinh B ngay cùng
-  // ngày với A sáng — sai quy tắc "A hôm nay, hôm sau bản B"). So theo ngày giờ VN của a_at.
-  const dayVNOf = (iso?: string) => (iso ? new Date(new Date(iso).getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10) : '');
-  const todayVNStr = dayVNOf(new Date().toISOString());
-  const candidateSuggestions = [
-    ...allSuggestions.filter((s) => !s.used_at && s.pending_variant === 'B' && dayVNOf(s.a_at) !== todayVNStr),
-    ...allSuggestions.filter((s) => !s.used_at && !s.pending_variant),
-  ];
+  // User chốt 21/8 đêm: cặp A/B chạy TRONG CÙNG NGÀY — bản A slot SÁNG, bản B slot CHIỀU
+  // (đổi lại quyết định tách 2 ngày 18/8; Evaluator có kết luận nhanh hơn, so cùng điều
+  // kiện ngày). Slot chiều KHÔNG mở hướng mới (không sinh A) để nhịp không trôi thành
+  // "A chiều, B sáng hôm sau" — chiều chỉ sinh bản B đang chờ, không có B chờ thì rơi về
+  // vòng xoay thường. Slot sáng: ưu tiên B mồ côi (hôm trước lỡ nhịp), rồi mở hướng mới.
+  const pendingBs = allSuggestions.filter((s) => !s.used_at && s.pending_variant === 'B');
+  const freshSugs = allSuggestions.filter((s) => !s.used_at && !s.pending_variant);
+  const candidateSuggestions = slot === 'chieu' ? pendingBs : [...pendingBs, ...freshSugs];
 
   type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number; variant?: 'A' | 'B' };
   const pickedFolders: PickedFolder[] = [];

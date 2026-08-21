@@ -78,7 +78,7 @@ export type DailyPlan = {
   // v7 (20/8, user: "kế hoạch phải chi tiết hơn — hướng đi gì, cấu trúc ra sao"):
   // hướng đi DỰ KIẾN cho bài bán ngày đó (map từ content_suggestions chưa dùng của bản đang
   // áp, theo đúng thứ tự vòng xoay sẽ rút). Chỉ để hiển thị; rotate vẫn tự rút lúc chạy.
-  direction?: { title: string; product: string; variant: 'A' | 'B'; done?: boolean } | null;
+  direction?: { title: string; product: string; variant: 'A' | 'B' | 'AB'; done?: boolean } | null;
   contentStructure?: string; // cấu trúc 1 dòng của bài content ("❓ Hỏi 1 câu → 💡 Đáp 3-5 câu")
   groups: string[];    // tên nhóm chia sẻ hôm đó
 };
