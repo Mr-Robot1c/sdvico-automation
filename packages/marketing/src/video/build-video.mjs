@@ -427,7 +427,9 @@ async function main() {
   const env = loadRealEnv();
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   // Giong mac dinh: NAM NamMinh (user 21/8 chieu doi lai sau khi nghe thu ca hai). Env TTS_VOICE ep khac.
-  const voice = arg('voice', process.env.TTS_VOICE || 'vi-VN-NamMinhNeural');
+  // Giong du phong edge-tts: NU HoaiMy (user chot giong nu 21/8 toi) de khi Gemini can han muc,
+  // video roi ve edge van la giong nu chu khong bat ngo thanh nam. TTS_VOICE / --voice ep khac.
+  const voice = arg('voice', process.env.TTS_VOICE || 'vi-VN-HoaiMyNeural');
   const outDir = arg('out', join(HERE, '..', '..', '..', '..', 'out', 'video'));
   await mkdir(outDir, { recursive: true });
 
