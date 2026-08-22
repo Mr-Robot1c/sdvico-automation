@@ -42,6 +42,48 @@ export async function probeDuration(path) {
   return Number.isFinite(d) ? d : 0;
 }
 
+// Cắt một file audio làm 2 tại KHOẢNG LẶNG gần vị trí kỳ vọng nhất. firstShare = tỷ lệ ký tự
+// phần đầu (vd cảnh cuối / (cảnh cuối + outro)). Dùng cho "cảnh cuối + outro đọc chung một lần
+// gọi TTS" (user 21/8: outro phải cùng giọng với lời đọc — Gemini mỗi lần gọi lên giọng khác
+// nhau chút, đọc chung thì chắc chắn cùng giọng).
+// Cách chọn: quét ngưỡng từ NGHIÊM tới NHẠY (giọng đọc liền mạch hay chỉ nghỉ 0,1-0,4s giữa
+// câu); trong cửa sổ ±20% quanh vị trí kỳ vọng, CHẤM ĐIỂM = độ dài khoảng lặng trừ 0,08 × số giây
+// lệch khỏi kỳ vọng (đo 21/8 trên file Leda: "dài nhất" chọn nhầm câu trước, chấm điểm chọn đúng).
+// Không thấy gì thì cắt đúng vị trí kỳ vọng (gần đúng, vẫn dùng được).
+export async function splitAtSilence(fullPath, firstOut, secondOut, firstShare) {
+  const total = await probeDuration(fullPath);
+  const expect = total * Math.min(0.95, Math.max(0.05, firstShare));
+  const win = Math.max(1.0, total * 0.2);
+  const tiers = [['-30dB', '0.14'], ['-27dB', '0.09'], ['-24dB', '0.07']];
+  let best = null;
+  let tierUsed = null;
+  for (const [noise, d] of tiers) {
+    const { stderr } = await run(FFMPEG, ['-i', fullPath, '-af', `silencedetect=noise=${noise}:d=${d}`, '-f', 'null', '-']);
+    const starts = [];
+    const ends = [];
+    for (const line of String(stderr || '').split('\n')) {
+      const a = line.match(/silence_start: ([\d.]+)/);
+      if (a) starts.push(parseFloat(a[1]));
+      const b = line.match(/silence_end: ([\d.]+)/);
+      if (b) ends.push(parseFloat(b[1]));
+    }
+    for (let i = 0; i < Math.min(starts.length, ends.length); i++) {
+      const sS = starts[i];
+      const sE = ends[i];
+      const mid = (sS + sE) / 2;
+      const len = sE - sS;
+      if (sS <= 0.5 || sE >= total - 0.5 || Math.abs(mid - expect) > win) continue;
+      const score = len - 0.08 * Math.abs(mid - expect);
+      if (!best || score > best.score) best = { mid, len, score };
+    }
+    if (best) { tierUsed = `${noise}/${d}s`; break; }
+  }
+  const cut = best ? best.mid : expect;
+  await run(FFMPEG, ['-y', '-i', fullPath, '-t', cut.toFixed(3), '-c:a', 'libmp3lame', '-q:a', '4', firstOut]);
+  await run(FFMPEG, ['-y', '-i', fullPath, '-ss', cut.toFixed(3), '-c:a', 'libmp3lame', '-q:a', '4', secondOut]);
+  return { cut, total, expect, found: !!best, tier: tierUsed, silenceLen: best ? best.len : 0, first: await probeDuration(firstOut), second: await probeDuration(secondOut) };
+}
+
 // Kích thước khung hình (width,height) của video.
 export async function probeSize(path) {
   const { stdout } = await run(FFPROBE, [

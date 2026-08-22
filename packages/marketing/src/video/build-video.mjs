@@ -11,7 +11,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { loadRealEnv } from './env.mjs';
-import { downloadAsset, probeDuration, ffmpeg } from './ffmpeg.mjs';
+import { downloadAsset, probeDuration, ffmpeg, splitAtSilence } from './ffmpeg.mjs';
 import { assembleVideo } from './assemble.mjs';
 import { generateVideoScript } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
@@ -104,9 +104,10 @@ const GEMINI_TTS_MODELS = process.env.GEMINI_TTS_MODEL
   ? [process.env.GEMINI_TTS_MODEL]
   : ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'];
 let geminiModelIdx = 0; // model đang dùng; 429 cạn ngày thì nhích lên, các cảnh sau đi thẳng model sống
-const GEMINI_TTS_VOICE = process.env.GEMINI_TTS_VOICE || 'Puck';
+// 21/8 toi: user nghe Puck (nam) va Leda (nu) roi chot GIONG NU Leda lam mac dinh.
+const GEMINI_TTS_VOICE = process.env.GEMINI_TTS_VOICE || 'Leda';
 const GEMINI_TTS_STYLE = process.env.GEMINI_TTS_STYLE
-  || 'Đọc bằng tiếng Việt, giọng TikToker trẻ trung hào hứng, ngữ điệu lên xuống tự nhiên, nhấn nhá chỗ quan trọng, câu cảm thán thì phấn khích: ';
+  || 'Đọc bằng tiếng Việt, giọng nữ TikToker trẻ trung hào hứng, ngữ điệu lên xuống tự nhiên, nhấn nhá chỗ quan trọng, câu cảm thán thì phấn khích, giữ đúng một chất giọng từ đầu tới cuối: ';
 // Hạn mức PHÚT của TTS free tier chặt (build 21/8: bản ngang dính 429 giữa chừng, bản dọc chạy
 // sau lại êm) -> giãn nhịp giữa các lần gọi để cả 2 bản đều được giọng Gemini. Env chỉnh được.
 const GEMINI_TTS_GAP_MS = Number(process.env.GEMINI_TTS_GAP_MS || 20000);
@@ -139,6 +140,32 @@ async function geminiTTS(cleanText, outPath, workDir, tag, model) {
   return probeDuration(outPath);
 }
 
+// Gemini TTS có thử lại + đổi model: 429 đợi 25s thử lại (hạn mức PHÚT); vẫn 429 coi như model
+// cạn hạn mức NGÀY -> sang model kế (idx giữ ở module, các cảnh sau đi thẳng model sống). Hết
+// model thì THROW cho caller làm lại cả bản bằng edge. Nhận text ĐÃ làm sạch.
+async function geminiTTSWithRetry(cleanText, outPath, workDir, tag) {
+  let lastGemErr;
+  for (; geminiModelIdx < GEMINI_TTS_MODELS.length; geminiModelIdx++) {
+    const model = GEMINI_TTS_MODELS[geminiModelIdx];
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await geminiTTS(cleanText, outPath, workDir, tag, model);
+      } catch (e) {
+        lastGemErr = e;
+        if (/429/.test(String(e?.message)) && attempt === 0) await new Promise((r) => setTimeout(r, 25000));
+      }
+    }
+    if (/429/.test(String(lastGemErr?.message))) {
+      if (geminiModelIdx + 1 < GEMINI_TTS_MODELS.length) {
+        console.warn(`  (gemini-tts: ${model} hết hạn mức, chuyển ${GEMINI_TTS_MODELS[geminiModelIdx + 1]})`);
+      }
+      continue; // 429 dai dẳng: thử model kế
+    }
+    break; // lỗi khác 429: không đổi model, cho caller lùi edge
+  }
+  throw lastGemErr || new Error('gemini-tts loi');
+}
+
 // engine 'gemini': đọc bằng Gemini TTS, THROW khi hỏng (caller quyết làm lại cả bản bằng edge —
 // tránh video lẫn 2 giọng giữa chừng). engine 'edge': đường cũ, tự chống chịu, không bao giờ throw.
 async function tts(text, outPath, voice, workDir, tag, engine = 'edge') {
@@ -148,32 +175,7 @@ async function tts(text, outPath, voice, workDir, tag, engine = 'edge') {
   const estSec = Math.max(2, Math.round(clean.length / 14));
   if (!clean) return silentAudio(outPath, estSec);
 
-  if (engine === 'gemini') {
-    // Đọc cả đoạn một lần (Gemini tự lên xuống ngữ điệu, không cần tách câu chỉnh rate/pitch).
-    // 429: đợi 25s thử lại (hạn mức PHÚT); vẫn 429 coi như model cạn hạn mức NGÀY -> sang model
-    // kế trong danh sách (idx giữ ở module, các cảnh sau đi thẳng model sống). Hết model thì
-    // THROW cho caller làm lại cả bản bằng edge.
-    let lastGemErr;
-    for (; geminiModelIdx < GEMINI_TTS_MODELS.length; geminiModelIdx++) {
-      const model = GEMINI_TTS_MODELS[geminiModelIdx];
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          return await geminiTTS(clean, outPath, workDir, tag, model);
-        } catch (e) {
-          lastGemErr = e;
-          if (/429/.test(String(e?.message)) && attempt === 0) await new Promise((r) => setTimeout(r, 25000));
-        }
-      }
-      if (/429/.test(String(lastGemErr?.message))) {
-        if (geminiModelIdx + 1 < GEMINI_TTS_MODELS.length) {
-          console.warn(`  (gemini-tts: ${model} hết hạn mức, chuyển ${GEMINI_TTS_MODELS[geminiModelIdx + 1]})`);
-        }
-        continue; // 429 dai dẳng: thử model kế
-      }
-      break; // lỗi khác 429: không đổi model, cho caller lùi edge
-    }
-    throw lastGemErr || new Error('gemini-tts loi');
-  }
+  if (engine === 'gemini') return geminiTTSWithRetry(clean, outPath, workDir, tag);
 
   // LÊN XUỐNG GIỌNG: nhiều câu thì synth từng câu với ngữ điệu riêng rồi ghép. Một câu lỗi
   // sau 3 lần thử, hoặc chỉ có 1 câu -> rơi về cách cũ đọc cả đoạn một giọng bên dưới.
@@ -266,10 +268,25 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
     try {
       built = [];
       sceneAudios = [];
+      let outroDone = false;
       for (let i = 0; i < scenes.length; i++) {
         const s = scenes[i];
         const audio = join(fdir, `sc${i}.mp3`);
-        const dur = await tts(s.narration, audio, voice, fdir, `t${i}`, engine);
+        let dur;
+        const cleanLast = spellPhones(cleanNarration(s.narration));
+        if (engine === 'gemini' && i === scenes.length - 1 && cleanLast) {
+          // CẢNH CUỐI + OUTRO đọc CHUNG một lần gọi rồi cắt tại khoảng lặng -> outro cùng giọng,
+          // cùng nhịp với lời đọc (user 21/8), lại bớt một lần gọi hạn mức.
+          const cleanOutro = spellPhones(cleanNarration(OUTRO_TEXT));
+          const full = join(fdir, 'tail_full.mp3');
+          await geminiTTSWithRetry(`${cleanLast}\n\n${cleanOutro}`, full, fdir, 'tail');
+          const r = await splitAtSilence(full, audio, outroAudio, cleanLast.length / (cleanLast.length + cleanOutro.length));
+          dur = r.first;
+          outroDone = true;
+          console.log(`  (outro đọc chung cảnh cuối, cắt tại ${r.cut.toFixed(2)}s/${r.total.toFixed(2)}s${r.found ? '' : ' — không thấy khoảng lặng, cắt theo tỷ lệ'})`);
+        } else {
+          dur = await tts(s.narration, audio, voice, fdir, `t${i}`, engine);
+        }
         sceneAudios.push(audio);
         const asset = assetPaths.get(s.assetId);
         built.push({
@@ -281,8 +298,9 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
         });
       }
       // Outro đọc số 0939 243 222 (spellPhones đọc từng chữ số). Đường edge tự chống chịu
-      // (không throw); đường gemini throw thì cả bản rơi xuống edge cùng nhau.
-      await tts(OUTRO_TEXT, outroAudio, voice, fdir, 'outro', engine);
+      // (không throw); đường gemini throw thì cả bản rơi xuống edge cùng nhau. Gemini đã đọc
+      // chung với cảnh cuối ở trên thì bỏ qua.
+      if (!outroDone) await tts(OUTRO_TEXT, outroAudio, voice, fdir, 'outro', engine);
       engineUsed = engine;
       break;
     } catch (e) {
