@@ -240,7 +240,14 @@ export default async function BangSection() {
                           {imgUrl || vidUrl ? (
                             <div className="modal-media">
                               {imgUrl ? <img src={imgUrl} alt="" /> : null}
-                              {vidUrl ? <video src={`${vidUrl}#t=2`} controls preload="metadata" playsInline /> : null}
+                              {vidUrl ? (
+                                <>
+                                  {/* Không dùng #t=2 + preload metadata ở đây (22/8: video đứng 0:00 trên bảng
+                                      Chờ duyệt); ViewModal gọi load() khi mở, poster = ảnh bài cho đỡ ô đen. */}
+                                  <video src={vidUrl} controls preload="none" playsInline poster={imgUrl || undefined} />
+                                  <a className="src" href={vidUrl} target="_blank" rel="noreferrer" style={{ fontSize: '.82rem', alignSelf: 'flex-start' }}>↗ Mở video ở tab mới</a>
+                                </>
+                              ) : null}
                             </div>
                           ) : null}
                         </ViewModal>

@@ -443,7 +443,12 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                         {img || vid ? (
                           <div className="modal-media">
                             {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} /> : null}
-                            {vid ? <video src={vid.url} controls preload="metadata" /> : null}
+                            {vid ? (
+                              <>
+                                <video src={vid.url} controls preload="metadata" playsInline poster={img?.url || undefined} />
+                                <a className="src" href={vid.url} target="_blank" rel="noreferrer" style={{ fontSize: '.82rem', alignSelf: 'flex-start' }}>↗ Mở video ở tab mới</a>
+                              </>
+                            ) : null}
                           </div>
                         ) : null}
                       </ViewModal>

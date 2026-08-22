@@ -13,7 +13,17 @@ export default function ViewModal({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  const open = () => ref.current?.showModal();
+  // Mở modal thì ÉP NẠP video bên trong (user 22/8: bấm xem bài, video đứng 0:00 không chạy).
+  // Video nằm trong <dialog> đóng (display:none) có trình duyệt không nạp metadata, hoặc đang
+  // preload="none"; gọi load() khi readyState còn 0 để bấm play là chạy được ngay.
+  const open = () => {
+    const d = ref.current;
+    if (!d) return;
+    d.showModal();
+    d.querySelectorAll('video').forEach((v) => {
+      if (v.readyState === 0) { try { v.load(); } catch { /* bỏ qua */ } }
+    });
+  };
   // Đóng thì dừng hẳn video/âm thanh bên trong (đóng dialog không tự dừng media).
   const stopMedia = () => {
     const m = ref.current?.querySelector('video, audio') as HTMLMediaElement | null;
