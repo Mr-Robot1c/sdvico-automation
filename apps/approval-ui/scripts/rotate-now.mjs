@@ -190,7 +190,14 @@ if (!ARG['no-content']) {
     const KIND_LABEL = { qa: '❓ Hỏi-Đáp', checklist: '📋 Checklist', glossary: '📖 Thuật ngữ', tip: '💡 Mẹo', engage: '💬 Hỏi bà con' };
     const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';
     // Anh KHOP chu de: folder san pham duoc nhac -> Unsplash theo tu khoa -> folder Content.
-    const picked = await pickImageForContent(client, folders, `${gen.topic || ''} ${displayTitle}`);
+    // Ne anh da dung 14 ngay (user 22/8) - cung logic voi /api/rotate.
+    const recentlyUsed = new Map();
+    try {
+      const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+      const { data: rr } = await client.from('mkt_content').select('brief, created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(200);
+      for (const r of rr || []) { const a = r.brief?.assets || {}; for (const id of [a.image, ...(Array.isArray(a.images) ? a.images : [])]) if (typeof id === 'string' && !recentlyUsed.has(id)) recentlyUsed.set(id, String(r.created_at || '')); }
+    } catch { /* bo qua */ }
+    const picked = await pickImageForContent(client, folders, `${gen.topic || ''} ${displayTitle}`, recentlyUsed);
     if (!picked?.id) throw new Error('khong tim duoc anh cho bai content');
     console.log(`  anh: ${picked.via} (${picked.note})`);
     const media = { id: picked.id };

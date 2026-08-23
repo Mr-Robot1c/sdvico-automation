@@ -91,17 +91,32 @@ async function saveUnsplashToAssets(client, photo, titleHint) {
   return data.id;
 }
 
+// Chọn 1 ảnh trong pool, NÉ ảnh đã dùng gần đây (user 22/8: ảnh bài content không được trùng
+// trong 14 ngày). recentlyUsed: Map<assetId, lastUsedISO>. Còn ảnh chưa dùng -> random trong đó;
+// hết sạch (folder nhỏ) -> lấy ảnh dùng LÂU NHẤT (ít trùng nhất có thể) thay vì random.
+function pickFresh(imgs, recentlyUsed) {
+  if (!imgs.length) return null;
+  if (!recentlyUsed || !recentlyUsed.size) return pickRandom(imgs);
+  const fresh = imgs.filter((i) => !recentlyUsed.has(i.id));
+  if (fresh.length) return pickRandom(fresh);
+  const oldest = imgs.slice().sort((a, b) => String(recentlyUsed.get(a.id) || '').localeCompare(String(recentlyUsed.get(b.id) || '')));
+  return oldest[0];
+}
+
 // folders: Map<product_group, {images:[{id,...}], videos:[...]}> (đã gom sẵn ở rotate).
 // topicText: chủ đề + tiêu đề bài content.
-export async function pickImageForContent(client, folders, topicText) {
+// recentlyUsed: Map<assetId, lastUsedISO> ảnh đã dùng trong cửa sổ chống trùng (rotate tính từ
+// mkt_content 14 ngày) — có thể bỏ trống (script cũ / test).
+export async function pickImageForContent(client, folders, topicText, recentlyUsed = null) {
   const text = String(topicText || '');
 
-  // 1. Chủ đề dính sản phẩm -> ảnh folder sản phẩm đó.
+  // 1. Chủ đề dính sản phẩm -> ảnh folder sản phẩm đó (né ảnh vừa dùng).
   const grp = guessGroup(text);
   if (grp) {
     const key = [...folders.keys()].find((g) => productName(g).toLowerCase() === productName(grp).toLowerCase());
     const imgs = key ? folders.get(key)?.images || [] : [];
-    if (imgs.length) return { id: pickRandom(imgs).id, via: 'product', note: `folder ${key}` };
+    const pick = pickFresh(imgs, recentlyUsed);
+    if (pick) return { id: pick.id, via: 'product', note: `folder ${key}${recentlyUsed?.has(pick.id) ? ' (het anh moi, lay anh dung lau nhat)' : ''}` };
   }
 
   // 2. Unsplash theo từ khóa dịch từ chủ đề.
@@ -118,10 +133,11 @@ export async function pickImageForContent(client, folders, topicText) {
     }
   } catch { /* rơi xuống fallback */ }
 
-  // 3. Fallback: folder Content, rồi bất kỳ.
+  // 3. Fallback: folder Content, rồi bất kỳ — né ảnh đã dùng 14 ngày, hết mới lấy ảnh dùng lâu nhất.
   const contentImgs = folders.get('Content')?.images || [];
   const any = [...folders.values()].flatMap((f) => f.images);
   const pool = contentImgs.length ? contentImgs : any;
-  if (pool.length) return { id: pickRandom(pool).id, via: 'content-folder', note: contentImgs.length ? 'Content' : 'any' };
+  const pick = pickFresh(pool, recentlyUsed);
+  if (pick) return { id: pick.id, via: 'content-folder', note: `${contentImgs.length ? 'Content' : 'any'}${recentlyUsed?.has(pick.id) ? ' (het anh moi, lay anh dung lau nhat)' : ''}` };
   return { id: null, via: null, note: 'khong co anh' };
 }

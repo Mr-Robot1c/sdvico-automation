@@ -452,6 +452,21 @@ export async function GET(req: Request) {
   // tàu cá chung chung".
   // @ts-ignore — module JS thuần
   const { pickImageForContent } = await import('../../../lib/gen/pick-image.mjs');
+  // Ảnh đã dùng trong 14 NGÀY (mọi bài, kể cả bài bán) -> bài content né trùng (user 22/8:
+  // "ảnh content không được trùng nhau trong 14 ngày"). Map id -> lần dùng gần nhất để khi
+  // folder cạn ảnh mới thì lấy ảnh dùng lâu nhất.
+  const recentlyUsedImages = new Map<string, string>();
+  try {
+    const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+    const { data: recentRows } = await client
+      .from('mkt_content').select('brief, created_at').gte('created_at', since)
+      .order('created_at', { ascending: false }).limit(200);
+    for (const r of (recentRows || []) as any[]) {
+      const a = r.brief?.assets || {};
+      const ids = [a.image, ...(Array.isArray(a.images) ? a.images : [])].filter((x) => typeof x === 'string');
+      for (const id of ids) if (!recentlyUsedImages.has(id)) recentlyUsedImages.set(id, String(r.created_at || ''));
+    }
+  } catch { /* thiếu thì không né, vẫn chọn như cũ */ }
   for (let i = 0; i < contentCount; i++) {
     // Chọn CỤM CONTENT theo tỷ lệ đề xuất Phòng KD (tuần 5 bài content):
     //   qa=2, checklist=2, glossary=1, tip=1, engage=1, portrait=1, news=1 -> tổng 9 lượt/vòng.
@@ -506,9 +521,11 @@ export async function GET(req: Request) {
     const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';
 
     // Chọn ảnh KHỚP chủ đề (sau khi đã biết chủ đề + tiêu đề).
-    const picked = await (pickImageForContent as any)(client, folders, `${gen.topic || ''} ${displayTitle}`);
+    const picked = await (pickImageForContent as any)(client, folders, `${gen.topic || ''} ${displayTitle}`, recentlyUsedImages);
     if (!picked?.id) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
     const media = { id: picked.id as string };
+    // Đánh dấu ngay để bài content thứ 2 trong cùng lượt (nếu có) cũng không trùng.
+    recentlyUsedImages.set(media.id, new Date().toISOString());
     // Auto-logo cho ảnh bài content (in-place, giữ nguyên id). Ảnh Unsplash mới tải cũng đóng logo.
     if (AUTO_LOGO) {
       try { logoActions.push({ group: 'Bài content', via: picked.via, ...(await ensureLogoForPost(client, media.id)) }); }
