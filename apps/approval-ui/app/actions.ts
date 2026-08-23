@@ -788,15 +788,31 @@ export async function retryFacebookPublish(formData: FormData): Promise<void> {
   if (await isEmergencyStopped(client)) { await log('error', 'dang dung khan, khong dang'); return; }
   const { data: q } = await client.from('approval_queue').select('id').eq('kind', 'mkt_publish_content').eq('payload->>content_id', contentId).eq('status', 'approved').limit(1);
   if (!q || !q.length) { await log('error', 'bai chua duoc duyet, khong dang lai'); return; }
-  const res = await publishContentToFacebook(client, contentId, null);
-  if (res.ok) {
-    // Dọn các dòng 'failed' cũ của kênh facebook để thẻ hết cảnh báo; dòng published do
-    // publishContentToFacebook vừa ghi.
-    await client.from('mkt_posts').delete().eq('content_id', contentId).eq('channel', 'facebook').eq('status', 'failed');
-    await log('ok', res.url ? 'da dang lai' : 'bai da co tren facebook tu truoc', { url: res.url || null, warn: res.warn || null });
-  } else {
-    await log('error', 'dang lai van loi: ' + String(res.error || ''), {});
-  }
+  // Chống bấm đúp: đang có lượt đăng lại chạy nền (3 phút qua) thì bỏ qua.
+  const since = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+  const { count: inflight } = await client.from('run_log').select('id', { count: 'exact', head: true })
+    .eq('task', 'mkt.publish_facebook_retry').eq('detail->>phase', 'started').eq('detail->>contentId', contentId).gte('created_at', since);
+  if (inflight && inflight > 0) { revalidatePath('/noi-dung'); return; }
+  // CHẠY NỀN (23/8: user bấm -> web treo ~70s vì chờ FB xử lý video rồi mới trả trang). Giống
+  // decideForm: waitUntil giữ hàm sống sau khi đã trả response; thẻ tự cập nhật khi xong.
+  await log('ok', 'bat dau dang lai (chay nen)', { phase: 'started' });
+  const bgClient = getServerClient();
+  const bgJob = (async () => {
+    try {
+      const res = await publishContentToFacebook(bgClient, contentId, null);
+      if (res.ok) {
+        // Dọn các dòng 'failed' cũ của kênh facebook để thẻ hết cảnh báo; dòng published do
+        // publishContentToFacebook vừa ghi.
+        await bgClient.from('mkt_posts').delete().eq('content_id', contentId).eq('channel', 'facebook').eq('status', 'failed');
+        try { await bgClient.from('run_log').insert({ task: 'mkt.publish_facebook_retry', actor: 'nguoi-bam', status: 'ok', detail: { contentId, phase: 'done', msg: res.url ? 'da dang lai' : 'bai da co tren facebook tu truoc', url: res.url || null, warn: res.warn || null } }); } catch { /* bỏ qua */ }
+      } else {
+        try { await bgClient.from('run_log').insert({ task: 'mkt.publish_facebook_retry', actor: 'nguoi-bam', status: 'error', detail: { contentId, phase: 'done', msg: 'dang lai van loi: ' + String(res.error || '') } }); } catch { /* bỏ qua */ }
+      }
+    } catch (e: any) {
+      try { await bgClient.from('run_log').insert({ task: 'mkt.publish_facebook_retry', actor: 'nguoi-bam', status: 'error', detail: { contentId, phase: 'done', msg: String(e?.message || e) } }); } catch { /* bỏ qua */ }
+    }
+  })();
+  waitUntil(bgJob);
   revalidatePath('/noi-dung');
   revalidatePath('/do-luong');
 }

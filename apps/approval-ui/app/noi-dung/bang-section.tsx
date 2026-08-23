@@ -80,6 +80,7 @@ export default async function BangSection() {
   const contents = new Map<string, { title: string; draft: string; brief: any }>();
   const postsByContent = new Map<string, { channel: string; url: string; at: string }[]>();
   const fbFailed = new Set<string>(); // bài có lượt đăng Facebook thất bại, chưa có bản FB published
+  const fbRetrying = new Set<string>(); // đang có lượt đăng lại chạy nền
   const metricsByContent = new Map<string, M>();
   const ytByContent = new Map<string, { views: number; reactions: number; comments: number }>();
   if (cids.length) {
@@ -91,6 +92,13 @@ export default async function BangSection() {
       client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'facebook').in('content_id', cids)
     ]);
     for (const f of fails || []) { const cid = (f as any).content_id as string | null; if (cid) fbFailed.add(cid); }
+    // Lượt "Đăng lại Facebook" đang chạy nền (bấm trong 3 phút qua, chưa có bản FB published):
+    // hiện "Đang đăng lại…" thay nút để người dùng biết máy đang làm, khỏi bấm thêm.
+    if (fbFailed.size) {
+      const since = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+      const { data: rl } = await client.from('run_log').select('detail').eq('task', 'mkt.publish_facebook_retry').gte('created_at', since).order('created_at', { ascending: false }).limit(50);
+      for (const r of rl || []) { const d = (r as any).detail || {}; if (d.phase === 'started' && d.contentId && fbFailed.has(d.contentId)) fbRetrying.add(String(d.contentId)); }
+    }
     for (const c of cs || []) contents.set((c as any).id, { title: (c as any).title || '', draft: String((c as any).draft || ''), brief: (c as any).brief || {} });
     for (const p of ps || []) {
       const cid = (p as any).content_id as string | null;
@@ -316,11 +324,15 @@ export default async function BangSection() {
                       ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
                       {fbPost ? <span><ShareGroups postUrl={fbPost.url} /></span> : null}
                       {!posts.some((x) => x.channel === 'facebook') && fbFailed.has(it.cid) ? (
-                        <form action={retryFacebookPublish} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <input type="hidden" name="content_id" value={it.cid} />
-                          <span className="badge tone-no" title="Lượt đăng Facebook thất bại (token Page hết hạn hoặc lỗi mạng). Kênh khác vẫn lên bình thường.">Facebook chưa lên</span>
-                          <button className="btn ghost sm" type="submit" title="Đăng lại bài này lên Facebook (đã duyệt, không đăng lại kênh khác)">↻ Đăng lại Facebook</button>
-                        </form>
+                        fbRetrying.has(it.cid) ? (
+                          <span className="badge tone-demo" title="Máy đang đăng lại lên Facebook (upload + chờ FB xử lý video, 1 tới 2 phút). Thẻ tự cập nhật khi xong.">⏳ Đang đăng lại Facebook…</span>
+                        ) : (
+                          <form action={retryFacebookPublish} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <input type="hidden" name="content_id" value={it.cid} />
+                            <span className="badge tone-no" title="Lượt đăng Facebook thất bại (token Page hết hạn hoặc lỗi mạng). Kênh khác vẫn lên bình thường.">Facebook chưa lên</span>
+                            <button className="btn ghost sm" type="submit" title="Đăng lại bài này lên Facebook, chạy nền 1 tới 2 phút (đã duyệt, không đăng lại kênh khác)">↻ Đăng lại Facebook</button>
+                          </form>
+                        )
                       ) : null}
                     </div>
                   );
