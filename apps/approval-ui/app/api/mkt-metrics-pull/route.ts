@@ -144,9 +144,23 @@ export async function GET(req: Request) {
     } else {
       try {
         const { id, plan: p } = await generateAndStorePlan(client, 'cron', { cadence: slot });
+        // THỨ 2 = bản TUẦN: TỰ ÁP làm xương sống tuần (nguyên tắc user 22/8: đo lường tuần ->
+        // kế hoạch tổng quát tuần sau; trước đây bản cron nằm applied=false nên không ai thấy
+        // BOSS "ra kế hoạch tuần"). Hướng đi chưa dùng đã được carry-over bên trong. Bản cập nhật
+        // thứ 6 vẫn chỉ đề xuất (số liệu ngày đã chỉnh dần mỗi tối rồi).
+        let applied = false;
+        if (slot === 'weekly' && id) {
+          await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
+          await client.from('mkt_plans').update({ applied: true, applied_at: new Date().toISOString() }).eq('id', id);
+          applied = true;
+        }
         plan = { id, ranked: p.summary.ranked, cadence: slot, directions: p.content_suggestions?.length || 0 };
+        try {
+          await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'ok', detail: { cadence: slot, planId: id, applied, directions: p.content_suggestions?.length || 0, measurement_source: p.measurement_source || null } });
+        } catch { /* bỏ qua */ }
       } catch (e: any) {
         console.error('[plan] sinh ke hoach that bai:', e?.message || e);
+        try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'error', detail: { cadence: slot, error: String(e?.message || e) } }); } catch { /* bỏ qua */ }
       }
     }
   }
@@ -160,6 +174,7 @@ export async function GET(req: Request) {
     try {
       const r = await learnWeekly(client, { force: forceLearn });
       learn = { planId: r.planId, ranked: r.ranked, skipped: r.skipped };
+      if (!r.skipped) { try { await client.from('run_log').insert({ task: 'mkt.learn_weekly', actor: forceLearn ? 'manual' : 'cron', status: 'ok', detail: { planId: r.planId, ranked: r.ranked } }); } catch { /* bỏ qua */ } }
     } catch (e: any) {
       console.error('[learn-weekly] that bai:', e?.message || e);
       learn = { error: String(e?.message || e) };

@@ -15,6 +15,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   const heThong: Group = {
     title: 'Hệ thống',
     items: [
+      { href: '/van-hanh', label: 'Vận hành', icon: '🛑' },
       { href: '/ket-noi', label: 'Kết nối', icon: '🔌' },
       { href: '/quy-tac', label: 'Quy tắc', icon: '📜' }
     ]

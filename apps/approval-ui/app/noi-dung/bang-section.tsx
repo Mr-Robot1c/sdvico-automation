@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { isEmergencyStopped, getPostCount, isQuotaDisabled } from '../../lib/safety';
-import { toggleEmergencyStop, editDraft, retryFacebookPublish } from '../actions';
+import { editDraft, retryFacebookPublish } from '../actions';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import ShareGroups from './share-groups';
@@ -162,34 +162,29 @@ export default async function BangSection() {
 
   return (
     <section>
-      {/* Thanh vận hành: dừng khẩn + hạn mức ngày. Bản đầy đủ ở /van-hanh. */}
-      <div className={`card ${stopped ? 'tone-no' : ''}`} style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', padding: '10px 14px', marginBottom: 14 }}>
-        <span>{stopped ? <b style={{ color: 'var(--no)' }}>🔴 ĐANG DỪNG KHẨN — bài Duyệt sẽ không đăng</b> : <span>🟢 Đang chạy</span>}</span>
-        <form action={toggleEmergencyStop} style={{ display: 'inline' }}>
-          <input type="hidden" name="on" value={stopped ? '0' : '1'} />
-          <button className={`btn sm ${stopped ? 'ok' : 'no'}`} type="submit">{stopped ? '▶ Bật lại (cho phép đăng)' : '🛑 Dừng khẩn'}</button>
-        </form>
-        <span className="muted" style={{ fontSize: '.85rem' }}>Hôm nay: FB <b>{fbCount}{quotaOff ? '' : `/${limit}`}</b>, TikTok <b>{ttCount}{quotaOff ? '' : `/${limit}`}</b>{quotaOff ? ' (đang bỏ hạn mức)' : ''}</span>
-        {approvedWaiting.length ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span className="badge tone-demo" title="Bài đã duyệt nhưng chưa thấy trên kênh (đang đăng, hẹn giờ, hoặc kẹt — xem Vận hành chi tiết).">
-              ⏳ {approvedWaiting.length} bài đã duyệt chưa lên kênh
-            </span>
-            {approvedWaiting.filter((it) => fbFailed.has(it.cid)).slice(0, 3).map((it) => (
-              <form key={it.qid} action={retryFacebookPublish} style={{ display: 'inline' }}>
-                <input type="hidden" name="content_id" value={it.cid} />
-                <button className="btn ghost sm" type="submit" title={`Facebook đăng lỗi (token hết hạn, mạng...). Bấm để đăng lại bài "${stripInternalPrefix(contents.get(it.cid)?.title || it.title)}" lên Facebook — bài đã được duyệt, không đăng kênh khác.`}>↻ Đăng lại FB</button>
-              </form>
-            ))}
+      {/* 23/8 (user: "bỏ cái dòng chạy"): thanh vận hành thường trực đã bỏ — dừng khẩn, hạn mức
+          nằm ở mục Vận hành (menu Hệ thống). Bảng chỉ còn cảnh báo KHI CẦN: đang dừng khẩn, hoặc
+          có bài đã duyệt mà chưa lên kênh (kèm nút đăng lại FB). */}
+      {stopped ? (
+        <div className="card tone-no" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', padding: '10px 14px', marginBottom: 14 }}>
+          <b style={{ color: 'var(--no)' }}>🔴 Đang dừng khẩn, bài Duyệt sẽ không đăng</b>
+          <Link className="src" href="/van-hanh">Bật lại ở Vận hành</Link>
+        </div>
+      ) : null}
+      {approvedWaiting.length ? (
+        <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '8px 14px', marginBottom: 14 }}>
+          <span className="badge tone-demo" title="Bài đã duyệt nhưng chưa thấy trên kênh nào (đang đăng, hẹn giờ, hoặc kẹt).">
+            ⏳ {approvedWaiting.length} bài đã duyệt chưa lên kênh
           </span>
-        ) : null}
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: '.85rem' }}>
-          {otherPending ? (
-            <Link className="src" href="/hang-doi" title="Hồ sơ HR và cảnh báo hệ thống chờ xử lý">⚠ {otherPending.toLocaleString('vi-VN')} mục chờ khác</Link>
-          ) : null}
-          <Link className="src" href="/van-hanh">Vận hành chi tiết</Link>
-        </span>
-      </div>
+          {approvedWaiting.filter((it) => fbFailed.has(it.cid)).slice(0, 3).map((it) => (
+            <form key={it.qid} action={retryFacebookPublish} style={{ display: 'inline' }}>
+              <input type="hidden" name="content_id" value={it.cid} />
+              <button className="btn ghost sm" type="submit" title={`Đăng lại "${stripInternalPrefix(contents.get(it.cid)?.title || it.title)}" lên Facebook (chạy nền 1 tới 2 phút)`}>↻ Đăng lại FB</button>
+            </form>
+          ))}
+          <Link className="src" href="/van-hanh" style={{ marginLeft: 'auto', fontSize: '.85rem' }}>Vận hành</Link>
+        </div>
+      ) : null}
 
       {/* Board 4 cột theo dòng chảy bài viết, chiếm trọn chiều ngang. */}
       <div className="kanban-wrap">
