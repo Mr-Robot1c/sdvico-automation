@@ -774,6 +774,33 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   revalidatePath('/do-luong');
 }
 
+// ĐĂNG LẠI FACEBOOK cho bài đã duyệt mà lượt đăng FB thất bại (23/8: token Page bị Facebook vô
+// hiệu -> FB lỗi, YouTube + TikTok vẫn lên; trước đây không có đường nào đẩy lại, bài kẹt mãi).
+// Người bấm nút mới chạy (điều cấm 1 vẫn giữ: bài đã qua duyệt, máy chỉ thực hiện lại lượt đăng).
+// Điều kiện: có mục approval_queue status 'approved' cho bài; chưa có mkt_posts facebook published.
+export async function retryFacebookPublish(formData: FormData): Promise<void> {
+  const contentId = String(formData.get('content_id') || '').trim();
+  if (!contentId) return;
+  const client = getServerClient();
+  const log = async (status: 'ok' | 'error', msg: string, extra: any = {}) => {
+    try { await client.from('run_log').insert({ task: 'mkt.publish_facebook_retry', actor: 'nguoi-bam', status, detail: { contentId, msg, ...extra } }); } catch { /* bỏ qua */ }
+  };
+  if (await isEmergencyStopped(client)) { await log('error', 'dang dung khan, khong dang'); return; }
+  const { data: q } = await client.from('approval_queue').select('id').eq('kind', 'mkt_publish_content').eq('payload->>content_id', contentId).eq('status', 'approved').limit(1);
+  if (!q || !q.length) { await log('error', 'bai chua duoc duyet, khong dang lai'); return; }
+  const res = await publishContentToFacebook(client, contentId, null);
+  if (res.ok) {
+    // Dọn các dòng 'failed' cũ của kênh facebook để thẻ hết cảnh báo; dòng published do
+    // publishContentToFacebook vừa ghi.
+    await client.from('mkt_posts').delete().eq('content_id', contentId).eq('channel', 'facebook').eq('status', 'failed');
+    await log('ok', res.url ? 'da dang lai' : 'bai da co tren facebook tu truoc', { url: res.url || null, warn: res.warn || null });
+  } else {
+    await log('error', 'dang lai van loi: ' + String(res.error || ''), {});
+  }
+  revalidatePath('/noi-dung');
+  revalidatePath('/do-luong');
+}
+
 // Thêm một từ khóa vào kho.
 export async function addKeyword(formData: FormData) {
   const keyword = String(formData.get('keyword') || '').trim();

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { isEmergencyStopped, getPostCount, isQuotaDisabled } from '../../lib/safety';
-import { toggleEmergencyStop, editDraft } from '../actions';
+import { toggleEmergencyStop, editDraft, retryFacebookPublish } from '../actions';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import ShareGroups from './share-groups';
@@ -79,14 +79,18 @@ export default async function BangSection() {
   // Nội dung + nháp + cờ video; bài đã đăng; số liệu; media để xem trước khi duyệt.
   const contents = new Map<string, { title: string; draft: string; brief: any }>();
   const postsByContent = new Map<string, { channel: string; url: string; at: string }[]>();
+  const fbFailed = new Set<string>(); // bài có lượt đăng Facebook thất bại, chưa có bản FB published
   const metricsByContent = new Map<string, M>();
   const ytByContent = new Map<string, { views: number; reactions: number; comments: number }>();
   if (cids.length) {
-    const [{ data: cs }, { data: ps }, { data: ms }] = await Promise.all([
+    const [{ data: cs }, { data: ps }, { data: ms }, { data: fails }] = await Promise.all([
       client.from('mkt_content').select('id, title, draft, brief').in('id', cids),
       client.from('mkt_posts').select('content_id, channel, external_url, published_at').eq('status', 'published').in('content_id', cids),
-      client.from('mkt_metrics').select('source, entity_ref, metrics, created_at').in('source', ['facebook', 'youtube']).in('entity_ref', cids).order('created_at', { ascending: false }).limit(700)
+      client.from('mkt_metrics').select('source, entity_ref, metrics, created_at').in('source', ['facebook', 'youtube']).in('entity_ref', cids).order('created_at', { ascending: false }).limit(700),
+      // Lượt đăng FACEBOOK THẤT BẠI (23/8: token Page bị vô hiệu) -> thẻ hiện nút "Đăng lại Facebook".
+      client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'facebook').in('content_id', cids)
     ]);
+    for (const f of fails || []) { const cid = (f as any).content_id as string | null; if (cid) fbFailed.add(cid); }
     for (const c of cs || []) contents.set((c as any).id, { title: (c as any).title || '', draft: String((c as any).draft || ''), brief: (c as any).brief || {} });
     for (const p of ps || []) {
       const cid = (p as any).content_id as string | null;
@@ -159,8 +163,16 @@ export default async function BangSection() {
         </form>
         <span className="muted" style={{ fontSize: '.85rem' }}>Hôm nay: FB <b>{fbCount}{quotaOff ? '' : `/${limit}`}</b>, TikTok <b>{ttCount}{quotaOff ? '' : `/${limit}`}</b>{quotaOff ? ' (đang bỏ hạn mức)' : ''}</span>
         {approvedWaiting.length ? (
-          <span className="badge tone-demo" title="Bài đã duyệt nhưng chưa thấy trên kênh (đang đăng, hẹn giờ, hoặc kẹt — xem Vận hành chi tiết).">
-            ⏳ {approvedWaiting.length} bài đã duyệt chưa lên kênh
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span className="badge tone-demo" title="Bài đã duyệt nhưng chưa thấy trên kênh (đang đăng, hẹn giờ, hoặc kẹt — xem Vận hành chi tiết).">
+              ⏳ {approvedWaiting.length} bài đã duyệt chưa lên kênh
+            </span>
+            {approvedWaiting.filter((it) => fbFailed.has(it.cid)).slice(0, 3).map((it) => (
+              <form key={it.qid} action={retryFacebookPublish} style={{ display: 'inline' }}>
+                <input type="hidden" name="content_id" value={it.cid} />
+                <button className="btn ghost sm" type="submit" title={`Facebook đăng lỗi (token hết hạn, mạng...). Bấm để đăng lại bài "${stripInternalPrefix(contents.get(it.cid)?.title || it.title)}" lên Facebook — bài đã được duyệt, không đăng kênh khác.`}>↻ Đăng lại FB</button>
+              </form>
+            ))}
           </span>
         ) : null}
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: '.85rem' }}>
@@ -303,6 +315,13 @@ export default async function BangSection() {
                         </span>
                       ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
                       {fbPost ? <span><ShareGroups postUrl={fbPost.url} /></span> : null}
+                      {!posts.some((x) => x.channel === 'facebook') && fbFailed.has(it.cid) ? (
+                        <form action={retryFacebookPublish} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <input type="hidden" name="content_id" value={it.cid} />
+                          <span className="badge tone-no" title="Lượt đăng Facebook thất bại (token Page hết hạn hoặc lỗi mạng). Kênh khác vẫn lên bình thường.">Facebook chưa lên</span>
+                          <button className="btn ghost sm" type="submit" title="Đăng lại bài này lên Facebook (đã duyệt, không đăng lại kênh khác)">↻ Đăng lại Facebook</button>
+                        </form>
+                      ) : null}
                     </div>
                   );
                 }
