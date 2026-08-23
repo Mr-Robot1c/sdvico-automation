@@ -129,6 +129,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
                     <td className="cell-title">
                       {i === 0 ? '🏆 ' : ''}
                       <PostTitle title={p.title} product={p.product} draft={''} url={p.url} />
+                      {p.otherPage ? <span className="badge tone-demo" style={{ marginLeft: 6 }} title="Bài nhập từ page khác, không phải page chính hệ thống đang đăng. Số liệu chỉ để tham khảo.">Page khác</span> : null}
                     </td>
                     <td>{p.product}</td>
                     <td className="num"><b>{vnInt(p.score)}</b></td>

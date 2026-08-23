@@ -12,6 +12,8 @@
 import type { getServerClient } from './supabase-server';
 // @ts-ignore — module JS thuần
 import { guessGroup } from './gen/products.mjs';
+// @ts-ignore — module JS thuần
+import { isOtherPage } from './page-origin.mjs';
 import { vnInt, vnDec1 } from './plan';
 
 type Client = ReturnType<typeof getServerClient>;
@@ -41,6 +43,7 @@ export type PostScore = {
   m: PostMetric;
   conversions: number;
   score: number;           // Điểm composite
+  otherPage?: boolean;     // Bài nằm trên PAGE KHÁC (không phải page hệ thống đang đăng) — user 22/8
 };
 
 export type WeekReport = {
@@ -203,7 +206,8 @@ async function loadPostsInWindow(client: Client, win: WeekWindow): Promise<PostS
       url: p.url,
       m,
       conversions: Number(c.brief?.conversions) || 0,
-      score: scoreOf(m)
+      score: scoreOf(m),
+      otherPage: !!(isOtherPage as (u: string, b: any) => boolean)(p.url, c.brief)
     };
   });
   return posts;

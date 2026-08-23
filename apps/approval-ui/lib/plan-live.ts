@@ -19,6 +19,8 @@ import type { Plan, PlanProduct, Tier, DailyPlan } from './plan';
 import { vnInt, weekWindowVN } from './plan';
 // @ts-ignore — module JS thuần
 import { guessGroup } from './gen/products.mjs';
+// @ts-ignore — module JS thuần (test được bằng node)
+import { dampWeights, describeChanges, DEFAULT_STEP } from './plan-damp.mjs';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -382,17 +384,37 @@ export async function applyLiveEvening(client: Client, opts: { force?: boolean }
     .maybeSingle();
 
   if (appliedRow && (appliedRow as any).id) {
-    // GỘP: chỉ đổi weights + daily_schedule + share_groups + narrative của bản đang áp, giữ
-    // nguyên content_suggestions (hướng đi A/B) + summary gốc.
+    // GỘP TỪNG CHÚT (user 22/8): kế hoạch tuần là xương sống, số liệu ngày chỉ DỊCH trọng số
+    // tối đa ±step mỗi tối về phía đề xuất sống (trước đây thay hẳn -> tối nào cũng lật kế
+    // hoạch tuần). Giữ nguyên content_suggestions (hướng đi A/B) + summary gốc; products +
+    // lịch ngày dựng lại theo trọng số ĐÃ DỊCH để mọi chỗ nhất quán.
     const base = (appliedRow as any).data as Plan;
+    const step = Number(process.env.LIVE_ADJUST_STEP) > 0 ? Number(process.env.LIVE_ADJUST_STEP) : (DEFAULT_STEP as number);
+    const { weights: damped, changes } = (dampWeights as any)(base.weights || {}, liveData.weights || {}, step) as { weights: Record<string, number>; changes: Array<{ product: string; from: number; to: number; target: number }> };
+    const liveByName = new Map((liveData.products || []).map((p) => [p.product, p] as const));
+    const baseByName = new Map((base.products || []).map((p) => [p.product, p] as const));
+    const products: PlanProduct[] = Object.keys(damped).map((name) => {
+      const src = liveByName.get(name) || baseByName.get(name);
+      const p: PlanProduct = src ? { ...src } : { product: name, count: 0, engagement: 0, conversions: 0, avgEng: 0, avgConv: 0, tier: 'insufficient', weight: 1, postsPerWeek: 0, note: '' };
+      p.weight = damped[name];
+      return p;
+    });
+    const sumW = products.reduce((s, p) => s + p.weight, 0) || 1;
+    for (const p of products) p.postsPerWeek = Math.max(1, Math.round((p.weight / sumW) * WEEKLY_SALES_BUDGET));
+    const dirQueue = buildDirectionQueue(Array.isArray(base.content_suggestions) ? base.content_suggestions : [], damped);
+    const dailySchedule = buildDailySchedule(now, products, liveData.share_groups || base.share_groups || [], dirQueue);
+    const adjustNote = (describeChanges as any)(changes) as string;
+    const prevLog = Array.isArray(base.adjust_log) ? base.adjust_log : [];
+    const adjustLog = [...prevLog, ...changes.map((c) => ({ at: now.toISOString(), ...c }))].slice(-30);
     const merged: Plan = {
       ...base,
-      weights: liveData.weights,
-      products: liveData.products,
-      daily_schedule: liveData.daily_schedule,
+      weights: damped,
+      products,
+      daily_schedule: dailySchedule,
       share_groups: liveData.share_groups,
-      narrative: liveData.narrative,
+      narrative: [adjustNote, ...(liveData.narrative || [])],
       generatedAt: liveData.generatedAt,
+      adjust_log: adjustLog,
     };
     const { error } = await client.from('mkt_plans').update({ data: merged, applied_at: new Date().toISOString() }).eq('id', (appliedRow as any).id);
     if (error) throw new Error(error.message);
@@ -403,6 +425,6 @@ export async function applyLiveEvening(client: Client, opts: { force?: boolean }
     if (error) throw new Error(error.message);
   }
 
-  try { await client.from('run_log').insert({ task: 'mkt.live_apply', actor: 'cron', status: 'ok', detail: { merged: !!appliedRow } }); } catch { /* bỏ qua */ }
+  try { await client.from('run_log').insert({ task: 'mkt.live_apply', actor: 'cron', status: 'ok', detail: { merged: !!appliedRow, damped: !!appliedRow } }); } catch { /* bỏ qua */ }
   return { applied: true };
 }

@@ -7,6 +7,8 @@ import MetricsAuto from './metrics-auto';
 import RefreshButton from './refresh-button';
 // @ts-ignore — module JS thuần
 import { guessGroup } from '../../lib/gen/products.mjs';
+// @ts-ignore — module JS thuần
+import { isOtherPage, OTHER_PAGE_LABEL, OTHER_PAGE_HINT } from '../../lib/page-origin.mjs';
 
 // Tab Đo lường trong Quản lý bài viết (user 21/8: "đo lường gộp với quản lý bài viết cho cụ
 // thể và dễ kiểm soát"). Nguyên nội dung trang /do-luong cũ chuyển vào đây; /do-luong giờ chỉ
@@ -85,7 +87,7 @@ export default async function DoLuongSection() {
   const cids = [...latest.keys()];
   // Nạp tên bài cho CẢ bài Facebook lẫn bài chỉ có số liệu YouTube.
   const allCids = [...new Set([...cids, ...ytLatest.keys()])];
-  const contents = new Map<string, { title: string; product: string; conversions: number; draft: string }>();
+  const contents = new Map<string, { title: string; product: string; conversions: number; draft: string; brief: any }>();
   if (allCids.length) {
     const { data: cs } = await client.from('mkt_content').select('id, title, brief, draft').in('id', allCids);
     for (const c of cs || []) {
@@ -94,7 +96,8 @@ export default async function DoLuongSection() {
         title: (c as any).title || '(không tên)',
         product: productOf(brief, (c as any).title, (c as any).draft),
         conversions: Number(brief.conversions) || 0,
-        draft: String((c as any).draft || '')
+        draft: String((c as any).draft || ''),
+        brief
       });
     }
   }
@@ -125,11 +128,14 @@ export default async function DoLuongSection() {
   const rows = cids
     .map((cid) => {
       const m = latest.get(cid) || {};
-      const c = contents.get(cid) || { title: '(không rõ)', product: 'Khác', conversions: 0, draft: '' };
+      const c = contents.get(cid) || { title: '(không rõ)', product: 'Khác', conversions: 0, draft: '', brief: {} };
       const reactions = m.reactions || 0;
       const comments = m.comments || 0;
       const shares = m.shares || 0;
-      return { cid, title: c.title, product: c.product, draft: c.draft, url: postUrl.get(cid) || '', reactions, comments, shares, engagement: reactions + comments + shares, views: m.views, reach: m.reach, watchSec: m.watchSec, conversions: c.conversions };
+      const url = postUrl.get(cid) || '';
+      // Bài nằm trên PAGE KHÁC (nhập tay từ page không phải page hệ thống đang đăng) — user 22/8.
+      const otherPage = !!(isOtherPage as (u: string, b: any) => boolean)(url, c.brief);
+      return { cid, title: c.title, product: c.product, draft: c.draft, url, otherPage, reactions, comments, shares, engagement: reactions + comments + shares, views: m.views, reach: m.reach, watchSec: m.watchSec, conversions: c.conversions };
     })
     .sort((a, b) => b.engagement - a.engagement);
 
@@ -259,7 +265,10 @@ export default async function DoLuongSection() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.cid}>
-                    <td className="cell-title"><PostTitle title={r.title} product={r.product} draft={r.draft} url={r.url} /></td>
+                    <td className="cell-title">
+                      <PostTitle title={r.title} product={r.product} draft={r.draft} url={r.url} />
+                      {r.otherPage ? <span className="badge tone-demo" style={{ marginLeft: 6 }} title={OTHER_PAGE_HINT as string}>{OTHER_PAGE_LABEL as string}</span> : null}
+                    </td>
                     <td>{r.product}</td>
                     <td><b>{r.engagement}</b></td>
                     <td>{r.views == null ? '—' : fmt(r.views)}</td>

@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-21
 ttl_days: 90
+<!-- re-verified: 2026-08-22 12:30 - NGUYEN TAC BOSS user chot 22/8 (sua NV4/NV5 hanh vi): ban tuan lay DO LUONG TUAN VUA XONG (khong 7 ngay truot); so lieu ngay chi DICH trong so +-0.5/toi (dampWeights), khong lat ke hoach tuan; huong di A/B giu nguyen. Bai page khac gan nhan o Do luong (khong loai khoi xep hang — user chi yeu cau ghi chu). -->
 <!-- re-verified: 2026-08-21 19:55 - Edge fallback voice -> HoaiMy (nu) — khong doi flow NV. -->
 <!-- re-verified: 2026-08-21 19:20 - Giong video default Leda (nu) + outro doc chung canh cuoi (chi tiet marketing.md) — khong doi flow NV. -->
 <!-- re-verified: 2026-08-21 17:05 - Gemini TTS du phong 3 model noi tiep chong can han muc ngay (chi tiet marketing.md) — khong doi flow NV. -->

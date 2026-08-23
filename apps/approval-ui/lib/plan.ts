@@ -91,6 +91,11 @@ export type Plan = {
   products: PlanProduct[];
   weights: Record<string, number>; // product -> mức ưu tiên, cho /api/rotate
   narrative: string[];
+  // v9 (22/8, user chốt nguyên tắc BOSS): bản tuần lấy số liệu TUẦN VỪA XONG (đo lường theo
+  // tuần -> kế hoạch tổng quát tuần sau); ghi rõ nguồn để /ke-hoach hiện. Số liệu NGÀY chỉ
+  // điều chỉnh dần qua applyLiveEvening (adjust_log ghi từng tối dịch bao nhiêu).
+  measurement_source?: string;
+  adjust_log?: Array<{ at: string; product: string; from: number; to: number; target: number }>;
   // v3 (18/8): mục tiêu tuần do người giao (app_config mkt_weekly_goal) tại thời điểm sinh bản này.
   goal?: string;
   // v3 (18/8): nhịp bản này — 'weekly' (Thứ 2, kế hoạch tuần), 'update' (Thứ 4, cập nhật lần 1),
@@ -307,14 +312,50 @@ export function vnDayStartIso(now: Date): string {
 // v2 (18/8/2026): thêm nguyên liệu tri thức (nội bộ + public) 7 ngày qua vào plan.summary.knowledge.
 // v3 (18/8/2026): mỗi bản TỰ KÈM hướng đi (content_suggestions, chỉ đạo cho AI Creator) qua
 // Gemini — lỗi LLM không đánh hỏng bản kế hoạch, chỉ thiếu hướng đi (chạy tay bù sau).
+// Đổi báo cáo TUẦN (week-report, T2..CN) sang dạng Measurement cho buildPlan. Dùng cho bản
+// kế hoạch tuần (thứ 2): nguyên tắc user 22/8 — đo lường THEO TUẦN quyết định kế hoạch tổng
+// quát tuần sau, không lấy 7 ngày trượt lẫn lộn hai tuần.
+export async function loadMeasurementFromWeekReport(client: Client, weekOffset: number, now: Date = new Date()): Promise<{ m: Measurement; label: string } | null> {
+  try {
+    const { buildWeekReport } = await import('./week-report');
+    const report = await buildWeekReport(client, weekOffset, now);
+    if (!report || !report.totals.posts) return null;
+    const products: ProductAgg[] = report.byProduct.map((p) => ({
+      product: p.product,
+      count: p.count,
+      engagement: p.totalEng,
+      conversions: p.conversions,
+      avgEng: p.avgEng,
+      avgConv: p.count ? Math.round((p.conversions / p.count) * 10) / 10 : 0,
+    }));
+    const m: Measurement = {
+      products,
+      totals: { posts: report.totals.posts, engagement: report.totals.engagement, conversions: report.totals.conversions },
+      topPosts: report.topPosts.map((t) => ({ title: t.title, product: t.product, engagement: t.m.engagement })),
+    };
+    const w: any = report.window || {};
+    const label = w.label ? `tuần ${w.label}` : `tuần ${String(w.start || w.startIso || '').slice(0, 10)} tới ${String(w.end || w.endIso || '').slice(0, 10)}`;
+    return { m, label };
+  } catch {
+    return null;
+  }
+}
+
 export async function generateAndStorePlan(
   client: Client,
   generatedBy: 'cron' | 'manual',
   opts: { cadence?: 'weekly' | 'update' } = {}
 ): Promise<{ id: string | null; plan: Plan }> {
   const now = new Date();
+  // Bản TUẦN (thứ 2): số liệu = báo cáo TUẦN VỪA XONG. Bản cập nhật/tay: 7 ngày gần nhất.
+  let measurementSource = '7 ngày gần nhất';
+  let weeklyMeasurement: Measurement | null = null;
+  if (opts.cadence === 'weekly') {
+    const r = await loadMeasurementFromWeekReport(client, -1, now);
+    if (r) { weeklyMeasurement = r.m; measurementSource = `đo lường ${r.label} (tuần vừa xong)`; }
+  }
   const [measurement, knowledge, goalRes, focusRes] = await Promise.all([
-    loadMeasurement(client),
+    weeklyMeasurement ? Promise.resolve(weeklyMeasurement) : loadMeasurement(client),
     loadRecentKnowledge(client, 7, 30),
     client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
     client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle(),
@@ -348,6 +389,8 @@ export async function generateAndStorePlan(
     goal: goal || undefined,
   });
   plan.cadence = opts.cadence || (generatedBy === 'manual' ? 'manual' : undefined);
+  plan.measurement_source = measurementSource;
+  plan.narrative = [`Nguồn số liệu của bản này: ${measurementSource}. Số liệu từng ngày chỉ điều chỉnh dần trọng số mỗi tối (tối đa 0,5 điểm), không thay kế hoạch tuần.`, ...plan.narrative];
 
   // Chỉ đạo cho AI Creator: sinh hướng đi từ chính tri thức vừa nạp. Lỗi -> bản kế hoạch
   // vẫn lưu, hướng đi trống (chạy tay scripts/generate-plan-directions.mjs bù).
