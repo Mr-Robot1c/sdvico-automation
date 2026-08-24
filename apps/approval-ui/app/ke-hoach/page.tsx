@@ -191,26 +191,16 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           <p className="sub">
             Chủ nhật 19h BOSS học số liệu tuần, Thứ 2 8h ra kế hoạch tuần, mỗi tối 19h điều chỉnh nhẹ theo số liệu từng ngày. Bài vẫn chờ người bấm Duyệt mới đăng.
           </p>
-          {appliedRow ? (
-            <p className="sub" style={{ margin: '4px 0 0' }}>
-              <b>📋 Đang áp:</b> {appliedRow.data?.cadence || 'manual'} · {suggestions.length} hướng
-              {focusActive ? <> · focus <b>{focusGroups.join(' + ')}</b></> : null}
-              {fmtGenAt ? <> · {fmtGenAt}</> : null}
-            </p>
-          ) : null}
+          {/* Thong tin "Dang ap" da chuyen xuong banner rieng ngay duoi header. */}
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* 24/8: nut "Ap dung de xuat" (learn-weekly) + "Go ap dung" len header — truoc o
-              giua/cuoi trang, user "chua chi" phai keo xuong. */}
+          {/* Nut "Ap dung de xuat moi" giu o header (learn-weekly hiem hoi, khi co thi user
+              se muon bam ngay). "Go ap dung" da chuyen xuong banner "Ban dang ap" ngay
+              duoi header — hop cum, thay ngay khi keo top of page. */}
           {learnSuggestion ? (
             <form action={applyPlanWeights} title={`Đề xuất cuối tuần từ số liệu — sinh ${fmtDateTime(learnSuggestion.created_at)}`}>
               <input type="hidden" name="plan_id" value={learnSuggestion.id} />
               <button className="btn ok" type="submit">🧪 Áp dụng đề xuất mới</button>
-            </form>
-          ) : null}
-          {appliedRow ? (
-            <form action={clearPlanWeights} title="Gỡ bản đang áp — vòng xoay sẽ chạy random, không theo trọng số/hướng đi">
-              <button className="btn ghost" type="submit">Gỡ áp dụng</button>
             </form>
           ) : null}
           <GenerateButton action={generatePlanNow} />
@@ -218,6 +208,34 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       </header>
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
+
+      {/* ===== BẢN ĐANG ÁP — banner LÊN DÀU (user 24/8 nhac 3 lan: "dem cai ap dung len dau",
+          "sao m ngu qua vay"). Truoc nam trong <details> cuoi trang, phai keo xuong. ===== */}
+      {appliedRow ? (
+        <section className="plan-card" style={{ borderLeft: '6px solid var(--ok, #1a9e6f)', marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <b style={{ fontSize: '1.02rem' }}>📋 Bản đang áp</b>
+                <span className="badge tone-ok">✓ Đang áp</span>
+                <span className="badge">{appliedRow.generated_by === 'cron' ? '🤖 Tự động' : '✍️ Tạo tay'}</span>
+                {appliedRow.data.cadence === 'weekly' ? <span className="badge">📅 Tuần</span>
+                  : appliedRow.data.cadence === 'update' ? <span className="badge">🔁 Cập nhật</span> : null}
+                <span className="sub">Sinh {fmtDateTime(appliedRow.created_at)} · {suggestions.length} hướng</span>
+              </div>
+              {appliedRow.data.goal ? (
+                <p style={{ margin: '8px 0 4px' }}><b>Mục tiêu:</b> {appliedRow.data.goal.split('\n')[0]}</p>
+              ) : null}
+              <p className="sub" style={{ margin: '4px 0 0' }}>
+                Chi tiết bảng sản phẩm, tri thức đã đọc, nhật ký chỉnh dần: xem tab <a className="src" href="/kho-tri-thuc?ai=boss">AI Kế hoạch</a>.
+              </p>
+            </div>
+            <form action={clearPlanWeights} title="Gỡ bản đang áp — vòng xoay sẽ chạy random, không theo trọng số/hướng đi">
+              <button className="btn ghost" type="submit">Gỡ áp dụng</button>
+            </form>
+          </div>
+        </section>
+      ) : null}
 
       {/* ===== CÀI ĐẶT TUẦN — gộp Mục tiêu + Focus + Nhóm chia sẻ vào 1 khối grid (24/8:
           user "rối và không đồng nhất, kéo lên kéo xuống"). Trước là 3 khối tách nhau. ===== */}
@@ -369,12 +387,19 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                       </span>
                       <span aria-hidden="true" style={{ color: 'var(--ink-2)' }}>▾</span>
                     </summary>
-                    {/* 24/8 refactor: 4 day-block xep doc chiem ~240px -> bang compact 3 cot
-                        (Khung gio / Noi dung / Kenh) — cao ~120px, doc theo cot de scan nhanh.
-                        Insight: hom nay = insight_line THAT tu bai rotation da sinh (brief);
+                    {/* 24/8 refactor: 4 day-block xep doc chiem ~240px -> bang datatable 3 cot
+                        (Khung gio / Noi dung / Kenh) co thead giong bang "Ke hoach tuan" o tren
+                        cho dong bo. Insight: hom nay = insight_line THAT tu bai rotation da sinh;
                         ngay khac = placeholder "may chon 1 insight chua dung". */}
                     <div className="tuan-day-body">
                       <table className="datatable dir-table" style={{ margin: 0 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ width: 130 }}>Khung giờ</th>
+                            <th>Nội dung</th>
+                            <th style={{ width: 240 }}>Kênh đăng</th>
+                          </tr>
+                        </thead>
                         <tbody>
                           <tr>
                             <td style={{ whiteSpace: 'nowrap', width: 130 }}><b>🕗 7h — Bản A</b><div className="sub">bài bán</div></td>
@@ -457,14 +482,13 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </section>
       ) : null}
 
-      {/* ===== 5. Ban ke hoach hien tai + lich su (gon 24/8) =====
-          Bang san pham day du + tri thuc + adjust log da chuyen sang tab "AI Ke hoach" o
-          /kho-tri-thuc?ai=boss (khong lap thong tin). O day chi giu: badge nhan dang ban dang
-          ap, mo/gac ap dung, va lich su 3 ban gan nhat (con lai gap vao summary phu). */}
+      {/* ===== LICH SU CAC BAN (gon 24/8) — Ban dang ap chuyen len banner tren dau; day chi
+          con lich su cac ban cu de xem lai / xoa. Bang san pham day du + tri thuc + adjust
+          log o tab "AI Ke hoach" (/kho-tri-thuc?ai=boss). ===== */}
       <details className="plan-card" open={!!viewing}>
         <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1.02rem' }}>
-          📋 Bản đang áp và lịch sử
-          {appliedRow ? <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>{fmtDateTime(appliedRow.created_at)}</span> : null}
+          📚 Lịch sử các bản kế hoạch
+          <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>{vnInt(planRows.length)} bản</span>
         </summary>
 
         {!latest ? (
@@ -473,34 +497,16 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           <div style={{ marginTop: 12 }}>
             {viewing ? (
               <p className="err" role="status">
-                Đang xem lại bản cũ sinh lúc {fmtDateTime(viewing.created_at)}. <a href="/ke-hoach">Về bản mới nhất</a>
+                Đang xem lại bản cũ sinh lúc {fmtDateTime(viewing.created_at)}.{' '}
+                {!viewing.applied ? (
+                  <form action={applyPlanWeights} style={{ display: 'inline-block', marginLeft: 8 }}>
+                    <input type="hidden" name="plan_id" value={viewing.id} />
+                    <button className="btn ok sm" type="submit">Áp dụng bản này</button>
+                  </form>
+                ) : null}
+                {' '}<a href="/ke-hoach">Về bản mới nhất</a>
               </p>
             ) : null}
-            <div className="plan-meta">
-              <span className="badge">{latest.generated_by === 'cron' ? '🤖 Tự động' : '✍️ Tạo tay'}</span>
-              {latest.data.cadence === 'weekly' ? <span className="badge">📅 Kế hoạch tuần</span>
-                : latest.data.cadence === 'update' ? <span className="badge">🔁 Cập nhật</span> : null}
-              <span className="sub">Sinh {fmtDateTime(latest.created_at)}</span>
-              {latest.applied ? <span className="badge tone-ok">✓ Đang áp</span> : null}
-            </div>
-
-            {latest.data.goal ? (
-              <p style={{ margin: '8px 0 4px' }}><b>Mục tiêu:</b> {latest.data.goal.split('\n')[0]}</p>
-            ) : null}
-            <p className="sub" style={{ margin: '4px 0 6px' }}>
-              Chi tiết bảng sản phẩm, tri thức đã đọc, nhật ký chỉnh dần: xem tab <a className="src" href="/kho-tri-thuc?ai=boss">AI Kế hoạch</a>.
-            </p>
-
-            <div className="plan-actions" style={{ display: 'flex', gap: 8, margin: '10px 0' }}>
-              {latest.applied ? (
-                <form action={clearPlanWeights}><button className="btn ghost" type="submit">Gỡ áp dụng</button></form>
-              ) : (
-                <form action={applyPlanWeights}>
-                  <input type="hidden" name="plan_id" value={latest.id} />
-                  <button className="btn ok" type="submit">Áp dụng trọng số</button>
-                </form>
-              )}
-            </div>
 
             {history.length ? (
               <>
