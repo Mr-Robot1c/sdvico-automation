@@ -28,7 +28,7 @@ type KnowledgeInput = {
   publicSrc: Array<{ source_title: string | null; summary: string; source_url: string; needs_gov_review: boolean }>;
 };
 
-async function callGemini(prompt: string): Promise<string> {
+async function callGemini(prompt: string, temperature = 0.5): Promise<string> {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   let lastErr = '';
@@ -37,7 +37,7 @@ async function callGemini(prompt: string): Promise<string> {
       const res = await ai.models.generateContent({
         model,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { responseMimeType: 'application/json', temperature: 0.5 },
+        config: { responseMimeType: 'application/json', temperature },
       });
       return res.text || '';
     } catch (e: any) {
@@ -66,6 +66,13 @@ export async function generateContentDirections(
     ...knowledge.publicSrc.map((k, i) => `${i + 1}. ${k.source_title || ''}${k.needs_gov_review ? ' [can duyet QL]' : ''}\n   ${k.summary}\n   Nguon: ${k.source_url}`),
   ].join('\n');
 
+  // CẤM TRÙNG (user 24/8 gắt: "TAO BAO MAY LA KHONG DUOC TRUNG LAI"): liệt kê các hướng
+  // đã có (bài đã đăng + hướng trong plan đang áp) để Gemini tránh sinh na ná. avoidTitles
+  // trước đây KHAI BÁO nhưng KHÔNG chèn vào prompt (bug) -> Gemini sinh lại y hệt mỗi lần.
+  const avoidBlock = avoidTitles.length
+    ? `\nCÁC HƯỚNG ĐÃ CÓ (TUYỆT ĐỐI KHÔNG lặp lại, không viết na ná, không đổi vài chữ):\n${avoidTitles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n`
+    : '';
+
   const prompt = `Bạn là chuyên gia marketing cho SDVICO, công ty phân phối thiết bị cho ngư dân và tàu cá Việt Nam.
 
 ${goal
@@ -76,8 +83,8 @@ ${PRODUCTS.map((p) => '- ' + p).join('\n')}
 
 Nguyên liệu tri thức tuần này:
 ${knowledgeBlock}
-
-Nhiệm vụ: dựa vào NHỮNG GÌ ĐANG XẢY RA (tri thức trên), đề xuất 5-7 hướng bài đăng cụ thể cho tuần tới trên Facebook/TikTok của SDVICO. Mỗi hướng phải:
+${avoidBlock}
+Nhiệm vụ: dựa vào NHỮNG GÌ ĐANG XẢY RA (tri thức trên), đề xuất 7 hướng bài đăng cụ thể cho tuần tới trên Facebook/TikTok của SDVICO. Mỗi hướng phải:
 - Bám vào một nguồn tri thức thật (nói rõ dựa vào mục nội bộ số N hay public số N)
 - Gọi tên một sản phẩm cụ thể trong danh mục, không nói chung chung
 - Cho biết loại bài (checklist / hỏi đáp / mẹo / chia sẻ / tin ngành)
@@ -85,13 +92,18 @@ Nhiệm vụ: dựa vào NHỮNG GÌ ĐANG XẢY RA (tri thức trên), đề xu
 - Nếu tri thức gốc có cờ "cần duyệt QL" thì bài theo hướng này cũng có "needs_gov_review: true"
 - Nếu có kết luận đánh giá A/B vòng trước, ưu tiên cách viết của bản thắng
 
+QUY TẮC CHỐNG TRÙNG (BẮT BUỘC):
+- Mỗi hướng phải xoáy vào MỘT nỗi lo / góc nhìn KHÁC NHAU của bà con. Ví dụ với cùng máy lọc dầu: một hướng về tiết kiệm tiền dầu, một hướng về máy bền đỡ hỏng giữa biển, một hướng về lắp đặt tận nơi — KHÔNG được 3 hướng đều nói "lắp đặt lọc dầu".
+- KHÔNG được có 2 hướng cùng sản phẩm mà thông điệp na ná nhau. Nếu 2 sản phẩm tập trung, chia đều mỗi sản phẩm vài góc khác biệt.
+- Tránh mọi tiêu đề trùng hoặc gần giống "CÁC HƯỚNG ĐÃ CÓ" ở trên.
+
 Văn phong: câu ngắn, gần gũi bà con ngư dân, KHÔNG dùng gạch dài, KHÔNG dùng mũi tên, số theo chuẩn Việt Nam. BẮT BUỘC viết tiếng Việt CÓ DẤU đầy đủ trong mọi trường (title, why, product), tuyệt đối không viết không dấu.
 
 Trả JSON đúng dạng, không thêm chữ ngoài JSON:
 {
   "directions": [
     {
-      "title": "Tiêu đề gợi ý (5-10 chữ, tiếng Việt có dấu)",
+      "title": "Tiêu đề gợi ý (5-10 chữ, tiếng Việt có dấu, mỗi hướng một góc khác biệt)",
       "why": "1-2 câu giải thích tại sao tuần này nên đăng chủ đề này, dựa vào tri thức nào (có dấu)",
       "product": "Tên sản phẩm chính xác trong danh mục",
       "kind": "checklist|qa|tip|engage|glossary|news",
@@ -101,7 +113,9 @@ Trả JSON đúng dạng, không thêm chữ ngoài JSON:
   ]
 }`;
 
-  const text = await callGemini(prompt);
+  // temperature cao hơn (0.85) cho hướng đi ĐA DẠNG hơn giữa các lần sinh (user: "sinh lại
+  // mà y hệt"). 0.5 quá thấp -> Gemini hội tụ về cùng output với input giống nhau.
+  const text = await callGemini(prompt, 0.85);
   const m = text.match(/\{[\s\S]*\}/);
   if (!m) throw new Error('Khong parse duoc JSON directions.');
   const parsed = JSON.parse(m[0]);

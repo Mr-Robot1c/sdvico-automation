@@ -267,17 +267,25 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
 // dau kip chuyen bien" trùng ý hướng vừa chạy hôm trước, dedupe theo title không bắt được).
 export async function loadRecentDirectionTitles(client: Client): Promise<string[]> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const { data } = await client
+  // 1. Tiêu đề hướng đi của các bài ĐÃ ĐĂNG 7 ngày qua.
+  const { data: posted } = await client
     .from('mkt_content')
     .select('brief')
     .gte('created_at', sevenDaysAgo)
     .eq('brief->>generator', 'rotation')
     .limit(100);
-  return [...new Set(
-    (data || [])
-      .map((r: any) => String(r.brief?.suggestion_title || '').trim())
-      .filter(Boolean)
-  )].slice(0, 20);
+  const postedTitles = (posted || [])
+    .map((r: any) => String(r.brief?.suggestion_title || '').trim())
+    .filter(Boolean);
+  // 2. 24/8 (user "KHONG DUOC TRUNG"): CẢ hướng trong plan ĐANG ÁP (chưa đăng) — trước đây
+  //    thiếu nên regen sinh lại y hệt 12 hướng của chính plan đang áp. Gộp vào avoidTitles.
+  const { data: applied } = await client
+    .from('mkt_plans').select('data').eq('applied', true)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const planTitles: string[] = Array.isArray((applied as any)?.data?.content_suggestions)
+    ? (applied as any).data.content_suggestions.map((s: any) => String(s.title || '').trim()).filter(Boolean)
+    : [];
+  return [...new Set([...planTitles, ...postedTitles])].slice(0, 30);
 }
 
 // Thứ 4 (3) hoặc chủ nhật (0) theo giờ Việt Nam. Nhịp CŨ, giữ cho tương thích chỗ khác gọi.
