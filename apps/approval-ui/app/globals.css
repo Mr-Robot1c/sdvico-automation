@@ -840,6 +840,20 @@ a.chip:hover { filter: brightness(0.98); }
   font-family: inherit; font-size: 0.92rem; line-height: 1.5; min-height: 88px;
 }
 
+/* CTA gop cua Cai dat tuan (/ke-hoach 24/8, user "hint kho nhin, lam cho no dep"):
+   nut 'Luu & sinh ke hoach moi' cung dong voi caption phu, nen mo nhat de tach hàng
+   truc quan voi cac field o tren. */
+.settings-cta {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  margin-top: 14px; padding: 10px 14px;
+  background: var(--surface-2); border: 1px dashed var(--line); border-radius: 10px;
+}
+.settings-cta .sub { flex: 1 1 220px; min-width: 0; }
+@media (max-width: 560px) {
+  .settings-cta { flex-direction: column; align-items: stretch; }
+  .settings-cta .btn { align-self: flex-start; }
+}
+
 /* Hang HOM NAY trong bang lich tuan (/ke-hoach). Dung bien theme (truoc dung inline
    #f0f6ff sang -> dark mode chu trang nen trang, khong doc duoc - user bao 20/8). */
 .row-today td { background: var(--surface-2); }

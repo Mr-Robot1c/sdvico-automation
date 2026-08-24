@@ -242,27 +242,22 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           bam la sinh plan moi -> 2 plan trong 30s. Gio 1 form voi 2 field, 1 nut =
           1 plan. Nhom chia se van hien inline (khong sua o day, xu ly o /noi-dung). ===== */}
       <section className="plan-card" style={{ marginBottom: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'baseline', marginBottom: 6 }}>
-          <b style={{ fontSize: '1.02rem' }}>⚙️ Cài đặt tuần</b>
-          <span className="sub">Đổi Mục tiêu hoặc Sản phẩm tập trung → bấm nút xanh → máy TỰ sinh kế hoạch mới + áp NGAY</span>
-        </div>
+        <b style={{ fontSize: '1.02rem', display: 'block', marginBottom: 10 }}>⚙️ Cài đặt tuần</b>
         <form action={saveGoalFocusAndRegenerate}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
             <label className="goal-form">
-              <b>🎯 Mục tiêu tuần</b>
-              <textarea name="goal_text" defaultValue={goalText} rows={2} placeholder="Ví dụ: ưu tiên lọc dầu SF-50, cần 20 cuộc gọi về tổng đài." />
-              <span className="sub" style={{ display: 'block', marginTop: 4 }}>Câu ngắn giao cho BOSS — sẽ đưa vào prompt sinh hướng đi.</span>
+              <b title="Câu ngắn bạn giao cho BOSS — sẽ được đưa vào prompt sinh hướng đi bài viết.">🎯 Mục tiêu tuần</b>
+              <textarea name="goal_text" defaultValue={goalText} rows={2} placeholder="Ví dụ: tuần này ưu tiên lọc dầu SF-50, cần 20 cuộc gọi." />
             </label>
             <label className="goal-form">
-              <b>🎯 Chỉ đăng sản phẩm này</b>
+              <b title="Máy chỉ đăng các sản phẩm liệt kê ở đây, sản phẩm khác bị chặn hoàn toàn.">🎯 Chỉ đăng sản phẩm này</b>
               <input name="focus_groups" defaultValue={focusGroups.join(', ')} placeholder="lọc dầu, lọc nước" />
               <span className="sub" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                 đến hết <input type="date" name="focus_until" defaultValue={focusUntil} style={{ maxWidth: 150 }} />
               </span>
-              <span className="sub" style={{ display: 'block', marginTop: 4 }}>Máy CHỈ đăng SP này — SP khác bị chặn hoàn toàn (rotate + plan).</span>
             </label>
             <div>
-              <b>👥 Nhóm chia sẻ Facebook</b>
+              <b title="Nhóm Facebook mà bạn sẽ chia sẻ bài đã duyệt vào (chia sẻ tay). Sửa danh sách này ở trang Quản lý bài viết.">👥 Nhóm chia sẻ Facebook</b>
               <div className="sub" style={{ marginTop: 4 }}>
                 {shareGroups.length} nhóm — sửa ở <a href="/noi-dung">Quản lý bài viết</a>
               </div>
@@ -275,9 +270,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
+          <div className="settings-cta">
             <button className="btn ok" type="submit">💾 Lưu & sinh kế hoạch mới</button>
-            <span className="sub">→ Kế hoạch cũ bị thay ngay bằng bản mới bám mục tiêu/tập trung vừa nhập.</span>
+            <span className="sub">Sau khi lưu, kế hoạch tuần được sinh lại và áp ngay theo mục tiêu + tập trung ở trên.</span>
           </div>
         </form>
         {(() => {
