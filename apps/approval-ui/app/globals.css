@@ -1245,3 +1245,8 @@ a.chip:hover { filter: brightness(0.98); }
 .ai-stat b { display: block; font-size: 1.15rem; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .ai-stat span { font-size: .72rem; color: var(--ink-2); }
 .ai-foot { font-size: .8rem; color: var(--ink-2); line-height: 1.4; }
+
+/* Bảng Hướng đi bài viết — cột ngày hẹp, sản phẩm max-width, không tràn (24/8). */
+.dir-table th, .dir-table td { padding: 8px 10px; }
+.dir-table .cell-title b { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.dir-table td.sub { color: var(--ink-2); font-size: .85rem; }

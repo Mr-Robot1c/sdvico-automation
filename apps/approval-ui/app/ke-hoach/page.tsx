@@ -329,43 +329,58 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </section>
       ) : null}
 
-      {/* ===== 3. HUONG DI BAI VIET ===== */}
+      {/* ===== 3. HUONG DI BAI VIET — bang gon (user 24/8: list roi mat) ===== */}
       {suggestions.length ? (
         <section className="plan-card" style={{ marginBottom: 14 }}>
-          <b style={{ fontSize: '1.05rem' }}>🧭 Hướng đi bài viết ({vnInt(sugFresh.filter((s) => !(s as any).pending_variant).length)} chưa dùng, {vnInt(sugFresh.filter((s) => (s as any).pending_variant).length)} đang thử, {vnInt(sugUsed.length)} xong cặp{sugRejected.length ? `, ${vnInt(sugRejected.length)} đã loại` : ''})</b>
-          {fmtGenAt ? (
-            <p className="sub" style={{ margin: '2px 0 0' }}>
-              Bản kế hoạch đang áp tạo lúc <b>{fmtGenAt}</b>{sugNew.length ? <> — có <b>{vnInt(sugNew.length)} hướng mới ✨</b>, các hướng cũ chưa dùng được giữ lại chạy trước</> : null}.
-            </p>
-          ) : null}
-          <p className="sub" style={{ margin: '4px 0 8px' }}>
-            Xếp theo thứ tự lịch tuần bên trên. Mỗi hướng chạy trong một ngày: bản thử A ra 7h sáng, bản B ra 12h30 chiều; đủ cặp thì Evaluator so xem bản nào ăn hơn.
-          </p>
-          <ul className="directions-list" style={{ margin: 0 }}>
-            {orderedSuggestions.map((d, i) => (
-              <li key={i} className="direction-item" style={d.used_at ? { opacity: 0.55 } : undefined}>
-                <div className="direction-head">
-                  <b>{d.title}</b>
-                  {!d.used_at && schedOrder.has(sugKeyOf(d)) ? (
-                    <span className="badge" style={{ marginLeft: 8 }} title="Ngày lịch tuần xếp chạy hướng này">📅 {schedOrder.get(sugKeyOf(d))!.dow} {fmtDate(schedOrder.get(sugKeyOf(d))!.date)}</span>
-                  ) : null}
-                  {!d.used_at && (d as any).carried !== true && !(d as any).pending_variant ? (
-                    <span className="badge tone-ok" style={{ marginLeft: 8 }} title="Hướng mới của bản kế hoạch đang áp.">✨ mới</span>
-                  ) : null}
-                  <span className="badge tone-default" style={{ marginLeft: 8 }}>{d.product}</span>
-                  {d.used_at
-                    ? ((d as any).rejected === true
-                      ? <span className="badge tone-no" style={{ marginLeft: 6 }} title="Bản thử của hướng này bị từ chối nên hướng bị loại, không sinh tiếp bản B.">⛔ đã loại (bản thử bị từ chối)</span>
-                      : <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ xong cặp A + B</span>)
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
+            <b style={{ fontSize: '1.05rem' }}>🧭 Hướng đi bài viết</b>
+            <span className="sub">
+              {vnInt(sugFresh.filter((s) => !(s as any).pending_variant).length)} chưa dùng · {vnInt(sugFresh.filter((s) => (s as any).pending_variant).length)} đang thử · {vnInt(sugUsed.length)} xong{sugRejected.length ? ` · ${vnInt(sugRejected.length)} đã loại` : ''}
+              {sugNew.length ? <> · <b>{vnInt(sugNew.length)} mới ✨</b></> : null}
+            </span>
+          </div>
+          <div className="tablewrap" style={{ marginTop: 10 }}>
+            <table className="datatable dir-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 90 }}>Ngày</th>
+                  <th>Hướng đi</th>
+                  <th>Sản phẩm</th>
+                  <th style={{ width: 130 }}>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderedSuggestions.map((d, i) => {
+                  const day = schedOrder.get(sugKeyOf(d));
+                  const status = (d as any).rejected === true
+                    ? { text: '⛔ đã loại', tone: 'no' }
+                    : d.used_at
+                    ? { text: '✓ xong cặp', tone: 'ok' }
                     : (d as any).pending_variant
-                      ? <span className="badge" style={{ marginLeft: 6 }}>🧪 đã ra bản A, chờ bản B</span>
-                      : null}
-                  {d.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️ cần duyệt QL</span> : null}
-                </div>
-                <p className="sub" style={{ margin: '2px 0 0' }}>{d.why}</p>
-              </li>
-            ))}
-          </ul>
+                    ? { text: '🧪 chờ B', tone: 'demo' }
+                    : (d as any).carried !== true
+                    ? { text: '✨ mới', tone: 'ok' }
+                    : { text: 'Chờ chạy', tone: 'default' };
+                  return (
+                    <tr key={i} style={d.used_at ? { opacity: 0.6 } : undefined} title={d.why || ''}>
+                      <td className="sub" style={{ whiteSpace: 'nowrap' }}>
+                        {day ? <span className="badge">{day.dow.replace('Chủ nhật', 'CN').replace('Thứ ', 'T')} {fmtDate(day.date).slice(0, 5)}</span> : <span className="muted">—</span>}
+                      </td>
+                      <td className="cell-title">
+                        <b>{d.title}</b>
+                        {d.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️ QL</span> : null}
+                      </td>
+                      <td className="sub">{d.product}</td>
+                      <td><span className={`badge tone-${status.tone}`}>{status.text}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="sub" style={{ margin: '8px 0 0' }}>
+            Xếp theo lịch tuần. Mỗi hướng chạy 1 ngày: bản A ra 7h, bản B ra 12h30; đủ cặp thì Evaluator so bản nào ăn hơn. Rê chuột vào dòng để đọc lý do BOSS chọn.
+          </p>
         </section>
       ) : null}
 
@@ -462,11 +477,14 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </div>
       </details>
 
-      {/* ===== 5. Chi tiet + lich su (giau) ===== */}
+      {/* ===== 5. Ban ke hoach hien tai + lich su (gon 24/8) =====
+          Bang san pham day du + tri thuc + adjust log da chuyen sang tab "AI Ke hoach" o
+          /kho-tri-thuc?ai=boss (khong lap thong tin). O day chi giu: badge nhan dang ban dang
+          ap, mo/gac ap dung, va lich su 3 ban gan nhat (con lai gap vao summary phu). */}
       <details className="plan-card" open={!!viewing}>
         <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1.02rem' }}>
-          📋 Bản kế hoạch đầy đủ và lịch sử
-          {appliedRow ? <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>đang áp bản {fmtDateTime(appliedRow.created_at)}</span> : null}
+          📋 Bản đang áp và lịch sử
+          {appliedRow ? <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>{fmtDateTime(appliedRow.created_at)}</span> : null}
         </summary>
 
         {!latest ? (
@@ -480,20 +498,17 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             ) : null}
             <div className="plan-meta">
               <span className="badge">{latest.generated_by === 'cron' ? '🤖 Tự động' : '✍️ Tạo tay'}</span>
-              {latest.data.cadence === 'weekly' ? <span className="badge">📅 Kế hoạch tuần (Thứ 2)</span>
+              {latest.data.cadence === 'weekly' ? <span className="badge">📅 Kế hoạch tuần</span>
                 : latest.data.cadence === 'update' ? <span className="badge">🔁 Cập nhật</span> : null}
-              <span className="sub">Sinh lúc {fmtDateTime(latest.created_at)}</span>
-              {latest.applied ? <span className="badge tone-ok">✓ Đang áp dụng</span> : null}
+              <span className="sub">Sinh {fmtDateTime(latest.created_at)}</span>
+              {latest.applied ? <span className="badge tone-ok">✓ Đang áp</span> : null}
             </div>
 
-            {/* Gọn (user 20/8: "kế hoạch lộn xộn quá"): bỏ các đoạn văn mẫu dài — thông tin
-                chính đã nằm ở các khối phía trên. Chỉ giữ mục tiêu + 1 dòng số liệu. */}
             {latest.data.goal ? (
               <p style={{ margin: '8px 0 4px' }}><b>Mục tiêu:</b> {latest.data.goal.split('\n')[0]}</p>
             ) : null}
-            <p className="sub" style={{ margin: '4px 0 8px' }}>
-              {vnInt(latest.data.summary?.totalPosts || 0)} bài có số liệu · {vnInt(latest.data.summary?.totalEngagement || 0)} tương tác · {vnInt(latest.data.summary?.totalConversions || 0)} đơn/lead
-              {latest.data.summary?.knowledge ? ` · đã học ${vnInt(latest.data.summary.knowledge.internal)} nguồn nội bộ + ${vnInt(latest.data.summary.knowledge.publicSrc)} nguồn public` : ''}
+            <p className="sub" style={{ margin: '4px 0 6px' }}>
+              Chi tiết bảng sản phẩm, tri thức đã đọc, nhật ký chỉnh dần: xem tab <a className="src" href="/kho-tri-thuc?ai=boss">AI Kế hoạch</a>.
             </p>
 
             <div className="plan-actions" style={{ display: 'flex', gap: 8, margin: '10px 0' }}>
@@ -507,44 +522,17 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               )}
             </div>
 
-            {latest.data.products?.length ? (
-              <div className="tablewrap">
-                <table className="datatable">
-                  <thead>
-                    <tr><th>Sản phẩm</th><th className="center">Hướng</th><th className="num">Số bài</th><th className="num">Tương tác/bài</th><th className="num">Đơn/bài</th><th className="num">Bài/tuần</th></tr>
-                  </thead>
-                  <tbody>
-                    {latest.data.products.map((p) => {
-                      const t = TIER_LABEL[p.tier];
-                      return (
-                        <tr key={p.product}>
-                          <td>{p.product}</td>
-                          <td className="center"><span className={`badge ${t.cls}`}>{t.icon} {t.text}</span></td>
-                          <td className="num">{vnInt(p.count)}</td>
-                          <td className="num">{vnInt(p.avgEng)}</td>
-                          <td className="num">{p.avgConv > 0 ? vnDec1(p.avgConv) : '—'}</td>
-                          <td className="num"><b>{vnInt(p.postsPerWeek)}</b></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-
             {history.length ? (
               <>
-                <h3 style={{ margin: '16px 0 6px' }}>Lịch sử</h3>
+                <h3 style={{ margin: '14px 0 6px', fontSize: '.95rem', color: 'var(--ink-2)' }}>Lịch sử ({vnInt(history.length)} bản)</h3>
                 <div className="tablewrap">
                   <table className="datatable">
-                    <thead>
-                      <tr><th>Sinh lúc</th><th>Loại</th><th>Tuần</th><th className="center"></th></tr>
-                    </thead>
+                    <thead><tr><th>Sinh lúc</th><th>Loại</th><th>Tuần</th><th className="center"></th></tr></thead>
                     <tbody>
-                      {history.map((r) => (
+                      {history.slice(0, 3).map((r) => (
                         <tr key={r.id}>
                           <td><a href={`/ke-hoach?xem=${r.id}`}>{fmtDateTime(r.created_at)}</a></td>
-                          <td>{r.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}{r.applied ? ' · đang áp' : ''}</td>
+                          <td className="sub">{r.data?.cadence === 'weekly' ? 'Tuần' : r.data?.cadence === 'update' ? 'Cập nhật' : r.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}{r.applied ? ' · đang áp' : ''}</td>
                           <td className="sub">{r.period_start ? `${fmtDate(r.period_start)}–${fmtDate(r.period_end)}` : '—'}</td>
                           <td className="center">
                             <form action={deletePlan} style={{ display: 'inline' }}>
@@ -557,6 +545,30 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                     </tbody>
                   </table>
                 </div>
+                {history.length > 3 ? (
+                  <details style={{ marginTop: 8 }}>
+                    <summary className="sub" style={{ cursor: 'pointer' }}>Xem {vnInt(history.length - 3)} bản cũ hơn</summary>
+                    <div className="tablewrap" style={{ marginTop: 8 }}>
+                      <table className="datatable">
+                        <tbody>
+                          {history.slice(3).map((r) => (
+                            <tr key={r.id}>
+                              <td><a href={`/ke-hoach?xem=${r.id}`}>{fmtDateTime(r.created_at)}</a></td>
+                              <td className="sub">{r.data?.cadence === 'weekly' ? 'Tuần' : r.data?.cadence === 'update' ? 'Cập nhật' : r.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}</td>
+                              <td className="sub">{r.period_start ? `${fmtDate(r.period_start)}–${fmtDate(r.period_end)}` : '—'}</td>
+                              <td className="center">
+                                <form action={deletePlan} style={{ display: 'inline' }}>
+                                  <input type="hidden" name="plan_id" value={r.id} />
+                                  <button className="btn no sm" type="submit" aria-label="Xóa kế hoạch">Xóa</button>
+                                </form>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                ) : null}
               </>
             ) : null}
           </div>
