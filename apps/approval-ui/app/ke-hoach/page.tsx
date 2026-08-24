@@ -157,6 +157,23 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   // dong chan doan focus). Section "Huong di bai viet" rieng da xoa 24/8 — chi tiet nam
   // trong lich 7 ngay + trang /kho-tri-thuc?ai=boss.
   const suggestions = appliedRow?.data?.content_suggestions || [];
+
+  // Insight_line THAT cua bai rotation HOM NAY (user 24/8: "insight ngay nao hien ngay do,
+  // dung hien ca 3"). Chi hom nay moi co bai da sinh (ngay mai tro di chua sinh); tuong lai
+  // hien "may chon 1 insight chua dung gan day" nhu cu.
+  const dayStartIsoInsight = new Date(new Date(today + 'T00:00:00+07:00')).toISOString();
+  const { data: todayRot } = await client
+    .from('mkt_content')
+    .select('brief, created_at')
+    .gte('created_at', dayStartIsoInsight)
+    .eq('brief->>generator', 'rotation')
+    .limit(20);
+  const insightsByVariant = new Map<'A' | 'B', string>();
+  for (const r of (todayRot || []) as any[]) {
+    const v: 'A' | 'B' = r.brief?.ab_variant === 'B' ? 'B' : 'A';
+    const line = String(r.brief?.insight_line || '').trim();
+    if (line && !insightsByVariant.has(v)) insightsByVariant.set(v, line);
+  }
   const appliedGeneratedAt = String(appliedRow?.data?.generatedAt || '');
   const fmtGenAt = (() => {
     const d = new Date(appliedGeneratedAt);
@@ -183,11 +200,17 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           ) : null}
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* 24/8: nut "Ap dung de xuat" (learn-weekly) len header — truoc o giua trang, user "chua chi" phai keo. */}
+          {/* 24/8: nut "Ap dung de xuat" (learn-weekly) + "Go ap dung" len header — truoc o
+              giua/cuoi trang, user "chua chi" phai keo xuong. */}
           {learnSuggestion ? (
             <form action={applyPlanWeights} title={`Đề xuất cuối tuần từ số liệu — sinh ${fmtDateTime(learnSuggestion.created_at)}`}>
               <input type="hidden" name="plan_id" value={learnSuggestion.id} />
               <button className="btn ok" type="submit">🧪 Áp dụng đề xuất mới</button>
+            </form>
+          ) : null}
+          {appliedRow ? (
+            <form action={clearPlanWeights} title="Gỡ bản đang áp — vòng xoay sẽ chạy random, không theo trọng số/hướng đi">
+              <button className="btn ghost" type="submit">Gỡ áp dụng</button>
             </form>
           ) : null}
           <GenerateButton action={generatePlanNow} />
@@ -321,54 +344,59 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
 
           {liveData.daily_schedule?.length ? (
             <div className="tuan-days">
-              <div className="tuan-days-head">
-                <span>Ngày</span>
-                <span>Hướng đi + bài bán (7h + 12h30)</span>
-                <span>Content 12h30</span>
-                <span>Nhóm chia sẻ</span>
-              </div>
+              {/* 24/8: BO header row 4 cot (user: "chu dinh lien khong cach, dai vo nghia").
+                  BO cac dong phu SP/content/nhom o summary — chi tiet da co trong bang khi bam
+                  expand, dup vao summary chi lam chat. Summary chi giu: ngay + huong di + badge. */}
               {liveData.daily_schedule.map((d) => {
                 const dayTitle = d.direction?.title || (d.sales.length ? d.sales.map((s) => s.product).join(' + ') : '—');
                 const kind = (d as any).contentKindLabel || 'Content';
                 const dayProduct = d.direction?.product || (d.sales[0]?.product || '—');
                 return (
                   <details key={d.date} className={`tuan-day ${d.date === today ? 'is-today' : ''}`}>
-                    <summary className="tuan-day-summary">
-                      <span className="tuan-col tuan-col-date">
+                    <summary className="tuan-day-summary" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', cursor: 'pointer', listStyle: 'none' }}>
+                      <span style={{ whiteSpace: 'nowrap', minWidth: 78 }}>
                         {d.date === today ? '👉 ' : ''}<b>{d.dow.replace('Chủ nhật', 'CN').replace('Thứ ', 'T')}</b> <span className="sub">{fmtDate(d.date).slice(0, 5)}</span>
                       </span>
-                      <span className="tuan-col tuan-col-huong">
+                      <span style={{ flex: 1, minWidth: 0 }}>
                         {d.direction ? (
                           <>
                             <b>{d.direction.title}</b>
-                            {d.direction.done ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ đã sinh</span> : null}
-                            <span className="sub" style={{ display: 'block', marginTop: 2 }}>{d.direction.product}{d.direction.variant === 'AB' ? ' · A 7h + B 12h30' : ` · ${d.direction.variant}`}</span>
+                            {d.direction.done ? <span className="badge tone-ok" style={{ marginLeft: 8 }}>✓ đã sinh</span> : null}
                           </>
                         ) : (
-                          <>{d.sales.length ? d.sales.map((s) => `${s.product} ×${s.count}`).join(' + ') : '—'}</>
+                          <span className="sub">{d.sales.length ? d.sales.map((s) => `${s.product} ×${s.count}`).join(' + ') : '—'}</span>
                         )}
                       </span>
-                      <span className="tuan-col tuan-col-content">
-                        <b>{kind}</b>{(d as any).contentPurpose ? <span className="sub" style={{ display: 'block', marginTop: 2 }}>để {(d as any).contentPurpose}</span> : null}
-                      </span>
-                      <span className="tuan-col tuan-col-nhom sub">
-                        {d.groups.length ? d.groups.slice(0, 2).join(', ') + (d.groups.length > 2 ? ` +${d.groups.length - 2}` : '') : '—'}
-                      </span>
-                      <span className="tuan-col-caret" aria-hidden="true">▾</span>
+                      <span aria-hidden="true" style={{ color: 'var(--ink-2)' }}>▾</span>
                     </summary>
                     {/* 24/8 refactor: 4 day-block xep doc chiem ~240px -> bang compact 3 cot
-                        (Khung gio / Noi dung / Kenh) — cao ~120px, doc theo cot de scan nhanh. */}
+                        (Khung gio / Noi dung / Kenh) — cao ~120px, doc theo cot de scan nhanh.
+                        Insight: hom nay = insight_line THAT tu bai rotation da sinh (brief);
+                        ngay khac = placeholder "may chon 1 insight chua dung". */}
                     <div className="tuan-day-body">
                       <table className="datatable dir-table" style={{ margin: 0 }}>
                         <tbody>
                           <tr>
                             <td style={{ whiteSpace: 'nowrap', width: 130 }}><b>🕗 7h — Bản A</b><div className="sub">bài bán</div></td>
-                            <td><b>{dayTitle}</b><div className="sub">{dayProduct} · máy chọn 1 insight chưa dùng gần đây</div></td>
+                            <td>
+                              <b>{dayTitle}</b>
+                              <div className="sub">{dayProduct}</div>
+                              {d.date === today && insightsByVariant.get('A') ? (
+                                <div className="sub">🎯 {insightsByVariant.get('A')}</div>
+                              ) : (
+                                <div className="sub">🎯 <i>máy chọn 1 insight chưa dùng gần đây</i></div>
+                              )}
+                            </td>
                             <td className="sub" style={{ whiteSpace: 'nowrap' }}>FB Post+Reel · YT Shorts · TikTok</td>
                           </tr>
                           <tr>
                             <td style={{ whiteSpace: 'nowrap' }}><b>🕐 12h30 — Bản B</b><div className="sub">bài bán A/B</div></td>
-                            <td>Cùng hướng, <b>xoáy insight khác</b> để đo bản nào bà con thích hơn</td>
+                            <td>
+                              Cùng hướng, <b>xoáy insight khác</b> để so
+                              {d.date === today && insightsByVariant.get('B') ? (
+                                <div className="sub">🎯 {insightsByVariant.get('B')}</div>
+                              ) : null}
+                            </td>
                             <td className="sub" style={{ whiteSpace: 'nowrap' }}>FB Post+Reel · YT Shorts · TikTok</td>
                           </tr>
                           <tr>
