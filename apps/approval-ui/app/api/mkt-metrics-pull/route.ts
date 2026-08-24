@@ -5,6 +5,7 @@ import { generateAndStorePlan, planSlotVN, vnDayStartIso } from '../../../lib/pl
 import { importInternalFromBucket } from '../../../lib/knowledge';
 import { learnPublicKnowledge, learnPublicDaily, isSundayVN } from '../../../lib/knowledge-public';
 import { evaluateAbPairs } from '../../../lib/evaluator';
+import { pullTikTokMetrics } from '../../../lib/tiktok-metrics';
 import { learnWeekly, shouldRunLearnWeekly } from '../../../lib/learn-weekly';
 import { refreshLiveProposal, applyLiveEvening } from '../../../lib/plan-live';
 
@@ -51,6 +52,14 @@ export async function GET(req: Request) {
   } catch (e: any) {
     yt = { pulled: 0, errors: [String(e?.message || e).slice(0, 160)] };
   }
+  // TikTok metrics (24/8: sandbox bat scope video.list -> keo view/like/comment). Loi bo qua
+  // khong lam vo cron; log qua run_log de theo doi.
+  let tt: { pulled: number; matched: number; errors: string[] } = { pulled: 0, matched: 0, errors: [] };
+  try {
+    tt = await pullTikTokMetrics(client);
+  } catch (e: any) {
+    tt = { pulled: 0, matched: 0, errors: [String(e?.message || e).slice(0, 160)] };
+  }
   // GHI run_log mỗi lần chạy (18/8: mkt_metrics trống suốt mà không ai biết cron có chạy không
   // vì route này im lặng). Trang Dữ liệu AI + /api/fb-diag đọc được để chẩn đoán.
   try {
@@ -67,7 +76,7 @@ export async function GET(req: Request) {
       task: 'mkt.metrics_pull',
       actor: 'cron',
       status: errs.length && !(res?.pulled > 0) ? 'error' : 'ok',
-      detail: { pulled: res?.pulled ?? 0, errors: errs.slice(0, 5), insightErrs, notes, ytPulled: yt.pulled, ytErrors: yt.errors.slice(0, 3), ms: Date.now() - startedAt },
+      detail: { pulled: res?.pulled ?? 0, errors: errs.slice(0, 5), insightErrs, notes, ytPulled: yt.pulled, ytErrors: yt.errors.slice(0, 3), ttPulled: tt.pulled, ttMatched: tt.matched, ttErrors: tt.errors.slice(0, 3), ms: Date.now() - startedAt },
     });
   } catch { /* không để lỗi ghi log làm hỏng cron */ }
 
