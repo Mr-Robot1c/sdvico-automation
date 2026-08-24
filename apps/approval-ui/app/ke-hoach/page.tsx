@@ -78,10 +78,21 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
     .map((x: any) => (typeof x === 'string' ? x.trim() : String(x?.label || x?.id || '').trim()))
     .filter(Boolean);
 
-  const rows = (data || []) as Row[];
-  const planRows = rows.filter((r) => r.data?.origin !== 'live');
-  const liveProposal = rows.find((r) => r.data?.origin === 'live');
+  const rowsInit = (data || []) as Row[];
+  const planRows = rowsInit.filter((r) => r.data?.origin !== 'live');
+  // 24/8 (user: "ke hoach tuan dau, huong di dau"): ban live thuong bi 12+ ban manual/update
+  // ep sinh de bug day khoi limit 12 -> UI trong. Query rieng dam bao luon co.
+  let liveProposal = rowsInit.find((r) => r.data?.origin === 'live');
+  if (!liveProposal) {
+    const { data: liveRow } = await client
+      .from('mkt_plans')
+      .select('id, period_start, period_end, generated_by, data, applied, applied_at, created_at')
+      .eq('data->>origin', 'live')
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (liveRow) liveProposal = liveRow as Row;
+  }
   const liveData = liveProposal?.data;
+  const rows = rowsInit;
   const appliedRow = rows.find((r) => r.applied);
   const learnSuggestion = rows.find((r) => r.data?.origin === 'learn-weekly' && !r.applied);
 
@@ -353,48 +364,73 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           ) : null}
 
           {liveData.daily_schedule?.length ? (
-            <div className="tablewrap" style={{ marginTop: 12 }}>
-              {/* Gọn (user 21/8: "UI kế hoạch quá rối"): gộp cột bài bán + hướng đi làm một
-                  (bài bán trong ngày CHÍNH LÀ cặp A/B của hướng), bỏ dòng cấu trúc lặp 7 lần
-                  — cấu trúc chung nêu 1 lần ở chú thích dưới bảng. */}
-              <table className="datatable">
-                <thead>
-                  <tr>
-                    <th>Ngày</th>
-                    <th>🕗 Bài bán — hướng đi trong ngày</th>
-                    <th>🕐 Content 12h30</th>
-                    <th>📣 Chia sẻ vào nhóm</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {liveData.daily_schedule.map((d) => (
-                    <tr key={d.date} className={d.date === today ? 'row-today' : undefined}>
-                      <td style={{ whiteSpace: 'nowrap' }}>{d.date === today ? '👉 ' : ''}<b>{d.dow}</b><br /><span className="sub">{fmtDate(d.date)}</span></td>
-                      <td>
+            <div className="tuan-days">
+              <div className="tuan-days-head">
+                <span>Ngày</span>
+                <span>Hướng đi + bài bán (7h + 12h30)</span>
+                <span>Content 12h30</span>
+                <span>Nhóm chia sẻ</span>
+              </div>
+              {liveData.daily_schedule.map((d) => {
+                const dayTitle = d.direction?.title || (d.sales.length ? d.sales.map((s) => s.product).join(' + ') : '—');
+                const kind = (d as any).contentKindLabel || 'Content';
+                const dayProduct = d.direction?.product || (d.sales[0]?.product || '—');
+                return (
+                  <details key={d.date} className={`tuan-day ${d.date === today ? 'is-today' : ''}`}>
+                    <summary className="tuan-day-summary">
+                      <span className="tuan-col tuan-col-date">
+                        {d.date === today ? '👉 ' : ''}<b>{d.dow.replace('Chủ nhật', 'CN').replace('Thứ ', 'T')}</b> <span className="sub">{fmtDate(d.date).slice(0, 5)}</span>
+                      </span>
+                      <span className="tuan-col tuan-col-huong">
                         {d.direction ? (
                           <>
                             <b>{d.direction.title}</b>
                             {d.direction.done ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ đã sinh</span> : null}
-                            <div className="sub" style={{ marginTop: 2 }}>
-                              {d.direction.product}{d.direction.variant === 'AB' ? ' · bản A ra 7h, bản B ra 12h30' : ` · bản thử ${d.direction.variant}`}
-                            </div>
+                            <span className="sub" style={{ display: 'block', marginTop: 2 }}>{d.direction.product}{d.direction.variant === 'AB' ? ' · A 7h + B 12h30' : ` · ${d.direction.variant}`}</span>
                           </>
                         ) : (
-                          <>
-                            {d.sales.length ? d.sales.map((s) => `${s.product} (${vnInt(s.count)} bài)`).join(' + ') : '—'}
-                            <div className="sub" style={{ marginTop: 2 }}>vòng xoay tự chọn theo ưu tiên</div>
-                          </>
+                          <>{d.sales.length ? d.sales.map((s) => `${s.product} ×${s.count}`).join(' + ') : '—'}</>
                         )}
-                      </td>
-                      <td>
-                        <span title={d.contentStructure || ''}>{d.contentKindLabel ? <b>{d.contentKindLabel}</b> : vnInt(d.contentCount)}</span>
-                        {(d as any).contentPurpose ? <div className="sub" style={{ marginTop: 2 }}>để {(d as any).contentPurpose}</div> : null}
-                      </td>
-                      <td className="sub">{d.groups.length ? d.groups.join(', ') : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </span>
+                      <span className="tuan-col tuan-col-content">
+                        <b>{kind}</b>{(d as any).contentPurpose ? <span className="sub" style={{ display: 'block', marginTop: 2 }}>để {(d as any).contentPurpose}</span> : null}
+                      </span>
+                      <span className="tuan-col tuan-col-nhom sub">
+                        {d.groups.length ? d.groups.slice(0, 2).join(', ') + (d.groups.length > 2 ? ` +${d.groups.length - 2}` : '') : '—'}
+                      </span>
+                      <span className="tuan-col-caret" aria-hidden="true">▾</span>
+                    </summary>
+                    <div className="tuan-day-body">
+                      <div className="day-block">
+                        <b>🕗 7:00 — Bản A (bài bán)</b>
+                        <div>Hướng đi: <b>{dayTitle}</b></div>
+                        <div>Sản phẩm: {dayProduct}</div>
+                        <div>Insight xoáy: <span className="sub">máy tự chọn 1 nỗi khách hàng chưa dùng gần đây</span></div>
+                        <div>Kênh: <b>Facebook (Post + Reel), YouTube Shorts, TikTok</b></div>
+                      </div>
+                      <div className="day-block">
+                        <b>🕐 12:30 — Bản B (bài bán A/B)</b>
+                        <div>Cùng hướng <b>{dayTitle}</b>, cùng sản phẩm nhưng <b>xoáy insight khác</b> để đo bản nào bà con thích hơn</div>
+                        <div>Kênh: <b>Facebook (Post + Reel), YouTube Shorts, TikTok</b></div>
+                      </div>
+                      <div className="day-block">
+                        <b>🕐 12:30 — Content {kind}</b>
+                        {(d as any).contentPurpose ? <div>Mục đích: <b>{(d as any).contentPurpose}</b></div> : null}
+                        {(d as any).contentStructure ? <div className="sub">Cấu trúc: {(d as any).contentStructure}</div> : null}
+                        <div>Kênh: <b>Facebook</b> (nuôi trang, không A/B)</div>
+                      </div>
+                      {d.groups.length ? (
+                        <div className="day-block">
+                          <b>📣 Chia sẻ vào nhóm hôm nay</b>
+                          <ul style={{ margin: '4px 0 0 18px', padding: 0 }}>
+                            {d.groups.map((g) => <li key={g}>{g}</li>)}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  </details>
+                );
+              })}
             </div>
           ) : null}
           <p className="sub" style={{ margin: '8px 0 0' }}>

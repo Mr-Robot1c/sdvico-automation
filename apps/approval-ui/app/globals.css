@@ -1267,3 +1267,11 @@ a.chip:hover { filter: brightness(0.98); }
 .dai-stat span { font-size: .68rem; color: var(--ink-2); }
 .dai-foot { font-size: .78rem; color: var(--ink-2); }
 .dai-latest { margin: 0; font-size: .78rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+
+/* Xem truoc chi tiet 1 ngay (24/8: bam vao xem A/B, insight, kenh, gio, nhom). */
+.day-detail summary { cursor: pointer; color: var(--accent); font-size: .82rem; }
+.day-detail[open] { background: var(--surface-2); border-radius: 8px; padding: 6px 10px; }
+.day-detail-body { display: grid; gap: 10px; margin-top: 8px; }
+.day-block { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: .85rem; line-height: 1.5; }
+.day-block b { color: var(--ink); }
