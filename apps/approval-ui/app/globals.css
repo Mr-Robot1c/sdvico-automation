@@ -1252,13 +1252,15 @@ a.chip:hover { filter: brightness(0.98); }
 .dir-table td.sub { color: var(--ink-2); font-size: .85rem; }
 
 /* /du-lieu-ai bo cuc moi (24/8): the AI gon, khong con role chu dai keo doc, timeline giu nguyen. */
-.dai-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin: 14px 0 22px; }
-.dai-card { display: grid; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; text-decoration: none; color: inherit; transition: border-color .15s ease, box-shadow .15s ease; }
+.dai-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 14px 0 22px; }
+.dai-card { display: grid; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; text-decoration: none; color: inherit; transition: border-color .15s ease, box-shadow .15s ease; min-width: 0; }
 .dai-card:hover { border-color: var(--accent); box-shadow: 0 6px 16px rgba(15, 23, 42, .08); }
-.dai-head { display: flex; align-items: center; gap: 8px; }
-.dai-icon { width: 28px; height: 28px; border-radius: 8px; background: var(--accent-bg); display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex: 0 0 auto; }
-.dai-name { font-size: .95rem; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dai-health { font-size: .7rem; padding: 2px 8px; flex: 0 0 auto; }
+.dai-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.dai-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--accent-bg); display: inline-flex; align-items: center; justify-content: center; font-size: 16px; flex: 0 0 auto; }
+.dai-title { flex: 1 1 auto; min-width: 0; display: grid; gap: 1px; line-height: 1.15; }
+.dai-name { font-size: 1rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dai-sub { font-size: .72rem; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dai-health { font-size: .7rem; padding: 2px 7px; flex: 0 0 auto; align-self: flex-start; margin-top: 2px; }
 .dai-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .dai-stat { background: var(--surface-2); border-radius: 8px; padding: 6px 8px; text-align: center; }
 .dai-stat b { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; line-height: 1.15; }

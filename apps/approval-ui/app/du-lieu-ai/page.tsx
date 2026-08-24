@@ -116,7 +116,7 @@ export default async function Page() {
 
   const cards = [
     {
-      key: 'data1', icon: '🔒', name: 'AI Data 1 · Nội bộ',
+      key: 'data1', icon: '🔒', name: 'Data 1', sub: 'Nội bộ',
       role: 'Đọc file Zalo (Cowork xuất, thả vào bucket) mỗi ngày, tóm tắt thành bản ghi tri thức.',
       last: d1Last, health: healthOf(d1Last),
       stats: [
@@ -127,7 +127,7 @@ export default async function Page() {
       link: '/kho-tri-thuc',
     },
     {
-      key: 'data2', icon: '🌐', name: 'AI Data 2 · Public ngành cá',
+      key: 'data2', icon: '🌐', name: 'Data 2', sub: 'Ngành cá',
       role: 'Lên mạng đọc tin ngành thủy sản, IUU, giá dầu, VMS mỗi ngày (Google News); Chủ nhật quét sâu thêm.',
       last: d2Last, health: healthOf(d2Last),
       stats: [
@@ -138,7 +138,7 @@ export default async function Page() {
       link: '/kho-tri-thuc',
     },
     {
-      key: 'boss', icon: '🧠', name: 'AI Planner · BOSS',
+      key: 'boss', icon: '🧠', name: 'BOSS', sub: 'Kế hoạch',
       role: 'CN 19h học số liệu tuần, Thứ 2 8h ra kế hoạch tuần, mỗi tối 19h chỉnh nhẹ; gom tri thức 2 AI Data + kết luận A/B để ra hướng đi cho Creator.',
       last: bossLast, health: bossLast ? ((Date.now() - new Date(bossLast).getTime()) / 86400000 <= 7 ? 'ok' : 'warn') : 'idle',
       stats: [
@@ -152,7 +152,7 @@ export default async function Page() {
       link: '/ke-hoach',
     },
     {
-      key: 'creator', icon: '✍️', name: 'AI Creator · Sáng tạo',
+      key: 'creator', icon: '✍️', name: 'Creator', sub: 'Sáng tạo',
       role: 'Nhận hướng đi từ BOSS, viết bài A/B (mỗi ngày 1 bản), dựng video AI cho sản phẩm có clip gốc, chọn ảnh khớp chủ đề.',
       last: crLast, health: healthOf(crLast),
       stats: [
@@ -164,7 +164,7 @@ export default async function Page() {
       link: '/noi-dung',
     },
     {
-      key: 'evaluator', icon: '🧪', name: 'AI Evaluator · Đánh giá',
+      key: 'evaluator', icon: '🧪', name: 'Evaluator', sub: 'Đánh giá',
       role: 'Mỗi ngày so cặp A/B theo tương tác thật, ghi kết luận về Nguồn để BOSS và các AI học cho vòng sau.',
       last: evLast, health: ev.length ? healthOf(evLast) : 'idle',
       stats: [
@@ -214,7 +214,10 @@ export default async function Page() {
             <a key={c.key} className="dai-card" href={c.link} title={c.role}>
               <div className="dai-head">
                 <span className="dai-icon" aria-hidden="true">{c.icon}</span>
-                <b className="dai-name">{c.name}</b>
+                <div className="dai-title">
+                  <b className="dai-name">{c.name}</b>
+                  <span className="dai-sub">{(c as any).sub}</span>
+                </div>
                 <span className={`badge tone-${h.tone} dai-health`}>{h.text}</span>
               </div>
               <div className="dai-stats">

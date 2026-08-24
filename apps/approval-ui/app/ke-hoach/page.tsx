@@ -264,7 +264,25 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </section>
       ) : null}
 
-      {/* ===== 1. HOM NAY ===== */}
+      {/* ===== 0b. NHOM CHIA SE (24/8: user "nhom chia se cung dem len tren luon"; cung cum cau hinh) ===== */}
+      <details className="plan-card" style={{ marginBottom: 14 }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1.02rem' }}>
+          👥 Nhóm chia sẻ Facebook
+          <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>{shareGroups.length} nhóm — quản lý ở Quản lý bài viết</span>
+        </summary>
+        <p className="sub" style={{ margin: '10px 0 6px' }}>
+          Dùng chung với nút <b>📣 Chia sẻ vào group</b> ở trang Quản lý bài viết — thêm, xóa, đổi tên nhóm ở đó. BOSS đọc danh sách này để xếp lịch chia sẻ theo ngày.
+        </p>
+        {shareGroups.length ? (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
+          </div>
+        ) : (
+          <p className="sub" style={{ margin: 0 }}>Chưa có nhóm nào. Mở <a href="/noi-dung">Quản lý bài viết</a> để thêm.</p>
+        )}
+      </details>
+
+            {/* ===== 1. HOM NAY ===== */}
       <section className="plan-card" style={{ borderLeft: '6px solid var(--accent, #1f5fbf)', marginBottom: 14 }}>
         <b style={{ fontSize: '1.05rem' }}>📌 Hôm nay ({fmtDate(today)})</b>
         {todayPlan ? (
@@ -464,24 +482,6 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           </div>
         </section>
       ) : null}
-
-      {/* ===== 4. NHOM CHIA SE (24/8: bo details Cai dat trung Muc tieu/Focus; chi giu Nhom chia se) ===== */}
-      <details className="plan-card" style={{ marginBottom: 14 }}>
-        <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1.02rem' }}>
-          👥 Nhóm chia sẻ Facebook
-          <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>{shareGroups.length} nhóm — quản lý ở Quản lý bài viết</span>
-        </summary>
-        <p className="sub" style={{ margin: '10px 0 6px' }}>
-          Dùng chung với nút <b>📣 Chia sẻ vào group</b> ở trang Quản lý bài viết — thêm, xóa, đổi tên nhóm ở đó. BOSS đọc danh sách này để xếp lịch chia sẻ theo ngày.
-        </p>
-        {shareGroups.length ? (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
-          </div>
-        ) : (
-          <p className="sub" style={{ margin: 0 }}>Chưa có nhóm nào. Mở <a href="/noi-dung">Quản lý bài viết</a> để thêm.</p>
-        )}
-      </details>
 
       {/* ===== 5. Ban ke hoach hien tai + lich su (gon 24/8) =====
           Bang san pham day du + tri thuc + adjust log da chuyen sang tab "AI Ke hoach" o

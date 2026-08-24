@@ -1398,7 +1398,40 @@ export async function applyPlanWeights(formData: FormData) {
   const planId = String(formData.get('plan_id') || '');
   if (!planId) return;
   const client = getServerClient();
-  // Chỉ một bản được áp tại một thời điểm: gỡ hết rồi áp bản được chọn.
+  // 24/8 (bug user: "bam de xuat ke hoach mat tieu huong di"): ban learn-weekly chi co
+  // weights + products, KHONG co content_suggestions -> ap thang -> mat het huong di.
+  // FIX: neu ban duoc chon la learn-weekly, MERGE weights + products + narrative vao ban
+  // dang ap (giu content_suggestions cua ban tuan/cap nhat). Giong applyLiveEvening.
+  const { data: incoming } = await client.from('mkt_plans').select('id, data').eq('id', planId).maybeSingle();
+  const inData = ((incoming as any)?.data || {}) as any;
+  const isLearn = inData.origin === 'learn-weekly';
+  if (isLearn) {
+    const { data: base } = await client.from('mkt_plans').select('id, data').eq('applied', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const baseData = ((base as any)?.data || {}) as any;
+    if ((base as any)?.id && Array.isArray(baseData.content_suggestions) && baseData.content_suggestions.length) {
+      // Merge INTO bản đang áp, giữ hướng đi. Bản learn-weekly chỉ đóng vai "đề xuất trọng số".
+      const merged = {
+        ...baseData,
+        weights: inData.weights || baseData.weights,
+        products: inData.products || baseData.products,
+        summary: { ...(baseData.summary || {}), ...(inData.summary || {}) },
+        narrative: [
+          `Đã áp đề xuất cuối tuần: ${(inData.narrative || [])[0] || ''}`,
+          ...(baseData.narrative || []),
+        ].slice(0, 6),
+        appliedLearnPlanId: planId,
+        appliedLearnAt: new Date().toISOString(),
+      };
+      const { error: e1 } = await client.from('mkt_plans').update({ data: merged, applied_at: new Date().toISOString() }).eq('id', (base as any).id);
+      if (e1) throw new Error(e1.message);
+      // Đánh dấu bản learn-weekly đã áp (để nút không hiện lại), nhưng KHÔNG set applied cho nó.
+      await client.from('mkt_plans').update({ applied_at: new Date().toISOString() }).eq('id', planId);
+      try { await client.from('run_log').insert({ task: 'mkt.apply_learn', actor: 'nguoi-bam', status: 'ok', detail: { planId, mergedInto: (base as any).id } }); } catch { /* bo qua */ }
+      revalidatePath('/ke-hoach');
+      return;
+    }
+  }
+  // Bản có content_suggestions (kế hoạch tuần / cập nhật): áp thay như cũ.
   await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
   const { error } = await client
     .from('mkt_plans')

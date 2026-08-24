@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-21
 ttl_days: 90
+<!-- re-verified: 2026-08-24 11:15 - Fix R5: ap dung ban learn-weekly = MERGE weights vao ban dang ap (giu huong di), khong thay hang; Nhom chia se dua len tren cung cum cau hinh. Khong doi flow NV. -->
 <!-- re-verified: 2026-08-24 10:40 - /ke-hoach thu tu: Muc tieu+Focus (form) -> De xuat learn-weekly -> Hom nay -> lich tuan -> Huong di -> Nhom chia se -> Ban dang ap. Bo form trung. Khong doi flow NV. -->
 <!-- re-verified: 2026-08-24 10:20 - Focus carry-over lọc: huong cu chua dung KHONG thuoc focus bi loai khi sinh ban moi (dong nhat cai dat -> ke hoach). Form Muc tieu + Focus len dau /ke-hoach. Nav link ra sdvico.vn. -->
 <!-- re-verified: 2026-08-24 09:50 - /ke-hoach: khoi Muc tieu len dau (khong doi flow, chi doi bo cuc). /du-lieu-ai: UI the AI gon, khong doi flow NV. -->
