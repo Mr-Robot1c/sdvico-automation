@@ -421,7 +421,16 @@ export async function generateAndStorePlan(
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
     const prevSugs: ContentDirection[] = Array.isArray((prevApplied as any)?.data?.content_suggestions)
       ? (prevApplied as any).data.content_suggestions : [];
-    const carry = prevSugs.filter((s) => !s.used_at);
+    let carry = prevSugs.filter((s) => !s.used_at);
+    // 24/8: focus dang ap -> loai huong cu KHONG thuoc focus (user: "co tap trung ma van thay
+    // huong sp khac, dong bo o dau"). Khop theo cach loadFocusKeys + productName tuong tu rotate.
+    if (carry.length && fGroups.length && (!fv.until || new Date(fv.until).getTime() > Date.now())) {
+      const keys = fGroups.map((g) => String(g).toLowerCase().trim()).filter(Boolean);
+      carry = carry.filter((c) => {
+        const p = String(c.product || '').toLowerCase();
+        return keys.some((k) => p === k || p.includes(k) || k.includes(p));
+      });
+    }
     if (carry.length) {
       const seen = new Set(carry.map((s) => s.title.toLowerCase().trim()));
       const fresh = (plan.content_suggestions || []).filter((s) => !seen.has(s.title.toLowerCase().trim()));

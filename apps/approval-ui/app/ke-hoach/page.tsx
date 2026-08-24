@@ -208,14 +208,42 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
 
-      {/* ===== 0. MUC TIEU TUAN (user 24/8: dem len tren, khong de duoi Cai dat) ===== */}
-      <section className="plan-card" style={{ marginBottom: 14, background: 'var(--surface-2)' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-          <b style={{ fontSize: '1.02rem' }}>🎯 Mục tiêu tuần</b>
-          {goalText ? <span className="sub" style={{ flex: '1 1 auto', minWidth: 0 }}>{goalText.split('\n')[0]}</span> : <span className="muted">Chưa giao mục tiêu, BOSS tự định hướng theo số liệu.</span>}
-          {focusActive ? <span className="badge tone-ok" title={`Tuần này chỉ đăng: ${focusGroups.join(', ')}${focusUntil ? ` (đến ${fmtDate(focusUntil)})` : ''}`}>🎯 tập trung {focusGroups.length} SP</span> : null}
-          <a className="src" href="#cai-dat" style={{ marginLeft: 'auto', fontSize: '.85rem' }}>Sửa</a>
+      {/* ===== 0. MUC TIEU + FOCUS ngay dau (user 24/8: cai dat phai co tac dung ngay + dong nhat) ===== */}
+      <section className="plan-card goal-block" style={{ marginBottom: 14 }}>
+        <div className="goal-row">
+          <form action={saveWeeklyGoal} className="goal-form">
+            <label>
+              <b>🎯 Mục tiêu tuần</b>
+              <textarea name="goal_text" defaultValue={goalText} rows={2} placeholder="Ví dụ: tuần này ưu tiên lọc dầu SF-50, cần 20 cuộc gọi về tổng đài." />
+            </label>
+            <button className="btn ok sm" type="submit">Lưu mục tiêu</button>
+          </form>
+          <form action={saveFocus} className="goal-form">
+            <label>
+              <b>🎯 Chỉ đăng sản phẩm</b>
+              <input name="focus_groups" defaultValue={focusGroups.join(', ')} placeholder="lọc dầu, lọc nước" />
+              <span className="sub" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                đến hết <input type="date" name="focus_until" defaultValue={focusUntil} style={{ maxWidth: 150 }} />
+              </span>
+            </label>
+            <button className="btn ok sm" type="submit">Lưu tập trung</button>
+          </form>
         </div>
+        {(() => {
+          const total = (appliedRow?.data?.content_suggestions || []).length;
+          if (!focusActive || !total) return null;
+          const keys = focusGroups.map((g) => String(g).toLowerCase().trim());
+          const inFocus = (appliedRow!.data.content_suggestions || []).filter((sg: any) => {
+            const pn = String(sg.product || '').toLowerCase();
+            return keys.some((k) => pn === k || pn.includes(k) || k.includes(pn));
+          }).length;
+          const allIn = inFocus === total;
+          return (
+            <p className="sub" style={{ margin: '10px 0 0' }}>
+              {allIn ? '✅' : '⚠️'} <b>{inFocus}/{total}</b> hướng đi bám đúng sản phẩm tập trung ({focusGroups.join(', ')}){focusUntil ? ` — đến ${fmtDate(focusUntil)}` : ''}. {allIn ? 'Kế hoạch đồng nhất với mục tiêu.' : 'Còn hướng cũ chưa bám focus — bấm "Lưu tập trung" để sinh lại.'}
+            </p>
+          );
+        })()}
       </section>
 
       {/* ===== 1. HOM NAY ===== */}

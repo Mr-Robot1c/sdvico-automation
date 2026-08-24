@@ -33,9 +33,9 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
       { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' },
       { href: '/quang-cao', label: 'Quảng cáo', icon: '📣' },
-      // 21/8 (user: "trang SEO đâu, giấu à?"): trang công khai /blog + /san-pham dựng 20/8 nhưng
-      // không có lối vào từ menu nội bộ -> thêm mục này, mở tab mới (shell công khai riêng).
-      { href: '/blog', label: 'Trang công khai', icon: '🌐', external: true }
+      // 24/8 (user: "lấy link sdvico.vn cho lẹ, cần gì tạo mới"): trỏ thẳng ra web công ty
+      // thay vì trang /blog nội bộ (đang trên vercel.app, chưa SEO thật).
+      { href: 'https://sdvico.vn', label: 'Web SDVICO', icon: '🌐', external: true }
     ]
   };
   // Nhóm AI (user 18/8): Nguồn = tri thức các AI đã học (nội bộ + public); Dữ liệu = 5 AI
