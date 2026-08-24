@@ -11,8 +11,9 @@ export async function GET() {
   }
   const redirectUri =
     process.env.TIKTOK_REDIRECT_URI || 'https://sdvico-mktit.vercel.app/api/tiktok/callback';
-  // Direct Post cần video.publish. Kèm video.upload (dự phòng nháp) và user.info.basic.
-  const scope = process.env.TIKTOK_SCOPES || 'user.info.basic,video.publish,video.upload';
+  // Direct Post cần video.publish. Kèm video.upload (dự phòng nháp), user.info.basic,
+  // và video.list (24/8: cần để kéo view/like/comment của video mình đã đăng — Display API).
+  const scope = process.env.TIKTOK_SCOPES || 'user.info.basic,video.publish,video.upload,video.list';
   const state = crypto.randomUUID();
 
   const authorize = new URL('https://www.tiktok.com/v2/auth/authorize/');
