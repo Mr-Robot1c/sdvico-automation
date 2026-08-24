@@ -116,5 +116,44 @@ export async function GET(req: Request) {
     products: Array.isArray(r.detail?.results) ? r.detail.results.map((x: any) => ({ group: x.group, variant: x.variant, from_suggestion: x.from_suggestion })) : null,
   }));
 
+  // 6. run_log MANUAL PLAN 5 lan gan nhat (user 24/8: bam "Luu & sinh ke hoach moi" khong
+  //    thay gi doi -> soi cho nay xem action co chay khong, sinh thanh cong khong).
+  const { data: manualLogs } = await client
+    .from('run_log')
+    .select('status, detail, created_at')
+    .eq('task', 'mkt.plan_manual')
+    .order('created_at', { ascending: false })
+    .limit(5);
+  out.recentManualPlanRuns = (manualLogs || []).map((r: any) => ({
+    at: r.created_at,
+    status: r.status,
+    planId: r.detail?.planId || null,
+    suggestions: r.detail?.suggestions ?? null,
+    error: r.detail?.error || null,
+    ms: r.detail?.ms || null,
+  }));
+
+  // 7. 5 ban ke hoach moi nhat (id, cadence, applied, createdAt, first 3 huong)
+  const { data: recentPlans } = await client
+    .from('mkt_plans')
+    .select('id, generated_by, applied, applied_at, created_at, data')
+    .order('created_at', { ascending: false })
+    .limit(5);
+  out.recentPlans = (recentPlans || []).map((p: any) => ({
+    id: p.id,
+    generatedBy: p.generated_by,
+    applied: p.applied,
+    appliedAt: p.applied_at,
+    createdAt: p.created_at,
+    cadence: p.data?.cadence,
+    origin: p.data?.origin,
+    focus: p.data?.focus || null,
+    weights: p.data?.weights || {},
+    suggestionsCount: (p.data?.content_suggestions || []).length,
+    firstThreeSuggestions: (p.data?.content_suggestions || []).slice(0, 3).map((s: any) => ({
+      title: s.title, product: s.product, used_at: s.used_at, carried: s.carried,
+    })),
+  }));
+
   return NextResponse.json({ ok: true, ...out });
 }
