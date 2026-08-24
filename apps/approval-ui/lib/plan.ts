@@ -335,7 +335,8 @@ export async function loadMeasurementFromWeekReport(client: Client, weekOffset: 
       topPosts: report.topPosts.map((t) => ({ title: t.title, product: t.product, engagement: t.m.engagement })),
     };
     const w: any = report.window || {};
-    const label = w.label ? `tuần ${w.label}` : `tuần ${String(w.start || w.startIso || '').slice(0, 10)} tới ${String(w.end || w.endIso || '').slice(0, 10)}`;
+    // w.label da co san chu "Tuan truoc (...)" — dung them tien to "tuan" keo lap chu (24/8).
+    const label = w.label ? String(w.label) : `tuần ${String(w.start || w.startIso || '').slice(0, 10)} tới ${String(w.end || w.endIso || '').slice(0, 10)}`;
     return { m, label };
   } catch {
     return null;

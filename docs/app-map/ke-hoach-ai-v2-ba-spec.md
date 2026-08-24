@@ -4,7 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-21
 ttl_days: 90
-<!-- DOC-STATUS: SUSPECT (2026-08-24) — code 'packages/marketing/src' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-24 09:15 - measurement_source het lap chu (chi tiet README). -->
 <!-- re-verified: 2026-08-24 09:05 - Ban tuan lay dung tuan truoc: weekWindowVNOffset offset +1 (truoc -1 ra tuan sau 0 bai -> fallback 7 ngay). Khong doi flow NV. -->
 <!-- re-verified: 2026-08-24 02:30 - Gio moi user chot: CN 19h hoc tuan, T2 8h ban tuan (tu ap), moi toi 19h chinh dan. Content bo loai Chan dung (T6 -> Thuat ngu), moi loai content khai MUC DICH (CONTENT_PURPOSE). ?plan=weekly ep ban tuan ngay. -->
 <!-- re-verified: 2026-08-23 18:30 - Ban ke hoach TUAN (cron Thu 2) TU AP (sua R5 hanh vi: truoc applied=false cho nguoi bam; theo nguyen tac 22/8 do luong tuan -> ke hoach tuan, ban tuan la xuong song tu dong). Ban cap nhat Thu 6 + de xuat learn-weekly van chi de xuat. Evaluator ghep cap theo huong di (khong theo ab_pair_id). Trang Nguon hien cach Evaluator so + ket luan. -->
