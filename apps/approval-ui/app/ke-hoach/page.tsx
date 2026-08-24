@@ -219,6 +219,38 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
 
+      {/* ===== BANNER "VUA THAY DOI KE HOACH" (24/8, user "UI m lam xau nhu cut, khong biet
+          co doi hay khong"). Hien LON, ROI khi log mkt.plan_manual < 60 giay tuoi — sau
+          F5 se tu bien mat vi tuoi log > nguong. ===== */}
+      {(() => {
+        if (!lastPlanLog) return null;
+        const ageSec = (Date.now() - new Date(lastPlanLog.created_at).getTime()) / 1000;
+        if (ageSec > 60) return null; // qua han, khong hien banner lon (dong sub o duoi nut van co)
+        const ok = lastPlanLog.status === 'ok';
+        return (
+          <section role="status" style={{
+            padding: '14px 18px', marginBottom: 14, borderRadius: 10,
+            border: `2px solid var(--${ok ? 'ok' : 'no'}, ${ok ? '#16a34a' : '#dc2626'})`,
+            background: `var(--${ok ? 'ok-bg' : 'no-bg'}, ${ok ? '#dcfce7' : '#fee2e2'})`,
+            color: 'var(--ink)',
+            display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+          }}>
+            <span style={{ fontSize: '1.8rem', lineHeight: 1 }}>{ok ? '✅' : '⛔'}</span>
+            <div style={{ flex: '1 1 300px', minWidth: 0 }}>
+              <b style={{ fontSize: '1.05rem' }}>{ok ? 'Đã thay đổi kế hoạch mới' : 'Sinh kế hoạch thất bại'}</b>
+              <div style={{ marginTop: 4 }}>
+                {ok ? (
+                  <>Kế hoạch tuần vừa sinh <b>{vnInt(Number(lastPlanLog.detail?.suggestions) || 0)} hướng đi bài viết</b>, đã áp và thay bản cũ. F5 hoặc kéo xuống xem chi tiết ở khối "📆 Kế hoạch tuần" bên dưới.</>
+                ) : (
+                  <>Lý do: {String(lastPlanLog.detail?.error || 'không rõ').slice(0, 240)}. Kế hoạch cũ vẫn còn nguyên (không bị xoá). Kiểm tra Gemini API key/quota rồi bấm lại.</>
+                )}
+              </div>
+              <div className="sub" style={{ marginTop: 4 }}>Thao tác lúc {fmtDateTime(lastPlanLog.created_at)}. Banner này tự ẩn sau 1 phút.</div>
+            </div>
+          </section>
+        );
+      })()}
+
       {/* ===== HINT 3 NUT (24/8, user "chua co hint canh bao ...de lam gi ca") ===== */}
       <details className="plan-card" style={{ marginBottom: 14, padding: '10px 14px' }}>
         <summary style={{ cursor: 'pointer', fontWeight: 600 }}>

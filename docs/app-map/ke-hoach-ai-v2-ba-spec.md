@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-24
 ttl_days: 90
+<!-- re-verified: 2026-08-24 19:50 - Banner XAC NHAN thay doi ke hoach o dau trang (age log < 60s, border 2px xanh/do, emoji 1.8rem) + fix textarea resize:none. KHONG doi flow NV. -->
 <!-- re-verified: 2026-08-24 19:30 - FIX silent fail saveGoalFocusAndRegenerate: regenerate return {ok,planId,error} + ghi run_log task=mkt.plan_manual moi lan; UI hien dong log gan nhat duoi nut submit. Them details "Khi nao bam nut nao?" o dau trang, bang datatable 3 cot bao phu 4 nut. KHONG doi flow NV. -->
 <!-- re-verified: 2026-08-24 19:00 - Cai dat tuan hint gon: bo hint sub inline duoi field, chuyen vao title tooltip nhan; nut submit + caption vao .settings-cta box border dashed. KHONG doi flow NV. -->
 <!-- re-verified: 2026-08-24 18:45 - GOP 3 nut Cai dat tuan ve 1 action moi saveGoalFocusAndRegenerate (upsert 2 app_config song song + 1 lan regeneratePlanAndApply, truoc 2 form 2 nut = 2 plan). Them hint text duoi moi field va tren nut, tooltip cho nut "Tao ke hoach ngay" o header giai thich khac nut moi. KHONG doi flow NV — chi rut gon UX. -->
