@@ -27,13 +27,13 @@ export async function pullTikTokMetrics(client: Client): Promise<{ pulled: numbe
     return { pulled: 0, matched: 0, errors: ['token: ' + String(e?.message || e)] };
   }
 
-  // 1. Danh sách video mới nhất trên TikTok (30 cái đầu, đủ 1-2 tuần đăng).
-  //    share_url = link mở video công khai (dùng cho nút "Mở video" ở /do-luong).
+  // 1. Danh sách video mới nhất trên TikTok (20 cái đầu — TikTok giới hạn max_count 1..20,
+  //    truyền 30 se 400 invalid_params). share_url = link mở video công khai.
   let videos: Array<{ id: string; create_time: number; view_count: number; like_count: number; comment_count: number; share_count: number; title?: string; share_url?: string }> = [];
   try {
     const r = await fetch(
       'https://open.tiktokapis.com/v2/video/list/?fields=id,create_time,view_count,like_count,comment_count,share_count,title,share_url',
-      { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ max_count: 30 }) }
+      { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ max_count: 20 }) }
     );
     const j: any = await r.json();
     if (!r.ok || j.error?.code && j.error.code !== 'ok') {

@@ -86,7 +86,7 @@ export async function GET(req: Request) {
     const { accessToken } = await getValidTikTokToken(client);
     const r = await fetch(
       'https://open.tiktokapis.com/v2/video/list/?fields=id,create_time,view_count,like_count,comment_count,share_count,title,share_url',
-      { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ max_count: 30 }) }
+      { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ max_count: 20 }) }
     );
     const j: any = await r.json();
     const videos = j?.data?.videos || [];
