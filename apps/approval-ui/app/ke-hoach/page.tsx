@@ -4,9 +4,15 @@ import { vnInt, vnDec1 } from '../../lib/plan';
 import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
 import { saveGoalFocusAndRegenerate, generatePostsNow } from './goal-actions';
 import GeneratePostsButton from './generate-posts-button';
+import SaveGenerateButton from './save-generate-button';
 import GenerateButton from './generate-button';
 
 export const dynamic = 'force-dynamic';
+// Sinh kế hoạch gọi Gemini mất 30 giây tới ~2 phút (chuỗi 4 model fallback khi model đầu bị
+// rate-limit). Server action saveGoalFocusAndRegenerate chạy trong function của trang này —
+// KHÔNG set maxDuration thì bị cắt sớm, plan tạo được server-side nhưng response không về kịp
+// browser -> UI không refresh (user 24/8: "bấm Lưu mà không cập nhật"). Cho 300s.
+export const maxDuration = 300;
 
 // TRANG KE HOACH sap xep lai 20/8 (user: "gon gang - the hien day du cac plan"):
 //   1. HOM NAY: dang san pham nao may bai, content, chia se nhom nao (tu de xuat song).
@@ -350,8 +356,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             </div>
           </div>
           <div className="settings-cta">
-            <button className="btn ok" type="submit">💾 Lưu & sinh kế hoạch mới</button>
-            <span className="sub">Sau khi lưu, kế hoạch tuần được sinh lại và áp ngay theo mục tiêu + tập trung ở trên.</span>
+            <SaveGenerateButton />
           </div>
           {lastPlanLog ? (
             <p className={`sub ${lastPlanLog.status === 'error' ? 'err-note' : ''}`} style={{ margin: '8px 0 0' }}>
