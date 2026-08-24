@@ -244,6 +244,12 @@ export async function GET(req: Request) {
   type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number; variant?: 'A' | 'B' };
   const pickedFolders: PickedFolder[] = [];
   const usedInThisRun = new Set<string>();
+  // Khai bao skipped/results/logoActions SOM (24/8): fallback random block (~line 270) can
+  // day skip reason "bo qua bai ban de bam plan" vao skipped[], nhung truoc kia const nay
+  // khai bao sau day → build fail "used before its declaration". Dat cung 1 cho ngay day.
+  const results: any[] = [];
+  const skipped: any[] = [];
+  const logoActions: any[] = []; // nhat ky auto-logo cho moi anh (stamped/kept/already/skip)
   for (const s of candidateSuggestions) {
     if (pickedFolders.length) break; // 1 hướng đi/run
     const guessed = (guessGroup as (t: string) => string | null)(s.product);
@@ -319,10 +325,6 @@ export async function GET(req: Request) {
   } catch { /* thiếu thì coi như chưa dùng insight nào */ }
   // @ts-ignore — module JS thuần
   const { ensureLogoForPost } = await import('../../../lib/gen/ensure-logo.mjs');
-
-  const results: any[] = [];
-  const skipped: any[] = [];
-  const logoActions: any[] = []; // nhật ký auto-logo cho mỗi ảnh (stamped/kept/already/skip)
 
   // Track thay đổi suggestion trong run này (idx -> 'A' vừa sinh | 'B' vừa sinh), cuối vòng
   // update plan.data một lần: sinh A -> pending_variant='B'; sinh B -> used_at.
