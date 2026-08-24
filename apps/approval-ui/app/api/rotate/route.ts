@@ -222,9 +222,13 @@ export async function GET(req: Request) {
     : [];
   // User chốt 21/8 đêm: cặp A/B chạy TRONG CÙNG NGÀY — bản A slot SÁNG, bản B slot CHIỀU
   // (đổi lại quyết định tách 2 ngày 18/8; Evaluator có kết luận nhanh hơn, so cùng điều
-  // kiện ngày). Slot chiều KHÔNG mở hướng mới (không sinh A) để nhịp không trôi thành
-  // "A chiều, B sáng hôm sau" — chiều chỉ sinh bản B đang chờ, không có B chờ thì rơi về
-  // vòng xoay thường. Slot sáng: ưu tiên B mồ côi (hôm trước lỡ nhịp), rồi mở hướng mới.
+  // kiện ngày). Slot sáng: ưu tiên B mồ côi (hôm trước lỡ nhịp), rồi mở hướng mới.
+  //
+  // 24/8 (user): slot CHIỀU trước đây CẤM mở hướng mới (chỉ pendingBs) — nhưng khi user áp
+  // plan mới giữa buổi (plan cũ hết pendingB), chiều rỗng candidates → fallback random →
+  // sinh sản phẩm NGOÀI plan (bug Ắc quy 24/8). Nới: chiều cũng có thể mở fresh khi hết
+  // pendingB, để 100% bám plan; nhịp trôi thành "A chiều T2, B sáng T3" chấp nhận được vì
+  // sáng mai pendingBs.filter đưa bản B đó lên đầu tiên → cặp vẫn đủ trong 24h.
   const pendingBs = allSuggestions.filter((s) => !s.used_at && s.pending_variant === 'B');
   const freshSugs = allSuggestions.filter((s) => !s.used_at && !s.pending_variant);
   // BOSS truyền cho Creator (user 21/8): hướng của sản phẩm trọng số cao (đang thắng) được
@@ -235,7 +239,7 @@ export async function GET(req: Request) {
     return weights[productName(g || s.product)] ?? 1;
   };
   const freshSorted = [...freshSugs].sort((a, b) => weightOfSug(b) - weightOfSug(a));
-  const candidateSuggestions = slot === 'chieu' ? pendingBs : [...pendingBs, ...freshSorted];
+  const candidateSuggestions = [...pendingBs, ...freshSorted];
 
   type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number; variant?: 'A' | 'B' };
   const pickedFolders: PickedFolder[] = [];
@@ -257,8 +261,21 @@ export async function GET(req: Request) {
     pickedFolders.push({ group: matchedFolder, suggestion: s, suggestionIdx: idx, variant: s.pending_variant === 'B' ? 'B' : 'A' });
   }
   // Không có suggestion -> vòng xoay/weights như cũ, mỗi folder 1 bài đơn.
+  // 24/8 (user "100% theo kế hoạch tuần, không xàm xàm"): NẾU plan đã áp có weights
+  // (BOSS đã chốt sản phẩm), fallback CHỈ pick từ folder có tên TRONG weights — chặn
+  // hoàn toàn sản phẩm ngoài plan (bug Ắc quy 24/8: plan chỉ có SF-50 + SEA-40 nhưng
+  // fallback random pick Ắc quy vì weights map dùng default 1). Nếu mọi folder trong
+  // plan đã dùng vòng này → không sinh bài bán (chỉ log skip); thà thiếu 1 bài bán
+  // còn hơn đăng bài ngoài kế hoạch.
   if (!pickedFolders.length) {
-    const remaining = unused.filter((g) => !usedInThisRun.has(g));
+    let remaining = unused.filter((g) => !usedInThisRun.has(g));
+    if (hasWeights) {
+      const inPlan = remaining.filter((g) => weights[productName(g)] != null);
+      if (!inPlan.length) {
+        skipped.push({ reason: 'moi folder trong plan da dung vong nay — bo qua bai ban de bam plan', remaining: remaining.map((g) => productName(g)) });
+      }
+      remaining = inPlan;
+    }
     const extra = hasWeights
       ? weightedSample(remaining, (g) => weights[productName(g)] ?? 1, salesCount)
       : shuffle(remaining).slice(0, salesCount);
