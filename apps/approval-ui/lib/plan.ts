@@ -352,7 +352,9 @@ export async function generateAndStorePlan(
   let measurementSource = '7 ngày gần nhất';
   let weeklyMeasurement: Measurement | null = null;
   if (opts.cadence === 'weekly') {
-    const r = await loadMeasurementFromWeekReport(client, -1, now);
+    // weekWindowVNOffset: offset DUONG = lui ve qua khu (+1 = tuan truoc). 24/8 tung truyen -1
+    // (tuan sau, 0 bai) nen ban tuan dau tien roi ve "7 ngay gan nhat".
+    const r = await loadMeasurementFromWeekReport(client, 1, now);
     if (r) { weeklyMeasurement = r.m; measurementSource = `đo lường ${r.label} (tuần vừa xong)`; }
   }
   const [measurement, knowledge, goalRes, focusRes] = await Promise.all([
