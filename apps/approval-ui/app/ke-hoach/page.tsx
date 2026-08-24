@@ -158,6 +158,16 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   // trong lich 7 ngay + trang /kho-tri-thuc?ai=boss.
   const suggestions = appliedRow?.data?.content_suggestions || [];
 
+  // Log lan sinh ke hoach tay gan nhat (task=mkt.plan_manual) — hien duoi nut submit "Luu &
+  // sinh ke hoach moi" de user biet ket qua (24/8: user "bam luu khong duoc" — truoc silent).
+  const { data: lastManualPlan } = await client
+    .from('run_log')
+    .select('status, detail, created_at')
+    .eq('task', 'mkt.plan_manual')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const lastPlanLog = (lastManualPlan || [])[0] as any;
+
   // Insight_line THAT cua bai rotation HOM NAY (user 24/8: "insight ngay nao hien ngay do,
   // dung hien ca 3"). Chi hom nay moi co bai da sinh (ngay mai tro di chua sinh); tuong lai
   // hien "may chon 1 insight chua dung gan day" nhu cu.
@@ -208,6 +218,42 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       </header>
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
+
+      {/* ===== HINT 3 NUT (24/8, user "chua co hint canh bao ...de lam gi ca") ===== */}
+      <details className="plan-card" style={{ marginBottom: 14, padding: '10px 14px' }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+          ❓ Khi nào bấm nút nào? <span className="sub" style={{ fontWeight: 400 }}>(bấm để xem)</span>
+        </summary>
+        <div className="tablewrap" style={{ marginTop: 10 }}>
+          <table className="datatable">
+            <thead>
+              <tr><th style={{ width: 220 }}>Nút</th><th style={{ width: 190 }}>Ở đâu</th><th>Bấm khi nào — làm gì</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>💾 Lưu &amp; sinh kế hoạch mới</b></td>
+                <td className="sub">Cài đặt tuần</td>
+                <td>Khi bạn <b>đổi Mục tiêu hoặc Sản phẩm tập trung</b> ở khối Cài đặt tuần. Máy lưu cài đặt + sinh kế hoạch mới bám cài đặt đó + áp NGAY.</td>
+              </tr>
+              <tr>
+                <td><b>✨ Tạo kế hoạch ngay</b></td>
+                <td className="sub">Góc phải header</td>
+                <td>Khi <b>KHÔNG đổi cài đặt</b> nhưng muốn ép BOSS sinh lại kế hoạch (VD: tri thức nội bộ vừa cập nhật, muốn refresh). Giữ nguyên mục tiêu + focus.</td>
+              </tr>
+              <tr>
+                <td><b>🧪 Áp dụng đề xuất mới</b></td>
+                <td className="sub">Header (khi có)</td>
+                <td>Chỉ hiện <b>khi BOSS học tuần xong</b> (mỗi CN 19h) đề xuất đổi trọng số sản phẩm. Bấm để nhập weights mới vào kế hoạch đang áp, KHÔNG mất hướng đi cũ.</td>
+              </tr>
+              <tr>
+                <td><b>Gỡ áp dụng</b></td>
+                <td className="sub">Banner Bản đang áp</td>
+                <td>Khi <b>muốn máy đăng đủ sản phẩm không tập trung</b> nữa. Vòng xoay sẽ chạy random theo trọng số cũ, không bám hướng đi mới.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
 
       {/* ===== BẢN ĐANG ÁP — banner LÊN DÀU (user 24/8 nhac 3 lan: "dem cai ap dung len dau",
           "sao m ngu qua vay"). Truoc nam trong <details> cuoi trang, phai keo xuong. ===== */}
@@ -274,6 +320,14 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             <button className="btn ok" type="submit">💾 Lưu & sinh kế hoạch mới</button>
             <span className="sub">Sau khi lưu, kế hoạch tuần được sinh lại và áp ngay theo mục tiêu + tập trung ở trên.</span>
           </div>
+          {lastPlanLog ? (
+            <p className={`sub ${lastPlanLog.status === 'error' ? 'err-note' : ''}`} style={{ margin: '8px 0 0' }}>
+              Lần sinh gần nhất ({fmtDateTime(lastPlanLog.created_at)}):{' '}
+              {lastPlanLog.status === 'ok'
+                ? <>✅ xong — {vnInt(Number(lastPlanLog.detail?.suggestions) || 0)} hướng</>
+                : <>⛔ lỗi — {String(lastPlanLog.detail?.error || 'không rõ').slice(0, 200)}</>}
+            </p>
+          ) : null}
         </form>
         {(() => {
           const total = (appliedRow?.data?.content_suggestions || []).length;

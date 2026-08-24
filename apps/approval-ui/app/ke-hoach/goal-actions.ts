@@ -14,14 +14,34 @@ import { refreshLiveProposal } from '../../lib/plan-live';
 // luôn (user 19/8: "đã note mục tiêu mới mà BOSS vẫn giữ kế hoạch cũ không cập nhật"). Đây là
 // quyết định của người (mục tiêu), không phải máy tự quyết; bản mới thay bản đang áp. Lỗi sinh
 // kế hoạch (Gemini) thì vẫn giữ mục tiêu đã lưu, kế hoạch cũ còn nguyên, không chặn người dùng.
-async function regeneratePlanAndApply(client: ReturnType<typeof getServerClient>) {
+//
+// 24/8 (user "bam luu va sinh khong duoc"): ghi run_log task=mkt.plan_manual moi lan chay
+// (ok / error + message). Trang /ke-hoach doc dong log moi nhat de hien "Lan sinh gan nhat:
+// ✅ xong" hoac "⛔ loi <ly do>" duoi nut submit — truoc console.error, user khong thay gi.
+async function regeneratePlanAndApply(client: ReturnType<typeof getServerClient>): Promise<{ ok: boolean; planId?: string; error?: string }> {
+  const startedAt = Date.now();
   try {
-    const { id } = await generateAndStorePlan(client, 'manual', { cadence: 'update' });
-    if (!id) return;
+    const { id, plan } = await generateAndStorePlan(client, 'manual', { cadence: 'update' });
+    if (!id) throw new Error('generateAndStorePlan tra ve id rong');
     await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
     await client.from('mkt_plans').update({ applied: true, applied_at: new Date().toISOString() }).eq('id', id);
+    try {
+      await client.from('run_log').insert({
+        task: 'mkt.plan_manual', actor: 'user', status: 'ok',
+        detail: { planId: id, suggestions: plan.content_suggestions?.length || 0, ms: Date.now() - startedAt },
+      });
+    } catch { /* bo qua loi ghi log */ }
+    return { ok: true, planId: id };
   } catch (e: any) {
-    console.error('[goal] sinh lai ke hoach theo muc tieu that bai:', e?.message || e);
+    const err = String(e?.message || e).slice(0, 300);
+    console.error('[goal] sinh lai ke hoach that bai:', err);
+    try {
+      await client.from('run_log').insert({
+        task: 'mkt.plan_manual', actor: 'user', status: 'error',
+        detail: { error: err, ms: Date.now() - startedAt },
+      });
+    } catch { /* bo qua */ }
+    return { ok: false, error: err };
   }
 }
 
