@@ -5,7 +5,7 @@
 //     trọng số + số bài mỗi sản phẩm + lịch theo NGÀY (sản phẩm nào mấy bài, chia sẻ nhóm nào),
 //     lưu vào MỘT bản đề xuất 'live' (origin='live', applied=false, cập nhật tại chỗ, không
 //     đầy lịch sử). KHÔNG gọi Gemini (rẻ, chạy dày được).
-//   - MỖI TỐI (>=21h VN, 1 lần/ngày): applyLiveEvening GỘP trọng số + lịch + nhóm của bản 'live'
+//   - MỖI TỐI (>=19h VN, 1 lần/ngày): applyLiveEvening GỘP trọng số + lịch + nhóm của bản 'live'
 //     VÀO bản đang áp (giữ nguyên content_suggestions/hướng đi A/B của BOSS — không phá luồng
 //     sinh bài). Hôm sau vòng xoay dùng trọng số mới.
 //   - CUỐI TUẦN: báo cáo tuần ở /do-luong/tuan (item 1a) + đề xuất Chủ nhật (learn-weekly).
@@ -40,9 +40,20 @@ const CONTENT_KIND_BY_DOW: Record<number, { kind: string; label: string }> = {
   2: { kind: 'checklist', label: 'Checklist' },  // Thứ 3
   3: { kind: 'tip', label: 'Mẹo' },              // Thứ 4
   4: { kind: 'qa', label: 'Hỏi Đáp' },           // Thứ 5
-  5: { kind: 'portrait', label: 'Chân dung' },   // Thứ 6
+  5: { kind: 'glossary', label: 'Thuật ngữ' },   // Thứ 6 (24/8: bỏ Chân dung — user: "không có mục đích")
   6: { kind: 'checklist', label: 'Checklist' },  // Thứ 7
   0: { kind: 'engage', label: 'Hỏi bà con' },    // Chủ nhật
+};
+
+// MỤC ĐÍCH từng loại content (user 24/8: "content phải có mục đích của nó") — hiện trong lịch
+// tuần + khối Hôm nay để người đọc biết bài này ĐỂ LÀM GÌ cho bà con, không đăng cho có.
+const CONTENT_PURPOSE: Record<string, string> = {
+  qa: 'bà con có thêm kiến thức dùng thiết bị, đi biển',
+  checklist: 'bà con tự kiểm tra tàu và thiết bị trước chuyến',
+  tip: 'xử lý sự cố hay gặp, đỡ tốn tiền sửa',
+  glossary: 'hiểu đúng thuật ngữ, thông số khi chọn mua thiết bị',
+  engage: 'nghe nhu cầu thật của bà con để chọn hướng bài tuần sau',
+  news: 'bà con nắm quy định mới, tránh bị phạt',
 };
 
 // Cấu trúc 1 dòng của từng loại content — hiển thị trong lịch để người đọc biết bài sẽ
@@ -158,7 +169,7 @@ function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: str
     out.push({
       date, dow, sales,
       contentCount: CONTENT_PER_DAY,
-      contentKind: ck?.kind, contentKindLabel: ck?.label,
+      contentKind: ck?.kind, contentKindLabel: ck?.label, contentPurpose: ck ? CONTENT_PURPOSE[ck.kind] : undefined,
       contentStructure: ck ? CONTENT_STRUCTURE[ck.kind] : undefined,
       direction: dirQueue[i] || null,
       groups: dayGroups,
@@ -337,10 +348,10 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
   return { id: ((data as any)?.id as string) || null };
 }
 
-// Tối (>=21h VN)? Dùng để cron biết có tự áp dụng đề xuất sống hôm nay chưa.
+// Tối (>=19h VN, user 24/8 dời từ 21h)? Dùng để cron biết có tự áp dụng đề xuất sống hôm nay chưa.
 export function isEveningVN(now: Date = new Date()): boolean {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-  return vn.getUTCHours() >= 21;
+  return vn.getUTCHours() >= 19;
 }
 
 function vnDayStartIso(now: Date): string {
@@ -352,7 +363,7 @@ function vnDayStartIso(now: Date): string {
 // content_suggestions của BOSS). Chưa có bản đang áp -> áp thẳng bản 'live'. Guard 1 lần/ngày
 // bằng cột run_log task 'mkt.live_apply'.
 export async function applyLiveEvening(client: Client, opts: { force?: boolean } = {}, now: Date = new Date()): Promise<{ applied: boolean; skipped?: string }> {
-  if (!opts.force && !isEveningVN(now)) return { applied: false, skipped: 'chua toi buoi toi (>=21h VN)' };
+  if (!opts.force && !isEveningVN(now)) return { applied: false, skipped: 'chua toi buoi toi (>=19h VN)' };
 
   if (!opts.force) {
     const { count } = await client

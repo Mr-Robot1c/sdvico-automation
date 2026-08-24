@@ -117,15 +117,19 @@ export async function GET(req: Request) {
   // ?plan=1 (kèm CRON_SECRET): ép BOSS sinh kế hoạch NGAY + áp dụng, bỏ qua lịch T2/T6 và guard
   // 1 bản/ngày. Dùng khi người giao việc đổi mục tiêu/sản phẩm tập trung và muốn thấy liền
   // (GitHub workflow mkt-metrics-pull input force_plan=true).
-  const forcePlan = new URL(req.url).searchParams.get('plan') === '1';
+  const planParam = new URL(req.url).searchParams.get('plan');
+  const forcePlan = planParam === '1' || planParam === 'weekly';
   if (forcePlan) {
+    // ?plan=weekly (24/8): ép ra BẢN TUẦN ngay (số liệu tuần vừa xong) không chờ 8h Thứ 2.
+    // generatedBy 'cron' để guard 1-bản-cron/ngày chặn cron 8h khỏi sinh trùng.
+    const forcedCadence: 'weekly' | 'update' = planParam === 'weekly' ? 'weekly' : 'update';
     try {
-      const { id, plan: p } = await generateAndStorePlan(client, 'manual', { cadence: 'update' });
+      const { id, plan: p } = await generateAndStorePlan(client, planParam === 'weekly' ? 'cron' : 'manual', { cadence: forcedCadence });
       if (id) {
         await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
         await client.from('mkt_plans').update({ applied: true, applied_at: new Date().toISOString() }).eq('id', id);
       }
-      plan = { id, ranked: p.summary.ranked, cadence: 'update', directions: p.content_suggestions?.length || 0 };
+      plan = { id, ranked: p.summary.ranked, cadence: forcedCadence, directions: p.content_suggestions?.length || 0 };
     } catch (e: any) {
       console.error('[plan] ep sinh ke hoach that bai:', e?.message || e);
       plan = { skipped: 'loi: ' + String(e?.message || e) };
@@ -225,7 +229,7 @@ export async function GET(req: Request) {
 
   // ĐỀ XUẤT SỐNG (user 20/8): mỗi 30 phút BOSS cập nhật đề xuất (trọng số + số bài mỗi sản phẩm
   // + lịch theo ngày + nhóm chia sẻ) từ số liệu mới nhất. Rẻ (không Gemini), cập nhật tại chỗ 1
-  // bản 'live'. Mỗi tối (>=21h VN, 1 lần/ngày) tự GỘP trọng số vào bản đang áp. ?live=1 ép áp ngay.
+  // bản 'live'. Mỗi tối (>=19h VN, 1 lần/ngày) tự GỘP trọng số vào bản đang áp. ?live=1 ép áp ngay.
   const forceLive = new URL(req.url).searchParams.get('live') === '1';
   let live: { proposalId?: string | null; applied?: boolean; skipped?: string; error?: string } | null = null;
   try {

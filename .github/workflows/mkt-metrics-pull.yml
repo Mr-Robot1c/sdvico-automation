@@ -19,7 +19,7 @@ on:
         type: choice
         options: ['false', 'true']
       force_plan:
-        description: 'Ép BOSS sinh lại kế hoạch ngay + áp dụng (sau khi đổi mục tiêu/sản phẩm tập trung).'
+        description: 'Ép BOSS sinh kế hoạch ngay + áp dụng: true = bản cập nhật, weekly = bản TUẦN (số liệu tuần vừa xong).'
         required: false
         default: 'false'
       force_learn:
@@ -46,6 +46,7 @@ jobs:
           if [ -z "$CRON_SECRET" ]; then echo "Thieu CRON_SECRET"; exit 1; fi
           Q=""
           if [ "$FORCE_PLAN" = "true" ]; then Q="?plan=1"; echo "FORCE PLAN: sinh ke hoach ngay + ap dung"; fi
+          if [ "$FORCE_PLAN" = "weekly" ]; then Q="?plan=weekly"; echo "FORCE PLAN WEEKLY: ban tuan ngay"; fi
           if [ "$FORCE_LEARN" = "true" ]; then Q="?learn=1"; echo "FORCE LEARN: BOSS hoc tuan ngay"; fi
           code=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
             -H "Authorization: Bearer $CRON_SECRET" \

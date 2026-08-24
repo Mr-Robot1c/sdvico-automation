@@ -75,7 +75,8 @@ export type DailyPlan = {
   // v6 (20/8, user: "ghi rõ là content gì"): loại bài content BOSS định cho ngày đó
   // (qa | checklist | glossary | tip | engage | portrait). Rotate đọc để sinh ĐÚNG loại.
   contentKind?: string;
-  contentKindLabel?: string; // nhãn tiếng Việt hiển thị ("Hỏi Đáp"...)
+  contentKindLabel?: string;
+  contentPurpose?: string;   // bài content này ĐỂ LÀM GÌ cho bà con (user 24/8) // nhãn tiếng Việt hiển thị ("Hỏi Đáp"...)
   // v7 (20/8, user: "kế hoạch phải chi tiết hơn — hướng đi gì, cấu trúc ra sao"):
   // hướng đi DỰ KIẾN cho bài bán ngày đó (map từ content_suggestions chưa dùng của bản đang
   // áp, theo đúng thứ tự vòng xoay sẽ rút). Chỉ để hiển thị; rotate vẫn tự rút lúc chạy.

@@ -177,13 +177,28 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   const sugRejected = suggestions.filter((s) => s.used_at && (s as any).rejected === true);
   const sugUsed = suggestions.filter((s) => s.used_at && (s as any).rejected !== true);
 
+  // Sắp hướng đi THEO LỊCH TUẦN (user 24/8: "hướng đi sắp xếp đi theo với kế hoạch"): hướng nào
+  // lịch xếp ngày nào thì đứng theo thứ tự ngày đó (kèm chip ngày); chưa vào lịch xếp sau; xong
+  // cặp và đã loại xuống cuối cùng.
+  const schedOrder = new Map<string, { idx: number; dow: string; date: string }>();
+  (liveData?.daily_schedule || []).forEach((d: any, i: number) => {
+    const t = String(d.direction?.title || '').trim().toLowerCase();
+    if (t && !schedOrder.has(t)) schedOrder.set(t, { idx: i, dow: d.dow, date: d.date });
+  });
+  const sugKeyOf = (s: any) => String(s.title || '').trim().toLowerCase();
+  const orderedSuggestions = [
+    ...sugFresh.slice().sort((a, b) => (schedOrder.get(sugKeyOf(a))?.idx ?? 99) - (schedOrder.get(sugKeyOf(b))?.idx ?? 99)),
+    ...sugUsed,
+    ...sugRejected,
+  ];
+
   return (
     <main>
       <header className="head-row">
         <div>
           <h1>Kế hoạch</h1>
           <p className="sub">
-            BOSS đọc số liệu rồi tự cập nhật đề xuất mỗi 30 phút, mỗi tối tự áp trọng số, cuối tuần báo cáo. Bài vẫn chờ người bấm Duyệt mới đăng.
+            Chủ nhật 19h BOSS học số liệu tuần, Thứ 2 8h ra kế hoạch tuần, mỗi tối 19h điều chỉnh nhẹ theo số liệu từng ngày. Bài vẫn chờ người bấm Duyệt mới đăng.
           </p>
         </div>
         <div className="head-actions">
@@ -211,8 +226,8 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 : 'không có bài bán hôm nay')}
             </div>
             <div>
-              <b>🕐 Content 12h30:</b> {todayPlan.contentKindLabel || vnInt(todayPlan.contentCount)}
-              {todayPlan.contentStructure ? <span className="sub"> — {todayPlan.contentStructure}</span> : null}
+              <b>🕐 Content 12h30:</b> <span title={todayPlan.contentStructure || ''}>{todayPlan.contentKindLabel || vnInt(todayPlan.contentCount)}</span>
+              {(todayPlan as any).contentPurpose ? <span className="sub"> — để {(todayPlan as any).contentPurpose}</span> : null}
             </div>
             <div>
               <b>📣 Chia sẻ vào nhóm:</b>{' '}
@@ -299,6 +314,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                       </td>
                       <td>
                         <span title={d.contentStructure || ''}>{d.contentKindLabel ? <b>{d.contentKindLabel}</b> : vnInt(d.contentCount)}</span>
+                        {(d as any).contentPurpose ? <div className="sub" style={{ marginTop: 2 }}>để {(d as any).contentPurpose}</div> : null}
                       </td>
                       <td className="sub">{d.groups.length ? d.groups.join(', ') : '—'}</td>
                     </tr>
@@ -323,13 +339,16 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             </p>
           ) : null}
           <p className="sub" style={{ margin: '4px 0 8px' }}>
-            BOSS đề xuất góc bài từ kho tri thức. Mỗi hướng chạy trong một ngày: bản thử A ra 7h sáng, bản B ra 12h30 chiều; đủ cặp thì Evaluator so xem bản nào ăn hơn.
+            Xếp theo thứ tự lịch tuần bên trên. Mỗi hướng chạy trong một ngày: bản thử A ra 7h sáng, bản B ra 12h30 chiều; đủ cặp thì Evaluator so xem bản nào ăn hơn.
           </p>
           <ul className="directions-list" style={{ margin: 0 }}>
-            {suggestions.map((d, i) => (
+            {orderedSuggestions.map((d, i) => (
               <li key={i} className="direction-item" style={d.used_at ? { opacity: 0.55 } : undefined}>
                 <div className="direction-head">
                   <b>{d.title}</b>
+                  {!d.used_at && schedOrder.has(sugKeyOf(d)) ? (
+                    <span className="badge" style={{ marginLeft: 8 }} title="Ngày lịch tuần xếp chạy hướng này">📅 {schedOrder.get(sugKeyOf(d))!.dow} {fmtDate(schedOrder.get(sugKeyOf(d))!.date)}</span>
+                  ) : null}
                   {!d.used_at && (d as any).carried !== true && !(d as any).pending_variant ? (
                     <span className="badge tone-ok" style={{ marginLeft: 8 }} title="Hướng mới của bản kế hoạch đang áp.">✨ mới</span>
                   ) : null}

@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-21
 ttl_days: 90
+<!-- re-verified: 2026-08-24 02:30 - Gio moi user chot: CN 19h hoc tuan, T2 8h ban tuan (tu ap), moi toi 19h chinh dan. Content bo loai Chan dung (T6 -> Thuat ngu), moi loai content khai MUC DICH (CONTENT_PURPOSE). ?plan=weekly ep ban tuan ngay. -->
 <!-- re-verified: 2026-08-23 18:30 - Ban ke hoach TUAN (cron Thu 2) TU AP (sua R5 hanh vi: truoc applied=false cho nguoi bam; theo nguyen tac 22/8 do luong tuan -> ke hoach tuan, ban tuan la xuong song tu dong). Ban cap nhat Thu 6 + de xuat learn-weekly van chi de xuat. Evaluator ghep cap theo huong di (khong theo ab_pair_id). Trang Nguon hien cach Evaluator so + ket luan. -->
 <!-- re-verified: 2026-08-22 12:30 - NGUYEN TAC BOSS user chot 22/8 (sua NV4/NV5 hanh vi): ban tuan lay DO LUONG TUAN VUA XONG (khong 7 ngay truot); so lieu ngay chi DICH trong so +-0.5/toi (dampWeights), khong lat ke hoach tuan; huong di A/B giu nguyen. Bai page khac gan nhan o Do luong (khong loai khoi xep hang — user chi yeu cau ghi chu). -->
 <!-- re-verified: 2026-08-21 19:55 - Edge fallback voice -> HoaiMy (nu) — khong doi flow NV. -->

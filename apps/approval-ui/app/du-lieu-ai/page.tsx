@@ -81,12 +81,15 @@ export default async function Page() {
   // ---- BOSS ----
   const latestPlan = (plans || [])[0] as any;
   const appliedPlan = (plans || []).find((p: any) => p.applied) as any;
+  // Số liệu thẻ BOSS đọc từ bản ĐANG ÁP (24/8: bản mới nhất có thể là đề xuất learn-weekly
+  // không có hướng đi -> thẻ hiện 0 hướng đi, 0 nguồn dù bản đang áp đầy đủ).
+  const bossPlan = (appliedPlan || latestPlan) as any;
   const bossLast = latestPlan?.created_at || null;
-  const bossSug: any[] = latestPlan?.data?.content_suggestions || [];
+  const bossSug: any[] = bossPlan?.data?.content_suggestions || [];
   const bossSugUsed = bossSug.filter((s) => s.used_at).length;
   const bossSugPending = bossSug.filter((s) => !s.used_at && s.pending_variant).length;
-  const bossKnowledge = latestPlan?.data?.summary?.knowledge;
-  const bossCadence = latestPlan?.data?.cadence === 'weekly' ? 'Kế hoạch tuần (Thứ 2)' : latestPlan?.data?.cadence === 'update' ? 'Cập nhật giữa tuần (Thứ 6)' : latestPlan?.generated_by === 'manual' ? 'Tạo tay' : 'Tự động';
+  const bossKnowledge = bossPlan?.data?.summary?.knowledge;
+  const bossCadence = latestPlan?.data?.origin === 'learn-weekly' ? 'Học tuần (Chủ nhật)' : latestPlan?.data?.cadence === 'weekly' ? 'Kế hoạch tuần (Thứ 2)' : latestPlan?.data?.cadence === 'update' ? 'Cập nhật giữa tuần (Thứ 6)' : latestPlan?.generated_by === 'manual' ? 'Tạo tay' : 'Tự động';
 
   // ---- Creator ----
   const cr = (creator || []) as any[];
@@ -136,7 +139,7 @@ export default async function Page() {
     },
     {
       key: 'boss', icon: '🧠', name: 'AI Planner · BOSS',
-      role: 'Thứ 2 ra kế hoạch tuần, Thứ 6 cập nhật; gom tri thức 2 AI Data + số đo lường + kết luận A/B để ra hướng đi cho Creator.',
+      role: 'CN 19h học số liệu tuần, Thứ 2 8h ra kế hoạch tuần, mỗi tối 19h chỉnh nhẹ; gom tri thức 2 AI Data + kết luận A/B để ra hướng đi cho Creator.',
       last: bossLast, health: bossLast ? ((Date.now() - new Date(bossLast).getTime()) / 86400000 <= 7 ? 'ok' : 'warn') : 'idle',
       stats: [
         { n: bossSug.length, l: 'hướng đi' },
@@ -144,7 +147,7 @@ export default async function Page() {
         { n: bossKnowledge ? (bossKnowledge.internal || 0) + (bossKnowledge.publicSrc || 0) : 0, l: 'nguồn đã đọc' },
       ],
       latest: latestPlan
-        ? `Bản mới nhất: ${bossCadence}, ${fmtDT(bossLast)}${appliedPlan ? (appliedPlan.id === latestPlan.id ? ' — đang áp dụng' : ' — bản đang áp dụng là bản cũ hơn') : ' — chưa áp dụng'}${latestPlan.data?.goal ? `. Mục tiêu: ${latestPlan.data.goal}` : '. Không có mục tiêu giao, BOSS tự định hướng.'}${bossSugPending ? ` ${vnInt(bossSugPending)} hướng đang chờ bản B.` : ''}`
+        ? `Bản mới nhất: ${bossCadence}, ${fmtDT(bossLast)}${appliedPlan ? (appliedPlan.id === latestPlan.id ? ' — đang áp dụng' : ' — bản đang áp dụng là bản cũ hơn') : ' — chưa áp dụng'}${bossPlan?.data?.goal ? `. Mục tiêu: ${bossPlan.data.goal}` : '. Không có mục tiêu giao, BOSS tự định hướng.'}${bossSugPending ? ` ${vnInt(bossSugPending)} hướng đang chờ bản B.` : ''}`
         : 'Chưa có bản kế hoạch nào.',
       link: '/ke-hoach',
     },

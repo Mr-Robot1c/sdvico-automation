@@ -479,7 +479,8 @@ export async function GET(req: Request) {
     // Bài portrait không cần duyệt cấp quản lý (không chạm quy định nhà nước); người duyệt vẫn đọc
     // thật + gắn ảnh thật trước khi duyệt (điều cấm 5). news=0: giữ tắt, dễ chạm quy định
     // (điều cấm 3), chỉ viết tay khi có nguồn chính thống.
-    const KIND_WEIGHT: Record<string, number> = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 1, news: 0 };
+    // portrait: 0 (24/8, user: "chân dung chả có mục đích gì") — bỏ khỏi vòng random, prompt giữ cho bài cũ.
+    const KIND_WEIGHT: Record<string, number> = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 0, news: 0 };
     const kindTotal = Object.values(KIND_WEIGHT).reduce((a, b) => a + b, 0);
     let r = Math.random() * kindTotal;
     let chosenKind = 'qa';

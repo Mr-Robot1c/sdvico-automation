@@ -93,8 +93,8 @@ export async function learnWeekly(client: Client, opts: { force?: boolean } = {}
     return { planId: null, ranked: 0, skipped: 'da co ban learn-weekly trong 24 gio qua' };
   }
 
-  // Đọc số liệu tuần VỪA KẾT THÚC. Chủ Nhật 23h chạy thì offset=0 là tuần đang khép lại,
-  // dùng offset=0 (T2-CN tuần này, số liệu tới CN 23h).
+  // Đọc số liệu tuần VỪA KẾT THÚC. Chủ Nhật 19h chạy thì offset=0 là tuần đang khép lại,
+  // dùng offset=0 (T2-CN tuần này, số liệu tới CN 19h).
   const report = await buildWeekReport(client, 0, now);
 
   if (report.totals.posts === 0) {
@@ -181,10 +181,10 @@ export async function learnWeekly(client: Client, opts: { force?: boolean } = {}
 }
 
 // Chỉ chạy vào Chủ Nhật giờ VN, từ 23:00 trở đi. Cron 30 phút/lần nên tự chặn trùng ở
-// alreadyRanThisWeek. Trước 23h hoặc ngày khác: trả false, không chạy.
+// alreadyRanThisWeek. Trước 19h hoặc ngày khác: trả false, không chạy.
 export function shouldRunLearnWeekly(now: Date = new Date()): boolean {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
   const dow = vn.getUTCDay(); // 0 = CN
   const hour = vn.getUTCHours();
-  return dow === 0 && hour >= 23;
+  return dow === 0 && hour >= 19;
 }

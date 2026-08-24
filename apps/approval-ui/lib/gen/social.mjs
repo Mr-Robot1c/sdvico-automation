@@ -139,15 +139,15 @@ export async function generateSocialPost({
 // Chỉ dẫn cấu trúc bài cho từng LOẠI content. AI phải theo đúng dạng để bài hữu ích, không sáo rỗng.
 const CONTENT_TYPE_INSTRUCTION = {
   checklist:
-    'Bài dạng CHECKLIST. Viết 1 câu mở ngắn dẫn dắt, XUỐNG DÒNG TRỐNG, rồi liệt kê 5 tới 7 mục ĐÁNH SỐ (1. 2. 3. ...). MỖI MỤC PHẢI XUỐNG DÒNG RIÊNG (dùng 2 ký tự xuống dòng \\n\\n giữa các mục để cách 1 dòng trống nhìn cho thoáng, KHÔNG viết liền nhau trong 1 đoạn). Mỗi mục dài 8 tới 15 từ, đầu mục có 1 emoji hợp cảnh (⚓ 🛟 🌊 📡 💧 ⚙️). Sau mục cuối, XUỐNG DÒNG TRỐNG, kết bằng 1 câu nhắc bà con lưu bài hoặc chia sẻ cho anh em.',
+    'MỤC ĐÍCH BÀI: giúp bà con tự kiểm tra tàu và thiết bị trước chuyến biển. Bài dạng CHECKLIST. Viết 1 câu mở ngắn dẫn dắt, XUỐNG DÒNG TRỐNG, rồi liệt kê 5 tới 7 mục ĐÁNH SỐ (1. 2. 3. ...). MỖI MỤC PHẢI XUỐNG DÒNG RIÊNG (dùng 2 ký tự xuống dòng \\n\\n giữa các mục để cách 1 dòng trống nhìn cho thoáng, KHÔNG viết liền nhau trong 1 đoạn). Mỗi mục dài 8 tới 15 từ, đầu mục có 1 emoji hợp cảnh (⚓ 🛟 🌊 📡 💧 ⚙️). Sau mục cuối, XUỐNG DÒNG TRỐNG, kết bằng 1 câu nhắc bà con lưu bài hoặc chia sẻ cho anh em.',
   glossary:
-    'Bài dạng GIẢI THÍCH THUẬT NGỮ. Câu đầu ĐỊNH NGHĨA gọn trong 1 dòng (dạng "X là..."). Sau đó 3 tới 4 câu giải thích ngắn: dùng để làm gì, khi nào bà con gặp, cần lưu ý gì. Không đi sâu kỹ thuật, dùng ví dụ đời thường. Không bịa số liệu.',
+    'MỤC ĐÍCH BÀI: giúp bà con hiểu đúng thuật ngữ, thông số khi chọn mua thiết bị. Bài dạng GIẢI THÍCH THUẬT NGỮ. Câu đầu ĐỊNH NGHĨA gọn trong 1 dòng (dạng "X là..."). Sau đó 3 tới 4 câu giải thích ngắn: dùng để làm gì, khi nào bà con gặp, cần lưu ý gì. Không đi sâu kỹ thuật, dùng ví dụ đời thường. Không bịa số liệu.',
   tip:
-    'Bài dạng MẸO / KINH NGHIỆM. Nêu vấn đề bà con hay gặp trong 1 câu, chỉ ra 2 tới 3 NGUYÊN NHÂN hoặc thói quen sai lầm (đánh dấu bằng ⚠️), rồi 2 tới 3 CÁCH XỬ LÝ (đánh dấu bằng ✅). Ngắn, thực dụng, không lý thuyết chung chung.',
+    'MỤC ĐÍCH BÀI: giúp bà con xử lý sự cố hay gặp, đỡ tốn tiền sửa. Bài dạng MẸO / KINH NGHIỆM. Nêu vấn đề bà con hay gặp trong 1 câu, chỉ ra 2 tới 3 NGUYÊN NHÂN hoặc thói quen sai lầm (đánh dấu bằng ⚠️), rồi 2 tới 3 CÁCH XỬ LÝ (đánh dấu bằng ✅). Ngắn, thực dụng, không lý thuyết chung chung.',
   qa:
-    'Bài dạng HỎI - ĐÁP. Bắt đầu bằng dòng "❓ Hỏi: <câu hỏi>" rồi dòng "💡 Đáp: <câu trả lời gọn 3 tới 5 câu>". Đáp phải đi thẳng, chính xác, có thể mở rộng 1 tới 2 lưu ý. Không lan man.',
+    'MỤC ĐÍCH BÀI: giúp bà con có thêm kiến thức dùng thiết bị, đi biển. Bài dạng HỎI - ĐÁP. Bắt đầu bằng dòng "❓ Hỏi: <câu hỏi>" rồi dòng "💡 Đáp: <câu trả lời gọn 3 tới 5 câu>". Đáp phải đi thẳng, chính xác, có thể mở rộng 1 tới 2 lưu ý. Không lan man.',
   engage:
-    'Bài dạng ĐẶT CÂU HỎI để bà con bình luận. Rất ngắn: 2 tới 3 câu dẫn dắt cảm xúc/kỷ niệm, rồi KẾT bằng câu hỏi mở (dấu ? cuối) mời bà con kể chuyện trong bình luận. Không nêu sản phẩm, không nhắc SDVICO trong bài này.',
+    'MỤC ĐÍCH BÀI: nghe nhu cầu thật của bà con để chọn hướng bài tuần sau. Bài dạng ĐẶT CÂU HỎI để bà con bình luận. Rất ngắn: 2 tới 3 câu dẫn dắt cảm xúc/kỷ niệm, rồi KẾT bằng câu hỏi mở (dấu ? cuối) mời bà con kể chuyện trong bình luận. Không nêu sản phẩm, không nhắc SDVICO trong bài này.',
   portrait:
     'Bài dạng CHÂN DUNG NGƯỜI TRONG NGHỀ, viết HOÀN CHỈNH để đăng ngay (sếp chốt 19/8: điền sẵn, không để ô trống). Nhân vật là NGƯỜI ĐIỂN HÌNH: gọi thân mật kiểu "bác Ba", "chú Bảy", "anh Tư" (KHÔNG họ tên đầy đủ), tuổi khoảng 45-65 (hoặc 28-35 nếu ngư dân trẻ), địa phương ven biển Bà Rịa Vũng Tàu (Long Hải, Phước Tỉnh, Bình Châu, Lộc An, Bến Đá) hoặc miền Trung, số năm bám biển. Cấu trúc: 1 câu mở giới thiệu (tên gọi + tuổi + địa phương + số năm đi biển; tuổi và số năm viết bằng CHỮ SỐ, ví dụ "bác Ba 55 tuổi", "30 năm bám biển", KHÔNG viết "năm mươi lăm tuổi"), 2-3 câu bối cảnh nghề, 1 câu NÓI của nhân vật trong ngoặc kép (giọng chân chất, đúng đời sống ngư dân, không sáo), 1 câu kết chúc bà con. KHÔNG dùng ngoặc vuông, KHÔNG để chỗ trống, KHÔNG ghi chú "khung sườn"; KHÔNG gán số liệu doanh thu/sản lượng cụ thể cho nhân vật.',
   news:

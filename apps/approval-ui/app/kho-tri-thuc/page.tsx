@@ -221,7 +221,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
                 <div><b>Bản đang áp</b> · tạo {fmtDT(plan.generatedAt || applied.created_at)} · nhịp {plan.cadence === 'weekly' ? 'tuần (Thứ 2)' : plan.cadence === 'update' ? 'cập nhật' : 'bấm tay'}</div>
                 <div>Nguồn số liệu: <b>{plan.measurement_source || '7 ngày gần nhất'}</b></div>
                 <div>Tri thức đã đọc khi lập: <b>{vn(kn.internal)}</b> nội bộ, <b>{vn(kn.publicSrc)}</b> public{concluded.length ? <>, <b>{vn(verdicts.length)}</b> kết luận A/B</> : null}</div>
-                <div className="sub">Lịch: học tuần Chủ nhật 23h · kế hoạch tuần Thứ 2 8h (tự áp) · chỉnh dần mỗi tối 21h theo số liệu ngày, tối đa 0,5 điểm{learn ? ` · đề xuất học tuần gần nhất ${fmtDT(learn.created_at)}${learn.applied ? ' (đã áp)' : ' (chờ áp)'}` : ''}</div>
+                <div className="sub">Lịch: học tuần Chủ nhật 19h · kế hoạch tuần Thứ 2 8h (tự áp) · chỉnh dần mỗi tối 19h theo số liệu ngày, tối đa 0,5 điểm{learn ? ` · đề xuất học tuần gần nhất ${fmtDT(learn.created_at)}${learn.applied ? ' (đã áp)' : ' (chờ áp)'}` : ''}</div>
               </div>
 
               <h2 style={{ fontSize: '1.05rem', margin: '0 0 8px' }}>Xếp hạng sản phẩm</h2>
@@ -258,7 +258,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
               </div>
 
               <h2 style={{ fontSize: '1.05rem', margin: '18px 0 8px' }}>Nhật ký chỉnh dần theo số liệu ngày</h2>
-              {adjustLog.length === 0 ? <p className="sub">Chưa có lần chỉnh nào (bắt đầu từ tối 22/8, mỗi tối 21h).</p> : (
+              {adjustLog.length === 0 ? <p className="sub">Chưa có lần chỉnh nào (mỗi tối 19h).</p> : (
                 <ul className="kt-list">
                   {adjustLog.slice().reverse().slice(0, 20).map((a, i) => (
                     <li key={i} className="kt-item"><span className="muted" style={{ fontSize: '.8rem' }}>{fmtDT(a.at)}</span> · {a.product}: {vnDec(a.from)} {a.to > a.from ? 'lên' : 'xuống'} {vnDec(a.to)}{a.target !== a.to ? ` (đang hướng ${vnDec(a.target)})` : ''}</li>
