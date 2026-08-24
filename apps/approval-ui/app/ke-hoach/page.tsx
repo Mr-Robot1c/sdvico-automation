@@ -246,6 +246,24 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         })()}
       </section>
 
+      {/* ===== De xuat hoc tuan (Chu nhat) — chi hien khi co ===== */}
+      {learnSuggestion ? (
+        <section className="plan-card" style={{ borderLeft: '6px solid var(--ok, #1a9e6f)', marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 320px' }}>
+              <b>🧪 Đề xuất cuối tuần từ số liệu</b>
+              <p className="sub" style={{ margin: '4px 0' }}>
+                Sinh lúc {fmtDateTime(learnSuggestion.created_at)}. {(learnSuggestion.data.narrative || [])[0] || ''}
+              </p>
+            </div>
+            <form action={applyPlanWeights}>
+              <input type="hidden" name="plan_id" value={learnSuggestion.id} />
+              <button className="btn ok" type="submit">Áp dụng đề xuất</button>
+            </form>
+          </div>
+        </section>
+      ) : null}
+
       {/* ===== 1. HOM NAY ===== */}
       <section className="plan-card" style={{ borderLeft: '6px solid var(--accent, #1f5fbf)', marginBottom: 14 }}>
         <b style={{ fontSize: '1.05rem' }}>📌 Hôm nay ({fmtDate(today)})</b>
@@ -447,72 +465,22 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </section>
       ) : null}
 
-      {/* ===== De xuat hoc tuan (Chu nhat) — chi hien khi co ===== */}
-      {learnSuggestion ? (
-        <section className="plan-card" style={{ borderLeft: '6px solid var(--ok, #1a9e6f)', marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 320px' }}>
-              <b>🧪 Đề xuất cuối tuần từ số liệu</b>
-              <p className="sub" style={{ margin: '4px 0' }}>
-                Sinh lúc {fmtDateTime(learnSuggestion.created_at)}. {(learnSuggestion.data.narrative || [])[0] || ''}
-              </p>
-            </div>
-            <form action={applyPlanWeights}>
-              <input type="hidden" name="plan_id" value={learnSuggestion.id} />
-              <button className="btn ok" type="submit">Áp dụng đề xuất</button>
-            </form>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ===== 4. CAI DAT (thu gon) ===== */}
-      <details id="cai-dat" className="plan-card" style={{ marginBottom: 14 }}>
+      {/* ===== 4. NHOM CHIA SE (24/8: bo details Cai dat trung Muc tieu/Focus; chi giu Nhom chia se) ===== */}
+      <details className="plan-card" style={{ marginBottom: 14 }}>
         <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1.02rem' }}>
-          ⚙️ Cài đặt cho BOSS
-          <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>
-            {focusActive ? `tập trung: ${focusGroups.join(', ')}` : 'đủ sản phẩm'} · {shareGroups.length} nhóm chia sẻ
-          </span>
+          👥 Nhóm chia sẻ Facebook
+          <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>{shareGroups.length} nhóm — quản lý ở Quản lý bài viết</span>
         </summary>
-
-        <form action={saveWeeklyGoal} style={{ marginTop: 12 }}>
-          <b>🎯 Mục tiêu tuần</b>
-          <p className="sub" style={{ margin: '2px 0 6px' }}>Viết như giao việc. Bỏ trống thì BOSS tự định hướng theo dữ liệu.</p>
-          <textarea name="goal_text" defaultValue={goalText} rows={4} placeholder="Ví dụ: tuần này ưu tiên máy lọc dầu SF-50, cần 20 cuộc gọi về tổng đài." />
-          <div style={{ marginTop: 6 }}><button className="btn ok" type="submit">Lưu mục tiêu</button></div>
-        </form>
-
-        <form action={saveFocus} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-          <b>🎯 Tuần này chỉ đăng sản phẩm</b>
-          <p className="sub" style={{ margin: '2px 0 6px' }}>
-            Gõ tên cách nhau dấu phẩy (ví dụ <code>lọc dầu, lọc nước</code>). Trống và Lưu = đủ sản phẩm.
-            {focusGroups.length ? ` Đang: ${focusGroups.join(', ')}${focusUntil ? ` (đến ${fmtDate(focusUntil)})` : ''}.` : ''}
-          </p>
-          <div className="row" style={{ alignItems: 'center' }}>
-            <input className="note" name="focus_groups" defaultValue={focusGroups.join(', ')} placeholder="lọc dầu, lọc nước" style={{ maxWidth: 360 }} aria-label="Sản phẩm tập trung" />
-            <label className="sub" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              đến hết ngày
-              <input type="date" name="focus_until" defaultValue={focusUntil} className="note" style={{ maxWidth: 170, flex: '0 0 auto' }} aria-label="Đến ngày" />
-            </label>
-            <button className="btn ok" type="submit">Lưu</button>
+        <p className="sub" style={{ margin: '10px 0 6px' }}>
+          Dùng chung với nút <b>📣 Chia sẻ vào group</b> ở trang Quản lý bài viết — thêm, xóa, đổi tên nhóm ở đó. BOSS đọc danh sách này để xếp lịch chia sẻ theo ngày.
+        </p>
+        {shareGroups.length ? (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
           </div>
-        </form>
-
-        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-          <b>👥 Nhóm chia sẻ (Facebook groups bạn đang ở)</b>
-          <p className="sub" style={{ margin: '2px 0 6px' }}>
-            Dùng CHUNG danh sách với nút <b>📣 Chia sẻ vào group</b> ở trang Quản lý bài viết — thêm, xóa, đổi tên nhóm ở đó.
-            BOSS đọc danh sách này để xếp lịch chia sẻ theo ngày.
-          </p>
-          {shareGroups.length ? (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
-            </div>
-          ) : (
-            <p className="sub" style={{ margin: 0 }}>
-              Chưa có nhóm nào. Mở <a href="/noi-dung">Quản lý bài viết</a>, bấm 📣 Chia sẻ vào group ở một bài đã đăng rồi thêm nhóm — danh sách tự đồng bộ về đây.
-            </p>
-          )}
-        </div>
+        ) : (
+          <p className="sub" style={{ margin: 0 }}>Chưa có nhóm nào. Mở <a href="/noi-dung">Quản lý bài viết</a> để thêm.</p>
+        )}
       </details>
 
       {/* ===== 5. Ban ke hoach hien tai + lich su (gon 24/8) =====
