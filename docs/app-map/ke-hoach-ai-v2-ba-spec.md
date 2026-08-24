@@ -2,8 +2,9 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
-last_verified: 2026-08-21
+last_verified: 2026-08-24
 ttl_days: 90
+<!-- re-verified: 2026-08-24 14:45 - Migration 20260824150000_mkt_metrics_source_tiktok noi CHECK mkt_metrics.source them 'tiktok'. KHONG doi flow NV Ke hoach: mkt_metrics vao loadMeasurementFromWeekReport (plan.ts) van chi query source='facebook'; tiktok chi phuc vu bang so lieu /do-luong. -->
 <!-- re-verified: 2026-08-24 12:35 - UI bang tuan refactor thanh danh sach details.tuan-day (khong doi flow NV, chi doi trinh bay). -->
 <!-- re-verified: 2026-08-24 12:15 - /ke-hoach lich tuan hien lai (query live fallback khong bi rop limit 12) + moi ngay co <details> Xem truoc (2 ban A/B + Content + Nhom). Khong doi flow NV. --><!-- re-verified: 2026-08-24 11:15 - Fix R5: ap dung ban learn-weekly = MERGE weights vao ban dang ap (giu huong di), khong thay hang; Nhom chia se dua len tren cung cum cau hinh. Khong doi flow NV. -->
 <!-- re-verified: 2026-08-24 10:40 - /ke-hoach thu tu: Muc tieu+Focus (form) -> De xuat learn-weekly -> Hom nay -> lich tuan -> Huong di -> Nhom chia se -> Ban dang ap. Bo form trung. Khong doi flow NV. -->

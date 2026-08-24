@@ -7,6 +7,7 @@ Thư mục này chứa lược đồ cơ sở dữ liệu và chính sách bảo
 - `migrations/20260810140000_core.sql`: bảng app_config cho công tắc dừng khẩn và daily_counters cho bộ đếm hạn mức, kèm RLS.
 - `migrations/20260813000000_mkt_oauth_tokens.sql`: bảng lưu token OAuth (TikTok) cần refresh, RLS bật không policy nên chỉ service_role (backend) đọc ghi.
 - `migrations/20260813150000_widen_channel_source_checks.sql`: nới CHECK cho `mkt_posts.channel` (thêm `tiktok`) và `mkt_metrics.source` (thêm `manual`). Sửa lỗi ngầm: bản ghi `channel='tiktok'` trước đây bị chặn mà không báo lỗi.
+- `migrations/20260824150000_mkt_metrics_source_tiktok.sql`: nới CHECK `mkt_metrics.source` thêm `'tiktok'`. Cần từ 24/8 khi cron bắt đầu kéo view/like/comment TikTok vào `mkt_metrics` (source='tiktok').
 - `migrations/20260814120000_mkt_plans.sql`: bảng `mkt_plans` cho con bot định hướng. Mỗi bản kế hoạch (cron thứ 4 và chủ nhật, hoặc bấm tạo tay) lưu ở đây kèm trọng số sản phẩm. RLS bật, policy staff như các bảng mkt khác. Trang `/ke-hoach` và cron `/api/plan` cần bảng này, phải áp trước khi deploy.
 
 ## Cách áp dụng

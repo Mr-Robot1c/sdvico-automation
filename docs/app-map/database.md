@@ -2,8 +2,9 @@
 
 > Load khi / Load when: cần biết lược đồ bảng, cột chính và chính sách RLS. Nguồn sự thật là `supabase/migrations` (doc này tóm tắt, migration mới thì cập nhật ở đây cùng commit).
 covers: supabase/migrations
-last_verified: 2026-08-14
+last_verified: 2026-08-24
 ttl_days: 180
+<!-- re-verified: 2026-08-24 14:45 - Migration 20260824150000_mkt_metrics_source_tiktok: noi CHECK mkt_metrics.source them 'tiktok'. Cap nhat mo ta hang mkt_metrics duoi day (gsc/ga4/facebook/youtube/tiktok/manual). Ly do: cron 24/8 keo TikTok view/like/comment vao mkt_metrics source='tiktok' nhung constraint chua cho, insert bi chan. USER paste .sql vao Supabase SQL Editor de ap. -->
 <!-- re-verified: 2026-08-13 - Lap doc luoc do lan dau: liet ke 14 bang tu supabase/migrations. Them mkt_oauth_tokens (token OAuth TikTok, RLS khong policy = chi service_role doc/ghi). -->
 <!-- re-verified: 2026-08-14 - Migration 20260813150000 noi CHECK: mkt_posts.channel them 'tiktok', mkt_metrics.source them 'manual'. Cap nhat 2 hang bang tuong ung. -->
 <!-- re-verified: 2026-08-14 - Migration 20260814100000: them cot brand_assets.product_group (folder san pham theo STT) + index. Phuc vu vong xoay dang bai hang ngay theo folder. -->
@@ -24,7 +25,7 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 | mkt_keywords | Marketing | Kho từ khóa, phân loại theo ý định | Bật, staff |
 | mkt_content | Marketing | Nội dung + trạng thái, cờ needs_gov_review, brief.assets | Bật, staff |
 | mkt_posts | Marketing | Bài đã đăng + kênh (facebook/website/youtube/tiktok), external_url | Bật, staff |
-| mkt_metrics | Marketing | Số liệu đo lường (gsc/ga4/facebook/youtube/manual) | Bật, staff |
+| mkt_metrics | Marketing | Số liệu đo lường (gsc/ga4/facebook/youtube/tiktok/manual) | Bật, staff |
 | mkt_oauth_tokens | Marketing | Token OAuth cần refresh (TikTok): access/refresh token, hạn. **RLS không policy = chỉ service_role đọc/ghi, không lộ ra giao diện** | Bật, service_role only |
 | mkt_plans | Marketing | Kế hoạch định hướng do bot sinh từ số liệu Đo lường (cron T4 & CN hoặc bấm tay). data jsonb chứa xếp hạng + trọng số + đoạn định hướng; `applied` bật thì vòng xoay ưu tiên theo; v2 thêm `summary.knowledge` (số nguồn tri thức 7 ngày đã dùng) | Bật, staff |
 | mkt_knowledge_internal | Marketing | Tri thức nội bộ (file trong bucket kho-tri-thuc-noi-bo, Cowork xuất từ Zalo). Cột `source_path` UNIQUE để idempotent. Chỉ nguyên liệu cho Kế hoạch AI | Bật, staff |
