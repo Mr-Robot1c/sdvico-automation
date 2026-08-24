@@ -114,22 +114,6 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   const today = todayVN();
   const todayPlan = liveData?.daily_schedule?.find((d) => d.date === today) || null;
 
-  // Bang chung hom nay may DA sinh bai theo huong nao (user 20/8: "tao huong di ma cha thay
-  // dung"): doc mkt_content sinh hom nay co brief.suggestion_title. Huong da dung nam o ban
-  // ke hoach TRUOC (bi thay giua ngay) van hien duoc o day.
-  const dayStartIso = new Date(new Date(today + 'T00:00:00+07:00')).toISOString();
-  const { data: todayGen } = await client
-    .from('mkt_content')
-    .select('brief')
-    .gte('created_at', dayStartIso)
-    .eq('brief->>generator', 'rotation')
-    .limit(20);
-  const usedTodayTitles = [...new Set(
-    (todayGen || [])
-      .map((r: any) => String(r.brief?.suggestion_title || '').trim())
-      .filter(Boolean)
-  )];
-
   // ĐĂNG LẠI BÀI CŨ ĂN KHÁCH (user 20/8: "máy tự đề xuất đăng lại bài cũ ăn khách"):
   // bài đã đăng từ 7 ngày trước trở lên, lấy tương tác từ snapshot metric mới nhất, chọn top 3.
   // Máy chỉ ĐỀ XUẤT — người mở bài, copy, chia sẻ lại (nút 📣 ở Quản lý bài viết).
@@ -169,12 +153,10 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       .slice(0, 3);
   }
 
-  // Huong di bai viet tu ban DANG AP (content_suggestions).
+  // Huong di bai viet tu ban DANG AP (chi con dung `suggestions.length` cho badge header +
+  // dong chan doan focus). Section "Huong di bai viet" rieng da xoa 24/8 — chi tiet nam
+  // trong lich 7 ngay + trang /kho-tri-thuc?ai=boss.
   const suggestions = appliedRow?.data?.content_suggestions || [];
-  const sugFresh = suggestions.filter((s) => !s.used_at);
-  // Hướng MỚI của bản đang áp = chưa dùng và KHÔNG mang cờ carried (giữ lại từ bản trước).
-  // Bấm "Tạo kế hoạch ngay" xong nhìn số này + badge ✨ là biết có gì mới (user 21/8).
-  const sugNew = sugFresh.filter((s) => (s as any).carried !== true && !(s as any).pending_variant);
   const appliedGeneratedAt = String(appliedRow?.data?.generatedAt || '');
   const fmtGenAt = (() => {
     const d = new Date(appliedGeneratedAt);
@@ -183,25 +165,6 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
     const g = (t: string) => p.find((x) => x.type === t)?.value || '';
     return `${g('hour')}:${g('minute')} ${g('day')}/${g('month')}`;
   })();
-  // Hướng bị TỪ CHỐI bản thử (rejected) tách khỏi "xong cặp" — user 21/8: hướng vừa bị
-  // loại mà hiện "✓ xong cặp A + B" là sai bản chất.
-  const sugRejected = suggestions.filter((s) => s.used_at && (s as any).rejected === true);
-  const sugUsed = suggestions.filter((s) => s.used_at && (s as any).rejected !== true);
-
-  // Sắp hướng đi THEO LỊCH TUẦN (user 24/8: "hướng đi sắp xếp đi theo với kế hoạch"): hướng nào
-  // lịch xếp ngày nào thì đứng theo thứ tự ngày đó (kèm chip ngày); chưa vào lịch xếp sau; xong
-  // cặp và đã loại xuống cuối cùng.
-  const schedOrder = new Map<string, { idx: number; dow: string; date: string }>();
-  (liveData?.daily_schedule || []).forEach((d: any, i: number) => {
-    const t = String(d.direction?.title || '').trim().toLowerCase();
-    if (t && !schedOrder.has(t)) schedOrder.set(t, { idx: i, dow: d.dow, date: d.date });
-  });
-  const sugKeyOf = (s: any) => String(s.title || '').trim().toLowerCase();
-  const orderedSuggestions = [
-    ...sugFresh.slice().sort((a, b) => (schedOrder.get(sugKeyOf(a))?.idx ?? 99) - (schedOrder.get(sugKeyOf(b))?.idx ?? 99)),
-    ...sugUsed,
-    ...sugRejected,
-  ];
 
   return (
     <main>
@@ -211,21 +174,37 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           <p className="sub">
             Chủ nhật 19h BOSS học số liệu tuần, Thứ 2 8h ra kế hoạch tuần, mỗi tối 19h điều chỉnh nhẹ theo số liệu từng ngày. Bài vẫn chờ người bấm Duyệt mới đăng.
           </p>
+          {appliedRow ? (
+            <p className="sub" style={{ margin: '4px 0 0' }}>
+              <b>📋 Đang áp:</b> {appliedRow.data?.cadence || 'manual'} · {suggestions.length} hướng
+              {focusActive ? <> · focus <b>{focusGroups.join(' + ')}</b></> : null}
+              {fmtGenAt ? <> · {fmtGenAt}</> : null}
+            </p>
+          ) : null}
         </div>
-        <div className="head-actions">
+        <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* 24/8: nut "Ap dung de xuat" (learn-weekly) len header — truoc o giua trang, user "chua chi" phai keo. */}
+          {learnSuggestion ? (
+            <form action={applyPlanWeights} title={`Đề xuất cuối tuần từ số liệu — sinh ${fmtDateTime(learnSuggestion.created_at)}`}>
+              <input type="hidden" name="plan_id" value={learnSuggestion.id} />
+              <button className="btn ok" type="submit">🧪 Áp dụng đề xuất mới</button>
+            </form>
+          ) : null}
           <GenerateButton action={generatePlanNow} />
         </div>
       </header>
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
 
-      {/* ===== 0. MUC TIEU + FOCUS ngay dau (user 24/8: cai dat phai co tac dung ngay + dong nhat) ===== */}
-      <section className="plan-card goal-block" style={{ marginBottom: 14 }}>
-        <div className="goal-row">
+      {/* ===== CÀI ĐẶT TUẦN — gộp Mục tiêu + Focus + Nhóm chia sẻ vào 1 khối grid (24/8:
+          user "rối và không đồng nhất, kéo lên kéo xuống"). Trước là 3 khối tách nhau. ===== */}
+      <section className="plan-card" style={{ marginBottom: 14 }}>
+        <b style={{ fontSize: '1.02rem', display: 'block', marginBottom: 10 }}>⚙️ Cài đặt tuần</b>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
           <form action={saveWeeklyGoal} className="goal-form">
             <label>
               <b>🎯 Mục tiêu tuần</b>
-              <textarea name="goal_text" defaultValue={goalText} rows={2} placeholder="Ví dụ: tuần này ưu tiên lọc dầu SF-50, cần 20 cuộc gọi về tổng đài." />
+              <textarea name="goal_text" defaultValue={goalText} rows={2} placeholder="Ví dụ: ưu tiên lọc dầu SF-50, cần 20 cuộc gọi về tổng đài." />
             </label>
             <button className="btn ok sm" type="submit">Lưu mục tiêu</button>
           </form>
@@ -239,6 +218,19 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             </label>
             <button className="btn ok sm" type="submit">Lưu tập trung</button>
           </form>
+          <div>
+            <b>👥 Nhóm chia sẻ Facebook</b>
+            <div className="sub" style={{ marginTop: 4 }}>
+              {shareGroups.length} nhóm — thêm/sửa/xóa ở <a href="/noi-dung">Quản lý bài viết</a>
+            </div>
+            {shareGroups.length ? (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
+              </div>
+            ) : (
+              <p className="sub" style={{ margin: '6px 0 0' }}>Chưa có nhóm nào.</p>
+            )}
+          </div>
         </div>
         {(() => {
           const total = (appliedRow?.data?.content_suggestions || []).length;
@@ -256,42 +248,6 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           );
         })()}
       </section>
-
-      {/* ===== De xuat hoc tuan (Chu nhat) — chi hien khi co ===== */}
-      {learnSuggestion ? (
-        <section className="plan-card" style={{ borderLeft: '6px solid var(--ok, #1a9e6f)', marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 320px' }}>
-              <b>🧪 Đề xuất cuối tuần từ số liệu</b>
-              <p className="sub" style={{ margin: '4px 0' }}>
-                Sinh lúc {fmtDateTime(learnSuggestion.created_at)}. {(learnSuggestion.data.narrative || [])[0] || ''}
-              </p>
-            </div>
-            <form action={applyPlanWeights}>
-              <input type="hidden" name="plan_id" value={learnSuggestion.id} />
-              <button className="btn ok" type="submit">Áp dụng đề xuất</button>
-            </form>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ===== 0b. NHOM CHIA SE (24/8: user "nhom chia se cung dem len tren luon"; cung cum cau hinh) ===== */}
-      <details className="plan-card" style={{ marginBottom: 14 }}>
-        <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1.02rem' }}>
-          👥 Nhóm chia sẻ Facebook
-          <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>{shareGroups.length} nhóm — quản lý ở Quản lý bài viết</span>
-        </summary>
-        <p className="sub" style={{ margin: '10px 0 6px' }}>
-          Dùng chung với nút <b>📣 Chia sẻ vào group</b> ở trang Quản lý bài viết — thêm, xóa, đổi tên nhóm ở đó. BOSS đọc danh sách này để xếp lịch chia sẻ theo ngày.
-        </p>
-        {shareGroups.length ? (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
-          </div>
-        ) : (
-          <p className="sub" style={{ margin: 0 }}>Chưa có nhóm nào. Mở <a href="/noi-dung">Quản lý bài viết</a> để thêm.</p>
-        )}
-      </details>
 
             {/* ===== 1. HOM NAY ===== */}
       <section className="plan-card" style={{ borderLeft: '6px solid var(--accent, #1f5fbf)', marginBottom: 14 }}>
@@ -439,60 +395,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </section>
       ) : null}
 
-      {/* ===== 3. HUONG DI BAI VIET — bang gon (user 24/8: list roi mat) ===== */}
-      {suggestions.length ? (
-        <section className="plan-card" style={{ marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
-            <b style={{ fontSize: '1.05rem' }}>🧭 Hướng đi bài viết</b>
-            <span className="sub">
-              {vnInt(sugFresh.filter((s) => !(s as any).pending_variant).length)} chưa dùng · {vnInt(sugFresh.filter((s) => (s as any).pending_variant).length)} đang thử · {vnInt(sugUsed.length)} xong{sugRejected.length ? ` · ${vnInt(sugRejected.length)} đã loại` : ''}
-              {sugNew.length ? <> · <b>{vnInt(sugNew.length)} mới ✨</b></> : null}
-            </span>
-          </div>
-          <div className="tablewrap" style={{ marginTop: 10 }}>
-            <table className="datatable dir-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 90 }}>Ngày</th>
-                  <th>Hướng đi</th>
-                  <th>Sản phẩm</th>
-                  <th style={{ width: 130 }}>Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orderedSuggestions.map((d, i) => {
-                  const day = schedOrder.get(sugKeyOf(d));
-                  const status = (d as any).rejected === true
-                    ? { text: '⛔ đã loại', tone: 'no' }
-                    : d.used_at
-                    ? { text: '✓ xong cặp', tone: 'ok' }
-                    : (d as any).pending_variant
-                    ? { text: '🧪 chờ B', tone: 'demo' }
-                    : (d as any).carried !== true
-                    ? { text: '✨ mới', tone: 'ok' }
-                    : { text: 'Chờ chạy', tone: 'default' };
-                  return (
-                    <tr key={i} style={d.used_at ? { opacity: 0.6 } : undefined} title={d.why || ''}>
-                      <td className="sub" style={{ whiteSpace: 'nowrap' }}>
-                        {day ? <span className="badge">{day.dow.replace('Chủ nhật', 'CN').replace('Thứ ', 'T')} {fmtDate(day.date).slice(0, 5)}</span> : <span className="muted">—</span>}
-                      </td>
-                      <td className="cell-title">
-                        <b>{d.title}</b>
-                        {d.needs_gov_review ? <span className="badge tone-no" style={{ marginLeft: 6 }}>⚠️ QL</span> : null}
-                      </td>
-                      <td className="sub">{d.product}</td>
-                      <td><span className={`badge tone-${status.tone}`}>{status.text}</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <p className="sub" style={{ margin: '8px 0 0' }}>
-            Xếp theo lịch tuần. Mỗi hướng chạy 1 ngày: bản A ra 7h, bản B ra 12h30; đủ cặp thì Evaluator so bản nào ăn hơn. Rê chuột vào dòng để đọc lý do BOSS chọn.
-          </p>
-        </section>
-      ) : null}
+      {/* ===== Huong di bai viet: XOA khoi trang chinh (24/8, user "roi va khong dong nhat").
+          Da nam trong lich 7 ngay o "Ke hoach tuan" — moi ngay bam <details> ra thay huong,
+          insight, san pham, kenh. Danh sach full con o /kho-tri-thuc?ai=boss. ===== */}
 
       {/* ===== Dang lai bai cu an khach (may de xuat, nguoi chia se) ===== */}
       {repostSuggestions.length ? (
