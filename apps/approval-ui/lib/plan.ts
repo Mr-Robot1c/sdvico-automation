@@ -414,16 +414,29 @@ export async function generateAndStorePlan(
 
   // GIỮ LẠI hướng đi CHƯA DÙNG của bản đang áp (user 20/8: "tạo hướng đi mà chả thấy dùng"
   // — trước đây mỗi lần sinh bản mới là vứt hết hướng cũ chưa kịp dùng, đếm reset về 0).
-  // Hướng cũ chưa dùng đứng TRƯỚC (ưu tiên dùng nốt), khử trùng theo tiêu đề, tối đa 12.
+  //
+  // 24/8 (user "bam sinh ke hoach moi ma T3-T6 khong doi"): CARRY-OVER BUG lon — plan cu
+  // luon co 12 fresh chua dung, carry lay het 12 + fresh moi -> slice(0,12) VUT HET fresh
+  // moi. Vong lap: moi lan bam Luu = 12 huong y het lan truoc.
+  //
+  // FIX 24/8 - QUY TAC PHAN LOAI CARRY:
+  //   pendingBs (ban A vua sinh, dang cho B) -> LUON carry (khong the bo, cap A/B chua xong)
+  //   fresh chua dung -> carry TOI DA 4 (thay 12) -> giu 8 slot cho huong moi
+  //   Neu generatedBy='manual' (nguoi CHU DONG bam) -> KHONG carry fresh, chi carry pendingBs
+  //     (nguoi bam Luu = nguoi MUON huong moi, khong muon nhet huong cu cua cron sang nay).
   try {
     const { data: prevApplied } = await client
       .from('mkt_plans').select('data').eq('applied', true)
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
     const prevSugs: ContentDirection[] = Array.isArray((prevApplied as any)?.data?.content_suggestions)
       ? (prevApplied as any).data.content_suggestions : [];
-    let carry = prevSugs.filter((s) => !s.used_at);
-    // 24/8: focus dang ap -> loai huong cu KHONG thuoc focus (user: "co tap trung ma van thay
-    // huong sp khac, dong bo o dau"). Khop theo cach loadFocusKeys + productName tuong tu rotate.
+    const pendingBs = prevSugs.filter((s) => !s.used_at && (s as any).pending_variant === 'B');
+    const freshCarry = prevSugs.filter((s) => !s.used_at && (s as any).pending_variant !== 'B');
+    // Manual = nguoi bam: bo fresh cu. Cron = tu dong: giu toi da 4 fresh cu de khong mat sach.
+    let carry = generatedBy === 'manual'
+      ? [...pendingBs]
+      : [...pendingBs, ...freshCarry.slice(0, 4)];
+    // 24/8: focus dang ap -> loai huong cu KHONG thuoc focus.
     if (carry.length && fGroups.length && (!fv.until || new Date(fv.until).getTime() > Date.now())) {
       const keys = fGroups.map((g) => String(g).toLowerCase().trim()).filter(Boolean);
       carry = carry.filter((c) => {
@@ -434,8 +447,7 @@ export async function generateAndStorePlan(
     if (carry.length) {
       const seen = new Set(carry.map((s) => s.title.toLowerCase().trim()));
       const fresh = (plan.content_suggestions || []).filter((s) => !seen.has(s.title.toLowerCase().trim()));
-      // Đánh dấu carried để UI phân biệt hướng giữ lại với hướng ✨ MỚI của bản này (user
-      // 21/8: "bấm tạo kế hoạch sao không thấy mới gì" — hướng mới nằm cuối, không ai biết).
+      // Danh dau carried de UI phan biet huong giu lai voi huong ✨ MOI cua ban nay.
       plan.content_suggestions = [...carry.map((s) => ({ ...s, carried: true })), ...fresh].slice(0, 12);
     }
   } catch (e: any) {

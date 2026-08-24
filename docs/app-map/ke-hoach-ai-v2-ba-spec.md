@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-24
 ttl_days: 90
+<!-- re-verified: 2026-08-24 20:30 - FIX CARRY-OVER BUG (user "bam Luu ma T3-T6 khong doi"): tt-diag xac nhan moi plan moi sinh du apply, nhung firstThreeSuggestions all carried:true — carry-over lay 12 fresh cu dung dau -> slice(0,12) vut het fresh moi. FIX quy tac carry: pendingBs (dang cho ban B) LUON carry (khong the bo cap A/B); fresh chua dung: generatedBy='manual' KHONG carry (nguoi bam Luu = muon huong moi), 'cron' toi da 4 (khong mat sach). Voi manual: plan moi = pendingBs (0-N) + 12 fresh moi tu Gemini -> user thay huong doi that su. -->
 <!-- re-verified: 2026-08-24 19:50 - Banner XAC NHAN thay doi ke hoach o dau trang (age log < 60s, border 2px xanh/do, emoji 1.8rem) + fix textarea resize:none. KHONG doi flow NV. -->
 <!-- re-verified: 2026-08-24 19:30 - FIX silent fail saveGoalFocusAndRegenerate: regenerate return {ok,planId,error} + ghi run_log task=mkt.plan_manual moi lan; UI hien dong log gan nhat duoi nut submit. Them details "Khi nao bam nut nao?" o dau trang, bang datatable 3 cot bao phu 4 nut. KHONG doi flow NV. -->
 <!-- re-verified: 2026-08-24 19:00 - Cai dat tuan hint gon: bo hint sub inline duoi field, chuyen vao title tooltip nhan; nut submit + caption vao .settings-cta box border dashed. KHONG doi flow NV. -->
