@@ -208,6 +208,16 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
 
+      {/* ===== 0. MUC TIEU TUAN (user 24/8: dem len tren, khong de duoi Cai dat) ===== */}
+      <section className="plan-card" style={{ marginBottom: 14, background: 'var(--surface-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <b style={{ fontSize: '1.02rem' }}>🎯 Mục tiêu tuần</b>
+          {goalText ? <span className="sub" style={{ flex: '1 1 auto', minWidth: 0 }}>{goalText.split('\n')[0]}</span> : <span className="muted">Chưa giao mục tiêu, BOSS tự định hướng theo số liệu.</span>}
+          {focusActive ? <span className="badge tone-ok" title={`Tuần này chỉ đăng: ${focusGroups.join(', ')}${focusUntil ? ` (đến ${fmtDate(focusUntil)})` : ''}`}>🎯 tập trung {focusGroups.length} SP</span> : null}
+          <a className="src" href="#cai-dat" style={{ marginLeft: 'auto', fontSize: '.85rem' }}>Sửa</a>
+        </div>
+      </section>
+
       {/* ===== 1. HOM NAY ===== */}
       <section className="plan-card" style={{ borderLeft: '6px solid var(--accent, #1f5fbf)', marginBottom: 14 }}>
         <b style={{ fontSize: '1.05rem' }}>📌 Hôm nay ({fmtDate(today)})</b>
@@ -428,7 +438,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       ) : null}
 
       {/* ===== 4. CAI DAT (thu gon) ===== */}
-      <details className="plan-card" style={{ marginBottom: 14 }}>
+      <details id="cai-dat" className="plan-card" style={{ marginBottom: 14 }}>
         <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1.02rem' }}>
           ⚙️ Cài đặt cho BOSS
           <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>

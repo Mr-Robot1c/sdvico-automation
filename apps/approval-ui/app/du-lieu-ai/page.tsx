@@ -193,10 +193,7 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Dữ liệu AI</h1>
-          <p className="sub">
-            Năm AI trong vòng lặp: hai AI Data học nguyên liệu, BOSS lập kế hoạch, Creator viết bài và dựng video, Evaluator đo kết quả rồi trả lại cho BOSS học tiếp.
-            Trang này chỉ đọc số liệu thật từ hệ thống, không tự làm gì. Người vẫn giữ hai chốt: giao mục tiêu và bấm duyệt.
-          </p>
+          <p className="sub">5 AI trong vòng lặp: Data 1 + Data 2 học nguyên liệu → BOSS lập kế hoạch → Creator viết bài dựng video → Evaluator so kết quả trả lại BOSS.</p>
         </div>
       </header>
 
@@ -209,34 +206,27 @@ export default async function Page() {
         <p className="ai-ok">✅ Mọi AI đều học trong 30 giờ qua và số liệu đang chảy về.</p>
       )}
 
-      <div className="ai-grid">
+      <div className="dai-grid">
         {cards.map((c) => {
           const h = HEALTH_LABEL[c.health];
+          const top2 = c.stats.slice(0, 2);
           return (
-            <section key={c.key} className="ai-card">
-              <div className="ai-card-head">
-                <span className="ai-icon" aria-hidden="true">{c.icon}</span>
-                <div style={{ minWidth: 0 }}>
-                  <div className="ai-name">{c.name}</div>
-                  <div className="sub ai-role">{c.role}</div>
-                </div>
-                <span className={`badge tone-${h.tone} ai-health`}>{h.text}</span>
+            <a key={c.key} className="dai-card" href={c.link} title={c.role}>
+              <div className="dai-head">
+                <span className="dai-icon" aria-hidden="true">{c.icon}</span>
+                <b className="dai-name">{c.name}</b>
+                <span className={`badge tone-${h.tone} dai-health`}>{h.text}</span>
               </div>
-              <div className="ai-stats">
-                {c.stats.map((s) => (
-                  <div key={s.l} className="ai-stat">
-                    <div className="ai-stat-n">{vnInt(s.n)}</div>
-                    <div className="ai-stat-l">{s.l}</div>
-                  </div>
+              <div className="dai-stats">
+                {top2.map((s) => (
+                  <div key={s.l} className="dai-stat"><b>{vnInt(s.n)}</b><span>{s.l}</span></div>
                 ))}
-                <div className="ai-stat ai-stat-wide">
-                  <div className="ai-stat-n" style={{ fontSize: '0.95rem' }}>{c.last ? fmtDT(c.last) : '—'}</div>
-                  <div className="ai-stat-l">Lần học gần nhất{c.last ? ` · ${ago(c.last)}` : ''}</div>
-                </div>
               </div>
-              <p className="ai-latest">{c.latest}</p>
-              <a className="sub" href={c.link}>Xem chi tiết</a>
-            </section>
+              <div className="dai-foot">
+                {c.last ? <span>Gần nhất {ago(c.last)}</span> : <span className="muted">Chưa học</span>}
+              </div>
+              <p className="dai-latest sub">{c.latest}</p>
+            </a>
           );
         })}
       </div>
