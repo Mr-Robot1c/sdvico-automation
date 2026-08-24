@@ -24,7 +24,8 @@ export default function GenerateButton({ action }: { action: () => Promise<void>
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <button className="btn ok" type="button" onClick={run} disabled={state === 'busy'}>
+      <button className="btn ok" type="button" onClick={run} disabled={state === 'busy'}
+        title="Ép BOSS sinh kế hoạch MỚI ngay (giữ nguyên mục tiêu + focus hiện tại). Dùng khi tri thức nội bộ vừa cập nhật hoặc muốn refresh kế hoạch. Đổi mục tiêu/focus thì dùng nút 'Lưu & sinh kế hoạch mới' ở khối Cài đặt tuần bên dưới.">
         {state === 'busy' ? '⏳ Đang tạo...' : '✨ Tạo kế hoạch ngay'}
       </button>
       {state === 'done' ? <span className="save-note">✓ Đã tạo xong</span> : null}

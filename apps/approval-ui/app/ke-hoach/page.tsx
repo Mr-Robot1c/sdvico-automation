@@ -2,7 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import type { Plan, Tier } from '../../lib/plan';
 import { vnInt, vnDec1 } from '../../lib/plan';
 import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
-import { saveWeeklyGoal, saveFocus } from './goal-actions';
+import { saveGoalFocusAndRegenerate } from './goal-actions';
 import GenerateButton from './generate-button';
 
 export const dynamic = 'force-dynamic';
@@ -237,42 +237,49 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </section>
       ) : null}
 
-      {/* ===== CÀI ĐẶT TUẦN — gộp Mục tiêu + Focus + Nhóm chia sẻ vào 1 khối grid (24/8:
-          user "rối và không đồng nhất, kéo lên kéo xuống"). Trước là 3 khối tách nhau. ===== */}
+      {/* ===== CÀI ĐẶT TUẦN — GỘP 1 FORM 1 NÚT (24/8: user "3 nut cha biet bam gi, gop
+          lai 1 nut cho de"). Truoc 2 form 2 nut (Luu muc tieu / Luu tap trung), moi lan
+          bam la sinh plan moi -> 2 plan trong 30s. Gio 1 form voi 2 field, 1 nut =
+          1 plan. Nhom chia se van hien inline (khong sua o day, xu ly o /noi-dung). ===== */}
       <section className="plan-card" style={{ marginBottom: 14 }}>
-        <b style={{ fontSize: '1.02rem', display: 'block', marginBottom: 10 }}>⚙️ Cài đặt tuần</b>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
-          <form action={saveWeeklyGoal} className="goal-form">
-            <label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'baseline', marginBottom: 6 }}>
+          <b style={{ fontSize: '1.02rem' }}>⚙️ Cài đặt tuần</b>
+          <span className="sub">Đổi Mục tiêu hoặc Sản phẩm tập trung → bấm nút xanh → máy TỰ sinh kế hoạch mới + áp NGAY</span>
+        </div>
+        <form action={saveGoalFocusAndRegenerate}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+            <label className="goal-form">
               <b>🎯 Mục tiêu tuần</b>
               <textarea name="goal_text" defaultValue={goalText} rows={2} placeholder="Ví dụ: ưu tiên lọc dầu SF-50, cần 20 cuộc gọi về tổng đài." />
+              <span className="sub" style={{ display: 'block', marginTop: 4 }}>Câu ngắn giao cho BOSS — sẽ đưa vào prompt sinh hướng đi.</span>
             </label>
-            <button className="btn ok sm" type="submit">Lưu mục tiêu</button>
-          </form>
-          <form action={saveFocus} className="goal-form">
-            <label>
-              <b>🎯 Chỉ đăng sản phẩm</b>
+            <label className="goal-form">
+              <b>🎯 Chỉ đăng sản phẩm này</b>
               <input name="focus_groups" defaultValue={focusGroups.join(', ')} placeholder="lọc dầu, lọc nước" />
               <span className="sub" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                 đến hết <input type="date" name="focus_until" defaultValue={focusUntil} style={{ maxWidth: 150 }} />
               </span>
+              <span className="sub" style={{ display: 'block', marginTop: 4 }}>Máy CHỈ đăng SP này — SP khác bị chặn hoàn toàn (rotate + plan).</span>
             </label>
-            <button className="btn ok sm" type="submit">Lưu tập trung</button>
-          </form>
-          <div>
-            <b>👥 Nhóm chia sẻ Facebook</b>
-            <div className="sub" style={{ marginTop: 4 }}>
-              {shareGroups.length} nhóm — thêm/sửa/xóa ở <a href="/noi-dung">Quản lý bài viết</a>
-            </div>
-            {shareGroups.length ? (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
+            <div>
+              <b>👥 Nhóm chia sẻ Facebook</b>
+              <div className="sub" style={{ marginTop: 4 }}>
+                {shareGroups.length} nhóm — sửa ở <a href="/noi-dung">Quản lý bài viết</a>
               </div>
-            ) : (
-              <p className="sub" style={{ margin: '6px 0 0' }}>Chưa có nhóm nào.</p>
-            )}
+              {shareGroups.length ? (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                  {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
+                </div>
+              ) : (
+                <p className="sub" style={{ margin: '6px 0 0' }}>Chưa có nhóm nào.</p>
+              )}
+            </div>
           </div>
-        </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
+            <button className="btn ok" type="submit">💾 Lưu & sinh kế hoạch mới</button>
+            <span className="sub">→ Kế hoạch cũ bị thay ngay bằng bản mới bám mục tiêu/tập trung vừa nhập.</span>
+          </div>
+        </form>
         {(() => {
           const total = (appliedRow?.data?.content_suggestions || []).length;
           if (!focusActive || !total) return null;
@@ -284,7 +291,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           const allIn = inFocus === total;
           return (
             <p className="sub" style={{ margin: '10px 0 0' }}>
-              {allIn ? '✅' : '⚠️'} <b>{inFocus}/{total}</b> hướng đi bám đúng sản phẩm tập trung ({focusGroups.join(', ')}){focusUntil ? ` — đến ${fmtDate(focusUntil)}` : ''}. {allIn ? 'Kế hoạch đồng nhất với mục tiêu.' : 'Còn hướng cũ chưa bám focus — bấm "Lưu tập trung" để sinh lại.'}
+              {allIn ? '✅' : '⚠️'} <b>{inFocus}/{total}</b> hướng đi bám đúng sản phẩm tập trung ({focusGroups.join(', ')}){focusUntil ? ` — đến ${fmtDate(focusUntil)}` : ''}. {allIn ? 'Kế hoạch đồng nhất với mục tiêu.' : 'Còn hướng cũ chưa bám focus — bấm nút xanh để sinh lại.'}
             </p>
           );
         })()}

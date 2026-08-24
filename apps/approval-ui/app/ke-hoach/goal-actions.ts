@@ -69,6 +69,37 @@ export async function saveFocus(formData: FormData) {
   revalidatePath('/ke-hoach');
 }
 
+// GỘP: lưu Mục tiêu + Focus + sinh kế hoạch (user 24/8: "3 nút chả biết bấm gì, gộp lại 1
+// nút cho dễ"). Trước là 2 form 2 nút, mỗi lần bấm là auto sinh plan mới -> 2 plan trong 30s
+// nếu user đổi cả 2. Giờ 1 form, 1 nút = 1 plan.
+export async function saveGoalFocusAndRegenerate(formData: FormData) {
+  const text = String(formData.get('goal_text') || '').trim().slice(0, 2000);
+  const raw = String(formData.get('focus_groups') || '');
+  const groups = raw.split(/[,\n;]+/).map((s) => s.trim()).filter(Boolean).slice(0, 10);
+  const untilDay = String(formData.get('focus_until') || '').trim();
+  let until: string | null = null;
+  if (untilDay && /^\d{4}-\d{2}-\d{2}$/.test(untilDay)) {
+    until = new Date(`${untilDay}T23:59:59+07:00`).toISOString();
+  } else if (groups.length) {
+    const vn = new Date(Date.now() + 7 * 3600 * 1000);
+    const dow = vn.getUTCDay();
+    const daysToSun = dow === 0 ? 0 : 7 - dow;
+    const sun = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate() + daysToSun));
+    until = new Date(`${sun.toISOString().slice(0, 10)}T23:59:59+07:00`).toISOString();
+  }
+  const client = getServerClient();
+  const nowIso = new Date().toISOString();
+  const [{ error: e1 }, { error: e2 }] = await Promise.all([
+    client.from('app_config').upsert({ key: 'mkt_weekly_goal', value: { text, updated_at: nowIso }, updated_at: nowIso }),
+    client.from('app_config').upsert({ key: 'mkt_focus', value: { groups, until, updated_at: nowIso }, updated_at: nowIso }),
+  ]);
+  if (e1) throw new Error('Không lưu được mục tiêu: ' + e1.message);
+  if (e2) throw new Error('Không lưu được sản phẩm tập trung: ' + e2.message);
+  await regeneratePlanAndApply(client);
+  try { await refreshLiveProposal(client); } catch (e: any) { console.error('[goal-focus] refresh live loi:', e?.message || e); }
+  revalidatePath('/ke-hoach');
+}
+
 // Nhóm chia sẻ: từ 20/8 quản lý DUY NHẤT qua popover 📣 ở Quản lý bài viết (/api/share-groups,
 // app_config 'mkt_share_groups' dạng {groups: [{id,label,url}]}). Trang Kế hoạch chỉ hiển thị.
 // (saveShareGroups nhập tay cũ đã bỏ — hai nguồn từng lệch nhau, user bắt lỗi 20/8.)
