@@ -68,6 +68,22 @@ export default async function DoLuongSection() {
     ytLatest.set(cid, { views: m.views || 0, reactions: m.reactions || 0, comments: m.comments || 0, videoId: m.videoId });
   }
 
+  // Số liệu TikTok (24/8): cron kéo qua /v2/video/list/ (scope video.list sandbox đã bật),
+  // ghi source='tiktok' + shareUrl để mở video công khai. Lấy snapshot mới nhất mỗi bài.
+  const { data: ttRows } = await client
+    .from('mkt_metrics')
+    .select('entity_ref, metrics, created_at')
+    .eq('source', 'tiktok')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  const ttLatest = new Map<string, { views: number; reactions: number; comments: number; shares: number; videoId?: string; shareUrl?: string }>();
+  for (const r of ttRows || []) {
+    const cid = (r as any).entity_ref as string | null;
+    if (!cid || cid.startsWith('__') || ttLatest.has(cid)) continue;
+    const m = ((r as any).metrics || {}) as any;
+    ttLatest.set(cid, { views: m.views || 0, reactions: m.reactions || 0, comments: m.comments || 0, shares: m.shares || 0, videoId: m.videoId, shareUrl: m.shareUrl || undefined });
+  }
+
   // Tên sản phẩm của một bài. Ưu tiên: rotation_group folder chuẩn -> guessGroup(rot+kw+title+draft)
   // -> keyword thô -> title thô. Thêm draft (300 ký tự đầu) để bắt bài Xưởng sản xuất tay có title
   // không nêu tên SP nhưng thân bài có (vd "Chạy máy khoẻ..." + thân "Thiết bị lọc dầu SF-50 giúp...").
@@ -85,8 +101,8 @@ export default async function DoLuongSection() {
   };
 
   const cids = [...latest.keys()];
-  // Nạp tên bài cho CẢ bài Facebook lẫn bài chỉ có số liệu YouTube.
-  const allCids = [...new Set([...cids, ...ytLatest.keys()])];
+  // Nạp tên bài cho CẢ bài Facebook lẫn bài chỉ có số liệu YouTube/TikTok.
+  const allCids = [...new Set([...cids, ...ytLatest.keys(), ...ttLatest.keys()])];
   const contents = new Map<string, { title: string; product: string; conversions: number; draft: string; brief: any }>();
   if (allCids.length) {
     const { data: cs } = await client.from('mkt_content').select('id, title, brief, draft').in('id', allCids);
@@ -216,11 +232,11 @@ export default async function DoLuongSection() {
         ) : null}
       </section>
 
-      {rows.length === 0 && ytLatest.size === 0 ? (
+      {rows.length === 0 && ytLatest.size === 0 && ttLatest.size === 0 ? (
         <div className="empty">
           <div className="empty-icon" aria-hidden="true">📊</div>
           <p>Chưa có số liệu.</p>
-          <p className="sub">Đăng bài lên Facebook hoặc YouTube, chờ có tương tác, rồi bấm <b>Cập nhật số liệu</b>. (TikTok chưa lấy được vì app chưa audit.)</p>
+          <p className="sub">Đăng bài lên Facebook, YouTube hoặc TikTok, chờ có tương tác, rồi bấm <b>Cập nhật số liệu</b>.</p>
         </div>
       ) : (
         <>
@@ -332,9 +348,39 @@ export default async function DoLuongSection() {
               </div>
             </>
           ) : null}
+          {ttLatest.size ? (
+            <>
+              <h2 style={{ marginTop: 24 }}>🎵 TikTok</h2>
+              <div className="tablewrap">
+                <table className="datatable">
+                  <thead>
+                    <tr><th>Tên bài</th><th>Lượt xem</th><th>Like</th><th>Comment</th><th>Share</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {[...ttLatest.entries()]
+                      .sort((a, b) => b[1].views - a[1].views)
+                      .map(([cid, m]) => (
+                        <tr key={cid}>
+                          <td className="cell-title">{contents.get(cid)?.title || '(không rõ)'}</td>
+                          <td>{fmt(m.views)}</td>
+                          <td>{m.reactions}</td>
+                          <td>{m.comments}</td>
+                          <td>{m.shares}</td>
+                          <td>
+                            {m.shareUrl ? (
+                              <a className="src" href={m.shareUrl} target="_blank" rel="noreferrer">↗ Mở video</a>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
           <p className="muted" style={{ marginTop: 10, fontSize: '.85rem' }}>
             <b>Lượt xem</b>, <b>Người xem</b> và <b>Giây xem</b> (video) cần quyền <b>read_insights</b> trên trang Facebook. Chưa cấp thì
-            các cột này để trống, còn Like/Comment/Share vẫn có. Số liệu YouTube Shorts kéo qua YouTube API mỗi 30 phút. TikTok chưa lấy được số liệu vì app chưa qua audit.
+            các cột này để trống, còn Like/Comment/Share vẫn có. Số liệu YouTube Shorts và TikTok kéo qua API mỗi 30 phút.
           </p>
         </>
       )}

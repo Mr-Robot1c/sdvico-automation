@@ -28,10 +28,11 @@ export async function pullTikTokMetrics(client: Client): Promise<{ pulled: numbe
   }
 
   // 1. Danh sách video mới nhất trên TikTok (30 cái đầu, đủ 1-2 tuần đăng).
-  let videos: Array<{ id: string; create_time: number; view_count: number; like_count: number; comment_count: number; share_count: number; title?: string }> = [];
+  //    share_url = link mở video công khai (dùng cho nút "Mở video" ở /do-luong).
+  let videos: Array<{ id: string; create_time: number; view_count: number; like_count: number; comment_count: number; share_count: number; title?: string; share_url?: string }> = [];
   try {
     const r = await fetch(
-      'https://open.tiktokapis.com/v2/video/list/?fields=id,create_time,view_count,like_count,comment_count,share_count,title',
+      'https://open.tiktokapis.com/v2/video/list/?fields=id,create_time,view_count,like_count,comment_count,share_count,title,share_url',
       { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ max_count: 30 }) }
     );
     const j: any = await r.json();
@@ -86,6 +87,7 @@ export async function pullTikTokMetrics(client: Client): Promise<{ pulled: numbe
     metric_date: now.slice(0, 10),
     metrics: {
       videoId: video.id,
+      shareUrl: video.share_url || null,
       views: video.view_count || 0,
       reactions: video.like_count || 0,
       comments: video.comment_count || 0,
