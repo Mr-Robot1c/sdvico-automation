@@ -255,11 +255,17 @@ export async function GET(req: Request) {
     const guessed = (guessGroup as (t: string) => string | null)(s.product);
     // guessGroup trả NHÃN FOLDER đầy đủ KÈM STT ("6. Thiết bị lọc dầu SF-50") — phải strip
     // STT CẢ HAI vế mới khớp (bug bắt được khi chạy thật 18/8).
-    // Với bản B không cần folder "chưa dùng trong vòng" (A hôm qua đã dùng folder này) —
-    // tìm trong eligible.
-    const pool = s.pending_variant === 'B' ? eligible : unused;
+    //
+    // 24/8 (user "vi sao plan noi SEA-40 ma sinh S-Tracking?"): TRUOC dung
+    // `pool = pending_variant==='B' ? eligible : unused`. `unused` = folder chua dung
+    // vong xoay -> bai SEA-40 sang som dung folder SEA-40 roi -> khi force chieu xu
+    // suggestion "Nuoc ngot tren tau" (SEA-40, weight top) -> matchedFolder=undefined
+    // -> nhay sang S-Tracking. Co che usedThisCycle thiet ke cho flow CU (random) de
+    // dam bao da dang SP trong vong; flow plan-driven 2 suggestion cung SP van hop le.
+    // Dung eligible cho ca A va B; usedInThisRun van chan pick trung folder trong 1 run.
+    const pool = eligible;
     const matchedFolder = guessed
-      ? pool.find((g) => productName(g).toLowerCase() === productName(guessed).toLowerCase())
+      ? pool.find((g) => productName(g).toLowerCase() === productName(guessed).toLowerCase() && !usedInThisRun.has(g))
       : null;
     if (!matchedFolder) continue;
     usedInThisRun.add(matchedFolder);

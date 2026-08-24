@@ -4,6 +4,8 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-24
 ttl_days: 90
+<!-- DOC-STATUS: SUSPECT (2026-08-24) — code 'supabase/migrations' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
+<!-- re-verified: 2026-08-24 16:10 - FIX rotate SUGGESTION FRESH pick folder tu 'eligible' thay 'unused' (usedThisCycle khong ap dung cho flow plan-driven). KHONG doi flow NV Ke hoach, sua bug bam sat NV5 R5 "may lam dung ke hoach" — plan uu tien SEA-40 weight 3 thi rotate phai lam SEA-40, khong nhay sang S-Tracking chi vi folder SEA-40 "da dung vong nay". -->
 <!-- re-verified: 2026-08-24 15:35 - FIX rotate khong bam plan (KHONG doi flow NV, sua bug bam sat NV5 R5 "may lam dung ke hoach"). Bug: (1) slot chieu chi pick pendingBs -> plan moi ap giua ngay bi rong pendingB -> fallback random -> sinh SP ngoai plan. (2) fallback random khong loc theo weights -> Ac quy lot du plan chi co SF-50+SEA-40. Fix: candidateSuggestions = [...pendingBs,...freshSorted] cho ca 2 slot; fallback random khi hasWeights CHI pick folder in weights, empty -> skip bai ban (log ly do). Nguyen tac user 24/8 "100% theo ke hoach tuan" duoc dam bao. -->
 <!-- re-verified: 2026-08-24 14:45 - Migration 20260824150000_mkt_metrics_source_tiktok noi CHECK mkt_metrics.source them 'tiktok'. KHONG doi flow NV Ke hoach: mkt_metrics vao loadMeasurementFromWeekReport (plan.ts) van chi query source='facebook'; tiktok chi phuc vu bang so lieu /do-luong. -->
 <!-- re-verified: 2026-08-24 12:35 - UI bang tuan refactor thanh danh sach details.tuan-day (khong doi flow NV, chi doi trinh bay). -->
