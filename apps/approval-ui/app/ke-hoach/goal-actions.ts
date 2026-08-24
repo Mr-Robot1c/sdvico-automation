@@ -120,6 +120,33 @@ export async function saveGoalFocusAndRegenerate(formData: FormData) {
   revalidatePath('/ke-hoach');
 }
 
+// SINH BÀI NGAY theo kế hoạch (user 24/8: "doi ke hoach ma khong sinh bai moi, ket cai gi
+// roi?"). Rotate co guard 1 bai/slot/ngay -> doi ke hoach giua ngay (2 slot da chay) thi
+// khong tu sinh them, phai cho 7h sang mai. Nut nay goi /api/rotate?force=1 (bo guard) de
+// nguoi quan ly thay bai theo ke hoach moi NGAY. Bai van vao Hang doi duyet, khong tu dang
+// (dieu cam 1). Ghi run_log qua chinh route rotate; tra {ok, created, note} de UI hien.
+export async function generatePostsNow(): Promise<{ ok: boolean; created: number; note: string }> {
+  const secret = process.env.CRON_SECRET || '';
+  const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+  try {
+    const res = await fetch(`${base}/api/rotate?force=1`, {
+      method: 'GET',
+      headers: secret ? { Authorization: `Bearer ${secret}` } : {},
+      cache: 'no-store',
+    });
+    const j: any = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, created: 0, note: `HTTP ${res.status}: ${String(j?.error || j?.note || '').slice(0, 200)}` };
+    }
+    const created = Number(j?.created ?? (Array.isArray(j?.results) ? j.results.length : 0)) || 0;
+    revalidatePath('/ke-hoach');
+    revalidatePath('/noi-dung');
+    return { ok: true, created, note: created > 0 ? `Đã sinh ${created} bài vào Hàng đợi duyệt.` : (j?.note || 'Không sinh được bài (xem lý do bên dưới).') };
+  } catch (e: any) {
+    return { ok: false, created: 0, note: String(e?.message || e).slice(0, 200) };
+  }
+}
+
 // Nhóm chia sẻ: từ 20/8 quản lý DUY NHẤT qua popover 📣 ở Quản lý bài viết (/api/share-groups,
 // app_config 'mkt_share_groups' dạng {groups: [{id,label,url}]}). Trang Kế hoạch chỉ hiển thị.
 // (saveShareGroups nhập tay cũ đã bỏ — hai nguồn từng lệch nhau, user bắt lỗi 20/8.)

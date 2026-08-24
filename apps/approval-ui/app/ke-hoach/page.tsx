@@ -2,7 +2,8 @@ import { getServerClient } from '../../lib/supabase-server';
 import type { Plan, Tier } from '../../lib/plan';
 import { vnInt, vnDec1 } from '../../lib/plan';
 import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
-import { saveGoalFocusAndRegenerate } from './goal-actions';
+import { saveGoalFocusAndRegenerate, generatePostsNow } from './goal-actions';
+import GeneratePostsButton from './generate-posts-button';
 import GenerateButton from './generate-button';
 
 export const dynamic = 'force-dynamic';
@@ -404,7 +405,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               {todayPlan.groups.length ? todayPlan.groups.join(', ') : (shareGroups.length ? 'nghỉ hôm nay' : 'chưa nhập nhóm (mở Cài đặt bên dưới)')}
             </div>
             <p className="sub" style={{ margin: 0 }}>
-              Máy tự sinh rồi chờ trong Hàng đợi duyệt. Người bấm Duyệt và tự tay chia sẻ vào nhóm (Facebook không cho máy đăng nhóm).
+              Máy tự sinh lúc 7h và 12h30 rồi chờ trong Hàng đợi duyệt. Người bấm Duyệt và tự tay chia sẻ vào nhóm (Facebook không cho máy đăng nhóm).
             </p>
           </div>
         ) : (
@@ -412,6 +413,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             Chưa có lịch hôm nay. Đề xuất sống sẽ tự sinh trong vòng 30 phút tới, hoặc lưu lại Cài đặt bên dưới để sinh ngay.
           </p>
         )}
+        {/* 24/8 (user "doi ke hoach ma khong sinh bai moi"): nut sinh bai NGAY, bo guard
+            1 bai/slot/ngay. Dung khi vua doi ke hoach giua ngay muon thay bai lien. */}
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+          <GeneratePostsButton action={generatePostsNow} />
+        </div>
       </section>
 
       {/* ===== 2. KE HOACH TUAN ===== */}
