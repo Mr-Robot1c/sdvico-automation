@@ -356,33 +356,38 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                       </span>
                       <span className="tuan-col-caret" aria-hidden="true">▾</span>
                     </summary>
+                    {/* 24/8 refactor: 4 day-block xep doc chiem ~240px -> bang compact 3 cot
+                        (Khung gio / Noi dung / Kenh) — cao ~120px, doc theo cot de scan nhanh. */}
                     <div className="tuan-day-body">
-                      <div className="day-block">
-                        <b>🕗 7:00 — Bản A (bài bán)</b>
-                        <div>Hướng đi: <b>{dayTitle}</b></div>
-                        <div>Sản phẩm: {dayProduct}</div>
-                        <div>Insight xoáy: <span className="sub">máy tự chọn 1 nỗi khách hàng chưa dùng gần đây</span></div>
-                        <div>Kênh: <b>Facebook (Post + Reel), YouTube Shorts, TikTok</b></div>
-                      </div>
-                      <div className="day-block">
-                        <b>🕐 12:30 — Bản B (bài bán A/B)</b>
-                        <div>Cùng hướng <b>{dayTitle}</b>, cùng sản phẩm nhưng <b>xoáy insight khác</b> để đo bản nào bà con thích hơn</div>
-                        <div>Kênh: <b>Facebook (Post + Reel), YouTube Shorts, TikTok</b></div>
-                      </div>
-                      <div className="day-block">
-                        <b>🕐 12:30 — Content {kind}</b>
-                        {(d as any).contentPurpose ? <div>Mục đích: <b>{(d as any).contentPurpose}</b></div> : null}
-                        {(d as any).contentStructure ? <div className="sub">Cấu trúc: {(d as any).contentStructure}</div> : null}
-                        <div>Kênh: <b>Facebook</b> (nuôi trang, không A/B)</div>
-                      </div>
-                      {d.groups.length ? (
-                        <div className="day-block">
-                          <b>📣 Chia sẻ vào nhóm hôm nay</b>
-                          <ul style={{ margin: '4px 0 0 18px', padding: 0 }}>
-                            {d.groups.map((g) => <li key={g}>{g}</li>)}
-                          </ul>
-                        </div>
-                      ) : null}
+                      <table className="datatable dir-table" style={{ margin: 0 }}>
+                        <tbody>
+                          <tr>
+                            <td style={{ whiteSpace: 'nowrap', width: 130 }}><b>🕗 7h — Bản A</b><div className="sub">bài bán</div></td>
+                            <td><b>{dayTitle}</b><div className="sub">{dayProduct} · máy chọn 1 insight chưa dùng gần đây</div></td>
+                            <td className="sub" style={{ whiteSpace: 'nowrap' }}>FB Post+Reel · YT Shorts · TikTok</td>
+                          </tr>
+                          <tr>
+                            <td style={{ whiteSpace: 'nowrap' }}><b>🕐 12h30 — Bản B</b><div className="sub">bài bán A/B</div></td>
+                            <td>Cùng hướng, <b>xoáy insight khác</b> để đo bản nào bà con thích hơn</td>
+                            <td className="sub" style={{ whiteSpace: 'nowrap' }}>FB Post+Reel · YT Shorts · TikTok</td>
+                          </tr>
+                          <tr>
+                            <td style={{ whiteSpace: 'nowrap' }}><b>🕐 12h30 — Content</b><div className="sub">{kind}</div></td>
+                            <td>
+                              {(d as any).contentPurpose ? <>Mục đích: <b>{(d as any).contentPurpose}</b></> : <span className="sub">(theo lịch tuần)</span>}
+                              {(d as any).contentStructure ? <div className="sub">Cấu trúc: {(d as any).contentStructure}</div> : null}
+                            </td>
+                            <td className="sub" style={{ whiteSpace: 'nowrap' }}>Facebook (nuôi trang)</td>
+                          </tr>
+                          {d.groups.length ? (
+                            <tr>
+                              <td style={{ whiteSpace: 'nowrap' }}><b>📣 Nhóm</b><div className="sub">chia sẻ tay</div></td>
+                              <td>{d.groups.join(', ')}</td>
+                              <td className="sub" style={{ whiteSpace: 'nowrap' }}>Facebook Groups</td>
+                            </tr>
+                          ) : null}
+                        </tbody>
+                      </table>
                     </div>
                   </details>
                 );
