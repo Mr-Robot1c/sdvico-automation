@@ -5,6 +5,7 @@ import { vnInt } from '../../../lib/plan';
 import BarChart from '../bar-chart';
 import PostTitle from '../post-title';
 import CopyReport from './copy-report';
+import PlatformLogo from '../../noi-dung/platform-logo';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,49 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
 
   const report = await buildWeekReport(client, offset);
   const { window: win, totals, totalsPrev, delta, posts, topPosts, byProduct, byKind, narrative } = report;
+
+  // 26/8 (user tach 2 trang Do luong): trang tuan them bang "Tung bai — moi kenh" gom
+  // Facebook + TikTok + YouTube TRONG TUAN nay, icon platform, bo cot don/lead.
+  // Query mkt_metrics 3 source trong khung thoi gian tuan (dua published_at cua mkt_posts).
+  const { data: postsInWeek } = await client
+    .from('mkt_posts')
+    .select('content_id, channel, external_url, published_at')
+    .eq('status', 'published')
+    .gte('published_at', win.startIso)
+    .lt('published_at', win.endIso)
+    .limit(500);
+  type PostRow = { cid: string; channel: 'facebook' | 'tiktok' | 'youtube'; publishedAt: string; url: string };
+  const weekPosts: PostRow[] = (postsInWeek || []).map((p: any) => ({
+    cid: String(p.content_id || ''), channel: p.channel, publishedAt: String(p.published_at || ''), url: String(p.external_url || ''),
+  })).filter((p) => p.cid && ['facebook', 'tiktok', 'youtube'].includes(p.channel));
+  const weekCids = [...new Set(weekPosts.map((p) => p.cid))];
+  const weekTitles = new Map<string, string>();
+  if (weekCids.length) {
+    const { data: cs } = await client.from('mkt_content').select('id, title').in('id', weekCids);
+    for (const c of cs || []) weekTitles.set((c as any).id, (c as any).title || '(không tên)');
+  }
+  const { data: weekMetrics } = await client
+    .from('mkt_metrics')
+    .select('entity_ref, source, metrics, created_at')
+    .in('entity_ref', weekCids.length ? weekCids : ['__none__'])
+    .order('created_at', { ascending: false })
+    .limit(1500);
+  // Snapshot mới nhất mỗi (cid, source).
+  const latest = new Map<string, any>();
+  for (const r of (weekMetrics || []) as any[]) {
+    const k = `${r.entity_ref}|${r.source}`;
+    if (!latest.has(k)) latest.set(k, r.metrics || {});
+  }
+  const rowsAllChannels = weekPosts.map((p) => {
+    const m = latest.get(`${p.cid}|${p.channel}`) || {};
+    const eng = (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
+    return {
+      cid: p.cid, channel: p.channel, publishedAt: p.publishedAt, url: p.url,
+      title: weekTitles.get(p.cid) || '(không tên)',
+      reactions: m.reactions || 0, comments: m.comments || 0, shares: m.shares || 0,
+      views: m.views || 0, engagement: eng, shareUrl: m.shareUrl, videoId: m.videoId,
+    };
+  }).sort((a, b) => (b.views + b.engagement) - (a.views + a.engagement));
 
   const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
   const deltaStr = (v: number) => v === 0 ? null : (
@@ -38,13 +82,13 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
     <main>
       <header className="head-row">
         <div>
-          <h1>Đo lường theo tuần</h1>
+          <h1>Đo lường tuần</h1>
           <p className="sub">
-            Gom số liệu Facebook theo tuần (Thứ 2 đến Chủ Nhật, giờ Việt Nam). So sánh với tuần liền trước để biết đang lên hay xuống.
+            Gom số liệu cả tuần (Thứ 2 đến Chủ Nhật, giờ Việt Nam) mọi kênh: Facebook, TikTok, YouTube Shorts. So sánh với tuần liền trước để biết đang lên hay xuống. Xem số liệu HÔM NAY ở <Link className="src" href="/do-luong">Đo lường ngày</Link>.
           </p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Link href="/do-luong" className="btn ghost">← Đo lường</Link>
+          <Link href="/do-luong" className="btn ghost">← Đo lường ngày</Link>
           <CopyReport text={narrative} />
         </div>
       </header>
@@ -143,23 +187,41 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
             </table>
           </div>
 
-          <h2 style={{ marginTop: 24 }}>Theo sản phẩm — tuần này</h2>
+          <h2 style={{ marginTop: 24 }}>Từng bài trong tuần — mọi kênh</h2>
           <div className="tablewrap">
             <table className="datatable">
               <thead>
-                <tr><th>Sản phẩm</th><th className="num">Số bài</th><th className="num">TB điểm</th><th className="num">TB tương tác/bài</th><th className="num">TB lượt xem/bài</th><th className="num">Tổng đơn/lead</th></tr>
+                <tr>
+                  <th style={{ width: 60 }}>Kênh</th>
+                  <th>Tên bài</th>
+                  <th className="num">Lượt xem</th>
+                  <th className="num">React/Like</th>
+                  <th className="num">Comment</th>
+                  <th className="num">Share</th>
+                  <th>Link</th>
+                </tr>
               </thead>
               <tbody>
-                {byProduct.map((t, i) => (
-                  <tr key={t.product}>
-                    <td>{i === 0 && t.product !== 'Bài content' ? '🏆 ' : ''}{t.product}</td>
-                    <td className="num">{vnInt(t.count)}</td>
-                    <td className="num"><b>{vnInt(t.avgScore)}</b></td>
-                    <td className="num">{vnInt(t.avgEng)}</td>
-                    <td className="num">{t.avgViews ? fmt(t.avgViews) : '—'}</td>
-                    <td className="num">{t.conversions ? vnInt(t.conversions) : '—'}</td>
-                  </tr>
-                ))}
+                {rowsAllChannels.length === 0 ? (
+                  <tr><td colSpan={7} className="sub" style={{ textAlign: 'center' }}>Chưa có bài nào trong tuần này.</td></tr>
+                ) : rowsAllChannels.map((r) => {
+                  const link = r.channel === 'tiktok'
+                    ? (r.shareUrl || r.url)
+                    : r.channel === 'youtube' && r.videoId
+                      ? `https://youtube.com/shorts/${r.videoId}`
+                      : r.url;
+                  return (
+                    <tr key={`${r.cid}-${r.channel}`}>
+                      <td><PlatformLogo platform={r.channel} size={20} /></td>
+                      <td className="cell-title"><b>{r.title}</b></td>
+                      <td className="num">{r.views ? fmt(r.views) : '—'}</td>
+                      <td className="num">{vnInt(r.reactions)}</td>
+                      <td className="num">{vnInt(r.comments)}</td>
+                      <td className="num">{r.channel === 'facebook' || r.channel === 'tiktok' ? vnInt(r.shares) : '—'}</td>
+                      <td>{link ? <a className="src" href={link} target="_blank" rel="noreferrer">↗ Mở</a> : <span className="muted">—</span>}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
