@@ -1,9 +1,15 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Nút "📱 Chuyển NV" ở /khach-hang — user 25/8: "gửi thông tin đó cho zalo nhân viên
 // kinh doanh". Zalo OA chưa xác thực nên KHÔNG tự động gửi được — cách thay thế: copy
 // nội dung lead vào clipboard + mở tab zalo.me/{phone-nv}, NV tự paste vào chat cá nhân.
+//
+// UI (revised 25/8, user: "sửa lại UI nha"):
+// - 0 NV: chip mờ, hover chỉ tôi tới khối config
+// - 1 NV: nút thẳng "📱 → <tên>" click 1 phát chuyển ngay, không dropdown
+// - ≥2 NV: nút mở dropdown chọn NV, tự đóng khi click ra ngoài
+// - Fallback: name rỗng → hiển thị "NV chưa đặt tên" thay vì space trống nhìn hỏng
 export default function ForwardZaloButton({
   leadSummary,
   salesPeople,
@@ -13,46 +19,104 @@ export default function ForwardZaloButton({
 }) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<string>('');
+  const wrapRef = useRef<HTMLSpanElement>(null);
+
+  // Tự đóng khi click ra ngoài (UX chuẩn dropdown).
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
 
   if (!salesPeople.length) {
     return (
-      <span className="sub" title="Chưa cấu hình danh sách NV Zalo — mở khối 'NV kinh doanh nhận Zalo' bên trên nhập vào">📱 —</span>
+      <span className="sub" title="Chưa cấu hình NV Zalo — mở khối 'NV kinh doanh nhận Zalo' bên trên để nhập">
+        📱 Chưa có NV
+      </span>
     );
   }
 
-  async function handleForward(person: { name: string; phone: string }) {
+  const nameOf = (p: { name: string; phone: string }) => p.name?.trim() || 'NV chưa đặt tên';
+
+  async function forwardTo(person: { name: string; phone: string }) {
     try {
       await navigator.clipboard.writeText(leadSummary);
-      setStatus(`✓ Đã copy, mở Zalo...`);
+      setStatus('✓ Đã copy, mở Zalo...');
     } catch {
-      setStatus('⛔ Copy fail, tự copy tay');
+      setStatus('⛔ Copy fail, bấm phải copy tay');
     }
-    // Mở tab mới tới zalo.me — Zalo tự nhận diện số phone, mở chat cá nhân với NV đó.
     window.open(`https://zalo.me/${person.phone}`, '_blank', 'noopener,noreferrer');
-    setTimeout(() => { setOpen(false); setStatus(''); }, 3000);
+    setTimeout(() => { setOpen(false); setStatus(''); }, 3500);
   }
 
+  // Chỉ 1 NV: click thẳng, không cần dropdown.
+  if (salesPeople.length === 1) {
+    const p = salesPeople[0];
+    return (
+      <span ref={wrapRef} style={{ display: 'inline-flex', flexDirection: 'column', gap: 2 }}>
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => forwardTo(p)}
+          title={`Copy nội dung lead + mở Zalo với ${nameOf(p)} (${p.phone})`}
+          style={{ whiteSpace: 'nowrap' }}
+        >
+          📱 → {nameOf(p)}
+        </button>
+        {status ? <span className="sub" style={{ fontSize: '.72rem' }}>{status}</span> : null}
+      </span>
+    );
+  }
+
+  // ≥2 NV: mở dropdown chọn.
   return (
-    <span style={{ position: 'relative', display: 'inline-block' }}>
-      <button type="button" className="btn ghost sm" onClick={() => setOpen(!open)}>📱 Chuyển NV</button>
+    <span ref={wrapRef} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        className="btn ghost sm"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        style={{ whiteSpace: 'nowrap' }}
+      >
+        📱 Chuyển NV ▾
+      </button>
       {open ? (
-        <div style={{
-          position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 10,
-          background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8,
-          padding: 8, minWidth: 180, boxShadow: '0 4px 12px rgba(15,23,42,.14)',
-        }}>
-          <div className="sub" style={{ fontSize: '.75rem', marginBottom: 6 }}>Chọn NV nhận:</div>
+        <div
+          role="menu"
+          style={{
+            position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 20,
+            background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10,
+            padding: 6, minWidth: 200, boxShadow: '0 6px 20px rgba(15,23,42,.18)',
+          }}
+        >
+          <div className="sub" style={{ fontSize: '.72rem', padding: '4px 8px 6px', borderBottom: '1px solid var(--line)', marginBottom: 4 }}>
+            Chọn NV nhận Zalo:
+          </div>
           {salesPeople.map((p) => (
             <button
-              key={p.phone} type="button"
-              className="btn sm"
-              style={{ display: 'block', width: '100%', textAlign: 'left', marginBottom: 4, background: 'transparent', border: '1px solid var(--line)' }}
-              onClick={() => handleForward(p)}
+              key={p.phone}
+              type="button"
+              onClick={() => forwardTo(p)}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left', padding: '6px 10px',
+                background: 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer',
+                color: 'var(--ink)', font: 'inherit', fontSize: '.88rem',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-2)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
-              {p.name} <span className="sub" style={{ fontSize: '.75rem' }}>({p.phone})</span>
+              <div style={{ fontWeight: 600 }}>{nameOf(p)}</div>
+              <div className="sub" style={{ fontSize: '.72rem' }}>{p.phone}</div>
             </button>
           ))}
-          {status ? <div className="sub" style={{ fontSize: '.75rem', marginTop: 4 }}>{status}</div> : null}
+          {status ? (
+            <div className="sub" style={{ fontSize: '.72rem', padding: '6px 8px 2px', borderTop: '1px solid var(--line)', marginTop: 4 }}>
+              {status}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </span>
