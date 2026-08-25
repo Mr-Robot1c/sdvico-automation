@@ -58,10 +58,12 @@ export default async function TongQuanSection() {
       .order('created_at', { ascending: false })
       .limit(40),
     // Bản kế hoạch đang áp (user 24/8: "cần thể hiện ngày lên plan").
+    // Ưu tiên bản LIVE (có daily_schedule 7 ngày cập nhật mỗi 30 phút) hơn bản manual/weekly
+    // vì user 26/8 chốt: "hiện kế hoạch NGÀY HÔM ĐÓ", cần daily_schedule[today].
     client
       .from('mkt_plans')
       .select('created_at, generated_by, data')
-      .eq('applied', true)
+      .eq('data->>origin', 'live')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -195,12 +197,13 @@ export default async function TongQuanSection() {
           <div className="stat-lbl">Người hỏi mua hôm nay</div>
           <div className="stat-num">{fmt(leadTodayCount)}</div>
         </Link>
-        <PlanQuickView
-          createdAtLabel={planRow ? fmtVNDateTime(planRow.created_at) : ''}
-          cadenceLabel={planRow?.data?.cadence === 'weekly' ? 'Bản tuần' : planRow?.data?.cadence === 'update' ? 'Bản cập nhật' : 'Tạo tay'}
-          goal={String(planRow?.data?.goal || '')}
-          suggestionsCount={Array.isArray(planRow?.data?.content_suggestions) ? planRow.data.content_suggestions.length : 0}
-        />
+        <PlanQuickView todayPlan={(() => {
+          if (!planRow) return null;
+          const vnToday = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+          const schedule = Array.isArray(planRow.data?.daily_schedule) ? planRow.data.daily_schedule : [];
+          const today = schedule.find((d: any) => d.date === vnToday) || null;
+          return today;
+        })()} />
       </div>
 
       {/* Bài chờ duyệt: chỉ nhắc khi có, bấm qua Bảng bài viết để xử. */}
