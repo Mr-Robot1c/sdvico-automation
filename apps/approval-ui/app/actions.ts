@@ -685,6 +685,31 @@ export async function updateLeadStatus(formData: FormData) {
   revalidatePath('/noi-dung');
 }
 
+// Cấu hình nhân viên kinh doanh nhận Zalo forward (user 25/8: "chuyển lead qua Zalo NV").
+// Lưu app_config key 'mkt_sales_zalo' = { people: [{name, phone}] }. Zalo OA chưa xác thực
+// nên KHÔNG tự động gửi được tin nhắn — cách thay thế: /khach-hang có nút "Chuyển NV" tự
+// copy nội dung lead vào clipboard + mở tab zalo.me/{phone}, NV paste vào chat.
+export async function saveSalesZalo(formData: FormData) {
+  const raw = String(formData.get('people') || '').trim();
+  // Format nhập: mỗi dòng "Tên NV | SĐT". Ví dụ: "Anh Bình | 0939123456"
+  const people = raw
+    .split(/\n+/)
+    .map((line) => {
+      const [name, phone] = line.split('|').map((s) => s.trim());
+      const cleanPhone = String(phone || '').replace(/\D/g, '');
+      return name && cleanPhone ? { name, phone: cleanPhone } : null;
+    })
+    .filter(Boolean)
+    .slice(0, 10);
+  const client = getServerClient();
+  await client.from('app_config').upsert({
+    key: 'mkt_sales_zalo',
+    value: { people, updated_at: new Date().toISOString() },
+    updated_at: new Date().toISOString(),
+  });
+  revalidatePath('/khach-hang');
+}
+
 // Nhập tay 1 lead (khi nhân viên thấy khách hỏi mua qua kênh chưa tự động bắt được —
 // gọi điện trực tiếp, nhắn Zalo cá nhân, gặp mặt...). Nguồn 'manual' phân biệt với lead
 // máy tự bắt từ webhook Facebook.

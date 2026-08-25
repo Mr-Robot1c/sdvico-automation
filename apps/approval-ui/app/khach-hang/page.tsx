@@ -1,6 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { updateLeadStatus, addLeadManual } from '../actions';
+import { updateLeadStatus, addLeadManual, saveSalesZalo } from '../actions';
 import LeadStatusSelect from './lead-status-select';
+import ForwardZaloButton from './forward-zalo-button';
 
 // Trang "Theo dõi người mua" (24/8, user: "thông tin khách hàng sẽ được gửi về cho nhân
 // viên kinh doanh"). Nhân viên vào đây xem danh sách người hỏi mua bắt được từ comment/tin
@@ -56,6 +57,11 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
   const counts: Record<string, number> = { all: (allForCount || []).length };
   for (const r of (allForCount || []) as any[]) counts[r.status] = (counts[r.status] || 0) + 1;
 
+  // Danh sách NV kinh doanh nhận forward Zalo (user 25/8).
+  const { data: salesRow } = await client.from('app_config').select('value').eq('key', 'mkt_sales_zalo').maybeSingle();
+  const salesPeople: Array<{ name: string; phone: string }> = Array.isArray((salesRow as any)?.value?.people) ? (salesRow as any).value.people : [];
+  const salesTextarea = salesPeople.map((p) => `${p.name} | ${p.phone}`).join('\n');
+
   return (
     <main>
       <header className="head-row">
@@ -74,6 +80,26 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
           <input name="contact" placeholder="SĐT / Zalo / link" className="note" style={{ flex: '1 1 180px' }} />
           <input name="message" placeholder="Hỏi gì / sản phẩm quan tâm" className="note" style={{ flex: '2 1 260px' }} />
           <button className="btn ok" type="submit">Thêm</button>
+        </form>
+      </details>
+
+      <details className="plan-card" style={{ marginBottom: 14 }} open={salesPeople.length === 0}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+          📱 NV kinh doanh nhận Zalo forward
+          <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>{salesPeople.length} người</span>
+        </summary>
+        <p className="sub" style={{ margin: '8px 0' }}>
+          Mỗi dòng một NV, format: <code>Tên NV | SĐT Zalo</code>. Bấm "📱 Chuyển NV" ở mỗi lead sẽ copy nội dung vào clipboard + mở tab zalo.me tới NV bạn chọn — NV paste vào chat Zalo cá nhân. (Zalo OA chưa xác thực nên chưa gửi tự động được.)
+        </p>
+        <form action={saveSalesZalo} style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
+          <textarea
+            name="people"
+            defaultValue={salesTextarea}
+            rows={4}
+            placeholder={`Ví dụ:\nAnh Bình | 0939123456\nChị Hoa | 0912345678`}
+            style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)', fontFamily: 'inherit', fontSize: '.92rem', resize: 'vertical', minHeight: 80 }}
+          />
+          <button className="btn ok sm" type="submit" style={{ alignSelf: 'flex-start' }}>Lưu danh sách</button>
         </form>
       </details>
 
@@ -96,7 +122,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
         <div className="tablewrap">
           <table className="datatable">
             <thead>
-              <tr><th>Lúc</th><th>Nguồn</th><th>Người</th><th>Nội dung hỏi</th><th>Bài liên quan</th><th style={{ width: 150 }}>Trạng thái</th><th>Ghi chú</th></tr>
+              <tr><th>Lúc</th><th>Nguồn</th><th>Người</th><th>Nội dung hỏi</th><th>Bài liên quan</th><th style={{ width: 150 }}>Trạng thái</th><th>Ghi chú</th><th>Chuyển NV</th></tr>
             </thead>
             <tbody>
               {leads.map((l) => {
@@ -127,6 +153,20 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                         <input name="note" defaultValue={l.note || ''} placeholder="ghi chú..." className="note" style={{ width: 120, fontSize: '.85rem' }} />
                         <button className="btn ghost sm" type="submit">Lưu</button>
                       </form>
+                    </td>
+                    <td>
+                      <ForwardZaloButton
+                        salesPeople={salesPeople}
+                        leadSummary={[
+                          `🔔 Lead mới từ SDVICO (${fmtDateTime(l.created_at)})`,
+                          `Nguồn: ${SOURCE_LABEL[l.source] || l.source}`,
+                          `Người: ${l.fb_user_name || '(chưa lấy được tên)'}`,
+                          `Hỏi: ${l.message}`,
+                          l.content_id && titleOf.get(l.content_id) ? `Bài liên quan: ${titleOf.get(l.content_id)}` : '',
+                          l.fb_profile_url ? `Link: ${l.fb_profile_url}` : '',
+                          `Mở dashboard: https://sdvico-mktit.vercel.app/khach-hang`,
+                        ].filter(Boolean).join('\n')}
+                      />
                     </td>
                   </tr>
                 );
