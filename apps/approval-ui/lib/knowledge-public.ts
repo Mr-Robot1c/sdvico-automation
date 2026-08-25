@@ -12,6 +12,8 @@
 
 import type { getServerClient } from './supabase-server';
 import { needsGovReview } from './knowledge';
+// @ts-ignore — module JS thuần
+import { logTokenUsage } from './gen/token-log.mjs';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -81,7 +83,7 @@ async function filterUnseen(client: Client, uniq: Finding[]): Promise<Finding[]>
 }
 
 // Gọi Gemini có bật google_search grounding, trả về danh sách nguồn kèm URL.
-async function searchOneTopic(topic: string): Promise<Finding[]> {
+async function searchOneTopic(topic: string, client: Client): Promise<Finding[]> {
   try {
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -109,6 +111,7 @@ async function searchOneTopic(topic: string): Promise<Finding[]> {
         tools: [{ googleSearch: {} }] as any,
       },
     });
+    logTokenUsage(client, 'knowledge_public_search', MKT_MODEL, (res as any).usageMetadata);
 
     const t = (res.text || '').trim();
     const m = t.match(/\{[\s\S]*\}/);
@@ -137,7 +140,7 @@ export async function learnPublicKnowledge(
   const all: Finding[] = [];
 
   for (const topic of SEARCH_TOPICS) {
-    const findings = await searchOneTopic(topic);
+    const findings = await searchOneTopic(topic, client);
     for (const f of findings) all.push(f);
   }
 

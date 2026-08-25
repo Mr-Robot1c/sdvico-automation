@@ -14,6 +14,8 @@
 // (compliance.mjs) để đặt cờ needs_gov_review — điều cấm 3.
 
 import type { getServerClient } from './supabase-server';
+// @ts-ignore — module JS thuần
+import { logTokenUsage } from './gen/token-log.mjs';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -115,6 +117,7 @@ async function readFileContent(
         ],
         config: { temperature: 0 }
       });
+      logTokenUsage(client, 'knowledge_internal_vision', MKT_MODEL, (res as any).usageMetadata);
       const text = (res.text || '').trim();
       return { excerpt: text.slice(0, 15000), via: 'vision' };
     } catch (e: any) {
@@ -127,7 +130,7 @@ async function readFileContent(
 
 // Gọi Gemini tóm tắt nội dung nội bộ thành các điểm chính cho Kế hoạch AI dùng.
 // Đầu ra bám brand-voice: câu ngắn, không gạch dài, không mũi tên, số chuẩn Việt Nam.
-async function summarizeForPlan(text: string): Promise<{ title: string; summary: string }> {
+async function summarizeForPlan(text: string, client: Client): Promise<{ title: string; summary: string }> {
   if (!text || text.trim().length < 20) {
     return { title: '(nội dung quá ngắn)', summary: text.trim() };
   }
@@ -158,6 +161,7 @@ async function summarizeForPlan(text: string): Promise<{ title: string; summary:
       ],
       config: { responseMimeType: 'application/json', temperature: 0.4 }
     });
+    logTokenUsage(client, 'knowledge_internal_summary', MKT_MODEL, (res as any).usageMetadata);
     const t = (res.text || '').trim();
     const m = t.match(/\{[\s\S]*\}/);
     if (!m) return { title: 'Ghi chú nội bộ', summary: text.slice(0, 500) };
@@ -233,7 +237,7 @@ export async function importInternalFromBucket(
         if (reason) errors.push(`${f.path}: ${reason}`);
         continue;
       }
-      const { title, summary } = await summarizeForPlan(excerpt);
+      const { title, summary } = await summarizeForPlan(excerpt, client);
       const gov = needsGovReview(excerpt + ' ' + summary);
       const ins = await client.from('mkt_knowledge_internal').insert({
         source_path: f.path,

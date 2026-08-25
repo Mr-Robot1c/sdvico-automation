@@ -8,6 +8,10 @@
 // (quota nhỏ) — tri thức đã nằm sẵn trong DB do 2 AI Data học hằng ngày.
 
 import type { ContentDirection } from './plan';
+// @ts-ignore — module JS thuần
+import { logTokenUsage } from './gen/token-log.mjs';
+
+type AnyClient = { from: (t: string) => any };
 
 const MKT_MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
 
@@ -44,7 +48,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   ]);
 }
 
-async function callGemini(prompt: string, temperature = 0.5): Promise<string> {
+async function callGemini(prompt: string, temperature = 0.5, client?: AnyClient | null): Promise<string> {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   let lastErr = '';
@@ -59,6 +63,8 @@ async function callGemini(prompt: string, temperature = 0.5): Promise<string> {
         MODEL_TIMEOUT_MS,
         model
       );
+      // 24/8 (user "quan tri token cac agent"): ghi lai token da dung, khong doi flow.
+      if (client) logTokenUsage(client, 'plan_directions', model, (res as any).usageMetadata);
       return res.text || '';
     } catch (e: any) {
       lastErr = `${model}: ${String(e?.message || e).slice(0, 150)}`;
@@ -74,7 +80,9 @@ export async function generateContentDirections(
   goal: string,
   // Tieu de huong DA DUNG gan day — cam Gemini sinh huong trung/na na (user 21/8: BOSS regen
   // ra huong "Lap dat may loc dau kip chuyen bien" gan giong huong vua chay hom truoc).
-  avoidTitles: string[] = []
+  avoidTitles: string[] = [],
+  // 24/8: client Supabase de ghi log token (optional — thieu thi bo qua log, khong loi).
+  client: AnyClient | null = null
 ): Promise<ContentDirection[]> {
   if (!knowledge.internal.length && !knowledge.publicSrc.length) return [];
 
@@ -135,7 +143,7 @@ Trả JSON đúng dạng, không thêm chữ ngoài JSON:
 
   // temperature cao hơn (0.85) cho hướng đi ĐA DẠNG hơn giữa các lần sinh (user: "sinh lại
   // mà y hệt"). 0.5 quá thấp -> Gemini hội tụ về cùng output với input giống nhau.
-  const text = await callGemini(prompt, 0.85);
+  const text = await callGemini(prompt, 0.85, client);
   const m = text.match(/\{[\s\S]*\}/);
   if (!m) throw new Error('Khong parse duoc JSON directions.');
   const parsed = JSON.parse(m[0]);

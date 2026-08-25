@@ -413,7 +413,8 @@ export async function generateAndStorePlan(
     plan.content_suggestions = await generateContentDirections(
       { internal: knowledge.internal, publicSrc: knowledge.publicSrc },
       goal,
-      avoidTitles
+      avoidTitles,
+      client
     );
   } catch (e: any) {
     console.error('[plan] sinh huong di that bai (ke hoach van luu):', e?.message || e);

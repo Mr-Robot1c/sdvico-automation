@@ -13,7 +13,7 @@ import { collectAbPairs, type AbPair } from '../../lib/evaluator';
 
 export const dynamic = 'force-dynamic';
 
-type Tab = 'tong-quan' | 'noi-bo' | 'public' | 'danh-gia' | 'boss' | 'creator';
+type Tab = 'tong-quan' | 'noi-bo' | 'public' | 'danh-gia' | 'boss' | 'creator' | 'token';
 const TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: 'tong-quan', label: 'Tổng quan', icon: '🧠' },
   { key: 'noi-bo', label: 'AI Data 1', icon: '📁' },
@@ -21,6 +21,8 @@ const TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: 'danh-gia', label: 'AI Đánh giá', icon: '⚖️' },
   { key: 'boss', label: 'AI Kế hoạch', icon: '🧭' },
   { key: 'creator', label: 'AI Sáng tạo', icon: '✍️' },
+  // 24/8 (user "quản trị token các agent... sếp bảo đốt quá nhiều token rồi").
+  { key: 'token', label: 'Quản trị token', icon: '⚡' },
 ];
 
 function fmtDT(iso: string | null | undefined): string {
@@ -46,6 +48,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
   const client = getServerClient();
   const since7 = new Date(Date.now() - 7 * 86400000).toISOString();
 
+  const since30 = new Date(Date.now() - 30 * 86400000).toISOString();
   const [
     { data: internalRows },
     { data: publicRows },
@@ -54,6 +57,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     { data: learnRows },
     { data: creatorRows },
     abPairs,
+    { data: tokenRows },
   ] = await Promise.all([
     client.from('mkt_knowledge_internal').select('id, source_path, title, summary, needs_gov_review, created_at').not('source_path', 'like', 'evaluator/%').order('created_at', { ascending: false }).limit(60),
     client.from('mkt_knowledge_public').select('id, source_url, source_title, summary, needs_gov_review, created_at').order('created_at', { ascending: false }).limit(60),
@@ -62,6 +66,8 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     client.from('mkt_plans').select('id, created_at, applied, data').eq('data->>origin', 'learn-weekly').order('created_at', { ascending: false }).limit(1),
     client.from('mkt_content').select('id, title, created_at, status, brief').eq('brief->>generator', 'rotation').gte('created_at', since7).order('created_at', { ascending: false }).limit(60),
     collectAbPairs(client),
+    // 24/8: token Gemini đã dùng (mkt.token_usage, ghi bởi lib/gen/token-log.mjs).
+    client.from('run_log').select('detail, created_at').eq('task', 'mkt.token_usage').gte('created_at', since30).order('created_at', { ascending: false }).limit(3000),
   ]);
 
   const internal = (internalRows || []) as any[];
@@ -72,6 +78,46 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
   const learn = ((learnRows || []) as any[])[0] || null;
   const creator = (creatorRows || []) as any[];
   const pairs = abPairs as AbPair[];
+
+  // Tổng hợp token: theo NGÀY (VN, 7 ngày gần nhất cho chart) + theo TÁC VỤ (30 ngày, cho
+  // biết cái gì đang "đốt" nhiều nhất — user "sếp bảo đốt quá nhiều token").
+  const TASK_LABEL: Record<string, string> = {
+    plan_directions: '🧭 Sinh hướng đi (BOSS)',
+    knowledge_internal_vision: '📁 Đọc ảnh Zalo (AI Data 1)',
+    knowledge_internal_summary: '📁 Tóm tắt nội bộ (AI Data 1)',
+    knowledge_public_search: '🌐 Tìm tin ngành (AI Data 2)',
+  };
+  const dayOfVN = (iso: string) => {
+    const d = new Date(new Date(iso).getTime() + 7 * 3600 * 1000);
+    return d.toISOString().slice(0, 10);
+  };
+  const byDay = new Map<string, number>();
+  const byTask = new Map<string, { calls: number; tokens: number }>();
+  let totalTokens30 = 0;
+  for (const r of (tokenRows || []) as any[]) {
+    const d = r.detail || {};
+    const t = Number(d.totalTokens) || 0;
+    if (!t) continue;
+    totalTokens30 += t;
+    const day = dayOfVN(r.created_at);
+    byDay.set(day, (byDay.get(day) || 0) + t);
+    const task = String(d.source_task || 'khac');
+    const e = byTask.get(task) || { calls: 0, tokens: 0 };
+    e.calls += 1;
+    e.tokens += t;
+    byTask.set(task, e);
+  }
+  const todayVN = dayOfVN(new Date().toISOString());
+  const tokenToday = byDay.get(todayVN) || 0;
+  const last7Days: Array<{ day: string; tokens: number }> = [];
+  for (let i = 6; i >= 0; i--) {
+    const day = new Date(Date.now() - i * 86400000 + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    last7Days.push({ day, tokens: byDay.get(day) || 0 });
+  }
+  const taskRows = [...byTask.entries()]
+    .map(([task, e]) => ({ task, label: TASK_LABEL[task] || task, ...e }))
+    .sort((a, b) => b.tokens - a.tokens);
+  const maxDayTokens = Math.max(1, ...last7Days.map((d) => d.tokens));
 
   const sugs: any[] = Array.isArray(plan.content_suggestions) ? plan.content_suggestions : [];
   const products: any[] = Array.isArray(plan.products) ? plan.products : [];
@@ -290,6 +336,65 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {tab === 'token' ? (
+        <section>
+          <p className="sub" style={{ margin: '8px 0 12px' }}>
+            Token Gemini đã dùng — chỉ theo dõi được các tác vụ ghi log (sinh hướng đi BOSS, AI Data 1/2). Bài viết Facebook/TikTok của AI Sáng tạo và dựng video (Whisper local, edge-tts miễn phí) chưa ghi vào đây.
+          </p>
+          <div className="chart-grid" style={{ marginBottom: 18 }}>
+            <div className="stat-tile">
+              <div className="stat-num">{vn(tokenToday)}</div>
+              <div className="stat-lbl">Token hôm nay</div>
+            </div>
+            <div className="stat-tile">
+              <div className="stat-num">{vn(totalTokens30)}</div>
+              <div className="stat-lbl">Token 30 ngày qua</div>
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: '1.05rem', margin: '18px 0 8px' }}>7 ngày gần nhất</h2>
+          <div className="tablewrap" style={{ marginBottom: 18 }}>
+            <table className="datatable">
+              <thead><tr><th>Ngày</th><th className="num">Token</th><th></th></tr></thead>
+              <tbody>
+                {last7Days.map((d) => (
+                  <tr key={d.day}>
+                    <td>{d.day.split('-').reverse().join('/')}{d.day === todayVN ? ' (hôm nay)' : ''}</td>
+                    <td className="num"><b>{vn(d.tokens)}</b></td>
+                    <td style={{ width: 200 }}>
+                      <div style={{ background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden', height: 8 }}>
+                        <div style={{ width: `${Math.round((d.tokens / maxDayTokens) * 100)}%`, background: 'var(--accent, #1f5fbf)', height: '100%' }} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <h2 style={{ fontSize: '1.05rem', margin: '18px 0 8px' }}>Theo tác vụ (30 ngày)</h2>
+          {taskRows.length === 0 ? (
+            <p className="sub">Chưa có dữ liệu token — cron chạy vài lần rồi bảng này sẽ có số.</p>
+          ) : (
+            <div className="tablewrap">
+              <table className="datatable">
+                <thead><tr><th>Tác vụ</th><th className="num">Số lần gọi</th><th className="num">Tổng token</th><th className="num">TB/lần</th></tr></thead>
+                <tbody>
+                  {taskRows.map((t) => (
+                    <tr key={t.task}>
+                      <td>{t.label}</td>
+                      <td className="num">{vn(t.calls)}</td>
+                      <td className="num"><b>{vn(t.tokens)}</b></td>
+                      <td className="num">{vn(t.calls ? t.tokens / t.calls : 0)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
