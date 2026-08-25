@@ -4,6 +4,7 @@ import { fbStatus, tiktokStatus } from '../../lib/platform-status';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
 import { zaloOaStatus } from '../../lib/zalo-oa';
 import PlatformLogo from './platform-logo';
+import PlanQuickView from './plan-quick-view';
 
 // TỔNG QUAN thiết kế lại (user 21/8 đêm, nhắc lại yêu cầu gốc): một trang tổng quát để xem
 // cho đỡ rối mắt — mỗi NỀN TẢNG một thẻ: đang làm tốt cỡ nào (thông số react, cmt, view),
@@ -27,7 +28,8 @@ export default async function TongQuanSection() {
   const client = getServerClient();
 
   const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const [fb, tt, yt, za, postsRes, metricsRes, pendingRes, logRes, planRes, leadsRes] = await Promise.all([
+  const todayStartIso = new Date(new Date(new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10) + 'T00:00:00+07:00')).toISOString();
+  const [fb, tt, yt, za, postsRes, metricsRes, pendingRes, logRes, planRes, leadsRes, leadsTodayRes] = await Promise.all([
     fbStatus(),
     tiktokStatus(),
     getYouTubeChannelInfo(),
@@ -69,6 +71,12 @@ export default async function TongQuanSection() {
       .select('id', { count: 'exact', head: true })
       .neq('status', 'spam')
       .gte('created_at', sevenDaysAgoIso),
+    // Riêng HÔM NAY, cho tile đầu trang (24/8: theo mẫu "Lead mới hôm nay").
+    client
+      .from('mkt_leads')
+      .select('id', { count: 'exact', head: true })
+      .neq('status', 'spam')
+      .gte('created_at', todayStartIso),
   ]);
 
   // Bài đã đăng theo kênh + lần đăng gần nhất.
@@ -112,6 +120,7 @@ export default async function TongQuanSection() {
   const tEngagement = tReactions + tComments + tShares + yLikes + yComments;
   const pendingCount = pendingRes.count || 0;
   const leadCount = leadsRes.count || 0;
+  const leadTodayCount = leadsTodayRes.count || 0;
   const planRow = planRes.data as any;
   const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 
@@ -164,7 +173,11 @@ export default async function TongQuanSection() {
 
   return (
     <section>
-      {/* Hàng số tổng, nhìn 3 giây biết sức khỏe hệ thống. */}
+      {/* Hàng số tổng, nhìn 3 giây biết sức khỏe hệ thống. 24/8 (user "gộp lượt xem/follower
+          vào ô nền tảng đi, dư thừa chả được mẹ gì"): Lượt xem video + Người theo dõi Page
+          đã BỎ khỏi hàng này — số đó đã hiện sẵn trong pf-card Facebook/YouTube bên dưới,
+          để cả 2 chỗ là trùng lặp. Hàng này giữ 4 số KHÔNG trùng ở đâu khác: bài đăng, tương
+          tác, bài chờ xử lý, lead mới hôm nay — cộng ô Kế hoạch mở modal xem nhanh. */}
       <div className="board-top">
         <div className="board-stat">
           <div className="stat-lbl">Bài đã đăng (mọi kênh)</div>
@@ -174,20 +187,20 @@ export default async function TongQuanSection() {
           <div className="stat-lbl">Tổng tương tác</div>
           <div className="stat-num">{fmt(tEngagement)}</div>
         </div>
-        <div className="board-stat">
-          <div className="stat-lbl">Lượt xem video</div>
-          <div className="stat-num">{fmt(tViews + yViews)}</div>
-        </div>
-        <div className="board-stat">
-          <div className="stat-lbl">Người theo dõi Page</div>
-          <div className="stat-num">{followers ? fmt(followers) : '—'}</div>
-        </div>
-        {/* Ngày lên kế hoạch đang áp (user 24/8: "cần thể hiện ngày lên plan"). */}
-        <Link href="/ke-hoach" className="board-stat" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="stat-lbl">Kế hoạch đang áp</div>
-          <div className="stat-num" style={{ fontSize: '1.1rem' }}>{planRow ? fmtVNDateTime(planRow.created_at) : '—'}</div>
-          {planRow ? <div className="sub" style={{ fontSize: '.76rem', marginTop: 2 }}>{planRow.data?.cadence === 'weekly' ? 'Bản tuần' : planRow.data?.cadence === 'update' ? 'Bản cập nhật' : 'Tạo tay'}</div> : null}
+        <Link href="/noi-dung?loai=bang" className="board-stat" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="stat-lbl">Bài chờ duyệt</div>
+          <div className="stat-num">{fmt(pendingCount)}</div>
         </Link>
+        <Link href="/khach-hang" className="board-stat" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="stat-lbl">Người hỏi mua hôm nay</div>
+          <div className="stat-num">{fmt(leadTodayCount)}</div>
+        </Link>
+        <PlanQuickView
+          createdAtLabel={planRow ? fmtVNDateTime(planRow.created_at) : ''}
+          cadenceLabel={planRow?.data?.cadence === 'weekly' ? 'Bản tuần' : planRow?.data?.cadence === 'update' ? 'Bản cập nhật' : 'Tạo tay'}
+          goal={String(planRow?.data?.goal || '')}
+          suggestionsCount={Array.isArray(planRow?.data?.content_suggestions) ? planRow.data.content_suggestions.length : 0}
+        />
       </div>
 
       {/* Bài chờ duyệt: chỉ nhắc khi có, bấm qua Bảng bài viết để xử. */}
