@@ -106,7 +106,14 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                     <td className="sub" style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(l.created_at)}</td>
                     <td className="sub" style={{ whiteSpace: 'nowrap' }}>{SOURCE_LABEL[l.source] || l.source}</td>
                     <td>
-                      {l.fb_profile_url ? <a className="src" href={l.fb_profile_url} target="_blank" rel="noreferrer">{l.fb_user_name || '(không tên)'}</a> : (l.fb_user_name || '(không tên)')}
+                      {l.fb_user_name || <span className="muted">(chưa lấy được tên)</span>}
+                      {l.fb_profile_url ? (
+                        <div style={{ marginTop: 2 }}>
+                          <a className="src" href={l.fb_profile_url} target="_blank" rel="noreferrer" style={{ fontSize: '.8rem' }}>
+                            {l.source === 'facebook_message' ? '📩 Mở hộp thư Page ↗' : '↗ Xem profile'}
+                          </a>
+                        </div>
+                      ) : null}
                     </td>
                     <td style={{ maxWidth: 280 }}>{l.message}</td>
                     <td className="sub">{l.content_id ? (titleOf.get(l.content_id) || '—') : '—'}</td>

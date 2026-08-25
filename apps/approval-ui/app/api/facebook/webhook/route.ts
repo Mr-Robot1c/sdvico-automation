@@ -44,6 +44,33 @@ function looksLikeIntent(text: string): boolean {
   return INTENT_KEYWORDS.some((k) => t.includes(k));
 }
 
+// 25/8 (user "khong hien ten, khong bam vao xem cuoc tro chuyen"): Facebook Messenger
+// webhook chi gui PSID (Page-Scoped ID), khong kem ten. Fetch ten qua Graph API — token
+// page co pages_messaging (da xac nhan) goi duoc.
+async function fetchMessengerUserName(psid: string): Promise<string | null> {
+  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const version = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+  if (!token || !psid) return null;
+  try {
+    const r = await fetch(`https://graph.facebook.com/${version}/${psid}?fields=name`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const j: any = await r.json();
+    if (j.error) return null;
+    return String(j.name || '').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+// Link mo Meta Business Suite Inbox cua Page — Facebook KHONG cho link truc tiep toi 1
+// conversation cu the qua URL public, nen dua admin toi inbox chung, tu tim conversation.
+function messengerInboxUrl(): string | null {
+  const pageId = process.env.FACEBOOK_PAGE_ID;
+  if (!pageId) return null;
+  return `https://business.facebook.com/latest/inbox/messenger?asset_id=${pageId}`;
+}
+
 export async function POST(req: Request) {
   const client = getServerClient();
   let body: any;
@@ -68,10 +95,15 @@ export async function POST(req: Request) {
       // 25/8 (user "captured=1 nhung totalLeadsInDb=0"): Supabase client insert KHONG throw
       // khi loi DB (bang khong ton tai, RLS chan...) — no tra { error } object. Phai check
       // field error thay vi try/catch, khong thi captured++ nham.
+      // 25/8 (user "khong hien ten, khong bam xem cuoc tro chuyen"): fetch ten Messenger qua
+      // Graph API bang PSID, luu link Meta Business Suite Inbox lam profile_url.
+      const senderName = await fetchMessengerUserName(senderId);
       try {
         const { error } = await client.from('mkt_leads').insert({
           source: 'facebook_message',
           fb_user_id: senderId,
+          fb_user_name: senderName,
+          fb_profile_url: messengerInboxUrl(),
           message: text.slice(0, 2000),
           status: 'new',
           raw_payload: ev,
