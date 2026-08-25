@@ -65,17 +65,21 @@ export async function POST(req: Request) {
       const text = String(ev?.message?.text || '').trim();
       const senderId = String(ev?.sender?.id || '');
       if (!text || !senderId) continue;
+      // 25/8 (user "captured=1 nhung totalLeadsInDb=0"): Supabase client insert KHONG throw
+      // khi loi DB (bang khong ton tai, RLS chan...) — no tra { error } object. Phai check
+      // field error thay vi try/catch, khong thi captured++ nham.
       try {
-        await client.from('mkt_leads').insert({
+        const { error } = await client.from('mkt_leads').insert({
           source: 'facebook_message',
           fb_user_id: senderId,
           message: text.slice(0, 2000),
           status: 'new',
           raw_payload: ev,
         });
-        captured++;
+        if (error) errors.push('message insert: ' + error.message.slice(0, 150));
+        else captured++;
       } catch (e: any) {
-        errors.push('message insert: ' + String(e?.message || e).slice(0, 150));
+        errors.push('message insert exception: ' + String(e?.message || e).slice(0, 150));
       }
     }
 
@@ -102,7 +106,7 @@ export async function POST(req: Request) {
         } catch { /* không match được thì bỏ qua, vẫn lưu lead */ }
       }
       try {
-        await client.from('mkt_leads').insert({
+        const { error } = await client.from('mkt_leads').insert({
           source: 'facebook_comment',
           fb_user_id: String(v.sender_id || ''),
           fb_user_name: String(v.sender_name || '') || null,
@@ -111,9 +115,10 @@ export async function POST(req: Request) {
           status: 'new',
           raw_payload: v,
         });
-        captured++;
+        if (error) errors.push('comment insert: ' + error.message.slice(0, 150));
+        else captured++;
       } catch (e: any) {
-        errors.push('comment insert: ' + String(e?.message || e).slice(0, 150));
+        errors.push('comment insert exception: ' + String(e?.message || e).slice(0, 150));
       }
     }
   }
