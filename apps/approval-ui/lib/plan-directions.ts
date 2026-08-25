@@ -28,23 +28,43 @@ type KnowledgeInput = {
   publicSrc: Array<{ source_title: string | null; summary: string; source_url: string; needs_gov_review: boolean }>;
 };
 
+// 24/8 (user "bam sinh ke hoach qua lau dan den crash web"): 1 lan do that mat 133 GIAY.
+// Goc: khong co timeout cho tung model — model treo (khong loi ngay ma cho mang lau) thi
+// callGemini cho VO THOI HAN truoc khi thu model ke. Vercel Hobby gioi han CUNG 60s cho
+// serverless function (du code set maxDuration=300 trong page.tsx cung khong vuot duoc
+// tren Hobby) -> qua 60s la browser nhan 504, thay nhu "crash".
+// FIX: moi model toi da 12s (Promise.race voi timeout) — 4 model fallback toi da 48s,
+// duoi nguong 60s Hobby. Model treo bi bo qua ngay, khong cho vo han.
+const MODEL_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label}: timeout ${ms}ms`)), ms)),
+  ]);
+}
+
 async function callGemini(prompt: string, temperature = 0.5): Promise<string> {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   let lastErr = '';
   for (const model of MKT_MODEL_CHAIN) {
     try {
-      const res = await ai.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { responseMimeType: 'application/json', temperature },
-      });
+      const res = await withTimeout(
+        ai.models.generateContent({
+          model,
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: { responseMimeType: 'application/json', temperature },
+        }),
+        MODEL_TIMEOUT_MS,
+        model
+      );
       return res.text || '';
     } catch (e: any) {
       lastErr = `${model}: ${String(e?.message || e).slice(0, 150)}`;
     }
   }
-  throw new Error('Moi model Gemini deu loi. Cuoi: ' + lastErr);
+  throw new Error('Moi model Gemini deu loi/timeout. Cuoi: ' + lastErr);
 }
 
 // Sinh hướng đi từ tri thức đã nạp (không tự query DB — nhận nguyên liệu từ generateAndStorePlan
