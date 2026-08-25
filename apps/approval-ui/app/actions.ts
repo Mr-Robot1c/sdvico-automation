@@ -671,6 +671,40 @@ export async function setConversions(formData: FormData) {
   revalidatePath('/do-luong');
 }
 
+// Cập nhật trạng thái / ghi chú 1 lead (khối "theo dõi người mua" — user 24/8). Nhân viên
+// kinh doanh tự đánh dấu đã liên hệ chưa, không phải máy tự động (điều cấm 1: máy soạn,
+// người bấm gửi — máy chỉ BẮT lead từ comment, KHÔNG tự nhắn lại khách).
+export async function updateLeadStatus(formData: FormData) {
+  const id = String(formData.get('lead_id') || '');
+  const status = String(formData.get('status') || '');
+  const note = String(formData.get('note') || '').slice(0, 1000);
+  if (!id || !['new', 'contacted', 'closed', 'spam'].includes(status)) return;
+  const client = getServerClient();
+  await client.from('mkt_leads').update({ status, note, updated_at: new Date().toISOString() }).eq('id', id);
+  revalidatePath('/khach-hang');
+  revalidatePath('/noi-dung');
+}
+
+// Nhập tay 1 lead (khi nhân viên thấy khách hỏi mua qua kênh chưa tự động bắt được —
+// gọi điện trực tiếp, nhắn Zalo cá nhân, gặp mặt...). Nguồn 'manual' phân biệt với lead
+// máy tự bắt từ webhook Facebook.
+export async function addLeadManual(formData: FormData) {
+  const name = String(formData.get('name') || '').trim().slice(0, 200);
+  const message = String(formData.get('message') || '').trim().slice(0, 2000);
+  const contact = String(formData.get('contact') || '').trim().slice(0, 200);
+  if (!name && !message) return;
+  const client = getServerClient();
+  await client.from('mkt_leads').insert({
+    source: 'manual',
+    fb_user_name: name || null,
+    message: message || contact,
+    fb_profile_url: contact || null,
+    status: 'new',
+  });
+  revalidatePath('/khach-hang');
+  revalidatePath('/noi-dung');
+}
+
 // Cập nhật số liệu thủ công (nút trên trang Đo lường): Facebook + YouTube Shorts.
 export async function refreshFacebookMetrics() {
   const client = getServerClient();

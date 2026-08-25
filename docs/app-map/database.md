@@ -4,6 +4,7 @@
 covers: supabase/migrations
 last_verified: 2026-08-24
 ttl_days: 180
+<!-- re-verified: 2026-08-24 23:00 - Migration 20260824230000_mkt_leads: bang mkt_leads (theo doi nguoi mua — user "khoi do co bao nhieu nguoi"). source facebook_comment/facebook_message/manual, status new/contacted/closed/spam, content_id lien ket bai. Webhook /api/facebook/webhook bat comment NGAY (khong can quyen dac biet); tin nhan Messenger can pages_messaging (dang xin Facebook App Review 24/8, chua duyet). Trang /khach-hang xem + cap nhat trang thai, /noi-dung them tile so lead 7 ngay + link. USER CAN AP MIGRATION qua Supabase SQL Editor truoc khi webhook chay duoc. -->
 <!-- re-verified: 2026-08-24 14:45 - Migration 20260824150000_mkt_metrics_source_tiktok: noi CHECK mkt_metrics.source them 'tiktok'. Cap nhat mo ta hang mkt_metrics duoi day (gsc/ga4/facebook/youtube/tiktok/manual). Ly do: cron 24/8 keo TikTok view/like/comment vao mkt_metrics source='tiktok' nhung constraint chua cho, insert bi chan. USER paste .sql vao Supabase SQL Editor de ap. -->
 <!-- re-verified: 2026-08-13 - Lap doc luoc do lan dau: liet ke 14 bang tu supabase/migrations. Them mkt_oauth_tokens (token OAuth TikTok, RLS khong policy = chi service_role doc/ghi). -->
 <!-- re-verified: 2026-08-14 - Migration 20260813150000 noi CHECK: mkt_posts.channel them 'tiktok', mkt_metrics.source them 'manual'. Cap nhat 2 hang bang tuong ung. -->
@@ -30,6 +31,7 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 | mkt_plans | Marketing | Kế hoạch định hướng do bot sinh từ số liệu Đo lường (cron T4 & CN hoặc bấm tay). data jsonb chứa xếp hạng + trọng số + đoạn định hướng; `applied` bật thì vòng xoay ưu tiên theo; v2 thêm `summary.knowledge` (số nguồn tri thức 7 ngày đã dùng) | Bật, staff |
 | mkt_knowledge_internal | Marketing | Tri thức nội bộ (file trong bucket kho-tri-thuc-noi-bo, Cowork xuất từ Zalo). Cột `source_path` UNIQUE để idempotent. Chỉ nguyên liệu cho Kế hoạch AI | Bật, staff |
 | mkt_knowledge_public | Marketing | Tri thức public bot học mỗi CN từ Gemini google_search grounding. Cột `source_url` bắt buộc khác rỗng. Chỉ nguyên liệu cho Kế hoạch AI | Bật, staff |
+| mkt_leads | Marketing | Người hỏi mua bắt được từ comment/tin nhắn Facebook (webhook `/api/facebook/webhook`) hoặc nhập tay. `status` new/contacted/closed/spam, `content_id` liên kết bài nếu là comment. Máy CHỈ đọc/lưu, không tự nhắn lại khách (điều cấm 1) | Bật, staff |
 | hr_jobs | Tuyển dụng | Vị trí tuyển dụng | Bật, staff |
 | hr_candidates | Tuyển dụng | Ứng viên, dữ liệu cá nhân (consent_at, retention_until, dedup_key) | Bật, dữ liệu cá nhân |
 | hr_applications | Tuyển dụng | Hồ sơ ứng tuyển, dữ liệu cá nhân | Bật, dữ liệu cá nhân |

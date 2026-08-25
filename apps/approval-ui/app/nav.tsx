@@ -29,6 +29,9 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
     items: [
       { href: '/noi-dung', label: 'Tổng quan', icon: '📊' },
       { href: '/do-luong', label: 'Đo lường', icon: '📈' },
+      // 24/8 (user "khối theo dõi người mua"): danh sách người hỏi mua bắt từ comment/tin
+      // nhắn Facebook, nhân viên kinh doanh vào xem + đánh dấu đã liên hệ.
+      { href: '/khach-hang', label: 'Khách hàng', icon: '👥' },
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
       { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' },

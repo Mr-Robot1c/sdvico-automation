@@ -26,7 +26,8 @@ function fmtVNDateTime(iso: string): string {
 export default async function TongQuanSection() {
   const client = getServerClient();
 
-  const [fb, tt, yt, za, postsRes, metricsRes, pendingRes, logRes] = await Promise.all([
+  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const [fb, tt, yt, za, postsRes, metricsRes, pendingRes, logRes, planRes, leadsRes] = await Promise.all([
     fbStatus(),
     tiktokStatus(),
     getYouTubeChannelInfo(),
@@ -53,7 +54,21 @@ export default async function TongQuanSection() {
       .select('task, status, detail, created_at')
       .in('task', ['mkt.rotate', 'mkt.publish_facebook_ui', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull', 'mkt.live_apply', 'mkt.direction_rejected'])
       .order('created_at', { ascending: false })
-      .limit(40)
+      .limit(40),
+    // Bản kế hoạch đang áp (user 24/8: "cần thể hiện ngày lên plan").
+    client
+      .from('mkt_plans')
+      .select('created_at, generated_by, data')
+      .eq('applied', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // Số người hỏi mua bắt được trong 7 ngày qua (user: "khối đó có bao nhiêu người hay sao đó").
+    client
+      .from('mkt_leads')
+      .select('id', { count: 'exact', head: true })
+      .neq('status', 'spam')
+      .gte('created_at', sevenDaysAgoIso),
   ]);
 
   // Bài đã đăng theo kênh + lần đăng gần nhất.
@@ -96,6 +111,8 @@ export default async function TongQuanSection() {
   }
   const tEngagement = tReactions + tComments + tShares + yLikes + yComments;
   const pendingCount = pendingRes.count || 0;
+  const leadCount = leadsRes.count || 0;
+  const planRow = planRes.data as any;
   const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 
   const fbPosts = byChannel.get('facebook') || { count: 0, lastAt: '' };
@@ -165,6 +182,12 @@ export default async function TongQuanSection() {
           <div className="stat-lbl">Người theo dõi Page</div>
           <div className="stat-num">{followers ? fmt(followers) : '—'}</div>
         </div>
+        {/* Ngày lên kế hoạch đang áp (user 24/8: "cần thể hiện ngày lên plan"). */}
+        <Link href="/ke-hoach" className="board-stat" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="stat-lbl">Kế hoạch đang áp</div>
+          <div className="stat-num" style={{ fontSize: '1.1rem' }}>{planRow ? fmtVNDateTime(planRow.created_at) : '—'}</div>
+          {planRow ? <div className="sub" style={{ fontSize: '.76rem', marginTop: 2 }}>{planRow.data?.cadence === 'weekly' ? 'Bản tuần' : planRow.data?.cadence === 'update' ? 'Bản cập nhật' : 'Tạo tay'}</div> : null}
+        </Link>
       </div>
 
       {/* Bài chờ duyệt: chỉ nhắc khi có, bấm qua Bảng bài viết để xử. */}
@@ -301,6 +324,17 @@ export default async function TongQuanSection() {
             </div>
           )}
           <Link className="src" href="/du-lieu-ai" style={{ display: 'inline-block', marginTop: 10, fontSize: '.85rem' }}>Xem các AI đang học gì</Link>
+        </div>
+        {/* Theo dõi người mua (user 24/8): số người hỏi mua bắt được tuần qua, bấm xem chi tiết. */}
+        <div className="tq-panel">
+          <b>👥 Người hỏi mua (7 ngày qua)</b>
+          <div style={{ marginTop: 10 }}>
+            <div className="stat-num" style={{ fontSize: '2rem' }}>{fmt(leadCount)}</div>
+            <p className="sub" style={{ margin: '4px 0 0' }}>
+              Bắt tự động từ comment Facebook dưới bài đăng (tin nhắn inbox đang chờ Facebook duyệt quyền).
+            </p>
+          </div>
+          <Link className="src" href="/khach-hang" style={{ display: 'inline-block', marginTop: 10, fontSize: '.85rem' }}>Xem danh sách →</Link>
         </div>
       </div>
 
