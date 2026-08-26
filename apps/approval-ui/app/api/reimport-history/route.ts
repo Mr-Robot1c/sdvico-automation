@@ -70,8 +70,27 @@ async function importFacebook(client: any, sinceIso: string): Promise<{ added: n
       try {
         const permalink = String(p.permalink_url || `https://www.facebook.com/${p.id}`);
         const { data: existing } = await client.from('mkt_posts')
-          .select('id').eq('external_url', permalink).eq('channel', 'facebook').maybeSingle();
-        if (existing) { skipped++; continue; }
+          .select('id, content_id').eq('external_url', permalink).eq('channel', 'facebook').maybeSingle();
+        if (existing?.content_id) {
+          // Bai da co, chi insert metric neu chua co (fix cho run lan truoc thieu metric_date).
+          const { data: exMetric } = await client.from('mkt_metrics')
+            .select('id').eq('source', 'facebook').eq('entity_ref', existing.content_id).limit(1).maybeSingle();
+          if (exMetric) { skipped++; continue; }
+          const backfillMetrics = {
+            reactions: p.reactions?.summary?.total_count || 0,
+            comments: p.comments?.summary?.total_count || 0,
+            shares: p.shares?.count || 0,
+            views: 0
+          };
+          const { error: eBM } = await client.from('mkt_metrics').insert({
+            source: 'facebook', entity_ref: existing.content_id, metrics: backfillMetrics,
+            metric_date: new Date().toISOString().slice(0, 10),
+            created_at: new Date().toISOString()
+          });
+          if (eBM) errors.push(`backfill metric ${p.id}: ${eBM.message}`);
+          added++;
+          continue;
+        }
         const message = String(p.message || '').trim();
         const title = message.slice(0, 100) || `Bài FB ${p.id}`;
         const contentId = randomUUID();
@@ -93,7 +112,9 @@ async function importFacebook(client: any, sinceIso: string): Promise<{ added: n
           views: 0
         };
         const { error: eM } = await client.from('mkt_metrics').insert({
-          source: 'facebook', entity_ref: contentId, metrics, created_at: new Date().toISOString()
+          source: 'facebook', entity_ref: contentId, metrics,
+          metric_date: new Date().toISOString().slice(0, 10),
+          created_at: new Date().toISOString()
         });
         if (eM) errors.push(`metric ${p.id}: ${eM.message}`);
         added++;
@@ -135,8 +156,26 @@ async function importYouTube(client: any, sinceIso: string): Promise<{ added: nu
       if (publishedAt && new Date(publishedAt).getTime() < sinceMs) break outer;
       const url = `https://www.youtube.com/watch?v=${vid}`;
       const { data: existing } = await client.from('mkt_posts')
-        .select('id').eq('external_url', url).eq('channel', 'youtube').maybeSingle();
-      if (existing) { skipped++; continue; }
+        .select('id, content_id').eq('external_url', url).eq('channel', 'youtube').maybeSingle();
+      if (existing?.content_id) {
+        const { data: exMetric } = await client.from('mkt_metrics')
+          .select('id').eq('source', 'youtube').eq('entity_ref', existing.content_id).limit(1).maybeSingle();
+        if (exMetric) { skipped++; continue; }
+        const backfillMetrics = {
+          views: Number(v.statistics?.viewCount || 0),
+          reactions: Number(v.statistics?.likeCount || 0),
+          comments: Number(v.statistics?.commentCount || 0),
+          shares: 0
+        };
+        const { error: eBM } = await client.from('mkt_metrics').insert({
+          source: 'youtube', entity_ref: existing.content_id, metrics: backfillMetrics,
+          metric_date: new Date().toISOString().slice(0, 10),
+          created_at: new Date().toISOString()
+        });
+        if (eBM) errors.push(`backfill metric ${vid}: ${eBM.message}`);
+        added++;
+        continue;
+      }
       const title = String(v.snippet?.title || '').slice(0, 100) || `Video YT ${vid}`;
       const contentId = randomUUID();
       const { error: eC } = await client.from('mkt_content').insert({
@@ -157,7 +196,9 @@ async function importYouTube(client: any, sinceIso: string): Promise<{ added: nu
         shares: 0
       };
       const { error: eM } = await client.from('mkt_metrics').insert({
-        source: 'youtube', entity_ref: contentId, metrics, created_at: new Date().toISOString()
+        source: 'youtube', entity_ref: contentId, metrics,
+        metric_date: new Date().toISOString().slice(0, 10),
+        created_at: new Date().toISOString()
       });
       if (eM) errors.push(`metric ${vid}: ${eM.message}`);
       added++;
