@@ -1391,7 +1391,7 @@ export async function generateTextForTitle(
   try {
     const r = await generateContentAsync(
       { keyword: clean, intent, landing_url },
-      { assetHint: (assetHint || '').trim(), format, contentType, client }
+      { assetHint: (assetHint || '').trim(), format, contentType, client: client as any }
     );
     return (r?.draft as string) || '';
   } catch (e: any) {
