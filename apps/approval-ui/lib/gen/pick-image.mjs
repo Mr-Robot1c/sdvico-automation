@@ -189,22 +189,20 @@ function pickFresh(imgs, recentlyUsed) {
 export async function pickImageForContent(client, folders, topicText, recentlyUsed = null, bodyHint = '') {
   const text = String(topicText || '');
 
-  // 1. Chủ đề dính sản phẩm -> ảnh folder sản phẩm đó (né ảnh vừa dùng).
-  const grp = guessGroup(text);
-  if (grp) {
-    const key = [...folders.keys()].find((g) => productName(g).toLowerCase() === productName(grp).toLowerCase());
-    const imgs = key ? folders.get(key)?.images || [] : [];
-    const pick = pickFresh(imgs, recentlyUsed);
-    if (pick) return { id: pick.id, via: 'product', note: `folder ${key}${recentlyUsed?.has(pick.id) ? ' (het anh moi, lay anh dung lau nhat)' : ''}` };
-  }
-
+  // 26/8 (user "sinh bai content toan lay anh san pham"): DAO thu tu — tang 1 cu la product
+  // folder da thang hau het vi bai content hay dinh keyword nganh (dau, nuoc, VMS) => match
+  // guessGroup => folder san pham luon co anh => Google CSE khong bao gio duoc chay. Nay ep
+  // Google CSE + Unsplash truoc de bai content co anh minh hoa DA DANG tu Google Images
+  // (CC-filtered) thay vi lap anh san pham SDVICO nham chan. Folder san pham lui xuong lam
+  // backup - chi dung khi Google + Unsplash deu khong co ket qua.
+  //
   // Sinh keyword 1 lượt (VI cho Google + EN cho Unsplash) — tiết kiệm 1 lần call Gemini.
   const kw = (process.env.GOOGLE_CSE_API_KEY || process.env.UNSPLASH_ACCESS_KEY)
     ? await imageKeywordsFor(text, client, bodyHint)
     : { vi: '', en: '' };
 
-  // 2. GOOGLE CSE (user 26/8 chốt ưu tiên) — keyword tiếng Việt + filter CC. Ảnh Việt Nam
-  // hợp topic ngư dân hơn Unsplash. Hết quota (100/ngày) hoặc không có kết quả -> fallback.
+  // 1. GOOGLE CSE — keyword tiếng Việt + filter CC. Ảnh Việt Nam hợp topic ngư dân hơn.
+  // Hết quota (100/ngày) hoặc không có kết quả -> fallback.
   try {
     if (process.env.GOOGLE_CSE_API_KEY && process.env.GOOGLE_CSE_ID && kw.vi) {
       const items = await searchGoogleCSE(kw.vi);
@@ -216,7 +214,7 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
     }
   } catch { /* rơi xuống Unsplash */ }
 
-  // 3. Unsplash fallback — keyword tiếng Anh.
+  // 2. Unsplash fallback — keyword tiếng Anh.
   try {
     if (process.env.UNSPLASH_ACCESS_KEY && kw.en) {
       const results = await searchUnsplash(kw.en);
@@ -229,7 +227,16 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
     }
   } catch { /* rơi xuống fallback */ }
 
-  // 4. Fallback: folder Content, rồi bất kỳ — né ảnh đã dùng 14 ngày, hết mới lấy ảnh dùng lâu nhất.
+  // 3. Backup: folder sản phẩm SDVICO nếu chủ đề dính guessGroup (trước là tầng 1, nay backup).
+  const grp = guessGroup(text);
+  if (grp) {
+    const key = [...folders.keys()].find((g) => productName(g).toLowerCase() === productName(grp).toLowerCase());
+    const imgs = key ? folders.get(key)?.images || [] : [];
+    const pick = pickFresh(imgs, recentlyUsed);
+    if (pick) return { id: pick.id, via: 'product', note: `folder ${key} (backup Google/Unsplash fail)${recentlyUsed?.has(pick.id) ? ' (het anh moi, lay anh dung lau nhat)' : ''}` };
+  }
+
+  // 4. Fallback cuối: folder Content, rồi bất kỳ — né ảnh đã dùng 14 ngày.
   const contentImgs = folders.get('Content')?.images || [];
   const any = [...folders.values()].flatMap((f) => f.images);
   const pool = contentImgs.length ? contentImgs : any;
