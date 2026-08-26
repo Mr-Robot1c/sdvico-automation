@@ -5,6 +5,7 @@ import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
 import { zaloOaStatus } from '../../lib/zalo-oa';
 import PlatformLogo from './platform-logo';
 import PlanQuickView from './plan-quick-view';
+import LeadQuickView, { type QuickLead } from './lead-quick-view';
 
 // TỔNG QUAN thiết kế lại (user 21/8 đêm, nhắc lại yêu cầu gốc): một trang tổng quát để xem
 // cho đỡ rối mắt — mỗi NỀN TẢNG một thẻ: đang làm tốt cỡ nào (thông số react, cmt, view),
@@ -73,12 +74,16 @@ export default async function TongQuanSection() {
       .select('id', { count: 'exact', head: true })
       .neq('status', 'spam')
       .gte('created_at', sevenDaysAgoIso),
-    // Riêng HÔM NAY, cho tile đầu trang (24/8: theo mẫu "Lead mới hôm nay").
+    // Riêng HÔM NAY, cho tile đầu trang (24/8: theo mẫu "Lead mới hôm nay"). User 26/8: tile
+    // này bấm mở MODAL xem lead ngay tại Tổng quan, không navigate — nên lấy full field cho
+    // modal chứ không chỉ count. Limit 50 (hôm nay hiếm khi vượt).
     client
       .from('mkt_leads')
-      .select('id', { count: 'exact', head: true })
+      .select('id, source, fb_user_name, fb_profile_url, message, created_at, content_id', { count: 'exact' })
       .neq('status', 'spam')
-      .gte('created_at', todayStartIso),
+      .gte('created_at', todayStartIso)
+      .order('created_at', { ascending: false })
+      .limit(50),
   ]);
 
   // Bài đã đăng theo kênh + lần đăng gần nhất.
@@ -125,6 +130,25 @@ export default async function TongQuanSection() {
   const leadTodayCount = leadsTodayRes.count || 0;
   const planRow = planRes.data as any;
   const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
+
+  // Build danh sách lead hôm nay cho LeadQuickView (modal xem nhanh ở tile Tổng quan).
+  // Query nhỏ join content title vì mkt_leads chỉ có content_id, không có tiêu đề bài.
+  const leadsTodayRaw = (leadsTodayRes.data || []) as any[];
+  const leadContentIds = [...new Set(leadsTodayRaw.map((l) => l.content_id).filter(Boolean))] as string[];
+  const leadContentTitle = new Map<string, string>();
+  if (leadContentIds.length) {
+    const { data: cs } = await client.from('mkt_content').select('id, title').in('id', leadContentIds);
+    for (const c of cs || []) leadContentTitle.set((c as any).id, (c as any).title || '(không tên)');
+  }
+  const leadsToday: QuickLead[] = leadsTodayRaw.map((l) => ({
+    id: String(l.id),
+    source: String(l.source || ''),
+    fbUserName: (l.fb_user_name as string) || null,
+    fbProfileUrl: (l.fb_profile_url as string) || null,
+    message: String(l.message || ''),
+    createdAt: String(l.created_at || ''),
+    contentTitle: l.content_id ? (leadContentTitle.get(l.content_id) || null) : null,
+  }));
 
   const fbPosts = byChannel.get('facebook') || { count: 0, lastAt: '' };
   const ytPosts = byChannel.get('youtube') || { count: 0, lastAt: '' };
@@ -193,10 +217,7 @@ export default async function TongQuanSection() {
           <div className="stat-lbl">Bài chờ duyệt</div>
           <div className="stat-num">{fmt(pendingCount)}</div>
         </Link>
-        <Link href="/khach-hang" className="board-stat" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="stat-lbl">Người hỏi mua hôm nay</div>
-          <div className="stat-num">{fmt(leadTodayCount)}</div>
-        </Link>
+        <LeadQuickView leads={leadsToday} count={leadTodayCount} />
         <PlanQuickView todayPlan={(() => {
           if (!planRow) return null;
           const vnToday = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
