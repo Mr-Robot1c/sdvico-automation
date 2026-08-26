@@ -1,15 +1,15 @@
-name: Cron 30 phút - số liệu + sinh nội dung
+name: Cron 1 tieng - so lieu + sinh noi dung
 
-# GỌI 2 endpoint trên Vercel mỗi 30 phút (cron Vercel Hobby không chạy được lịch dưới 1 ngày):
+# GỌI 2 endpoint trên Vercel mỗi 1 tiếng (26/8/2026 dời từ 30 phút xuống 1 tiếng để đỡ hao quota
+# GitHub Actions 2.000 phút/tháng miễn phí — 30 phút/lần đã đốt hết quota trước 26/8):
 #  1) /api/mkt-metrics-pull  - cập nhật mkt_metrics + học tri thức + sinh kế hoạch theo lịch.
-#  2) /api/rotate            - sinh bài A/B chờ duyệt. Route có GUARD 1 lần/ngày (VN) nên gọi 30
-#     phút/lần vẫn chỉ tạo 1 đợt bài mỗi ngày; đây là LƯỚI AN TOÀN cho cron Vercel /api/rotate hay
-#     bị trượt (19/8: cron Vercel trượt cả ngày, không ai biết vì route im lặng — nay có run_log).
+#  2) /api/rotate            - sinh bài A/B chờ duyệt. Route có GUARD 1 lần/ngày (VN) nên gọi
+#     nhiều lần vẫn chỉ tạo 1 đợt bài mỗi ngày; đây là LƯỚI AN TOÀN cho cron Vercel /api/rotate.
 # Cả 2 bảo vệ bằng CRON_SECRET (đặt cùng giá trị trên GitHub secret + Vercel env production).
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # mỗi 30 phút
+    - cron: '0 * * * *' # mỗi 1 tiếng, phút 0
   workflow_dispatch:
     inputs:
       force_rotate:
