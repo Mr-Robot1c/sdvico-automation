@@ -186,7 +186,8 @@ export default function DecideActions({
       }}
     >
       <input type="hidden" name="id" value={id} />
-      {hasTiktok ? <TiktokComposer videoUrl={videoUrl} caption={caption} /> : null}
+      {/* TiktokComposer bỏ (user 26/8): TikTok API không post được cho account public
+          của unaudited app SDVICO. Flow mới = Xuất tay ở /noi-dung sau khi bài đăng. */}
       <div className="row">
         <input className="note" name="note" placeholder="Ghi chú (không bắt buộc)" aria-label="Ghi chú" />
         <label className="schedule-lbl" title="Để trống = đăng ngay khi bấm Duyệt. Có giờ = Facebook tự đăng đúng giờ hẹn. Lưu ý AM = sáng/khuya, PM = trưa/chiều/tối.">
