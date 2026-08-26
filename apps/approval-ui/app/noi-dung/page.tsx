@@ -101,11 +101,9 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       <a className="chip" href="/khach-hang">
         <span aria-hidden="true">👥</span> Khách hàng <span className="n">{cLeadNew ?? 0}</span>
       </a>
-      {cTrash && cTrash > 0 ? (
-        <a className={`chip ${tab === 'thung-rac' ? 'on' : ''}`} href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn — số liệu vẫn còn. Khôi phục hoặc xoá hẳn tại đây.">
-          <span aria-hidden="true">🗑️</span> Thùng rác <span className="n">{cTrash}</span>
-        </a>
-      ) : null}
+      <a className={`chip ${tab === 'thung-rac' ? 'on' : ''}`} href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn — số liệu vẫn còn nguyên trong lịch sử. Khôi phục hoặc xoá hẳn tại đây.">
+        <span aria-hidden="true">🗑️</span> Thùng rác <span className="n">{cTrash ?? 0}</span>
+      </a>
     </nav>
   );
 
@@ -348,11 +346,22 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
 
       {!error && items.length === 0 ? (
-        <div className="empty">
-          <div className="empty-icon" aria-hidden="true">{tab === 'video' ? '🎬' : '📝'}</div>
-          <p>Chưa có {tab === 'video' ? 'kịch bản video' : 'bài viết'} nào{statusFilter ? ` ở mục ${STATUS[statusFilter].label}` : ''}.</p>
-          <p className="sub">Vào <a className="src" href="/san-xuat">Xưởng sản xuất</a> để soạn bài mới.</p>
-        </div>
+        tab === 'thung-rac' ? (
+          <div className="empty">
+            <div className="empty-icon" aria-hidden="true">🗑️</div>
+            <p><b>Thùng rác trống.</b></p>
+            <p className="sub" style={{ maxWidth: 520, margin: '8px auto 0' }}>
+              Chưa có bài nào bị ẩn. Khi bấm nút <b>Xoá</b> trên bài viết, bài sẽ vào đây (soft-delete)
+              — lịch sử số liệu vẫn còn nguyên, có thể khôi phục hoặc xoá hẳn tại đây.
+            </p>
+          </div>
+        ) : (
+          <div className="empty">
+            <div className="empty-icon" aria-hidden="true">{tab === 'video' ? '🎬' : '📝'}</div>
+            <p>Chưa có {tab === 'video' ? 'kịch bản video' : 'bài viết'} nào{statusFilter ? ` ở mục ${STATUS[statusFilter].label}` : ''}.</p>
+            <p className="sub">Vào <a className="src" href="/san-xuat">Xưởng sản xuất</a> để soạn bài mới.</p>
+          </div>
+        )
       ) : null}
 
       {!error && items.length > 0 ? (
