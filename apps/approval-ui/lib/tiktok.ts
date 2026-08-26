@@ -203,3 +203,37 @@ export async function postVideoToTikTok(
     return { ok: false, steps, error: String(e?.message || e) };
   }
 }
+
+// Đếm số video THỰC còn trên profile TikTok qua Display API `/v2/video/list/` (scope video.list
+// đã grant khi OAuth connect). Dùng cho tile Tổng quan thay vì đếm mkt_posts.deleted_at (user
+// phải mark tay). Null = API fail (mất scope, network, chưa audit approve...) — caller fallback
+// về số đếm mkt_posts. Paginate tối đa 10 trang (200 video), an toàn cho tài khoản SDVICO ít video.
+export async function getTikTokVideoCount(client: Client): Promise<number | null> {
+  try {
+    const { accessToken } = await getValidTikTokToken(client);
+    const authJson = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+    let count = 0;
+    let cursor: number | undefined = undefined;
+    let hasMore = true;
+    let guard = 10;
+    while (hasMore && guard-- > 0) {
+      const body: any = { max_count: 20 };
+      if (cursor) body.cursor = cursor;
+      const r = await fetch(`${TT}/v2/video/list/?fields=id`, {
+        method: 'POST', headers: authJson, body: JSON.stringify(body)
+      });
+      const j: any = await r.json();
+      if (!r.ok) return null;
+      const err = ttErr(j);
+      if (err) return null;
+      const videos = j?.data?.videos || [];
+      count += videos.length;
+      hasMore = !!j?.data?.has_more;
+      cursor = j?.data?.cursor;
+      if (!cursor) break;
+    }
+    return count;
+  } catch {
+    return null;
+  }
+}
