@@ -199,8 +199,11 @@ export default async function BangSection() {
   // (https://www.tiktok.com/@sdvico_tbtc — user confirm 26/8). Hardcode fallback vì fact
   // tĩnh của SDVICO; env NEXT_PUBLIC_TIKTOK_USERNAME override nếu sau này đổi.
   const tiktokUsername = (process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim() || null;
-  const PUB_CAP = 12;
-  const REJ_CAP = 8;
+  // Bang bai viet la kanban tong quan - chi hien 1 vai bai gan nhat, xem het qua tab Bai viet
+  // (user 26/8: "bang bai viet hien 1 so bai gan day thoi, qua trang bai viet no moi hien het").
+  // Cot moi co nut "Xem tat ca" moreHref dan qua /noi-dung?loai=bai-viet.
+  const PUB_CAP = 4;
+  const REJ_CAP = 4;
 
   // Bỏ cột "Đã duyệt" (user 21/8: "dù sao có đã đăng rồi") — board còn 3 bước. Bài đã duyệt
   // mà chưa lên kênh (hẹn giờ, kẹt) hiện thành dòng cảnh ở thanh vận hành, không mất dấu.
