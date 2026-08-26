@@ -1,5 +1,5 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { deleteAsset, renameAsset, setAssetProductGroup } from '../actions';
+import { deleteAsset, renameAsset, setAssetProductGroup, createProductFolder, deleteProductFolder } from '../actions';
 import AssetViewer from './asset-viewer';
 import LogoButton from './logo-button';
 import LibUploader from './lib-uploader';
@@ -54,19 +54,27 @@ function fmtDate(iso: string): string {
 
 export default async function Page({ searchParams }: { searchParams: { folder?: string } }) {
   const client = getServerClient();
-  const { data, error } = await client
-    .from('brand_assets')
-    .select('id, kind, title, storage_path, license, license_note, source, product_group, created_at')
-    .order('created_at', { ascending: false })
-    .limit(300);
+  const [{ data, error }, { data: customCfg }] = await Promise.all([
+    client
+      .from('brand_assets')
+      .select('id, kind, title, storage_path, license, license_note, source, product_group, created_at')
+      .order('created_at', { ascending: false })
+      .limit(300),
+    // 26/8 (user "thêm folder để tạo thêm sản phẩm"): folder custom lưu app_config.
+    client.from('app_config').select('value').eq('key', 'mkt_custom_product_groups').maybeSingle(),
+  ]);
+  const customGroups: string[] = Array.isArray((customCfg as any)?.value?.groups) ? (customCfg as any).value.groups : [];
 
   const rows = (data || []) as Asset[];
   const urlOf = (p: string) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
   const isVideo = (k: string) => k === 'video' || k === 'clip';
 
-  // Gom theo folder. Giữ đúng thứ tự 8 folder + Content, cuối là nhóm chưa gán (nếu có).
+  // Gộp folder cứng + custom folder từ app_config để chọn/hiển thị.
+  const ALL_GROUPS: string[] = [...PRODUCT_GROUPS, ...customGroups.filter((g) => !PRODUCT_GROUPS.includes(g))];
+
+  // Gom theo folder. Giữ đúng thứ tự 8 folder + Content + custom, cuối là nhóm chưa gán.
   const byGroup = new Map<string, Asset[]>();
-  for (const g of PRODUCT_GROUPS) byGroup.set(g, []);
+  for (const g of ALL_GROUPS) byGroup.set(g, []);
   byGroup.set(UNASSIGNED, []);
   for (const a of rows) {
     const key = a.product_group && byGroup.has(a.product_group) ? a.product_group : (a.product_group || UNASSIGNED);
@@ -74,8 +82,8 @@ export default async function Page({ searchParams }: { searchParams: { folder?: 
     byGroup.get(key)!.push(a);
   }
   const folderKeys: string[] = [
-    ...PRODUCT_GROUPS,
-    ...[...byGroup.keys()].filter((k) => !PRODUCT_GROUPS.includes(k) && k !== UNASSIGNED),
+    ...ALL_GROUPS,
+    ...[...byGroup.keys()].filter((k) => !ALL_GROUPS.includes(k) && k !== UNASSIGNED),
     ...(byGroup.get(UNASSIGNED)!.length ? [UNASSIGNED] : []),
   ];
 
@@ -104,17 +112,43 @@ export default async function Page({ searchParams }: { searchParams: { folder?: 
           </a>
           {folderKeys.map((g) => {
             const list = byGroup.get(g) || [];
+            const isCustom = customGroups.includes(g);
             return (
-              <a
-                key={g}
-                className={`lib-folder ${selected === g ? 'on' : ''}`}
-                href={`/tu-lieu?folder=${encodeURIComponent(g)}`}
-                title={g === UNASSIGNED ? 'Tư liệu chưa gán vào folder nào' : g}
-              >
-                <span aria-hidden="true">📁</span> {folderLabel(g)} <span className="n">{list.length || ''}</span>
-              </a>
+              <div key={g} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <a
+                  className={`lib-folder ${selected === g ? 'on' : ''}`}
+                  href={`/tu-lieu?folder=${encodeURIComponent(g)}`}
+                  title={g === UNASSIGNED ? 'Tư liệu chưa gán vào folder nào' : g}
+                  style={{ flex: 1 }}
+                >
+                  <span aria-hidden="true">📁</span> {folderLabel(g)} <span className="n">{list.length || ''}</span>
+                </a>
+                {isCustom ? (
+                  <form action={deleteProductFolder} style={{ display: 'inline' }}>
+                    <input type="hidden" name="name" value={g} />
+                    <button type="submit" className="btn ghost sm" title="Xoá folder tự tạo (tư liệu đã gán vẫn giữ)" style={{ padding: '2px 6px', fontSize: '.75rem' }}>
+                      ✕
+                    </button>
+                  </form>
+                ) : null}
+              </div>
             );
           })}
+          {/* Form thêm folder mới (user 26/8: "thêm folder để tạo thêm sản phẩm"). */}
+          <details style={{ marginTop: 10, padding: '8px 10px', border: '1px dashed var(--line)', borderRadius: 8 }}>
+            <summary style={{ cursor: 'pointer', fontSize: '.85rem', fontWeight: 600 }}>➕ Thêm folder mới</summary>
+            <form action={createProductFolder} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+              <input
+                name="name"
+                required
+                placeholder="Ví dụ: Máy dò cá X"
+                className="note"
+                style={{ padding: '6px 8px', fontSize: '.85rem', borderRadius: 6 }}
+              />
+              <button type="submit" className="btn ok sm">Tạo folder</button>
+              <span className="sub" style={{ fontSize: '.72rem' }}>Số thứ tự tự thêm. Upload tư liệu rồi gán vào folder ngay bên dưới.</span>
+            </form>
+          </details>
         </nav>
 
         {/* Lưới thumbnail bên phải */}
@@ -151,7 +185,7 @@ export default async function Page({ searchParams }: { searchParams: { folder?: 
                         <input name="title" defaultValue={a.title} aria-label="Tên tư liệu" title="Đặt tên mô tả rõ để AI sinh text bám theo" />
                         <button className="btn ghost sm" type="submit">Đổi tên</button>
                       </form>
-                      <ProductGroupSelect id={a.id} value={a.product_group || ''} options={PRODUCT_GROUPS} action={setAssetProductGroup} />
+                      <ProductGroupSelect id={a.id} value={a.product_group || ''} options={ALL_GROUPS} action={setAssetProductGroup} />
                       {a.kind === 'image' ? <LogoButton id={a.id} /> : null}
                       {a.source ? <div className="metaline">Nguồn: {a.source}</div> : null}
                       <div className="metaline">{a.license === 'licensed' ? 'Có giấy phép' : 'Công ty sở hữu'}</div>

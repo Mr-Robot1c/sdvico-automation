@@ -1185,6 +1185,64 @@ export async function setAssetProductGroup(formData: FormData) {
   revalidatePath('/tu-lieu');
 }
 
+// Tạo folder sản phẩm MỚI (user 26/8: "thêm folder để tạo thêm sản phẩm"). Lưu app_config
+// key 'mkt_custom_product_groups' = array string. Folder mới hiện ngay ở sidebar /tu-lieu
+// (kể cả khi rỗng), user upload tư liệu gán vào folder này. Rotate tự nhận vì query
+// brand_assets by product_group thực tế, không đọc PRODUCTS hardcode.
+export async function createProductFolder(formData: FormData) {
+  let name = String(formData.get('name') || '').trim().slice(0, 120);
+  if (!name) return;
+  // Auto-prefix STT nếu user chưa gõ (VD "Máy dò cá" -> "9. Máy dò cá") để khớp format
+  // 8 folder cứng "1. ..., 2. ..." — sidebar sort đẹp hơn. Nếu user đã gõ "N." rồi giữ nguyên.
+  if (!/^\s*\d+\.\s*/.test(name)) {
+    // Đếm folder hiện có (cứng + custom) để đưa STT tiếp theo.
+    // @ts-ignore — module JS thuần
+    const { PRODUCTS, CONTENT_GROUP } = await import('../lib/gen/products.mjs');
+    const client = getServerClient();
+    const { data: cfgRow } = await client.from('app_config').select('value').eq('key', 'mkt_custom_product_groups').maybeSingle();
+    const existing: string[] = Array.isArray((cfgRow as any)?.value?.groups) ? (cfgRow as any).value.groups : [];
+    const totalHardCoded = (PRODUCTS as { group: string }[]).length; // 8 folder cứng, không đếm Content
+    const nextIdx = totalHardCoded + existing.length + 1;
+    name = `${nextIdx}. ${name}`;
+    const groups = [...existing, name];
+    await client.from('app_config').upsert({
+      key: 'mkt_custom_product_groups',
+      value: { groups, updated_at: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    });
+  } else {
+    // User đã gõ STT rồi — chỉ append thẳng.
+    const client = getServerClient();
+    const { data: cfgRow } = await client.from('app_config').select('value').eq('key', 'mkt_custom_product_groups').maybeSingle();
+    const existing: string[] = Array.isArray((cfgRow as any)?.value?.groups) ? (cfgRow as any).value.groups : [];
+    if (existing.includes(name)) { revalidatePath('/tu-lieu'); return; }
+    const groups = [...existing, name];
+    await client.from('app_config').upsert({
+      key: 'mkt_custom_product_groups',
+      value: { groups, updated_at: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    });
+  }
+  revalidatePath('/tu-lieu');
+}
+
+// Xoá 1 folder custom (không đụng brand_assets — tư liệu đã gán vào folder này vẫn giữ
+// product_group cũ, hiện dưới nhóm "custom" ở sidebar cho tới khi user chuyển đi hoặc xoá).
+export async function deleteProductFolder(formData: FormData) {
+  const name = String(formData.get('name') || '').trim();
+  if (!name) return;
+  const client = getServerClient();
+  const { data: cfgRow } = await client.from('app_config').select('value').eq('key', 'mkt_custom_product_groups').maybeSingle();
+  const existing: string[] = Array.isArray((cfgRow as any)?.value?.groups) ? (cfgRow as any).value.groups : [];
+  const groups = existing.filter((g) => g !== name);
+  await client.from('app_config').upsert({
+    key: 'mkt_custom_product_groups',
+    value: { groups, updated_at: new Date().toISOString() },
+    updated_at: new Date().toISOString(),
+  });
+  revalidatePath('/tu-lieu');
+}
+
 // Xóa một tư liệu, gỡ cả file trên Storage.
 export async function deleteAsset(formData: FormData) {
   const id = String(formData.get('id') || '');

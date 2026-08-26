@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-24
 ttl_days: 180
+<!-- re-verified: 2026-08-26 02:00 - Them chuc nang tao folder san pham moi o /tu-lieu (user "them folder de tao them san pham"). App_config key 'mkt_custom_product_groups' = {groups:[]}. Action createProductFolder: auto-prefix STT tiep theo (VD "9. Ma dò cá X") neu user chua go, hoac giu nguyen neu da co "N.". deleteProductFolder xoa custom folder (khong dung brand_assets — tu lieu da gan van giu product_group cu). Sidebar them accordion "➕ Them folder moi" o cuoi. Moi folder custom co nut ✕ ben canh. Dropdown chuyen folder cua ProductGroupSelect nhan ALL_GROUPS = PRODUCT_GROUPS + customGroups. Rotate tu nhan folder moi vi query brand_assets by product_group thuc te, khong hardcode PRODUCTS. -->
 <!-- re-verified: 2026-08-26 01:45 - Bo tab Video khoi /noi-dung (user "du thua"), thay bang chip link Khach hang -> /khach-hang kem count leads status=new. Query cVid bo, them cLeadNew tu mkt_leads. Route ?loai=video van hoat dong (bookmark cu khong pha) chi khong co chip. -->
 <!-- re-verified: 2026-08-26 01:30 - forward-zalo-button LUON dropdown ke ca 1 NV (user "van chua thay dropdown"). Bo special case len===1 tu 25/8. Nhat quan UX. -->
 <!-- re-verified: 2026-08-26 01:15 - Fix BarChart mat cot khi tone-accent/tone-ok: CSS .col-bar chua co ruleset cho .tone-*, chi .cat-N moi apply background. Them .col-bar.tone-accent + .col-bar.tone-ok + default var(--ink-2). -->
