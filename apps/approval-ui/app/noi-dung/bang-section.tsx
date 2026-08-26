@@ -118,7 +118,7 @@ export default async function BangSection() {
   const ytByContent = new Map<string, { views: number; reactions: number; comments: number }>();
   if (cids.length) {
     const [{ data: cs }, { data: ps }, { data: ms }, { data: fails }] = await Promise.all([
-      client.from('mkt_content').select('id, title, draft, brief').in('id', cids),
+      client.from('mkt_content').select('id, title, draft, brief').in('id', cids).is('deleted_at', null),
       client.from('mkt_posts').select('id, content_id, channel, external_url, published_at, made_public_at, deleted_at').eq('status', 'published').in('content_id', cids),
       client.from('mkt_metrics').select('source, entity_ref, metrics, created_at').in('source', ['facebook', 'youtube']).in('entity_ref', cids).order('created_at', { ascending: false }).limit(700),
       // Lượt đăng FACEBOOK THẤT BẠI (23/8: token Page bị vô hiệu) -> thẻ hiện nút "Đăng lại Facebook".
@@ -178,7 +178,8 @@ export default async function BangSection() {
   }
 
   // Chia cột. Đã duyệt = approved nhưng chưa có bài đăng thật (đang đăng / chờ hẹn giờ / bị chặn).
-  const items = [...byContent.values()];
+  // Loc bo bai da soft-delete (contents.get(cid) undefined vi query mkt_content filter deleted_at null).
+  const items = [...byContent.values()].filter((it) => contents.has(it.cid));
   const pending = items.filter((it) => it.status === 'pending');
   const approvedWaiting = items.filter((it) => it.status === 'approved' && !(postsByContent.get(it.cid) || []).length);
   const published = items

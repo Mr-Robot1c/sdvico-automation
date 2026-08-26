@@ -1358,20 +1358,52 @@ export async function requestVideoForContent(formData: FormData) {
 
 // Xóa một BÀI (nội dung) khỏi hệ thống: gỡ bản ghi mkt_content + mục hàng đợi + bài đăng + số liệu.
 // LƯU Ý: chỉ xóa dữ liệu trong hệ thống, KHÔNG gỡ bài đã đăng thật trên Facebook/TikTok.
+// SOFT-DELETE (user 26/8 chot cach C): chi mark mkt_content.deleted_at, KHONG cham
+// mkt_posts / mkt_metrics / approval_queue -> lich su Like/View/Comment con nguyen o Do luong.
+// UI filter deleted_at null nen bai bien mat khoi Bang bai viet + Bai viet day du. Undo qua
+// restoreContent tu thung rac. Chi hardDeleteContent moi xoa han (co warning tren UI).
 export async function deleteContent(formData: FormData) {
   const id = String(formData.get('content_id') || '');
   if (!id) return;
   const client = getServerClient();
-  // 3 bảng con xóa SONG SONG, rồi mới xóa mkt_content. Trước đây xóa cả 4 cùng lúc: FK
-  // mkt_posts.content_id ON DELETE SET NULL chạy trước lệnh xóa mkt_posts -> để lại dòng mồ côi
-  // content_id=null (18/8 thấy 2 dòng như vậy), lệnh kéo số liệu bỏ qua mà không ai biết.
+  const { error } = await client.from('mkt_content').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw new Error('Soft-delete lỗi: ' + error.message);
+  try {
+    await client.from('run_log').insert({
+      task: 'mkt.content_soft_deleted', actor: 'user', status: 'ok', detail: { contentId: id }
+    });
+  } catch { /* bỏ qua */ }
+  revalidatePath('/noi-dung');
+  revalidatePath('/do-luong');
+}
+
+// Khoi phuc bai da soft-delete: clear mkt_content.deleted_at. Goi tu trang thung rac.
+export async function restoreContent(formData: FormData) {
+  const id = String(formData.get('content_id') || '');
+  if (!id) return;
+  const client = getServerClient();
+  const { error } = await client.from('mkt_content').update({ deleted_at: null }).eq('id', id);
+  if (error) throw new Error('Khôi phục lỗi: ' + error.message);
+  revalidatePath('/noi-dung');
+}
+
+// XOA HAN (khong khoi phuc duoc): xoa 4 bang nhu logic cu. Chi goi tu trang thung rac voi
+// warning ro rang. User 26/8 hoi han vi phien ban cu deleteContent la hard-delete silent.
+export async function hardDeleteContent(formData: FormData) {
+  const id = String(formData.get('content_id') || '');
+  if (!id) return;
+  const client = getServerClient();
   await Promise.all([
     client.from('approval_queue').delete().eq('payload->>content_id', id),
     client.from('mkt_posts').delete().eq('content_id', id),
     client.from('mkt_metrics').delete().eq('entity_ref', id)
   ]);
   await client.from('mkt_content').delete().eq('id', id);
-  // Xoá được gọi từ cả Bảng bài viết lẫn trang Đo lường -> revalidate cả hai.
+  try {
+    await client.from('run_log').insert({
+      task: 'mkt.content_hard_deleted', actor: 'user', status: 'ok', detail: { contentId: id }
+    });
+  } catch { /* bỏ qua */ }
   revalidatePath('/noi-dung');
   revalidatePath('/do-luong');
 }

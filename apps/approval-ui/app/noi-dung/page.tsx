@@ -5,6 +5,7 @@ import AutoRefresh from '../auto-refresh';
 import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
 import DeleteButton from './delete-button';
+import TrashActions from './trash-actions';
 import ShareGroups from './share-groups';
 import BangSection from './bang-section';
 import TongQuanSection from './tong-quan-section';
@@ -57,7 +58,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
   // viết / Video là danh sách chi tiết. Đo lường là trang riêng /do-luong.
   const loai = searchParams?.loai || '';
   if (loai === 'do-luong') redirect('/do-luong');
-  const tab = loai === 'video' ? 'video' : loai === 'bai-viet' ? 'baiviet' : loai === 'bang' ? 'bang' : 'tong-quan';
+  const tab = loai === 'video' ? 'video' : loai === 'bai-viet' ? 'baiviet' : loai === 'bang' ? 'bang' : loai === 'thung-rac' ? 'thung-rac' : 'tong-quan';
   const kinds = tab === 'video' ? ['video'] : ['article', 'social'];
   const statusFilter = searchParams?.trangthai && STATUS[searchParams.trangthai] ? searchParams.trangthai : null;
 
@@ -77,9 +78,11 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
 
   // 26/8 (user): bo tab Video (du thua), thay bang tab Khach hang link sang /khach-hang.
   // Van dem cBai cho tab "Bai viet" (bai article + social). Khong dem video nua.
-  const [{ count: cBai }, { count: cLeadNew }] = await Promise.all([
-    client.from('mkt_content').select('*', { count: 'exact', head: true }).in('kind', ['article', 'social']),
+  // Filter deleted_at null: bai soft-delete an khoi dem tab Bai viet + tab Thung rac dem rieng.
+  const [{ count: cBai }, { count: cLeadNew }, { count: cTrash }] = await Promise.all([
+    client.from('mkt_content').select('*', { count: 'exact', head: true }).in('kind', ['article', 'social']).is('deleted_at', null),
     client.from('mkt_leads').select('*', { count: 'exact', head: true }).eq('status', 'new'),
+    client.from('mkt_content').select('*', { count: 'exact', head: true }).not('deleted_at', 'is', null),
   ]);
 
   const typeChips = (
@@ -98,6 +101,11 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       <a className="chip" href="/khach-hang">
         <span aria-hidden="true">👥</span> Khách hàng <span className="n">{cLeadNew ?? 0}</span>
       </a>
+      {cTrash && cTrash > 0 ? (
+        <a className={`chip ${tab === 'thung-rac' ? 'on' : ''}`} href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn — số liệu vẫn còn. Khôi phục hoặc xoá hẳn tại đây.">
+          <span aria-hidden="true">🗑️</span> Thùng rác <span className="n">{cTrash}</span>
+        </a>
+      ) : null}
     </nav>
   );
 
@@ -137,12 +145,17 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     );
   }
 
-  const { data, error } = await client
+  // Tab Thung rac: hien danh sach bai soft-deleted (deleted_at NOT NULL) voi 2 nut Khoi phuc / Xoa han.
+  // Cac tab khac loc deleted_at null de bai an sau soft-delete khong hien.
+  const contentQuery = client
     .from('mkt_content')
-    .select('id, kind, title, brief, draft, status, created_at')
+    .select('id, kind, title, brief, draft, status, created_at, deleted_at')
     .in('kind', kinds)
-    .order('created_at', { ascending: false })
+    .order(tab === 'thung-rac' ? 'deleted_at' : 'created_at', { ascending: false })
     .limit(200);
+  const { data, error } = tab === 'thung-rac'
+    ? await contentQuery.not('deleted_at', 'is', null)
+    : await contentQuery.is('deleted_at', null);
 
   const rawItems = (data || []) as Content[];
 
@@ -498,7 +511,11 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                       {c.brief?.video_requested ? (
                         <span className="badge tone-demo" title="Đã bấm dựng video — máy đang dựng, xong sẽ tự tắt nhãn này">🎬 Đang dựng video</span>
                       ) : null}
-                      <DeleteButton contentId={c.id} title={c.title} />
+                      {tab === 'thung-rac' ? (
+                        <TrashActions contentId={c.id} title={c.title} deletedAt={(c as any).deleted_at || null} />
+                      ) : (
+                        <DeleteButton contentId={c.id} title={c.title} />
+                      )}
                       </div>
                     </td>
                   </tr>

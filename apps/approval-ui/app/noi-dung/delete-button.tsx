@@ -3,11 +3,11 @@
 import { useState, useTransition } from 'react';
 import { deleteContent } from '../actions';
 
-// Nút Xoá 1 bài khỏi DB (mkt_content + approval_queue + mkt_posts + mkt_metrics).
-// KHÔNG gỡ bài đã đăng thật trên FB/TikTok - chỉ gỡ khỏi hệ thống theo dõi.
+// Nút Xoá 1 bài khỏi UI. Tu 26/8 la SOFT-DELETE (mark mkt_content.deleted_at) -> lich su
+// Like/View/Comment o mkt_metrics CON NGUYEN. Undo tu trang /noi-dung?trangthai=da-xoa.
+// KHÔNG gỡ bài đã đăng thật trên FB/TikTok - chỉ ẩn khỏi bảng theo dõi.
 // 19/8 (user): BỎ popup xác nhận (xoá nhiều bài rất phiền) + XOÁ TỨC THÌ trên màn hình:
-// bấm là dòng ẩn ngay (optimistic), server xoá ở nền; lỗi thì hiện lại dòng + báo. Trước đây
-// form action đợi server + revalidatePath 3 trang xong mới vẽ lại -> cảm giác delay 1-3s.
+// bấm là dòng ẩn ngay (optimistic), server xoá ở nền; lỗi thì hiện lại dòng + báo.
 export default function DeleteButton({ contentId, title }: { contentId: string; title: string }) {
   const [pending, startTransition] = useTransition();
   const [gone, setGone] = useState(false);
@@ -21,7 +21,7 @@ export default function DeleteButton({ contentId, title }: { contentId: string; 
         className="btn no sm"
         type="button"
         disabled={pending}
-        title={`Xoá "${title}" khỏi hệ thống (không gỡ bài đã đăng trên FB/TikTok)`}
+        title={`Ẩn "${title}" khỏi bảng (soft-delete). Lịch sử số liệu còn nguyên, khôi phục qua Thùng rác.`}
         onClick={() => {
           setErr(null);
           // Ẩn dòng NGAY để người dùng xoá liên tiếp không phải chờ; server xoá ở nền.
