@@ -7,6 +7,7 @@ import ViewModal from '../view-modal';
 import ShareGroups from './share-groups';
 import { channelsLabel, riskMeta, formatRelative, formatDateTimeVN } from '../labels';
 import PlatformLogo, { type PlatformKey } from './platform-logo';
+import TikTokPrivateChip from './tiktok-private-chip';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -78,7 +79,7 @@ export default async function BangSection() {
 
   // Nội dung + nháp + cờ video; bài đã đăng; số liệu; media để xem trước khi duyệt.
   const contents = new Map<string, { title: string; draft: string; brief: any }>();
-  const postsByContent = new Map<string, { channel: string; url: string; at: string }[]>();
+  const postsByContent = new Map<string, { id: string; channel: string; url: string; at: string; madePublicAt: string | null }[]>();
   const fbFailed = new Set<string>(); // bài có lượt đăng Facebook thất bại, chưa có bản FB published
   const fbRetrying = new Set<string>(); // đang có lượt đăng lại chạy nền
   const metricsByContent = new Map<string, M>();
@@ -86,7 +87,7 @@ export default async function BangSection() {
   if (cids.length) {
     const [{ data: cs }, { data: ps }, { data: ms }, { data: fails }] = await Promise.all([
       client.from('mkt_content').select('id, title, draft, brief').in('id', cids),
-      client.from('mkt_posts').select('content_id, channel, external_url, published_at').eq('status', 'published').in('content_id', cids),
+      client.from('mkt_posts').select('id, content_id, channel, external_url, published_at, made_public_at').eq('status', 'published').in('content_id', cids),
       client.from('mkt_metrics').select('source, entity_ref, metrics, created_at').in('source', ['facebook', 'youtube']).in('entity_ref', cids).order('created_at', { ascending: false }).limit(700),
       // Lượt đăng FACEBOOK THẤT BẠI (23/8: token Page bị vô hiệu) -> thẻ hiện nút "Đăng lại Facebook".
       client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'facebook').in('content_id', cids)
@@ -104,7 +105,13 @@ export default async function BangSection() {
       const cid = (p as any).content_id as string | null;
       if (!cid) continue;
       if (!postsByContent.has(cid)) postsByContent.set(cid, []);
-      postsByContent.get(cid)!.push({ channel: (p as any).channel || '', url: (p as any).external_url || '', at: (p as any).published_at || '' });
+      postsByContent.get(cid)!.push({
+        id: String((p as any).id || ''),
+        channel: (p as any).channel || '',
+        url: (p as any).external_url || '',
+        at: (p as any).published_at || '',
+        madePublicAt: (p as any).made_public_at || null
+      });
     }
     for (const m of ms || []) {
       const cid = (m as any).entity_ref as string | null;
@@ -149,6 +156,9 @@ export default async function BangSection() {
   // Nhãn kênh chuẩn (thay emoji thô); logo brthật vẽ bằng PlatformLogo.
   const CH_LABEL: Record<string, string> = { facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok', zalo: 'Zalo', website: 'Website' };
   const isPlat = (c: string): c is PlatformKey => c === 'facebook' || c === 'youtube' || c === 'tiktok' || c === 'zalo';
+  // Username TikTok công ty để nút "Mở TikTok" trên chip riêng tư mở đúng profile. Rỗng thì
+  // ẩn nút, người dùng tự mở app TikTok.
+  const tiktokUsername = (process.env.NEXT_PUBLIC_TIKTOK_USERNAME || '').trim() || null;
   const PUB_CAP = 12;
   const REJ_CAP = 8;
 
@@ -296,12 +306,16 @@ export default async function BangSection() {
                             <span>{CH_LABEL[x.channel] || x.channel}</span>
                           </a>
                         ))}
-                        {posts.some((x) => x.channel === 'tiktok' && !/^https?:/.test(x.url)) ? (
-                          <span className="ch-link is-off" title="Đã đăng TikTok ở chế độ riêng tư (chờ duyệt ứng dụng), chưa có link công khai">
-                            <PlatformLogo platform="tiktok" size={15} />
-                            <span>TikTok</span>
-                          </span>
-                        ) : null}
+                        {posts
+                          .filter((x) => x.channel === 'tiktok' && !/^https?:/.test(x.url))
+                          .map((x) => (
+                            <TikTokPrivateChip
+                              key={x.id}
+                              postId={x.id}
+                              madePublicAt={x.madePublicAt}
+                              tiktokUsername={tiktokUsername}
+                            />
+                          ))}
                       </div>
                       {m || ytByContent.get(it.cid) ? (
                         <span style={{ fontSize: '.85rem' }}>

@@ -2,8 +2,9 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
-last_verified: 2026-08-24
+last_verified: 2026-08-26
 ttl_days: 90
+<!-- re-verified: 2026-08-26 03:00 - Migration 20260826010000_mkt_posts_made_public: them cot mkt_posts.made_public_at (workaround TikTok audit reject — user danh dau bai da doi cong khai tay). KHONG doi flow NV Ke hoach: cot moi khong duoc query trong plan.ts/loadMeasurement, khong anh huong xep hang huong di / weighted rotate. Chi anh huong hien thi /noi-dung. -->
 <!-- re-verified: 2026-08-24 23:30 - plan.ts truyen them `client` vao generateContentDirections() (chi de logTokenUsage — track token BOSS sinh huong di, xem README "Quan tri token"). KHONG doi logic sinh huong di/carry-over, chi them 1 tham so optional cuoi. -->
 <!-- re-verified: 2026-08-24 23:00 - actions.ts them updateLeadStatus/addLeadManual (theo doi nguoi mua) — KHONG lien quan flow Ke hoach, chi them action moi cuoi file, khong sua ham nao co san (generatePlanNow/applyPlanWeights/clearPlanWeights nguyen). -->
 <!-- re-verified: 2026-08-24 22:00 - FIX "bam Luu khong cap nhat": generateAndStorePlan cham (Gemini 30-133s), page thieu maxDuration -> server action bi cat, response khong ve browser. Them maxDuration=300 + SaveGenerateButton (useFormStatus hien "Dang sinh... dung roi trang"). KHONG doi flow NV. -->
