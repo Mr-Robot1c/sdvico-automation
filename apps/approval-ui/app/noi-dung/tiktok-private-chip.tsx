@@ -1,27 +1,46 @@
 'use client';
 
 // Chip TikTok cho bài đã đăng qua Direct Post API ở chế độ RIÊNG TƯ (do app SDVICO không được
-// TikTok audit — reject 26/8/2026 vì "internal company use"). 3 trạng thái:
-//   1. Chưa xử → chip vàng "TikTok · riêng tư" + nút [Mở TikTok] (nếu env NEXT_PUBLIC_TIKTOK_USERNAME
-//      có) + nút [Đã đổi công khai] (mở form paste URL tuỳ chọn).
-//   2. Đã đánh dấu (made_public_at có, url không http) → chip xanh nhạt "TikTok ✓ công khai" + nút [↺]
-//      bỏ đánh dấu.
-//   3. Có URL http → parent (bang-section) tự render <a> link chip xanh chuẩn, không dùng component này.
+// TikTok audit — reject 26/8/2026 vì "internal company use"). 4 trạng thái:
+//   1. Chưa xử → chip vàng "TikTok · riêng tư" + nút [Mở TikTok] + [Đã đổi công khai] + [🗑 Đã xoá].
+//   2. Đã công khai (made_public_at có, url không http) → chip xanh "TikTok ✓ công khai" + nút [↺].
+//   3. Đã xoá (deleted_at có) → chip xám "TikTok · đã xoá" + nút [↺] (tile Tổng quan ngừng đếm).
+//   4. Có URL http → parent (bang-section) tự render <a> link chip xanh chuẩn, không dùng component này.
 
 import { useState, useTransition } from 'react';
 import PlatformLogo from './platform-logo';
-import { markTikTokPublic, undoMarkTikTokPublic } from './tiktok-public-actions';
+import { markTikTokPublic, undoMarkTikTokPublic, markTikTokDeleted, undoMarkTikTokDeleted } from './tiktok-public-actions';
 
 type Props = {
   postId: string;
   madePublicAt: string | null;
+  deletedAt?: string | null;
   tiktokUsername?: string | null;
 };
 
-export default function TikTokPrivateChip({ postId, madePublicAt, tiktokUsername }: Props) {
+export default function TikTokPrivateChip({ postId, madePublicAt, deletedAt, tiktokUsername }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [url, setUrl] = useState('');
   const [pending, start] = useTransition();
+
+  if (deletedAt) {
+    const at = new Date(deletedAt).toLocaleString('vi-VN');
+    return (
+      <span className="ch-link" title={`Đã đánh dấu xoá lúc ${at}. Tile Tổng quan không đếm bài này. Bấm ↺ để bỏ đánh dấu.`}
+        style={{ borderColor: 'var(--muted, #9ca3af)', color: 'var(--muted, #6b7280)', opacity: 0.85 }}>
+        <PlatformLogo platform="tiktok" size={15} />
+        <span>TikTok · đã xoá</span>
+        <button
+          type="button"
+          className="btn ghost sm"
+          disabled={pending}
+          style={{ padding: '2px 8px', fontSize: '.72rem', marginLeft: 4 }}
+          onClick={() => start(() => undoMarkTikTokDeleted(postId))}
+          title="Bỏ đánh dấu (bấm nhầm)"
+        >↺</button>
+      </span>
+    );
+  }
 
   if (madePublicAt) {
     const at = new Date(madePublicAt).toLocaleString('vi-VN');
@@ -61,13 +80,27 @@ export default function TikTokPrivateChip({ postId, madePublicAt, tiktokUsername
         >Mở TikTok</a>
       ) : null}
       {!showForm ? (
-        <button
-          type="button"
-          className="btn ghost sm"
-          style={{ padding: '2px 8px', fontSize: '.72rem' }}
-          onClick={() => setShowForm(true)}
-          title="Sau khi đổi công khai trên app TikTok, bấm để đánh dấu"
-        >Đã đổi công khai</button>
+        <>
+          <button
+            type="button"
+            className="btn ghost sm"
+            style={{ padding: '2px 8px', fontSize: '.72rem' }}
+            onClick={() => setShowForm(true)}
+            title="Sau khi đổi công khai trên app TikTok, bấm để đánh dấu"
+          >Đã đổi công khai</button>
+          <button
+            type="button"
+            className="btn ghost sm"
+            disabled={pending}
+            style={{ padding: '2px 8px', fontSize: '.72rem' }}
+            onClick={() => {
+              if (confirm('Đánh dấu bài này đã bị xoá khỏi TikTok? Tile Tổng quan sẽ ngừng đếm.')) {
+                start(() => markTikTokDeleted(postId));
+              }
+            }}
+            title="Bạn đã xoá video này trên app TikTok → bấm để tile Tổng quan giảm số"
+          >🗑 Đã xoá</button>
+        </>
       ) : (
         <form
           onSubmit={(e) => {
