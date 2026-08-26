@@ -33,6 +33,15 @@ const ANGLES = [
   'TỰ HÀO — danh dự nghề, tình bạn thuyền: mở bằng khoảnh khắc lộc biển hoặc nghề cha truyền con, kéo comment share/khoe',
 ];
 
+// Cho bài CONTENT nuôi trang (không bán): bám 4 chữ, hình thức khác bài bán một chút (không có
+// sản phẩm để đẩy, thay bằng "kết bằng câu hỏi mở").
+const CONTENT_ANGLES = [
+  'NGHỀ — bà con tự nhận ra mình, muốn học kinh nghiệm hoặc khoe kỹ thuật của mình',
+  'TIỀN — chạm túi tiền cụ thể (dầu, nước, chi phí sửa), có ít nhất 1 con số',
+  'RỦI RO — cảnh báo hậu quả nếu bỏ qua (mất chuyến, bị phạt, hư máy)',
+  'TỰ HÀO — khoảnh khắc đẹp nghề, tình bạn thuyền, cảm giác dân biển',
+];
+
 function parseJson(t) {
   let s = (t || '').trim();
   const f = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -74,7 +83,8 @@ export async function generateSocialPost({
     `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${productName}". Bắt buộc: nêu rõ tên sản phẩm này, 1 tới 2 lợi ích thật của nó. Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
     'Giọng BẠN THUYỀN kể chuyện cho bạn nghe (không phải tờ rơi kỹ thuật, không sáo rỗng, không "công nghệ tiên tiến", không "thiết kế gọn gàng"). Câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM ĐANG VIẾT (xem SỰ THẬT NGHỀ bên dưới); KHÔNG gán lợi ích của sản phẩm khác.',
     '',
-    'CÂU ĐẦU = HOOK NGHỊCH LÝ MẤT MÁT, dưới 15 chữ, khúc mạnh nhất đặt đầu (tránh bị "See more" cắt). Nghịch lý = thành quả lớn bị phá bởi nguyên nhân nhỏ. Ví dụ chuẩn: "Trúng luồng cá mà phải quay vào bờ chỉ vì hết nước ngọt." — 13 chữ, tiếc đứt ruột, tự soi mình.',
+    'CÂU ĐẦU CỦA BODY = HOOK NGHỊCH LÝ MẤT MÁT, dưới 15 chữ, khúc mạnh nhất đặt đầu (tránh bị "See more" cắt). Nghịch lý = thành quả lớn bị phá bởi nguyên nhân nhỏ. Ví dụ chuẩn: "Trúng luồng cá mà phải quay vào bờ chỉ vì hết nước ngọt." — 13 chữ, tiếc đứt ruột, tự soi mình.',
+    'PHÂN BIỆT VAI TRÒ HEADLINE VÀ BODY (rất quan trọng, model hay lộn): headline là tiêu đề gợi ý (tag riêng), BODY là thân bài đăng thực tế. HOOK NGHỊCH LÝ NẰM Ở CÂU ĐẦU CỦA BODY, KHÔNG PHẢI HEADLINE — không được để hook chỉ trong headline rồi body vào tả cảnh / đồng cảm luôn. Câu đầu body phải là 1 CÂU RIÊNG, DÒNG RIÊNG (xuống dòng ngay sau nó), dưới 15 chữ, chứa mất mát cụ thể. TỰ ĐẾM CHỮ trước khi trả — nếu quá 15 thì viết ngắn lại.',
     '',
     'KHUNG 6 NHỊP cho toàn bài (bám theo thứ tự này):',
     '1) HOOK nghịch lý mất mát (đã nói ở trên, dưới 15 chữ, đứng riêng dòng đầu).',
@@ -192,10 +202,13 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
   const type = chosen.type || 'tip';
   const topicText = chosen.topic || String(chosen);
   const structure = CONTENT_TYPE_INSTRUCTION[type] || CONTENT_TYPE_INSTRUCTION.tip;
+  const contentAngle = CONTENT_ANGLES[Math.floor(Math.random() * CONTENT_ANGLES.length)];
 
   const system = [
     'Bạn viết bài cộng đồng cho trang của Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     'Đây KHÔNG phải bài bán hàng. Mục tiêu là hữu ích thật cho bà con ngư dân đọc là học được điều gì đó, hoặc để lại bình luận.',
+    `BỘ LỌC VÀNG playbook 24/8 (bắt buộc): bài PHẢI chạm 1 trong 4 chữ cảm xúc NGHỀ/TIỀN/RỦI RO/TỰ HÀO. Chữ lần này: ${contentAngle}. Bài không chạm chữ nào = chắc chắn chìm.`,
+    'KẾT BÀI (bất kể type) bằng 1 CÂU HỎI MỞ nhẹ nhàng kéo bà con comment (kỷ niệm, kinh nghiệm, con số họ hay gặp). KHÔNG mời gọi tổng đài, KHÔNG mời nhắn Page — đây là bài cộng đồng, đừng bán hàng.',
     'Giọng ấm áp, gần gũi, câu ngắn, đọc trên điện thoại. Chèn vài emoji hợp cảnh biển (⚓ 🚢 🌊 🐟 🎣), đừng lạm dụng.',
     'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn. KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'KHÔNG bịa tin tức, số liệu, sự kiện, quy định cụ thể. Nói chung, đúng, không phịa chi tiết.',
