@@ -113,14 +113,68 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
       </section>
 
       {posts.length === 0 ? (
-        <div className="empty">
-          <div className="empty-icon" aria-hidden="true">🗓️</div>
-          <p>Tuần này chưa có bài nào đăng lên Facebook.</p>
-          <p className="sub">
-            Bấm <Link href={`/do-luong/tuan?tuan=${offset + 1}`}>Xem {offset === 0 ? 'tuần trước' : `${offset + 1} tuần trước`}</Link>{' '}
-            hoặc kiểm tra hàng đợi duyệt xem có bài chờ không.
-          </p>
-        </div>
+        await (async () => {
+          // Tuan nay rong - do dem TAT CA bai (moi kenh, khong chi FB) trong tuan gan nhat co bai
+          // de gio y user bam sang tuan do. User 26/8: "so lieu mat het roi" - thuc te data cu
+          // van con, chi tuan dang chon chua co bai. Explicit thong tin ra de user hieu.
+          const { data: allPast } = await client
+            .from('mkt_posts')
+            .select('published_at, channel')
+            .eq('status', 'published')
+            .lt('published_at', win.startIso)
+            .is('deleted_at', null)
+            .order('published_at', { ascending: false })
+            .limit(200);
+          let hintText: any = null;
+          let hintOffset: number | null = null;
+          if ((allPast || []).length) {
+            const latestIso = String((allPast as any[])[0].published_at);
+            const latestMs = new Date(latestIso).getTime();
+            const nowMs = Date.now();
+            const weeksAgo = Math.max(1, Math.ceil((nowMs - latestMs) / (7 * 24 * 3600 * 1000)));
+            hintOffset = Math.min(12, offset + weeksAgo);
+            const cntByChan = new Map<string, number>();
+            for (const p of allPast as any[]) {
+              const at = new Date(String(p.published_at)).getTime();
+              if (nowMs - at <= weeksAgo * 7 * 24 * 3600 * 1000 && nowMs - at >= (weeksAgo - 1) * 7 * 24 * 3600 * 1000) {
+                cntByChan.set(String(p.channel), (cntByChan.get(String(p.channel)) || 0) + 1);
+              }
+            }
+            const parts: string[] = [];
+            const fb = cntByChan.get('facebook') || 0;
+            const yt = cntByChan.get('youtube') || 0;
+            const tt = cntByChan.get('tiktok') || 0;
+            if (fb) parts.push(`${fb} Facebook`);
+            if (yt) parts.push(`${yt} YouTube`);
+            if (tt) parts.push(`${tt} TikTok`);
+            const partsStr = parts.length ? ` (${parts.join(', ')})` : '';
+            const weekLabel = weeksAgo === 1 ? 'tuần trước' : `${weeksAgo} tuần trước`;
+            hintText = (
+              <>
+                Bài gần nhất đăng vào <b>{new Date(latestIso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}</b> — nằm ở <b>{weekLabel}</b>{partsStr}.
+              </>
+            );
+          }
+          return (
+            <div className="empty">
+              <div className="empty-icon" aria-hidden="true">🗓️</div>
+              <p><b>Tuần này chưa có bài nào đăng.</b></p>
+              {hintText ? <p className="sub" style={{ marginTop: 8 }}>{hintText}</p> : null}
+              <p className="sub" style={{ marginTop: 10 }}>
+                {hintOffset !== null ? (
+                  <Link href={`/do-luong/tuan?tuan=${hintOffset}`} className="btn ok sm" style={{ textDecoration: 'none' }}>
+                    → Xem {hintOffset === 1 ? 'tuần trước' : `${hintOffset} tuần trước`} (có bài đăng)
+                  </Link>
+                ) : (
+                  <Link href={`/do-luong/tuan?tuan=${offset + 1}`}>Xem {offset === 0 ? 'tuần trước' : `${offset + 1} tuần trước`}</Link>
+                )}
+              </p>
+              <p className="sub" style={{ marginTop: 12, fontStyle: 'italic', opacity: 0.8 }}>
+                Số liệu cũ vẫn còn trong lịch sử — chỉ khung <b>{win.label}</b> trống vì chưa có bài đăng.
+              </p>
+            </div>
+          );
+        })()
       ) : (
         <>
           <section className="kpi-row" aria-label="Chỉ số tổng tuần" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 18 }}>
