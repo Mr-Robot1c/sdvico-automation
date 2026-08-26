@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { isEmergencyStopped, getPostCount, isQuotaDisabled } from '../../lib/safety';
-import { editDraft, retryFacebookPublish } from '../actions';
+import { editDraft, retryFacebookPublish, requestVideoForContent } from '../actions';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import ShareGroups from './share-groups';
@@ -315,6 +315,17 @@ export default async function BangSection() {
                             </div>
                           ) : null}
                         </ViewModal>
+                        {/* 26/8: user chuyen nut "Lam video" tu /san-xuat sang day de bam nhanh
+                            khong phai vao trang Xuong san xuat. Chi hien khi bai chua yeu cau
+                            (badge "Dang lam video AI" o tren se thay khi video_requested=true). */}
+                        {c?.id && brief.video_requested !== true ? (
+                          <form action={requestVideoForContent} style={{ display: 'inline' }}>
+                            <input type="hidden" name="content_id" value={c.id} />
+                            <button type="submit" className="btn" title="Yeu cau day chuyen video AI dung bai nay (FB 16:9 + TikTok doc). Mat 8-15 phut, ra ban rieng vao Hang doi duyet.">
+                              🎬 Làm video
+                            </button>
+                          </form>
+                        ) : null}
                       </div>
                       <DecideActions
                         id={it.qid}

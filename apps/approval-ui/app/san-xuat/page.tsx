@@ -11,12 +11,15 @@ type Asset = { id: string; kind: string; title: string; storage_path: string; pr
 // Máy soạn, người bấm — nút Xong chỉ tạo khung sườn (mkt_content + approval_queue), KHÔNG tự đăng.
 export default async function Page() {
   const client = getServerClient();
+  // 26/8: user "loc theo folder bi bug mat tieu het roi" — truoc limit 40 -> chip filter chi
+  // hien 2-3 folder co asset trong 40 dong moi nhat (SEA-40 + Content). Nang len 500 de phu
+  // du 8-9 folder san pham (moi folder trung binh 20-60 asset). Render lazy neu can.
   const { data: assetRows } = await client
     .from('brand_assets')
     .select('id, kind, title, storage_path, product_group')
     .in('kind', ['image', 'video', 'logo', 'clip'])
     .order('created_at', { ascending: false })
-    .limit(40);
+    .limit(500);
 
   const assets = (assetRows || []) as Asset[];
   const images = assets.filter((a) => a.kind === 'image' || a.kind === 'logo');
