@@ -74,9 +74,11 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
 
   const client = getServerClient();
 
-  const [{ count: cBai }, { count: cVid }] = await Promise.all([
+  // 26/8 (user): bo tab Video (du thua), thay bang tab Khach hang link sang /khach-hang.
+  // Van dem cBai cho tab "Bai viet" (bai article + social). Khong dem video nua.
+  const [{ count: cBai }, { count: cLeadNew }] = await Promise.all([
     client.from('mkt_content').select('*', { count: 'exact', head: true }).in('kind', ['article', 'social']),
-    client.from('mkt_content').select('*', { count: 'exact', head: true }).eq('kind', 'video')
+    client.from('mkt_leads').select('*', { count: 'exact', head: true }).eq('status', 'new'),
   ]);
 
   const typeChips = (
@@ -90,8 +92,10 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       <a className={`chip ${tab === 'baiviet' ? 'on' : ''}`} href={withParams({ loai: 'bai-viet', trangthai: null })}>
         <span aria-hidden="true">📝</span> Bài viết <span className="n">{cBai ?? 0}</span>
       </a>
-      <a className={`chip ${tab === 'video' ? 'on' : ''}`} href={withParams({ loai: 'video', trangthai: null })}>
-        <span aria-hidden="true">🎬</span> Video <span className="n">{cVid ?? 0}</span>
+      {/* Tab Video BO (user 26/8: "du thua"). Video van xem duoc trong tab "Bang bai viet"
+          hoac tab "Bai viet" (chua kind=video). Thay bang link Khach hang sang /khach-hang. */}
+      <a className="chip" href="/khach-hang">
+        <span aria-hidden="true">👥</span> Khách hàng <span className="n">{cLeadNew ?? 0}</span>
       </a>
     </nav>
   );

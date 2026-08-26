@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-24
 ttl_days: 180
+<!-- re-verified: 2026-08-26 01:45 - Bo tab Video khoi /noi-dung (user "du thua"), thay bang chip link Khach hang -> /khach-hang kem count leads status=new. Query cVid bo, them cLeadNew tu mkt_leads. Route ?loai=video van hoat dong (bookmark cu khong pha) chi khong co chip. -->
 <!-- re-verified: 2026-08-26 01:30 - forward-zalo-button LUON dropdown ke ca 1 NV (user "van chua thay dropdown"). Bo special case len===1 tu 25/8. Nhat quan UX. -->
 <!-- re-verified: 2026-08-26 01:15 - Fix BarChart mat cot khi tone-accent/tone-ok: CSS .col-bar chua co ruleset cho .tone-*, chi .cat-N moi apply background. Them .col-bar.tone-accent + .col-bar.tone-ok + default var(--ink-2). -->
 <!-- re-verified: 2026-08-26 01:00 - Tile "Ke hoach dang ap" o Tong quan HIEN KE HOACH NGAY HOM DO (user 26/8): tong-quan-section doi query planRes tu applied=true sang data->>origin=live (co daily_schedule 7 ngay cap nhat 30 phut), truyen daily_schedule[vnToday] vao PlanQuickView. Tile hien "T3 26/08 · <tieu de huong>" + badge da sinh; modal expand thanh bang 4 row: 7h Ban A, 12h30 Ban B, 12h30 Content, Nhom chia se — dung du lieu that tu daily_schedule (khong bia). Neu chua co lich hom nay hien tile mo "—". -->
