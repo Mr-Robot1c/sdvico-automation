@@ -8,6 +8,7 @@ import DeleteButton from './delete-button';
 import ShareGroups from './share-groups';
 import BangSection from './bang-section';
 import TongQuanSection from './tong-quan-section';
+import TikTokPrivateChip from './tiktok-private-chip';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 
 export const dynamic = 'force-dynamic';
@@ -220,24 +221,37 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
   }
 
   // Bài đã đăng thật: link "Xem bài" (external_url) theo content — thay cho trang Lịch sử xuất bản đã bỏ.
-  // Chỉ nhận link http (Facebook). TikTok lưu 'tiktok:publishId' không mở được nên bỏ qua.
-  const publishedByContent = new Map<string, { channel: string; url: string }[]>();
+  // Link http (Facebook, YouTube, TikTok đã đổi công khai kèm URL) hiện <a>. TikTok private
+  // (external_url = 'tiktok:publishId' hoặc rỗng) hiện chip có nút "🗑 Đã xoá" để user đánh dấu
+  // video đã xoá tay khỏi TikTok — giúp tile Tổng quan đếm đúng (user 26/8 xoá 3/5 video).
+  type PubItem = { channel: string; url: string; postId: string; madePublicAt: string | null; deletedAt: string | null };
+  const publishedByContent = new Map<string, PubItem[]>();
   const itemIds = items.map((c) => c.id);
   if (itemIds.length) {
     const { data: posts } = await client
       .from('mkt_posts')
-      .select('content_id, channel, external_url')
+      .select('id, content_id, channel, external_url, made_public_at, deleted_at')
       .eq('status', 'published')
       .in('content_id', itemIds);
     for (const p of posts || []) {
       const cid = (p as any).content_id as string | null;
-      const ext = (p as any).external_url as string | null;
-      if (cid && ext && /^https?:\/\//.test(ext)) {
-        if (!publishedByContent.has(cid)) publishedByContent.set(cid, []);
-        publishedByContent.get(cid)!.push({ channel: (p as any).channel || '', url: ext });
-      }
+      const ext = String((p as any).external_url || '');
+      const channel = String((p as any).channel || '');
+      if (!cid) continue;
+      const isHttp = /^https?:\/\//.test(ext);
+      const isTiktokPrivate = channel === 'tiktok' && !isHttp;
+      if (!isHttp && !isTiktokPrivate) continue;
+      if (!publishedByContent.has(cid)) publishedByContent.set(cid, []);
+      publishedByContent.get(cid)!.push({
+        channel,
+        url: isHttp ? ext : '',
+        postId: String((p as any).id || ''),
+        madePublicAt: (p as any).made_public_at || null,
+        deletedAt: (p as any).deleted_at || null
+      });
     }
   }
+  const tiktokUsername = (process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim() || null;
 
   // Số liệu mới nhất (like, comment, share, lượt xem) của bài ĐÃ ĐĂNG — hiện gọn ngay trong
   // bảng (user 21/8: gộp đo lường vào đây cho dễ kiểm soát). mkt_metrics là chuỗi snapshot
@@ -458,17 +472,26 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                       </ViewModal>
                       {(publishedByContent.get(c.id) || []).map((p, i) => (
                         <Fragment key={i}>
-                          <a
-                            className="src"
-                            href={p.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ whiteSpace: 'nowrap' }}
-                            title={`Xem bài đã đăng${p.channel ? ` trên ${p.channel === 'facebook' ? 'Facebook' : p.channel === 'youtube' ? 'YouTube' : p.channel === 'tiktok' ? 'TikTok' : p.channel}` : ''}`}
-                          >
-                            ↗ {p.channel === 'facebook' ? 'FB' : p.channel === 'youtube' ? 'YouTube' : p.channel === 'tiktok' ? 'TikTok' : 'Bài'}
-                          </a>
-                          {p.channel === 'facebook' && !/\/reel\//.test(p.url) ? <ShareGroups postUrl={p.url} /> : null}
+                          {p.url ? (
+                            <a
+                              className="src"
+                              href={p.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ whiteSpace: 'nowrap' }}
+                              title={`Xem bài đã đăng${p.channel ? ` trên ${p.channel === 'facebook' ? 'Facebook' : p.channel === 'youtube' ? 'YouTube' : p.channel === 'tiktok' ? 'TikTok' : p.channel}` : ''}`}
+                            >
+                              ↗ {p.channel === 'facebook' ? 'FB' : p.channel === 'youtube' ? 'YouTube' : p.channel === 'tiktok' ? 'TikTok' : 'Bài'}
+                            </a>
+                          ) : p.channel === 'tiktok' ? (
+                            <TikTokPrivateChip
+                              postId={p.postId}
+                              madePublicAt={p.madePublicAt}
+                              deletedAt={p.deletedAt}
+                              tiktokUsername={tiktokUsername}
+                            />
+                          ) : null}
+                          {p.url && p.channel === 'facebook' && !/\/reel\//.test(p.url) ? <ShareGroups postUrl={p.url} /> : null}
                         </Fragment>
                       ))}
                       {/* Nút "Làm video" đã chuyển sang trang /san-xuat (nút "Xong + Làm video"). */}
