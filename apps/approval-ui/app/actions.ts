@@ -750,6 +750,66 @@ export async function addLeadManual(formData: FormData) {
   revalidatePath('/do-luong/tuan');
 }
 
+// Playbook 26/8 item 2 (PHẦN 10): Bung 1 ý thành 7 bài theo 7 góc tiếp cận (cảnh báo,
+// case study, so sánh, hướng dẫn, phản biện, cảm xúc, listicle). Mỗi bài vào mkt_content
+// status='review' + approval_queue để người duyệt chọn bài nào giữ/xóa.
+export async function generateSevenAngles(formData: FormData): Promise<{ ok: boolean; count?: number; error?: string }> {
+  const topic = String(formData.get('topic') || '').trim().slice(0, 500);
+  const productGroup = String(formData.get('product_group') || '').trim() || null;
+  if (!topic || topic.length < 5) return { ok: false, error: 'Chủ đề quá ngắn (cần ít nhất 5 chữ).' };
+
+  const client = getServerClient();
+  try {
+    // @ts-ignore — module JS thuần
+    const { generateSevenAngles: gen } = await import('../lib/gen/seven-angles.mjs');
+    const posts = await gen({ topic, productGroup, client });
+    if (!posts?.length) return { ok: false, error: 'Không sinh được bài nào.' };
+
+    const productName = productGroup ? String(productGroup).replace(/^\d+\.\s*/, '').trim() : 'Bài chung';
+    let inserted = 0;
+    for (const p of posts) {
+      const risk = p.assessment?.risk || 'none';
+      const displayTitle = p.headline && p.headline.length >= 4 ? p.headline : `[${p.angle_label}] ${topic.slice(0, 60)}`;
+      const { data: ins } = await client
+        .from('mkt_content')
+        .insert({
+          kind: 'social',
+          title: displayTitle,
+          brief: {
+            keyword: productName,
+            intent: 'giao_dich',
+            channels: ['facebook'],
+            generator: 'seven_angles',
+            seven_angles_topic: topic,
+            angle_key: p.angle_key,
+            angle_label: p.angle_label,
+            emotion: p.emotion || null,
+            rotation_group: productGroup || null,
+          },
+          draft: p.text,
+          status: 'review',
+          needs_gov_review: risk === 'red',
+        })
+        .select('id')
+        .single();
+      if (!ins) continue;
+      const contentId = (ins as { id: string }).id;
+      await client.from('approval_queue').insert({
+        kind: 'mkt_publish_content',
+        title: `🎯 ${p.angle_label} · ${displayTitle}`,
+        payload: { content_id: contentId, channels: ['facebook'] },
+        status: 'pending',
+      });
+      inserted++;
+    }
+    revalidatePath('/noi-dung');
+    revalidatePath('/hang-doi');
+    return { ok: true, count: inserted };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e).slice(0, 300) };
+  }
+}
+
 // Cập nhật số liệu thủ công (nút trên trang Đo lường): Facebook + YouTube Shorts.
 export async function refreshFacebookMetrics() {
   const client = getServerClient();

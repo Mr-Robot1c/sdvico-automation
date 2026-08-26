@@ -8,6 +8,7 @@ import PlatformLogo from './platform-logo';
 import PlanQuickView from './plan-quick-view';
 import LeadQuickView, { type QuickLead } from './lead-quick-view';
 import PullMetricsButton from './pull-metrics-button';
+import SevenAnglesButton from './seven-angles-button';
 
 // TỔNG QUAN thiết kế lại (user 21/8 đêm, nhắc lại yêu cầu gốc): một trang tổng quát để xem
 // cho đỡ rối mắt — mỗi NỀN TẢNG một thẻ: đang làm tốt cỡ nào (thông số react, cmt, view),
@@ -210,8 +211,9 @@ export default async function TongQuanSection() {
 
   return (
     <section>
-      {/* Nút kéo số liệu tay - user 26/8 khong muon cho cron 1h/lan. */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+      {/* Nút kéo số liệu tay + nút bung 1 ý thành 7 bài (item 2 playbook). */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+        <SevenAnglesButton />
         <PullMetricsButton size="sm" />
       </div>
       {/* Hàng số tổng, nhìn 3 giây biết sức khỏe hệ thống. 24/8 (user "gộp lượt xem/follower
