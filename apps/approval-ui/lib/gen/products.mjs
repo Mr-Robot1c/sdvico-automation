@@ -10,7 +10,7 @@ export const PRODUCTS = [
     hashtags: ['#dầu_nhớt_Nano_Graphene', '#PVOil', '#tiết_kiệm_nhiên_liệu', '#bảo_vệ_động_cơ'] },
   { no: 2, group: '2. Máy lọc nước biển SEA-40',
     match: ['loc nuoc', 'sea-40', 'sea40', 'nuoc ngot', 'nuoc bien thanh nuoc ngot', 'mln'],
-    hashtags: ['#máy_lọc_nước_biển', '#nước_ngọt_trên_tàu', '#lọc_nước_RO', '#SEA40'] },
+    hashtags: ['#máy_lọc_nước_biển', '#nước_ngọt_trên_tàu', '#khỏi_chở_nước', '#SEA40'] },
   { no: 3, group: '3. Thiết bị giám sát hành trình Viettel S-Tracking',
     match: ['giam sat hanh trinh', 's-tracking', 's tracking', 'stracking', 'gsht', 'viettel'],
     hashtags: ['#giám_sát_hành_trình', '#thiết_bị_VMS', '#S_Tracking', '#chống_khai_thác_IUU'] },

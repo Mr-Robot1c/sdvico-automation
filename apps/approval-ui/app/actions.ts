@@ -1335,12 +1335,13 @@ export async function generateTextForTitle(
 ): Promise<string> {
   const clean = (keyword || '').trim();
   if (!clean) return '';
+  const client = getServerClient();
   // @ts-ignore — module JS thuần, không có .d.ts
   const { generateContentAsync } = await import('../lib/gen/content.mjs');
   try {
     const r = await generateContentAsync(
       { keyword: clean, intent, landing_url },
-      { assetHint: (assetHint || '').trim(), format, contentType }
+      { assetHint: (assetHint || '').trim(), format, contentType, client }
     );
     return (r?.draft as string) || '';
   } catch (e: any) {

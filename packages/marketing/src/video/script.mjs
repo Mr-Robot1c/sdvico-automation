@@ -3,6 +3,7 @@
 import { assessDraft } from '../compliance.mjs';
 import { knownFactValues, testFactValues } from '../product-facts.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
+import { logTokenUsage } from '../token-log.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 
@@ -39,7 +40,7 @@ function parseJson(text) {
 // content: {title, draft, brief}. assets: [{id, kind, title}]. facts: PRODUCT_FACTS.
 // opts.short: chế độ VIDEO SHORTS 10-20 giây (flowchart v3, bài thuộc cặp thử A/B) — ít cảnh,
 // lời thoại ngắn, câu đầu là móc câu. Mặc định false = bản dài 40-50 giây như cũ.
-export async function generateVideoScript(content, assets, facts = [], opts = {}) {
+export async function generateVideoScript(content, assets, facts = [], opts = {}, client = null) {
   const short = !!opts.short;
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -111,6 +112,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       contents: user + extra,
       config: { systemInstruction: system, responseMimeType: 'application/json' },
     });
+    logTokenUsage(client, 'creator_video_script', MKT_MODEL, res?.usageMetadata);
     parsed = parseJson(res.text || '');
     const all = [...(parsed.vertical?.scenes || []), ...(parsed.horizontal?.scenes || [])].map((x) => x?.narration || '').join('\n');
     viol = guardViolations(all, topic);

@@ -5,6 +5,7 @@ import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.
 import { guardLines, guardViolations } from './product-guard.mjs';
 import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS } from './products.mjs';
 import { insightBrief } from './insights.mjs';
+import { logTokenUsage } from './token-log.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -22,15 +23,14 @@ async function genWithRetry(ai, params, tries = 4) {
   throw last;
 }
 
-// Các góc tiếp cận BÁN HÀNG để mỗi bài khác nhau (chống trùng), nhưng góc nào cũng
-// xoay quanh sản phẩm và kết bằng mời mua/liên hệ (không lạc thành bài tâm sự chung chung).
+// 4 CHỮ CẢM XÚC (playbook 24/8/2026): ngư dân chỉ tương tác quanh NGHỀ/TIỀN/RỦI RO/TỰ HÀO.
+// Trước đăng, mỗi bài phải chạm ĐÚNG 1 chữ (bộ lọc vàng) — không chạm chữ nào = chắc chắn chìm.
+// Xoay đều để cả tuần phủ đủ 4 chữ. Mỗi chữ ép người xem LÀM 1 việc khác nhau.
 const ANGLES = [
-  'mở bằng một nỗi lo thật khi đi biển rồi giới thiệu sản phẩm giải quyết, mời bà con sắm',
-  'nhấn tiết kiệm chi phí cụ thể mỗi chuyến biển nhờ sản phẩm rồi mời liên hệ mua',
-  'làm nổi bật một đặc điểm mạnh của sản phẩm và lợi ích thiết thực rồi mời đặt hàng',
-  'nhấn ra khơi an toàn và đúng quy định nhờ sản phẩm rồi mời lắp đặt',
-  'so sánh nhẹ trước và sau khi trang bị sản phẩm rồi mời bà con liên hệ',
-  'nhấn SDVICO phân phối chính hãng, lắp đặt tận bến, bảo hành, rồi mời bà con đặt ngay',
+  'RỦI RO — sợ mất chuyến, mất tiền, mất an toàn: mở bằng cảnh báo cụ thể (mất tín hiệu, máy tua giờ, ra khơi mùa bão), kéo comment cảnh báo bạn thuyền',
+  'TIỀN — ảnh hưởng trực tiếp túi tiền mỗi chuyến: mở bằng con số (dầu bao nhiêu đồng/lít, nước mấy khối, mấy chuyến tiết kiệm được bao nhiêu), kéo comment hỏi giá',
+  'NGHỀ — tự nhận ra mình, muốn học và khoe kinh nghiệm: mở bằng cảnh nghề thật (kiểm tra VMS trước khi rời bến, chọn máy theo tải tàu), kéo comment kể chuyện của họ',
+  'TỰ HÀO — danh dự nghề, tình bạn thuyền: mở bằng khoảnh khắc lộc biển hoặc nghề cha truyền con, kéo comment share/khoe',
 ];
 
 function parseJson(t) {
@@ -58,6 +58,7 @@ export async function generateSocialPost({
   facts = PRODUCT_FACTS,
   angleOverride = null, preferredHeadline = null,
   insight = null,
+  client = null,
 }) {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -70,19 +71,38 @@ export async function generateSocialPost({
   const angle = angleOverride || ANGLES[Math.floor(Math.random() * ANGLES.length)];
   const system = [
     'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
-    `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${productName}". Bắt buộc: nêu rõ tên sản phẩm này, 1 tới 2 lợi ích thật của nó, và MỜI bà con liên hệ SDVICO để mua hoặc lắp đặt (SDVICO phân phối chính hãng, lắp đặt tận bến, bảo hành). Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
-    'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM ĐANG VIẾT (xem SỰ THẬT NGHỀ bên dưới); KHÔNG gán lợi ích của sản phẩm khác.',
+    `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${productName}". Bắt buộc: nêu rõ tên sản phẩm này, 1 tới 2 lợi ích thật của nó. Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
+    'Giọng BẠN THUYỀN kể chuyện cho bạn nghe (không phải tờ rơi kỹ thuật, không sáo rỗng, không "công nghệ tiên tiến", không "thiết kế gọn gàng"). Câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM ĐANG VIẾT (xem SỰ THẬT NGHỀ bên dưới); KHÔNG gán lợi ích của sản phẩm khác.',
+    '',
+    'CÂU ĐẦU = HOOK NGHỊCH LÝ MẤT MÁT, dưới 15 chữ, khúc mạnh nhất đặt đầu (tránh bị "See more" cắt). Nghịch lý = thành quả lớn bị phá bởi nguyên nhân nhỏ. Ví dụ chuẩn: "Trúng luồng cá mà phải quay vào bờ chỉ vì hết nước ngọt." — 13 chữ, tiếc đứt ruột, tự soi mình.',
+    '',
+    'KHUNG 6 NHỊP cho toàn bài (bám theo thứ tự này):',
+    '1) HOOK nghịch lý mất mát (đã nói ở trên, dưới 15 chữ, đứng riêng dòng đầu).',
+    '2) ĐỒNG CẢM giọng bạn thuyền, tả đúng khoảnh khắc đau để chạm TIẾC + UẤT + LO. Ngư dân đọc phải thấy "ủa đúng mình rồi".',
+    '3) LỐI THOÁT: sản phẩm xuất hiện như CÁCH GIẢI QUYẾT, nói bằng LỢI ÍCH (đỡ tốn dầu, đủ nước ngọt, bám biển dài hơn, ra khơi đúng quy định), KHÔNG liệt kê thông số kỹ thuật khô khan.',
+    '4) PHẦN THƯỞNG cụ thể: cái được rõ ràng (chở thêm được đá/cá, tiết kiệm bao nhiêu, an tâm hơn).',
+    '5) TIN CẬY 1 CÂU DUY NHẤT: lắp tận bến, bảo hành, hướng dẫn tới khi quen tay. Đủ, không sa đà khoe.',
+    '6) CTA MỞ CHUYỆN: một CÂU HỎI mở kéo comment (hỏi con số/kinh nghiệm ngư dân thường có, kiểu "anh thường đi mấy ngày một chuyến, tốn bao nhiêu khối nước?") + một TỪ KHÓA NGẮN mời nhắn Page nhẹ nhàng (ví dụ nhắn "NƯỚC" / "DẦU" / "VMS" cho page, mình gửi thông tin — không gọi làm phiền). KHÔNG đòi gọi tổng đài trong bài (tệp mới, đòi gọi là quá sức).',
+    '',
     ...guardLines(productName + ' ' + productGroup),
     'Chèn vài emoji hợp cảnh biển và thiết bị cho sinh động (ví dụ ⚓ 🚢 🌊 📡 💧 🛟 📞), đừng lạm dụng.',
     'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn (3.000.000 đồng). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung, không nêu số.',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO; chỉ nói phân phối, lắp đặt, tương thích.',
     isTikTok
-      ? 'Đây là chú thích cho video TikTok: 2 tới 4 câu thật ngắn, cuốn, kết bằng mời gọi.'
-      : 'Đây là bài Facebook: 4 tới 6 câu, có thể có 2 tới 3 dòng gạch đầu lợi ích (dùng emoji làm đầu dòng, không dùng dấu chấm tròn).',
-    'Kết bằng lời mời rõ ràng, đúng kiểu bán hàng: NHẮN TIN cho Page SDVICO ở đây hoặc gọi tổng đài 1900 23 23 49 để được tư vấn, báo giá và lắp đặt tận bến. KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.',
+      ? 'ĐÂY LÀ CHÚ THÍCH VIDEO TIKTOK: rút gọn khung 6 nhịp còn 2 tới 4 câu thật ngắn, giữ hook nghịch lý ở câu đầu + CTA hỏi ở câu cuối. KHÔNG viết cả 6 nhịp cho TikTok.'
+      : 'ĐÂY LÀ BÀI FACEBOOK: khoảng 150 tới 220 chữ (6 tới 10 câu ngắn), viết ĐỦ 6 nhịp theo thứ tự, mỗi nhịp cách nhau bằng xuống dòng để đọc thoáng trên điện thoại. Có thể có 2 tới 3 dòng gạch đầu lợi ích ở nhịp 3 (dùng emoji làm đầu dòng, không dùng dấu chấm tròn).',
+    'KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.',
     'Mỗi bài phải KHÁC các bài trước: khác câu mở đầu, khác cách triển khai, khác tiêu đề.',
     'Bài phải CÓ Ý NGHĨA, xoáy vào MỘT nỗi thật của bà con (không sáo rỗng, không liệt kê tính năng khô khan). Khi có insight bên dưới thì bám đúng insight đó.',
+    '',
+    'BÀI MẪU CHUẨN để so sánh giọng (playbook PHẦN 12) — chỉ dùng làm ví dụ về giọng và khung 6 nhịp, KHÔNG copy nguyên chữ:',
+    'Trúng luồng cá mà phải quay vào bờ chỉ vì hết nước ngọt.',
+    'Anh em đi biển dài ngày chắc thấm: cá thì đang vào, mà can nước ngọt đã cạn đáy. Nước để lâu thì hôi, uống vào đau bụng cả tàu. Cuối cùng đành chạy vào bờ sớm, bỏ lại luồng cá ngay trước mắt — tiếc đứt ruột.',
+    'Cái máy lọc nước biển SEA-40 lo đúng chuyện đó: biến nước biển thành nước ngọt ngay trên tàu, chạy bằng điện tàu sẵn có. Uống, nấu, tắm rửa thoải mái — khỏi chở theo mấy khối nước nặng trịch.',
+    'Nghĩa là tàu nhẹ hơn, bám biển dài ngày hơn, và không phải cắt ngang chuyến chỉ vì hết nước. Chỗ nước đó để dành chở thêm đá, thêm cá.',
+    'Bên mình lắp tận bến ở Vũng Tàu, bảo hành đầy đủ, hướng dẫn tới khi anh em quen tay.',
+    'Anh em thường đi mấy ngày một chuyến, tốn khoảng mấy khối nước ngọt? Comment con số bên dưới, mình tính thử cái máy cỡ nào hợp với tàu mình. Cần kỹ hơn thì nhắn "NƯỚC" cho page, mình gửi thông tin — không gọi làm phiền.',
     '',
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số được duyệt: nói chung chung, không nêu số cụ thể.',
   ].join('\n');
@@ -93,7 +113,7 @@ export async function generateSocialPost({
     features.length ? 'Đặc điểm sản phẩm (nêu đúng, chọn vài ý nổi bật, không thêm thông số ngoài danh sách này):\n- ' + features.join('\n- ') : '',
     hasVideo ? 'Bài có kèm video minh họa.' : 'Bài dùng ảnh minh họa.',
     insightText,
-    insightText ? `Phụ trợ giọng nếu hợp: ${angle}.` : `Góc tiếp cận lần này: ${angle}.`,
+    insightText ? `Chữ cảm xúc lần này: ${angle}. Bài PHẢI chạm đúng chữ này (bộ lọc vàng playbook).` : `Chữ cảm xúc lần này: ${angle}. Bài PHẢI chạm đúng chữ này (bộ lọc vàng playbook).`,
     preferredHeadline ? `Nếu phù hợp, giữ hoặc bám gần tiêu đề gợi ý: "${preferredHeadline}" (đây là hướng đi tuần từ Kế hoạch AI). Không bắt buộc chép nguyên, nhưng nội dung phải khớp hướng đi này.` : '',
     'Trả về JSON đúng dạng, không thêm chữ ngoài JSON:',
     '{"headline": "tiêu đề ngắn 6 tới 12 từ, riêng biệt, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag)"}',
@@ -113,6 +133,7 @@ export async function generateSocialPost({
       contents: user + extra,
       config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
     });
+    logTokenUsage(client, 'creator_social', MKT_MODEL, res?.usageMetadata);
     const parsed = parseJson(res.text || '');
     body = String(parsed.body || '').trim();
     headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
@@ -157,7 +178,7 @@ const CONTENT_TYPE_INSTRUCTION = {
 // Bài CONTENT (không bán trực tiếp): viết theo một chủ đề để nuôi trang, lấy tương tác.
 // AI tự nghĩ nội dung theo chủ đề, KHÔNG bịa tin tức/số liệu cụ thể (điều cấm 5).
 // Chấp nhận 3 dạng đầu vào: {type,topic} object, string chủ đề, hoặc không truyền (random).
-export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {}) {
+export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client = null } = {}) {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -196,6 +217,7 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {})
     contents: user,
     config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
   });
+  logTokenUsage(client, 'creator_content', MKT_MODEL, res?.usageMetadata);
   const parsed = parseJson(res.text || '');
   const body = String(parsed.body || '').trim();
   const headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();

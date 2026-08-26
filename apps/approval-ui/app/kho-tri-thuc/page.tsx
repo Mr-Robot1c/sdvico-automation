@@ -86,6 +86,28 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     knowledge_internal_vision: '📁 Đọc ảnh Zalo (AI Data 1)',
     knowledge_internal_summary: '📁 Tóm tắt nội bộ (AI Data 1)',
     knowledge_public_search: '🌐 Tìm tin ngành (AI Data 2)',
+    creator_social: '✍️ Viết bài bán (Creator)',
+    creator_content: '✍️ Viết bài nuôi trang (Creator)',
+    creator_content_old: '✍️ Viết bài theo từ khóa cũ (Creator)',
+    creator_pick_image: '🖼️ Chọn ảnh Unsplash (Creator)',
+    creator_video_script: '🎬 Sinh kịch bản video (Creator)',
+    voice_tts: '🔊 Đọc lời video TTS (Voice)',
+  };
+  // 26/8: nhóm theo AI (user "quản trị token của từng AI"). Task nào chưa map thì gom "AI khác".
+  const AI_OF_TASK: Record<string, string> = {
+    knowledge_internal_vision: 'Data 1', knowledge_internal_summary: 'Data 1',
+    knowledge_public_search: 'Data 2',
+    plan_directions: 'BOSS',
+    creator_social: 'Creator', creator_content: 'Creator', creator_content_old: 'Creator', creator_pick_image: 'Creator', creator_video_script: 'Creator',
+    voice_tts: 'Voice',
+  };
+  const AI_META: Record<string, { icon: string; note: string }> = {
+    'Data 1': { icon: '📁', note: 'Đọc file Zalo Phòng Kinh doanh, tóm tắt về tri thức nội bộ' },
+    'Data 2': { icon: '🌐', note: 'Quét báo ngành cá hằng ngày (Google News + Chủ nhật sâu)' },
+    'BOSS':   { icon: '🧭', note: 'Sinh hướng đi tuần, cập nhật kế hoạch từ tri thức + số liệu' },
+    'Creator':{ icon: '✍️', note: 'Viết bài bán, bài nuôi trang, kịch bản video, chọn ảnh Unsplash' },
+    'Voice':  { icon: '🔊', note: 'Đọc lời video bằng Gemini TTS (Leda), fallback edge-tts miễn phí' },
+    'Evaluator': { icon: '⚖️', note: 'So cặp A/B — chỉ đọc mkt_metrics, không dùng token AI' },
   };
   const dayOfVN = (iso: string) => {
     const d = new Date(new Date(iso).getTime() + 7 * 3600 * 1000);
@@ -118,6 +140,22 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     .map(([task, e]) => ({ task, label: TASK_LABEL[task] || task, ...e }))
     .sort((a, b) => b.tokens - a.tokens);
   const maxDayTokens = Math.max(1, ...last7Days.map((d) => d.tokens));
+
+  // Nhóm token theo AI. Evaluator luôn có row để user thấy nó KHÔNG đốt token (tránh hiểu nhầm
+  // "sao thiếu Evaluator" — nó chỉ tính toán từ mkt_metrics, không gọi Gemini).
+  const AI_ORDER = ['Creator', 'Voice', 'BOSS', 'Data 1', 'Data 2', 'Evaluator', 'AI khác'];
+  const byAI = new Map<string, { calls: number; tokens: number; tasks: Set<string> }>();
+  for (const [task, e] of byTask.entries()) {
+    const ai = AI_OF_TASK[task] || 'AI khác';
+    const row = byAI.get(ai) || { calls: 0, tokens: 0, tasks: new Set<string>() };
+    row.calls += e.calls; row.tokens += e.tokens; row.tasks.add(task);
+    byAI.set(ai, row);
+  }
+  if (!byAI.has('Evaluator')) byAI.set('Evaluator', { calls: 0, tokens: 0, tasks: new Set() });
+  const aiRows = AI_ORDER
+    .filter((ai) => byAI.has(ai))
+    .map((ai) => ({ ai, ...byAI.get(ai)!, meta: AI_META[ai] || { icon: '🤖', note: '' } }));
+  const maxAiTokens = Math.max(1, ...aiRows.map((r) => r.tokens));
 
   const sugs: any[] = Array.isArray(plan.content_suggestions) ? plan.content_suggestions : [];
   const products: any[] = Array.isArray(plan.products) ? plan.products : [];
@@ -346,7 +384,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
       {tab === 'token' ? (
         <section>
           <p className="sub" style={{ margin: '8px 0 12px' }}>
-            Token Gemini đã dùng — chỉ theo dõi được các tác vụ ghi log (sinh hướng đi BOSS, AI Data 1/2). Bài viết Facebook/TikTok của AI Sáng tạo và dựng video (Whisper local, edge-tts miễn phí) chưa ghi vào đây.
+            Token Gemini đã dùng, tách theo từng AI trong hệ. Đã gắn đo: BOSS (hướng đi), Data 1 (đọc/tóm tắt file Zalo), Data 2 (báo ngành), Creator (viết bài, chọn ảnh, kịch bản video), Voice (Gemini TTS). Evaluator không dùng token (chỉ đọc số liệu). Whisper phụ đề chạy local nên không tính.
           </p>
           <div className="chart-grid" style={{ marginBottom: 18 }}>
             <div className="stat-tile">
@@ -371,6 +409,28 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
                     <td style={{ width: 200 }}>
                       <div style={{ background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden', height: 8 }}>
                         <div style={{ width: `${Math.round((d.tokens / maxDayTokens) * 100)}%`, background: 'var(--accent, #1f5fbf)', height: '100%' }} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <h2 style={{ fontSize: '1.05rem', margin: '18px 0 8px' }}>Theo AI (30 ngày)</h2>
+          <div className="tablewrap" style={{ marginBottom: 18 }}>
+            <table className="datatable">
+              <thead><tr><th>AI</th><th className="num">Số lần gọi</th><th className="num">Tổng token</th><th>Tác vụ</th><th></th></tr></thead>
+              <tbody>
+                {aiRows.map((r) => (
+                  <tr key={r.ai}>
+                    <td><span aria-hidden="true" style={{ marginRight: 6 }}>{r.meta.icon}</span><b>{r.ai}</b><div className="sub" style={{ fontSize: '.8rem' }}>{r.meta.note}</div></td>
+                    <td className="num">{vn(r.calls)}</td>
+                    <td className="num"><b>{vn(r.tokens)}</b></td>
+                    <td className="sub" style={{ fontSize: '.8rem' }}>{[...r.tasks].map((t) => TASK_LABEL[t] || t).join(', ') || (r.ai === 'Evaluator' ? 'Không gọi Gemini' : 'Chưa có')}</td>
+                    <td style={{ width: 180 }}>
+                      <div style={{ background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden', height: 8 }}>
+                        <div style={{ width: `${Math.round((r.tokens / maxAiTokens) * 100)}%`, background: 'var(--accent, #1f5fbf)', height: '100%' }} />
                       </div>
                     </td>
                   </tr>

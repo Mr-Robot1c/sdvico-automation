@@ -10,6 +10,7 @@
 // Dù sinh bằng mô hình hay bản mẫu, bản nháp vẫn qua compliance và hàng đợi duyệt.
 
 import { DEFAULT_HASHTAGS, productHashtags, guessGroup } from './products.mjs';
+import { logTokenUsage } from './token-log.mjs';
 
 const TONGDAI = '1900 23 23 49';
 
@@ -410,7 +411,7 @@ function formatInstruction(format) {
   return 'ĐỊNH DẠNG: BÀI FACEBOOK NGẮN. Chỉ hai tới bốn câu: một câu hook mở đầu bắt trúng vấn đề, một hai câu lợi ích, một lời kêu gọi gọi tổng đài. Không tiêu đề riêng, không dài dòng.';
 }
 
-export async function generateDraftLLM(brief, facts = [], assetHint = '', format = 'social', contentType = 'tips') {
+export async function generateDraftLLM(brief, facts = [], assetHint = '', format = 'social', contentType = 'tips', client = null) {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -450,13 +451,14 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '', format
     contents: user,
     config: { systemInstruction: system, temperature: 1.0 },
   });
+  logTokenUsage(client, 'creator_content_old', MKT_MODEL, res?.usageMetadata);
   const text = (res.text || '').trim();
   if (!text) throw new Error('Gemini trả về rỗng.');
   return text;
 }
 
 // Sinh nội dung, ưu tiên Gemini khi có khóa, không thì lùi về bản mẫu. Luôn trả draft dùng được.
-export async function generateContentAsync(kw, { facts = [], assetHint = '', format = 'social', contentType = 'tips' } = {}) {
+export async function generateContentAsync(kw, { facts = [], assetHint = '', format = 'social', contentType = 'tips', client = null } = {}) {
   const brief = buildBrief(kw);
   // Gắn hashtag ĐÚNG theo hình + tiêu đề cho MỌI định dạng (bài ngắn, bài dài, kịch bản video).
   const withTags = (draft) => {
@@ -466,7 +468,7 @@ export async function generateContentAsync(kw, { facts = [], assetHint = '', for
   };
   if (process.env.GEMINI_API_KEY) {
     try {
-      const draft = await generateDraftLLM(brief, facts, assetHint, format, contentType);
+      const draft = await generateDraftLLM(brief, facts, assetHint, format, contentType, client);
       return { title: draftTitle(brief), brief: { ...brief, generator: 'gemini' }, draft: withTags(draft) };
     } catch (e) {
       console.warn('Gemini lỗi, lùi về bản mẫu:', e.message);

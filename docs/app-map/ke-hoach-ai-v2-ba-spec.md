@@ -2,8 +2,9 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
-last_verified: 2026-08-24
+last_verified: 2026-08-26
 ttl_days: 90
+<!-- re-verified: 2026-08-26 10:30 - packages/marketing/src/video/script.mjs generateVideoScript them optional param `client` cuoi cho logTokenUsage (creator_video_script) — KHONG doi flow NV, KHONG doi prompt/logic sinh kich ban. Duplicate token-log.mjs sang packages/marketing/src/ (module JS thuan, import supabase client vao insert run_log task=mkt.token_usage). rotate/route.ts truyen client vao generateSocialPost/generateContentPost/pickImageForContent (arg thu 4). actions.ts generateTextForTitle them getServerClient() truyen vao generateContentAsync. -->
 <!-- re-verified: 2026-08-24 23:30 - plan.ts truyen them `client` vao generateContentDirections() (chi de logTokenUsage — track token BOSS sinh huong di, xem README "Quan tri token"). KHONG doi logic sinh huong di/carry-over, chi them 1 tham so optional cuoi. -->
 <!-- re-verified: 2026-08-24 23:00 - actions.ts them updateLeadStatus/addLeadManual (theo doi nguoi mua) — KHONG lien quan flow Ke hoach, chi them action moi cuoi file, khong sua ham nao co san (generatePlanNow/applyPlanWeights/clearPlanWeights nguyen). -->
 <!-- re-verified: 2026-08-24 22:00 - FIX "bam Luu khong cap nhat": generateAndStorePlan cham (Gemini 30-133s), page thieu maxDuration -> server action bi cat, response khong ve browser. Them maxDuration=300 + SaveGenerateButton (useFormStatus hien "Dang sinh... dung roi trang"). KHONG doi flow NV. -->

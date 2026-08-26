@@ -12,6 +12,7 @@
 // Dùng chung cho app/api/rotate/route.ts và scripts/rotate-now.mjs (module JS thuần).
 
 import { guessGroup } from './products.mjs';
+import { logTokenUsage } from './token-log.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const BUCKET = 'brand-assets';
@@ -21,7 +22,7 @@ function productName(g) { return String(g || '').replace(/^\s*\d+\.\s*/, '').tri
 
 // Dịch chủ đề tiếng Việt thành từ khóa ảnh tiếng Anh ngắn (Unsplash tìm tiếng Anh tốt hơn).
 // Lỗi -> fallback từ khóa chung ngành cá.
-async function imageKeywordsFor(topicText) {
+async function imageKeywordsFor(topicText, client = null) {
   try {
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -34,6 +35,7 @@ async function imageKeywordsFor(topicText) {
       ].join('\n'),
       config: { responseMimeType: 'application/json', temperature: 0.2 },
     });
+    logTokenUsage(client, 'creator_pick_image', MKT_MODEL, res?.usageMetadata);
     const m = (res.text || '').match(/\{[\s\S]*\}/);
     const q = m ? String(JSON.parse(m[0]).query || '').trim() : '';
     return q || 'fishing boat vietnam';
@@ -122,7 +124,7 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
   // 2. Unsplash theo từ khóa dịch từ chủ đề.
   try {
     if (process.env.UNSPLASH_ACCESS_KEY) {
-      const q = await imageKeywordsFor(text);
+      const q = await imageKeywordsFor(text, client);
       const results = await searchUnsplash(q);
       if (results) {
         // Lấy 1 trong 5 ảnh đầu (đa dạng, vẫn sát chủ đề).

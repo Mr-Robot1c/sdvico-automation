@@ -16,6 +16,11 @@ import { assembleVideo } from './assemble.mjs';
 import { generateVideoScript } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
+import { logTokenUsage } from '../token-log.mjs';
+
+// Supabase client dùng chung cho log token (script + TTS). Set 1 lần từ main() sau khi tạo
+// client bên dưới; các hàm sâu (geminiTTS) không cần thread qua từng call.
+let _tokenLogClient = null;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // So lien he doi 21/8 theo sep: 0939 243 222 (du phong 0974 669 649 — doi tay o day + bumpers.mjs).
@@ -129,6 +134,7 @@ async function geminiTTS(cleanText, outPath, workDir, tag, model) {
   );
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`gemini-tts HTTP ${res.status}: ${JSON.stringify(json.error || json).slice(0, 200)}`);
+  logTokenUsage(_tokenLogClient, 'voice_tts', model, json?.usageMetadata);
   const part = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
   if (!part) throw new Error('gemini-tts khong tra audio: ' + JSON.stringify(json).slice(0, 200));
   const mime = part.inlineData.mimeType || '';
@@ -426,6 +432,7 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
 async function main() {
   const env = loadRealEnv();
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  _tokenLogClient = client;
   // Giong mac dinh: NAM NamMinh (user 21/8 chieu doi lai sau khi nghe thu ca hai). Env TTS_VOICE ep khac.
   // Giong du phong edge-tts: NU HoaiMy (user chot giong nu 21/8 toi) de khi Gemini can han muc,
   // video roi ve edge van la giong nu chu khong bat ngo thanh nam. TTS_VOICE / --voice ep khac.
@@ -484,7 +491,8 @@ async function main() {
     content,
     assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title })),
     PRODUCT_FACTS,
-    { short: isShort }
+    { short: isShort },
+    _tokenLogClient
   );
   console.log('Tiêu đề:', script.titles);
   console.log('Rủi ro tuân thủ:', script.assessment.risk, JSON.stringify(script.assessment.flags));

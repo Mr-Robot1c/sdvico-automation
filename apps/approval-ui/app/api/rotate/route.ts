@@ -399,6 +399,7 @@ export async function GET(req: Request) {
           angleOverride,
           preferredHeadline,
           insight: chosenInsight,
+          client,
         });
       } catch (e) {
         skipped.push({ group, variant, reason: 'gen loi: ' + (e as any)?.message });
@@ -529,7 +530,7 @@ export async function GET(req: Request) {
     let gen: any;
     try {
       // @ts-ignore — generateContentPost là module JS thuần, TS không biết param topic.
-      gen = await generateContentPost({ topic: chosenTopic });
+      gen = await generateContentPost({ topic: chosenTopic, client });
     } catch (e) {
       skipped.push({ group: 'Bài content', reason: 'gen loi: ' + (e as any)?.message });
       break;
@@ -548,6 +549,7 @@ export async function GET(req: Request) {
 
     // Chọn ảnh KHỚP chủ đề (sau khi đã biết chủ đề + tiêu đề).
     const picked = await (pickImageForContent as any)(client, folders, `${gen.topic || ''} ${displayTitle}`, recentlyUsedImages);
+    // pickImageForContent đã dùng client sẵn (arg đầu) để log token cho Unsplash keyword translation.
     if (!picked?.id) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
     const media = { id: picked.id as string };
     // Đánh dấu ngay để bài content thứ 2 trong cùng lượt (nếu có) cũng không trùng.
