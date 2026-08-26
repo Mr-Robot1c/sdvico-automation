@@ -316,9 +316,10 @@ export default async function BangSection() {
                           ) : null}
                         </ViewModal>
                         {/* 26/8: user chuyen nut "Lam video" tu /san-xuat sang day de bam nhanh
-                            khong phai vao trang Xuong san xuat. Chi hien khi bai chua yeu cau
-                            (badge "Dang lam video AI" o tren se thay khi video_requested=true). */}
-                        {it.cid && brief.video_requested !== true ? (
+                            khong phai vao trang Xuong san xuat. Chi hien khi:
+                            (1) bai chua yeu cau video (badge "Dang lam video AI" o tren se thay)
+                            (2) la bai BAN HANG - bai content nuoi trang khong can video (user 26/8). */}
+                        {it.cid && brief.video_requested !== true && p.post_kind !== 'content' ? (
                           <form action={requestVideoForContent} style={{ display: 'inline' }}>
                             <input type="hidden" name="content_id" value={it.cid} />
                             <button type="submit" className="btn" title="Yeu cau day chuyen video AI dung bai nay (FB 16:9 + TikTok doc). Mat 8-15 phut, ra ban rieng vao Hang doi duyet.">
