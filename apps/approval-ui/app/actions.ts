@@ -746,6 +746,10 @@ export async function refreshFacebookMetrics() {
     const { pullYouTubeMetrics } = await import('../lib/youtube-metrics');
     await pullYouTubeMetrics(client);
   } catch { /* YouTube loi khong chan phan Facebook */ }
+  try {
+    const { pullTikTokMetrics } = await import('../lib/tiktok-metrics');
+    await pullTikTokMetrics(client);
+  } catch { /* TikTok loi khong chan phan tren */ }
   revalidatePath('/do-luong');
 }
 
@@ -1625,5 +1629,47 @@ export async function deletePlan(formData: FormData) {
   const { error } = await client.from('mkt_plans').delete().eq('id', planId);
   if (error) throw new Error(error.message);
   revalidatePath('/ke-hoach');
+}
+
+// Kéo số liệu 3 nền tảng ngay (Facebook + YouTube + TikTok) — user bấm nút thay vì chờ
+// cron 1h (user 26/8: "sếp muốn thấy số liệu ngay không phải chờ"). Song song 3 nguồn, 1
+// nguồn lỗi không đánh hỏng nguồn khác. Sau khi xong revalidate các trang có số liệu.
+export async function pullMetricsNow(): Promise<{ ok: boolean; fb: number; yt: number; tt: number; msg: string }> {
+  const client = getServerClient();
+  const [fbRes, ytRes, ttRes] = await Promise.all([
+    pullFacebookMetrics(client).catch((e) => ({ pulled: 0, results: [{ error: String(e?.message || e) }] })),
+    (async () => {
+      try {
+        const { pullYouTubeMetrics } = await import('../lib/youtube-metrics');
+        return await pullYouTubeMetrics(client);
+      } catch (e: any) { return { pulled: 0, errors: [String(e?.message || e)] }; }
+    })(),
+    (async () => {
+      try {
+        const { pullTikTokMetrics } = await import('../lib/tiktok-metrics');
+        return await pullTikTokMetrics(client);
+      } catch (e: any) { return { pulled: 0, matched: 0, errors: [String(e?.message || e)] }; }
+    })(),
+  ]);
+  const fb = (fbRes as any).pulled || 0;
+  const yt = (ytRes as any).pulled || 0;
+  const tt = (ttRes as any).pulled || 0;
+  try {
+    await client.from('run_log').insert({
+      task: 'mkt.metrics_pull_manual',
+      actor: 'user',
+      status: 'ok',
+      detail: { fb, yt, tt }
+    });
+  } catch { /* bỏ qua */ }
+  revalidatePath('/noi-dung');
+  revalidatePath('/do-luong');
+  revalidatePath('/do-luong/tuan');
+  const parts: string[] = [];
+  if (fb) parts.push(`Facebook ${fb}`);
+  if (yt) parts.push(`YouTube ${yt}`);
+  if (tt) parts.push(`TikTok ${tt}`);
+  const msg = parts.length ? `Đã kéo: ${parts.join(', ')} bài` : 'Không có số liệu mới (API im hoặc không có bài).';
+  return { ok: true, fb, yt, tt, msg };
 }
 
