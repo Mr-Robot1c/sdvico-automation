@@ -52,26 +52,9 @@ export default function ForwardZaloButton({
     setTimeout(() => { setOpen(false); setStatus(''); }, 3500);
   }
 
-  // Chỉ 1 NV: click thẳng, không cần dropdown.
-  if (salesPeople.length === 1) {
-    const p = salesPeople[0];
-    return (
-      <span ref={wrapRef} style={{ display: 'inline-flex', flexDirection: 'column', gap: 2 }}>
-        <button
-          type="button"
-          className="btn ghost sm"
-          onClick={() => forwardTo(p)}
-          title={`Copy nội dung lead + mở Zalo với ${nameOf(p)} (${p.phone})`}
-          style={{ whiteSpace: 'nowrap' }}
-        >
-          📱 → {nameOf(p)}
-        </button>
-        {status ? <span className="sub" style={{ fontSize: '.72rem' }}>{status}</span> : null}
-      </span>
-    );
-  }
-
-  // ≥2 NV: mở dropdown chọn.
+  // LUON dung dropdown ke ca 1 NV (user 26/8: "van chua thay dropdown"). Truoc do co
+  // special case 1 NV click thang khong dropdown — nhung user muon nhat quan UX, va khi
+  // them NV sau khong phai nho doi cach bam.
   return (
     <span ref={wrapRef} style={{ position: 'relative', display: 'inline-block' }}>
       <button
