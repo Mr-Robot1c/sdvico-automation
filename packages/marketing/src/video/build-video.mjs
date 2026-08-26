@@ -134,7 +134,18 @@ async function geminiTTS(cleanText, outPath, workDir, tag, model) {
   );
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`gemini-tts HTTP ${res.status}: ${JSON.stringify(json.error || json).slice(0, 200)}`);
-  logTokenUsage(_tokenLogClient, 'voice_tts', model, json?.usageMetadata);
+  // Gemini TTS endpoint KHÔNG trả usageMetadata (khác generateContent thường) — dashboard
+  // "Quản trị token" (26/8) thiếu số Voice hoài. Fallback: ước tính token theo chars input
+  // (chuẩn Gemini tokenizer ~4 chars/token cho text latin, tiếng Việt có dấu ~3-4). Ghi
+  // dưới cùng dạng usageMetadata để logTokenUsage không cần đổi. Ưu tiên usageMetadata thật
+  // nếu Gemini future update endpoint trả về.
+  const ttsInput = GEMINI_TTS_STYLE + '\n\n' + cleanText;
+  const estimatedInputTokens = Math.ceil(ttsInput.length / 4);
+  logTokenUsage(_tokenLogClient, 'voice_tts', model, json?.usageMetadata || {
+    promptTokenCount: estimatedInputTokens,
+    candidatesTokenCount: 0,
+    totalTokenCount: estimatedInputTokens,
+  });
   const part = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
   if (!part) throw new Error('gemini-tts khong tra audio: ' + JSON.stringify(json).slice(0, 200));
   const mime = part.inlineData.mimeType || '';
