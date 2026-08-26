@@ -382,6 +382,11 @@ export async function GET(req: Request) {
         ? (variant === 'A' ? sug.why : pickRandom(CONTRAST_ANGLES))
         : null;
       const preferredHeadline = sug && variant === 'A' ? sug.title : null;
+      // Playbook 26/8: emotion + hook nghịch lý mất mát BOSS chốt sẵn cho ngày đó (theo lịch
+      // tuần 2-2-1-1-1). Cả A và B đều dùng ĐÚNG chữ cảm xúc (chữ ngày nào ngày ấy), chỉ khác
+      // nhau ở góc kể (why). Hook nghịch lý chỉ BOSS ra khi hướng thuộc dạng viral/seeding.
+      const emotionOverride = sug?.emotion || null;
+      const preferredHook = sug?.hook || null;
       // Chọn insight/painpoint MỚI cho nhóm này (né các insight đã dùng gần đây + đã dùng trong
       // chính run này) — mỗi bài xoáy vào một nỗi thật khác nhau (user 21/8: content phải có ý
       // nghĩa, không lặp). Nhóm chưa có insight trong thư viện -> null, bài viết như cũ.
@@ -398,6 +403,8 @@ export async function GET(req: Request) {
           hasVideo: false,
           angleOverride,
           preferredHeadline,
+          emotionOverride,
+          preferredHook,
           insight: chosenInsight,
           client,
         });
@@ -514,6 +521,8 @@ export async function GET(req: Request) {
     // v6 (20/8, user: "ghi rõ content gì"): KẾ HOẠCH SỐNG đã định loại content cho từng ngày
     // (daily_schedule[hôm nay].contentKind) — máy làm ĐÚNG loại kế hoạch ghi, hết cảnh trang
     // Kế hoạch nói một đằng máy sinh một nẻo. Không có lịch hôm nay -> giữ random theo weight.
+    // Playbook 26/8: đọc thêm contentEmotion để bài content chạm đúng 1 trong 4 chữ playbook.
+    let contentEmotionOverride: string | null = null;
     try {
       const { data: liveRow } = await client
         .from('mkt_plans').select('data').eq('data->>origin', 'live')
@@ -523,6 +532,7 @@ export async function GET(req: Request) {
       if (todaySched?.contentKind && KIND_WEIGHT[todaySched.contentKind] !== undefined) {
         chosenKind = todaySched.contentKind;
       }
+      if (todaySched?.contentEmotion) contentEmotionOverride = String(todaySched.contentEmotion);
     } catch { /* giữ random */ }
     const topicsOfKind = (CONTENT_TOPICS as any[]).filter((t) => t.type === chosenKind);
     const chosenTopic = topicsOfKind.length ? pickRandom(topicsOfKind) : undefined;
@@ -530,7 +540,7 @@ export async function GET(req: Request) {
     let gen: any;
     try {
       // @ts-ignore — generateContentPost là module JS thuần, TS không biết param topic.
-      gen = await generateContentPost({ topic: chosenTopic, client });
+      gen = await generateContentPost({ topic: chosenTopic, client, emotionOverride: contentEmotionOverride });
     } catch (e) {
       skipped.push({ group: 'Bài content', reason: 'gen loi: ' + (e as any)?.message });
       break;

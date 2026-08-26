@@ -62,10 +62,19 @@ export function hashtagBlock(productGroup, extra = []) {
 // channel: 'facebook' | 'tiktok'. productName: tên sạch của sản phẩm. hasVideo: có kèm video không.
 // v2 (18/8): angleOverride + preferredHeadline dùng khi rotate bám suggestion từ Kế hoạch AI —
 // bài đăng sẽ đi đúng hướng đi tuần (dựa why từ tri thức) thay vì góc random.
+// Playbook 26/8: emotionOverride (1 trong 4 chữ NGHỀ/TIỀN/RỦI RO/TỰ HÀO) + preferredHook (câu
+// mở nghịch lý ≤15 chữ BOSS đã ra sẵn) — nếu suggestion có thì Creator bám luôn, cả A và B
+// đều dùng đúng chữ cảm xúc BOSS đã chốt cho ngày đó, chỉ khác nhau góc kể.
+const EMOTION_KEYS = ['NGHỀ', 'TIỀN', 'RỦI RO', 'TỰ HÀO'];
+function pickAngleForEmotion(e) {
+  const key = String(e || '').toUpperCase();
+  return ANGLES.find((a) => a.startsWith(key)) || null;
+}
 export async function generateSocialPost({
   productGroup, productName, channel, hasVideo,
   facts = PRODUCT_FACTS,
   angleOverride = null, preferredHeadline = null,
+  emotionOverride = null, preferredHook = null,
   insight = null,
   client = null,
 }) {
@@ -77,7 +86,10 @@ export async function generateSocialPost({
 
   const features = getFeatures(productGroup);
   const isTikTok = channel === 'tiktok';
-  const angle = angleOverride || ANGLES[Math.floor(Math.random() * ANGLES.length)];
+  // Ưu tiên emotionOverride (BOSS đã chốt chữ cho ngày đó theo playbook), rồi mới tới
+  // angleOverride cũ, cuối cùng random 4 chữ. Cách này giữ tương thích với chỗ gọi cũ.
+  const emotionAngle = emotionOverride ? pickAngleForEmotion(emotionOverride) : null;
+  const angle = emotionAngle || angleOverride || ANGLES[Math.floor(Math.random() * ANGLES.length)];
   const system = [
     'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${productName}". Bắt buộc: nêu rõ tên sản phẩm này, 1 tới 2 lợi ích thật của nó. Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
@@ -125,6 +137,9 @@ export async function generateSocialPost({
     insightText,
     insightText ? `Chữ cảm xúc lần này: ${angle}. Bài PHẢI chạm đúng chữ này (bộ lọc vàng playbook).` : `Chữ cảm xúc lần này: ${angle}. Bài PHẢI chạm đúng chữ này (bộ lọc vàng playbook).`,
     preferredHeadline ? `Nếu phù hợp, giữ hoặc bám gần tiêu đề gợi ý: "${preferredHeadline}" (đây là hướng đi tuần từ Kế hoạch AI). Không bắt buộc chép nguyên, nhưng nội dung phải khớp hướng đi này.` : '',
+    // Playbook 26/8: BOSS ra sẵn hook nghịch lý mất mát ≤15 chữ cho hướng viral/seeding. Nếu
+    // có, Creator BÁM ĐÚNG câu này ở dòng đầu body (không tự bịa hook mới) để bài không lệch.
+    preferredHook ? `HOOK BOSS ĐÃ RA (BẮT BUỘC dùng nguyên hoặc chỉ chỉnh 1-2 chữ, đặt làm CÂU ĐẦU BODY, dòng riêng): "${preferredHook}"` : '',
     'Trả về JSON đúng dạng, không thêm chữ ngoài JSON:',
     '{"headline": "tiêu đề ngắn 6 tới 12 từ, riêng biệt, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag)"}',
   ].filter(Boolean).join('\n');
@@ -183,12 +198,23 @@ const CONTENT_TYPE_INSTRUCTION = {
     'Bài dạng CHÂN DUNG NGƯỜI TRONG NGHỀ, viết HOÀN CHỈNH để đăng ngay (sếp chốt 19/8: điền sẵn, không để ô trống). Nhân vật là NGƯỜI ĐIỂN HÌNH: gọi thân mật kiểu "bác Ba", "chú Bảy", "anh Tư" (KHÔNG họ tên đầy đủ), tuổi khoảng 45-65 (hoặc 28-35 nếu ngư dân trẻ), địa phương ven biển Bà Rịa Vũng Tàu (Long Hải, Phước Tỉnh, Bình Châu, Lộc An, Bến Đá) hoặc miền Trung, số năm bám biển. Cấu trúc: 1 câu mở giới thiệu (tên gọi + tuổi + địa phương + số năm đi biển; tuổi và số năm viết bằng CHỮ SỐ, ví dụ "bác Ba 55 tuổi", "30 năm bám biển", KHÔNG viết "năm mươi lăm tuổi"), 2-3 câu bối cảnh nghề, 1 câu NÓI của nhân vật trong ngoặc kép (giọng chân chất, đúng đời sống ngư dân, không sáo), 1 câu kết chúc bà con. KHÔNG dùng ngoặc vuông, KHÔNG để chỗ trống, KHÔNG ghi chú "khung sườn"; KHÔNG gán số liệu doanh thu/sản lượng cụ thể cho nhân vật.',
   news:
     'Bài dạng NHỊP THỜI SỰ NGÀNH - CHỜ CẤP QUẢN LÝ DUYỆT. Viết TRUNG THỰC, KHÔNG nêu con số/ngày tháng/mốc quy định cụ thể (điều cấm 5). Dùng ngôn ngữ chung: "quy định mới", "gần đây", "theo cập nhật của cơ quan quản lý". Cấu trúc: 1 câu nêu chủ đề, 2-3 câu bối cảnh chung mà bà con cần biết, 1 dòng khuyên bà con theo dõi kênh chính thức của Cục Thủy sản/địa phương. Chèn đầu bài: "⚠️ CẦN CẤP QUẢN LÝ DUYỆT - nội dung chạm quy định nhà nước (điều cấm 3)".',
+  // Playbook 26/8 lịch tuần 2-2-1-1-1: thêm 2 loại bài mới cho nhịp viral và seeding.
+  viral:
+    'MỤC ĐÍCH BÀI: nhịp VIRAL — bài dễ share, dễ bàn tán trong hội bạn thuyền, KHÔNG bán hàng. Bám 4 chữ NGHỀ/TIỀN/RỦI RO/TỰ HÀO (chữ đã chọn ở trên). Cấu trúc gợi ý: 1 CÂU HOOK CỰC MẠNH ở dòng đầu (dưới 15 chữ, nghịch lý mất mát HOẶC khoảnh khắc tự hào HOẶC con số gây sốc kiểu "3 giờ sáng, cá bỏ chạy vì..."), XUỐNG DÒNG. Rồi 3-5 câu kể chuyện SỐNG ĐỘNG như bạn thuyền đang kể (không lý thuyết): tình huống, cảm xúc, tình tiết bất ngờ hoặc cái kết đáng nhớ. Kết bằng 1 câu hỏi mở kéo bà con TAG bạn thuyền vào hoặc kể chuyện họ đã gặp. TUYỆT ĐỐI KHÔNG nhắc tên sản phẩm SDVICO, không mời gọi, không CTA bán. Bài này để lan, không để bán.',
+  seeding:
+    'MỤC ĐÍCH BÀI: nhịp SEEDING — thả CÂU HỎI / NỖI LO của bà con trước, dẫn dắt nhẹ về vùng nhu cầu sản phẩm CUỐI BÀI (không chào giá, không mời chốt). Cấu trúc: 1 câu mở nêu nỗi lo cụ thể bà con hay gặp (hết nước giữa biển, dầu bẩn hư máy, mất tín hiệu bị phạt...) xuống dòng. 2-3 câu bàn về nỗi lo đó dưới góc bạn thuyền, KHÔNG bịa số liệu. Cuối bài GỢI MỞ hướng giải quyết chung chung (không nêu model, không nêu giá) kèm 1 câu hỏi mở kiểu "bà con có ai đã xử lý được chuyện này chưa, kể mình nghe với". Chỉ được nhắc SDVICO tối đa 1 lần và chỉ ở câu cuối như "bên mình đang tìm hiểu hướng này, ai quan tâm nhắn Page trao đổi thêm". KHÔNG dùng khung 6 nhịp bài bán, giữ nhẹ tay để bà con không thấy đây là quảng cáo.',
 };
 
 // Bài CONTENT (không bán trực tiếp): viết theo một chủ đề để nuôi trang, lấy tương tác.
 // AI tự nghĩ nội dung theo chủ đề, KHÔNG bịa tin tức/số liệu cụ thể (điều cấm 5).
 // Chấp nhận 3 dạng đầu vào: {type,topic} object, string chủ đề, hoặc không truyền (random).
-export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client = null } = {}) {
+// Playbook 26/8: emotionOverride (BOSS chốt chữ cảm xúc theo ngày trong lịch tuần 2-2-1-1-1).
+// Rotate truyền todaySched.contentEmotion vào -> bài content ngày đó bám đúng chữ playbook.
+function pickContentAngleForEmotion(e) {
+  const key = String(e || '').toUpperCase();
+  return CONTENT_ANGLES.find((a) => a.startsWith(key)) || null;
+}
+export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client = null, emotionOverride = null } = {}) {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -202,7 +228,8 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
   const type = chosen.type || 'tip';
   const topicText = chosen.topic || String(chosen);
   const structure = CONTENT_TYPE_INSTRUCTION[type] || CONTENT_TYPE_INSTRUCTION.tip;
-  const contentAngle = CONTENT_ANGLES[Math.floor(Math.random() * CONTENT_ANGLES.length)];
+  const emotionAngle = emotionOverride ? pickContentAngleForEmotion(emotionOverride) : null;
+  const contentAngle = emotionAngle || CONTENT_ANGLES[Math.floor(Math.random() * CONTENT_ANGLES.length)];
 
   const system = [
     'Bạn viết bài cộng đồng cho trang của Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',

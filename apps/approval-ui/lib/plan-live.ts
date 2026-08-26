@@ -32,39 +32,70 @@ const GROUPS_PER_DAY = 2;         // mỗi ngày gợi ý chia sẻ vào 2 nhóm
 
 const DOW_VN = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
-// Loại bài content chia sẵn cho 7 ngày (user 20/8: "ghi rõ content gì"). Tỷ lệ bám
-// KIND_WEIGHT của rotate (qa 2, checklist 2, tip 1, engage 1, portrait 1): chuỗi 7 ngày
-// xoay theo NGÀY TRONG TUẦN (T2 đầu chuỗi) để ổn định giữa các lần refresh, không nhảy loạn.
+// Playbook SDVICO 26/8 (user chốt "lịch tuần 2-2-1-1-1"): 7 bài content nuôi trang/tuần chia
+// đúng 2 giáo dục + 2 viral + 1 cá nhân + 1 seeding + 1 tương tác. Bám PHẦN 9 playbook:
+//   T2 GIÁO DỤC 1 (checklist)  — chữ RỦI RO — mẹo kỹ thuật áp dụng ngay
+//   T3 VIRAL 1    (viral)      — chữ RỦI RO — cảnh báo hậu quả thật, kích tranh luận
+//   T4 GIÁO DỤC 2 (tip)        — chữ TIỀN  — mẹo tiết kiệm/tránh mua hớ, có con số
+//   T5 TƯƠNG TÁC  (engage)     — chữ NGHỀ  — poll/câu hỏi chia phe
+//   T6 VIRAL 2    (viral)      — chữ TỰ HÀO — khoảnh khắc "lộc biển", payoff giây đầu
+//   T7 CÁ NHÂN    (portrait)   — chữ TỰ HÀO — câu chuyện thật, kết nối cảm xúc
+//   CN SEEDING    (seeding)    — chữ TIỀN  — checklist tuần → dẫn tự nhiên về sản phẩm
+// Quy tắc playbook: chỉ 2/7 bài trực tiếp bán (T4 nhắc nhẹ + CN seeding), 5 bài còn lại xây
+// niềm tin. Cả tuần phủ đủ 4 chữ.
 const CONTENT_KIND_BY_DOW: Record<number, { kind: string; label: string }> = {
-  1: { kind: 'qa', label: 'Hỏi Đáp' },          // Thứ 2
-  2: { kind: 'checklist', label: 'Checklist' },  // Thứ 3
-  3: { kind: 'tip', label: 'Mẹo' },              // Thứ 4
-  4: { kind: 'qa', label: 'Hỏi Đáp' },           // Thứ 5
-  5: { kind: 'glossary', label: 'Thuật ngữ' },   // Thứ 6 (24/8: bỏ Chân dung — user: "không có mục đích")
-  6: { kind: 'checklist', label: 'Checklist' },  // Thứ 7
-  0: { kind: 'engage', label: 'Hỏi bà con' },    // Chủ nhật
+  1: { kind: 'checklist', label: 'Giáo dục · Rủi ro' },  // Thứ 2
+  2: { kind: 'viral', label: 'Viral · Rủi ro' },         // Thứ 3
+  3: { kind: 'tip', label: 'Giáo dục · Tiền' },          // Thứ 4
+  4: { kind: 'engage', label: 'Tương tác · Nghề' },      // Thứ 5
+  5: { kind: 'viral', label: 'Viral · Tự hào' },         // Thứ 6
+  6: { kind: 'portrait', label: 'Cá nhân · Tự hào' },    // Thứ 7
+  0: { kind: 'seeding', label: 'Seeding · Tiền' },       // Chủ nhật
+};
+
+// 4 chữ cảm xúc theo playbook — mỗi ngày mặc một chữ, để BOSS/Creator biết bài này chạm chữ
+// nào (NGHỀ/TIỀN/RỦI RO/TỰ HÀO). Cả tuần phủ đủ 4 chữ, không được cả 7 bài cùng một chữ.
+const CONTENT_EMOTION_BY_DOW: Record<number, string> = {
+  1: 'RỦI RO',   // T2 — giáo dục kỹ thuật, sợ mất chuyến/tiền/an toàn
+  2: 'RỦI RO',   // T3 — cảnh báo hậu quả
+  3: 'TIỀN',     // T4 — mẹo tiết kiệm
+  4: 'NGHỀ',     // T5 — tương tác về nghề
+  5: 'TỰ HÀO',   // T6 — khoảnh khắc lộc biển
+  6: 'TỰ HÀO',   // T7 — câu chuyện thật
+  0: 'TIỀN',     // CN — seeding sản phẩm
 };
 
 // MỤC ĐÍCH từng loại content (user 24/8: "content phải có mục đích của nó") — hiện trong lịch
 // tuần + khối Hôm nay để người đọc biết bài này ĐỂ LÀM GÌ cho bà con, không đăng cho có.
+// Playbook 26/8 (PHẦN 4): mỗi chữ cảm xúc ép người xem LÀM một việc riêng —
+//   RỦI RO -> cảnh báo nhau (comment); TIỀN -> hỏi giá (inbox);
+//   TỰ HÀO -> khoe (share);           NGHỀ  -> kể chuyện của họ.
 const CONTENT_PURPOSE: Record<string, string> = {
   qa: 'bà con có thêm kiến thức dùng thiết bị, đi biển',
-  checklist: 'bà con tự kiểm tra tàu và thiết bị trước chuyến',
-  tip: 'xử lý sự cố hay gặp, đỡ tốn tiền sửa',
+  checklist: 'GIÁO DỤC (rủi ro) — bà con tự kiểm tra tàu/thiết bị trước chuyến, comment cảnh báo nhau',
+  tip: 'GIÁO DỤC (tiền) — mẹo tiết kiệm, tránh mua hớ, có con số cụ thể để bà con tự tính vào túi',
   glossary: 'hiểu đúng thuật ngữ, thông số khi chọn mua thiết bị',
-  engage: 'nghe nhu cầu thật của bà con để chọn hướng bài tuần sau',
+  engage: 'TƯƠNG TÁC (nghề) — poll/câu hỏi chia phe, bà con tự kể chuyện của mình',
   news: 'bà con nắm quy định mới, tránh bị phạt',
+  viral: 'VIRAL — hook nghịch lý mất mát <15 chữ, chạm TIẾC/UẤT, bà con tag bạn thuyền',
+  seeding: 'SEEDING (tiền) — checklist tuần dẫn tự nhiên về vùng nhu cầu sản phẩm, mở đường Zalo',
+  portrait: 'CÁ NHÂN (tự hào) — chân dung ngư dân điển hình, kể chuyện thật, bà con share vì bản sắc dân biển',
 };
 
 // Cấu trúc 1 dòng của từng loại content — hiển thị trong lịch để người đọc biết bài sẽ
 // trông ra sao (bám CONTENT_TYPE_INSTRUCTION trong lib/gen/social.mjs).
+// Playbook 26/8 (PHẦN 6 — khung viral 6 nhịp): HOOK nghịch lý (≤15 chữ) → ĐỒNG CẢM bạn thuyền
+// (TIẾC+UẤT) → LỐI THOÁT nói bằng LỢI ÍCH (không thông số) → PHẦN THƯỞNG cụ thể → TIN CẬY 1
+// câu → CTA MỞ CHUYỆN (câu hỏi + từ khóa nhắn Page). CTA KHÔNG đòi gọi tổng đài với tệp lạ.
 const CONTENT_STRUCTURE: Record<string, string> = {
   qa: '❓ 1 câu hỏi bà con hay gặp → 💡 đáp gọn 3-5 câu',
-  checklist: '📋 mở 1 câu → 4-6 gạch ✅ việc cần làm',
-  tip: '⚠️ 2-3 thói quen sai → ✅ 2-3 cách xử đúng',
-  engage: '💬 2-3 câu gợi chuyện → kết bằng câu hỏi mở, không bán hàng',
-  portrait: '👤 nhân vật điển hình + tuổi + quê → câu nói thật → lời chúc',
+  checklist: '📋 mở 1 câu → 4-6 gạch ✅ việc kiểm tra trước chuyến → CTA nhắn Page',
+  tip: '⚠️ 2-3 thói quen sai → ✅ 2-3 cách xử đúng, kèm CON SỐ tiết kiệm cụ thể',
+  engage: '💬 2-3 câu gợi chuyện → CÂU HỎI CHIA PHE (A hay B) → bà con tự kể',
+  portrait: '👤 nhân vật + tuổi + quê → khoảnh khắc thật → câu nói ruột gan → lời chúc',
   glossary: '📖 1 thuật ngữ nghề → giải thích dễ hiểu + ví dụ',
+  viral: '🔥 HOOK nghịch lý ≤15 chữ (thành quả lớn bị phá bởi 1 nguyên nhân nhỏ) → 3-5 câu ĐỒNG CẢM giọng bạn thuyền chạm TIẾC+UẤT → câu hỏi mời tag bạn thuyền',
+  seeding: '😥 nỗi lo cụ thể → 2-3 câu bàn giọng bạn thuyền → checklist gọn → gợi mở nhu cầu sản phẩm cuối bài (không chốt trực tiếp)',
 };
 
 // Cấu trúc bài BÁN (chung cho mọi hướng — bám prompt generateSocialPost).
@@ -171,6 +202,7 @@ function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: str
       contentCount: CONTENT_PER_DAY,
       contentKind: ck?.kind, contentKindLabel: ck?.label, contentPurpose: ck ? CONTENT_PURPOSE[ck.kind] : undefined,
       contentStructure: ck ? CONTENT_STRUCTURE[ck.kind] : undefined,
+      contentEmotion: CONTENT_EMOTION_BY_DOW[dowIdx],
       direction: dirQueue[i] || null,
       groups: dayGroups,
     });

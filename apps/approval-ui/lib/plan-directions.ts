@@ -116,11 +116,58 @@ ${PRODUCTS.map((p) => '- ' + p).join('\n')}
 Nguyên liệu tri thức tuần này:
 ${knowledgeBlock}
 ${avoidBlock}
-Nhiệm vụ: dựa vào NHỮNG GÌ ĐANG XẢY RA (tri thức trên), đề xuất 7 hướng bài đăng cụ thể cho tuần tới trên Facebook/TikTok của SDVICO. Mỗi hướng phải:
+
+=== PLAYBOOK MARKETING SDVICO (BẮT BUỘC BÁM) ===
+
+Khách của SDVICO là NGƯỜI ĐI BIỂN (ngư dân, chủ tàu, thợ máy), KHÔNG phải người ăn hải sản.
+Ngư dân chỉ tin "người trong nghề thật" (boong tàu, tiếng máy, giọng địa phương). Càng bóng bẩy càng bị lướt.
+
+BỘ LỌC VÀNG — MỖI BÀI PHẢI CHẠM 1 TRONG 4 CHỮ CẢM XÚC (không chạm chữ nào chắc chắn chìm):
+- NGHỀ: bà con tự nhận ra mình, muốn khoe kinh nghiệm -> kể chuyện của họ (comment)
+- TIỀN: ảnh hưởng túi tiền mỗi chuyến -> hỏi giá (inbox)
+- RỦI RO: sợ mất chuyến/mất tiền/mất an toàn -> cảnh báo bạn thuyền (comment/share)
+- TỰ HÀO: danh dự nghề, tình anh em bạn thuyền -> khoe (share)
+
+7 HƯỚNG PHẢI CHIA ĐÚNG CẤU TRÚC TUẦN (2 giáo dục · 2 viral · 1 cá nhân · 1 seeding · 1 tương tác):
+- Hướng #1 (Thứ 2)  = GIÁO DỤC · chữ RỦI RO · role="giao_duc" · kind="checklist" — mẹo kỹ thuật áp dụng ngay
+- Hướng #2 (Thứ 3)  = VIRAL    · chữ RỦI RO · role="viral"    · kind="tip"       — cảnh báo hậu quả thật, kích tranh luận
+- Hướng #3 (Thứ 4)  = GIÁO DỤC · chữ TIỀN   · role="giao_duc" · kind="tip"       — mẹo tiết kiệm/tránh mua hớ, CÓ CON SỐ
+- Hướng #4 (Thứ 5)  = TƯƠNG TÁC · chữ NGHỀ  · role="tuong_tac" · kind="engage"   — poll/câu hỏi chia phe (A hay B)
+- Hướng #5 (Thứ 6)  = VIRAL    · chữ TỰ HÀO · role="viral"    · kind="tip"       — khoảnh khắc "lộc biển", payoff giây đầu
+- Hướng #6 (Thứ 7)  = CÁ NHÂN  · chữ TỰ HÀO · role="ca_nhan"  · kind="qa"        — câu chuyện thật, người thật việc thật
+- Hướng #7 (CN)     = SEEDING  · chữ TIỀN   · role="seeding"  · kind="checklist" — checklist tuần dẫn tự nhiên về sản phẩm
+
+Quy tắc phân phối: chỉ 2/7 bài trực tiếp bán (Hướng #3 nhắc nhẹ + Hướng #7 seeding). 5 hướng còn lại XÂY NIỀM TIN — nhắc sản phẩm nhẹ hoặc không nhắc, ưu tiên cảnh nghề thật + con số + câu chuyện.
+
+HOOK NGHỊCH LÝ MẤT MÁT (bắt buộc cho hướng viral #2, #5, #7):
+- Cấu trúc: "Thành quả lớn bị phá bởi 1 nguyên nhân nhỏ" — ≤15 chữ
+- Ví dụ mẫu: "Trúng luồng cá mà phải quay vào bờ - chỉ vì hết nước ngọt."
+- 5 yếu tố: nghịch lý, nỗi sợ mất mát cụ thể, tự soi mình, ngắn dồn, có hình ảnh cụ thể
+
+Với các hướng còn lại (giáo dục, tương tác, cá nhân), hook có thể theo cơ chế khác nhưng vẫn ≤15 chữ:
+- Gây shock bằng con số cụ thể (dầu 38.000đ/lít)
+- Phá vỡ niềm tin sai ("điều anh đang tin là sai")
+- Kể tình huống cụ thể (thời gian + địa điểm + nhân vật)
+- Câu hỏi tự soi ("Anh còn nhớ lần cuối...")
+- Cảnh báo sai lầm đang mắc
+
+Ví dụ hook mẫu (không copy nguyên, chỉ tham khảo cấu trúc):
+- "Dầu 38.000đ/lít - mỗi chuyến anh đang đốt trôi bao nhiêu tiền?"
+- "Máy 300 triệu, nhưng chưa bỏ 1 đồng lọc sạch dầu cho nó."
+- "3 giờ sáng, cách bờ 80 hải lý, máy khục một tiếng rồi tắt."
+- "Anh còn nhớ lần cuối súc rửa két nước ngọt là khi nào không?"
+- "Trúng luồng cá mà phải quay vào bờ - chỉ vì hết nước ngọt."
+
+CTA MỞ CHUYỆN (không phải "gọi tổng đài báo giá" - page mới, tệp lạ, xin gọi tổng đài là quá sức):
+- Một câu hỏi kéo comment (để bà con tự trả lời trong đầu, dừng lại, comment)
+- Một từ khóa nhắn Page nhẹ nhàng ("nhắn KEYWORD cho page, mình gửi thông tin - không gọi làm phiền")
+
+Nhiệm vụ chi tiết: dựa vào NHỮNG GÌ ĐANG XẢY RA (tri thức trên), đề xuất ĐÚNG 7 hướng bài đăng cho tuần tới trên Facebook/TikTok của SDVICO, THEO ĐÚNG THỨ TỰ 7 nhịp bên trên. Mỗi hướng phải:
 - Bám vào một nguồn tri thức thật (nói rõ dựa vào mục nội bộ số N hay public số N)
 - Gọi tên một sản phẩm cụ thể trong danh mục, không nói chung chung
-- Cho biết loại bài (checklist / hỏi đáp / mẹo / chia sẻ / tin ngành)
-- Nêu rõ TẠI SAO tuần này đang là thời điểm tốt cho chủ đề này
+- Gán ĐÚNG "role" + "emotion" + "kind" theo bảng 7 nhịp trên (KHÔNG được đổi)
+- Viết "hook" ≤15 chữ theo mô tả từng loại
+- Nêu rõ TẠI SAO tuần này đang là thời điểm tốt cho chủ đề này ở trường "why"
 - Nếu tri thức gốc có cờ "cần duyệt QL" thì bài theo hướng này cũng có "needs_gov_review: true"
 - Nếu có kết luận đánh giá A/B vòng trước, ưu tiên cách viết của bản thắng
 
@@ -129,9 +176,14 @@ QUY TẮC CHỐNG TRÙNG (BẮT BUỘC):
 - KHÔNG được có 2 hướng cùng sản phẩm mà thông điệp na ná nhau. Nếu 2 sản phẩm tập trung, chia đều mỗi sản phẩm vài góc khác biệt.
 - Tránh mọi tiêu đề trùng hoặc gần giống "CÁC HƯỚNG ĐÃ CÓ" ở trên.
 
-Văn phong: câu ngắn, gần gũi bà con ngư dân, KHÔNG dùng gạch dài, KHÔNG dùng mũi tên, số theo chuẩn Việt Nam. BẮT BUỘC viết tiếng Việt CÓ DẤU đầy đủ trong mọi trường (title, why, product), tuyệt đối không viết không dấu.
+3 LỖI CHẾT NGƯỜI TUYỆT ĐỐI TRÁNH:
+1. Bán hàng quá sớm (chèn "sắm ngay X" ở câu mở) - não gắn nhãn quảng cáo, bà con lướt
+2. Liệt kê thông số kỹ thuật thay vì lợi ích (VAC, RO, lít/giờ...) - phải "dịch" ra: đỡ tốn, đi xa hơn, an tâm hơn
+3. CTA đòi hành động lớn với tệp lạ - "gọi tổng đài lấy báo giá" là quá sức
 
-Trả JSON đúng dạng, không thêm chữ ngoài JSON:
+Văn phong: câu ngắn, giọng bạn thuyền, KHÔNG dùng gạch dài, KHÔNG dùng mũi tên, KHÔNG dùng ký hiệu thay chữ "và", số theo chuẩn Việt Nam (3.000.000đ). BẮT BUỘC viết tiếng Việt CÓ DẤU đầy đủ trong mọi trường (title, why, product, hook, emotion, role), tuyệt đối không viết không dấu.
+
+Trả JSON đúng dạng, KHÔNG thêm chữ ngoài JSON, đúng 7 phần tử theo đúng thứ tự 7 nhịp:
 {
   "directions": [
     {
@@ -139,6 +191,9 @@ Trả JSON đúng dạng, không thêm chữ ngoài JSON:
       "why": "1-2 câu giải thích tại sao tuần này nên đăng chủ đề này, dựa vào tri thức nào (có dấu)",
       "product": "Tên sản phẩm chính xác trong danh mục",
       "kind": "checklist|qa|tip|engage|glossary|news",
+      "role": "giao_duc|viral|ca_nhan|seeding|tuong_tac",
+      "emotion": "NGHỀ|TIỀN|RỦI RO|TỰ HÀO",
+      "hook": "Câu mở đầu ≤15 chữ, tiếng Việt có dấu",
       "sources": ["nội bộ #N", "public #N"],
       "needs_gov_review": false
     }
@@ -158,6 +213,11 @@ Trả JSON đúng dạng, không thêm chữ ngoài JSON:
       why: String(d.why || '').slice(0, 1000),
       product: String(d.product || '').slice(0, 200),
       kind: String(d.kind || 'tip').slice(0, 30),
+      // Playbook 26/8: 3 field mới BOSS ép Creator bám khung viral SDVICO. Bản cũ không có
+      // các field này -> undefined; Creator có fallback riêng nên không vỡ.
+      emotion: d.emotion ? String(d.emotion).slice(0, 20) : undefined,
+      role: d.role ? String(d.role).slice(0, 20) : undefined,
+      hook: d.hook ? String(d.hook).slice(0, 150) : undefined,
       sources: Array.isArray(d.sources) ? d.sources.map((s: any) => String(s)) : [],
       needs_gov_review: d.needs_gov_review === true,
     }))

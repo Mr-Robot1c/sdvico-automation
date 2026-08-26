@@ -64,6 +64,15 @@ export type ContentDirection = {
   needs_gov_review: boolean;        // Nguồn chạm quy định thì bài theo hướng này cũng cần duyệt QL
   used_at?: string;                 // Rotate đánh dấu khi hướng này đã sinh cặp bài A/B (không lặp)
   carried?: boolean;                // Hướng giữ lại từ bản trước (chưa dùng); thiếu cờ = hướng MỚI của bản này
+  // Playbook 26/8: chữ cảm xúc BOSS ép mỗi hướng phải chạm — NGHỀ / TIỀN / RỦI RO / TỰ HÀO.
+  // Cả 7 hướng trong tuần phủ đủ 4 chữ (không dồn 5-6 hướng vào 1 chữ).
+  emotion?: string;
+  // Playbook 26/8: dạng bài trong khung tuần 2-2-1-1-1.
+  // 'giao_duc' | 'viral' | 'ca_nhan' | 'seeding' | 'tuong_tac'
+  role?: string;
+  // Playbook 26/8 (PHẦN 5+6): câu hook nghịch lý mất mát ≤15 chữ — thành quả lớn bị phá bởi 1
+  // nguyên nhân nhỏ. Creator dùng làm dòng mở đầu bài viral/seeding thay vì tự bịa hook mới.
+  hook?: string;
 };
 
 // Một ngày trong lịch BOSS đề xuất: sản phẩm bán + số bài, số bài content, nhóm chia sẻ.
@@ -77,6 +86,9 @@ export type DailyPlan = {
   contentKind?: string;
   contentKindLabel?: string;
   contentPurpose?: string;   // bài content này ĐỂ LÀM GÌ cho bà con (user 24/8) // nhãn tiếng Việt hiển thị ("Hỏi Đáp"...)
+  // Playbook 26/8 (PHẦN 4): chữ cảm xúc bài content phải chạm — NGHỀ/TIỀN/RỦI RO/TỰ HÀO.
+  // Cả tuần phủ đủ 4 chữ. Rotate truyền tiếp xuống Creator để bài đúng chữ đã định.
+  contentEmotion?: string;
   // v7 (20/8, user: "kế hoạch phải chi tiết hơn — hướng đi gì, cấu trúc ra sao"):
   // hướng đi DỰ KIẾN cho bài bán ngày đó (map từ content_suggestions chưa dùng của bản đang
   // áp, theo đúng thứ tự vòng xoay sẽ rút). Chỉ để hiển thị; rotate vẫn tự rút lúc chạy.
