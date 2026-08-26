@@ -216,6 +216,8 @@ export async function GET(req: Request) {
   type Suggestion = {
     title: string; why: string; product: string; kind: string;
     sources?: string[]; needs_gov_review?: boolean; used_at?: string; pending_variant?: 'B'; a_at?: string;
+    // Playbook 26/8: BOSS chốt sẵn chữ cảm xúc + dạng bài + hook nghịch lý cho mỗi hướng.
+    emotion?: string; role?: string; hook?: string;
   };
   const allSuggestions: Suggestion[] = Array.isArray(appliedPlan?.data?.content_suggestions)
     ? appliedPlan!.data.content_suggestions
