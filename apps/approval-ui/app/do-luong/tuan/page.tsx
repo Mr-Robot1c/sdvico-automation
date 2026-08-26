@@ -70,13 +70,13 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
     </span>
   );
 
-  const productColor = new Map<string, number>();
-  byProduct.forEach((t, i) => productColor.set(t.product, i < 8 ? i + 1 : 0));
-  const colorOf = (product: string) => productColor.get(product) || 0;
-
-  const engByProduct = byProduct.map((t) => ({ label: t.product, value: t.avgEng, color: colorOf(t.product) }));
-  const topPostChart = topPosts.map((p) => ({ label: p.title, value: p.score, color: colorOf(p.product) }));
-  const kindChart = byKind.filter((k) => k.count > 0).map((k) => ({ label: k.label, value: k.avgEng, color: 0 }));
+  // Màu chart: mỗi cột 1 màu KHÁC NHAU (user 26/8: "các chart cho màu đi chứ — nhớ là khác
+   // màu với nhau"). Trước dùng color theo product nên khi topPosts 4 bài cùng SEA-40 thì
+   // 4 cột đều 1 màu. Giờ dùng index cycle 1..8 để cột nào cũng khác.
+  const cycleColor = (i: number) => (i % 8) + 1;
+  const engByProduct = byProduct.map((t, i) => ({ label: t.product, value: t.avgEng, color: cycleColor(i) }));
+  const topPostChart = topPosts.map((p, i) => ({ label: p.title, value: p.score, color: cycleColor(i) }));
+  const kindChart = byKind.filter((k) => k.count > 0).map((k, i) => ({ label: k.label, value: k.avgEng, color: cycleColor(i) }));
 
   return (
     <main>
@@ -187,44 +187,68 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
             </table>
           </div>
 
-          <h2 style={{ marginTop: 24 }}>Từng bài trong tuần — mọi kênh</h2>
-          <div className="tablewrap">
-            <table className="datatable">
-              <thead>
-                <tr>
-                  <th style={{ width: 60 }}>Kênh</th>
-                  <th>Tên bài</th>
-                  <th className="num">Lượt xem</th>
-                  <th className="num">React/Like</th>
-                  <th className="num">Comment</th>
-                  <th className="num">Share</th>
-                  <th>Link</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rowsAllChannels.length === 0 ? (
-                  <tr><td colSpan={7} className="sub" style={{ textAlign: 'center' }}>Chưa có bài nào trong tuần này.</td></tr>
-                ) : rowsAllChannels.map((r) => {
-                  const link = r.channel === 'tiktok'
-                    ? (r.shareUrl || r.url)
-                    : r.channel === 'youtube' && r.videoId
-                      ? `https://youtube.com/shorts/${r.videoId}`
-                      : r.url;
-                  return (
-                    <tr key={`${r.cid}-${r.channel}`}>
-                      <td><PlatformLogo platform={r.channel} size={20} /></td>
-                      <td className="cell-title"><b>{r.title}</b></td>
-                      <td className="num">{r.views ? fmt(r.views) : '—'}</td>
-                      <td className="num">{vnInt(r.reactions)}</td>
-                      <td className="num">{vnInt(r.comments)}</td>
-                      <td className="num">{r.channel === 'facebook' || r.channel === 'tiktok' ? vnInt(r.shares) : '—'}</td>
-                      <td>{link ? <a className="src" href={link} target="_blank" rel="noreferrer">↗ Mở</a> : <span className="muted">—</span>}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {/* Từng bài trong tuần: user 26/8 chốt "chia ra 3 khung 3 nền tảng khác nhau chứa các
+              bài/video của từng nền tảng". Tách rowsAllChannels theo channel, render 3 section
+              riêng với heading + logo. Section không có bài vẫn hiện (empty state) để user
+              biết nền tảng đó chưa đăng bài trong tuần. Cột Share bỏ ở YouTube (Shorts không
+              có share count qua API); Facebook + TikTok giữ. */}
+          {(() => {
+            const rowsFB = rowsAllChannels.filter((r) => r.channel === 'facebook');
+            const rowsTT = rowsAllChannels.filter((r) => r.channel === 'tiktok');
+            const rowsYT = rowsAllChannels.filter((r) => r.channel === 'youtube');
+            const linkOf = (r: typeof rowsAllChannels[0]) =>
+              r.channel === 'tiktok' ? (r.shareUrl || r.url)
+              : r.channel === 'youtube' && r.videoId ? `https://youtube.com/shorts/${r.videoId}`
+              : r.url;
+            const sections: Array<{ channel: 'facebook' | 'tiktok' | 'youtube'; label: string; rows: typeof rowsAllChannels; showShare: boolean }> = [
+              { channel: 'facebook', label: 'Facebook', rows: rowsFB, showShare: true },
+              { channel: 'tiktok', label: 'TikTok', rows: rowsTT, showShare: true },
+              { channel: 'youtube', label: 'YouTube Shorts', rows: rowsYT, showShare: false },
+            ];
+            return sections.map((s) => (
+              <div key={s.channel} style={{ marginTop: 24 }}>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <PlatformLogo platform={s.channel} size={24} />
+                  <span>{s.label} · {s.rows.length} bài</span>
+                </h2>
+                {s.rows.length === 0 ? (
+                  <div className="empty" style={{ padding: '16px 8px' }}>
+                    <p className="sub" style={{ margin: 0 }}>Chưa có bài {s.label} nào trong tuần này.</p>
+                  </div>
+                ) : (
+                  <div className="tablewrap">
+                    <table className="datatable">
+                      <thead>
+                        <tr>
+                          <th>Tên bài</th>
+                          <th className="num">Lượt xem</th>
+                          <th className="num">React/Like</th>
+                          <th className="num">Comment</th>
+                          {s.showShare ? <th className="num">Share</th> : null}
+                          <th>Link</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {s.rows.map((r) => {
+                          const link = linkOf(r);
+                          return (
+                            <tr key={`${r.cid}-${r.channel}`}>
+                              <td className="cell-title"><b>{r.title}</b></td>
+                              <td className="num">{r.views ? fmt(r.views) : '—'}</td>
+                              <td className="num">{vnInt(r.reactions)}</td>
+                              <td className="num">{vnInt(r.comments)}</td>
+                              {s.showShare ? <td className="num">{vnInt(r.shares)}</td> : null}
+                              <td>{link ? <a className="src" href={link} target="_blank" rel="noreferrer">↗ Mở</a> : <span className="muted">—</span>}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ));
+          })()}
 
           <h2 style={{ marginTop: 24 }}>Theo loại bài — tuần này</h2>
           <div className="tablewrap">
