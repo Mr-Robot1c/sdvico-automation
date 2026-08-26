@@ -59,7 +59,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'LỜI THOẠI PHẢI CÓ CẢM XÚC như người kể chuyện cho bạn nghe (sếp góp ý 21/8: giọng đọc đều đều buồn ngủ): xen câu hỏi tu từ ("Bà con có thấy vậy không?"), câu cảm ngắn ("Đã lắm!", "Yên tâm hẳn!"), ngắt nhịp bằng dấu phẩy và câu ngắn 6 tới 12 chữ. Máy đọc lên xuống giọng THEO DẤU CÂU, nên dấu chấm hỏi, chấm than, dấu phẩy đặt đúng chỗ là giọng có hồn.',
     'CẢNH ĐẦU TIÊN PHẢI MỞ BẰNG LỜI CHÀO BẮT TAI THEO TREND GIỚI TRẺ (user 21/8), chọn hoặc biến tấu: "Hello anh em đi biển ơi!", "Hello các thuyền trưởng!", "Alo alo bà con ơi!", "Hello các con vợ ơi!", "Anh em ơi, nghe nè!" — rồi vào thẳng vấn đề. Cả video nói như TikToker trẻ kể chuyện cho anh em nghe: năng lượng cao, tự nhiên, có thể chêm "nha", "nè", "luôn á"; NHƯNG vẫn tôn trọng bà con, không chửi bậy, không lố tới mức mất uy tín thiết bị.',
     'PLAYBOOK 24/8 (bộ lọc vàng): CẢNH ĐẦU sau lời chào phải chứa 1 CÂU HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (thành quả lớn bị phá bởi nguyên nhân nhỏ) — ví dụ sau "Alo alo bà con ơi!" nói ngay "Trúng luồng cá mà phải quay vào bờ vì hết nước." Cảnh đầu = 2 câu: chào + hook. Bám 1 trong 4 CHỮ CẢM XÚC: NGHỀ (khoe kinh nghiệm) / TIỀN (con số túi tiền) / RỦI RO (cảnh báo sai lầm, mất chuyến) / TỰ HÀO (lộc biển, danh dự nghề). Bài phải chạm đúng 1 chữ, không sáo rỗng.',
-    'CẢNH 2 (đồng cảm): tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Không lan man.',
+    'HOOK NGHỊCH LÝ = CÂU KHẲNG ĐỊNH có 2 mảnh đối lập: THÀNH QUẢ LỚN + MẤT MÁT BẤT NGỜ. Ví dụ ĐÚNG: "Trúng luồng cá phải quay bờ vì cặn dầu.", "Đổ đầy dầu mà máy vẫn lịm giữa lộng.", "Dầu 38.000đ/lít đốt trôi vì kim phun bẩn." Ví dụ SAI (cấm): "Máy nổ có xót ruột không?", "Bà con có thấy vậy không?", "Anh em có gặp chưa?" — CÂU HỎI thăm/tu từ KHÔNG THAY THẾ được hook nghịch lý. Câu hỏi để dành cảnh cuối.',
+    'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển tiếc nuối, tàu nằm bờ). Không lan man.',
     'CẢNH GIỮA: lối thoát bằng LỢI ÍCH cụ thể (không liệt kê thông số kỹ thuật khô) → phần thưởng cụ thể (đỡ tốn bao nhiêu, đi được bao xa, chở thêm được gì) → tin cậy 1 câu ngắn (lắp tận bến, bảo hành).',
     'CẢNH CUỐI: 1 câu chốt ngắn về LỢI ÍCH/thông điệp sản phẩm (đã có luật ở trên), có thể là câu hỏi mở nhẹ cho bà con nghĩ tiếp. KHÔNG nhắc "gọi", "liên hệ", "hotline" — outro cố định đầu ký đã lo phần đó.',
     ...guardLines(`${content.title || ''} ${content.draft || ''} ${content.brief?.rotation_group || ''}`),
@@ -91,9 +92,13 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     ...(short
       ? [
           'ĐÂY LÀ VIDEO SHORTS GÂY CHÚ Ý (10-20 giây).',
-          'Bản dọc (vertical): 2 tới 3 cảnh, tổng lời thoại đọc khoảng 12 tới 18 giây.',
-          'Bản ngang (horizontal): 2 tới 3 cảnh, TỔNG LỜI THOẠI ĐỌC HẾT KHOẢNG 10-18 GIÂY (khoảng 30-50 từ tiếng Việt).',
-          'Lời thoại mỗi cảnh 4-6 giây (~10-16 từ). CÂU ĐẦU TIÊN phải là MÓC CÂU khiến bà con dừng tay: một câu hỏi trúng nỗi lo hoặc một sự thật bất ngờ.',
+          'Bản dọc (vertical): 3 cảnh (chào+hook / đồng cảm / lối thoát+chốt), tổng lời thoại đọc khoảng 12 tới 18 giây.',
+          'Bản ngang (horizontal): 3 cảnh (chào+hook / đồng cảm / lối thoát+chốt), TỔNG LỜI THOẠI ĐỌC HẾT KHOẢNG 12-18 GIÂY (khoảng 35-55 từ tiếng Việt).',
+          'CẤU TRÚC BẮT BUỘC (dù shorts vẫn phải đủ 3 nhịp, không được bỏ cảnh 2):',
+          '  - Cảnh 1 (4-5s): "[lời chào trend]. [HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ]." Ví dụ: "Alo bà con ơi! Đổ đầy dầu mà máy vẫn lịm giữa lộng."',
+          '  - Cảnh 2 (4-5s): ĐỒNG CẢM — nêu HẬU QUẢ TIẾC/UẤT cụ thể. Ví dụ: "Kim phun tắc, máy hỏng, cả chuyến biển đi đứt, xót đứt ruột." KHÔNG được nhảy thẳng sang lối thoát.',
+          '  - Cảnh 3 (4-6s): LỐI THOÁT + CHỐT LỢI ÍCH. Ví dụ: "May có SF-50 giữ dầu sạch từ đầu — yên tâm vươn khơi cả tháng."',
+          'CẤM cảnh 1 dùng CÂU HỎI thay hook (VD "xót ruột không?", "có thấy vậy không?") — hook PHẢI là câu khẳng định nghịch lý.',
         ]
       : [
           'Bản dọc (vertical): 4 tới 5 cảnh, tổng lời thoại đọc khoảng 55 tới 60 giây.',
