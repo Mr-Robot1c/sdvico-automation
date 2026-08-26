@@ -39,6 +39,7 @@ export default async function TongQuanSection() {
       .from('mkt_posts')
       .select('channel, published_at')
       .eq('status', 'published')
+      .is('deleted_at', null)
       .order('published_at', { ascending: false })
       .limit(1000),
     client
@@ -251,9 +252,9 @@ export default async function TongQuanSection() {
               : 'Chưa có bài nào. Máy tự đăng khi bấm Duyệt.'}
           </p>
           <div className="pf-stats">
+            <span className="pf-stat"><b>{fmt(fbPosts.count)}</b><span>Số bài viết</span></span>
             <span className="pf-stat"><b>{fmt(tReactions)}</b><span>Like</span></span>
             <span className="pf-stat"><b>{fmt(tComments)}</b><span>Comment</span></span>
-            <span className="pf-stat"><b>{fmt(tShares)}</b><span>Share</span></span>
             <span className="pf-stat"><b>{fmt(tViews)}</b><span>Lượt xem</span></span>
           </div>
           {followers ? <p className="pf-note">📣 {fmt(followers)} người theo dõi Page</p> : null}
@@ -275,7 +276,8 @@ export default async function TongQuanSection() {
                 ? `Token lỗi: ${yt.error || 'không rõ'}. Chế độ Testing hết hạn sau 7 ngày, lấy token mới theo runbook.`
                 : 'Chưa cấu hình 3 biến YOUTUBE_* trên Vercel.'}
           </p>
-          <div className="pf-stats three">
+          <div className="pf-stats">
+            <span className="pf-stat"><b>{fmt(ytPosts.count)}</b><span>Video đã đăng</span></span>
             <span className="pf-stat"><b>{fmt(yViews)}</b><span>Lượt xem</span></span>
             <span className="pf-stat"><b>{fmt(yLikes)}</b><span>Like</span></span>
             <span className="pf-stat"><b>{fmt(yComments)}</b><span>Comment</span></span>

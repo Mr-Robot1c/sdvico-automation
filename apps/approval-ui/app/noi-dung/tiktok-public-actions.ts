@@ -47,3 +47,30 @@ export async function undoMarkTikTokPublic(postId: string): Promise<void> {
   if (error) throw new Error('Bỏ đánh dấu lỗi: ' + error.message);
   revalidatePath('/noi-dung');
 }
+
+// Soft-delete: user vào app TikTok xoá video tay -> bấm nút để hệ thống ngừng đếm bài này ở
+// tile "Video đã đăng" trang Tổng quan. User 26/8 xoá 3/5 video, tile vẫn hiện 5. Chỉ set
+// deleted_at, không xoá thật -> có thể undo (nút ↺ trong chip).
+export async function markTikTokDeleted(postId: string): Promise<void> {
+  if (!postId) throw new Error('Thiếu postId.');
+  const client = getServerClient();
+  const { error } = await client.from('mkt_posts').update({ deleted_at: new Date().toISOString() }).eq('id', postId);
+  if (error) throw new Error('Đánh dấu đã xoá lỗi: ' + error.message);
+  try {
+    await client.from('run_log').insert({
+      task: 'mkt.tiktok_marked_deleted',
+      actor: 'user',
+      status: 'ok',
+      detail: { postId }
+    });
+  } catch { /* bỏ qua */ }
+  revalidatePath('/noi-dung');
+}
+
+export async function undoMarkTikTokDeleted(postId: string): Promise<void> {
+  if (!postId) throw new Error('Thiếu postId.');
+  const client = getServerClient();
+  const { error } = await client.from('mkt_posts').update({ deleted_at: null }).eq('id', postId);
+  if (error) throw new Error('Bỏ đánh dấu đã xoá lỗi: ' + error.message);
+  revalidatePath('/noi-dung');
+}
