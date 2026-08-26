@@ -1,13 +1,14 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { isEmergencyStopped, getPostCount, isQuotaDisabled } from '../../lib/safety';
-import { editDraft, retryFacebookPublish, retryTiktokPublish } from '../actions';
+import { editDraft, retryFacebookPublish } from '../actions';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import ShareGroups from './share-groups';
 import { channelsLabel, riskMeta, formatRelative, formatDateTimeVN } from '../labels';
 import PlatformLogo, { type PlatformKey } from './platform-logo';
 import TikTokPrivateChip from './tiktok-private-chip';
+import ExportTiktokButton from './export-tiktok-button';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -113,34 +114,23 @@ export default async function BangSection() {
   const postsByContent = new Map<string, { id: string; channel: string; url: string; at: string; madePublicAt: string | null }[]>();
   const fbFailed = new Set<string>(); // bài có lượt đăng Facebook thất bại, chưa có bản FB published
   const fbRetrying = new Set<string>(); // đang có lượt đăng lại chạy nền
-  const ttFailed = new Set<string>(); // tương tự cho TikTok (26/8 bug unaudited_client_can_only_post_to_private_accounts)
-  const ttRetrying = new Set<string>();
   const metricsByContent = new Map<string, M>();
   const ytByContent = new Map<string, { views: number; reactions: number; comments: number }>();
   if (cids.length) {
-    const [{ data: cs }, { data: ps }, { data: ms }, { data: fails }, { data: ttFails }] = await Promise.all([
+    const [{ data: cs }, { data: ps }, { data: ms }, { data: fails }] = await Promise.all([
       client.from('mkt_content').select('id, title, draft, brief').in('id', cids),
       client.from('mkt_posts').select('id, content_id, channel, external_url, published_at, made_public_at').eq('status', 'published').in('content_id', cids),
       client.from('mkt_metrics').select('source, entity_ref, metrics, created_at').in('source', ['facebook', 'youtube']).in('entity_ref', cids).order('created_at', { ascending: false }).limit(700),
       // Lượt đăng FACEBOOK THẤT BẠI (23/8: token Page bị vô hiệu) -> thẻ hiện nút "Đăng lại Facebook".
-      client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'facebook').in('content_id', cids),
-      // Lượt đăng TIKTOK THẤT BẠI (26/8: bug unaudited_client_can_only_post_to_private_accounts) -> nút "Đăng lại TikTok".
-      client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'tiktok').in('content_id', cids)
+      client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'facebook').in('content_id', cids)
     ]);
     for (const f of fails || []) { const cid = (f as any).content_id as string | null; if (cid) fbFailed.add(cid); }
-    for (const f of ttFails || []) { const cid = (f as any).content_id as string | null; if (cid) ttFailed.add(cid); }
-    // Lượt "Đăng lại" đang chạy nền (bấm trong 3 phút qua, chưa có bản published):
+    // Lượt "Đăng lại Facebook" đang chạy nền (bấm trong 3 phút qua, chưa có bản FB published):
     // hiện "Đang đăng lại…" thay nút để người dùng biết máy đang làm, khỏi bấm thêm.
-    if (fbFailed.size || ttFailed.size) {
+    if (fbFailed.size) {
       const since = new Date(Date.now() - 3 * 60 * 1000).toISOString();
-      const { data: rl } = await client.from('run_log').select('task, detail').in('task', ['mkt.publish_facebook_retry', 'mkt.publish_tiktok_retry']).gte('created_at', since).order('created_at', { ascending: false }).limit(80);
-      for (const r of rl || []) {
-        const d = (r as any).detail || {};
-        const t = (r as any).task as string;
-        if (d.phase !== 'started' || !d.contentId) continue;
-        if (t === 'mkt.publish_facebook_retry' && fbFailed.has(d.contentId)) fbRetrying.add(String(d.contentId));
-        if (t === 'mkt.publish_tiktok_retry' && ttFailed.has(d.contentId)) ttRetrying.add(String(d.contentId));
-      }
+      const { data: rl } = await client.from('run_log').select('detail').eq('task', 'mkt.publish_facebook_retry').gte('created_at', since).order('created_at', { ascending: false }).limit(50);
+      for (const r of rl || []) { const d = (r as any).detail || {}; if (d.phase === 'started' && d.contentId && fbFailed.has(d.contentId)) fbRetrying.add(String(d.contentId)); }
     }
     for (const c of cs || []) contents.set((c as any).id, { title: (c as any).title || '', draft: String((c as any).draft || ''), brief: (c as any).brief || {} });
     for (const p of ps || []) {
@@ -167,12 +157,18 @@ export default async function BangSection() {
     }
   }
 
-  // Ảnh/video gắn trong payload để hiện thumb + xem trước khi duyệt.
+  // Ảnh/video gắn trong payload để hiện thumb + xem trước khi duyệt. Thêm video_v (bản dọc
+   // 9:16) từ brief.assets của mkt_content cho nút "📥 Xuất TikTok" ở cột Đã đăng — user 26/8
+   // chốt bỏ API TikTok, chuyển sang xuất tay: cần videoUrl bản dọc để tải + copy caption.
   const assetIds = new Set<string>();
   for (const it of byContent.values()) {
     const a = it.payload?.assets || {};
     if (typeof a.image === 'string') assetIds.add(a.image);
     if (typeof a.video === 'string') assetIds.add(a.video);
+    // video_v ở brief của mkt_content (pipeline build video gắn vào), không phải payload.
+    const cnt = contents.get(it.cid);
+    const bAssets = cnt?.brief?.assets || {};
+    if (typeof bAssets.video_v === 'string') assetIds.add(bAssets.video_v);
   }
   const assetUrl = new Map<string, string>();
   if (assetIds.size) {
@@ -386,17 +382,22 @@ export default async function BangSection() {
                           </form>
                         )
                       ) : null}
-                      {!posts.some((x) => x.channel === 'tiktok') && ttFailed.has(it.cid) ? (
-                        ttRetrying.has(it.cid) ? (
-                          <span className="badge tone-demo" title="Máy đang đăng lại lên TikTok (chạy nền 30 giây tới 2 phút). Thẻ tự cập nhật khi xong.">⏳ Đang đăng lại TikTok…</span>
-                        ) : (
-                          <form action={retryTiktokPublish} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                            <input type="hidden" name="content_id" value={it.cid} />
-                            <span className="badge tone-no" title="Lượt đăng TikTok thất bại (26/8: app SDVICO không được TikTok audit, code cũ chọn public bị reject). Đã fix ép SELF_ONLY — bấm đăng lại sẽ lên riêng tư OK.">TikTok chưa lên</span>
-                            <button className="btn ghost sm" type="submit" title="Đăng lại bài này lên TikTok ở chế độ riêng tư (đã duyệt, không đăng lại kênh khác). Sau đó bạn vào app TikTok đổi Công khai tay.">↻ Đăng lại TikTok</button>
-                          </form>
-                        )
-                      ) : null}
+                      {/* Nút "📥 Xuất TikTok" — user 26/8 chốt bỏ API TikTok (unaudited app
+                          không post được cho account public). Bài có video_v -> hiện nút cho
+                          NV tải video + copy caption + mở tab TikTok Upload đăng tay. */}
+                      {(() => {
+                        const cnt = contents.get(it.cid);
+                        const videoVId = cnt?.brief?.assets?.video_v as string | undefined;
+                        const videoVUrl = videoVId ? assetUrl.get(videoVId) : null;
+                        if (!videoVUrl) return null;
+                        return (
+                          <ExportTiktokButton
+                            videoUrl={videoVUrl}
+                            caption={cnt?.draft || cnt?.title || ''}
+                            contentTitle={cnt?.title || 'sdvico'}
+                          />
+                        );
+                      })()}
                     </div>
                   );
                 }

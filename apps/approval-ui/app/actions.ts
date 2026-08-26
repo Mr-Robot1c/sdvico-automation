@@ -615,7 +615,15 @@ export async function decideForm(formData: FormData) {
             }
           }
           if (ch === 'facebook') jobs.push(publishContentToFacebook(bgClient, contentId, scheduledAt));
-          if (ch === 'tiktok') jobs.push(publishContentToTikTok(bgClient, contentId, tiktokPrivacy));
+          // TikTok API bỏ (user 26/8): app SDVICO không được TikTok audit ("internal company
+          // use" — Google/TikTok reject) → chỉ post được vào tài khoản PRIVATE, nhưng account
+          // SDVICO là PUBLIC nên mọi lần API đều trả `unaudited_client_can_only_post_to_private_accounts`.
+          // Thay bằng flow XUẤT tay: cột "Đã đăng" có nút "📥 Xuất TikTok" tải video vertical
+          // + copy caption + mở tiktok.com/upload để NV cầm điện thoại upload tay. Giữ hàm
+          // publishContentToTikTok cho tương lai nếu bằng cách nào đó audit đậu.
+          if (ch === 'tiktok') {
+            try { await bgClient.from('run_log').insert({ task: 'mkt.publish_tiktok', actor: 'decideForm', status: 'skipped', detail: { contentId, reason: 'tiktok-api-disabled: dung nut Xuat TikTok o /noi-dung' } }); } catch { /* bỏ qua */ }
+          }
           if (ch === 'youtube') jobs.push(publishContentToYoutube(bgClient, contentId));
         }
         await Promise.allSettled(jobs);
