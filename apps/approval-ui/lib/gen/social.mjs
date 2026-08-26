@@ -1,11 +1,12 @@
 // Sinh text bài mạng xã hội cho một sản phẩm: thân bài có emoji + khối hashtag.
 // Giọng brand-voice, hàng rào product-boundary (không bịa thông số, không nhận vơ phần mềm đối tác).
-import { assessDraft } from './compliance.mjs';
+import { assessDraft, scanPlaybook, countWords, firstBodyLine } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
 import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS } from './products.mjs';
 import { insightBrief } from './insights.mjs';
 import { logTokenUsage } from './token-log.mjs';
+import { sampleHooks } from './hook-library.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -148,11 +149,28 @@ export async function generateSocialPost({
   let body = '';
   let headline = '';
   let violations = [];
-  // Sinh -> quét SỰ THẬT NGHỀ -> dính thì sinh lại 1 lần với lệnh cấm rõ từng cụm (19/8: bài SEA-40
-  // từng bịa "bớt chở nước, nhẹ tàu, tiết kiệm dầu", cấp trên phản hồi sai nghề).
+  // Playbook 26/8 (item 3 checklist 7 điểm): kiểm HOOK <=15 chữ + có con số + CTA hỏi. Retry
+  // 1 lần với lệnh cụ thể nếu fail. Kết hợp với retry cũ SỰ THẬT NGHỀ (19/8): mỗi lần sinh
+  // vừa quét playbook vừa quét sự thật nghề, dính cái nào thì lệnh sửa cái đó.
+  let playbookLast = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const extra = !violations.length ? '' :
-      `\n\nLẦN TRƯỚC VIẾT SAI NGHỀ, phải bỏ hẳn các ý: ${violations.map((v) => `"${v.phrase}"`).join(', ')}. ${violations[0].why}`;
+    let extra = '';
+    if (violations.length) {
+      extra += `\n\nLẦN TRƯỚC VIẾT SAI NGHỀ, phải bỏ hẳn các ý: ${violations.map((v) => `"${v.phrase}"`).join(', ')}. ${violations[0].why}`;
+    }
+    if (playbookLast?.violations?.length) {
+      const errs = [];
+      if (playbookLast.violations.includes(`hook_too_long_${playbookLast.hookLen}w`))
+        errs.push(`Hook câu đầu body LẦN TRƯỚC ${playbookLast.hookLen} chữ - PHẢI viết lại ≤15 chữ, tự đếm trước khi trả. Hook lần trước: "${playbookLast.hook}"`);
+      if (playbookLast.violations.includes('no_number'))
+        errs.push('Bài LẦN TRƯỚC thiếu con số cụ thể - PHẢI có ít nhất 1 con số (đồng, lít, khối, hải lý, ngày, năm, mét, %). Đừng chỉ nói chung chung "tiết kiệm nhiều".');
+      if (playbookLast.violations.includes('no_question_cta'))
+        errs.push('CTA LẦN TRƯỚC thiếu câu hỏi - PHẢI kết bằng 1 câu hỏi mở (dấu ?) kéo bà con comment.');
+      extra += '\n\nLẦN TRƯỚC LỖI PLAYBOOK:\n' + errs.map((e) => '- ' + e).join('\n');
+      // Kho hook mẫu playbook PL1 - chỉ chèn KHI retry (lần 2) để tiết kiệm token.
+      const hooks = sampleHooks(3);
+      extra += '\n\n3 HOOK MẪU CHUẨN CẤU TRÚC (chỉ tham khảo cơ chế, KHÔNG copy nguyên chữ):\n' + hooks.map((h) => '- ' + h).join('\n');
+    }
     const res = await genWithRetry(ai, {
       model: MKT_MODEL,
       contents: user + extra,
@@ -164,7 +182,8 @@ export async function generateSocialPost({
     headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
     if (!body) throw new Error('Gemini trả rỗng.');
     violations = guardViolations(`${headline}\n${body}`, topic);
-    if (!violations.length) break;
+    playbookLast = scanPlaybook(body, { kind: 'sales' });
+    if (!violations.length && !playbookLast.violations.length) break;
   }
 
   const tags = hashtagBlock(productGroup);
@@ -173,6 +192,7 @@ export async function generateSocialPost({
   const assessment = assessDraft(text, {
     knownFactValues: knownFactValues(facts),
     testFactValues: testFactValues(facts),
+    kind: 'sales',
   });
   // Vẫn dính sau 2 lần: KHÔNG coi là sạch — gắn cờ "Sai nghề" (amber) để người duyệt thấy và sửa.
   if (violations.length) {
@@ -252,22 +272,42 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
     '{"headline": "tiêu đề ngắn 6 tới 12 từ, cuốn, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag), theo đúng cấu trúc đã dặn"}',
   ].join('\n');
 
-  const res = await genWithRetry(ai, {
-    model: MKT_MODEL,
-    contents: user,
-    config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
-  });
-  logTokenUsage(client, 'creator_content', MKT_MODEL, res?.usageMetadata);
-  const parsed = parseJson(res.text || '');
-  const body = String(parsed.body || '').trim();
-  const headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
-  if (!body) throw new Error('Gemini trả rỗng.');
+  // Playbook 26/8: bài content phải kết bằng câu hỏi mở (đã dặn trong system prompt).
+  // Bài viral thêm điều kiện hook <=15 chữ. Retry 1 lần nếu Creator quên.
+  const playbookKind = (type === 'viral' || type === 'seeding') ? 'viral' : 'content';
+  let body = '';
+  let headline = '';
+  let playbookLast = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let extra = '';
+    if (playbookLast?.violations?.length) {
+      const errs = [];
+      if (playbookLast.violations.includes(`hook_too_long_${playbookLast.hookLen}w`))
+        errs.push(`Hook câu đầu body LẦN TRƯỚC ${playbookLast.hookLen} chữ - PHẢI viết lại ≤15 chữ. Hook lần trước: "${playbookLast.hook}"`);
+      if (playbookLast.violations.includes('no_question_cta'))
+        errs.push('Bài LẦN TRƯỚC thiếu câu hỏi cuối - PHẢI kết bằng 1 câu hỏi mở (dấu ?) mời bà con comment.');
+      extra = '\n\nLẦN TRƯỚC LỖI PLAYBOOK:\n' + errs.map((e) => '- ' + e).join('\n');
+    }
+    const res = await genWithRetry(ai, {
+      model: MKT_MODEL,
+      contents: user + extra,
+      config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
+    });
+    logTokenUsage(client, 'creator_content', MKT_MODEL, res?.usageMetadata);
+    const parsed = parseJson(res.text || '');
+    body = String(parsed.body || '').trim();
+    headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
+    if (!body) throw new Error('Gemini trả rỗng.');
+    playbookLast = scanPlaybook(body, { kind: playbookKind });
+    if (!playbookLast.violations.length) break;
+  }
 
   const tags = hashtagBlock(null); // chỉ hashtag mặc định, không thẻ sản phẩm
   const text = `${body}\n\n${tags}`;
   const assessment = assessDraft(text, {
     knownFactValues: knownFactValues(facts),
     testFactValues: testFactValues(facts),
+    kind: playbookKind,
   });
   return { text, body, headline, topic: topicText, contentType: type, hashtags: tags, assessment };
 }
