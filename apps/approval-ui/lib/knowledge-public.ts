@@ -134,23 +134,23 @@ async function searchOneTopic(topic: string, client: Client): Promise<Finding[]>
 // Học tri thức public: chạy tất cả chủ đề, dedupe theo source_url, chèn vào DB.
 // Idempotent trong khoảng thời gian gần đây theo source_url (SELECT trước, insert sau).
 //
-// GUARD 1 LẦN/NGÀY VN (user 26/8: "Data 2 mỗi ngày sáng 7h chạy"). Cron mkt-metrics-pull
-// chạy mỗi giờ → nếu không guard sẽ chạy 24 lần/ngày, đốt token. Check run_log task
-// 'mkt.knowledge_public_deep' đã có dòng nào từ 00h VN chưa; có = skip. Ghi log sau khi chạy
-// thành công (chưa scan 100% nguồn nhưng chấp nhận best-effort — RSS hằng ngày đã phủ nền).
+// GUARD 2 NGÀY/LẦN (user 26/8: "điều chỉnh 2 ngày 1 lần quét đi" — cân bằng độ tươi tin
+// ngành cá vs chi phí token). Cron mkt-metrics-pull chạy mỗi giờ trong window 7-10h VN →
+// mỗi sáng đều gọi hàm này, guard chặn nếu lần cuối < 48h. Ghi log sau khi chạy OK để lần
+// sau biết. Kết quả: chạy vào sáng ngày lẻ (VD hôm nay 7h → next chạy sau 48h vào 7h ngày kia).
 export async function learnPublicKnowledge(
   client: Client
 ): Promise<{ topics: number; found: number; inserted: number; errors: string[]; skipped?: boolean }> {
-  // Guard: đã chạy hôm nay VN chưa?
-  const vnTodayIso = new Date(new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10) + 'T00:00:00+07:00').toISOString();
-  const { data: ranToday } = await client
+  // Guard: đã chạy trong 48h qua chưa?
+  const gate = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+  const { data: ranRecent } = await client
     .from('run_log')
     .select('id')
     .eq('task', 'mkt.knowledge_public_deep')
     .eq('status', 'ok')
-    .gte('created_at', vnTodayIso)
+    .gte('created_at', gate)
     .limit(1);
-  if (ranToday && ranToday.length) {
+  if (ranRecent && ranRecent.length) {
     return { topics: 0, found: 0, inserted: 0, errors: [], skipped: true };
   }
 
