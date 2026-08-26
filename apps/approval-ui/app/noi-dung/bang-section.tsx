@@ -42,7 +42,7 @@ export default async function BangSection() {
   const client = getServerClient();
   const limit = Number(process.env.MKT_MAX_POSTS_PER_DAY) || 3;
 
-  const [stopped, quotaOff, fbCount, ttCount, queueRes, alertRes] = await Promise.all([
+  const [stopped, quotaOff, fbCount, ttCount, queueRes, alertRes, planRes] = await Promise.all([
     isEmergencyStopped(client),
     isQuotaDisabled(client),
     getPostCount(client, 'facebook'),
@@ -57,8 +57,39 @@ export default async function BangSection() {
       .from('approval_queue')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending')
-      .neq('kind', 'mkt_publish_content')
+      .neq('kind', 'mkt_publish_content'),
+    // Plan live (có daily_schedule 7 ngày) để lọc groups chia sẻ theo lịch ngày (user 26/8:
+    // "chia sẻ vào group này có thể nhìn vào bảng kế hoạch ngày đó để hiển thị chỉ đăng vào
+    // group đó không?"). Không có plan → ShareGroups hiện tất cả groups như trước (fallback).
+    client
+      .from('mkt_plans')
+      .select('data')
+      .eq('data->>origin', 'live')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  // Extract groups theo ngày cho từng bài đã đăng. Key = date YYYY-MM-DD, value = mảng tên
+  // group. Bài đăng ngày nào -> lấy groups của ngày đó từ daily_schedule; bài đăng ngoài
+  // tuần plan -> mảng rỗng, ShareGroups tự hiện tất cả.
+  const planData = planRes.data as any;
+  const scheduleByDate = new Map<string, string[]>();
+  if (planData?.data?.daily_schedule && Array.isArray(planData.data.daily_schedule)) {
+    for (const d of planData.data.daily_schedule) {
+      if (d?.date && Array.isArray(d?.groups)) {
+        scheduleByDate.set(String(d.date), d.groups.map(String));
+      }
+    }
+  }
+  const groupsForDate = (isoDatetime: string): string[] => {
+    if (!isoDatetime) return [];
+    // Convert ISO datetime UTC -> YYYY-MM-DD VN (UTC+7)
+    const t = new Date(isoDatetime).getTime();
+    if (!Number.isFinite(t)) return [];
+    const vnDate = new Date(t + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    return scheduleByDate.get(vnDate) || [];
+  };
 
   const queue = (queueRes.data || []) as any[];
   const otherPending = alertRes.count || 0;
@@ -332,7 +363,7 @@ export default async function BangSection() {
                           ) : null}
                         </span>
                       ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
-                      {fbPost ? <span><ShareGroups postUrl={fbPost.url} /></span> : null}
+                      {fbPost ? <span><ShareGroups postUrl={fbPost.url} planGroupsToday={groupsForDate(lastAt)} /></span> : null}
                       {!posts.some((x) => x.channel === 'facebook') && fbFailed.has(it.cid) ? (
                         fbRetrying.has(it.cid) ? (
                           <span className="badge tone-demo" title="Máy đang đăng lại lên Facebook (upload + chờ FB xử lý video, 1 tới 2 phút). Thẻ tự cập nhật khi xong.">⏳ Đang đăng lại Facebook…</span>

@@ -43,11 +43,35 @@ function normalizeGroupUrl(input: string): { id: string; url: string } | null {
   return { id, url: `https://www.facebook.com/groups/${id}` };
 }
 
-export default function ShareGroups({ postUrl }: { postUrl: string }) {
+// Chuẩn hoá tên group để so khớp fuzzy với plan groups (user gõ tên trong /ke-hoach có thể
+// khác cách viết trong ShareGroups: hoa/thường, dấu, punctuation). Lowercase + bỏ dấu câu.
+function norm(s: string): string {
+  return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+function matchesPlan(groupLabel: string, planNames: string[]): boolean {
+  if (!planNames.length) return true; // không có plan -> hiện tất cả
+  const gl = norm(groupLabel);
+  if (!gl) return false;
+  return planNames.some((pn) => {
+    const pnn = norm(pn);
+    return pnn && (gl.includes(pnn) || pnn.includes(gl));
+  });
+}
+
+export default function ShareGroups({
+  postUrl,
+  planGroupsToday = [],
+}: {
+  postUrl: string;
+  planGroupsToday?: string[];
+}) {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<SavedGroup[]>([]);
   const [newG, setNewG] = useState('');
   const [copied, setCopied] = useState(false);
+  // User 26/8: bài đăng ngày nào -> chỉ hiện groups đã lên plan ngày đó. Toggle "Xem tất cả"
+  // để override khi user muốn chia sẻ vào group ngoài plan (case ngoại lệ).
+  const [showAll, setShowAll] = useState(false);
   const popRef = useRef<HTMLDivElement | null>(null);
   // Ref giữ bản groups MỚI NHẤT cho các chỗ lưu chạy ngoài vòng render (timer, đóng popover)
   // — closure cũ từng lưu thiếu ký tự cuối khi gõ nhanh rồi bấm ra ngoài.
@@ -160,14 +184,52 @@ export default function ShareGroups({ postUrl }: { postUrl: string }) {
               {copied ? '✓ Đã copy' : 'Copy'}
             </button>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 6 }}>Group của bạn:</div>
-          {groups.length === 0 ? (
-            <p className="sub" style={{ margin: '0 0 8px' }}>Chưa có group nào. Thêm bên dưới.</p>
-          ) : (
-            <>
-            <p className="sub" style={{ margin: '0 0 6px', fontSize: 11 }}>💡 Bấm vào ô tên để đặt lại (Meta chặn API lấy tên group tự động).</p>
-            <ul style={{ listStyle: 'none', margin: '0 0 8px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {groups.map((g) => (
+          {(() => {
+            // Filter theo plan groups của ngày bài đăng: chỉ hiện groups có label khớp plan
+            // (fuzzy match); không có plan hoặc user bật "Xem tất cả" -> hiện hết.
+            const hasPlan = planGroupsToday.length > 0;
+            const filtered = hasPlan && !showAll
+              ? groups.filter((g) => matchesPlan(g.label, planGroupsToday))
+              : groups;
+            const hidden = groups.length - filtered.length;
+            return (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                    {hasPlan && !showAll
+                      ? <>📋 <b>Groups theo kế hoạch hôm nay:</b></>
+                      : <>Group của bạn:</>}
+                  </div>
+                  {hasPlan ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAll(!showAll)}
+                      className="btn ghost sm"
+                      style={{ padding: '2px 8px', fontSize: 11 }}
+                      title={showAll ? 'Chỉ hiện groups đã lên plan hôm nay' : 'Hiện tất cả groups (kể cả ngoài plan)'}
+                    >
+                      {showAll ? `📋 Theo plan (${groups.length - hidden})` : `👁 Xem tất cả (${groups.length})`}
+                    </button>
+                  ) : null}
+                </div>
+                {hasPlan && !showAll && hidden > 0 ? (
+                  <p className="sub" style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--ink-2)' }}>
+                    Ẩn {hidden} group ngoài plan hôm nay. Plan có: <i>{planGroupsToday.join(', ')}</i>
+                  </p>
+                ) : null}
+                {filtered.length === 0 ? (
+                  hasPlan && groups.length > 0 ? (
+                    <p className="sub" style={{ margin: '0 0 8px' }}>
+                      Không có group nào trong plan hôm nay khớp với danh sách bên dưới. Bấm "Xem tất cả" để hiện tất cả groups.
+                    </p>
+                  ) : (
+                    <p className="sub" style={{ margin: '0 0 8px' }}>Chưa có group nào. Thêm bên dưới.</p>
+                  )
+                ) : (
+                  <>
+                    <p className="sub" style={{ margin: '0 0 6px', fontSize: 11 }}>💡 Bấm vào ô tên để đặt lại (Meta chặn API lấy tên group tự động).</p>
+                    <ul style={{ listStyle: 'none', margin: '0 0 8px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {filtered.map((g) => (
                 <li key={g.id} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <input
                     value={g.label}
@@ -182,9 +244,12 @@ Bấm để đặt tên gợi nhớ`}
                   <button type="button" className="btn no sm" onClick={() => removeGroup(g.id)} aria-label="Xoá" title="Xoá khỏi danh sách">✕</button>
                 </li>
               ))}
-            </ul>
-            </>
-          )}
+                    </ul>
+                  </>
+                )}
+              </>
+            );
+          })()}
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               placeholder="Dán link group hoặc ID (vd ngudan.vungtau)"
