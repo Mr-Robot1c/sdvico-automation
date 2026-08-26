@@ -133,9 +133,27 @@ async function searchOneTopic(topic: string, client: Client): Promise<Finding[]>
 
 // Học tri thức public: chạy tất cả chủ đề, dedupe theo source_url, chèn vào DB.
 // Idempotent trong khoảng thời gian gần đây theo source_url (SELECT trước, insert sau).
+//
+// GUARD 1 LẦN/NGÀY VN (user 26/8: "Data 2 mỗi ngày sáng 7h chạy"). Cron mkt-metrics-pull
+// chạy mỗi giờ → nếu không guard sẽ chạy 24 lần/ngày, đốt token. Check run_log task
+// 'mkt.knowledge_public_deep' đã có dòng nào từ 00h VN chưa; có = skip. Ghi log sau khi chạy
+// thành công (chưa scan 100% nguồn nhưng chấp nhận best-effort — RSS hằng ngày đã phủ nền).
 export async function learnPublicKnowledge(
   client: Client
-): Promise<{ topics: number; found: number; inserted: number; errors: string[] }> {
+): Promise<{ topics: number; found: number; inserted: number; errors: string[]; skipped?: boolean }> {
+  // Guard: đã chạy hôm nay VN chưa?
+  const vnTodayIso = new Date(new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10) + 'T00:00:00+07:00').toISOString();
+  const { data: ranToday } = await client
+    .from('run_log')
+    .select('id')
+    .eq('task', 'mkt.knowledge_public_deep')
+    .eq('status', 'ok')
+    .gte('created_at', vnTodayIso)
+    .limit(1);
+  if (ranToday && ranToday.length) {
+    return { topics: 0, found: 0, inserted: 0, errors: [], skipped: true };
+  }
+
   const errors: string[] = [];
   const all: Finding[] = [];
 
@@ -167,6 +185,16 @@ export async function learnPublicKnowledge(
     }
     inserted += 1;
   }
+
+  // Ghi log để lần chạy sau cùng ngày biết đã chạy (guard trên đầu hàm dựa vào log này).
+  try {
+    await client.from('run_log').insert({
+      task: 'mkt.knowledge_public_deep',
+      actor: 'cron',
+      status: 'ok',
+      detail: { topics: SEARCH_TOPICS.length, found: all.length, inserted, errors: errors.length ? errors.slice(0, 5) : undefined },
+    });
+  } catch { /* bỏ qua lỗi ghi log */ }
 
   return { topics: SEARCH_TOPICS.length, found: all.length, inserted, errors };
 }
