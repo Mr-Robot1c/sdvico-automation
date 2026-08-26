@@ -156,9 +156,10 @@ export default async function BangSection() {
   // Nhãn kênh chuẩn (thay emoji thô); logo brthật vẽ bằng PlatformLogo.
   const CH_LABEL: Record<string, string> = { facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok', zalo: 'Zalo', website: 'Website' };
   const isPlat = (c: string): c is PlatformKey => c === 'facebook' || c === 'youtube' || c === 'tiktok' || c === 'zalo';
-  // Username TikTok công ty để nút "Mở TikTok" trên chip riêng tư mở đúng profile. Rỗng thì
-  // ẩn nút, người dùng tự mở app TikTok.
-  const tiktokUsername = (process.env.NEXT_PUBLIC_TIKTOK_USERNAME || '').trim() || null;
+  // Username TikTok công ty để nút "Mở TikTok" trên chip riêng tư mở đúng profile
+  // (https://www.tiktok.com/@sdvico_tbtc — user confirm 26/8). Hardcode fallback vì fact
+  // tĩnh của SDVICO; env NEXT_PUBLIC_TIKTOK_USERNAME override nếu sau này đổi.
+  const tiktokUsername = (process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim() || null;
   const PUB_CAP = 12;
   const REJ_CAP = 8;
 
