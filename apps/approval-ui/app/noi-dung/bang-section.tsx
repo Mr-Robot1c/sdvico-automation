@@ -323,7 +323,7 @@ export default async function BangSection() {
                         {it.cid && brief.video_requested !== true && p.post_kind !== 'content' ? (
                           <form action={requestVideoForContent} style={{ display: 'inline' }}>
                             <input type="hidden" name="content_id" value={it.cid} />
-                            <button type="submit" className="btn" title="Yeu cau day chuyen video AI dung bai nay (FB 16:9 + TikTok doc). Mat 8-15 phut, ra ban rieng vao Hang doi duyet.">
+                            <button type="submit" className="btn ghost sm" title="Yeu cau day chuyen video AI dung bai nay (FB 16:9 + TikTok doc). Mat 8-15 phut, ra ban rieng vao Hang doi duyet.">
                               🎬 Làm video
                             </button>
                           </form>
