@@ -91,21 +91,23 @@ export async function postVideoToTikTok(
     steps.creatorInfo = ciErr ? { error: ci.error } : { privacy_options: ci?.data?.privacy_level_options };
     if (!ciRes.ok || ciErr) return { ok: false, steps, error: 'creator_info: ' + (ciErr || `HTTP ${ciRes.status}`) };
     const options: string[] = ci?.data?.privacy_level_options || [];
-    // Ưu tiên PUBLIC nếu TikTok cho phép. TikTok CHỈ trả 'PUBLIC_TO_EVERYONE' trong options khi app
-    // ĐÃ QUA AUDIT — chưa audit thì options chỉ có 'SELF_ONLY' (riêng tư), không ép public được bằng
-    // code. env TIKTOK_PRIVACY: 'public'|'auto' = lấy public khi có; 'self' = luôn riêng tư (mặc định
-    // auto -> sau khi audit đậu là tự động đăng public, không phải sửa code).
-    // Người duyệt chọn mức riêng tư ở màn composer (opts.privacy) -> ưu tiên NẾU TikTok cho phép mức
-    // đó (tôn trọng creator_info; chọn mức TikTok không trả về là rớt audit). Không chọn thì theo
-    // env TIKTOK_PRIVACY (auto = public khi có, mặc định).
-    const pref = (process.env.TIKTOK_PRIVACY || 'auto').toLowerCase();
-    const wantPublic = pref === 'public' || pref === 'auto';
+    // Chọn privacy — QUY TẮC (26/8, sau khi phát hiện bug fail hàng loạt từ 25/8):
+    // TikTok trả `privacy_level_options` theo TÀI KHOẢN (public account → include
+    // 'PUBLIC_TO_EVERYONE'), KHÔNG theo trạng thái audit của app. Nếu app CHƯA AUDIT mà
+    // post với 'PUBLIC_TO_EVERYONE', TikTok reject với code `unaudited_client_can_only_post_to_private_accounts`.
+    // App SDVICO không được TikTok audit ("internal company use" — Google/TikTok reject),
+    // nên MẶC ĐỊNH ép SELF_ONLY (riêng tư) bất kể options trả gì. Sau khi lên, user vào
+    // app TikTok đổi Công khai tay theo flow đã build ([[tiktok-private-chip.tsx]]).
+    // Env `TIKTOK_ALLOW_PUBLIC=true` bật lại chọn PUBLIC — CHỈ khi SDVICO thật sự qua
+    // audit (unlikely trong tương lai gần).
+    const allowPublic = (process.env.TIKTOK_ALLOW_PUBLIC || '').toLowerCase() === 'true';
     const picked = opts.privacy && options.includes(opts.privacy) ? opts.privacy : null;
     const privacy = picked
-      || (wantPublic && options.includes('PUBLIC_TO_EVERYONE') ? 'PUBLIC_TO_EVERYONE' : null)
+      || (allowPublic && options.includes('PUBLIC_TO_EVERYONE') ? 'PUBLIC_TO_EVERYONE' : null)
       || (options.includes('SELF_ONLY') ? 'SELF_ONLY' : options[0] || 'SELF_ONLY');
     steps.privacyChosen = privacy;
     steps.privacyRequested = opts.privacy || null;
+    steps.privacyAllowPublicEnv = allowPublic;
 
     // 2. Tải video về (từ Supabase). Chuẩn hóa bằng ffmpeg (nướng chiều xoay + H.264/AAC) để TikTok
     //    không hiển thị nghiêng 90 độ; lỗi/thiếu ffmpeg thì dùng file gốc, KHÔNG chặn đăng.

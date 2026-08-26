@@ -876,6 +876,48 @@ export async function retryFacebookPublish(formData: FormData): Promise<void> {
   revalidatePath('/do-luong');
 }
 
+// Đăng LẠI TikTok cho bài đã có lượt post fail (VD 26/8: fix privacy SELF_ONLY sau bug
+// unaudited_client_can_only_post_to_private_accounts). Copy pattern retryFacebookPublish.
+// KHÔNG đăng lại nếu đã có bản published — chống trùng.
+export async function retryTiktokPublish(formData: FormData): Promise<void> {
+  const contentId = String(formData.get('content_id') || '').trim();
+  if (!contentId) return;
+  const client = getServerClient();
+  const log = async (status: 'ok' | 'error', msg: string, extra: any = {}) => {
+    try { await client.from('run_log').insert({ task: 'mkt.publish_tiktok_retry', actor: 'nguoi-bam', status, detail: { contentId, msg, ...extra } }); } catch { /* bỏ qua */ }
+  };
+  if (await isEmergencyStopped(client)) { await log('error', 'dang dung khan, khong dang'); return; }
+  const { data: q } = await client.from('approval_queue').select('id').eq('kind', 'mkt_publish_content').eq('payload->>content_id', contentId).eq('status', 'approved').limit(1);
+  if (!q || !q.length) { await log('error', 'bai chua duoc duyet, khong dang lai'); return; }
+  // Chống bấm đúp: đang có lượt đăng lại chạy nền (3 phút qua) thì bỏ qua.
+  const since = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+  const { count: inflight } = await client.from('run_log').select('id', { count: 'exact', head: true })
+    .eq('task', 'mkt.publish_tiktok_retry').eq('detail->>phase', 'started').eq('detail->>contentId', contentId).gte('created_at', since);
+  if (inflight && inflight > 0) { revalidatePath('/noi-dung'); return; }
+  await log('ok', 'bat dau dang lai (chay nen)', { phase: 'started' });
+  const bgClient = getServerClient();
+  const bgJob = (async () => {
+    try {
+      // Dọn record 'failed' TRƯỚC khi thử lại để publishContentToTikTok không thấy record cũ
+      // (guard chỉ check status='published' nên vẫn retry được, nhưng dọn cho gọn).
+      await bgClient.from('mkt_posts').delete().eq('content_id', contentId).eq('channel', 'tiktok').eq('status', 'failed');
+      const res = await publishContentToTikTok(bgClient, contentId, null);
+      try {
+        await bgClient.from('run_log').insert({
+          task: 'mkt.publish_tiktok_retry',
+          actor: 'nguoi-bam',
+          status: res.ok ? 'ok' : 'error',
+          detail: { contentId, phase: 'done', msg: res.ok ? 'da dang lai' : ('van loi: ' + String(res.error || '')) }
+        });
+      } catch { /* bỏ qua */ }
+    } catch (e: any) {
+      try { await bgClient.from('run_log').insert({ task: 'mkt.publish_tiktok_retry', actor: 'nguoi-bam', status: 'error', detail: { contentId, phase: 'done', msg: String(e?.message || e) } }); } catch { /* bỏ qua */ }
+    }
+  })();
+  waitUntil(bgJob);
+  revalidatePath('/noi-dung');
+}
+
 // Thêm một từ khóa vào kho.
 export async function addKeyword(formData: FormData) {
   const keyword = String(formData.get('keyword') || '').trim();
