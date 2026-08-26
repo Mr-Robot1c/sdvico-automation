@@ -3,6 +3,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import { refreshFacebookMetrics, importManualFacebookPost } from '../actions';
 import MetricsAuto from './metrics-auto';
 import RefreshButton from './refresh-button';
+import PlatformLogo, { type PlatformKey } from '../noi-dung/platform-logo';
 // @ts-ignore — module JS thuần
 import { isOtherPage } from '../../lib/page-origin.mjs';
 
@@ -153,14 +154,14 @@ export default async function Page() {
       ) : (
         <>
           <BangSoLieu
-            title="📘 Facebook — page hệ thống"
+            title={<><PlatformLogo platform="facebook" size={20} /><span>Facebook — page hệ thống</span></>}
             headers={['Bài', 'React', 'Comment', 'Share', 'Lượt xem', 'Người xem', 'Link']}
             rows={fbTestRows}
             renderMetrics={(m) => [fmt(m.reactions), fmt(m.comments), fmt(m.shares), m.views != null ? fmt(m.views) : '—', m.reach != null ? fmt(m.reach) : '—']}
           />
 
           <BangSoLieu
-            title="🏢 Facebook — Page chính thức"
+            title={<><PlatformLogo platform="facebook" size={20} /><span>Facebook — Page chính thức</span></>}
             titleNote="Bài nhập tay từ page thật của SDVICO"
             headers={['Bài', 'React', 'Comment', 'Share', 'Lượt xem', 'Người xem', 'Link']}
             rows={fbRealRows}
@@ -168,7 +169,7 @@ export default async function Page() {
           />
 
           <BangSoLieu
-            title="🎵 TikTok"
+            title={<><PlatformLogo platform="tiktok" size={20} /><span>TikTok</span></>}
             headers={['Bài', 'Lượt xem', 'Like', 'Comment', 'Share', 'Link']}
             rows={ttRows}
             renderMetrics={(m) => [fmt(m.views), fmt(m.reactions), fmt(m.comments), fmt(m.shares)]}
@@ -176,7 +177,7 @@ export default async function Page() {
           />
 
           <BangSoLieu
-            title="▶️ YouTube Shorts"
+            title={<><PlatformLogo platform="youtube" size={20} /><span>YouTube Shorts</span></>}
             headers={['Bài', 'Lượt xem', 'Like', 'Comment', 'Link']}
             rows={ytRows}
             renderMetrics={(m) => [fmt(m.views), fmt(m.reactions), fmt(m.comments)]}
@@ -196,7 +197,7 @@ function BangSoLieu({
   renderMetrics,
   customUrl,
 }: {
-  title: string;
+  title: React.ReactNode;
   titleNote?: string;
   headers: string[];
   rows: Array<{ cid: string; title: string; url: string; publishedAt: string; m: M }>;
@@ -215,7 +216,10 @@ function BangSoLieu({
   };
   return (
     <section style={{ marginBottom: 22 }}>
-      <h2 style={{ fontSize: '1.02rem', margin: '0 0 4px' }}>{title} <span className="sub" style={{ fontSize: '.85rem', fontWeight: 400 }}>({rows.length} bài hôm nay)</span></h2>
+      <h2 style={{ fontSize: '1.02rem', margin: '0 0 4px', display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {title}
+        <span className="sub" style={{ fontSize: '.85rem', fontWeight: 400 }}>({rows.length} bài hôm nay)</span>
+      </h2>
       {titleNote ? <p className="sub" style={{ margin: '0 0 8px' }}>{titleNote}</p> : null}
       <div className="tablewrap">
         <table className="datatable">
