@@ -250,6 +250,24 @@ export default async function TongQuanSection() {
         </div>
       ) : null}
 
+      {/* Playbook 26/8 item 4 - CANH BAO PHAN PHOI: Page ~8 follower thi reach tu nhien
+          gan bang 0, noi dung tot may cung khong toi ba con. Chi hien khi followers < 100
+          (chua "hoc" thuat toan). Nhac 4 kenh phan phoi ngoai reach tu nhien. */}
+      {followers > 0 && followers < 100 ? (
+        <div className="pending-callout" style={{ background: '#fff8e1', border: '1px solid #f59e0b', color: '#92400e' }}>
+          <span style={{ flex: 1 }}>
+            ⚠️ <b>Page mới chỉ {fmt(followers)} người theo dõi</b> — reach tự nhiên rất thấp. Nội dung tốt cần thêm 4 kênh phân phối:
+            <br />
+            <span style={{ fontSize: '.85rem' }}>
+              1. Chia sẻ bài vào <b>group mua bán tàu thuyền theo vùng</b> (dùng nút "Chia sẻ vào nhóm" trên card bài) ·
+              2. Mời bạn thuyền/khách cũ <b>follow Page</b> ·
+              3. Chạy <b>quảng cáo địa phương</b> nhắm chủ tàu quanh cảng (FB Ads) ·
+              4. Dùng <b>Zalo OA</b> giữ khách đã liên hệ (nhập lead vào bài để BOSS học).
+            </span>
+          </span>
+        </div>
+      ) : null}
+
       {/* Mỗi nền tảng một thẻ: trạng thái, chạy tới đâu, thông số. Bấm cả thẻ xem chi tiết. */}
       <div className="pf-grid">
         <Link className="pf-card" href="/do-luong" title="Bấm xem số liệu chi tiết từng bài">
