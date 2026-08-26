@@ -69,6 +69,7 @@ async function importFacebook(client: any, sinceIso: string): Promise<{ added: n
     for (const p of (j.data || [])) {
       try {
         const permalink = String(p.permalink_url || `https://www.facebook.com/${p.id}`);
+        const publishedAt = p.created_time || new Date().toISOString();
         const { data: existing } = await client.from('mkt_posts')
           .select('id, content_id').eq('external_url', permalink).eq('channel', 'facebook').maybeSingle();
         if (existing?.content_id) {
@@ -84,8 +85,8 @@ async function importFacebook(client: any, sinceIso: string): Promise<{ added: n
           };
           const { error: eBM } = await client.from('mkt_metrics').insert({
             source: 'facebook', entity_ref: existing.content_id, metrics: backfillMetrics,
-            metric_date: new Date().toISOString().slice(0, 10),
-            created_at: new Date().toISOString()
+            metric_date: publishedAt.slice(0, 10),
+            created_at: publishedAt
           });
           if (eBM) errors.push(`backfill metric ${p.id}: ${eBM.message}`);
           added++;
@@ -94,7 +95,6 @@ async function importFacebook(client: any, sinceIso: string): Promise<{ added: n
         const message = String(p.message || '').trim();
         const title = message.slice(0, 100) || `Bài FB ${p.id}`;
         const contentId = randomUUID();
-        const publishedAt = p.created_time || new Date().toISOString();
         const { error: eC } = await client.from('mkt_content').insert({
           id: contentId, kind: 'social', title, draft: message, status: 'published',
           brief: { source: 'reimport_facebook', fb_post_id: p.id }, created_at: publishedAt
@@ -113,8 +113,8 @@ async function importFacebook(client: any, sinceIso: string): Promise<{ added: n
         };
         const { error: eM } = await client.from('mkt_metrics').insert({
           source: 'facebook', entity_ref: contentId, metrics,
-          metric_date: new Date().toISOString().slice(0, 10),
-          created_at: new Date().toISOString()
+          metric_date: publishedAt.slice(0, 10),
+          created_at: publishedAt
         });
         if (eM) errors.push(`metric ${p.id}: ${eM.message}`);
         added++;
@@ -169,8 +169,8 @@ async function importYouTube(client: any, sinceIso: string): Promise<{ added: nu
         };
         const { error: eBM } = await client.from('mkt_metrics').insert({
           source: 'youtube', entity_ref: existing.content_id, metrics: backfillMetrics,
-          metric_date: new Date().toISOString().slice(0, 10),
-          created_at: new Date().toISOString()
+          metric_date: publishedAt.slice(0, 10),
+          created_at: publishedAt
         });
         if (eBM) errors.push(`backfill metric ${vid}: ${eBM.message}`);
         added++;
@@ -197,8 +197,8 @@ async function importYouTube(client: any, sinceIso: string): Promise<{ added: nu
       };
       const { error: eM } = await client.from('mkt_metrics').insert({
         source: 'youtube', entity_ref: contentId, metrics,
-        metric_date: new Date().toISOString().slice(0, 10),
-        created_at: new Date().toISOString()
+        metric_date: (publishedAt || new Date().toISOString()).slice(0, 10),
+        created_at: publishedAt || new Date().toISOString()
       });
       if (eM) errors.push(`metric ${vid}: ${eM.message}`);
       added++;
