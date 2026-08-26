@@ -271,13 +271,13 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             <tbody>
               <tr>
                 <td><b>💾 Lưu &amp; sinh kế hoạch mới</b></td>
-                <td className="sub">Cài đặt tuần</td>
-                <td>Khi bạn <b>đổi Mục tiêu hoặc Sản phẩm tập trung</b> ở khối Cài đặt tuần. Máy lưu cài đặt + sinh kế hoạch mới bám cài đặt đó + áp NGAY.</td>
+                <td className="sub">Cài đặt tuần (nút xanh giữa trang)</td>
+                <td>Bấm khi bạn <b>vừa gõ đổi Mục tiêu hoặc Sản phẩm tập trung</b> trong khối Cài đặt tuần và muốn máy dùng đúng cài đặt mới. Máy lưu cài đặt + sinh kế hoạch mới bám cài đặt đó + áp NGAY.</td>
               </tr>
               <tr>
-                <td><b>✨ Tạo kế hoạch ngay</b></td>
+                <td><b>🔄 BOSS chạy lại (giữ cài đặt)</b></td>
                 <td className="sub">Góc phải header</td>
-                <td>Khi <b>KHÔNG đổi cài đặt</b> nhưng muốn ép BOSS sinh lại kế hoạch (VD: tri thức nội bộ vừa cập nhật, muốn refresh). Giữ nguyên mục tiêu + focus.</td>
+                <td>Bấm khi <b>KHÔNG đổi gì trong Cài đặt tuần</b> nhưng muốn ép BOSS chạy lại NGAY để ra 7 hướng khác (VD: tri thức nội bộ vừa cập nhật, hướng cũ nghe chán, muốn thử vòng khác). GIỮ NGUYÊN mục tiêu + focus + nhóm chia sẻ hiện có.</td>
               </tr>
               <tr>
                 <td><b>🧪 Áp dụng đề xuất mới</b></td>
@@ -591,7 +591,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </summary>
 
         {!latest ? (
-          <p className="sub" style={{ marginTop: 10 }}>Chưa có bản kế hoạch nào. Bấm Tạo kế hoạch ngay ở góc trên.</p>
+          <p className="sub" style={{ marginTop: 10 }}>Chưa có bản kế hoạch nào. Bấm 🔄 BOSS chạy lại ở góc trên.</p>
         ) : (
           <div style={{ marginTop: 12 }}>
             {viewing ? (
