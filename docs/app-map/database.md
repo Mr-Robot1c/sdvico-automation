@@ -2,8 +2,9 @@
 
 > Load khi / Load when: cần biết lược đồ bảng, cột chính và chính sách RLS. Nguồn sự thật là `supabase/migrations` (doc này tóm tắt, migration mới thì cập nhật ở đây cùng commit).
 covers: supabase/migrations
-last_verified: 2026-08-24
+last_verified: 2026-08-26
 ttl_days: 180
+<!-- re-verified: 2026-08-26 03:00 - Migration 20260826010000_mkt_posts_made_public: them cot mkt_posts.made_public_at timestamptz null. Dung cho TikTok da audit reject 26/8 ("internal company use") — video dang qua Direct Post API bi ep SELF_ONLY, user vao app TikTok doi cong khai tay roi bam nut o /noi-dung de danh dau. Row mkt_posts cap nhat mo ta them "made_public_at". USER paste .sql vao Supabase SQL Editor de ap. -->
 <!-- re-verified: 2026-08-24 23:00 - Migration 20260824230000_mkt_leads: bang mkt_leads (theo doi nguoi mua — user "khoi do co bao nhieu nguoi"). source facebook_comment/facebook_message/manual, status new/contacted/closed/spam, content_id lien ket bai. Webhook /api/facebook/webhook bat comment NGAY (khong can quyen dac biet); tin nhan Messenger can pages_messaging (dang xin Facebook App Review 24/8, chua duyet). Trang /khach-hang xem + cap nhat trang thai, /noi-dung them tile so lead 7 ngay + link. USER CAN AP MIGRATION qua Supabase SQL Editor truoc khi webhook chay duoc. -->
 <!-- re-verified: 2026-08-24 14:45 - Migration 20260824150000_mkt_metrics_source_tiktok: noi CHECK mkt_metrics.source them 'tiktok'. Cap nhat mo ta hang mkt_metrics duoi day (gsc/ga4/facebook/youtube/tiktok/manual). Ly do: cron 24/8 keo TikTok view/like/comment vao mkt_metrics source='tiktok' nhung constraint chua cho, insert bi chan. USER paste .sql vao Supabase SQL Editor de ap. -->
 <!-- re-verified: 2026-08-13 - Lap doc luoc do lan dau: liet ke 14 bang tu supabase/migrations. Them mkt_oauth_tokens (token OAuth TikTok, RLS khong policy = chi service_role doc/ghi). -->
@@ -25,7 +26,7 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 | brand_assets | Marketing | Kho tư liệu ảnh/clip thật (owned/licensed), cột `product_group` = folder sản phẩm (STT) cho vòng xoay | Bật, staff |
 | mkt_keywords | Marketing | Kho từ khóa, phân loại theo ý định | Bật, staff |
 | mkt_content | Marketing | Nội dung + trạng thái, cờ needs_gov_review, brief.assets | Bật, staff |
-| mkt_posts | Marketing | Bài đã đăng + kênh (facebook/website/youtube/tiktok), external_url | Bật, staff |
+| mkt_posts | Marketing | Bài đã đăng + kênh (facebook/website/youtube/tiktok), external_url, `made_public_at` = user đánh dấu đã đổi công khai tay (TikTok chưa audit) | Bật, staff |
 | mkt_metrics | Marketing | Số liệu đo lường (gsc/ga4/facebook/youtube/tiktok/manual) | Bật, staff |
 | mkt_oauth_tokens | Marketing | Token OAuth cần refresh (TikTok): access/refresh token, hạn. **RLS không policy = chỉ service_role đọc/ghi, không lộ ra giao diện** | Bật, service_role only |
 | mkt_plans | Marketing | Kế hoạch định hướng do bot sinh từ số liệu Đo lường (cron T4 & CN hoặc bấm tay). data jsonb chứa xếp hạng + trọng số + đoạn định hướng; `applied` bật thì vòng xoay ưu tiên theo; v2 thêm `summary.knowledge` (số nguồn tri thức 7 ngày đã dùng) | Bật, staff |

@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { isEmergencyStopped, getPostCount, isQuotaDisabled } from '../../lib/safety';
-import { editDraft, retryFacebookPublish } from '../actions';
+import { editDraft, retryFacebookPublish, retryTiktokPublish } from '../actions';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import ShareGroups from './share-groups';
 import { channelsLabel, riskMeta, formatRelative, formatDateTimeVN } from '../labels';
 import PlatformLogo, { type PlatformKey } from './platform-logo';
+import TikTokPrivateChip from './tiktok-private-chip';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -41,7 +42,7 @@ export default async function BangSection() {
   const client = getServerClient();
   const limit = Number(process.env.MKT_MAX_POSTS_PER_DAY) || 3;
 
-  const [stopped, quotaOff, fbCount, ttCount, queueRes, alertRes] = await Promise.all([
+  const [stopped, quotaOff, fbCount, ttCount, queueRes, alertRes, planRes] = await Promise.all([
     isEmergencyStopped(client),
     isQuotaDisabled(client),
     getPostCount(client, 'facebook'),
@@ -56,8 +57,39 @@ export default async function BangSection() {
       .from('approval_queue')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending')
-      .neq('kind', 'mkt_publish_content')
+      .neq('kind', 'mkt_publish_content'),
+    // Plan live (có daily_schedule 7 ngày) để lọc groups chia sẻ theo lịch ngày (user 26/8:
+    // "chia sẻ vào group này có thể nhìn vào bảng kế hoạch ngày đó để hiển thị chỉ đăng vào
+    // group đó không?"). Không có plan → ShareGroups hiện tất cả groups như trước (fallback).
+    client
+      .from('mkt_plans')
+      .select('data')
+      .eq('data->>origin', 'live')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  // Extract groups theo ngày cho từng bài đã đăng. Key = date YYYY-MM-DD, value = mảng tên
+  // group. Bài đăng ngày nào -> lấy groups của ngày đó từ daily_schedule; bài đăng ngoài
+  // tuần plan -> mảng rỗng, ShareGroups tự hiện tất cả.
+  const planData = planRes.data as any;
+  const scheduleByDate = new Map<string, string[]>();
+  if (planData?.data?.daily_schedule && Array.isArray(planData.data.daily_schedule)) {
+    for (const d of planData.data.daily_schedule) {
+      if (d?.date && Array.isArray(d?.groups)) {
+        scheduleByDate.set(String(d.date), d.groups.map(String));
+      }
+    }
+  }
+  const groupsForDate = (isoDatetime: string): string[] => {
+    if (!isoDatetime) return [];
+    // Convert ISO datetime UTC -> YYYY-MM-DD VN (UTC+7)
+    const t = new Date(isoDatetime).getTime();
+    if (!Number.isFinite(t)) return [];
+    const vnDate = new Date(t + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    return scheduleByDate.get(vnDate) || [];
+  };
 
   const queue = (queueRes.data || []) as any[];
   const otherPending = alertRes.count || 0;
@@ -78,33 +110,50 @@ export default async function BangSection() {
 
   // Nội dung + nháp + cờ video; bài đã đăng; số liệu; media để xem trước khi duyệt.
   const contents = new Map<string, { title: string; draft: string; brief: any }>();
-  const postsByContent = new Map<string, { channel: string; url: string; at: string }[]>();
+  const postsByContent = new Map<string, { id: string; channel: string; url: string; at: string; madePublicAt: string | null }[]>();
   const fbFailed = new Set<string>(); // bài có lượt đăng Facebook thất bại, chưa có bản FB published
   const fbRetrying = new Set<string>(); // đang có lượt đăng lại chạy nền
+  const ttFailed = new Set<string>(); // tương tự cho TikTok (26/8 bug unaudited_client_can_only_post_to_private_accounts)
+  const ttRetrying = new Set<string>();
   const metricsByContent = new Map<string, M>();
   const ytByContent = new Map<string, { views: number; reactions: number; comments: number }>();
   if (cids.length) {
-    const [{ data: cs }, { data: ps }, { data: ms }, { data: fails }] = await Promise.all([
+    const [{ data: cs }, { data: ps }, { data: ms }, { data: fails }, { data: ttFails }] = await Promise.all([
       client.from('mkt_content').select('id, title, draft, brief').in('id', cids),
-      client.from('mkt_posts').select('content_id, channel, external_url, published_at').eq('status', 'published').in('content_id', cids),
+      client.from('mkt_posts').select('id, content_id, channel, external_url, published_at, made_public_at').eq('status', 'published').in('content_id', cids),
       client.from('mkt_metrics').select('source, entity_ref, metrics, created_at').in('source', ['facebook', 'youtube']).in('entity_ref', cids).order('created_at', { ascending: false }).limit(700),
       // Lượt đăng FACEBOOK THẤT BẠI (23/8: token Page bị vô hiệu) -> thẻ hiện nút "Đăng lại Facebook".
-      client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'facebook').in('content_id', cids)
+      client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'facebook').in('content_id', cids),
+      // Lượt đăng TIKTOK THẤT BẠI (26/8: bug unaudited_client_can_only_post_to_private_accounts) -> nút "Đăng lại TikTok".
+      client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'tiktok').in('content_id', cids)
     ]);
     for (const f of fails || []) { const cid = (f as any).content_id as string | null; if (cid) fbFailed.add(cid); }
-    // Lượt "Đăng lại Facebook" đang chạy nền (bấm trong 3 phút qua, chưa có bản FB published):
+    for (const f of ttFails || []) { const cid = (f as any).content_id as string | null; if (cid) ttFailed.add(cid); }
+    // Lượt "Đăng lại" đang chạy nền (bấm trong 3 phút qua, chưa có bản published):
     // hiện "Đang đăng lại…" thay nút để người dùng biết máy đang làm, khỏi bấm thêm.
-    if (fbFailed.size) {
+    if (fbFailed.size || ttFailed.size) {
       const since = new Date(Date.now() - 3 * 60 * 1000).toISOString();
-      const { data: rl } = await client.from('run_log').select('detail').eq('task', 'mkt.publish_facebook_retry').gte('created_at', since).order('created_at', { ascending: false }).limit(50);
-      for (const r of rl || []) { const d = (r as any).detail || {}; if (d.phase === 'started' && d.contentId && fbFailed.has(d.contentId)) fbRetrying.add(String(d.contentId)); }
+      const { data: rl } = await client.from('run_log').select('task, detail').in('task', ['mkt.publish_facebook_retry', 'mkt.publish_tiktok_retry']).gte('created_at', since).order('created_at', { ascending: false }).limit(80);
+      for (const r of rl || []) {
+        const d = (r as any).detail || {};
+        const t = (r as any).task as string;
+        if (d.phase !== 'started' || !d.contentId) continue;
+        if (t === 'mkt.publish_facebook_retry' && fbFailed.has(d.contentId)) fbRetrying.add(String(d.contentId));
+        if (t === 'mkt.publish_tiktok_retry' && ttFailed.has(d.contentId)) ttRetrying.add(String(d.contentId));
+      }
     }
     for (const c of cs || []) contents.set((c as any).id, { title: (c as any).title || '', draft: String((c as any).draft || ''), brief: (c as any).brief || {} });
     for (const p of ps || []) {
       const cid = (p as any).content_id as string | null;
       if (!cid) continue;
       if (!postsByContent.has(cid)) postsByContent.set(cid, []);
-      postsByContent.get(cid)!.push({ channel: (p as any).channel || '', url: (p as any).external_url || '', at: (p as any).published_at || '' });
+      postsByContent.get(cid)!.push({
+        id: String((p as any).id || ''),
+        channel: (p as any).channel || '',
+        url: (p as any).external_url || '',
+        at: (p as any).published_at || '',
+        madePublicAt: (p as any).made_public_at || null
+      });
     }
     for (const m of ms || []) {
       const cid = (m as any).entity_ref as string | null;
@@ -149,6 +198,10 @@ export default async function BangSection() {
   // Nhãn kênh chuẩn (thay emoji thô); logo brthật vẽ bằng PlatformLogo.
   const CH_LABEL: Record<string, string> = { facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok', zalo: 'Zalo', website: 'Website' };
   const isPlat = (c: string): c is PlatformKey => c === 'facebook' || c === 'youtube' || c === 'tiktok' || c === 'zalo';
+  // Username TikTok công ty để nút "Mở TikTok" trên chip riêng tư mở đúng profile
+  // (https://www.tiktok.com/@sdvico_tbtc — user confirm 26/8). Hardcode fallback vì fact
+  // tĩnh của SDVICO; env NEXT_PUBLIC_TIKTOK_USERNAME override nếu sau này đổi.
+  const tiktokUsername = (process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim() || null;
   const PUB_CAP = 12;
   const REJ_CAP = 8;
 
@@ -296,12 +349,16 @@ export default async function BangSection() {
                             <span>{CH_LABEL[x.channel] || x.channel}</span>
                           </a>
                         ))}
-                        {posts.some((x) => x.channel === 'tiktok' && !/^https?:/.test(x.url)) ? (
-                          <span className="ch-link is-off" title="Đã đăng TikTok ở chế độ riêng tư (chờ duyệt ứng dụng), chưa có link công khai">
-                            <PlatformLogo platform="tiktok" size={15} />
-                            <span>TikTok</span>
-                          </span>
-                        ) : null}
+                        {posts
+                          .filter((x) => x.channel === 'tiktok' && !/^https?:/.test(x.url))
+                          .map((x) => (
+                            <TikTokPrivateChip
+                              key={x.id}
+                              postId={x.id}
+                              madePublicAt={x.madePublicAt}
+                              tiktokUsername={tiktokUsername}
+                            />
+                          ))}
                       </div>
                       {m || ytByContent.get(it.cid) ? (
                         <span style={{ fontSize: '.85rem' }}>
@@ -317,7 +374,7 @@ export default async function BangSection() {
                           ) : null}
                         </span>
                       ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
-                      {fbPost ? <span><ShareGroups postUrl={fbPost.url} /></span> : null}
+                      {fbPost ? <span><ShareGroups postUrl={fbPost.url} planGroupsToday={groupsForDate(lastAt)} /></span> : null}
                       {!posts.some((x) => x.channel === 'facebook') && fbFailed.has(it.cid) ? (
                         fbRetrying.has(it.cid) ? (
                           <span className="badge tone-demo" title="Máy đang đăng lại lên Facebook (upload + chờ FB xử lý video, 1 tới 2 phút). Thẻ tự cập nhật khi xong.">⏳ Đang đăng lại Facebook…</span>
@@ -326,6 +383,17 @@ export default async function BangSection() {
                             <input type="hidden" name="content_id" value={it.cid} />
                             <span className="badge tone-no" title="Lượt đăng Facebook thất bại (token Page hết hạn hoặc lỗi mạng). Kênh khác vẫn lên bình thường.">Facebook chưa lên</span>
                             <button className="btn ghost sm" type="submit" title="Đăng lại bài này lên Facebook, chạy nền 1 tới 2 phút (đã duyệt, không đăng lại kênh khác)">↻ Đăng lại Facebook</button>
+                          </form>
+                        )
+                      ) : null}
+                      {!posts.some((x) => x.channel === 'tiktok') && ttFailed.has(it.cid) ? (
+                        ttRetrying.has(it.cid) ? (
+                          <span className="badge tone-demo" title="Máy đang đăng lại lên TikTok (chạy nền 30 giây tới 2 phút). Thẻ tự cập nhật khi xong.">⏳ Đang đăng lại TikTok…</span>
+                        ) : (
+                          <form action={retryTiktokPublish} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <input type="hidden" name="content_id" value={it.cid} />
+                            <span className="badge tone-no" title="Lượt đăng TikTok thất bại (26/8: app SDVICO không được TikTok audit, code cũ chọn public bị reject). Đã fix ép SELF_ONLY — bấm đăng lại sẽ lên riêng tư OK.">TikTok chưa lên</span>
+                            <button className="btn ghost sm" type="submit" title="Đăng lại bài này lên TikTok ở chế độ riêng tư (đã duyệt, không đăng lại kênh khác). Sau đó bạn vào app TikTok đổi Công khai tay.">↻ Đăng lại TikTok</button>
                           </form>
                         )
                       ) : null}

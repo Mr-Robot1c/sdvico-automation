@@ -10,10 +10,16 @@ name: Dựng video theo yêu cầu
 #
 # Bỏ Whisper artifact (--skip-whisper) trên CI để tiết kiệm ~2 phút cài faster-whisper mỗi lần.
 # Phụ đề vẫn có (lấy từ kịch bản, không lệ thuộc ASR).
+#
+# Tần suất: 2 tiếng/lần (26/8 user chốt "đỡ hao" — trước là 10 phút, đã hết Actions Free
+# minutes ngay trong tháng 8). Nếu cần bài GẤP thay vì chờ 2h, có 2 cách:
+#  1. Chạy tay ở máy local: `node packages/marketing/src/video/build-video-all.mjs --requested --skip-whisper`
+#     (env local có SUPABASE + GEMINI + edge-tts sẵn theo memory sdvico-env-setup).
+#  2. Trigger workflow_dispatch trên GitHub UI (Actions > Dựng video theo yêu cầu > Run workflow).
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '0 */2 * * *'
   workflow_dispatch:
     inputs:
       limit:
