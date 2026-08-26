@@ -58,6 +58,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     { data: creatorRows },
     abPairs,
     { data: tokenRows },
+    { data: claudeUsageRows },
   ] = await Promise.all([
     client.from('mkt_knowledge_internal').select('id, source_path, title, summary, needs_gov_review, created_at').not('source_path', 'like', 'evaluator/%').order('created_at', { ascending: false }).limit(60),
     client.from('mkt_knowledge_public').select('id, source_url, source_title, summary, needs_gov_review, created_at').order('created_at', { ascending: false }).limit(60),
@@ -68,7 +69,12 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     collectAbPairs(client),
     // 24/8: token Gemini đã dùng (mkt.token_usage, ghi bởi lib/gen/token-log.mjs).
     client.from('run_log').select('detail, created_at').eq('task', 'mkt.token_usage').gte('created_at', since30).order('created_at', { ascending: false }).limit(3000),
-  ]);
+    // 26/8: token Claude Code (Anthropic Max) đã dùng khi chat với Claude Code — nguồn khác
+    // Gemini (dev tool riêng, không phải AI SDVICO chạy sản xuất). User: "sếp muốn thấy dung
+    // lượng token dùng + quy đổi ra tiền". Script upload-claude-usage.mjs cron 1h/lần đọc
+    // jsonl ~/.claude/projects/*SDVICO* → upsert bảng claude_code_usage.
+    client.from('claude_code_usage').select('ts, model, input_tokens, cache_creation_tokens, cache_read_tokens, output_tokens, estimated_cost_usd, estimated_cost_vnd').gte('ts', since30).order('ts', { ascending: false }).limit(10000),
+  ] as any);
 
   const internal = (internalRows || []) as any[];
   const pub = (publicRows || []) as any[];
@@ -156,6 +162,54 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     .filter((ai) => byAI.has(ai))
     .map((ai) => ({ ai, ...byAI.get(ai)!, meta: AI_META[ai] || { icon: '🤖', note: '' } }));
   const maxAiTokens = Math.max(1, ...aiRows.map((r) => r.tokens));
+
+  // Claude Code usage (26/8): parse rows từ bảng claude_code_usage. Nhóm theo model (opus /
+  // sonnet / haiku / fable) + tổng chi phí quy đổi USD/VND nếu trả API pricing (bảng script
+  // upload-claude-usage.mjs đã tính sẵn cột estimated_cost_usd/vnd). Sếp so sánh với Max sub
+  // fixed cost $200/tháng để thấy tiết kiệm hay không.
+  const ccRows = (claudeUsageRows || []) as any[];
+  let ccTotalTokens30 = 0;
+  let ccTotalUsd30 = 0;
+  let ccTotalVnd30 = 0;
+  let ccTodayTokens = 0;
+  let ccTodayVnd = 0;
+  const ccByDay = new Map<string, { tokens: number; vnd: number }>();
+  const ccByModel = new Map<string, { calls: number; tokens: number; usd: number; vnd: number }>();
+  const detectModelBucket = (m: string): string => {
+    const ml = String(m || '').toLowerCase();
+    if (ml.includes('opus')) return 'Opus';
+    if (ml.includes('sonnet')) return 'Sonnet';
+    if (ml.includes('haiku')) return 'Haiku';
+    if (ml.includes('fable')) return 'Fable';
+    return 'Khác';
+  };
+  for (const r of ccRows) {
+    const t = Number(r.input_tokens || 0) + Number(r.output_tokens || 0) + Number(r.cache_creation_tokens || 0) + Number(r.cache_read_tokens || 0);
+    const usd = Number(r.estimated_cost_usd || 0);
+    const vnd = Number(r.estimated_cost_vnd || 0);
+    ccTotalTokens30 += t;
+    ccTotalUsd30 += usd;
+    ccTotalVnd30 += vnd;
+    const day = dayOfVN(r.ts);
+    const dayEntry = ccByDay.get(day) || { tokens: 0, vnd: 0 };
+    dayEntry.tokens += t; dayEntry.vnd += vnd;
+    ccByDay.set(day, dayEntry);
+    if (day === todayVN) { ccTodayTokens += t; ccTodayVnd += vnd; }
+    const bucket = detectModelBucket(r.model);
+    const me = ccByModel.get(bucket) || { calls: 0, tokens: 0, usd: 0, vnd: 0 };
+    me.calls += 1; me.tokens += t; me.usd += usd; me.vnd += vnd;
+    ccByModel.set(bucket, me);
+  }
+  const ccLast7Days: Array<{ day: string; tokens: number; vnd: number }> = [];
+  for (let i = 6; i >= 0; i--) {
+    const day = new Date(Date.now() - i * 86400000 + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    const e = ccByDay.get(day) || { tokens: 0, vnd: 0 };
+    ccLast7Days.push({ day, tokens: e.tokens, vnd: e.vnd });
+  }
+  const ccMaxDayTokens = Math.max(1, ...ccLast7Days.map((d) => d.tokens));
+  const ccModelRows = [...ccByModel.entries()]
+    .map(([m, e]) => ({ model: m, ...e }))
+    .sort((a, b) => b.vnd - a.vnd);
 
   const sugs: any[] = Array.isArray(plan.content_suggestions) ? plan.content_suggestions : [];
   const products: any[] = Array.isArray(plan.products) ? plan.products : [];
@@ -458,6 +512,84 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
                 </tbody>
               </table>
             </div>
+          )}
+
+          {/* Khối "🤖 Claude Code (Anthropic Max)" — 26/8, user: "sếp muốn thấy dung lượng
+              token dùng + quy đổi ra tiền". Nguồn: bảng claude_code_usage, ghi bởi script
+              upload-claude-usage.mjs (cron Windows 1h/lần đọc jsonl ~/.claude/projects/*SDVICO*).
+              Quy đổi VND = giá nếu trả API pricing thay vì Max subscription. Sếp so sánh
+              con số này với $200/tháng của Max = thấy tiết kiệm bao nhiêu. */}
+          <h2 style={{ fontSize: '1.05rem', margin: '28px 0 8px' }}>🤖 Claude Code (Anthropic Max)</h2>
+          <p className="sub" style={{ margin: '0 0 12px' }}>
+            Token bạn dùng khi chat với Claude Code (dev tool riêng, không phải AI SDVICO chạy sản xuất). Cột "Tương đương API" là chi phí NẾU trả theo API pricing — dùng để so với Claude Max subscription ($200/tháng ≈ 5.200.000đ) xem tiết kiệm bao nhiêu. Script sync jsonl mỗi 1h (cron Windows Task Scheduler).
+          </p>
+          {ccRows.length === 0 ? (
+            <div className="empty" style={{ padding: '20px 8px' }}>
+              <p className="sub" style={{ margin: 0 }}>Chưa có dữ liệu Claude Code. Chạy tay: <code>node apps/approval-ui/scripts/upload-claude-usage.mjs</code></p>
+              <p className="sub" style={{ margin: '4px 0 0' }}>Sau đó thiết lập cron 1h/lần bằng file <code>apps/approval-ui/scripts/claude-usage-cron.xml</code> (Task Scheduler → Import Task).</p>
+            </div>
+          ) : (
+            <>
+              <div className="chart-grid" style={{ marginBottom: 18 }}>
+                <div className="stat-tile">
+                  <div className="stat-num">{vn(ccTodayTokens)}</div>
+                  <div className="stat-lbl">Token hôm nay</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="stat-num" title="Nếu trả theo API pricing thay vì subscription">{ccTodayVnd.toLocaleString('vi-VN')}đ</div>
+                  <div className="stat-lbl">Tương đương API hôm nay</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="stat-num">{vn(ccTotalTokens30)}</div>
+                  <div className="stat-lbl">Token 30 ngày</div>
+                </div>
+                <div className="stat-tile" style={{ background: 'var(--surface-2)' }}>
+                  <div className="stat-num" style={{ color: 'var(--accent, #1f5fbf)' }} title={`Nếu trả API pricing = ${ccTotalUsd30.toFixed(2)} USD. Max subscription 200 USD/tháng cố định.`}>
+                    {ccTotalVnd30.toLocaleString('vi-VN')}đ
+                  </div>
+                  <div className="stat-lbl">Tương đương API 30 ngày</div>
+                </div>
+              </div>
+
+              <h3 style={{ fontSize: '.95rem', margin: '14px 0 6px' }}>Theo model (30 ngày)</h3>
+              <div className="tablewrap" style={{ marginBottom: 14 }}>
+                <table className="datatable">
+                  <thead><tr><th>Model</th><th className="num">Lượt gọi</th><th className="num">Token</th><th className="num">USD</th><th className="num">VND (nếu trả API)</th></tr></thead>
+                  <tbody>
+                    {ccModelRows.map((m) => (
+                      <tr key={m.model}>
+                        <td><b>{m.model}</b></td>
+                        <td className="num">{vn(m.calls)}</td>
+                        <td className="num">{vn(m.tokens)}</td>
+                        <td className="num">${m.usd.toFixed(2)}</td>
+                        <td className="num"><b>{m.vnd.toLocaleString('vi-VN')}đ</b></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <h3 style={{ fontSize: '.95rem', margin: '14px 0 6px' }}>7 ngày gần nhất (Claude Code)</h3>
+              <div className="tablewrap">
+                <table className="datatable">
+                  <thead><tr><th>Ngày</th><th className="num">Token</th><th className="num">VND</th><th></th></tr></thead>
+                  <tbody>
+                    {ccLast7Days.map((d) => (
+                      <tr key={d.day}>
+                        <td>{d.day.split('-').reverse().join('/')}{d.day === todayVN ? ' (hôm nay)' : ''}</td>
+                        <td className="num"><b>{vn(d.tokens)}</b></td>
+                        <td className="num">{d.vnd.toLocaleString('vi-VN')}đ</td>
+                        <td style={{ width: 200 }}>
+                          <div style={{ background: 'var(--surface-2)', height: 8, borderRadius: 4, overflow: 'hidden' }}>
+                            <div style={{ width: `${Math.round((d.tokens / ccMaxDayTokens) * 100)}%`, background: 'var(--accent, #1f5fbf)', height: '100%' }} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </section>
       ) : null}
