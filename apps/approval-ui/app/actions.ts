@@ -721,21 +721,33 @@ export async function saveSalesZalo(formData: FormData) {
 // Nhập tay 1 lead (khi nhân viên thấy khách hỏi mua qua kênh chưa tự động bắt được —
 // gọi điện trực tiếp, nhắn Zalo cá nhân, gặp mặt...). Nguồn 'manual' phân biệt với lead
 // máy tự bắt từ webhook Facebook.
+// Playbook 26/8 (item 1 đo Zalo/inbox thay view): thêm content_id + channel để link lead
+// vào bài cụ thể. BOSS dùng lead count per bài để xếp hạng sản phẩm (thay vì chỉ view/like).
+// channel: 'zalo' | 'inbox' | 'call' | 'meet' — prefix vào message để phân loại (không cần
+// migration DB thêm cột, tận dụng bảng cũ).
 export async function addLeadManual(formData: FormData) {
   const name = String(formData.get('name') || '').trim().slice(0, 200);
   const message = String(formData.get('message') || '').trim().slice(0, 2000);
   const contact = String(formData.get('contact') || '').trim().slice(0, 200);
+  const contentId = String(formData.get('content_id') || '').trim();
+  const channel = String(formData.get('channel') || '').trim().toLowerCase();
   if (!name && !message) return;
+  const CHANNEL_LABEL: Record<string, string> = { zalo: '[Zalo]', inbox: '[Inbox]', call: '[Gọi]', meet: '[Gặp]' };
+  const prefix = CHANNEL_LABEL[channel] || '';
+  const finalMessage = prefix ? `${prefix} ${message || contact}`.trim() : (message || contact);
   const client = getServerClient();
   await client.from('mkt_leads').insert({
     source: 'manual',
     fb_user_name: name || null,
-    message: message || contact,
+    message: finalMessage,
     fb_profile_url: contact || null,
+    content_id: contentId || null,
     status: 'new',
   });
   revalidatePath('/khach-hang');
   revalidatePath('/noi-dung');
+  revalidatePath('/do-luong');
+  revalidatePath('/do-luong/tuan');
 }
 
 // Cập nhật số liệu thủ công (nút trên trang Đo lường): Facebook + YouTube Shorts.

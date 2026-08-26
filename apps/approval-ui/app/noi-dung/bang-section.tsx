@@ -9,6 +9,7 @@ import { channelsLabel, riskMeta, formatRelative, formatDateTimeVN } from '../la
 import PlatformLogo, { type PlatformKey } from './platform-logo';
 import TikTokPrivateChip from './tiktok-private-chip';
 import ExportTiktokButton from './export-tiktok-button';
+import AddLeadButton from './add-lead-button';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -116,14 +117,23 @@ export default async function BangSection() {
   const fbRetrying = new Set<string>(); // đang có lượt đăng lại chạy nền
   const metricsByContent = new Map<string, M>();
   const ytByContent = new Map<string, { views: number; reactions: number; comments: number }>();
+  // Playbook 26/8 item 1: đếm lead Zalo/inbox/gọi/gặp per bài. Loại 'spam'.
+  const leadsByContent = new Map<string, number>();
   if (cids.length) {
-    const [{ data: cs }, { data: ps }, { data: ms }, { data: fails }] = await Promise.all([
+    const [{ data: cs }, { data: ps }, { data: ms }, { data: fails }, { data: leadRows }] = await Promise.all([
       client.from('mkt_content').select('id, title, draft, brief').in('id', cids).is('deleted_at', null),
       client.from('mkt_posts').select('id, content_id, channel, external_url, published_at, made_public_at, deleted_at').eq('status', 'published').in('content_id', cids),
       client.from('mkt_metrics').select('source, entity_ref, metrics, created_at').in('source', ['facebook', 'youtube']).in('entity_ref', cids).order('created_at', { ascending: false }).limit(700),
       // Lượt đăng FACEBOOK THẤT BẠI (23/8: token Page bị vô hiệu) -> thẻ hiện nút "Đăng lại Facebook".
-      client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'facebook').in('content_id', cids)
+      client.from('mkt_posts').select('content_id').eq('status', 'failed').eq('channel', 'facebook').in('content_id', cids),
+      // Lead Zalo/inbox/gọi/gặp (playbook item 1) — đếm theo bài để hiện "🎯 N Zalo".
+      client.from('mkt_leads').select('content_id').in('content_id', cids).neq('status', 'spam')
     ]);
+    for (const l of leadRows || []) {
+      const cid = (l as any).content_id as string | null;
+      if (!cid) continue;
+      leadsByContent.set(cid, (leadsByContent.get(cid) || 0) + 1);
+    }
     for (const f of fails || []) { const cid = (f as any).content_id as string | null; if (cid) fbFailed.add(cid); }
     // Lượt "Đăng lại Facebook" đang chạy nền (bấm trong 3 phút qua, chưa có bản FB published):
     // hiện "Đang đăng lại…" thay nút để người dùng biết máy đang làm, khỏi bấm thêm.
@@ -386,8 +396,12 @@ export default async function BangSection() {
                           {ytByContent.get(it.cid) ? (
                             <span style={{ marginLeft: m ? 6 : 0 }} title="Lượt xem trên YouTube Shorts">▶️ {fmtVN(ytByContent.get(it.cid)!.views)} xem</span>
                           ) : null}
+                          {leadsByContent.get(it.cid) ? (
+                            <span style={{ marginLeft: 8, fontWeight: 600, color: 'var(--tone-ok, #16a34a)' }} title="Khách hỏi mua từ bài này (Zalo/inbox/gọi/gặp). BOSS ưu tiên bài ra nhiều Zalo hơn bài chỉ nhiều like.">🎯 {leadsByContent.get(it.cid)} khách hỏi</span>
+                          ) : null}
                         </span>
                       ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
+                      {it.cid ? <div style={{ marginTop: 4 }}><AddLeadButton contentId={it.cid} /></div> : null}
                       {fbPost ? <span><ShareGroups postUrl={fbPost.url} planGroupsToday={groupsForDate(lastAt)} /></span> : null}
                       {!posts.some((x) => x.channel === 'facebook') && fbFailed.has(it.cid) ? (
                         fbRetrying.has(it.cid) ? (

@@ -190,12 +190,30 @@ async function loadPostsInWindow(client: Client, win: WeekWindow): Promise<PostS
     contents.set((c as any).id, { title: String((c as any).title || '(không tên)'), brief: (c as any).brief || {}, draft: String((c as any).draft || '') });
   }
 
+  // Playbook 26/8 (item 1): đếm mkt_leads TRONG TUẦN theo content_id → cộng vào conversions.
+  // BOSS xếp hạng tuần theo avgConv trước avgEng → bài nhiều Zalo/inbox thắng, không phải
+  // bài view cao mà zero khách.
+  const leadsPerContent = new Map<string, number>();
+  const { data: leadRows } = await client
+    .from('mkt_leads')
+    .select('content_id, status')
+    .in('content_id', cids)
+    .neq('status', 'spam')
+    .gte('created_at', win.startIso)
+    .lt('created_at', win.endIso);
+  for (const l of leadRows || []) {
+    const id = (l as any).content_id as string | null;
+    if (!id) continue;
+    leadsPerContent.set(id, (leadsPerContent.get(id) || 0) + 1);
+  }
+
   const posts: PostScore[] = cids.map((cid) => {
     const p = byCid.get(cid)!;
     const c = contents.get(cid) || { title: '(không rõ)', brief: {}, draft: '' };
     const m: PostMetric = latest.get(cid) || { reactions: 0, comments: 0, shares: 0, engagement: 0, views: 0, watchSec: 0, reach: 0 };
     const product = productOf(c.brief, c.title, c.draft);
     const { isContent, contentType } = kindOf(c.brief);
+    const leadCount = leadsPerContent.get(cid) || 0;
     return {
       cid,
       title: c.title,
@@ -205,7 +223,7 @@ async function loadPostsInWindow(client: Client, win: WeekWindow): Promise<PostS
       publishedAt: p.publishedAt || null,
       url: p.url,
       m,
-      conversions: Number(c.brief?.conversions) || 0,
+      conversions: (Number(c.brief?.conversions) || 0) + leadCount,
       score: scoreOf(m),
       otherPage: !!(isOtherPage as (u: string, b: any) => boolean)(p.url, c.brief)
     };

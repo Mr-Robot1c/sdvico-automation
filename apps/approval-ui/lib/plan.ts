@@ -228,6 +228,25 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
     }
   }
 
+  // Playbook 26/8 (item 1 do Zalo/inbox thay view): đọc mkt_leads (Zalo/inbox/comment/gọi
+  // manual) 7 ngày qua, đếm theo content_id → cộng vào conversions per bài. BOSS xếp hạng
+  // theo avgConv trước avgEng (đã sẵn trong buildPlan) → bài nào ra Zalo nhiều là winner,
+  // không phải bài nhiều like nhưng zero khách. Lead status='spam' bị loại.
+  const leadsPerContent = new Map<string, number>();
+  if (cids.length) {
+    const { data: leads } = await client
+      .from('mkt_leads')
+      .select('content_id, status')
+      .in('content_id', cids)
+      .neq('status', 'spam')
+      .gte('created_at', sevenDaysAgo);
+    for (const l of leads || []) {
+      const id = (l as any).content_id as string | null;
+      if (!id) continue;
+      leadsPerContent.set(id, (leadsPerContent.get(id) || 0) + 1);
+    }
+  }
+
   // CHỈ đếm bài còn tồn tại trong mkt_content. Bài đã XÓA vẫn còn snapshot trong mkt_metrics
   // (entity_ref mồ côi) — trước đây rơi hết vào nhóm "Khác", đủ 3 bài là BOSS xếp "Dẫn đầu là
   // Khác" vô nghĩa (user bắt 20/8). Bỏ bài ma khỏi đo lường kế hoạch.
@@ -239,7 +258,9 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
       const reactions = m.reactions || 0;
       const comments = m.comments || 0;
       const shares = m.shares || 0;
-      return { cid, title: c.title, product: c.product, engagement: reactions + comments + shares, conversions: c.conversions };
+      // Conversions gộp: brief.conversions (nhập tay cũ) + lead count từ mkt_leads (mới).
+      const leadCount = leadsPerContent.get(cid) || 0;
+      return { cid, title: c.title, product: c.product, engagement: reactions + comments + shares, conversions: c.conversions + leadCount };
     });
 
   const byProduct = new Map<string, { count: number; engagement: number; conversions: number }>();
