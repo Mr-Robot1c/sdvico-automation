@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-26
 ttl_days: 90
+<!-- re-verified: 2026-08-26 23:30 - Migration 20260826040000_mkt_content_deleted_at: mkt_content.deleted_at cho soft-delete bai viet. KHONG doi flow NV Ke hoach - lib/plan.ts van query mkt_content theo id (co the join bai soft-deleted khi tinh so lieu lich su, dung y nghia). Chi anh huong hien thi UI /noi-dung (Bang bai viet + Bai viet day du an bai soft-deleted, tab Thung rac hien them). deleteContent chuyen tu hard delete 4 bang -> mark deleted_at, hardDeleteContent giu hard delete cho case can don thuc su. -->
 <!-- re-verified: 2026-08-26 22:00 - Migration 20260826030000_mkt_posts_deleted_at: them cot mkt_posts.deleted_at cho soft-delete row bai user xoa tay tren nen tang (VD: TikTok). KHONG doi flow NV Ke hoach — chi tile Tong quan filter deleted_at null de dem dung, va chip TikTok co nut mark deleted. Kho tri thuc/lib plan khong dung deleted_at. -->
 <!-- re-verified: 2026-08-26 18:30 - Migration 20260826020000_claude_code_usage: bang moi track Claude Code (Anthropic Max) token cho dashboard sep xem "quy doi ra tien". KHONG doi flow NV Ke hoach (Claude Code la dev tool user chat, tach hoan toan voi AI SDVICO Gemini o mkt.token_usage). -->
 <!-- re-verified: 2026-08-26 17:45 - Voice track token: build-video.mjs geminiTTS fallback estimate token theo chars (Gemini TTS API không trả usageMetadata). Không đổi flow NV Ke hoach, không đụng script.mjs. -->
