@@ -3,7 +3,7 @@ import { getServerClient } from '../../../lib/supabase-server';
 import { pullFacebookMetrics } from '../../../lib/fb-metrics';
 import { generateAndStorePlan, planSlotVN, vnDayStartIso } from '../../../lib/plan';
 import { importInternalFromBucket } from '../../../lib/knowledge';
-import { learnPublicKnowledge, learnPublicDaily, isSundayVN } from '../../../lib/knowledge-public';
+import { learnPublicKnowledge, learnPublicDaily } from '../../../lib/knowledge-public';
 import { evaluateAbPairs } from '../../../lib/evaluator';
 import { pullTikTokMetrics } from '../../../lib/tiktok-metrics';
 import { learnWeekly, shouldRunLearnWeekly } from '../../../lib/learn-weekly';
@@ -99,9 +99,13 @@ export async function GET(req: Request) {
     knowledge.publicSrc = { error: e?.message || String(e) };
   }
 
-  // CHỦ NHẬT — lượt quét sâu bằng Gemini grounding (ngày BOSS thu thập tổng). Hay dính
-  // quota 429; lỗi bỏ qua vì RSS hằng ngày đã phủ.
-  if (isSundayVN(new Date())) {
+  // MỖI NGÀY sáng 7-10h VN — lượt quét sâu bằng Gemini grounding (user 26/8 đổi từ CN 1 lần
+   // → mỗi ngày, tin ngành cá cập nhật liên tục kịp tận dụng cho bài thời sự). Cron mkt-metrics-pull
+   // chạy mỗi 1h, window 7-10h VN sẽ trúng 3 slots (7h, 8h, 9h) — learnPublicKnowledge tự guard
+   // 1 lần/ngày qua run_log 'mkt.knowledge_public_deep' nên chỉ chạy thực 1 lần. isSundayVN
+   // giữ lại nhưng KHÔNG dùng nữa (backward compat, sẽ xóa lần cleanup).
+  const vnHour = new Date(Date.now() + 7 * 3600 * 1000).getUTCHours();
+  if (vnHour >= 7 && vnHour < 10) {
     try {
       knowledge.publicDeep = await learnPublicKnowledge(client);
     } catch (e: any) {
