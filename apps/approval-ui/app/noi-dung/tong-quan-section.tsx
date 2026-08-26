@@ -7,6 +7,7 @@ import { zaloOaStatus } from '../../lib/zalo-oa';
 import PlatformLogo from './platform-logo';
 import PlanQuickView from './plan-quick-view';
 import LeadQuickView, { type QuickLead } from './lead-quick-view';
+import PullMetricsButton from './pull-metrics-button';
 
 // TỔNG QUAN thiết kế lại (user 21/8 đêm, nhắc lại yêu cầu gốc): một trang tổng quát để xem
 // cho đỡ rối mắt — mỗi NỀN TẢNG một thẻ: đang làm tốt cỡ nào (thông số react, cmt, view),
@@ -209,6 +210,10 @@ export default async function TongQuanSection() {
 
   return (
     <section>
+      {/* Nút kéo số liệu tay - user 26/8 khong muon cho cron 1h/lan. */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+        <PullMetricsButton size="sm" />
+      </div>
       {/* Hàng số tổng, nhìn 3 giây biết sức khỏe hệ thống. 24/8 (user "gộp lượt xem/follower
           vào ô nền tảng đi, dư thừa chả được mẹ gì"): Lượt xem video + Người theo dõi Page
           đã BỎ khỏi hàng này — số đó đã hiện sẵn trong pf-card Facebook/YouTube bên dưới,
