@@ -25,6 +25,10 @@ const PRODUCTS = [
   '4. Máy lọc nước biển thành nước ngọt',
   '5. Thiết bị lọc dầu SF-50 (tiết kiệm dầu diesel)',
   '6. Dầu nhớt PVOIL Nano Graphene',
+  '7. Ắc quy Accu Nano SDViCo',
+  '8. Sơn RARE (sơn chống nóng tàu)',
+  // 26/8: SP moi user cung cap (folder "9. May Loc Dau Diesel SD12-300").
+  '9. Máy Lọc Dầu Diesel SD12-300 (lọc nước và cặn bẩn trong dầu, bảo vệ kim phun/bơm cao áp)',
 ];
 
 type KnowledgeInput = {

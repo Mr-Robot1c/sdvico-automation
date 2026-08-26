@@ -129,6 +129,22 @@ export const INSIGHTS = {
       motivation: 'Muốn lớp sơn vừa bảo vệ vỏ tàu vừa chống nóng, đáng đồng tiền.',
       insight: 'Đã tốn tiền sơn tàu thì muốn lớp sơn làm được nhiều hơn là chỉ đẹp.' },
   ],
+  // 26/8: SP moi user cung cap. Insight xoay vao 3 noi thuc su cua chu tau khi dung dau
+  // diesel co nuoc/can — hong kim phun, ton tien sua, tau chet may giua bien.
+  '9. Máy Lọc Dầu Diesel SD12-300': [
+    { id: 'nuoc-lan-trong-dau', situation: 'Dầu diesel mua ngoài đôi khi lẫn nước hoặc cặn bẩn mà mắt thường khó thấy.',
+      tension: 'Đổ nhầm dầu bẩn vào máy là hại kim phun, hại bơm cao áp — sửa vào là tốn cả chục triệu.',
+      motivation: 'Muốn đảm bảo dầu vào máy sạch để bảo vệ những bộ phận đắt tiền nhất của động cơ.',
+      insight: 'Dầu bẩn vô máy một lần, tiền sửa bơm kim phun bằng cả năm tiết kiệm.' },
+    { id: 'may-chet-giua-bien', situation: 'Chuyến biển dài ngày cách bờ hàng chục hải lý, máy tàu là tất cả.',
+      tension: 'Máy khục khặc giữa biển vì dầu bẩn thì gọi ai cứu, mất chuyến còn nguy hiểm.',
+      motivation: 'Muốn máy chạy ổn định suốt chuyến, không phải nơm nớp lo dừng máy vì nhiên liệu.',
+      insight: 'Ra khơi rồi thì máy chạy êm là an tâm hơn tất cả.' },
+    { id: 'bao-duong-de-dang', situation: 'Đồ trên tàu nào cũng phải rửa mặn, chống ăn mòn thường xuyên.',
+      tension: 'Thiết bị lọc mà khó tháo lắp, khó vệ sinh thì anh em lười làm, cuối cùng hư sớm.',
+      motivation: 'Muốn thiết bị bền, dễ vệ sinh bảo dưỡng ngay trên tàu, khung inox chịu mặn được lâu.',
+      insight: 'Thứ nào tháo lắp gọn, rửa dễ thì mới bền được với tàu.' },
+  ],
 };
 
 function norm(s) {

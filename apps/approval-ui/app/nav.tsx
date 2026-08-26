@@ -29,9 +29,9 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
     items: [
       { href: '/noi-dung', label: 'Tổng quan', icon: '📊' },
       { href: '/do-luong', label: 'Đo lường', icon: '📈' },
-      // 24/8 (user "khối theo dõi người mua"): danh sách người hỏi mua bắt từ comment/tin
-      // nhắn Facebook, nhân viên kinh doanh vào xem + đánh dấu đã liên hệ.
-      { href: '/khach-hang', label: 'Khách hàng', icon: '👥' },
+      // 26/8: BO muc "Khach hang" khoi sidebar (user "trong tong quan co roi" — chip
+      // Khach hang trong thanh tab /noi-dung da dan sang /khach-hang). Trang /khach-hang
+      // van chay binh thuong theo URL truc tiep, chi khong xuat hien nav sidebar.
       { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
       { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
       { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' },
