@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { fbStatus, tiktokStatus } from '../../lib/platform-status';
+import { getTikTokVideoCount } from '../../lib/tiktok';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
 import { zaloOaStatus } from '../../lib/zalo-oa';
 import PlatformLogo from './platform-logo';
@@ -30,11 +31,14 @@ export default async function TongQuanSection() {
 
   const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const todayStartIso = new Date(new Date(new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10) + 'T00:00:00+07:00')).toISOString();
-  const [fb, tt, yt, za, postsRes, metricsRes, pendingRes, logRes, planRes, leadsRes, leadsTodayRes] = await Promise.all([
+  const [fb, tt, yt, za, ttVideoCount, postsRes, metricsRes, pendingRes, logRes, planRes, leadsRes, leadsTodayRes] = await Promise.all([
     fbStatus(),
     tiktokStatus(),
     getYouTubeChannelInfo(),
     zaloOaStatus(client),
+    // Số video THỰC trên profile TikTok qua Display API (user 26/8: "không còn dựa vào số bài
+    // đăng trên tiktok nữa à" — thay đếm mkt_posts bằng số thực). Null = API fail → fallback.
+    getTikTokVideoCount(client),
     client
       .from('mkt_posts')
       .select('channel, published_at')
@@ -153,7 +157,12 @@ export default async function TongQuanSection() {
 
   const fbPosts = byChannel.get('facebook') || { count: 0, lastAt: '' };
   const ytPosts = byChannel.get('youtube') || { count: 0, lastAt: '' };
-  const ttPosts = byChannel.get('tiktok') || { count: 0, lastAt: '' };
+  const ttPostsBot = byChannel.get('tiktok') || { count: 0, lastAt: '' };
+  // Tile TikTok ưu tiên số THỰC từ Display API (đúng với profile). Fallback về đếm mkt_posts
+  // (soft-delete deleted_at) nếu API fail — vẫn cần đếm mkt_posts để user mark tay được.
+  const ttCount = (typeof ttVideoCount === 'number') ? ttVideoCount : ttPostsBot.count;
+  const ttFromApi = typeof ttVideoCount === 'number';
+  const ttPosts = { count: ttCount, lastAt: ttPostsBot.lastAt };
   const ytOk = !!(yt.configured && yt.channelTitle);
 
   // BÀI NỔI BẬT: gộp CẢ Facebook lẫn YouTube của cùng một bài (user 21/8: "xếp hạng sai sai"
@@ -295,7 +304,7 @@ export default async function TongQuanSection() {
           </div>
           <p className="pf-run">
             {tt.ok
-              ? `${ttPosts.count ? `Đã đăng ${fmt(ttPosts.count)} video (chế độ riêng tư). ` : ''}App chưa qua audit nên video chỉ đăng riêng tư, qua audit mới công khai và đo được số liệu.`
+              ? `${ttPosts.count ? `${ttFromApi ? 'Trên kênh có' : 'Đã đăng'} ${fmt(ttPosts.count)} video${ttFromApi ? '' : ' (chế độ riêng tư)'}. ` : ''}App chưa qua audit nên video chỉ đăng riêng tư, qua audit mới công khai và đo được số liệu.`
               : tt.text}
           </p>
           <div className="pf-stats three">
