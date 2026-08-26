@@ -22,18 +22,26 @@ function productName(g) { return String(g || '').replace(/^\s*\d+\.\s*/, '').tri
 
 // Dịch chủ đề tiếng Việt thành từ khóa ảnh tiếng Anh ngắn (Unsplash tìm tiếng Anh tốt hơn).
 // Lỗi -> fallback từ khóa chung ngành cá.
-async function imageKeywordsFor(topicText, client = null) {
+// 26/8 (sếp: "ảnh không liên quan gì"): keyword cũ 2-4 từ chung chung ("fishing boat vietnam")
+// -> Unsplash trả ảnh generic. Cải thiện: truyền cả BODY bài (không chỉ tiêu đề) để keyword bám
+// đúng SỰ VIỆC trong bài (kim phun tắc, muối ăn mòn mạch điện, cạn nước ngọt giữa khơi...).
+async function imageKeywordsFor(topicText, client = null, bodyHint = '') {
   try {
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const bodyBlock = bodyHint ? `Nội dung bài (đọc kỹ để nắm SỰ VIỆC/HIỆN TƯỢNG):\n${String(bodyHint).slice(0, 800)}\n` : '';
     const res = await ai.models.generateContent({
       model: MKT_MODEL,
       contents: [
-        `Chủ đề bài đăng cho ngư dân Việt Nam: "${topicText}".`,
-        'Cho tôi 2 tới 4 từ khóa TIẾNG ANH để tìm ảnh minh họa phù hợp trên kho ảnh (ưu tiên cảnh tàu cá, thiết bị trên tàu, biển, ngư dân, cảng cá).',
+        `Tiêu đề bài đăng cho ngư dân Việt Nam: "${topicText}".`,
+        bodyBlock,
+        'Sinh 1 câu tìm kiếm ảnh TIẾNG ANH (3 tới 6 từ) mô tả ĐÚNG SỰ VIỆC/HIỆN TƯỢNG trong bài — không chung chung.',
+        'ĐÚNG (bám sự việc): "marine electronics corrosion", "diesel injector clogged carbon", "salt water damage boat panel", "fresh water tank empty ocean", "fishing net catch big".',
+        'SAI (chung chung, CẤM): "fishing boat vietnam", "fisherman work", "sea ocean", "boat engine" - trừ khi bài không có sự việc gì cụ thể ngoài ngành cá chung.',
+        'Nếu bài về THIẾT BỊ/HỎNG HÓC/RỦI RO cụ thể: keyword phải chứa từ vựng kỹ thuật/hiện tượng đó (rust, corrosion, leak, damage, broken, dirty, clogged...). Nếu bài về TIỀN/HIỆU QUẢ: keyword có "money", "coins", "fuel gauge", "saving". Nếu bài về TỰ HÀO nghề: "abundant catch", "sunrise fishing", "family reunion".',
         'Chỉ trả về JSON: {"query":"..."} không thêm chữ.',
-      ].join('\n'),
-      config: { responseMimeType: 'application/json', temperature: 0.2 },
+      ].filter(Boolean).join('\n'),
+      config: { responseMimeType: 'application/json', temperature: 0.3 },
     });
     logTokenUsage(client, 'creator_pick_image', MKT_MODEL, res?.usageMetadata);
     const m = (res.text || '').match(/\{[\s\S]*\}/);
@@ -109,7 +117,7 @@ function pickFresh(imgs, recentlyUsed) {
 // topicText: chủ đề + tiêu đề bài content.
 // recentlyUsed: Map<assetId, lastUsedISO> ảnh đã dùng trong cửa sổ chống trùng (rotate tính từ
 // mkt_content 14 ngày) — có thể bỏ trống (script cũ / test).
-export async function pickImageForContent(client, folders, topicText, recentlyUsed = null) {
+export async function pickImageForContent(client, folders, topicText, recentlyUsed = null, bodyHint = '') {
   const text = String(topicText || '');
 
   // 1. Chủ đề dính sản phẩm -> ảnh folder sản phẩm đó (né ảnh vừa dùng).
@@ -124,7 +132,7 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
   // 2. Unsplash theo từ khóa dịch từ chủ đề.
   try {
     if (process.env.UNSPLASH_ACCESS_KEY) {
-      const q = await imageKeywordsFor(text, client);
+      const q = await imageKeywordsFor(text, client, bodyHint);
       const results = await searchUnsplash(q);
       if (results) {
         // Lấy 1 trong 5 ảnh đầu (đa dạng, vẫn sát chủ đề).

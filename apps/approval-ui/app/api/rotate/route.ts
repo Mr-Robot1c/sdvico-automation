@@ -548,8 +548,9 @@ export async function GET(req: Request) {
     const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';
 
     // Chọn ảnh KHỚP chủ đề (sau khi đã biết chủ đề + tiêu đề).
-    const picked = await (pickImageForContent as any)(client, folders, `${gen.topic || ''} ${displayTitle}`, recentlyUsedImages);
-    // pickImageForContent đã dùng client sẵn (arg đầu) để log token cho Unsplash keyword translation.
+    // 26/8 (sếp: "ảnh không liên quan"): truyền cả BODY bài để Gemini sinh keyword bám sự việc
+    // (kim phun tắc, muối ăn mòn mạch...), không chung chung như trước.
+    const picked = await (pickImageForContent as any)(client, folders, `${gen.topic || ''} ${displayTitle}`, recentlyUsedImages, gen.body || '');
     if (!picked?.id) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
     const media = { id: picked.id as string };
     // Đánh dấu ngay để bài content thứ 2 trong cùng lượt (nếu có) cũng không trùng.
