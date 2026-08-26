@@ -86,24 +86,41 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'Trả về JSON đúng cấu trúc sau, không thêm chữ ngoài JSON:',
     '{',
     '  "titles": ["ba tiêu đề khác nhau, ngắn, hấp dẫn"],',
-    '  "vertical": {"scenes": [{"narration": "câu thoại", "asset_id": "id"}]},',
-    '  "horizontal": {"scenes": [{"narration": "câu thoại", "asset_id": "id"}]}',
+    '  "vertical": {"scenes": [{"role": "hook|empathy|solution|reward|closing", "narration": "câu thoại", "asset_id": "id"}]},',
+    '  "horizontal": {"scenes": [{"role": "hook|empathy|solution|reward|closing", "narration": "câu thoại", "asset_id": "id"}]}',
     '}',
+    'FIELD "role" BẮT BUỘC — không được thiếu, không được trùng. Model hay bỏ qua role và gộp/bỏ nhịp; đây là cách ép cấu trúc.',
     ...(short
       ? [
-          'ĐÂY LÀ VIDEO SHORTS GÂY CHÚ Ý (10-20 giây).',
-          'Bản dọc (vertical): 3 cảnh (chào+hook / đồng cảm / lối thoát+chốt), tổng lời thoại đọc khoảng 12 tới 18 giây.',
-          'Bản ngang (horizontal): 3 cảnh (chào+hook / đồng cảm / lối thoát+chốt), TỔNG LỜI THOẠI ĐỌC HẾT KHOẢNG 12-18 GIÂY (khoảng 35-55 từ tiếng Việt).',
-          'CẤU TRÚC BẮT BUỘC (dù shorts vẫn phải đủ 3 nhịp, không được bỏ cảnh 2):',
-          '  - Cảnh 1 (4-5s): "[lời chào trend]. [HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ]." Ví dụ: "Alo bà con ơi! Đổ đầy dầu mà máy vẫn lịm giữa lộng."',
-          '  - Cảnh 2 (4-5s): ĐỒNG CẢM — nêu HẬU QUẢ TIẾC/UẤT cụ thể. Ví dụ: "Kim phun tắc, máy hỏng, cả chuyến biển đi đứt, xót đứt ruột." KHÔNG được nhảy thẳng sang lối thoát.',
-          '  - Cảnh 3 (4-6s): LỐI THOÁT + CHỐT LỢI ÍCH. Ví dụ: "May có SF-50 giữ dầu sạch từ đầu — yên tâm vươn khơi cả tháng."',
-          'CẤM cảnh 1 dùng CÂU HỎI thay hook (VD "xót ruột không?", "có thấy vậy không?") — hook PHẢI là câu khẳng định nghịch lý.',
+          'ĐÂY LÀ VIDEO SHORTS GÂY CHÚ Ý (18-25 giây, tăng từ 10-18s để đủ chỗ cho cảnh empathy).',
+          'CHÍNH XÁC 3 CẢNH, role LẦN LƯỢT: "hook", "empathy", "solution". KHÔNG thêm cảnh, KHÔNG bớt cảnh, KHÔNG lặp role.',
+          'Bản dọc (vertical) VÀ Bản ngang (horizontal): mỗi bản 3 cảnh, tổng lời thoại 18-25 giây (~55-75 từ tiếng Việt).',
+          '',
+          'CẢNH 1 role="hook" (5-7s, ~15-22 từ):',
+          '  "[lời chào trend]. [HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ, câu KHẲNG ĐỊNH 2 mảnh đối lập]."',
+          '  Ví dụ ĐÚNG: "Alo bà con ơi! Mua dầu tưởng sạch, ai ngờ dính cặn nước làm nghẹt máy giữa biển." (chào 4 chữ + hook 13 chữ nghịch lý = thành quả "mua dầu tưởng sạch" + mất mát "nghẹt máy giữa biển").',
+          '  CẤM: câu hỏi ("xót ruột không?", "có thấy vậy không?"), câu tường thuật chung chung, thiếu 2 mảnh đối lập.',
+          '',
+          'CẢNH 2 role="empathy" (6-9s, ~18-28 từ) — BẮT BUỘC, KHÔNG được gộp vào cảnh 1 hay cảnh 3, KHÔNG được bỏ:',
+          '  Tả HẬU QUẢ CỤ THỂ để bà con thấy TIẾC + UẤT + LO (nhịp cảm xúc mạnh nhất). Nêu 2-3 điều: tiền mất (bao nhiêu triệu), thời gian mất (cả chuyến biển đi đứt), tâm trạng (xót ruột, tiếc đứt tim).',
+          '  Ví dụ ĐÚNG: "Kim phun tắc, phải nằm bờ sửa cả tuần, mất mấy triệu tiền phụ tùng. Chuyến biển đang trúng luồng cá phải bỏ, xót đứt ruột anh em ơi."',
+          '  CẤM: câu ngắn cụt ("máy hỏng vặt lắm"), lặp lại hook, hoặc nhắc sản phẩm SDVICO ở nhịp này (chưa tới lối thoát).',
+          '',
+          'CẢNH 3 role="solution" (5-7s, ~15-22 từ):',
+          '  LỐI THOÁT bằng sản phẩm + PHẦN THƯỞNG cụ thể + CHỐT lợi ích 1 câu. KHÔNG nhắc gọi/liên hệ (outro cố định lo phần đó).',
+          '  Ví dụ ĐÚNG: "May có SF-50 giữ dầu sạch từ đầu, máy nổ êm suốt hải trình. Yên tâm vươn khơi, không lo cắt chuyến."',
         ]
       : [
-          'Bản dọc (vertical): 4 tới 5 cảnh, tổng lời thoại đọc khoảng 55 tới 60 giây.',
-          'Bản ngang (horizontal): 5 tới 7 cảnh, TỔNG LỜI THOẠI ĐỌC HẾT KHOẢNG 40-50 GIÂY (khoảng 100-130 từ tiếng Việt).',
-          'Lời thoại mỗi cảnh 6-9 giây (~15-25 từ). Súc tích, không lặp ý, không lan man - video ngắn hiệu quả hơn dài.',
+          'ĐÂY LÀ VIDEO DÀI (40-60 giây). CHÍNH XÁC 5 CẢNH, role LẦN LƯỢT: "hook", "empathy", "solution", "reward", "closing".',
+          'Bản dọc (vertical): 5 cảnh, tổng lời thoại 55-60 giây.',
+          'Bản ngang (horizontal): 5 cảnh, tổng lời thoại 40-50 giây (~100-130 từ tiếng Việt).',
+          'Lời thoại mỗi cảnh 8-12 giây (~20-30 từ). Súc tích, không lặp ý.',
+          '',
+          'CẢNH 1 role="hook": chào trend + HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (câu khẳng định 2 mảnh đối lập). Cấm câu hỏi.',
+          'CẢNH 2 role="empathy" (BẮT BUỘC, không bỏ): tả HẬU QUẢ TIẾC + UẤT + LO cụ thể (số tiền mất, thời gian mất, tâm trạng). Không nhắc sản phẩm SDVICO.',
+          'CẢNH 3 role="solution": sản phẩm xuất hiện như LỐI THOÁT, nói bằng LỢI ÍCH (không thông số kỹ thuật khô).',
+          'CẢNH 4 role="reward": PHẦN THƯỞNG cụ thể (chở thêm bao nhiêu, đi xa bao nhiêu, tiết kiệm gì).',
+          'CẢNH 5 role="closing": câu chốt ngắn về lợi ích. Cấm nhắc gọi/liên hệ/hotline (outro cố định lo).',
         ]),
   ].filter(Boolean).join('\n');
 
@@ -123,6 +140,16 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     });
     logTokenUsage(client, 'creator_video_script', MKT_MODEL, res?.usageMetadata);
     parsed = parseJson(res.text || '');
+    // 26/8 siết lần 3: log warning nếu SHORTS thiếu scene role='empathy' (model hay lách gộp
+    // vào hook hoặc solution). Không auto-regenerate (đắt token) nhưng log để soi khi debug.
+    if (short) {
+      for (const k of ['vertical', 'horizontal']) {
+        const roles = (parsed[k]?.scenes || []).map((s) => s?.role);
+        if (!roles.includes('empathy')) {
+          console.warn(`[script] SHORTS ${k} thieu scene role='empathy' (roles=${JSON.stringify(roles)}) - can canh 2 dong cam TIEC+UAT theo playbook.`);
+        }
+      }
+    }
     const all = [...(parsed.vertical?.scenes || []), ...(parsed.horizontal?.scenes || [])].map((x) => x?.narration || '').join('\n');
     viol = guardViolations(all, topic);
     if (!viol.length) break;
