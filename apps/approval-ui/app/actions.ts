@@ -826,7 +826,7 @@ export async function generateTrendPost(formData: FormData): Promise<{ ok: boole
       brief: {
         keyword: 'Bài trend',
         intent: 'giao_dich',
-        channels: ['facebook'],
+        channels: ['facebook', 'youtube', 'tiktok'],
         generator: 'trend',
         trend_event: trendEvent,
         trend_generating: true,
@@ -846,7 +846,7 @@ export async function generateTrendPost(formData: FormData): Promise<{ ok: boole
   await client.from('approval_queue').insert({
     kind: 'mkt_publish_content',
     title: displayTitleQueue,
-    payload: { content_id: contentId, channels: ['facebook'], trend_generating: true },
+    payload: { content_id: contentId, channels: ['facebook', 'youtube', 'tiktok'], trend_generating: true },
     status: 'pending',
   });
 
@@ -896,7 +896,7 @@ export async function generateTrendPost(formData: FormData): Promise<{ ok: boole
         brief: {
           keyword: 'Bài trend',
           intent: 'giao_dich',
-          channels: ['facebook'],
+          channels: ['facebook', 'youtube', 'tiktok'],
           generator: 'trend',
           trend_event: trendEvent,
           trend_generating: false,
@@ -914,7 +914,7 @@ export async function generateTrendPost(formData: FormData): Promise<{ ok: boole
       // Update approval_queue title (đã insert ở trên với "đang sinh"). Không insert row
       // mới. Query theo payload->>content_id.
       await client.from('approval_queue')
-        .update({ title: `🔥 TREND · ${displayTitle}`, payload: { content_id: contentId, channels: ['facebook'], trend_generating: false } })
+        .update({ title: `🔥 TREND · ${displayTitle}`, payload: { content_id: contentId, channels: ['facebook', 'youtube', 'tiktok'], trend_generating: false } })
         .eq('kind', 'mkt_publish_content')
         .eq('payload->>content_id', contentId);
       revalidatePath('/noi-dung');

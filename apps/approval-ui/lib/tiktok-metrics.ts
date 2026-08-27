@@ -52,13 +52,14 @@ export async function pullTikTokMetrics(client: Client): Promise<{ pulled: numbe
   if (!videos.length) return { pulled: 0, matched: 0, errors };
 
   // 2a. Ưu tiên MATCH TAY (27/8): brief.tiktok_video_id user chọn qua UI /noi-dung. Match
-  //     kiểu này CHÍNH XÁC, không lệch thời gian.
+  //     kiểu này CHÍNH XÁC, không lệch thời gian. Fix 27/8 chiều: Supabase .not('brief->>x')
+  //     JSONB filter không reliable, chuyển sang select all + filter JS.
   const since = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
   const { data: manualMatchRows } = await client
     .from('mkt_content')
     .select('id, brief')
-    .not('brief->>tiktok_video_id', 'is', null)
-    .gte('created_at', since);
+    .gte('created_at', since)
+    .limit(500);
   const manualMap = new Map<string, string>(); // videoId -> contentId
   for (const c of manualMatchRows || []) {
     const brief = (c as any).brief || {};
