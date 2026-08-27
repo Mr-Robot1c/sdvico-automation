@@ -782,6 +782,78 @@ export async function getTikTokVideosForMatching(): Promise<{ ok: boolean; video
   }
 }
 
+// Playbook 27/8 Tầng 3: sinh bài TREND bám sự kiện nóng (bóng đá VN thắng, sự kiện lớn,
+// bão biển). BOSS sinh 1 bài + kịch bản video 5-8 cảnh với ảnh keyword. User tự dựng video
+// bằng CapCut/InShot (Vercel không có ffmpeg). Bài vào Bảng chờ duyệt như bình thường.
+export async function generateTrendPost(formData: FormData): Promise<{ ok: boolean; contentId?: string; msg: string }> {
+  const trendEvent = String(formData.get('trend_event') || '').trim();
+  if (!trendEvent || trendEvent.length < 5) return { ok: false, msg: 'Sự kiện quá ngắn (cần ≥5 chữ). VD: "Đội tuyển VN vô địch AFF Cup", "Bão số 5 vào Biển Đông".' };
+  const client = getServerClient();
+
+  // Lấy tri thức public 7 ngày qua liên quan trend nếu có (bám thực tế Data 2 đã học).
+  const sinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const { data: knowRows } = await client
+    .from('mkt_public_knowledge')
+    .select('source_title, summary')
+    .gte('created_at', sinceIso)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  const publicKnowledge = (knowRows || [])
+    .map((k: any) => `- ${k.source_title || ''}: ${(k.summary || '').slice(0, 200)}`)
+    .join('\n');
+
+  try {
+    // @ts-ignore JS thuần
+    const { generateTrendPost: gen } = await import('../lib/gen/trend-post.mjs');
+    const r = await (gen as any)({ trendEvent, publicKnowledge, client });
+    if (!r?.body) return { ok: false, msg: 'Không sinh được bài.' };
+
+    // Insert vào mkt_content + approval_queue
+    // @ts-ignore
+    const { hashtagBlock } = await import('../lib/gen/social.mjs');
+    const tags = hashtagBlock('', r.extraHashtags || []);
+    const text = `${r.body}\n\n${tags}`;
+    const displayTitle = r.headline || `[TREND] ${trendEvent.slice(0, 60)}`;
+
+    const { data: ins } = await client
+      .from('mkt_content')
+      .insert({
+        kind: 'social',
+        title: displayTitle,
+        brief: {
+          keyword: 'Bài trend',
+          intent: 'giao_dich',
+          channels: ['facebook'],
+          generator: 'trend',
+          trend_event: trendEvent,
+          emotion: r.emotion || null,
+          hook_15w: r.hook15w || null,
+          video_scenes: r.videoScenes || [],
+          extra_hashtags: r.extraHashtags || [],
+          rotation_group: 'Bài trend',
+        },
+        draft: text,
+        status: 'review',
+        needs_gov_review: false,
+      })
+      .select('id')
+      .single();
+    if (!ins) return { ok: false, msg: 'Không lưu được bài.' };
+    const contentId = (ins as { id: string }).id;
+    await client.from('approval_queue').insert({
+      kind: 'mkt_publish_content',
+      title: `🔥 TREND · ${displayTitle}`,
+      payload: { content_id: contentId, channels: ['facebook'] },
+      status: 'pending',
+    });
+    revalidatePath('/noi-dung');
+    revalidatePath('/hang-doi');
+    return { ok: true, contentId, msg: `Đã sinh bài trend "${displayTitle.slice(0, 60)}" + ${r.videoScenes?.length || 0} cảnh video. Vào Bảng chờ duyệt xem thêm.` };
+  } catch (e: any) {
+    return { ok: false, msg: String(e?.message || e).slice(0, 300) };
+  }
+}
+
 // Dọn dedup lead trùng (fromId + text) trong 5 phút — user 27/8 sau khi pull inbox có 3 tin
 // cùng câu từ 1 khách (user gửi Send 3 lần). Server action gộp: giữ tin đầu tiên, xoá tin sau.
 export async function dedupLeadsByContent(): Promise<{ ok: boolean; deleted: number; msg: string }> {

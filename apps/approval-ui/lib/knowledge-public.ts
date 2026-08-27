@@ -27,6 +27,12 @@ const SEARCH_TOPICS = [
   'giá dầu diesel tàu cá Việt Nam gần đây',
   'thiết bị giám sát hành trình tàu cá VMS quy định mới',
   'thẻ vàng IUU EC đối với thủy sản Việt Nam',
+  // Playbook 27/8 tầng 1 (user: "1 bài/tuần theo trend, VN vô địch làm video tự hào"):
+  // BOSS thấy trend Việt Nam trong tri thức tuần → tự đề xuất 1 hướng bài bám thời sự.
+  // Playbook PHẦN 3 pattern 5: "Thời sự nghề là xăng tăng lực viral miễn phí".
+  'sự kiện nóng Việt Nam tuần này',
+  'bóng đá đội tuyển Việt Nam thắng thua tuần này',
+  'thời tiết bão Biển Đông ảnh hưởng đi biển tuần này',
 ];
 
 type Finding = {

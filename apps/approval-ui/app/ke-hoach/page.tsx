@@ -7,6 +7,7 @@ import GeneratePostsButton from './generate-posts-button';
 import SaveGenerateButton from './save-generate-button';
 import GenerateButton from './generate-button';
 import SevenAnglesButton from '../noi-dung/seven-angles-button';
+import TrendPostButton from './trend-post-button';
 
 export const dynamic = 'force-dynamic';
 // Sinh kế hoạch gọi Gemini mất 30 giây tới ~2 phút (chuỗi 4 model fallback khi model đầu bị
@@ -221,6 +222,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               <button className="btn ok" type="submit">🧪 Áp dụng đề xuất mới</button>
             </form>
           ) : null}
+          <TrendPostButton />
           <SevenAnglesButton />
           <GenerateButton action={generatePlanNow} />
         </div>
@@ -285,6 +287,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 <td><b>🎯 Bung 1 ý thành 7 bài</b></td>
                 <td className="sub">Góc phải header</td>
                 <td>Bấm khi <b>có 1 chủ đề nóng cần seeding</b> hoặc <b>ra mắt sản phẩm mới</b>. Máy sinh 7 bài Facebook khác nhau về góc tiếp cận (cảnh báo · case study · so sánh · hướng dẫn · phản biện · cảm xúc · listicle) — vào Bảng bài viết duyệt/xóa.</td>
+              </tr>
+              <tr>
+                <td><b>🔥 Sinh bài trend</b></td>
+                <td className="sub">Góc phải header</td>
+                <td>Bấm khi <b>có sự kiện nóng ngoài ngành</b> (VN vô địch bóng đá, bão số 5, giải quốc gia, tin sốt xã hội). Máy sinh 1 bài Facebook móc sự kiện sang góc ngư dân (VD "VN vô địch → ngư dân treo cờ đỏ ra khơi") + kịch bản video 5-8 cảnh với keyword ảnh để bạn dựng bằng CapCut. Playbook: "thời sự nghề = xăng tăng lực viral miễn phí".</td>
               </tr>
               <tr>
                 <td><b>🧪 Áp dụng đề xuất mới</b></td>

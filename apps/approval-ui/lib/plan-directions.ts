@@ -133,7 +133,7 @@ BỘ LỌC VÀNG — MỖI BÀI PHẢI CHẠM 1 TRONG 4 CHỮ CẢM XÚC (không
 - Hướng #2 (Thứ 3)  = VIRAL    · chữ RỦI RO · role="viral"    · kind="tip"       — cảnh báo hậu quả thật, kích tranh luận
 - Hướng #3 (Thứ 4)  = GIÁO DỤC · chữ TIỀN   · role="giao_duc" · kind="tip"       — mẹo tiết kiệm/tránh mua hớ, CÓ CON SỐ
 - Hướng #4 (Thứ 5)  = TƯƠNG TÁC · chữ NGHỀ  · role="tuong_tac" · kind="engage"   — poll/câu hỏi chia phe (A hay B)
-- Hướng #5 (Thứ 6)  = VIRAL    · chữ TỰ HÀO · role="viral"    · kind="tip"       — khoảnh khắc "lộc biển", payoff giây đầu
+- Hướng #5 (Thứ 6)  = VIRAL    · chữ TỰ HÀO · role="viral"    · kind="tip"       — ƯU TIÊN BÁM TREND VIỆT NAM tuần này (bóng đá đội tuyển thắng lớn, sự kiện lớn xã hội, giải quốc gia). Móc sang góc ngư dân (VD "VN vô địch → ngư dân Vũng Tàu treo cờ đỏ ra khơi"). Nếu không có trend hot → khoảnh khắc "lộc biển" bình thường payoff giây đầu.
 - Hướng #6 (Thứ 7)  = CÁ NHÂN  · chữ TỰ HÀO · role="ca_nhan"  · kind="qa"        — câu chuyện thật, người thật việc thật
 - Hướng #7 (CN)     = SEEDING  · chữ TIỀN   · role="seeding"  · kind="checklist" — checklist tuần dẫn tự nhiên về sản phẩm
 
