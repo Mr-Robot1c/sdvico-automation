@@ -404,27 +404,54 @@ export default async function TongQuanSection() {
                 const fbUrl = topFbUrls.get(t.cid);
                 const ytUrl = topYtUrls.get(t.cid);
                 return (
-                  <div key={t.cid} className="tq-item" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <div
+                    key={t.cid}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '24px 1fr',
+                      gap: 10,
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--line)',
+                      borderRadius: 10,
+                      padding: '8px 10px',
+                      alignItems: 'start',
+                      minWidth: 0,
+                      overflow: 'hidden',
+                    }}
+                  >
                     <span className="tq-rank" aria-hidden="true">{i + 1}</span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span className="tq-item-title">{prettifyTitle(topTitles.get(t.cid) || '')}</span>
-                      <span className="sub" style={{ display: 'block', fontSize: '.78rem' }}>
+                    <div style={{ minWidth: 0, display: 'grid', gap: 2 }}>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          fontSize: '.88rem',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {prettifyTitle(topTitles.get(t.cid) || '')}
+                      </div>
+                      <div className="sub" style={{ fontSize: '.78rem' }}>
                         {fmt(t.eng)} tương tác, {fmt(t.views)} lượt xem
-                      </span>
-                      <span style={{ display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+                      </div>
+                      <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
                         {fbUrl ? (
-                          <a href={fbUrl} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.78rem', display: 'inline-flex', alignItems: 'center', gap: 4 }} title="Mở bài trên Facebook Page">
+                          <a href={fbUrl} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.78rem', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} title="Mở bài trên Facebook Page">
                             <PlatformLogo platform="facebook" size={12} /> Xem trên Facebook ↗
                           </a>
                         ) : null}
                         {ytUrl ? (
-                          <a href={ytUrl} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.78rem', display: 'inline-flex', alignItems: 'center', gap: 4 }} title="Mở video trên YouTube">
+                          <a href={ytUrl} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.78rem', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} title="Mở video trên YouTube">
                             <PlatformLogo platform="youtube" size={12} /> Xem trên YouTube ↗
                           </a>
                         ) : null}
-                        <Link href="/do-luong" className="src" style={{ fontSize: '.78rem' }} title="Xem số liệu chi tiết">📊 Số liệu chi tiết</Link>
-                      </span>
-                    </span>
+                        <Link href="/do-luong" className="src" style={{ fontSize: '.78rem', whiteSpace: 'nowrap' }} title="Xem số liệu chi tiết">📊 Số liệu</Link>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
