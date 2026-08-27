@@ -11,6 +11,7 @@ import TikTokPrivateChip from './tiktok-private-chip';
 import ExportTiktokButton from './export-tiktok-button';
 import AddLeadButton from './add-lead-button';
 import LinkTikTokButton from './link-tiktok-button';
+import PexelsScenesButton from './pexels-scenes-button';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -345,11 +346,13 @@ export default async function BangSection() {
                             </button>
                           </form>
                         ) : null}
-                        {/* Bai trend co Pexels footage san - hien badge "Video Pexels dung tay" thay vi nut Lam video. */}
+                        {/* Bai trend co Pexels footage: mo modal xem 6 canh voi video preview + nut tai truc tiep. */}
                         {(brief as any).generator === 'trend' && Array.isArray((brief as any).video_scenes) && (brief as any).video_scenes.length > 0 ? (
-                          <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', border: '1px solid #93c5fd' }} title="Bai trend co san URL Pexels cho tung canh - mo Xem bai (nut mat) de tai video/anh Pexels ve, tu dung CapCut">
-                            🎥 Có {((brief as any).video_scenes || []).length} cảnh Pexels
-                          </span>
+                          <PexelsScenesButton
+                            scenes={(brief as any).video_scenes}
+                            title={c?.title}
+                            hook={(brief as any).hook_15w}
+                          />
                         ) : null}
                       </div>
                       <DecideActions
