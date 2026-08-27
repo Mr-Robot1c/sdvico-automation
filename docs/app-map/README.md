@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-26
 ttl_days: 180
+<!-- re-verified: 2026-08-27 16:40 - THEM route /api/tiktok/metrics-diag?secret=X: dump bai co brief.tiktok_video_id + mkt_metrics tiktok recent + video list Display API + so khop + run_log pull gan nhat + auto diagnosis (chua link/khong match/metrics rong). -->
 <!-- re-verified: 2026-08-27 16:20 - Bai trend dang 3 kenh FB+YT+TikTok + fix TikTok manual match: pullTikTokMetrics Supabase .not JSONB filter khong reliable -> select all + filter JS. -->
 <!-- re-verified: 2026-08-27 15:35 - FIX UI khong hien video trend da build (user 27/8 Watcher log VIDEO TREND XONG voi asset_id, UI van chi hien badge Pexels). Root cause: bang-section chi collect asset ID tu payload.assets + brief.assets.video_v (doc TikTok), THIEU brief.assets.video (ngang bai trend). Fix: them dong `if (typeof bAssets.video === 'string') assetIds.add(bAssets.video)`. Kem: hien badge xanh "🎬✓ Video xong (Ns) ↗" cho bai trend co assets.video + trend_video_built_at - bam mo tab moi xem/tai video. -->
 <!-- re-verified: 2026-08-27 14:20 - Watcher local build mode trend: build-video.mjs bo skip, them buildTrendVideoFromPexels download Pexels + TTS + ghep 1920x1080 + concat + upload Supabase. actions.ts generateTrendPost auto set video_requested=true khi co Pexels URL. -->
