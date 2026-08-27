@@ -10,6 +10,7 @@ import PlatformLogo, { type PlatformKey } from './platform-logo';
 import TikTokPrivateChip from './tiktok-private-chip';
 import ExportTiktokButton from './export-tiktok-button';
 import AddLeadButton from './add-lead-button';
+import LinkTikTokButton from './link-tiktok-button';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -401,7 +402,17 @@ export default async function BangSection() {
                           ) : null}
                         </span>
                       ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
-                      {it.cid ? <div style={{ marginTop: 4 }}><AddLeadButton contentId={it.cid} /></div> : null}
+                      {it.cid ? (
+                        <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          <AddLeadButton contentId={it.cid} />
+                          {(() => {
+                            const cnt = contents.get(it.cid);
+                            const linkedVid = (cnt?.brief as any)?.tiktok_video_id as string | undefined;
+                            const linkedUrl = (cnt?.brief as any)?.tiktok_share_url as string | undefined;
+                            return <LinkTikTokButton contentId={it.cid} linkedVideoId={linkedVid || null} linkedShareUrl={linkedUrl || null} />;
+                          })()}
+                        </div>
+                      ) : null}
                       {fbPost ? <span><ShareGroups postUrl={fbPost.url} planGroupsToday={groupsForDate(lastAt)} /></span> : null}
                       {!posts.some((x) => x.channel === 'facebook') && fbFailed.has(it.cid) ? (
                         fbRetrying.has(it.cid) ? (

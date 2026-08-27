@@ -51,22 +51,45 @@ export async function pullTikTokMetrics(client: Client): Promise<{ pulled: numbe
   }
   if (!videos.length) return { pulled: 0, matched: 0, errors };
 
-  // 2. Bài TikTok đã đăng gần nhất trong hệ thống (30 ngày, thừa cửa sổ khớp).
-  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+  // 2a. Ưu tiên MATCH TAY (27/8): brief.tiktok_video_id user chọn qua UI /noi-dung. Match
+  //     kiểu này CHÍNH XÁC, không lệch thời gian.
+  const since = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+  const { data: manualMatchRows } = await client
+    .from('mkt_content')
+    .select('id, brief')
+    .not('brief->>tiktok_video_id', 'is', null)
+    .gte('created_at', since);
+  const manualMap = new Map<string, string>(); // videoId -> contentId
+  for (const c of manualMatchRows || []) {
+    const brief = (c as any).brief || {};
+    const vid = String(brief.tiktok_video_id || '');
+    if (vid) manualMap.set(vid, String((c as any).id));
+  }
+
+  // 2b. Bài TikTok đã đăng gần nhất trong hệ thống (30 ngày) — cho MATCH BY TIME fallback.
+  const since30 = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
   const { data: postRows } = await client
     .from('mkt_posts')
     .select('content_id, external_url, published_at')
     .eq('channel', 'tiktok')
     .eq('status', 'published')
-    .gte('published_at', since)
+    .gte('published_at', since30)
     .order('published_at', { ascending: false })
     .limit(60);
   const posts = (postRows || []).filter((p: any) => p.content_id && p.published_at);
-  if (!posts.length) return { pulled: 0, matched: 0, errors };
 
-  // 3. Khớp video ↔ post theo thời gian, giữ cặp lệch ít nhất.
-  const matched: Array<{ contentId: string; video: typeof videos[number]; deltaSec: number }> = [];
+  // 3. Khớp video ↔ content_id: ưu tiên manual map, fallback time-match.
+  const matched: Array<{ contentId: string; video: typeof videos[number]; deltaSec: number; via: 'manual' | 'time' }> = [];
   const usedVideos = new Set<string>();
+
+  for (const v of videos) {
+    const manualCid = manualMap.get(v.id);
+    if (manualCid) {
+      matched.push({ contentId: manualCid, video: v, deltaSec: 0, via: 'manual' });
+      usedVideos.add(v.id);
+    }
+  }
+
   for (const p of posts as any[]) {
     const postTs = Math.floor(new Date(p.published_at).getTime() / 1000);
     let best: { video: typeof videos[number]; delta: number } | null = null;
@@ -77,7 +100,7 @@ export async function pullTikTokMetrics(client: Client): Promise<{ pulled: numbe
       if (!best || delta < best.delta) best = { video: v, delta };
     }
     if (best) {
-      matched.push({ contentId: p.content_id, video: best.video, deltaSec: best.delta });
+      matched.push({ contentId: p.content_id, video: best.video, deltaSec: best.delta, via: 'time' });
       usedVideos.add(best.video.id);
     }
   }
@@ -103,4 +126,39 @@ export async function pullTikTokMetrics(client: Client): Promise<{ pulled: numbe
   const { error } = await client.from('mkt_metrics').insert(rows);
   if (error) errors.push('insert: ' + error.message);
   return { pulled: rows.length, matched: matched.length, errors };
+}
+
+// User 27/8: bỏ TikTok API 26/8 dùng ExportTiktokButton -> match by time không đủ (video đăng
+// tay lệch giờ). Thêm cơ chế MATCH TAY: user chọn video TikTok tương ứng với bài trong UI,
+// lưu vào mkt_content.brief.tiktok_video_id. Hàm này pull video profile để user chọn.
+export type TikTokVideo = {
+  id: string;
+  create_time: number;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  share_count: number;
+  title?: string;
+  share_url?: string;
+};
+
+export async function getTikTokRecentVideos(client: Client): Promise<{ videos: TikTokVideo[]; error?: string }> {
+  let accessToken: string;
+  try {
+    const t = await getValidTikTokToken(client);
+    accessToken = t.accessToken;
+  } catch (e: any) {
+    return { videos: [], error: 'token: ' + String(e?.message || e) };
+  }
+  try {
+    const r = await fetch(
+      'https://open.tiktokapis.com/v2/video/list/?fields=id,create_time,view_count,like_count,comment_count,share_count,title,share_url',
+      { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ max_count: 20 }) }
+    );
+    const j: any = await r.json();
+    if (!r.ok) return { videos: [], error: 'video/list: HTTP ' + r.status };
+    return { videos: j.data?.videos || [] };
+  } catch (e: any) {
+    return { videos: [], error: 'fetch: ' + String(e?.message || e) };
+  }
 }

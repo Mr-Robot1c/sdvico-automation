@@ -725,6 +725,63 @@ export async function saveSalesZalo(formData: FormData) {
 // vào bài cụ thể. BOSS dùng lead count per bài để xếp hạng sản phẩm (thay vì chỉ view/like).
 // channel: 'zalo' | 'inbox' | 'call' | 'meet' — prefix vào message để phân loại (không cần
 // migration DB thêm cột, tận dụng bảng cũ).
+// Playbook 27/8: user chọn video TikTok tương ứng với 1 bài (do bài xuất tay lên TikTok
+// Studio nên published_at trong DB lệch với video.create_time thật). Lưu vào brief.tiktok_video_id
+// -> pullTikTokMetrics dùng mapping chính xác.
+export async function linkTikTokVideoToContent(formData: FormData): Promise<{ ok: boolean; msg: string }> {
+  const contentId = String(formData.get('content_id') || '').trim();
+  const videoId = String(formData.get('video_id') || '').trim();
+  const shareUrl = String(formData.get('share_url') || '').trim();
+  if (!contentId || !videoId) return { ok: false, msg: 'Thiếu content_id hoặc video_id' };
+  const client = getServerClient();
+  const { data: content } = await client.from('mkt_content').select('brief').eq('id', contentId).maybeSingle();
+  if (!content) return { ok: false, msg: 'Không tìm thấy bài' };
+  const brief = { ...((content as any).brief || {}), tiktok_video_id: videoId, tiktok_share_url: shareUrl || null };
+  const { error } = await client.from('mkt_content').update({ brief }).eq('id', contentId);
+  if (error) return { ok: false, msg: 'Lỗi lưu: ' + error.message };
+  revalidatePath('/noi-dung');
+  revalidatePath('/do-luong');
+  return { ok: true, msg: 'Đã ghép video. Bấm "Kéo số liệu" để cập nhật view/like.' };
+}
+
+export async function unlinkTikTokVideoFromContent(formData: FormData): Promise<{ ok: boolean; msg: string }> {
+  const contentId = String(formData.get('content_id') || '').trim();
+  if (!contentId) return { ok: false, msg: 'Thiếu content_id' };
+  const client = getServerClient();
+  const { data: content } = await client.from('mkt_content').select('brief').eq('id', contentId).maybeSingle();
+  if (!content) return { ok: false, msg: 'Không tìm thấy bài' };
+  const brief = { ...((content as any).brief || {}) };
+  delete brief.tiktok_video_id;
+  delete brief.tiktok_share_url;
+  const { error } = await client.from('mkt_content').update({ brief }).eq('id', contentId);
+  if (error) return { ok: false, msg: 'Lỗi: ' + error.message };
+  revalidatePath('/noi-dung');
+  return { ok: true, msg: 'Đã bỏ ghép' };
+}
+
+// Trả list 20 video TikTok gần nhất trên profile cho UI hiển thị dropdown.
+export async function getTikTokVideosForMatching(): Promise<{ ok: boolean; videos: any[]; error?: string }> {
+  const client = getServerClient();
+  try {
+    const { getTikTokRecentVideos } = await import('../lib/tiktok-metrics');
+    const { videos, error } = await getTikTokRecentVideos(client);
+    if (error) return { ok: false, videos: [], error };
+    // Chỉ trả field cần cho UI, không lộ toàn bộ raw.
+    return { ok: true, videos: videos.map((v) => ({
+      id: v.id,
+      title: v.title || '',
+      shareUrl: v.share_url || '',
+      views: v.view_count || 0,
+      likes: v.like_count || 0,
+      comments: v.comment_count || 0,
+      createTime: v.create_time,
+      createdAtVN: new Date(v.create_time * 1000).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+    })) };
+  } catch (e: any) {
+    return { ok: false, videos: [], error: String(e?.message || e).slice(0, 200) };
+  }
+}
+
 // Xoá HẲN 1 lead khỏi mkt_leads (user 27/8: bảng có nhiều test rác/lead ma cần dọn tay).
 // Không revert được — chỉ dùng khi chắc chắn không cần. Muốn ẩn tạm dùng status='spam' qua
 // LeadStatusSelect thay vì xoá.
@@ -1753,9 +1810,9 @@ export async function deletePlan(formData: FormData) {
 // Kéo số liệu 3 nền tảng ngay (Facebook + YouTube + TikTok) — user bấm nút thay vì chờ
 // cron 1h (user 26/8: "sếp muốn thấy số liệu ngay không phải chờ"). Song song 3 nguồn, 1
 // nguồn lỗi không đánh hỏng nguồn khác. Sau khi xong revalidate các trang có số liệu.
-export async function pullMetricsNow(): Promise<{ ok: boolean; fb: number; yt: number; tt: number; msg: string; details?: any }> {
+export async function pullMetricsNow(): Promise<{ ok: boolean; fb: number; yt: number; tt: number; inbox: number; msg: string; details?: any }> {
   const client = getServerClient();
-  const [fbRes, ytRes, ttRes] = await Promise.all([
+  const [fbRes, ytRes, ttRes, inboxRes] = await Promise.all([
     pullFacebookMetrics(client).catch((e) => ({ pulled: 0, results: [{ error: String(e?.message || e) }] })),
     (async () => {
       try {
@@ -1769,10 +1826,18 @@ export async function pullMetricsNow(): Promise<{ ok: boolean; fb: number; yt: n
         return await pullTikTokMetrics(client);
       } catch (e: any) { return { pulled: 0, matched: 0, errors: [String(e?.message || e)] }; }
     })(),
+    (async () => {
+      try {
+        const { pullFacebookInbox } = await import('../lib/fb-inbox');
+        return await pullFacebookInbox(client);
+      } catch (e: any) { return { pulled: 0, skipped: 0, errors: [String(e?.message || e)] }; }
+    })(),
   ]);
   const fb = (fbRes as any).pulled || 0;
   const yt = (ytRes as any).pulled || 0;
   const tt = (ttRes as any).pulled || 0;
+  const inbox = (inboxRes as any).pulled || 0;
+  const inboxErrors = Array.isArray((inboxRes as any).errors) ? (inboxRes as any).errors : [];
   // 27/8: user "do luong khong keo so lieu tiktok ve nua" — thêm log chi tiết errors/matched
   // để debug khi TikTok pulled=0 (có thể do token hết hạn, do 0 matched giữa video profile ↔ mkt_posts).
   const ttMatched = (ttRes as any).matched;
@@ -1783,29 +1848,33 @@ export async function pullMetricsNow(): Promise<{ ok: boolean; fb: number; yt: n
     await client.from('run_log').insert({
       task: 'mkt.metrics_pull_manual',
       actor: 'user',
-      status: (ttErrors.length || ytErrors.length || fbErrors.length) ? 'error' : 'ok',
+      status: (ttErrors.length || ytErrors.length || fbErrors.length || inboxErrors.length) ? 'error' : 'ok',
       detail: {
-        fb, yt, tt, tt_matched: ttMatched,
+        fb, yt, tt, inbox, tt_matched: ttMatched,
         tt_errors: ttErrors.slice(0, 3),
         yt_errors: ytErrors.slice(0, 3),
         fb_errors: fbErrors.slice(0, 3),
+        inbox_errors: inboxErrors.slice(0, 3),
       },
     });
   } catch { /* bỏ qua */ }
   revalidatePath('/noi-dung');
   revalidatePath('/do-luong');
   revalidatePath('/do-luong/tuan');
+  revalidatePath('/khach-hang');
   const parts: string[] = [];
   if (fb) parts.push(`Facebook ${fb}`);
   if (yt) parts.push(`YouTube ${yt}`);
   if (tt) parts.push(`TikTok ${tt}`);
+  if (inbox) parts.push(`Inbox ${inbox} tin`);
   // Nếu TikTok 0 bài — gợi ý lý do gọn cho user.
   const suffixes: string[] = [];
   if (!tt && ttErrors.length) suffixes.push(`TikTok lỗi: ${ttErrors[0].slice(0, 80)}`);
-  else if (!tt && ttMatched === 0) suffixes.push('TikTok không khớp bài nào (video trên profile không đăng qua app hoặc lệch giờ >10 phút).');
+  else if (!tt && ttMatched === 0) suffixes.push('TikTok không khớp bài nào (video trên profile không đăng qua app hoặc lệch giờ >6h).');
+  if (inboxErrors.length) suffixes.push(`Inbox lỗi: ${inboxErrors[0].slice(0, 80)}`);
   const msg = parts.length
     ? `Đã kéo: ${parts.join(', ')} bài${suffixes.length ? '. ' + suffixes.join(' ') : ''}`
     : `Không có số liệu mới.${suffixes.length ? ' ' + suffixes.join(' ') : ''}`;
-  return { ok: true, fb, yt, tt, msg, details: { tt_errors: ttErrors, yt_errors: ytErrors, fb_errors: fbErrors, tt_matched: ttMatched } };
+  return { ok: true, fb, yt, tt, inbox, msg, details: { tt_errors: ttErrors, yt_errors: ytErrors, fb_errors: fbErrors, inbox_errors: inboxErrors, tt_matched: ttMatched } };
 }
 
