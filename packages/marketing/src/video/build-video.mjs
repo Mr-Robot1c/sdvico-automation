@@ -600,8 +600,9 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
 
   // Dung arg() helper co san (parse argv --voice), fallback edge-tts default.
   const voice = arg('voice', 'vi-VN-HoaiMyNeural');
-  // TARGET res: 16:9 landscape 1920x1080 (dep tren Facebook, TikTok co re-render doc sau).
-  const W = 1920, H = 1080;
+  // TARGET res: 9:16 vertical 1080x1920 (user 27/8: video trend phai la YouTube SHORT +
+  // TikTok video doc. YouTube nhan Short khi video doc + <=60s + co #Shorts trong tieu de/mo ta).
+  const W = 1080, H = 1920;
 
   const clipPaths = [];
   const sceneDurations = []; // theo dõi để build SRT sau khi concat
@@ -704,7 +705,8 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
   await writeFile(srtPath, srt, 'utf8');
 
   const outputPath = join(workDir, `sdvico_trend_${contentId.slice(0, 8)}.mp4`);
-  const forceStyle = "FontName=Arial,FontSize=20,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,BorderStyle=1,Alignment=2,MarginV=40";
+  // Video doc 1080x1920 -> font to hon + margin day cao (tranh che nut Shorts).
+  const forceStyle = "FontName=Arial,FontSize=32,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=3,Shadow=1,BorderStyle=1,Alignment=2,MarginV=140";
   try {
     await ffmpeg([
       '-y', '-i', concatPath,
@@ -738,9 +740,12 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
   }).select('id').single();
   if (assErr) throw new Error('Insert brand_assets loi: ' + assErr.message);
 
+  // Video trend gio la 9:16 vertical (Short/TikTok) -> luu vao assets.video_v de nut
+  // "Xuat TikTok" o /noi-dung nhan ra (nut check brief.assets.video_v). Van giu .video
+  // cho backward-compat voi cac bai da build truoc do.
   const newBrief = {
     ...brief,
-    assets: { ...(brief.assets || {}), video: asset.id },
+    assets: { ...(brief.assets || {}), video_v: asset.id, video: asset.id },
     video_requested: false,
     trend_video_built_at: new Date().toISOString(),
     trend_video_duration_sec: Math.round(finalTotalDur),

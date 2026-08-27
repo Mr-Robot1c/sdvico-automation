@@ -2,8 +2,9 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ttl_days: 90
+<!-- re-verified: 2026-08-27 17:50 - VIDEO TREND thanh 9:16 vertical (user 27/8: YT Short + TikTok). W/H 1920x1080 -> 1080x1920. Subtitle Font 20 -> 32, MarginV 40 -> 140. brief.assets.video_v = asset.id (moi) + giu .video (backward) -> nut "Xuat TikTok" o bang-section.tsx hien duoc. -->
 <!-- re-verified: 2026-08-27 15:50 - Them subtitle burn cho video trend (SRT tu narration + sceneDurations, ffmpeg subtitles filter Arial 20 chu trang vien den can duoi). -->
 <!-- re-verified: 2026-08-27 15:15 - Fix ffmpeg force_original_aspect_ratio cover->increase. -->
 <!-- re-verified: 2026-08-27 15:00 - Fix download Pexels URL bang fetch (khong dung downloadAsset cho Supabase Storage). -->
