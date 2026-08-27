@@ -87,9 +87,9 @@ export default async function TongQuanSection() {
       .from('mkt_leads')
       .select('id, source, fb_user_name, fb_profile_url, message, created_at, content_id, status, note', { count: 'exact' })
       .neq('status', 'spam')
-      .gte('created_at', todayStartIso)
+      .gte('created_at', new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString())
       .order('created_at', { ascending: false })
-      .limit(50),
+      .limit(200),
   ]);
 
   // NV kinh doanh nhan Zalo forward - LeadQuickView modal can de "Chuyen NV" button.
@@ -137,7 +137,8 @@ export default async function TongQuanSection() {
   const tEngagement = tReactions + tComments + tShares + yLikes + yComments;
   const pendingCount = pendingRes.count || 0;
   const leadCount = leadsRes.count || 0;
-  const leadTodayCount = leadsTodayRes.count || 0;
+  // Đếm today riêng client-side từ list 30 ngày (không cần query thêm).
+  const leadTodayCount = ((leadsTodayRes.data || []) as any[]).filter((l) => String(l.created_at || '') >= todayStartIso).length;
   const planRow = planRes.data as any;
   const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 

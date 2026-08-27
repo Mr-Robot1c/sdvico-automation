@@ -85,28 +85,51 @@ async function pullOnePage(client: Client, pageId: string, token: string, label:
 
   if (!allMsgs.length) return { pulled, skipped, errors };
 
-  // 3. Dedup: check message_id nào đã có trong mkt_leads.raw_payload.mid.
-  //    Query những row có source='facebook_message' + raw_payload.mid IN (danh sách id vừa lấy).
-  //    Supabase JSONB filter: dùng .in không được với JSONB field. Dùng .contains?
-  //    Trick: lấy hết mkt_leads recent facebook_message + build Set các mid đã có.
+  // 3. Dedup 2 tầng:
+  //    (a) Theo message.id (mid) — tránh insert lại tin đã pull lần trước.
+  //    (b) Theo (fromId + text) trong 5 phút — user gửi trùng nội dung liên tiếp (bấm Send 3
+  //        lần cùng câu) chỉ đếm là 1 lead. Playbook: 3 tin cùng câu = 1 khách sốt ruột.
+  //    Query lấy raw_payload + message + fb_user_id + created_at, build 2 set/map.
   const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
   const { data: existing } = await client
     .from('mkt_leads')
-    .select('raw_payload')
+    .select('raw_payload, message, fb_user_id, created_at')
     .eq('source', 'facebook_message')
     .gte('created_at', since)
     .limit(1000);
   const seenMids = new Set<string>();
+  // Map (fromId + '||' + textLower) -> array of created_at ISO (để check window 5 phút).
+  const seenContentTimes = new Map<string, number[]>();
+  const contentKey = (fromId: string, text: string) => `${fromId}||${text.toLowerCase().trim()}`;
   for (const r of existing || []) {
     const p = (r as any).raw_payload;
     const mid = p?.mid || p?.id;
     if (mid) seenMids.add(String(mid));
+    const from = String((r as any).fb_user_id || '');
+    const txt = String((r as any).message || '');
+    const at = String((r as any).created_at || '');
+    if (from && txt && at) {
+      const k = contentKey(from, txt);
+      const arr = seenContentTimes.get(k) || [];
+      arr.push(new Date(at).getTime());
+      seenContentTimes.set(k, arr);
+    }
   }
 
   // 4. Insert message mới. Batch insert 1 lần cho nhanh, nhưng phải build rows trước.
+  const DEDUP_WINDOW_MS = 5 * 60 * 1000;
   const rows: any[] = [];
   for (const m of allMsgs) {
     if (seenMids.has(m.id)) { skipped++; continue; }
+    // Dedup nội dung: nếu cùng khách + cùng câu trong ±5 phút -> skip (coi là 1 lead).
+    const k = contentKey(m.fromId, m.text);
+    const msgTime = m.createdAt ? new Date(m.createdAt).getTime() : Date.now();
+    const times = seenContentTimes.get(k) || [];
+    if (times.some((t) => Math.abs(t - msgTime) < DEDUP_WINDOW_MS)) {
+      skipped++;
+      seenMids.add(m.id); // mid vẫn add để lần sau không thử lại
+      continue;
+    }
     rows.push({
       source: 'facebook_message',
       fb_user_id: m.fromId,
@@ -117,6 +140,8 @@ async function pullOnePage(client: Client, pageId: string, token: string, label:
       raw_payload: { mid: m.id, from: { id: m.fromId, name: m.fromName }, created_time: m.createdAt, conversation_id: m.conversationId, page_label: label, source: 'inbox_pull' },
     });
     seenMids.add(m.id);
+    times.push(msgTime);
+    seenContentTimes.set(k, times);
   }
   if (!rows.length) return { pulled, skipped, errors };
 

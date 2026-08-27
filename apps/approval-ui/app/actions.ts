@@ -782,6 +782,44 @@ export async function getTikTokVideosForMatching(): Promise<{ ok: boolean; video
   }
 }
 
+// Dọn dedup lead trùng (fromId + text) trong 5 phút — user 27/8 sau khi pull inbox có 3 tin
+// cùng câu từ 1 khách (user gửi Send 3 lần). Server action gộp: giữ tin đầu tiên, xoá tin sau.
+export async function dedupLeadsByContent(): Promise<{ ok: boolean; deleted: number; msg: string }> {
+  const client = getServerClient();
+  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+  const { data: leads } = await client
+    .from('mkt_leads')
+    .select('id, fb_user_id, message, created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: true })
+    .limit(2000);
+  if (!leads?.length) return { ok: true, deleted: 0, msg: 'Không có lead nào để dedup.' };
+
+  const WINDOW_MS = 5 * 60 * 1000;
+  const seen = new Map<string, number>();
+  const toDelete: string[] = [];
+  for (const l of leads as any[]) {
+    const from = String(l.fb_user_id || '');
+    const txt = String(l.message || '').toLowerCase().trim();
+    if (!from || !txt) continue;
+    const k = `${from}||${txt}`;
+    const t = new Date(l.created_at).getTime();
+    const prevT = seen.get(k);
+    if (prevT != null && Math.abs(prevT - t) < WINDOW_MS) {
+      toDelete.push(String(l.id));
+    } else {
+      seen.set(k, t);
+    }
+  }
+  if (!toDelete.length) return { ok: true, deleted: 0, msg: 'Không tìm thấy lead trùng nội dung trong ±5 phút.' };
+
+  const { error } = await client.from('mkt_leads').delete().in('id', toDelete);
+  if (error) return { ok: false, deleted: 0, msg: 'Lỗi: ' + error.message };
+  revalidatePath('/khach-hang');
+  revalidatePath('/noi-dung');
+  return { ok: true, deleted: toDelete.length, msg: `Đã dọn ${toDelete.length} lead trùng nội dung (giữ tin đầu tiên).` };
+}
+
 // Xoá HẲN 1 lead khỏi mkt_leads (user 27/8: bảng có nhiều test rác/lead ma cần dọn tay).
 // Không revert được — chỉ dùng khi chắc chắn không cần. Muốn ẩn tạm dùng status='spam' qua
 // LeadStatusSelect thay vì xoá.
