@@ -49,8 +49,8 @@ export default async function Page() {
     .limit(200);
   const posts = (postsToday || []) as any[];
 
-  // 27/8: TikTok/YT KHÔNG dựa vào mkt_posts vì user hay link tay qua brief.tiktok_video_id
-  // (không tạo mkt_posts). Query mkt_metrics source='tiktok'/'youtube' created_at HÔM NAY:
+  // 27/8: TikTok RIÊNG BIỆT - user link tay video profile qua brief.tiktok_video_id
+  // (không tạo mkt_posts). Query mkt_metrics source='tiktok' created_at HÔM NAY:
   // bài nào có snapshot mới hôm nay là bài "đang chạy", hiện lên bảng.
   const { data: ttToday } = await client
     .from('mkt_metrics')
@@ -59,30 +59,35 @@ export default async function Page() {
     .gte('created_at', dayStart)
     .order('created_at', { ascending: false })
     .limit(200);
-  const { data: ytToday } = await client
-    .from('mkt_metrics')
-    .select('entity_ref, metrics, created_at')
-    .eq('source', 'youtube')
-    .gte('created_at', dayStart)
-    .order('created_at', { ascending: false })
-    .limit(200);
-
   const ttLatest = new Map<string, { m: M; ts: string }>();
   for (const r of (ttToday || []) as any[]) {
     const cid = r.entity_ref;
     if (cid && !ttLatest.has(cid)) ttLatest.set(cid, { m: r.metrics || {}, ts: r.created_at });
   }
-  const ytLatest = new Map<string, { m: M; ts: string }>();
-  for (const r of (ytToday || []) as any[]) {
-    const cid = r.entity_ref;
-    if (cid && !ytLatest.has(cid)) ytLatest.set(cid, { m: r.metrics || {}, ts: r.created_at });
+
+  // YouTube: dùng mkt_posts published_at HÔM NAY như Facebook (bài đăng qua system hôm nay).
+  // Cron pull YT 30p/lần cho tất cả bài -> nếu lấy theo snapshot sẽ hiện HẾT bài đã đăng.
+  const ytPostsToday = posts.filter((p) => p.channel === 'youtube');
+  const ytCids = [...new Set(ytPostsToday.map((p) => p.content_id).filter(Boolean))] as string[];
+  const latestYT = new Map<string, M>();
+  if (ytCids.length) {
+    const { data: ytMetricsRows } = await client
+      .from('mkt_metrics')
+      .select('entity_ref, metrics, created_at')
+      .eq('source', 'youtube')
+      .in('entity_ref', ytCids)
+      .order('created_at', { ascending: false })
+      .limit(400);
+    for (const r of (ytMetricsRows || []) as any[]) {
+      const cid = r.entity_ref;
+      if (!latestYT.has(cid)) latestYT.set(cid, r.metrics || {});
+    }
   }
 
-  // Gom content_id để lấy tên bài + brief (bài Facebook hôm nay + snapshot TT/YT hôm nay).
+  // Gom content_id để lấy tên bài + brief (bài đăng hôm nay + snapshot TikTok link tay).
   const cids = [...new Set([
     ...posts.map((p) => p.content_id).filter(Boolean),
     ...ttLatest.keys(),
-    ...ytLatest.keys(),
   ])] as string[];
   const contentsMap = new Map<string, { title: string; brief: any }>();
   if (cids.length) {
@@ -124,8 +129,11 @@ export default async function Page() {
       const m = latestFB.get(cid) || {};
       const isReal = !!(isOtherPage as (u: string, b: any) => boolean)(url, c?.brief || {});
       (isReal ? fbRealRows : fbTestRows).push({ cid, title, url, publishedAt, m });
+    } else if (p.channel === 'youtube') {
+      const m = latestYT.get(cid) || {};
+      ytRows.push({ cid, title, url, publishedAt, m });
     }
-    // Ghi chú: TikTok/YT không lấy từ mkt_posts nữa, dùng snapshot mkt_metrics ở dưới.
+    // TikTok không lấy từ mkt_posts (user thường link tay), dùng snapshot mkt_metrics ở dưới.
   }
   for (const [cid, { m, ts }] of ttLatest) {
     const c = contentsMap.get(cid);
@@ -133,17 +141,6 @@ export default async function Page() {
       cid,
       title: c?.title || '(không tên)',
       url: (m as any).shareUrl || '',
-      publishedAt: ts,
-      m,
-      timeLabel: 'Số',
-    });
-  }
-  for (const [cid, { m, ts }] of ytLatest) {
-    const c = contentsMap.get(cid);
-    ytRows.push({
-      cid,
-      title: c?.title || '(không tên)',
-      url: (m as any).videoId ? `https://youtube.com/shorts/${(m as any).videoId}` : '',
       publishedAt: ts,
       m,
       timeLabel: 'Số',
@@ -157,7 +154,7 @@ export default async function Page() {
   const impRow = (impRows || [])[0] as any;
   const lastImport = impRow ? { status: String(impRow.status), msg: String(impRow.detail?.msg || ''), link: String(impRow.detail?.link || '') } : null;
 
-  const empty = posts.length === 0 && ttLatest.size === 0 && ytLatest.size === 0;
+  const empty = posts.length === 0 && ttLatest.size === 0;
 
   return (
     <main>
