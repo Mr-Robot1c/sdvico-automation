@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 // Nut "Chia se vao group" cho bai da dang len Facebook Page (user 20/8: Groups API bi Meta dong
 // tu 2020 -> khong the tu dong post vao group; giai phap: rut gon con 2 click/group). Bam nut:
@@ -72,7 +73,32 @@ export default function ShareGroups({
   // User 26/8: bài đăng ngày nào -> chỉ hiện groups đã lên plan ngày đó. Toggle "Xem tất cả"
   // để override khi user muốn chia sẻ vào group ngoài plan (case ngoại lệ).
   const [showAll, setShowAll] = useState(false);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
   const popRef = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Portal render lên body cần biết mounted (Next.js SSR không có document).
+  useEffect(() => setMounted(true), []);
+
+  // Tính vị trí popover theo button ref (fixed positioning, không bị table overflow cắt).
+  // useLayoutEffect chạy sync trước paint để không nhấp nháy.
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return;
+    const update = () => {
+      const r = btnRef.current!.getBoundingClientRect();
+      const top = Math.round(r.bottom + 6);
+      const right = Math.round(window.innerWidth - r.right);
+      setPos({ top, right });
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open]);
   // Ref giữ bản groups MỚI NHẤT cho các chỗ lưu chạy ngoài vòng render (timer, đóng popover)
   // — closure cũ từng lưu thiếu ký tự cuối khi gõ nhanh rồi bấm ra ngoài.
   const groupsRef = useRef<SavedGroup[]>(groups);
@@ -98,7 +124,11 @@ export default function ShareGroups({
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (popRef.current && !popRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      // Bấm trong popover (portal) hoặc trong nút button đều KHÔNG đóng.
+      const inPop = popRef.current && popRef.current.contains(target);
+      const inBtn = btnRef.current && btnRef.current.contains(target);
+      if (!inPop && !inBtn) {
         if (saveTimer.current) clearTimeout(saveTimer.current);
         saveGroupsServer(groupsRef.current);
         setOpen(false);
@@ -148,27 +178,19 @@ export default function ShareGroups({
     saveGroupsServer(groupsRef.current);
   };
 
-  return (
-    <span style={{ marginLeft: 8, position: 'relative', display: 'inline-block' }} ref={popRef}>
-      <button
-        type="button"
-        className="btn ghost sm"
-        onClick={() => setOpen((v) => !v)}
-        title="Chia sẻ vào group (rút gọn thao tác)"
-      >
-        📣 Chia sẻ vào group
-      </button>
-      {open ? (
-        <div
-          role="dialog"
-          aria-label="Chia sẻ vào group"
-          style={{
-            position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 100,
-            background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10,
-            padding: 12, width: 360, boxShadow: '0 10px 28px rgba(0,0,0,.18)'
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
+  const popContent = open && pos ? (
+    <div
+      ref={popRef}
+      role="dialog"
+      aria-label="Chia sẻ vào group"
+      style={{
+        position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999,
+        background: 'var(--bg-1, #ffffff)', border: '1px solid var(--line, #d1d5db)', borderRadius: 10,
+        padding: 12, width: 360, boxShadow: '0 14px 42px rgba(0,0,0,.28)',
+        color: 'var(--ink, #111827)',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
           <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 8 }}>
             Facebook không cho tự đăng vào group qua API. Rút gọn:
             <b> (1) Copy link → (2) mở group → dán + Post</b>.
@@ -261,7 +283,20 @@ Bấm để đặt tên gợi nhớ`}
             <button type="button" className="btn ok sm" onClick={addGroup}>Thêm</button>
           </div>
         </div>
-      ) : null}
+  ) : null;
+
+  return (
+    <span style={{ marginLeft: 8, display: 'inline-block' }}>
+      <button
+        ref={btnRef}
+        type="button"
+        className="btn ghost sm"
+        onClick={() => setOpen((v) => !v)}
+        title="Chia sẻ vào group (rút gọn thao tác)"
+      >
+        📣 Chia sẻ vào group
+      </button>
+      {mounted && popContent ? createPortal(popContent, document.body) : null}
     </span>
   );
 }
