@@ -1,7 +1,8 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { updateLeadStatus, addLeadManual, saveSalesZalo } from '../actions';
+import { updateLeadStatus, addLeadManual } from '../actions';
 import LeadStatusSelect from './lead-status-select';
 import ForwardZaloButton from './forward-zalo-button';
+import SalesZaloEditor from './sales-zalo-editor';
 
 // Trang "Theo dõi người mua" (24/8, user: "thông tin khách hàng sẽ được gửi về cho nhân
 // viên kinh doanh"). Nhân viên vào đây xem danh sách người hỏi mua bắt được từ comment/tin
@@ -60,7 +61,6 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
   // Danh sách NV kinh doanh nhận forward Zalo (user 25/8).
   const { data: salesRow } = await client.from('app_config').select('value').eq('key', 'mkt_sales_zalo').maybeSingle();
   const salesPeople: Array<{ name: string; phone: string }> = Array.isArray((salesRow as any)?.value?.people) ? (salesRow as any).value.people : [];
-  const salesTextarea = salesPeople.map((p) => `${p.name} | ${p.phone}`).join('\n');
 
   return (
     <main>
@@ -89,18 +89,9 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
           <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>{salesPeople.length} người</span>
         </summary>
         <p className="sub" style={{ margin: '8px 0' }}>
-          Mỗi dòng một NV, format: <code>Tên NV | SĐT Zalo</code>. Bấm "📱 Chuyển NV" ở mỗi lead sẽ copy nội dung vào clipboard + mở tab zalo.me tới NV bạn chọn — NV paste vào chat Zalo cá nhân. (Zalo OA chưa xác thực nên chưa gửi tự động được.)
+          Thêm nhân viên nhận Zalo forward, mỗi NV 1 dòng. Bấm "📱 Chuyển NV" ở mỗi lead sẽ copy nội dung vào clipboard + mở tab zalo.me tới NV bạn chọn — NV paste vào chat Zalo cá nhân. (Zalo OA chưa xác thực nên chưa gửi tự động được.)
         </p>
-        <form action={saveSalesZalo} style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
-          <textarea
-            name="people"
-            defaultValue={salesTextarea}
-            rows={4}
-            placeholder={`Ví dụ:\nAnh Bình | 0939123456\nChị Hoa | 0912345678`}
-            style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)', fontFamily: 'inherit', fontSize: '.92rem', resize: 'vertical', minHeight: 80 }}
-          />
-          <button className="btn ok sm" type="submit" style={{ alignSelf: 'flex-start' }}>Lưu danh sách</button>
-        </form>
+        <SalesZaloEditor initial={salesPeople} />
       </details>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
