@@ -179,9 +179,11 @@ export default async function BangSection() {
     if (typeof a.image === 'string') assetIds.add(a.image);
     if (typeof a.video === 'string') assetIds.add(a.video);
     // video_v ở brief của mkt_content (pipeline build video gắn vào), không phải payload.
+    // 27/8: brief.assets.video (bản ngang 16:9, bài trend build từ Pexels).
     const cnt = contents.get(it.cid);
     const bAssets = cnt?.brief?.assets || {};
     if (typeof bAssets.video_v === 'string') assetIds.add(bAssets.video_v);
+    if (typeof bAssets.video === 'string') assetIds.add(bAssets.video);
   }
   const assetUrl = new Map<string, string>();
   if (assetIds.size) {
@@ -353,6 +355,25 @@ export default async function BangSection() {
                             title={c?.title}
                             hook={(brief as any).hook_15w}
                           />
+                        ) : null}
+                        {/* Bai trend da build xong video (brief.assets.video co asset_id + trend_video_built_at): hien badge xanh + link mo video. */}
+                        {(brief as any).generator === 'trend' && typeof (brief as any).assets?.video === 'string' && (brief as any).trend_video_built_at ? (
+                          (() => {
+                            const vUrl = assetUrl.get((brief as any).assets.video);
+                            const dur = (brief as any).trend_video_duration_sec;
+                            return vUrl ? (
+                              <a
+                                href={vUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="badge"
+                                style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', textDecoration: 'none' }}
+                                title={`Video trend đã dựng xong${dur ? ' (' + dur + 's)' : ''}. Bấm mở tab mới xem/tải.`}
+                              >
+                                🎬✓ Video xong{dur ? ` (${dur}s)` : ''} ↗
+                              </a>
+                            ) : null;
+                          })()
                         ) : null}
                       </div>
                       <DecideActions
