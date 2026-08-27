@@ -304,11 +304,12 @@ export default async function TongQuanSection() {
 
       {/* Mỗi nền tảng một thẻ: trạng thái, chạy tới đâu, thông số. Bấm cả thẻ xem chi tiết. */}
       <div className="pf-grid">
-        <Link className="pf-card" href="/do-luong" title="Bấm xem số liệu chi tiết từng bài">
+        <div className="pf-card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="pf-head">
             <span className="pf-icon facebook" aria-hidden="true"><PlatformLogo platform="facebook" size={24} /></span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span className="pf-name">Facebook</span>
+              <span className="sub" style={{ display: 'block', fontSize: '.72rem' }}>Quản trị {fb.pages.length || 0} Page</span>
             </span>
             <span className={`badge ${fb.ok ? 'tone-ok' : 'tone-no'}`}>{fb.ok ? 'Đang chạy' : 'Cần cấu hình'}</span>
           </div>
@@ -324,14 +325,24 @@ export default async function TongQuanSection() {
             <span className="pf-stat"><b>{fmt(tViews)}</b><span>Lượt xem</span></span>
           </div>
           {followers ? <p className="pf-note">📣 {fmt(followers)} người theo dõi Page</p> : null}
-          <div className="pf-foot"><span>Xem số liệu từng bài</span><span aria-hidden="true">→</span></div>
-        </Link>
+          {/* Link Page chinh thuc: user 27/8 sep muon co the click ra Page thuc de xem, du
+              khong dang tu dong duoc. Luon hien neu co realPageUrl. */}
+          <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {fb.realPageUrl ? (
+              <a href={fb.realPageUrl} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.82rem', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} title="Mở Page Facebook chính thức của SDVICO">
+                <PlatformLogo platform="facebook" size={14} /> Mở Page SDVICO ↗
+              </a>
+            ) : null}
+            <Link href="/do-luong" className="src" style={{ fontSize: '.82rem', whiteSpace: 'nowrap' }}>📊 Số liệu từng bài →</Link>
+          </div>
+        </div>
 
-        <Link className="pf-card" href="/do-luong" title="Bấm xem số liệu chi tiết từng video">
+        <div className="pf-card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="pf-head">
             <span className="pf-icon youtube" aria-hidden="true"><PlatformLogo platform="youtube" size={24} /></span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span className="pf-name">YouTube Shorts</span>
+              <span className="sub" style={{ display: 'block', fontSize: '.72rem' }}>Quản trị {ytOk ? 1 : 0} kênh</span>
             </span>
             <span className={`badge ${ytOk ? 'tone-ok' : 'tone-no'}`}>{ytOk ? 'Đang chạy' : 'Cần cấu hình'}</span>
           </div>
@@ -348,14 +359,22 @@ export default async function TongQuanSection() {
             <span className="pf-stat"><b>{fmt(yLikes)}</b><span>Like</span></span>
             <span className="pf-stat"><b>{fmt(yComments)}</b><span>Comment</span></span>
           </div>
-          <div className="pf-foot"><span>Xem số liệu từng video</span><span aria-hidden="true">→</span></div>
-        </Link>
+          <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {yt.channelUrl ? (
+              <a href={yt.channelUrl} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.82rem', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} title="Mở kênh YouTube SDVICO">
+                <PlatformLogo platform="youtube" size={14} /> Mở kênh {yt.channelTitle || 'SDVICO'} ↗
+              </a>
+            ) : null}
+            <Link href="/do-luong" className="src" style={{ fontSize: '.82rem', whiteSpace: 'nowrap' }}>📊 Số liệu từng video →</Link>
+          </div>
+        </div>
 
-        <Link className="pf-card" href="/tiktok" title="Bấm xem trạng thái kết nối TikTok">
+        <div className="pf-card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="pf-head">
             <span className="pf-icon tiktok" aria-hidden="true"><PlatformLogo platform="tiktok" size={24} /></span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span className="pf-name">TikTok</span>
+              <span className="sub" style={{ display: 'block', fontSize: '.72rem' }}>Quản trị {tt.ok ? 1 : 0} tài khoản</span>
             </span>
             <span className={`badge ${tt.ok ? 'tone-demo' : 'tone-no'}`}>{tt.ok ? 'Chờ audit' : 'Cần cấu hình'}</span>
           </div>
@@ -369,14 +388,20 @@ export default async function TongQuanSection() {
             <span className="pf-stat"><b>—</b><span>Lượt xem</span></span>
             <span className="pf-stat"><b>—</b><span>Like</span></span>
           </div>
-          <div className="pf-foot"><span>Xem kết nối và audit</span><span aria-hidden="true">→</span></div>
-        </Link>
+          <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <a href={`https://www.tiktok.com/@${(process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim()}`} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.82rem', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} title="Mở tài khoản TikTok SDVICO">
+              <PlatformLogo platform="tiktok" size={14} /> Mở TikTok @{(process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim()} ↗
+            </a>
+            <Link href="/tiktok" className="src" style={{ fontSize: '.82rem', whiteSpace: 'nowrap' }}>⚙️ Kết nối/audit →</Link>
+          </div>
+        </div>
 
         <Link className="pf-card" href="/ket-noi" title="Bấm xem hướng dẫn thiết lập Zalo OA">
           <div className="pf-head">
             <span className="pf-icon zalo" aria-hidden="true"><PlatformLogo platform="zalo" size={24} /></span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span className="pf-name">Zalo OA</span>
+              <span className="sub" style={{ display: 'block', fontSize: '.72rem' }}>Quản trị {za.configured ? 1 : 0} OA</span>
             </span>
             <span className={`badge ${za.configured ? 'tone-ok' : 'tone-demo'}`}>{za.configured ? 'Đang chạy' : 'Chờ thiết lập'}</span>
           </div>

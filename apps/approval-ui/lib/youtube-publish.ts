@@ -62,13 +62,13 @@ export async function getAccessToken(): Promise<string> {
 
 // Kiem tra ket noi YouTube cho trang /youtube: da cau hinh du 3 env chua, va neu co thi
 // goi API lay ten kenh de hien "Da ket noi kenh X". Loi khong nem ra ngoai (trang van hien).
-export async function getYouTubeChannelInfo(): Promise<{ configured: boolean; channelTitle: string | null; error: string | null }> {
+export async function getYouTubeChannelInfo(): Promise<{ configured: boolean; channelTitle: string | null; channelId: string | null; channelUrl: string | null; error: string | null }> {
   const configured = !!(
     (process.env.YOUTUBE_CLIENT_ID || '').trim() &&
     (process.env.YOUTUBE_CLIENT_SECRET || '').trim() &&
     (process.env.YOUTUBE_REFRESH_TOKEN || '').trim()
   );
-  if (!configured) return { configured: false, channelTitle: null, error: null };
+  if (!configured) return { configured: false, channelTitle: null, channelId: null, channelUrl: null, error: null };
   try {
     const at = await getAccessToken();
     // cache: 'no-store' BAT BUOC — Next Data Cache tung dong bang mot response 401 thoang qua
@@ -78,11 +78,19 @@ export async function getYouTubeChannelInfo(): Promise<{ configured: boolean; ch
       cache: 'no-store'
     });
     const j: any = await r.json();
-    if (!r.ok) return { configured: true, channelTitle: null, error: j?.error?.message || `HTTP ${r.status}` };
-    const title = j?.items?.[0]?.snippet?.title || null;
-    return { configured: true, channelTitle: title, error: title ? null : 'khong doc duoc ten kenh' };
+    if (!r.ok) return { configured: true, channelTitle: null, channelId: null, channelUrl: null, error: j?.error?.message || `HTTP ${r.status}` };
+    const item = j?.items?.[0];
+    const title = item?.snippet?.title || null;
+    const channelId = item?.id || null;
+    const customUrl = item?.snippet?.customUrl || null; // e.g. "@sdvico"
+    // User 27/8 sep: hien link kenh de bam mo xem. YouTube studio URL cho channel:
+    // https://www.youtube.com/channel/{ID} (fallback). @handle URL neu co customUrl.
+    const channelUrl = customUrl
+      ? `https://www.youtube.com/${customUrl.startsWith('@') ? customUrl : '@' + customUrl}`
+      : channelId ? `https://www.youtube.com/channel/${channelId}` : null;
+    return { configured: true, channelTitle: title, channelId, channelUrl, error: title ? null : 'khong doc duoc ten kenh' };
   } catch (e: any) {
-    return { configured: true, channelTitle: null, error: String(e?.message || e) };
+    return { configured: true, channelTitle: null, channelId: null, channelUrl: null, error: String(e?.message || e) };
   }
 }
 
