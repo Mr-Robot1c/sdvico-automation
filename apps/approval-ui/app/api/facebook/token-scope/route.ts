@@ -21,32 +21,66 @@ const REQUIRED_SCOPES = [
   { name: 'pages_show_list', purpose: 'List Pages user manage' },
 ];
 
+// Test THỰC TẾ 1 endpoint - nếu 200 hoặc lỗi không phải permission => có quyền. Facebook Page
+// Token không trả scope qua /me/permissions nên phải call thẳng endpoint đòi quyền đó xem có bị
+// reject vì permission không. Code 200 nghĩa là quyền OK. 403/OAuth error nghĩa là thiếu.
+async function probe(url: string, token: string): Promise<{ ok: boolean; status: number; error?: string; sample?: any }> {
+  try {
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const j: any = await r.json();
+    if (r.ok && !j.error) return { ok: true, status: r.status, sample: j };
+    // FB Graph error - fbtrace phân biệt: type=OAuthException + code 200/104/190 = auth/scope,
+    // các code khác = lỗi khác (rate limit, invalid arg...). Chỉ coi là "thiếu quyền" khi code auth.
+    const code = j.error?.code;
+    const isPermError = j.error?.type === 'OAuthException' || code === 200 || code === 104 || code === 190;
+    return { ok: false, status: r.status, error: (j.error?.message || `HTTP ${r.status}`).slice(0, 200), sample: isPermError ? undefined : { code, type: j.error?.type } };
+  } catch (e: any) {
+    return { ok: false, status: 0, error: String(e?.message || e).slice(0, 200) };
+  }
+}
+
 async function inspectOne(pageId: string, token: string, label: string) {
   try {
-    // 1. Kiểm tra token còn hoạt động — call /me trả về id + name.
+    // 1. Kiểm tra token còn hoạt động.
     const meRes = await fetch(`https://graph.facebook.com/${V}/me?fields=id,name`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const me: any = await meRes.json();
     if (me.error) return { label, page_id_env: pageId, error: `token loi: ${me.error?.message || 'unknown'}`, likely_expired: true };
 
-    // 2. Lấy permissions granted.
+    // 2. Vẫn thử /me/permissions nhưng CHỈ để log — Page Token thường trả rỗng.
     const permRes = await fetch(`https://graph.facebook.com/${V}/me/permissions`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const perm: any = await permRes.json();
     const permData: any[] = Array.isArray(perm?.data) ? perm.data : [];
-    const grantedSet = new Set(permData.filter((p) => p.status === 'granted').map((p) => p.permission));
-    const declinedSet = new Set(permData.filter((p) => p.status === 'declined').map((p) => p.permission));
+    const grantedFromPermsApi = new Set(permData.filter((p) => p.status === 'granted').map((p) => p.permission));
 
-    const required = REQUIRED_SCOPES.map((s) => ({
-      scope: s.name,
-      granted: grantedSet.has(s.name),
-      declined: declinedSet.has(s.name),
-      purpose: s.purpose,
-    }));
+    // 3. TEST THỰC TẾ — gọi endpoint đòi từng scope. Đây mới là câu trả lời đúng.
+    // Chỉ lấy 1 post gần nhất để đo (không tốn nhiều token).
+    const [postsProbe, insightsProbe, subscribedProbe, msgProbe] = await Promise.all([
+      // pages_read_engagement: đọc post/reactions của page
+      probe(`https://graph.facebook.com/${V}/${pageId}/posts?limit=1&fields=id,reactions.summary(true)`, token),
+      // read_insights: đọc insights bài. Lấy 1 post trước rồi gọi /post_id/insights.
+      (async () => {
+        const p = await probe(`https://graph.facebook.com/${V}/${pageId}/posts?limit=1&fields=id`, token);
+        if (!p.ok || !p.sample?.data?.[0]?.id) return { ok: false, status: 0, error: 'khong co bai de test insights' };
+        const postId = p.sample.data[0].id;
+        return probe(`https://graph.facebook.com/${V}/${postId}/insights?metric=post_impressions,post_media_view`, token);
+      })(),
+      // pages_manage_metadata: list subscribed apps
+      probe(`https://graph.facebook.com/${V}/${pageId}/subscribed_apps`, token),
+      // pages_messaging: list conversations (không cần trả data, chỉ cần không bị reject scope)
+      probe(`https://graph.facebook.com/${V}/${pageId}/conversations?limit=1`, token),
+    ]);
 
-    const missing = required.filter((s) => !s.granted).map((s) => s.scope);
+    const realCheck = [
+      { scope: 'pages_read_engagement', probe_result: postsProbe, likely_granted: postsProbe.ok, purpose: 'Đọc reactions/comments/shares' },
+      { scope: 'read_insights', probe_result: insightsProbe, likely_granted: insightsProbe.ok, purpose: 'Đọc Lượt xem (impressions/media_view) cho cột "Lượt xem" Đo lường' },
+      { scope: 'pages_manage_metadata', probe_result: subscribedProbe, likely_granted: subscribedProbe.ok, purpose: 'Subscribe webhook nhận comment' },
+      { scope: 'pages_messaging', probe_result: msgProbe, likely_granted: msgProbe.ok, purpose: 'Đọc Messenger inbox (chờ App Review)' },
+    ];
+    const missing = realCheck.filter((s) => !s.likely_granted).map((s) => s.scope);
 
     return {
       label,
@@ -54,12 +88,13 @@ async function inspectOne(pageId: string, token: string, label: string) {
       page_id_actual: me.id,
       page_id_env: pageId,
       page_id_matches: me.id === pageId,
-      required_scopes: required,
-      all_granted_scopes: [...grantedSet],
-      missing_required: missing,
-      diagnosis: missing.length
-        ? `THIẾU ${missing.length} scope: ${missing.join(', ')}. Cột "Lượt xem" trong Đo lường sẽ trống nếu thiếu read_insights. Comment webhook thiếu pages_read_engagement + pages_manage_metadata. Inbox thiếu pages_messaging (cần App Review).`
-        : 'Token có ĐỦ 5 scope quan trọng, ổn cho SDVICO.',
+      real_probe: realCheck,
+      missing_from_probe: missing,
+      me_permissions_api_returned: [...grantedFromPermsApi],
+      me_permissions_note: permData.length === 0 ? 'Page Token khong tra scope qua /me/permissions - dung real_probe o tren de biet chinh xac' : undefined,
+      diagnosis: missing.length === 0
+        ? '✓ Token co du quyen cho SDVICO (probe truc tiep het OK).'
+        : `Probe truc tiep tra loi khi goi ${missing.join(', ')}. ${missing.includes('read_insights') ? 'Con Luot xem trong Do luong se trong.' : ''} ${missing.includes('pages_messaging') ? 'Inbox chua doc duoc (can App Review).' : ''} Xem "real_probe[i].probe_result.error" de biet ly do chinh xac (loi permission hay khac).`,
     };
   } catch (e: any) {
     return { label, page_id_env: pageId, error: 'exception: ' + String(e?.message || e) };
