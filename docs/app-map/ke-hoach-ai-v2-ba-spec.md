@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-26
 ttl_days: 90
+<!-- re-verified: 2026-08-27 15:15 - Fix ffmpeg force_original_aspect_ratio cover->increase. -->
 <!-- re-verified: 2026-08-27 15:00 - Fix download Pexels URL bang fetch (khong dung downloadAsset cho Supabase Storage). -->
 <!-- re-verified: 2026-08-27 14:45 - Fix "args is not defined" trong buildTrendVideoFromPexels - bo param args, dung arg('voice', ...) helper. -->
 <!-- re-verified: 2026-08-27 14:20 - Watcher local build mode trend: buildTrendVideoFromPexels download Pexels URL + TTS narration + ghep 1920x1080 + concat + upload Supabase. actions.ts generateTrendPost sau khi Pexels xong tu set video_requested=true. -->

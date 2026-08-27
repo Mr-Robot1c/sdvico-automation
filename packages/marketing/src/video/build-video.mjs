@@ -624,7 +624,7 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
       // Convert anh -> video 5s (Ken Burns nhe).
       rawPath = join(workDir, `scene${sceneNo}_raw.mp4`);
       await ffmpeg(['-y', '-loop', '1', '-i', imgPath, '-t', '5',
-        '-vf', `scale=${W}:${H}:force_original_aspect_ratio=cover,crop=${W}:${H},setsar=1`,
+        '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`,
         '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-r', '30', rawPath]);
     }
 
@@ -655,7 +655,7 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
         '-stream_loop', String(loops - 1), '-i', rawPath,
         '-i', audioPath,
         '-t', finalDur.toFixed(2),
-        '-vf', `scale=${W}:${H}:force_original_aspect_ratio=cover,crop=${W}:${H},setsar=1,fps=30`,
+        '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=30`,
         '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
         '-map', '0:v:0', '-map', '1:a:0', '-shortest', clipPath]);
     } else {
@@ -663,7 +663,7 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
         '-i', rawPath,
         '-i', audioPath,
         '-t', finalDur.toFixed(2),
-        '-vf', `scale=${W}:${H}:force_original_aspect_ratio=cover,crop=${W}:${H},setsar=1,fps=30`,
+        '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=30`,
         '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
         '-map', '0:v:0', '-map', '1:a:0', clipPath]);
     }
