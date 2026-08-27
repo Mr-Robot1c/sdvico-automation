@@ -15,7 +15,11 @@ import { getValidTikTokToken } from './tiktok';
 
 type Client = ReturnType<typeof getServerClient>;
 
-const MATCH_WINDOW_SEC = 10 * 60; // ±10 phút
+// 27/8 (user "khong keo so lieu tiktok"): user bo TikTok API 26/8, dung ExportTiktokButton
+// (tai video + copy caption + mo tab TikTok Upload dang tay). Thoi diem dang thuc te tren
+// TikTok co the lech RAT NHIEU voi published_at trong mkt_posts (user tai xuong luc A, dang
+// tay luc B). Noi 10 phut -> 6 tieng de bat duoc phan lon truong hop nay.
+const MATCH_WINDOW_SEC = 6 * 60 * 60; // ±6 giờ
 
 export async function pullTikTokMetrics(client: Client): Promise<{ pulled: number; matched: number; errors: string[] }> {
   const errors: string[] = [];

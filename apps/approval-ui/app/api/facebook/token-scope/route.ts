@@ -62,11 +62,13 @@ async function inspectOne(pageId: string, token: string, label: string) {
       // pages_read_engagement: đọc post/reactions của page
       probe(`https://graph.facebook.com/${V}/${pageId}/posts?limit=1&fields=id,reactions.summary(true)`, token),
       // read_insights: đọc insights bài. Lấy 1 post trước rồi gọi /post_id/insights.
+      // Update 27/8: dùng metric v26 mới (post_impressions_organic + post_impressions_paid).
+      // Cả 2 metric cũ (post_impressions, post_media_view) đã bị Meta bỏ 15/6/2026.
       (async () => {
         const p = await probe(`https://graph.facebook.com/${V}/${pageId}/posts?limit=1&fields=id`, token);
         if (!p.ok || !p.sample?.data?.[0]?.id) return { ok: false, status: 0, error: 'khong co bai de test insights' };
         const postId = p.sample.data[0].id;
-        return probe(`https://graph.facebook.com/${V}/${postId}/insights?metric=post_impressions,post_media_view`, token);
+        return probe(`https://graph.facebook.com/${V}/${postId}/insights?metric=post_impressions_organic,post_impressions_paid`, token);
       })(),
       // pages_manage_metadata: list subscribed apps
       probe(`https://graph.facebook.com/${V}/${pageId}/subscribed_apps`, token),
