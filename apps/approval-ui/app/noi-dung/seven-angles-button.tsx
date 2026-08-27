@@ -64,7 +64,8 @@ export default function SevenAnglesButton() {
           aria-modal="true"
           onClick={(e) => { if (e.target === e.currentTarget && !pending) setOpen(false); }}
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 100,
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)', zIndex: 1000,
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
           }}
         >
