@@ -205,9 +205,25 @@ export default async function TongQuanSection() {
     .sort((a, b) => b.eng - a.eng || b.views - a.views)
     .slice(0, 3);
   const topTitles = new Map<string, string>();
+  const topFbUrls = new Map<string, string>();
+  const topYtUrls = new Map<string, string>();
   if (topIds.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, title').in('id', topIds.map((t) => t.cid));
-    for (const c of cs || []) topTitles.set((c as any).id, (c as any).title || '(không tên)');
+    const [csRes, postsRes] = await Promise.all([
+      client.from('mkt_content').select('id, title').in('id', topIds.map((t) => t.cid)),
+      // User 27/8: sep muon click bai o "Bai noi bat" -> mo thang bai tren FB Page chinh
+      // thuc de xem (khong the dang tu dong het). Lay external_url FB + YT cho tung bai.
+      client.from('mkt_posts').select('content_id, channel, external_url')
+        .in('content_id', topIds.map((t) => t.cid))
+        .eq('status', 'published'),
+    ]);
+    for (const c of csRes.data || []) topTitles.set((c as any).id, (c as any).title || '(không tên)');
+    for (const p of postsRes.data || []) {
+      const cid = String((p as any).content_id);
+      const url = String((p as any).external_url || '');
+      if (!url) continue;
+      if ((p as any).channel === 'facebook' && !topFbUrls.has(cid)) topFbUrls.set(cid, url);
+      if ((p as any).channel === 'youtube' && !topYtUrls.has(cid)) topYtUrls.set(cid, url);
+    }
   }
 
   // HOẠT ĐỘNG GẦN ĐÂY: dịch run_log ra câu người đọc được, bỏ các lượt trống.
@@ -384,17 +400,34 @@ export default async function TongQuanSection() {
             <p className="sub" style={{ margin: '8px 0 0' }}>Chưa có bài nào có số liệu.</p>
           ) : (
             <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-              {topIds.map((t, i) => (
-                <Link key={t.cid} href="/do-luong" className="tq-item" title="Bấm xem số liệu chi tiết">
-                  <span className="tq-rank" aria-hidden="true">{i + 1}</span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span className="tq-item-title">{prettifyTitle(topTitles.get(t.cid) || '')}</span>
-                    <span className="sub" style={{ display: 'block', fontSize: '.78rem' }}>
-                      {fmt(t.eng)} tương tác, {fmt(t.views)} lượt xem
+              {topIds.map((t, i) => {
+                const fbUrl = topFbUrls.get(t.cid);
+                const ytUrl = topYtUrls.get(t.cid);
+                return (
+                  <div key={t.cid} className="tq-item" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <span className="tq-rank" aria-hidden="true">{i + 1}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span className="tq-item-title">{prettifyTitle(topTitles.get(t.cid) || '')}</span>
+                      <span className="sub" style={{ display: 'block', fontSize: '.78rem' }}>
+                        {fmt(t.eng)} tương tác, {fmt(t.views)} lượt xem
+                      </span>
+                      <span style={{ display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+                        {fbUrl ? (
+                          <a href={fbUrl} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.78rem', display: 'inline-flex', alignItems: 'center', gap: 4 }} title="Mở bài trên Facebook Page">
+                            <PlatformLogo platform="facebook" size={12} /> Xem trên Facebook ↗
+                          </a>
+                        ) : null}
+                        {ytUrl ? (
+                          <a href={ytUrl} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.78rem', display: 'inline-flex', alignItems: 'center', gap: 4 }} title="Mở video trên YouTube">
+                            <PlatformLogo platform="youtube" size={12} /> Xem trên YouTube ↗
+                          </a>
+                        ) : null}
+                        <Link href="/do-luong" className="src" style={{ fontSize: '.78rem' }} title="Xem số liệu chi tiết">📊 Số liệu chi tiết</Link>
+                      </span>
                     </span>
-                  </span>
-                </Link>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
