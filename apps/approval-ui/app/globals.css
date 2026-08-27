@@ -1189,7 +1189,8 @@ button.board-stat:hover { border-color: var(--accent, #1f5fbf); }
 .board-ops { flex: 1.6 1 260px; min-width: 240px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: grid; gap: 6px; align-content: center; }
 .board-body { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 .kanban-wrap { flex: 1 1 640px; min-width: 0; overflow-x: auto; padding-bottom: 8px; }
-.kanban { display: grid; grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 12px; min-width: 820px; align-items: start; }
+/* 27/8: board 4 cot (them "Len lich" giua Cho duyet va Da dang). */
+.kanban { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 12px; min-width: 1040px; align-items: start; }
 .kanban-col { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 10px; align-content: start; }
 .kanban-col .card { box-shadow: none; }
 .kanban-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .9rem; padding: 6px 12px; border-radius: 999px; }
@@ -1366,3 +1367,18 @@ button.board-stat:hover { border-color: var(--accent, #1f5fbf); }
 .flow-step { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; white-space: nowrap; }
 .flow-step.boss { border-color: var(--brand-red); background: var(--brand-red-bg); font-weight: 700; }
 .flow-arrow { color: var(--ink-2); }
+
+/* Nut quay lai Tong quan tren topbar (trang chi tiet cu). */
+.topbar-back { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; color: var(--accent); background: var(--accent-bg); border: 1px solid var(--accent); border-radius: 8px; padding: 3px 10px; font-size: .82rem; font-weight: 600; white-space: nowrap; margin-right: 10px; }
+.topbar-back:hover { filter: brightness(1.05); }
+
+/* Tien do theo giai doan: pipeline to co mui ten (khac .flow-strip nho cua Agent). */
+.stage-flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.stage-node { flex: 1 1 130px; min-width: 120px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; text-align: center; text-decoration: none; color: inherit; position: relative; }
+.stage-node b { display: block; font-size: 1.35rem; line-height: 1.2; }
+.stage-node span { display: block; color: var(--ink-2); font-size: .78rem; margin-top: 2px; }
+.stage-node.act { border-color: var(--brand-red); background: var(--brand-red-bg); }
+.stage-node.act b { color: var(--brand-red); }
+.stage-node.done { border-color: var(--ok); }
+.stage-node.done b { color: var(--ok); }
+.stage-sep { align-self: center; color: var(--ink-2); font-size: 1.1rem; flex: 0 0 auto; }

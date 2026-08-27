@@ -8,7 +8,6 @@ import DeleteButton from './delete-button';
 import TrashActions from './trash-actions';
 import ShareGroups from './share-groups';
 import BangSection from './bang-section';
-import TongQuanSection from './tong-quan-section';
 import KhachHangSection from './khach-hang-section';
 import TikTokPrivateChip from './tiktok-private-chip';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
@@ -59,7 +58,12 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
   // viết / Video là danh sách chi tiết. Đo lường là trang riêng /do-luong.
   const loai = searchParams?.loai || '';
   if (loai === 'do-luong') redirect('/do-luong');
-  const tab = loai === 'video' ? 'video' : loai === 'bai-viet' ? 'baiviet' : loai === 'bang' ? 'bang' : loai === 'khach-hang' ? 'khach-hang' : loai === 'thung-rac' ? 'thung-rac' : 'tong-quan';
+  // 27/8 redesign: tab Tong quan cu BO — dashboard moi la trang /tong-quan rieng.
+  // /noi-dung mac dinh vao thang Bang bai viet (user: "bam Duyet bai thi chi con bang thoi").
+  if (loai === 'tong-quan' || loai === '') {
+    // giu link cu ?loai=tong-quan khong chet
+  }
+  const tab = loai === 'video' ? 'video' : loai === 'bai-viet' ? 'baiviet' : loai === 'khach-hang' ? 'khach-hang' : loai === 'thung-rac' ? 'thung-rac' : 'bang';
   const kinds = tab === 'video' ? ['video'] : ['article', 'social'];
   const statusFilter = searchParams?.trangthai && STATUS[searchParams.trangthai] ? searchParams.trangthai : null;
 
@@ -88,7 +92,8 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
 
   const typeChips = (
     <nav className="filters" aria-label="Loại nội dung">
-      <a className={`chip ${tab === 'tong-quan' ? 'on' : ''}`} href="/noi-dung">
+      {/* 27/8 redesign: chip dau tro ve dashboard MOI /tong-quan (tab Tong quan cu bo). */}
+      <a className="chip" href="/tong-quan">
         <span aria-hidden="true">📊</span> Tổng quan
       </a>
       <a className={`chip ${tab === 'bang' ? 'on' : ''}`} href={withParams({ loai: 'bang', trangthai: null })}>
@@ -108,25 +113,8 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     </nav>
   );
 
-  // Tab Tổng quan (mặc định): các nền tảng đang làm tốt cỡ nào, bấm thẻ xem chi tiết.
-  if (tab === 'tong-quan') {
-    return (
-      <main>
-        <header className="head-row">
-          <div>
-            <h1>Tổng quan</h1>
-          </div>
-          <div className="head-actions">
-            <AutoRefresh seconds={60} />
-          </div>
-        </header>
-        {typeChips}
-        <TongQuanSection />
-      </main>
-    );
-  }
-
-  // Tab Bảng bài viết: board duyệt + vận hành.
+  // Tab Bảng bài viết (mặc định): board duyệt + vận hành. Tab Tổng quan cũ (TongQuanSection)
+  // đã bỏ 27/8 — dashboard mới nằm ở /tong-quan.
   if (tab === 'bang') {
     return (
       <main>

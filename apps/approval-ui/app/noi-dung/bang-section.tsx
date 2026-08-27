@@ -220,10 +220,12 @@ export default async function BangSection() {
   const PUB_CAP = 4;
   const REJ_CAP = 4;
 
-  // Bỏ cột "Đã duyệt" (user 21/8: "dù sao có đã đăng rồi") — board còn 3 bước. Bài đã duyệt
-  // mà chưa lên kênh (hẹn giờ, kẹt) hiện thành dòng cảnh ở thanh vận hành, không mất dấu.
+  // 27/8 redesign (user: "bang hien Cho duyet - Len lich - Da dang - Tu choi"): board 4 cot.
+  // Cot "Len lich" = bai da duyet chua len kenh (hen gio hoac dang dang) — truoc nam trong
+  // banner canh bao phia tren, gio thanh cot rieng cho ro dong chay.
   const columns: { key: string; label: string; icon: string; tone: string; items: QItem[]; cap: number; moreHref?: string }[] = [
     { key: 'pending', label: 'Chờ duyệt', icon: '📥', tone: 'pending', items: pending, cap: 50 },
+    { key: 'scheduled', label: 'Lên lịch', icon: '⏰', tone: 'pending', items: approvedWaiting, cap: 10 },
     { key: 'published', label: 'Đã đăng', icon: '🌐', tone: 'published', items: published, cap: PUB_CAP, moreHref: '/noi-dung?loai=bai-viet' },
     { key: 'rejected', label: 'Từ chối', icon: '⛔', tone: 'rejected', items: rejected, cap: REJ_CAP, moreHref: '/noi-dung?loai=bai-viet&trangthai=rejected' }
   ];
@@ -239,20 +241,7 @@ export default async function BangSection() {
           <Link className="src" href="/van-hanh">Bật lại ở Vận hành</Link>
         </div>
       ) : null}
-      {approvedWaiting.length ? (
-        <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '8px 14px', marginBottom: 14 }}>
-          <span className="badge tone-demo" title="Bài đã duyệt nhưng chưa thấy trên kênh nào (đang đăng, hẹn giờ, hoặc kẹt).">
-            ⏳ {approvedWaiting.length} bài đã duyệt chưa lên kênh
-          </span>
-          {approvedWaiting.filter((it) => fbFailed.has(it.cid)).slice(0, 3).map((it) => (
-            <form key={it.qid} action={retryFacebookPublish} style={{ display: 'inline' }}>
-              <input type="hidden" name="content_id" value={it.cid} />
-              <button className="btn ghost sm" type="submit" title={`Đăng lại "${stripInternalPrefix(contents.get(it.cid)?.title || it.title)}" lên Facebook (chạy nền 1 tới 2 phút)`}>↻ Đăng lại FB</button>
-            </form>
-          ))}
-          <Link className="src" href="/van-hanh" style={{ marginLeft: 'auto', fontSize: '.85rem' }}>Vận hành</Link>
-        </div>
-      ) : null}
+      {/* 27/8: banner "da duyet chua len kenh" bo — thanh cot "Len lich" rieng tren board. */}
 
       {/* Board 4 cột theo dòng chảy bài viết, chiếm trọn chiều ngang. */}
       <div className="kanban-wrap">
@@ -383,6 +372,33 @@ export default async function BangSection() {
                         videoUrl={vidUrl ?? null}
                         caption={c?.draft ?? null}
                       />
+                    </div>
+                  );
+                }
+
+                // 27/8: cot "Len lich" — bai duyet roi, cho hen gio hoac dang dang len kenh.
+                if (col.key === 'scheduled') {
+                  const hasSched = !!it.scheduledAt;
+                  const future = hasSched && isFutureVN(it.scheduledAt);
+                  return (
+                    <div key={it.qid} className="card tone-mkt" style={{ display: 'grid', gap: 6, padding: 12 }}>
+                      <b>{title}</b>
+                      <div className="badges">
+                        {hasSched ? (
+                          <span className={`badge ${future ? 'tone-demo' : 'tone-ok'}`} title="Giờ hẹn đăng người duyệt đã chọn. Tới giờ máy tự đăng.">
+                            ⏰ Hẹn {fmtSchedule(it.scheduledAt)}{future ? '' : ' (đang đăng)'}
+                          </span>
+                        ) : (
+                          <span className="badge tone-demo" title="Đã duyệt, máy đang đăng lên kênh (1 tới 2 phút với video).">⏳ Đang đăng lên kênh</span>
+                        )}
+                        <span className="badge badge-format">📍 {channelsLabel(chans, p.post_reel === true)}</span>
+                      </div>
+                      {fbFailed.has(it.cid) ? (
+                        <form action={retryFacebookPublish}>
+                          <input type="hidden" name="content_id" value={it.cid} />
+                          <button className="btn ghost sm" type="submit" title="Lượt đăng Facebook thất bại — bấm đăng lại (chạy nền 1 tới 2 phút)">↻ Đăng lại Facebook</button>
+                        </form>
+                      ) : null}
                     </div>
                   );
                 }

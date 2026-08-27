@@ -1,7 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './theme-toggle';
+
+// 5 trang chinh cua redesign 27/8 — cac trang KHAC (trang chi tiet cu) hien nut
+// "← Tong quan" de quay ve dashboard (user 27/8: "trang nao chuyen sang trang khac
+// thi them nut quay lai").
+const MAIN_TABS = ['/tong-quan', '/video', '/seo', '/kenh', '/agent', '/'];
 
 // Thanh trên cùng: nhãn vai trò + tên trang gọn + hành động phải (theme, user).
 // Cố tình mỏng: title chi tiết của trang vẫn nằm trong <h1> của từng page.
@@ -9,10 +15,14 @@ export default function TopHeader({ marketingOnly = false }: { marketingOnly?: b
   const path = usePathname() || '/';
   const role = marketingOnly ? 'Marketing SDVICO' : 'Duyệt và Hồ sơ SDVICO';
   const crumb = crumbFor(path);
+  const showBack = !MAIN_TABS.includes(path);
 
   return (
     <header className="topbar" role="banner">
       <div className="topbar-left">
+        {showBack ? (
+          <Link href="/tong-quan" className="topbar-back" title="Quay lại trang Tổng quan">← Tổng quan</Link>
+        ) : null}
         <span className="topbar-role">{role}</span>
         {crumb ? (
           <>
