@@ -58,13 +58,13 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const since60 = new Date(now - 60 * 24 * 3600 * 1000).toISOString();
   const since7 = new Date(now - 7 * 24 * 3600 * 1000).toISOString();
 
-  let contentQuery = client
+  // 200 bai moi nhat, KHONG ilike o DB — q loc bang JS de tile "Da viet" khong lech khi search.
+  const contentQuery = client
     .from('mkt_content')
     .select('id, title, brief, status, created_at')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(200);
-  if (q) contentQuery = contentQuery.ilike('title', `%${q}%`);
 
   const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, planLiveRes, leadsRes, emergencyStopped, yt] = await Promise.all([
     client
@@ -201,9 +201,14 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     return null;
   }
 
-  // ---- Filter bang Tat ca noi dung ----
+  // "Da viet" = bai da viet xong con nam o buoc nhap/dang sinh (chua vao duyet, chua dang).
+  const writtenCount = contents.filter((c) => stageOf(c).key === 'draft').length;
+
+  // ---- Filter bang Tat ca noi dung (q loc JS — xem ghi chu o query) ----
   const allCampaigns = [...new Set(contents.map((c) => campaignOf(c.brief)))].sort();
+  const qLower = q.toLowerCase();
   const filtered = contents.filter((c) => {
+    if (qLower && !String(c.title || '').toLowerCase().includes(qLower)) return false;
     if (fGd && stageOf(c).key !== fGd) return false;
     if (fKenh) {
       const chSet = new Set<string>([
@@ -276,9 +281,15 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       {/* ===== 2. TIEN DO THEO GIAI DOAN (dashboard nhu anh ForLife) ===== */}
       <section className="blk">
         <h2>📶 Tiến độ theo giai đoạn <span className="sub">bài chạy từ trái sang phải — ô đỏ là chỗ cần người động tay</span></h2>
+        {/* 27/8 v3 (user): pipeline = Y tuong -> Da viet -> Cho duyet -> Len lich -> Da dang.
+            BO o Tu choi (van loc duoc qua dropdown bang duoi). */}
         <div className="stage-flow">
           <Link href="/ke-hoach" className="stage-node" title="Hướng đi bài viết BOSS đề xuất trong bản kế hoạch đang áp">
             <b>{fmt(ideaCount)}</b><span>Ý tưởng</span>
+          </Link>
+          <span className="stage-sep" aria-hidden="true">→</span>
+          <Link href="/tong-quan?gd=draft" className="stage-node" title="Bài đã viết xong còn ở bước nháp / đang sinh (trong 200 bài mới nhất)">
+            <b>{fmt(writtenCount)}</b><span>Đã viết</span>
           </Link>
           <span className="stage-sep" aria-hidden="true">→</span>
           <Link href="/noi-dung" className={`stage-node ${pending.length ? 'act' : ''}`} title="Bài chờ người bấm Duyệt">
@@ -291,10 +302,6 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           <span className="stage-sep" aria-hidden="true">→</span>
           <Link href="/kenh" className="stage-node done" title="Bài đã đăng thật lên các kênh">
             <b>{fmt(publishedCids.size)}</b><span>Đã đăng</span>
-          </Link>
-          <span className="stage-sep" aria-hidden="true">·</span>
-          <Link href="/noi-dung" className="stage-node" title="Bài bị người duyệt từ chối (60 ngày)">
-            <b>{fmt(rejected.length)}</b><span>Từ chối</span>
           </Link>
         </div>
         {/* 2 the giai doan can dong tay, nhu anh ForLife ("Cho duyet: khong co muc nao"...). */}

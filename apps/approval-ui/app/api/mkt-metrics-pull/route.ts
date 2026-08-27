@@ -70,6 +70,34 @@ export async function GET(req: Request) {
   } catch (e: any) {
     inbox = { pulled: 0, skipped: 0, errors: [String(e?.message || e).slice(0, 160)] };
   }
+
+  // DON THUNG RAC (27/8 v3, user: "thung rac giu bai soft-delete, sau 7 ngay tu xoa luon").
+  // Bai deleted_at qua 7 ngay -> hard delete 4 bang nhu hardDeleteContent. Toi da 30 bai/luot
+  // cron de khong keo dai function; con sot thi luot sau don tiep.
+  try {
+    const purgeBefore = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const { data: oldTrash } = await client
+      .from('mkt_content')
+      .select('id')
+      .not('deleted_at', 'is', null)
+      .lt('deleted_at', purgeBefore)
+      .limit(30);
+    const purgeIds = (oldTrash || []).map((r: any) => String(r.id));
+    if (purgeIds.length) {
+      for (const id of purgeIds) {
+        await Promise.all([
+          client.from('approval_queue').delete().eq('payload->>content_id', id),
+          client.from('mkt_posts').delete().eq('content_id', id),
+          client.from('mkt_metrics').delete().eq('entity_ref', id),
+        ]);
+        await client.from('mkt_content').delete().eq('id', id);
+      }
+      await client.from('run_log').insert({
+        task: 'mkt.trash_purge', actor: 'cron', status: 'ok',
+        detail: { purged: purgeIds.length, before: purgeBefore },
+      });
+    }
+  } catch { /* don rac loi khong lam vo cron */ }
   // GHI run_log mỗi lần chạy (18/8: mkt_metrics trống suốt mà không ai biết cron có chạy không
   // vì route này im lặng). Trang Dữ liệu AI + /api/fb-diag đọc được để chẩn đoán.
   try {

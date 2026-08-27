@@ -1382,3 +1382,5 @@ button.board-stat:hover { border-color: var(--accent, #1f5fbf); }
 .stage-node.done { border-color: var(--ok); }
 .stage-node.done b { color: var(--ok); }
 .stage-sep { align-self: center; color: var(--ink-2); font-size: 1.1rem; flex: 0 0 auto; }
+/* topbar-back la <button> tu 27/8 v3 (router.back) — reset style button cho giong link. */
+button.topbar-back { font: inherit; cursor: pointer; }

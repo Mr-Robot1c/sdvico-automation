@@ -90,24 +90,15 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     client.from('mkt_content').select('*', { count: 'exact', head: true }).not('deleted_at', 'is', null),
   ]);
 
+  // 27/8 v3 (user: "bo het tat ca tru Bang bai viet va Thung rac"): chips chi con 2. Cac tab
+  // bai-viet / khach-hang VAN render qua URL truc tiep (link tu Tong quan + nut "Xem tat ca"
+  // tren board), chi khong chiem cho tren thanh chip.
   const typeChips = (
     <nav className="filters" aria-label="Loại nội dung">
-      {/* 27/8 redesign: chip dau tro ve dashboard MOI /tong-quan (tab Tong quan cu bo). */}
-      <a className="chip" href="/tong-quan">
-        <span aria-hidden="true">📊</span> Tổng quan
-      </a>
       <a className={`chip ${tab === 'bang' ? 'on' : ''}`} href={withParams({ loai: 'bang', trangthai: null })}>
         <span aria-hidden="true">📋</span> Bảng bài viết
       </a>
-      <a className={`chip ${tab === 'baiviet' ? 'on' : ''}`} href={withParams({ loai: 'bai-viet', trangthai: null })}>
-        <span aria-hidden="true">📝</span> Bài viết <span className="n">{cBai ?? 0}</span>
-      </a>
-      {/* Tab Khách hàng: kanban 3 cột dạng như Bảng bài viết (user 27/8: "làm như bảng bài
-          viết" — không nhảy trang /khach-hang, cùng layout tabs để quay lại được). */}
-      <a className={`chip ${tab === 'khach-hang' ? 'on' : ''}`} href={withParams({ loai: 'khach-hang', trangthai: null })}>
-        <span aria-hidden="true">👥</span> Khách hàng <span className="n">{cLeadNew ?? 0}</span>
-      </a>
-      <a className={`chip ${tab === 'thung-rac' ? 'on' : ''}`} href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn — số liệu vẫn còn nguyên trong lịch sử. Khôi phục hoặc xoá hẳn tại đây.">
+      <a className={`chip ${tab === 'thung-rac' ? 'on' : ''}`} href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn — giữ 7 ngày rồi máy tự xoá hẳn. Khôi phục hoặc xoá ngay tại đây.">
         <span aria-hidden="true">🗑️</span> Thùng rác <span className="n">{cTrash ?? 0}</span>
       </a>
     </nav>
@@ -362,6 +353,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
             <p className="sub" style={{ maxWidth: 520, margin: '8px auto 0' }}>
               Chưa có bài nào bị ẩn. Khi bấm nút <b>Xoá</b> trên bài viết, bài sẽ vào đây (soft-delete)
               — lịch sử số liệu vẫn còn nguyên, có thể khôi phục hoặc xoá hẳn tại đây.
+              Bài nằm trong thùng rác <b>quá 7 ngày sẽ được máy tự xoá hẳn</b>.
             </p>
           </div>
         ) : (
