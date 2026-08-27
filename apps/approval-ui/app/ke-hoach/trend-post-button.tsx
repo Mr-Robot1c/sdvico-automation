@@ -20,8 +20,10 @@ export default function TrendPostButton() {
   const submit = async (fd: FormData) => {
     if (pending) return;
     setPending(true);
-    setMsg('Đang sinh bài + kịch bản video, chờ 20 tới 40 giây...');
+    setMsg('Đang tạo bài...');
     try {
+      // Async pattern: server trả OK ngay, sinh nội dung background. Redirect sang Bảng
+      // ngay → user thấy bài với badge "🔥 TREND (đang sinh)", F5 sẽ cập nhật khi xong.
       const r = await generateTrendPost(fd);
       setMsg(r.msg);
       if (r.ok) {
@@ -29,7 +31,7 @@ export default function TrendPostButton() {
           dialogRef.current?.close();
           setMsg('');
           router.push('/noi-dung?loai=bang');
-        }, 2000);
+        }, 1200);
       }
     } catch (e: any) {
       setMsg('⚠️ Lỗi: ' + (e?.message || 'không rõ'));
@@ -78,7 +80,8 @@ export default function TrendPostButton() {
             />
             <span className="sub" style={{ fontSize: '.75rem' }}>
               💡 BOSS tự MÓC sự kiện sang góc ngư dân (VD "VN vô địch → ngư dân treo cờ đỏ ra khơi").
-              Bài vào Bảng chờ duyệt. Video: bạn tự dựng CapCut theo kịch bản 5-8 cảnh BOSS đưa ra.
+              <br />🎥 Máy sẽ TỰ TÌM ẢNH + VIDEO từ Pexels (CC0 miễn phí bản quyền) cho từng cảnh.
+              <br />⚡ Bấm xong <b>redirect ngay</b> sang Bảng bài viết. Bài hiện với badge "đang sinh" ~30 giây. F5 sẽ thấy khi xong.
             </span>
           </label>
           {msg ? <div className="sub" style={{ fontSize: '.85rem', padding: '8px 10px', background: 'var(--bg-2)', borderRadius: 6 }}>{msg}</div> : null}

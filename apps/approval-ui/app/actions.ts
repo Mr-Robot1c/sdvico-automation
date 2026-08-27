@@ -783,42 +783,91 @@ export async function getTikTokVideosForMatching(): Promise<{ ok: boolean; video
 }
 
 // Playbook 27/8 Tầng 3: sinh bài TREND bám sự kiện nóng (bóng đá VN thắng, sự kiện lớn,
-// bão biển). BOSS sinh 1 bài + kịch bản video 5-8 cảnh với ảnh keyword. User tự dựng video
-// bằng CapCut/InShot (Vercel không có ffmpeg). Bài vào Bảng chờ duyệt như bình thường.
+// bão biển). BOSS sinh 1 bài + kịch bản video 5-8 cảnh + PEXELS API tự lấy ảnh/video CC0
+// cho mỗi cảnh. User tự dựng video bằng CapCut/InShot (Vercel không có ffmpeg).
+//
+// Chuyển sang async pattern: insert row "đang sinh" NGAY → trả contentId, sinh Gemini +
+// Pexels chạy background qua waitUntil. Client redirect ngay, F5 sẽ thấy khi xong. Tránh
+// UI treo 30-40 giây user không biết đang chạy hay không.
 export async function generateTrendPost(formData: FormData): Promise<{ ok: boolean; contentId?: string; msg: string }> {
   const trendEvent = String(formData.get('trend_event') || '').trim();
   if (!trendEvent || trendEvent.length < 5) return { ok: false, msg: 'Sự kiện quá ngắn (cần ≥5 chữ). VD: "Đội tuyển VN vô địch AFF Cup", "Bão số 5 vào Biển Đông".' };
   const client = getServerClient();
 
-  // Lấy tri thức public 7 ngày qua liên quan trend nếu có (bám thực tế Data 2 đã học).
-  const sinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const { data: knowRows } = await client
-    .from('mkt_public_knowledge')
-    .select('source_title, summary')
-    .gte('created_at', sinceIso)
-    .order('created_at', { ascending: false })
-    .limit(10);
-  const publicKnowledge = (knowRows || [])
-    .map((k: any) => `- ${k.source_title || ''}: ${(k.summary || '').slice(0, 200)}`)
-    .join('\n');
+  // 1. Insert row NGAY với status='draft', draft placeholder, brief.trend_generating=true.
+  //    User sẽ thấy bài trong Bảng chờ duyệt với badge "Đang sinh...". Khi xong, badge tắt.
+  const displayTitleQueue = `🔥 TREND (đang sinh) · ${trendEvent.slice(0, 60)}`;
+  const { data: ins } = await client
+    .from('mkt_content')
+    .insert({
+      kind: 'social',
+      title: displayTitleQueue,
+      brief: {
+        keyword: 'Bài trend',
+        intent: 'giao_dich',
+        channels: ['facebook'],
+        generator: 'trend',
+        trend_event: trendEvent,
+        trend_generating: true,
+        rotation_group: 'Bài trend',
+      },
+      draft: '⏳ Đang sinh nội dung + tìm ảnh Pexels... (~30 giây, F5 để cập nhật)',
+      status: 'review',
+      needs_gov_review: false,
+    })
+    .select('id')
+    .single();
+  if (!ins) return { ok: false, msg: 'Không lưu được bản khởi tạo.' };
+  const contentId = (ins as { id: string }).id;
 
-  try {
-    // @ts-ignore JS thuần
-    const { generateTrendPost: gen } = await import('../lib/gen/trend-post.mjs');
-    const r = await (gen as any)({ trendEvent, publicKnowledge, client });
-    if (!r?.body) return { ok: false, msg: 'Không sinh được bài.' };
+  // Insert approval_queue ngay với title cho user thấy bài trong Bảng chờ duyệt (badge
+  // "đang sinh"). Khi Gemini xong, update title + payload.
+  await client.from('approval_queue').insert({
+    kind: 'mkt_publish_content',
+    title: displayTitleQueue,
+    payload: { content_id: contentId, channels: ['facebook'], trend_generating: true },
+    status: 'pending',
+  });
 
-    // Insert vào mkt_content + approval_queue
-    // @ts-ignore
-    const { hashtagBlock } = await import('../lib/gen/social.mjs');
-    const tags = hashtagBlock('', r.extraHashtags || []);
-    const text = `${r.body}\n\n${tags}`;
-    const displayTitle = r.headline || `[TREND] ${trendEvent.slice(0, 60)}`;
+  // 2. Chạy background: gọi Gemini + Pexels, update row khi xong. waitUntil giữ execution
+  //    alive cho serverless function nhưng KHÔNG block response.
+  waitUntil((async () => {
+    try {
+      const sinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+      const { data: knowRows } = await client
+        .from('mkt_public_knowledge')
+        .select('source_title, summary')
+        .gte('created_at', sinceIso)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      const publicKnowledge = (knowRows || [])
+        .map((k: any) => `- ${k.source_title || ''}: ${(k.summary || '').slice(0, 200)}`)
+        .join('\n');
 
-    const { data: ins } = await client
-      .from('mkt_content')
-      .insert({
-        kind: 'social',
+      // @ts-ignore JS thuần
+      const { generateTrendPost: gen } = await import('../lib/gen/trend-post.mjs');
+      const r = await (gen as any)({ trendEvent, publicKnowledge, client });
+      if (!r?.body) {
+        await client.from('mkt_content').update({
+          title: `🔥 TREND (lỗi sinh) · ${trendEvent.slice(0, 60)}`,
+          brief: { keyword: 'Bài trend', trend_event: trendEvent, trend_generating: false, trend_error: 'Không sinh được bài' },
+          draft: '⚠️ Không sinh được bài. Bấm nút Sinh trend lại.',
+        }).eq('id', contentId);
+        return;
+      }
+
+      // 3. Search Pexels cho mỗi cảnh video (parallel).
+      // @ts-ignore
+      const { searchPexelsForScenes } = await import('../lib/gen/pexels.mjs');
+      const scenesWithMedia = await (searchPexelsForScenes as any)(r.videoScenes || []);
+
+      // @ts-ignore
+      const { hashtagBlock } = await import('../lib/gen/social.mjs');
+      const tags = hashtagBlock('', r.extraHashtags || []);
+      const text = `${r.body}\n\n${tags}`;
+      const displayTitle = r.headline || `[TREND] ${trendEvent.slice(0, 60)}`;
+
+      await client.from('mkt_content').update({
         title: displayTitle,
         brief: {
           keyword: 'Bài trend',
@@ -826,32 +875,36 @@ export async function generateTrendPost(formData: FormData): Promise<{ ok: boole
           channels: ['facebook'],
           generator: 'trend',
           trend_event: trendEvent,
+          trend_generating: false,
           emotion: r.emotion || null,
           hook_15w: r.hook15w || null,
-          video_scenes: r.videoScenes || [],
+          video_scenes: scenesWithMedia,
           extra_hashtags: r.extraHashtags || [],
           rotation_group: 'Bài trend',
         },
         draft: text,
         status: 'review',
-        needs_gov_review: false,
-      })
-      .select('id')
-      .single();
-    if (!ins) return { ok: false, msg: 'Không lưu được bài.' };
-    const contentId = (ins as { id: string }).id;
-    await client.from('approval_queue').insert({
-      kind: 'mkt_publish_content',
-      title: `🔥 TREND · ${displayTitle}`,
-      payload: { content_id: contentId, channels: ['facebook'] },
-      status: 'pending',
-    });
-    revalidatePath('/noi-dung');
-    revalidatePath('/hang-doi');
-    return { ok: true, contentId, msg: `Đã sinh bài trend "${displayTitle.slice(0, 60)}" + ${r.videoScenes?.length || 0} cảnh video. Vào Bảng chờ duyệt xem thêm.` };
-  } catch (e: any) {
-    return { ok: false, msg: String(e?.message || e).slice(0, 300) };
-  }
+      }).eq('id', contentId);
+
+      // Update approval_queue title (đã insert ở trên với "đang sinh"). Không insert row
+      // mới. Query theo payload->>content_id.
+      await client.from('approval_queue')
+        .update({ title: `🔥 TREND · ${displayTitle}`, payload: { content_id: contentId, channels: ['facebook'], trend_generating: false } })
+        .eq('kind', 'mkt_publish_content')
+        .eq('payload->>content_id', contentId);
+      revalidatePath('/noi-dung');
+      revalidatePath('/hang-doi');
+    } catch (e: any) {
+      await client.from('mkt_content').update({
+        title: `🔥 TREND (lỗi) · ${trendEvent.slice(0, 60)}`,
+        brief: { keyword: 'Bài trend', trend_event: trendEvent, trend_generating: false, trend_error: String(e?.message || e).slice(0, 300) },
+        draft: `⚠️ Lỗi: ${String(e?.message || e).slice(0, 300)}`,
+      }).eq('id', contentId);
+    }
+  })());
+
+  revalidatePath('/noi-dung');
+  return { ok: true, contentId, msg: `✓ Đã tạo bài trend "${trendEvent.slice(0, 40)}" — máy đang sinh nền + tìm ảnh Pexels (~30 giây). Vào Bảng bài viết F5 sẽ thấy khi xong.` };
 }
 
 // Dọn dedup lead trùng (fromId + text) trong 5 phút — user 27/8 sau khi pull inbox có 3 tin
