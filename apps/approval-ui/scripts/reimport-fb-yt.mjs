@@ -74,7 +74,7 @@ async function importFacebook() {
   const sinceSec = Math.floor(new Date(sinceIso).getTime() / 1000);
   let url = `https://graph.facebook.com/${version}/${pageId}/posts?` + new URLSearchParams({
     since: String(sinceSec),
-    fields: 'id,message,created_time,permalink_url,reactions.summary(true).limit(0),comments.summary(true).limit(0),shares,attachments{media_type,url}',
+    fields: 'id,message,story,created_time,permalink_url,reactions.summary(true).limit(0),comments.summary(true).limit(0),shares,attachments{media_type,url,title,description,type}',
     limit: '50',
     access_token: token
   });
@@ -89,9 +89,15 @@ async function importFacebook() {
         const { data: existing } = await client.from('mkt_posts')
           .select('id').eq('external_url', permalink).eq('channel', 'facebook').maybeSingle();
         if (existing) { skipped++; continue; }
-        // Tạo mkt_content mới
+        // Tạo mkt_content mới. Fallback title: message -> attachment desc/title -> story
+        // -> friendly (Video/Ảnh/Bài Facebook không caption). Không dùng raw ID.
         const message = String(p.message || '').trim();
-        const title = message.slice(0, 100) || `Bài FB ${p.id}`;
+        const att = Array.isArray(p.attachments?.data) ? p.attachments.data[0] : null;
+        const attText = String(att?.description || att?.title || '').trim();
+        const story = String(p.story || '').trim();
+        const attType = String(att?.type || att?.media_type || '');
+        const fallback = attType.includes('video') ? 'Video Facebook (không caption)' : (attType.includes('photo') ? 'Ảnh Facebook (không caption)' : 'Bài Facebook (không caption)');
+        const title = (message || attText || story || fallback).slice(0, 100);
         const contentId = randomUUID();
         const { error: eC } = await client.from('mkt_content').insert({
           id: contentId,

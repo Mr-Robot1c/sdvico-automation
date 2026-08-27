@@ -16,6 +16,16 @@ import PullMetricsButton from './pull-metrics-button';
 
 type M = { reactions?: number; comments?: number; shares?: number; views?: number };
 
+// User 27/8: Bai noi bat hien title "Bài FB {id_id}" (bai reimport khong co caption, fallback
+// title xau tu route reimport-history/reimport-fb-yt.mjs). UI helper thay hien thi thanh
+// friendly: "Bai Facebook (khong caption)". Backfill DB da fix tai reimport route cho bai moi.
+function prettifyTitle(t: string): string {
+  if (!t) return '(không tên)';
+  // Match "Bài FB {digits}_{digits?}" hoac "Bai FB {digits}"
+  if (/^B[àa]i\s+FB\s+\d+(_\d+)?\s*$/i.test(t)) return 'Bài Facebook (không caption)';
+  return t;
+}
+
 function fmtVNDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
@@ -378,7 +388,7 @@ export default async function TongQuanSection() {
                 <Link key={t.cid} href="/do-luong" className="tq-item" title="Bấm xem số liệu chi tiết">
                   <span className="tq-rank" aria-hidden="true">{i + 1}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span className="tq-item-title">{topTitles.get(t.cid) || '(không tên)'}</span>
+                    <span className="tq-item-title">{prettifyTitle(topTitles.get(t.cid) || '')}</span>
                     <span className="sub" style={{ display: 'block', fontSize: '.78rem' }}>
                       {fmt(t.eng)} tương tác, {fmt(t.views)} lượt xem
                     </span>

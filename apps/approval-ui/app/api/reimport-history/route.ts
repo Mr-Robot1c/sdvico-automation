@@ -55,9 +55,11 @@ async function importFacebook(client: any, sinceIso: string): Promise<{ added: n
   let added = 0, skipped = 0;
   const errors: string[] = [];
   const sinceSec = Math.floor(new Date(sinceIso).getTime() / 1000);
+  // 27/8: user thay title "Bai FB {id}" xau o Bai noi bat -> them attachments.description
+  // + story de bat title cho bai anh/video khong co message. Fallback friendly.
   let url: string | null = `https://graph.facebook.com/${version}/${pageId}/posts?` + new URLSearchParams({
     since: String(sinceSec),
-    fields: 'id,message,created_time,permalink_url,reactions.summary(true).limit(0),comments.summary(true).limit(0),shares',
+    fields: 'id,message,story,created_time,permalink_url,attachments{title,description,type},reactions.summary(true).limit(0),comments.summary(true).limit(0),shares',
     limit: '50',
     access_token: token
   });
@@ -93,7 +95,14 @@ async function importFacebook(client: any, sinceIso: string): Promise<{ added: n
           continue;
         }
         const message = String(p.message || '').trim();
-        const title = message.slice(0, 100) || `Bài FB ${p.id}`;
+        // Fallback title cho bai khong co message: dung story, hoac attachment description/title,
+        // hoac cuoi cung "Bai Facebook (khong caption)". Khong dung raw ID (user 27/8 phan hoi UI).
+        const att = Array.isArray(p.attachments?.data) ? p.attachments.data[0] : null;
+        const attText = String(att?.description || att?.title || '').trim();
+        const story = String(p.story || '').trim();
+        const attType = String(att?.type || '');
+        const fallback = attType.includes('video') ? 'Video Facebook (không caption)' : (attType.includes('photo') ? 'Ảnh Facebook (không caption)' : 'Bài Facebook (không caption)');
+        const title = (message || attText || story || fallback).slice(0, 100);
         const contentId = randomUUID();
         const { error: eC } = await client.from('mkt_content').insert({
           id: contentId, kind: 'social', title, draft: message, status: 'published',
