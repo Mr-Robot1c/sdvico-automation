@@ -888,6 +888,9 @@ export async function generateTrendPost(formData: FormData): Promise<{ ok: boole
       const text = `${r.body}\n\n${tags}`;
       const displayTitle = r.headline || `[TREND] ${trendEvent.slice(0, 60)}`;
 
+      // Kiểm tra có ít nhất 1 cảnh có Pexels URL không → set video_requested=true để
+      // Watcher local tự dựng video (mode trend: download Pexels + TTS + concat).
+      const hasPexels = scenesWithMedia.some((s: any) => s?.pexels_video_url || s?.pexels_image_url);
       await client.from('mkt_content').update({
         title: displayTitle,
         brief: {
@@ -902,6 +905,7 @@ export async function generateTrendPost(formData: FormData): Promise<{ ok: boole
           video_scenes: scenesWithMedia,
           extra_hashtags: r.extraHashtags || [],
           rotation_group: 'Bài trend',
+          video_requested: hasPexels,  // Watcher local pick up nếu có Pexels
         },
         draft: text,
         status: 'review',

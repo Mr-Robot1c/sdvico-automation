@@ -481,17 +481,10 @@ async function main() {
   const { guessGroup, CONTENT_GROUP } = await import('../products.mjs');
   const brief = content.brief || {};
 
-  // 27/8: BAI TREND CO Pexels URL san trong brief.video_scenes - KHONG dung Watcher dung
-  // tu brand_assets (khong co folder "Bai trend"). User dung tay bang CapCut. Clear
-  // video_requested + skip khong quay lai lan sau.
+  // 27/8: BAI TREND dung Pexels URL trong brief.video_scenes -> tu dung video luon
+  // (khong dung brand_assets folder). User "ghep + long tieng + xuat" hoi 27/8 chieu.
   if (brief.generator === 'trend') {
-    try {
-      const newBrief = { ...brief, video_requested: false, video_note: 'Bai trend dung tay bang CapCut voi URL Pexels trong video_scenes' };
-      await client.from('mkt_content').update({ brief: newBrief }).eq('id', contentId);
-    } catch { /* bo qua */ }
-    console.log('BAI TREND - co Pexels URL trong brief.video_scenes, khong dung Watcher. Da clear video_requested.');
-    console.log('Mo Xem bai trong /noi-dung -> tai video/anh Pexels ve -> dung tay CapCut/InShot.');
-    return;
+    return buildTrendVideoFromPexels(client, content, contentId, args);
   }
 
   let productGroup = brief.rotation_group
@@ -573,6 +566,136 @@ async function main() {
       console.warn('Không đẩy được vào Hàng đợi duyệt:', e.message, '(video vẫn có ở out/video/).');
     }
   }
+}
+
+// ============================================================
+// BAI TREND: dung video tu Pexels URL trong brief.video_scenes.
+// User 27/8: "co the tu ghep + long tieng + xuat video luon duoc khong?"
+// Flow: Download video/anh Pexels moi canh -> TTS narration -> ghep video +
+// audio moi canh -> concat tat ca canh -> upload Supabase Storage -> update
+// mkt_content.brief.assets.video.
+async function buildTrendVideoFromPexels(client, content, contentId, args) {
+  const brief = content.brief || {};
+  const scenes = Array.isArray(brief.video_scenes) ? brief.video_scenes : [];
+  if (!scenes.length) throw new Error('Bai trend khong co video_scenes trong brief.');
+  const usableScenes = scenes.filter((s) => s.pexels_video_url || s.pexels_image_url);
+  if (!usableScenes.length) throw new Error('Khong canh nao co pexels_video_url/pexels_image_url. Kiem tra PEXELS_API_KEY env tren Vercel.');
+
+  console.log(`BAI TREND · ${content.title}`);
+  console.log(`  ${usableScenes.length}/${scenes.length} canh co Pexels URL.`);
+
+  const workDir = join(HERE, '..', '..', '..', '..', 'out', 'video', `trend_${contentId.slice(0, 8)}`);
+  await mkdir(workDir, { recursive: true });
+
+  const voice = args.voice || 'vi-VN-HoaiMyNeural';
+  // TARGET res: 16:9 landscape 1920x1080 (dep tren Facebook, TikTok co re-render doc sau).
+  const W = 1920, H = 1080;
+
+  const clipPaths = [];
+  for (let i = 0; i < usableScenes.length; i++) {
+    const s = usableScenes[i];
+    const sceneNo = i + 1;
+    const narration = String(s.narration || '').trim();
+    console.log(`\n  Canh ${sceneNo}/${usableScenes.length}: "${narration.slice(0, 50)}..."`);
+
+    // 1. Download media (uu tien video, fallback image).
+    let rawPath;
+    if (s.pexels_video_url) {
+      rawPath = join(workDir, `scene${sceneNo}_raw.mp4`);
+      console.log(`    Tai video Pexels...`);
+      await downloadAsset(s.pexels_video_url, rawPath);
+    } else {
+      const imgPath = join(workDir, `scene${sceneNo}_raw.jpg`);
+      console.log(`    Tai anh Pexels...`);
+      await downloadAsset(s.pexels_image_url, imgPath);
+      // Convert anh -> video 5s (Ken Burns nhe).
+      rawPath = join(workDir, `scene${sceneNo}_raw.mp4`);
+      await ffmpeg(['-y', '-loop', '1', '-i', imgPath, '-t', '5',
+        '-vf', `scale=${W}:${H}:force_original_aspect_ratio=cover,crop=${W}:${H},setsar=1`,
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-r', '30', rawPath]);
+    }
+
+    // 2. TTS narration (Gemini fallback edge).
+    const audioPath = join(workDir, `scene${sceneNo}_audio.mp3`);
+    let audioDur = 0;
+    if (narration) {
+      console.log(`    TTS narration...`);
+      try {
+        audioDur = await tts(narration, audioPath, voice, workDir, `scene${sceneNo}`, 'gemini');
+      } catch (e) {
+        console.warn(`    (gemini-tts loi ${String(e?.message || e).slice(0, 80)}, lui edge-tts)`);
+        audioDur = await tts(narration, audioPath, voice, workDir, `scene${sceneNo}`, 'edge');
+      }
+    } else {
+      audioDur = await silentAudio(audioPath, s.duration_sec || 4);
+    }
+
+    // 3. Ghep video + audio. Neu video ngan hon audio -> loop; dai hon -> cat theo audio.
+    const videoDur = await probeDuration(rawPath);
+    const finalDur = Math.max(audioDur, 1.5);
+    const clipPath = join(workDir, `scene${sceneNo}_clip.mp4`);
+    console.log(`    Ghep clip ${finalDur.toFixed(1)}s (video ${videoDur.toFixed(1)}s + audio ${audioDur.toFixed(1)}s)`);
+    if (videoDur < finalDur - 0.3) {
+      // Loop video (stream_loop N lan) roi cat theo audio.
+      const loops = Math.ceil(finalDur / videoDur);
+      await ffmpeg(['-y',
+        '-stream_loop', String(loops - 1), '-i', rawPath,
+        '-i', audioPath,
+        '-t', finalDur.toFixed(2),
+        '-vf', `scale=${W}:${H}:force_original_aspect_ratio=cover,crop=${W}:${H},setsar=1,fps=30`,
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+        '-map', '0:v:0', '-map', '1:a:0', '-shortest', clipPath]);
+    } else {
+      await ffmpeg(['-y',
+        '-i', rawPath,
+        '-i', audioPath,
+        '-t', finalDur.toFixed(2),
+        '-vf', `scale=${W}:${H}:force_original_aspect_ratio=cover,crop=${W}:${H},setsar=1,fps=30`,
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+        '-map', '0:v:0', '-map', '1:a:0', clipPath]);
+    }
+    clipPaths.push(clipPath);
+  }
+
+  // 4. Concat tat ca clips (concat demuxer - moi clip da re-encode chung codec).
+  console.log(`\n  Concat ${clipPaths.length} clips...`);
+  const listPath = join(workDir, 'concat.txt');
+  await writeFile(listPath, clipPaths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join('\n'), 'utf8');
+  const outputPath = join(workDir, `sdvico_trend_${contentId.slice(0, 8)}.mp4`);
+  await ffmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', outputPath]);
+  const finalTotalDur = await probeDuration(outputPath);
+  console.log(`  Xong. Video final: ${outputPath} (${finalTotalDur.toFixed(1)}s)`);
+
+  // 5. Upload len Supabase Storage + insert brand_assets + update mkt_content.brief.assets.
+  console.log(`\n  Upload Supabase Storage...`);
+  const data = await readFile(outputPath);
+  const storagePath = `videos/trend_${contentId.slice(0, 8)}_${Date.now()}.mp4`;
+  const { error: upErr } = await client.storage.from('brand-assets').upload(storagePath, data, {
+    contentType: 'video/mp4', upsert: false,
+  });
+  if (upErr) throw new Error('Upload Storage loi: ' + upErr.message);
+
+  const { data: asset, error: assErr } = await client.from('brand_assets').insert({
+    kind: 'video',
+    title: `TREND · ${(content.title || '').slice(0, 60)}`,
+    storage_path: storagePath,
+    product_group: 'Bài trend',
+  }).select('id').single();
+  if (assErr) throw new Error('Insert brand_assets loi: ' + assErr.message);
+
+  const newBrief = {
+    ...brief,
+    assets: { ...(brief.assets || {}), video: asset.id },
+    video_requested: false,
+    trend_video_built_at: new Date().toISOString(),
+    trend_video_duration_sec: Math.round(finalTotalDur),
+  };
+  await client.from('mkt_content').update({ brief: newBrief }).eq('id', contentId);
+
+  console.log(`\n✓ VIDEO TREND XONG!`);
+  console.log(`  Asset ID: ${asset.id}`);
+  console.log(`  Duration: ${finalTotalDur.toFixed(1)}s`);
+  console.log(`  Mo /noi-dung -> Bang bai viet -> bai nay -> Xem bai -> video da san.`);
 }
 
 main().catch((e) => { console.error('LỖI:', e.message); process.exit(1); });

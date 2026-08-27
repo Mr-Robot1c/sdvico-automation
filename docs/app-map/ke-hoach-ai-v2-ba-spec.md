@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-26
 ttl_days: 90
+<!-- re-verified: 2026-08-27 14:20 - Watcher local build mode trend: buildTrendVideoFromPexels download Pexels URL + TTS narration + ghep 1920x1080 + concat + upload Supabase. actions.ts generateTrendPost sau khi Pexels xong tu set video_requested=true. -->
 <!-- re-verified: 2026-08-27 13:35 - FIX Watcher local mac ket bai trend: build-video.mjs skip generator='trend' + clear video_requested. bang-section.tsx an nut Lam video cho bai trend, hien badge Co N canh Pexels. /api/clear-trend-video reset bai dang mac ket. -->
 <!-- re-verified: 2026-08-27 13:20 - TICH HOP PEXELS API + FIX web treo Sinh trend: lib/gen/pexels.mjs search anh/video CC0 free (env PEXELS_API_KEY). actions.ts generateTrendPost async pattern - tra contentId NGAY, background waitUntil Gemini + Pexels. -->
 <!-- re-verified: 2026-08-27 12:35 - TANG 1+2+3 BAM TREND VN VIRAL MIEN PHI: (1) knowledge-public.ts SEARCH_TOPICS +3 topic trend cho Data 2 hoc hang ngay. (2) plan-directions.ts prompt BOSS: huong #5 Thu 6 uu tien bam trend, moc sang goc ngu dan. (3) lib/gen/trend-post.mjs generateTrendPost + actions.ts server action + /ke-hoach/trend-post-button.tsx nut "🔥 Sinh bai trend" o header. Modal nhap su kien, sinh 1 bai Facebook + kich ban video 5-8 canh, insert Bang cho duyet. -->
