@@ -3,6 +3,7 @@ import { updateLeadStatus, addLeadManual } from '../actions';
 import LeadStatusSelect from './lead-status-select';
 import ForwardZaloButton from './forward-zalo-button';
 import SalesZaloEditor from './sales-zalo-editor';
+import DeleteLeadButton from './delete-lead-button';
 
 // Trang "Theo dõi người mua" (24/8, user: "thông tin khách hàng sẽ được gửi về cho nhân
 // viên kinh doanh"). Nhân viên vào đây xem danh sách người hỏi mua bắt được từ comment/tin
@@ -113,7 +114,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
         <div className="tablewrap">
           <table className="datatable">
             <thead>
-              <tr><th>Lúc</th><th>Nguồn</th><th>Người</th><th>Nội dung hỏi</th><th>Bài liên quan</th><th style={{ width: 150 }}>Trạng thái</th><th>Ghi chú</th><th>Chuyển NV</th></tr>
+              <tr><th>Lúc</th><th>Nguồn</th><th>Người</th><th>Nội dung hỏi</th><th>Bài liên quan</th><th style={{ width: 150 }}>Trạng thái</th><th>Ghi chú</th><th>Chuyển NV</th><th style={{ width: 80 }}></th></tr>
             </thead>
             <tbody>
               {leads.map((l) => {
@@ -157,6 +158,12 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                           l.fb_profile_url ? `Link: ${l.fb_profile_url}` : '',
                           `Mở dashboard: https://sdvico-mktit.vercel.app/khach-hang`,
                         ].filter(Boolean).join('\n')}
+                      />
+                    </td>
+                    <td>
+                      <DeleteLeadButton
+                        leadId={l.id}
+                        leadSummary={`${SOURCE_LABEL[l.source] || l.source} · ${l.fb_user_name || '(chưa lấy được tên)'} · "${(l.message || '').slice(0, 80)}"`}
                       />
                     </td>
                   </tr>

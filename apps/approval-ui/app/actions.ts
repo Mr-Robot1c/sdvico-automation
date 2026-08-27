@@ -725,6 +725,20 @@ export async function saveSalesZalo(formData: FormData) {
 // vào bài cụ thể. BOSS dùng lead count per bài để xếp hạng sản phẩm (thay vì chỉ view/like).
 // channel: 'zalo' | 'inbox' | 'call' | 'meet' — prefix vào message để phân loại (không cần
 // migration DB thêm cột, tận dụng bảng cũ).
+// Xoá HẲN 1 lead khỏi mkt_leads (user 27/8: bảng có nhiều test rác/lead ma cần dọn tay).
+// Không revert được — chỉ dùng khi chắc chắn không cần. Muốn ẩn tạm dùng status='spam' qua
+// LeadStatusSelect thay vì xoá.
+export async function deleteLead(formData: FormData) {
+  const id = String(formData.get('lead_id') || '');
+  if (!id) return;
+  const client = getServerClient();
+  await client.from('mkt_leads').delete().eq('id', id);
+  revalidatePath('/khach-hang');
+  revalidatePath('/noi-dung');
+  revalidatePath('/do-luong');
+  revalidatePath('/do-luong/tuan');
+}
+
 export async function addLeadManual(formData: FormData) {
   const name = String(formData.get('name') || '').trim().slice(0, 200);
   const message = String(formData.get('message') || '').trim().slice(0, 2000);
