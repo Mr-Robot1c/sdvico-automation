@@ -307,3 +307,107 @@ export async function learnPublicDaily(
 
   return { topics: SEARCH_TOPICS.length, found: all.length, inserted, errors };
 }
+
+// ===== 27/8 dot 2 redesign: CHAM DIEM TIER S/A/B/C (Trending Digest kieu ForLife) =====
+// Cham cac dong tier IS NULL (moi hoc, chua danh gia): score 0-100 theo do dung duoc cho
+// content marketing ngu dan + tier + angle + key_message + keywords + plan goi y gio dang.
+// Chay trong cron sau learnPublicDaily; 1 call Gemini cham ca batch de tiet kiem token.
+// Yeu cau migration 20260827233000_knowledge_tier.sql da ap — chua ap thi select loi,
+// tra skipped de cron khong vo.
+export async function scoreUnscoredKnowledge(
+  client: Client,
+  opts: { limit?: number } = {}
+): Promise<{ scored: number; errors: string[]; skipped?: boolean }> {
+  const limit = opts.limit ?? 20;
+  const errors: string[] = [];
+
+  const sel = await client
+    .from('mkt_knowledge_public')
+    .select('id, source_title, summary')
+    .is('tier', null)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (sel.error) {
+    // Thuong la migration chua ap (cot tier chua co). Bao ro, khong pha cron.
+    return { scored: 0, errors: ['select: ' + sel.error.message + ' (da ap migration knowledge_tier chua?)'], skipped: true };
+  }
+  const rows = (sel.data || []) as Array<{ id: string; source_title: string | null; summary: string }>;
+  if (!rows.length) return { scored: 0, errors: [] };
+
+  let parsed: any;
+  try {
+    const { GoogleGenAI } = await import('@google/genai');
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const itemsBlock = rows
+      .map((r, i) => `${i + 1}. [id=${r.id}] ${r.source_title || '(khong tieu de)'}\n   ${String(r.summary || '').slice(0, 400)}`)
+      .join('\n');
+    const res = await ai.models.generateContent({
+      model: MKT_MODEL,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: [
+                'Bạn là AI DATA 2 của SDVICO — công ty phân phối thiết bị tàu cá (máy lọc nước biển, thiết bị giám sát hành trình, lọc dầu, dầu nhớt) cho ngư dân Việt Nam.',
+                'Chấm điểm từng mẩu tin dưới đây theo ĐỘ DÙNG ĐƯỢC cho content marketing hướng tới ngư dân/chủ tàu:',
+                '- Liên quan trực tiếp nghề biển, tàu cá, quy định IUU/VMS: điểm cao.',
+                '- Thời sự nóng cả nước có thể móc sang góc ngư dân (bóng đá VN thắng, bão Biển Đông): điểm cao.',
+                '- Tin chung chung khó móc sang nghề biển: điểm thấp.',
+                'Thang: score 0-100. tier: "S" nếu >= 80, "A" nếu >= 60, "B" nếu >= 40, "C" nếu < 40.',
+                'angle: góc tiếp cận gợi ý + tự chấm /10, ví dụ "cau_chuyen_cu_the (9/10)", "cam_xuc_tu_hao (8/10)", "canh_bao_rui_ro (7/10)".',
+                'key_message: 1 câu thông điệp chính nếu viết bài từ tin này (tiếng Việt, câu ngắn, không gạch dài, không mũi tên).',
+                'keywords: 3-5 từ khóa tiếng Việt của tin.',
+                'plan: 1-3 gợi ý lịch dùng tin (chỉ với tier S/A; tier B/C trả mảng rỗng), mỗi gợi ý {"time":"HH:MM","kind":"article|seed|video_short|blog","title":"tiêu đề gợi ý"}.',
+                '',
+                'DANH SÁCH TIN:',
+                itemsBlock,
+                '',
+                'Trả JSON đúng dạng, không thêm chữ ngoài JSON:',
+                '{"items":[{"id":"...","score":75,"tier":"A","angle":"cam_xuc_tu_hao (8/10)","key_message":"...","keywords":["..."],"plan":[{"time":"19:30","kind":"video_short","title":"..."}]}]}',
+              ].join('\n'),
+            },
+          ],
+        },
+      ],
+      config: { temperature: 0.3, responseMimeType: 'application/json' },
+    });
+    logTokenUsage(client, 'knowledge_score', MKT_MODEL, (res as any).usageMetadata);
+    const t = (res.text || '').trim();
+    const m = t.match(/\{[\s\S]*\}/);
+    parsed = m ? JSON.parse(m[0]) : null;
+  } catch (e: any) {
+    return { scored: 0, errors: ['gemini: ' + String(e?.message || e).slice(0, 200)] };
+  }
+
+  const items: any[] = Array.isArray(parsed?.items) ? parsed.items : [];
+  const validIds = new Set(rows.map((r) => r.id));
+  let scored = 0;
+  for (const it of items) {
+    const id = String(it?.id || '');
+    if (!validIds.has(id)) continue;
+    const score = Math.max(0, Math.min(100, Number(it.score) || 0));
+    const tier = ['S', 'A', 'B', 'C'].includes(String(it.tier)) ? String(it.tier) : score >= 80 ? 'S' : score >= 60 ? 'A' : score >= 40 ? 'B' : 'C';
+    const up = await client
+      .from('mkt_knowledge_public')
+      .update({
+        score,
+        tier,
+        angle: String(it.angle || '').slice(0, 120) || null,
+        key_message: String(it.key_message || '').slice(0, 300) || null,
+        keywords: Array.isArray(it.keywords) ? it.keywords.slice(0, 6).map((k: any) => String(k).slice(0, 60)) : [],
+        plan_suggestions: Array.isArray(it.plan) ? it.plan.slice(0, 4) : [],
+      })
+      .eq('id', id);
+    if (up.error) { errors.push(`${id}: ${up.error.message}`); continue; }
+    scored += 1;
+  }
+
+  try {
+    await client.from('run_log').insert({
+      task: 'mkt.knowledge_score', actor: 'cron', status: errors.length && !scored ? 'error' : 'ok',
+      detail: { candidates: rows.length, scored, errors: errors.length ? errors.slice(0, 3) : undefined },
+    });
+  } catch { /* bo qua */ }
+  return { scored, errors };
+}

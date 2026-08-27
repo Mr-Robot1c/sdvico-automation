@@ -3,7 +3,7 @@ import { getServerClient } from '../../../lib/supabase-server';
 import { pullFacebookMetrics } from '../../../lib/fb-metrics';
 import { generateAndStorePlan, planSlotVN, vnDayStartIso } from '../../../lib/plan';
 import { importInternalFromBucket } from '../../../lib/knowledge';
-import { learnPublicKnowledge, learnPublicDaily } from '../../../lib/knowledge-public';
+import { learnPublicKnowledge, learnPublicDaily, scoreUnscoredKnowledge } from '../../../lib/knowledge-public';
 import { evaluateAbPairs } from '../../../lib/evaluator';
 import { pullTikTokMetrics } from '../../../lib/tiktok-metrics';
 import { pullFacebookInbox } from '../../../lib/fb-inbox';
@@ -121,7 +121,7 @@ export async function GET(req: Request) {
   // HẰNG NGÀY — AI Data #1: import file mới từ bucket Kho tri thức nội bộ (zalo-insight
   // phiên 16:00 đẩy lên). Idempotent theo source_path, file cũ tự bỏ qua.
   // Lỗi ở từng khối KHÔNG được đánh hỏng metrics-pull hoặc plan.
-  const knowledge: { internal: any; publicSrc: any; publicDeep: any } = { internal: null, publicSrc: null, publicDeep: null };
+  const knowledge: { internal: any; publicSrc: any; publicDeep: any; scored: any } = { internal: null, publicSrc: null, publicDeep: null, scored: null };
   try {
     knowledge.internal = await importInternalFromBucket(client, { limit: 30 });
   } catch (e: any) {
@@ -135,6 +135,15 @@ export async function GET(req: Request) {
   } catch (e: any) {
     console.error('[knowledge] hoc public RSS that bai:', e?.message || e);
     knowledge.publicSrc = { error: e?.message || String(e) };
+  }
+
+  // 27/8 dot 2: CHAM DIEM TIER S/A/B/C cho tri thuc moi hoc (Trending Digest kieu ForLife).
+  // 1 call Gemini cham batch 20 dong tier IS NULL. Migration chua ap -> tra skipped, khong vo.
+  try {
+    knowledge.scored = await scoreUnscoredKnowledge(client, { limit: 20 });
+  } catch (e: any) {
+    console.error('[knowledge] cham tier that bai:', e?.message || e);
+    knowledge.scored = { error: e?.message || String(e) };
   }
 
   // 2 NGÀY/LẦN sáng 7-10h VN (user 26/8 chốt: "điều chỉnh 2 ngày 1 lần quét đi" — trung

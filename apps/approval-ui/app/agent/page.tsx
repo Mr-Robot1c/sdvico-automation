@@ -43,10 +43,49 @@ export default async function Page() {
       .limit(300),
     client.from('mkt_knowledge_internal').select('*', { count: 'exact', head: true }),
     client.from('mkt_knowledge_internal').select('created_at').order('created_at', { ascending: false }).limit(1),
-    client.from('mkt_public_knowledge').select('*', { count: 'exact', head: true }),
-    client.from('mkt_public_knowledge').select('source_title, summary, created_at').order('created_at', { ascending: false }).limit(6),
+    // 27/8 dot 2 fix: bang dung ten la mkt_knowledge_public (truoc query mkt_public_knowledge
+    // KHONG TON TAI -> digest luon trong).
+    client.from('mkt_knowledge_public').select('*', { count: 'exact', head: true }),
+    client.from('mkt_knowledge_public').select('source_title, summary, created_at').order('created_at', { ascending: false }).limit(6),
     client.from('brand_assets').select('title, created_at').in('kind', ['video', 'clip']).order('created_at', { ascending: false }).limit(1),
   ]);
+
+  // TRENDING DIGEST (dot 2): tri thuc 7 ngay kem tier/score/keywords/plan — can migration
+  // knowledge_tier da ap. Select rieng trong try de migration CHUA ap khong lam vo trang.
+  const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  let digestRows: any[] = [];
+  let digestReady = false;
+  try {
+    const r = await client
+      .from('mkt_knowledge_public')
+      .select('id, source_url, source_title, summary, tier, score, angle, key_message, keywords, plan_suggestions, created_at')
+      .gte('created_at', since7d)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (!r.error) { digestRows = r.data || []; digestReady = true; }
+  } catch { /* cot tier chua co */ }
+
+  const tierCount = { S: 0, A: 0, B: 0, C: 0 } as Record<string, number>;
+  let unscored = 0;
+  for (const r of digestRows) {
+    const t = String(r.tier || '');
+    if (t in tierCount) tierCount[t] += 1; else unscored += 1;
+  }
+  const topScored = [...digestRows]
+    .filter((r) => r.tier)
+    .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))
+    .slice(0, 5);
+  const kwCount = new Map<string, number>();
+  for (const r of digestRows) {
+    if (Array.isArray(r.keywords)) {
+      for (const k of r.keywords) {
+        const key = String(k).toLowerCase().trim();
+        if (key) kwCount.set(key, (kwCount.get(key) || 0) + 1);
+      }
+    }
+  }
+  const topKeywords = [...kwCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+  const TIER_CLS: Record<string, string> = { S: 'tone-no', A: 'tone-ok', B: 'tone-demo', C: 'tone-default' };
 
   const logs = (logRes.data || []) as LogRow[];
   const lastOf = (tasks: string[]): LogRow | null => logs.find((l) => tasks.includes(l.task)) || null;
@@ -181,13 +220,67 @@ export default async function Page() {
         </div>
       </section>
 
-      {/* ===== DATA 2 DIGEST ===== */}
+      {/* ===== TRENDING DIGEST — DATA 2 (dot 2: tier S/A/B/C + top keywords nhu ForLife) ===== */}
       <section className="blk">
-        <h2>🌐 DATA 2 vừa học gì trên mạng <span className="sub">mục mới nhất trong kho tri thức public — nguồn cho bài trend</span></h2>
-        {publicRows.length === 0 ? (
-          <p className="sub" style={{ margin: 0 }}>Kho public trống. DATA 2 quét theo lịch, hoặc chạy tay ở trang Nguồn.</p>
+        <h2>
+          📈 Trending Digest — DATA 2
+          <span className="sub">
+            7 ngày: {fmt(digestRows.length)} mục
+            {digestReady ? <> · Tiers <b>S:{tierCount.S}</b> A:{tierCount.A} B:{tierCount.B} C:{tierCount.C}{unscored ? ` · ${fmt(unscored)} chưa chấm` : ''}</> : null}
+          </span>
+        </h2>
+        {!digestReady ? (
+          <div className="need-item warn">
+            <span>⚙️</span>
+            <span style={{ flex: 1 }}>Chưa chấm được tier — cần chạy migration <code>20260827233000_knowledge_tier.sql</code> trên Supabase (SQL Editor) rồi chờ cron giờ tới chấm điểm.</span>
+          </div>
+        ) : digestRows.length === 0 ? (
+          <p className="sub" style={{ margin: 0 }}>7 ngày qua DATA 2 chưa học được mục nào. Kiểm tra cron hoặc chạy tay ở trang Nguồn.</p>
         ) : (
-          <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ display: 'grid', gap: 14 }}>
+            {/* Top bai theo score */}
+            {topScored.length ? (
+              <div style={{ display: 'grid', gap: 8 }}>
+                <b style={{ fontSize: '.9rem' }}>📰 Top bài đáng dùng nhất</b>
+                {topScored.map((r) => (
+                  <div key={r.id} className="need-item" style={{ alignItems: 'flex-start' }}>
+                    <span className={`badge ${TIER_CLS[String(r.tier)] || 'tone-default'}`} title={`Tier ${r.tier} — score ${r.score}/100`} style={{ flexShrink: 0 }}>
+                      {String(r.tier)} · {Number(r.score) || 0}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <a href={String(r.source_url || '#')} target="_blank" rel="noreferrer" className="src"><b>{String(r.source_title || '(không tên)').slice(0, 90)}</b></a>
+                      {r.angle ? <span className="sub" style={{ display: 'block', fontSize: '.78rem' }}>Góc: {String(r.angle)}</span> : null}
+                      {r.key_message ? <span className="sub" style={{ display: 'block', fontSize: '.8rem' }}>Key: {String(r.key_message).slice(0, 140)}</span> : null}
+                      {Array.isArray(r.plan_suggestions) && r.plan_suggestions.length ? (
+                        <span className="sub" style={{ display: 'block', fontSize: '.78rem', marginTop: 2 }}>
+                          Kế hoạch tạm: {r.plan_suggestions.slice(0, 3).map((p: any) => `[${String(p.time || '')}] ${String(p.kind || '')}: ${String(p.title || '').slice(0, 40)}`).join(' · ')}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="sub" style={{ fontSize: '.75rem', whiteSpace: 'nowrap' }}>{fmtDT(r.created_at)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="sub" style={{ margin: 0 }}>Đã có {fmt(digestRows.length)} mục nhưng chưa mục nào được chấm — cron giờ tới sẽ chấm tự động (20 mục/lượt).</p>
+            )}
+            {/* Top keywords */}
+            {topKeywords.length ? (
+              <div>
+                <b style={{ fontSize: '.9rem' }}>🔑 Top keywords tuần</b>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  {topKeywords.map(([k, n]) => (
+                    <span key={k} className="chip" style={{ fontSize: '.8rem' }}>{k} <span className="n">{n}</span></span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <Link href="/kho-tri-thuc" className="src" style={{ fontSize: '.85rem' }}>Mở kho tri thức đầy đủ →</Link>
+          </div>
+        )}
+        {/* Fallback: khi digest chua san sang van cho xem muc moi nhat (khong tier). */}
+        {!digestReady && publicRows.length ? (
+          <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
             {publicRows.map((r, i) => (
               <div key={i} className="need-item">
                 <span>📄</span>
@@ -198,9 +291,8 @@ export default async function Page() {
                 <span className="sub" style={{ fontSize: '.75rem', whiteSpace: 'nowrap' }}>{fmtDT(r.created_at)}</span>
               </div>
             ))}
-            <Link href="/kho-tri-thuc" className="src" style={{ fontSize: '.85rem' }}>Mở kho tri thức đầy đủ →</Link>
           </div>
-        )}
+        ) : null}
       </section>
     </main>
   );

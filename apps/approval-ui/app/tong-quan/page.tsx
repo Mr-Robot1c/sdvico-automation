@@ -105,7 +105,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       .maybeSingle(),
     client
       .from('mkt_leads')
-      .select('id, source, fb_user_name, message, created_at, status')
+      .select('id, source, fb_user_name, message, created_at, status, content_id')
       .neq('status', 'spam')
       .gte('created_at', since7)
       .order('created_at', { ascending: false })
@@ -169,6 +169,20 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const today = todayVN();
   const dayStartIso = new Date(today + 'T00:00:00+07:00').toISOString();
   const leadToday = leads.filter((l) => String(l.created_at || '') >= dayStartIso);
+
+  // 27/8 dot 2 (docx sep: "nguoi hoi mua danh cho so nguoi cmt tren cac bai... de ghi nhan
+  // don lead"): dem lead theo TUNG BAI (content_id) -> bai nao hut khach nhat 7 ngay.
+  const leadByCid = new Map<string, number>();
+  for (const l of leads) {
+    const cid = String(l.content_id || '');
+    if (cid) leadByCid.set(cid, (leadByCid.get(cid) || 0) + 1);
+  }
+  const topLeadPosts = [...leadByCid.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
+  const leadPostTitles = new Map<string, string>();
+  if (topLeadPosts.length) {
+    const { data: lp } = await client.from('mkt_content').select('id, title').in('id', topLeadPosts.map(([cid]) => cid));
+    for (const c of lp || []) leadPostTitles.set(String((c as any).id), String((c as any).title || '(không tên)'));
+  }
 
   // Ke hoach hom nay (tu ban live) — doc DUNG shape DailyPlan (lib/plan.ts):
   // direction {title, product, variant} + sales[{product,count}] + contentKindLabel +
@@ -356,6 +370,11 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
                   <span className="sub" style={{ fontSize: '.75rem', flexShrink: 0 }}>{fmtDT(l.created_at)}</span>
                 </div>
               ))}
+              {topLeadPosts.length ? (
+                <div className="sub" style={{ fontSize: '.82rem', paddingTop: 2 }}>
+                  🔥 Bài hút khách nhất: {topLeadPosts.map(([cid, n]) => `${(leadPostTitles.get(cid) || '(không tên)').slice(0, 50)} (${n} người hỏi)`).join(' · ')}
+                </div>
+              ) : null}
               <Link href="/noi-dung?loai=khach-hang" className="src" style={{ fontSize: '.85rem' }}>Xem tất cả khách hàng →</Link>
             </div>
           )}

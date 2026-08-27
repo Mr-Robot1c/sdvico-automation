@@ -268,19 +268,41 @@ export async function loadRecentKnowledge(
   publicSrc: Array<{ id: string; source_url: string; source_title: string | null; summary: string; needs_gov_review: boolean; created_at: string }>;
 }> {
   const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
-  const [{ data: iRows }, { data: pRows }] = await Promise.all([
-    client
-      .from('mkt_knowledge_internal')
-      .select('id, title, summary, needs_gov_review, created_at')
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(limit),
-    client
+  const { data: iRows } = await client
+    .from('mkt_knowledge_internal')
+    .select('id, title, summary, needs_gov_review, created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  // 27/8 dot 2: public UU TIEN TIER CAO (S > A > B > C > chua cham) roi moi toi score + moi.
+  // BOSS doc top N nen tin tier S/A (DATA 2 cham "dung duoc cho ngu dan") vao truoc.
+  // Fallback query cu neu migration knowledge_tier chua ap (select cot tier se loi).
+  let pRows: any[] = [];
+  const pTier = await client
+    .from('mkt_knowledge_public')
+    .select('id, source_url, source_title, summary, needs_gov_review, created_at, tier, score')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(limit * 3);
+  if (!pTier.error) {
+    const TIER_W: Record<string, number> = { S: 4, A: 3, B: 2, C: 1 };
+    pRows = (pTier.data || [])
+      .sort((a: any, b: any) => {
+        const wa = (TIER_W[String(a.tier)] || 0) * 1000 + (Number(a.score) || 0);
+        const wb = (TIER_W[String(b.tier)] || 0) * 1000 + (Number(b.score) || 0);
+        if (wb !== wa) return wb - wa;
+        return String(b.created_at).localeCompare(String(a.created_at));
+      })
+      .slice(0, limit);
+  } else {
+    const pOld = await client
       .from('mkt_knowledge_public')
       .select('id, source_url, source_title, summary, needs_gov_review, created_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
-      .limit(limit),
-  ]);
-  return { internal: (iRows as any[]) || [], publicSrc: (pRows as any[]) || [] };
+      .limit(limit);
+    pRows = pOld.data || [];
+  }
+  return { internal: (iRows as any[]) || [], publicSrc: pRows };
 }

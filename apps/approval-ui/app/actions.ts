@@ -861,7 +861,7 @@ export async function generateTrendPost(formData: FormData): Promise<{ ok: boole
   // Load knowledge 1 lần dùng chung cho cả N bài (tiết kiệm DB query).
   const sinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const { data: knowRows } = await client
-    .from('mkt_public_knowledge')
+    .from('mkt_knowledge_public')
     .select('source_title, summary')
     .gte('created_at', sinceIso)
     .order('created_at', { ascending: false })
