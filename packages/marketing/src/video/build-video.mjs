@@ -771,7 +771,31 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
   const finalTotalDur = await probeDuration(outputPath);
   console.log(`  Xong. Video final co subtitle: ${outputPath} (${finalTotalDur.toFixed(1)}s)`);
 
-  // 5. Upload len Supabase Storage + insert brand_assets + update mkt_content.brief.assets.
+  // 5. CLEANUP video cu (user 27/8: "chi luu 1 video cuoi cung, rac khong luu Kho tu lieu").
+  // Neu bai da co asset video_v/video tu lan build truoc -> xoa old Storage file + old
+  // brand_asset row. Giu 1 video final duy nhat cho moi bai.
+  const oldAssetIds = new Set([
+    brief.assets?.video_v,
+    brief.assets?.video,
+  ].filter(Boolean));
+  if (oldAssetIds.size) {
+    console.log(`\n  Cleanup ${oldAssetIds.size} asset cu (chi giu 1 video cuoi)...`);
+    for (const oldId of oldAssetIds) {
+      try {
+        const { data: oldAsset } = await client.from('brand_assets').select('storage_path').eq('id', oldId).maybeSingle();
+        if (oldAsset?.storage_path) {
+          const { error: remErr } = await client.storage.from('brand-assets').remove([oldAsset.storage_path]);
+          if (remErr) console.warn(`    Cleanup Storage loi (${oldAsset.storage_path}): ${remErr.message}`);
+        }
+        await client.from('brand_assets').delete().eq('id', oldId);
+        console.log(`    Xoa asset ${oldId} xong.`);
+      } catch (e) {
+        console.warn(`    Cleanup asset ${oldId} loi: ${String(e?.message || e).slice(0, 100)}`);
+      }
+    }
+  }
+
+  // 6. Upload video moi len Supabase Storage + insert brand_assets + update mkt_content.
   console.log(`\n  Upload Supabase Storage...`);
   const data = await readFile(outputPath);
   const storagePath = `videos/trend_${contentId.slice(0, 8)}_${Date.now()}.mp4`;

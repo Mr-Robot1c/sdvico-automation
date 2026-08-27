@@ -55,9 +55,12 @@ function fmtDate(iso: string): string {
 export default async function Page({ searchParams }: { searchParams: { folder?: string } }) {
   const client = getServerClient();
   const [{ data, error }, { data: customCfg }] = await Promise.all([
+    // User 27/8: video "Bai trend" khong hien o Kho tu lieu (san pham gian tiep, khong
+    // tai su dung cho bai khac + nhieu ban build cu tao nhieu rac).
     client
       .from('brand_assets')
       .select('id, kind, title, storage_path, license, license_note, source, product_group, created_at')
+      .not('product_group', 'eq', 'Bài trend')
       .order('created_at', { ascending: false })
       .limit(300),
     // 26/8 (user "thêm folder để tạo thêm sản phẩm"): folder custom lưu app_config.

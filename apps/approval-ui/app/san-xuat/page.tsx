@@ -14,10 +14,14 @@ export default async function Page() {
   // 26/8: user "loc theo folder bi bug mat tieu het roi" — truoc limit 40 -> chip filter chi
   // hien 2-3 folder co asset trong 40 dong moi nhat (SEA-40 + Content). Nang len 500 de phu
   // du 8-9 folder san pham (moi folder trung binh 20-60 asset). Render lazy neu can.
+  // User 27/8: an asset "Bai trend" khoi Kho tu lieu (video trend la san pham gian tiep,
+  // khong dung tai su dung cho bai khac + nhieu phien ban build cu -> nhieu rac). Bai trend
+  // van co asset trong DB (bai co brief.assets.video_v de xem), chi khong hien o day.
   const { data: assetRows } = await client
     .from('brand_assets')
     .select('id, kind, title, storage_path, product_group')
     .in('kind', ['image', 'video', 'logo', 'clip'])
+    .not('product_group', 'eq', 'Bài trend')
     .order('created_at', { ascending: false })
     .limit(500);
 
