@@ -334,14 +334,22 @@ export default async function BangSection() {
                         {/* 26/8: user chuyen nut "Lam video" tu /san-xuat sang day de bam nhanh
                             khong phai vao trang Xuong san xuat. Chi hien khi:
                             (1) bai chua yeu cau video (badge "Dang lam video AI" o tren se thay)
-                            (2) la bai BAN HANG - bai content nuoi trang khong can video (user 26/8). */}
-                        {it.cid && brief.video_requested !== true && p.post_kind !== 'content' ? (
+                            (2) la bai BAN HANG - bai content nuoi trang khong can video (user 26/8).
+                            (3) 27/8: KHONG hien cho bai trend - bai trend da co Pexels URL trong brief.video_scenes,
+                                khong can Watcher build tu brand_assets (khong co folder "Bai trend"). */}
+                        {it.cid && brief.video_requested !== true && p.post_kind !== 'content' && (brief as any).generator !== 'trend' ? (
                           <form action={requestVideoForContent} style={{ display: 'inline' }}>
                             <input type="hidden" name="content_id" value={it.cid} />
                             <button type="submit" className="btn ghost sm" title="Yeu cau day chuyen video AI dung bai nay (FB 16:9 + TikTok doc). Mat 8-15 phut, ra ban rieng vao Hang doi duyet.">
                               🎬 Làm video
                             </button>
                           </form>
+                        ) : null}
+                        {/* Bai trend co Pexels footage san - hien badge "Video Pexels dung tay" thay vi nut Lam video. */}
+                        {(brief as any).generator === 'trend' && Array.isArray((brief as any).video_scenes) && (brief as any).video_scenes.length > 0 ? (
+                          <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', border: '1px solid #93c5fd' }} title="Bai trend co san URL Pexels cho tung canh - mo Xem bai (nut mat) de tai video/anh Pexels ve, tu dung CapCut">
+                            🎥 Có {((brief as any).video_scenes || []).length} cảnh Pexels
+                          </span>
                         ) : null}
                       </div>
                       <DecideActions

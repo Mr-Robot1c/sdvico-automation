@@ -480,6 +480,20 @@ async function main() {
   // draft (bài Xưởng sản xuất người tự soạn thường không có rotation_group).
   const { guessGroup, CONTENT_GROUP } = await import('../products.mjs');
   const brief = content.brief || {};
+
+  // 27/8: BAI TREND CO Pexels URL san trong brief.video_scenes - KHONG dung Watcher dung
+  // tu brand_assets (khong co folder "Bai trend"). User dung tay bang CapCut. Clear
+  // video_requested + skip khong quay lai lan sau.
+  if (brief.generator === 'trend') {
+    try {
+      const newBrief = { ...brief, video_requested: false, video_note: 'Bai trend dung tay bang CapCut voi URL Pexels trong video_scenes' };
+      await client.from('mkt_content').update({ brief: newBrief }).eq('id', contentId);
+    } catch { /* bo qua */ }
+    console.log('BAI TREND - co Pexels URL trong brief.video_scenes, khong dung Watcher. Da clear video_requested.');
+    console.log('Mo Xem bai trong /noi-dung -> tai video/anh Pexels ve -> dung tay CapCut/InShot.');
+    return;
+  }
+
   let productGroup = brief.rotation_group
     || guessGroup(`${content.title || ''} ${brief.keyword || ''} ${String(content.draft || '').slice(0, 300)}`);
   // Bài content nuôi trang: kế hoạch gọi nhóm là 'Bài content' nhưng tư liệu nằm ở folder

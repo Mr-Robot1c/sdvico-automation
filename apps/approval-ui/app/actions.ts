@@ -782,6 +782,27 @@ export async function getTikTokVideosForMatching(): Promise<{ ok: boolean; video
   }
 }
 
+// Clear video_requested cho các bài trend đang mắc kẹt trong Watcher local (Watcher đòi
+// brand_assets folder "Bài trend" -> không có -> log lỗi liên tục). User 27/8: 3 bài fail
+// exit 1 loi tren watcher. Gọi 1 lần để reset.
+export async function clearTrendVideoRequested(): Promise<{ ok: boolean; cleared: number; msg: string }> {
+  const client = getServerClient();
+  const { data: trends } = await client
+    .from('mkt_content')
+    .select('id, brief')
+    .eq('brief->>generator', 'trend')
+    .eq('brief->>video_requested', 'true');
+  if (!trends?.length) return { ok: true, cleared: 0, msg: 'Không có bài trend nào đang chờ Watcher.' };
+  let cleared = 0;
+  for (const c of trends as any[]) {
+    const newBrief = { ...(c.brief || {}), video_requested: false, video_note: 'Bài trend dùng tay bằng CapCut với URL Pexels trong video_scenes' };
+    const { error } = await client.from('mkt_content').update({ brief: newBrief }).eq('id', c.id);
+    if (!error) cleared++;
+  }
+  revalidatePath('/noi-dung');
+  return { ok: true, cleared, msg: `Đã clear video_requested trên ${cleared} bài trend. Watcher local sẽ tự bỏ qua chúng.` };
+}
+
 // Playbook 27/8 Tầng 3: sinh bài TREND bám sự kiện nóng (bóng đá VN thắng, sự kiện lớn,
 // bão biển). BOSS sinh 1 bài + kịch bản video 5-8 cảnh + PEXELS API tự lấy ảnh/video CC0
 // cho mỗi cảnh. User tự dựng video bằng CapCut/InShot (Vercel không có ffmpeg).
