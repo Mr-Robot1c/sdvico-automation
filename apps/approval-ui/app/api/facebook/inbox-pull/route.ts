@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../../../../lib/supabase-server';
 import { pullFacebookInbox } from '../../../../lib/fb-inbox';
 
@@ -28,11 +29,16 @@ export async function GET(req: Request) {
     });
   } catch { /* bo qua */ }
 
+  if (r.pulled > 0) {
+    revalidatePath('/khach-hang');
+    revalidatePath('/noi-dung');
+  }
+
   return NextResponse.json({
     ok: r.errors.length === 0,
     pulled: r.pulled,
     skipped: r.skipped,
     errors: r.errors,
-    msg: r.pulled ? `Đã pull ${r.pulled} tin nhắn mới (${r.skipped} tin đã có, bỏ qua).` : (r.errors.length ? `Lỗi: ${r.errors[0]}` : `Không có tin mới (${r.skipped} tin đã có từ trước).`),
+    msg: r.pulled ? `Đã pull ${r.pulled} tin nhắn mới (${r.skipped} tin đã có, bỏ qua). Vào /khach-hang F5 để xem.` : (r.errors.length ? `Lỗi: ${r.errors[0]}` : `Không có tin mới (${r.skipped} tin đã có từ trước).`),
   });
 }

@@ -402,45 +402,49 @@ export default async function BangSection() {
                           ) : null}
                         </span>
                       ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
-                      {it.cid ? (
-                        <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          <AddLeadButton contentId={it.cid} />
-                          {(() => {
-                            const cnt = contents.get(it.cid);
-                            const linkedVid = (cnt?.brief as any)?.tiktok_video_id as string | undefined;
-                            const linkedUrl = (cnt?.brief as any)?.tiktok_share_url as string | undefined;
-                            return <LinkTikTokButton contentId={it.cid} linkedVideoId={linkedVid || null} linkedShareUrl={linkedUrl || null} />;
-                          })()}
-                        </div>
-                      ) : null}
-                      {fbPost ? <span><ShareGroups postUrl={fbPost.url} planGroupsToday={groupsForDate(lastAt)} /></span> : null}
+                      {/* User 27/8 layout: chia 2 cột. TRÁI = Ghi Zalo/inbox + Chia sẻ group.
+                          PHẢI = Xuất TikTok + Copy caption (dòng 1) + Ghép TikTok (dòng 2). */}
+                      {it.cid ? (() => {
+                        const cnt = contents.get(it.cid);
+                        const linkedVid = (cnt?.brief as any)?.tiktok_video_id as string | undefined;
+                        const linkedUrl = (cnt?.brief as any)?.tiktok_share_url as string | undefined;
+                        const videoVId = cnt?.brief?.assets?.video_v as string | undefined;
+                        const videoVUrl = videoVId ? assetUrl.get(videoVId) : null;
+                        const hasVideo = !!videoVUrl;
+                        return (
+                          <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, alignItems: 'start' }}>
+                            {/* Cột TRÁI */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                              <AddLeadButton contentId={it.cid} />
+                              {fbPost ? <ShareGroups postUrl={fbPost.url} planGroupsToday={groupsForDate(lastAt)} /> : null}
+                            </div>
+                            {/* Cột PHẢI: chỉ hiện nếu bài có video (bài content ảnh không có TikTok) */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                              {hasVideo ? (
+                                <ExportTiktokButton
+                                  videoUrl={videoVUrl!}
+                                  caption={cnt?.draft || cnt?.title || ''}
+                                  contentTitle={cnt?.title || 'sdvico'}
+                                />
+                              ) : null}
+                              {hasVideo ? (
+                                <LinkTikTokButton contentId={it.cid} linkedVideoId={linkedVid || null} linkedShareUrl={linkedUrl || null} />
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })() : null}
                       {!posts.some((x) => x.channel === 'facebook') && fbFailed.has(it.cid) ? (
                         fbRetrying.has(it.cid) ? (
-                          <span className="badge tone-demo" title="Máy đang đăng lại lên Facebook (upload + chờ FB xử lý video, 1 tới 2 phút). Thẻ tự cập nhật khi xong.">⏳ Đang đăng lại Facebook…</span>
+                          <span className="badge tone-demo" style={{ marginTop: 6, display: 'inline-block' }} title="Máy đang đăng lại lên Facebook (upload + chờ FB xử lý video, 1 tới 2 phút). Thẻ tự cập nhật khi xong.">⏳ Đang đăng lại Facebook…</span>
                         ) : (
-                          <form action={retryFacebookPublish} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <form action={retryFacebookPublish} style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             <input type="hidden" name="content_id" value={it.cid} />
                             <span className="badge tone-no" title="Lượt đăng Facebook thất bại (token Page hết hạn hoặc lỗi mạng). Kênh khác vẫn lên bình thường.">Facebook chưa lên</span>
                             <button className="btn ghost sm" type="submit" title="Đăng lại bài này lên Facebook, chạy nền 1 tới 2 phút (đã duyệt, không đăng lại kênh khác)">↻ Đăng lại Facebook</button>
                           </form>
                         )
                       ) : null}
-                      {/* Nút "📥 Xuất TikTok" — user 26/8 chốt bỏ API TikTok (unaudited app
-                          không post được cho account public). Bài có video_v -> hiện nút cho
-                          NV tải video + copy caption + mở tab TikTok Upload đăng tay. */}
-                      {(() => {
-                        const cnt = contents.get(it.cid);
-                        const videoVId = cnt?.brief?.assets?.video_v as string | undefined;
-                        const videoVUrl = videoVId ? assetUrl.get(videoVId) : null;
-                        if (!videoVUrl) return null;
-                        return (
-                          <ExportTiktokButton
-                            videoUrl={videoVUrl}
-                            caption={cnt?.draft || cnt?.title || ''}
-                            contentTitle={cnt?.title || 'sdvico'}
-                          />
-                        );
-                      })()}
                     </div>
                   );
                 }
