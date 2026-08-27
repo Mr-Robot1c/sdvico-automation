@@ -234,9 +234,9 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
                     <td>{p.product}</td>
                     <td className="num"><b>{vnInt(p.score)}</b></td>
                     <td className="num">{vnInt(p.m.engagement)}</td>
-                    <td className="num">{p.m.views ? fmt(p.m.views) : '—'}</td>
-                    <td className="num">{p.m.reach ? fmt(p.m.reach) : '—'}</td>
-                    <td className="num">{p.m.watchSec ? fmt(p.m.watchSec) : '—'}</td>
+                    <td className="num">{p.m.views != null ? fmt(p.m.views) : '—'}</td>
+                    <td className="num">{p.m.reach != null ? fmt(p.m.reach) : '—'}</td>
+                    <td className="num">{p.m.watchSec != null ? fmt(p.m.watchSec) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -290,7 +290,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
                           return (
                             <tr key={`${r.cid}-${r.channel}`}>
                               <td className="cell-title"><b>{r.title}</b></td>
-                              <td className="num">{r.views ? fmt(r.views) : '—'}</td>
+                              <td className="num">{r.views != null ? fmt(r.views) : '—'}</td>
                               <td className="num">{vnInt(r.reactions)}</td>
                               <td className="num">{vnInt(r.comments)}</td>
                               {s.showShare ? <td className="num">{vnInt(r.shares)}</td> : null}
