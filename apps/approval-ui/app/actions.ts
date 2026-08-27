@@ -762,7 +762,8 @@ export async function generateSevenAngles(formData: FormData): Promise<{ ok: boo
   try {
     // @ts-ignore — module JS thuần
     const { generateSevenAngles: gen } = await import('../lib/gen/seven-angles.mjs');
-    const posts = await gen({ topic, productGroup, client });
+    // Cast client + productGroup any vì gen là .mjs, TS infer sai type từ default value.
+    const posts = await (gen as any)({ topic, productGroup, client });
     if (!posts?.length) return { ok: false, error: 'Không sinh được bài nào.' };
 
     const productName = productGroup ? String(productGroup).replace(/^\d+\.\s*/, '').trim() : 'Bài chung';
