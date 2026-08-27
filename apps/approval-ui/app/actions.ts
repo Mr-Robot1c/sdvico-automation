@@ -811,125 +811,135 @@ export async function clearTrendVideoRequested(): Promise<{ ok: boolean; cleared
 // Pexels chạy background qua waitUntil. Client redirect ngay, F5 sẽ thấy khi xong. Tránh
 // UI treo 30-40 giây user không biết đang chạy hay không.
 export async function generateTrendPost(formData: FormData): Promise<{ ok: boolean; contentId?: string; msg: string }> {
-  const trendEvent = String(formData.get('trend_event') || '').trim();
-  if (!trendEvent || trendEvent.length < 5) return { ok: false, msg: 'Sự kiện quá ngắn (cần ≥5 chữ). VD: "Đội tuyển VN vô địch AFF Cup", "Bão số 5 vào Biển Đông".' };
+  const rawEvents = String(formData.get('trend_event') || '').trim();
+  if (!rawEvents || rawEvents.length < 5) return { ok: false, msg: 'Sự kiện quá ngắn (cần ≥5 chữ). VD: "Đội tuyển VN vô địch AFF Cup", "Bão số 5 vào Biển Đông".' };
+
+  // User 27/8: gõ nhiều sự kiện phân tách bằng dấu phẩy/xuống dòng -> tách list, sinh N
+  // bài parallel (mỗi bài 1 sự kiện). Nếu 1 sự kiện thì giữ flow 1 bài như cũ.
+  const trendEvents = rawEvents.split(/[,;\n]+/).map((s) => s.trim()).filter((s) => s.length >= 5);
+  if (!trendEvents.length) return { ok: false, msg: 'Không tách được sự kiện nào (mỗi sự kiện ≥5 chữ). Ngăn cách bằng dấu phẩy hoặc xuống dòng.' };
+
   const client = getServerClient();
 
-  // 1. Insert row NGAY với status='draft', draft placeholder, brief.trend_generating=true.
-  //    User sẽ thấy bài trong Bảng chờ duyệt với badge "Đang sinh...". Khi xong, badge tắt.
-  const displayTitleQueue = `🔥 TREND (đang sinh) · ${trendEvent.slice(0, 60)}`;
-  const { data: ins } = await client
-    .from('mkt_content')
-    .insert({
-      kind: 'social',
-      title: displayTitleQueue,
-      brief: {
-        keyword: 'Bài trend',
-        intent: 'giao_dich',
-        channels: ['facebook', 'youtube', 'tiktok'],
-        generator: 'trend',
-        trend_event: trendEvent,
-        trend_generating: true,
-        rotation_group: 'Bài trend',
-      },
-      draft: '⏳ Đang sinh nội dung + tìm ảnh Pexels... (~30 giây, F5 để cập nhật)',
-      status: 'review',
-      needs_gov_review: false,
-    })
-    .select('id')
-    .single();
-  if (!ins) return { ok: false, msg: 'Không lưu được bản khởi tạo.' };
-  const contentId = (ins as { id: string }).id;
-
-  // Insert approval_queue ngay với title cho user thấy bài trong Bảng chờ duyệt (badge
-  // "đang sinh"). Khi Gemini xong, update title + payload.
-  await client.from('approval_queue').insert({
-    kind: 'mkt_publish_content',
-    title: displayTitleQueue,
-    payload: { content_id: contentId, channels: ['facebook', 'youtube', 'tiktok'], trend_generating: true },
-    status: 'pending',
-  });
-
-  // 2. Chạy background: gọi Gemini + Pexels, update row khi xong. waitUntil giữ execution
-  //    alive cho serverless function nhưng KHÔNG block response.
-  waitUntil((async () => {
-    try {
-      const sinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-      const { data: knowRows } = await client
-        .from('mkt_public_knowledge')
-        .select('source_title, summary')
-        .gte('created_at', sinceIso)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      const publicKnowledge = (knowRows || [])
-        .map((k: any) => `- ${k.source_title || ''}: ${(k.summary || '').slice(0, 200)}`)
-        .join('\n');
-
-      // @ts-ignore JS thuần
-      const { generateTrendPost: gen } = await import('../lib/gen/trend-post.mjs');
-      const r = await (gen as any)({ trendEvent, publicKnowledge, client });
-      if (!r?.body) {
-        await client.from('mkt_content').update({
-          title: `🔥 TREND (lỗi sinh) · ${trendEvent.slice(0, 60)}`,
-          brief: { keyword: 'Bài trend', trend_event: trendEvent, trend_generating: false, trend_error: 'Không sinh được bài' },
-          draft: '⚠️ Không sinh được bài. Bấm nút Sinh trend lại.',
-        }).eq('id', contentId);
-        return;
-      }
-
-      // 3. Search Pexels cho mỗi cảnh video (parallel).
-      // @ts-ignore
-      const { searchPexelsForScenes } = await import('../lib/gen/pexels.mjs');
-      const scenesWithMedia = await (searchPexelsForScenes as any)(r.videoScenes || []);
-
-      // @ts-ignore
-      const { hashtagBlock } = await import('../lib/gen/social.mjs');
-      const tags = hashtagBlock('', r.extraHashtags || []);
-      const text = `${r.body}\n\n${tags}`;
-      const displayTitle = r.headline || `[TREND] ${trendEvent.slice(0, 60)}`;
-
-      // Kiểm tra có ít nhất 1 cảnh có Pexels URL không → set video_requested=true để
-      // Watcher local tự dựng video (mode trend: download Pexels + TTS + concat).
-      const hasPexels = scenesWithMedia.some((s: any) => s?.pexels_video_url || s?.pexels_image_url);
-      await client.from('mkt_content').update({
-        title: displayTitle,
+  // Insert N row 'đang sinh' NGAY để user thấy trong Bảng chờ duyệt.
+  const contentIds: string[] = [];
+  for (const trendEvent of trendEvents) {
+    const displayTitleQueue = `🔥 TREND (đang sinh) · ${trendEvent.slice(0, 60)}`;
+    const { data: ins } = await client
+      .from('mkt_content')
+      .insert({
+        kind: 'social',
+        title: displayTitleQueue,
         brief: {
           keyword: 'Bài trend',
           intent: 'giao_dich',
           channels: ['facebook', 'youtube', 'tiktok'],
           generator: 'trend',
           trend_event: trendEvent,
-          trend_generating: false,
-          emotion: r.emotion || null,
-          hook_15w: r.hook15w || null,
-          video_scenes: scenesWithMedia,
-          extra_hashtags: r.extraHashtags || [],
+          trend_generating: true,
           rotation_group: 'Bài trend',
-          video_requested: hasPexels,  // Watcher local pick up nếu có Pexels
         },
-        draft: text,
+        draft: '⏳ Đang sinh nội dung + tìm ảnh Pexels... (~30 giây, F5 để cập nhật)',
         status: 'review',
-      }).eq('id', contentId);
+        needs_gov_review: false,
+      })
+      .select('id')
+      .single();
+    if (!ins) continue;
+    const contentId = (ins as { id: string }).id;
+    contentIds.push(contentId);
 
-      // Update approval_queue title (đã insert ở trên với "đang sinh"). Không insert row
-      // mới. Query theo payload->>content_id.
-      await client.from('approval_queue')
-        .update({ title: `🔥 TREND · ${displayTitle}`, payload: { content_id: contentId, channels: ['facebook', 'youtube', 'tiktok'], trend_generating: false } })
-        .eq('kind', 'mkt_publish_content')
-        .eq('payload->>content_id', contentId);
-      revalidatePath('/noi-dung');
-      revalidatePath('/hang-doi');
-    } catch (e: any) {
-      await client.from('mkt_content').update({
-        title: `🔥 TREND (lỗi) · ${trendEvent.slice(0, 60)}`,
-        brief: { keyword: 'Bài trend', trend_event: trendEvent, trend_generating: false, trend_error: String(e?.message || e).slice(0, 300) },
-        draft: `⚠️ Lỗi: ${String(e?.message || e).slice(0, 300)}`,
-      }).eq('id', contentId);
-    }
+    await client.from('approval_queue').insert({
+      kind: 'mkt_publish_content',
+      title: displayTitleQueue,
+      payload: { content_id: contentId, channels: ['facebook', 'youtube', 'tiktok'], trend_generating: true },
+      status: 'pending',
+    });
+  }
+  if (!contentIds.length) return { ok: false, msg: 'Không lưu được bản khởi tạo nào.' };
+
+  // Load knowledge 1 lần dùng chung cho cả N bài (tiết kiệm DB query).
+  const sinceIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const { data: knowRows } = await client
+    .from('mkt_public_knowledge')
+    .select('source_title, summary')
+    .gte('created_at', sinceIso)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  const publicKnowledge = (knowRows || [])
+    .map((k: any) => `- ${k.source_title || ''}: ${(k.summary || '').slice(0, 200)}`)
+    .join('\n');
+
+  // Chạy background: N bài parallel (Promise.allSettled - 1 bài fail không chặn bài khác).
+  waitUntil((async () => {
+    // @ts-ignore JS thuần
+    const { generateTrendPost: gen } = await import('../lib/gen/trend-post.mjs');
+    // @ts-ignore
+    const { searchPexelsForScenes } = await import('../lib/gen/pexels.mjs');
+    // @ts-ignore
+    const { hashtagBlock } = await import('../lib/gen/social.mjs');
+
+    await Promise.allSettled(trendEvents.map(async (trendEvent, i) => {
+      const contentId = contentIds[i];
+      if (!contentId) return;
+      try {
+        const r = await (gen as any)({ trendEvent, publicKnowledge, client });
+        if (!r?.body) {
+          await client.from('mkt_content').update({
+            title: `🔥 TREND (lỗi sinh) · ${trendEvent.slice(0, 60)}`,
+            brief: { keyword: 'Bài trend', trend_event: trendEvent, trend_generating: false, trend_error: 'Không sinh được bài' },
+            draft: '⚠️ Không sinh được bài. Bấm nút Sinh trend lại.',
+          }).eq('id', contentId);
+          return;
+        }
+
+        const scenesWithMedia = await (searchPexelsForScenes as any)(r.videoScenes || []);
+        const tags = hashtagBlock('', r.extraHashtags || []);
+        const text = `${r.body}\n\n${tags}`;
+        const displayTitle = r.headline || `[TREND] ${trendEvent.slice(0, 60)}`;
+        const hasPexels = scenesWithMedia.some((s: any) => s?.pexels_video_url || s?.pexels_image_url);
+
+        await client.from('mkt_content').update({
+          title: displayTitle,
+          brief: {
+            keyword: 'Bài trend',
+            intent: 'giao_dich',
+            channels: ['facebook', 'youtube', 'tiktok'],
+            generator: 'trend',
+            trend_event: trendEvent,
+            trend_generating: false,
+            emotion: r.emotion || null,
+            hook_15w: r.hook15w || null,
+            video_scenes: scenesWithMedia,
+            extra_hashtags: r.extraHashtags || [],
+            rotation_group: 'Bài trend',
+            video_requested: hasPexels,
+          },
+          draft: text,
+          status: 'review',
+        }).eq('id', contentId);
+
+        await client.from('approval_queue')
+          .update({ title: `🔥 TREND · ${displayTitle}`, payload: { content_id: contentId, channels: ['facebook', 'youtube', 'tiktok'], trend_generating: false } })
+          .eq('kind', 'mkt_publish_content')
+          .eq('payload->>content_id', contentId);
+      } catch (e: any) {
+        await client.from('mkt_content').update({
+          title: `🔥 TREND (lỗi) · ${trendEvent.slice(0, 60)}`,
+          brief: { keyword: 'Bài trend', trend_event: trendEvent, trend_generating: false, trend_error: String(e?.message || e).slice(0, 300) },
+          draft: `⚠️ Lỗi: ${String(e?.message || e).slice(0, 300)}`,
+        }).eq('id', contentId);
+      }
+    }));
+    revalidatePath('/noi-dung');
+    revalidatePath('/hang-doi');
   })());
 
   revalidatePath('/noi-dung');
-  return { ok: true, contentId, msg: `✓ Đã tạo bài trend "${trendEvent.slice(0, 40)}" — máy đang sinh nền + tìm ảnh Pexels (~30 giây). Vào Bảng bài viết F5 sẽ thấy khi xong.` };
+  if (contentIds.length === 1) {
+    return { ok: true, contentId: contentIds[0], msg: `✓ Đã tạo bài trend "${trendEvents[0].slice(0, 40)}" — máy đang sinh nền + tìm ảnh Pexels (~30 giây). Vào Bảng bài viết F5 sẽ thấy khi xong.` };
+  }
+  return { ok: true, contentId: contentIds[0], msg: `✓ Đã tạo ${contentIds.length} bài trend từ ${trendEvents.length} sự kiện. Máy đang sinh song song ~30-60 giây. Vào Bảng bài viết F5 sẽ thấy khi xong.` };
 }
 
 // Dọn dedup lead trùng (fromId + text) trong 5 phút — user 27/8 sau khi pull inbox có 3 tin

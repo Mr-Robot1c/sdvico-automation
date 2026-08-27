@@ -60,28 +60,32 @@ export default function TrendPostButton() {
           <div>
             <b style={{ fontSize: '1.05rem' }}>🔥 Sinh bài bám trend</b>
             <p className="sub" style={{ fontSize: '.85rem', margin: '4px 0 0' }}>
-              Playbook PHẦN 3: "thời sự nghề là xăng tăng lực viral miễn phí". Nhập sự kiện đang nóng — BOSS sinh 1 bài + kịch bản video 5-8 cảnh với keyword ảnh (bạn dựng bằng CapCut/InShot).
+              Playbook PHẦN 3: "thời sự nghề là xăng tăng lực viral miễn phí". Nhập 1 hay nhiều sự kiện đang nóng (mỗi sự kiện 1 dòng hoặc cách nhau dấu phẩy) — BOSS sinh MỖI SỰ KIỆN 1 BÀI + kịch bản video với keyword ảnh Pexels.
             </p>
           </div>
           <button type="button" className="btn ghost sm" onClick={close} disabled={pending}>✕ Đóng</button>
         </div>
         <form action={submit} style={{ display: 'grid', gap: 10 }}>
           <label style={{ display: 'grid', gap: 4 }}>
-            <span style={{ fontSize: '.85rem', fontWeight: 600 }}>Sự kiện đang nóng</span>
+            <span style={{ fontSize: '.85rem', fontWeight: 600 }}>Sự kiện đang nóng (mỗi dòng 1 sự kiện, HOẶC cách nhau dấu phẩy)</span>
             <textarea
               name="trend_event"
               required
               minLength={5}
-              maxLength={200}
-              rows={2}
-              placeholder="VD: Đội tuyển VN vô địch AFF Cup 2026 · Bão số 5 đổ bộ Biển Đông · Giải bơi lội quốc gia · Nghị định mới về IUU"
+              maxLength={600}
+              rows={4}
+              placeholder={`VD nhập nhiều sự kiện — máy sinh 4 bài:
+Đội tuyển VN vô địch AFF Cup 2026
+Bão số 5 đổ bộ Biển Đông
+Giải bơi lội quốc gia
+Nghị định mới về IUU`}
               className="input"
               style={{ padding: '8px 10px', fontFamily: 'inherit', resize: 'vertical' }}
             />
             <span className="sub" style={{ fontSize: '.75rem' }}>
-              💡 BOSS tự MÓC sự kiện sang góc ngư dân (VD "VN vô địch → ngư dân treo cờ đỏ ra khơi").
+              💡 BOSS tự MÓC từng sự kiện sang góc ngư dân (VD "VN vô địch → ngư dân treo cờ đỏ ra khơi").
               <br />🎥 Máy sẽ TỰ TÌM ẢNH + VIDEO từ Pexels (CC0 miễn phí bản quyền) cho từng cảnh.
-              <br />⚡ Bấm xong <b>redirect ngay</b> sang Bảng bài viết. Bài hiện với badge "đang sinh" ~30 giây. F5 sẽ thấy khi xong.
+              <br />⚡ Bấm xong <b>redirect ngay</b> sang Bảng bài viết. Mỗi bài hiện với badge "đang sinh" ~30-60 giây. F5 sẽ thấy khi xong.
             </span>
           </label>
           {msg ? <div className="sub" style={{ fontSize: '.85rem', padding: '8px 10px', background: 'var(--bg-2)', borderRadius: 6 }}>{msg}</div> : null}

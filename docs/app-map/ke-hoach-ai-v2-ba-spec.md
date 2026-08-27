@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-27
 ttl_days: 90
+<!-- re-verified: 2026-08-27 19:00 - Nhap NHIEU su kien 1 lan sinh N bai trend (user 27/8: "toi dat 4 su kien ma no chi sinh 1 bai theo motip"). generateTrendPost split(/[,;\n]+/) tach list, insert N mkt_content + N approval_queue voi title "dang sinh", loop Promise.allSettled (1 bai fail khong chan bai khac). Load knowledge dung chung 1 lan de tiet kiem query. Msg tra tuy 1 hay N bai. UI trend-post-button.tsx textarea rows=4 maxLength=600, hint "moi dong 1 su kien HOAC dau phay", placeholder 4 su kien mau. -->
 <!-- re-verified: 2026-08-27 18:20 - GIONG DONG DEU ca video trend (user 27/8): TTS 2-pass. Pass 1 thu Gemini toan bo canh, fail 1 canh nao -> pass 2 re-TTS TOAN BO bang edge (khong mix engine). Ghep clip them loudnorm=I=-16 can am luong + -ar 44100 cho sample rate dong nhat. -->
 <!-- re-verified: 2026-08-27 17:50 - VIDEO TREND thanh 9:16 vertical (user 27/8). W/H 1080x1920. Subtitle Font 32 MarginV 140. brief.assets.video_v = asset.id. -->
 <!-- re-verified: 2026-08-27 15:50 - Them subtitle burn cho video trend (SRT tu narration + sceneDurations, ffmpeg subtitles filter Arial 20 chu trang vien den can duoi). -->
