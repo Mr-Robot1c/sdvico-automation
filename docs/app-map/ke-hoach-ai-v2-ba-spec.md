@@ -4,7 +4,8 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-27
 ttl_days: 90
-<!-- re-verified: 2026-08-27 17:50 - VIDEO TREND thanh 9:16 vertical (user 27/8: YT Short + TikTok). W/H 1920x1080 -> 1080x1920. Subtitle Font 20 -> 32, MarginV 40 -> 140. brief.assets.video_v = asset.id (moi) + giu .video (backward) -> nut "Xuat TikTok" o bang-section.tsx hien duoc. -->
+<!-- re-verified: 2026-08-27 18:20 - GIONG DONG DEU ca video trend (user 27/8): TTS 2-pass. Pass 1 thu Gemini toan bo canh, fail 1 canh nao -> pass 2 re-TTS TOAN BO bang edge (khong mix engine). Ghep clip them loudnorm=I=-16 can am luong + -ar 44100 cho sample rate dong nhat. -->
+<!-- re-verified: 2026-08-27 17:50 - VIDEO TREND thanh 9:16 vertical (user 27/8). W/H 1080x1920. Subtitle Font 32 MarginV 140. brief.assets.video_v = asset.id. -->
 <!-- re-verified: 2026-08-27 15:50 - Them subtitle burn cho video trend (SRT tu narration + sceneDurations, ffmpeg subtitles filter Arial 20 chu trang vien den can duoi). -->
 <!-- re-verified: 2026-08-27 15:15 - Fix ffmpeg force_original_aspect_ratio cover->increase. -->
 <!-- re-verified: 2026-08-27 15:00 - Fix download Pexels URL bang fetch (khong dung downloadAsset cho Supabase Storage). -->

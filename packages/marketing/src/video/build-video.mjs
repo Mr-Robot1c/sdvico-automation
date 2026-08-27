@@ -604,16 +604,23 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
   // TikTok video doc. YouTube nhan Short khi video doc + <=60s + co #Shorts trong tieu de/mo ta).
   const W = 1080, H = 1920;
 
-  const clipPaths = [];
-  const sceneDurations = []; // theo dõi để build SRT sau khi concat
+  // PASS 1: DOWNLOAD tat ca media va TTS tat ca narration TRUOC khi ghep clip.
+  // User 27/8: "giong o gan cuoi video khong dong deu" - do truoc day moi canh doc lap
+  // thu Gemini roi fallback edge -> canh 1-4 giong Leda (Gemini OK), canh 5-7 giong
+  // HoaiMy (Gemini rate-limit -> fallback edge). Fix: neu Gemini fail bat ky canh nao ->
+  // RE-TTS TOAN BO bang edge de dong nhat giong ca video.
+  const rawPaths = [];
+  const audioPaths = [];
+  const audioDurs = [];
+  const narrations = [];
   for (let i = 0; i < usableScenes.length; i++) {
     const s = usableScenes[i];
     const sceneNo = i + 1;
     const narration = String(s.narration || '').trim();
+    narrations.push(narration);
     console.log(`\n  Canh ${sceneNo}/${usableScenes.length}: "${narration.slice(0, 50)}..."`);
 
-    // 1. Download media (uu tien video, fallback image). Dung downloadHttpToFile vi
-    // Pexels URL la http/https, KHONG phai Supabase Storage path.
+    // 1. Download media (uu tien video, fallback image).
     let rawPath;
     if (s.pexels_video_url) {
       rawPath = join(workDir, `scene${sceneNo}_raw.mp4`);
@@ -623,42 +630,82 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
       const imgPath = join(workDir, `scene${sceneNo}_raw.jpg`);
       console.log(`    Tai anh Pexels...`);
       await downloadHttpToFile(s.pexels_image_url, imgPath);
-      // Convert anh -> video 5s (Ken Burns nhe).
       rawPath = join(workDir, `scene${sceneNo}_raw.mp4`);
       await ffmpeg(['-y', '-loop', '1', '-i', imgPath, '-t', '5',
         '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`,
         '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-r', '30', rawPath]);
     }
+    rawPaths.push(rawPath);
+    audioPaths.push(join(workDir, `scene${sceneNo}_audio.mp3`));
+  }
 
-    // 2. TTS narration (Gemini fallback edge).
-    const audioPath = join(workDir, `scene${sceneNo}_audio.mp3`);
-    let audioDur = 0;
+  // 2. TTS PASS 1: thu Gemini cho tat ca canh.
+  console.log(`\n  TTS pass 1 (Gemini) cho ${usableScenes.length} canh...`);
+  let allGeminiOK = true;
+  for (let i = 0; i < usableScenes.length; i++) {
+    const narration = narrations[i];
+    const audioPath = audioPaths[i];
+    const sceneNo = i + 1;
     if (narration) {
-      console.log(`    TTS narration...`);
       try {
-        audioDur = await tts(narration, audioPath, voice, workDir, `scene${sceneNo}`, 'gemini');
+        console.log(`    TTS Gemini canh ${sceneNo}/${usableScenes.length}...`);
+        const dur = await tts(narration, audioPath, voice, workDir, `scene${sceneNo}`, 'gemini');
+        audioDurs.push(dur);
       } catch (e) {
-        console.warn(`    (gemini-tts loi ${String(e?.message || e).slice(0, 80)}, lui edge-tts)`);
-        audioDur = await tts(narration, audioPath, voice, workDir, `scene${sceneNo}`, 'edge');
+        console.warn(`    (gemini-tts loi canh ${sceneNo}: ${String(e?.message || e).slice(0, 80)})`);
+        console.warn(`    -> RE-TTS TOAN BO bang edge de dong deu giong ca video.`);
+        allGeminiOK = false;
+        break;
       }
     } else {
-      audioDur = await silentAudio(audioPath, s.duration_sec || 4);
+      const dur = await silentAudio(audioPath, usableScenes[i].duration_sec || 4);
+      audioDurs.push(dur);
     }
+  }
 
-    // 3. Ghep video + audio. Neu video ngan hon audio -> loop; dai hon -> cat theo audio.
+  // 3. TTS PASS 2 (chi neu Gemini fail): re-TTS TOAN BO bang edge cho dong deu giong.
+  if (!allGeminiOK) {
+    audioDurs.length = 0;
+    console.log(`\n  TTS pass 2 (edge) cho toan bo ${usableScenes.length} canh...`);
+    for (let i = 0; i < usableScenes.length; i++) {
+      const narration = narrations[i];
+      const audioPath = audioPaths[i];
+      const sceneNo = i + 1;
+      if (narration) {
+        console.log(`    TTS edge canh ${sceneNo}/${usableScenes.length}...`);
+        const dur = await tts(narration, audioPath, voice, workDir, `scene${sceneNo}`, 'edge');
+        audioDurs.push(dur);
+      } else {
+        const dur = await silentAudio(audioPath, usableScenes[i].duration_sec || 4);
+        audioDurs.push(dur);
+      }
+    }
+  }
+
+  // 4. GHEP CLIP tung canh: video + audio + loudnorm de am luong cac canh dong deu.
+  const clipPaths = [];
+  const sceneDurations = [];
+  console.log(`\n  Ghep clip ${usableScenes.length} canh (loudnorm cân âm lượng)...`);
+  for (let i = 0; i < usableScenes.length; i++) {
+    const sceneNo = i + 1;
+    const rawPath = rawPaths[i];
+    const audioPath = audioPaths[i];
+    const audioDur = audioDurs[i];
     const videoDur = await probeDuration(rawPath);
     const finalDur = Math.max(audioDur, 1.5);
     const clipPath = join(workDir, `scene${sceneNo}_clip.mp4`);
-    console.log(`    Ghep clip ${finalDur.toFixed(1)}s (video ${videoDur.toFixed(1)}s + audio ${audioDur.toFixed(1)}s)`);
+    console.log(`    Canh ${sceneNo}: ${finalDur.toFixed(1)}s (video ${videoDur.toFixed(1)}s + audio ${audioDur.toFixed(1)}s)`);
+    // loudnorm chuan EBU R128: I=-16 LUFS, TP=-1.5 dB, LRA=11 - dong deu cac canh
+    // du dung Gemini hay edge (moi engine xuat volume khac nhau ~3-6dB).
     if (videoDur < finalDur - 0.3) {
-      // Loop video (stream_loop N lan) roi cat theo audio.
       const loops = Math.ceil(finalDur / videoDur);
       await ffmpeg(['-y',
         '-stream_loop', String(loops - 1), '-i', rawPath,
         '-i', audioPath,
         '-t', finalDur.toFixed(2),
         '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=30`,
-        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+        '-af', 'loudnorm=I=-16:LRA=11:TP=-1.5',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
         '-map', '0:v:0', '-map', '1:a:0', '-shortest', clipPath]);
     } else {
       await ffmpeg(['-y',
@@ -666,7 +713,8 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
         '-i', audioPath,
         '-t', finalDur.toFixed(2),
         '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=30`,
-        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+        '-af', 'loudnorm=I=-16:LRA=11:TP=-1.5',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
         '-map', '0:v:0', '-map', '1:a:0', clipPath]);
     }
     clipPaths.push(clipPath);
