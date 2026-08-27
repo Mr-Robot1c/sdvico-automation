@@ -1753,7 +1753,7 @@ export async function deletePlan(formData: FormData) {
 // Kéo số liệu 3 nền tảng ngay (Facebook + YouTube + TikTok) — user bấm nút thay vì chờ
 // cron 1h (user 26/8: "sếp muốn thấy số liệu ngay không phải chờ"). Song song 3 nguồn, 1
 // nguồn lỗi không đánh hỏng nguồn khác. Sau khi xong revalidate các trang có số liệu.
-export async function pullMetricsNow(): Promise<{ ok: boolean; fb: number; yt: number; tt: number; msg: string }> {
+export async function pullMetricsNow(): Promise<{ ok: boolean; fb: number; yt: number; tt: number; msg: string; details?: any }> {
   const client = getServerClient();
   const [fbRes, ytRes, ttRes] = await Promise.all([
     pullFacebookMetrics(client).catch((e) => ({ pulled: 0, results: [{ error: String(e?.message || e) }] })),
@@ -1773,12 +1773,23 @@ export async function pullMetricsNow(): Promise<{ ok: boolean; fb: number; yt: n
   const fb = (fbRes as any).pulled || 0;
   const yt = (ytRes as any).pulled || 0;
   const tt = (ttRes as any).pulled || 0;
+  // 27/8: user "do luong khong keo so lieu tiktok ve nua" — thêm log chi tiết errors/matched
+  // để debug khi TikTok pulled=0 (có thể do token hết hạn, do 0 matched giữa video profile ↔ mkt_posts).
+  const ttMatched = (ttRes as any).matched;
+  const ttErrors = Array.isArray((ttRes as any).errors) ? (ttRes as any).errors : [];
+  const ytErrors = Array.isArray((ytRes as any).errors) ? (ytRes as any).errors : [];
+  const fbErrors = Array.isArray((fbRes as any).errors) ? (fbRes as any).errors : [];
   try {
     await client.from('run_log').insert({
       task: 'mkt.metrics_pull_manual',
       actor: 'user',
-      status: 'ok',
-      detail: { fb, yt, tt }
+      status: (ttErrors.length || ytErrors.length || fbErrors.length) ? 'error' : 'ok',
+      detail: {
+        fb, yt, tt, tt_matched: ttMatched,
+        tt_errors: ttErrors.slice(0, 3),
+        yt_errors: ytErrors.slice(0, 3),
+        fb_errors: fbErrors.slice(0, 3),
+      },
     });
   } catch { /* bỏ qua */ }
   revalidatePath('/noi-dung');
@@ -1788,7 +1799,13 @@ export async function pullMetricsNow(): Promise<{ ok: boolean; fb: number; yt: n
   if (fb) parts.push(`Facebook ${fb}`);
   if (yt) parts.push(`YouTube ${yt}`);
   if (tt) parts.push(`TikTok ${tt}`);
-  const msg = parts.length ? `Đã kéo: ${parts.join(', ')} bài` : 'Không có số liệu mới (API im hoặc không có bài).';
-  return { ok: true, fb, yt, tt, msg };
+  // Nếu TikTok 0 bài — gợi ý lý do gọn cho user.
+  const suffixes: string[] = [];
+  if (!tt && ttErrors.length) suffixes.push(`TikTok lỗi: ${ttErrors[0].slice(0, 80)}`);
+  else if (!tt && ttMatched === 0) suffixes.push('TikTok không khớp bài nào (video trên profile không đăng qua app hoặc lệch giờ >10 phút).');
+  const msg = parts.length
+    ? `Đã kéo: ${parts.join(', ')} bài${suffixes.length ? '. ' + suffixes.join(' ') : ''}`
+    : `Không có số liệu mới.${suffixes.length ? ' ' + suffixes.join(' ') : ''}`;
+  return { ok: true, fb, yt, tt, msg, details: { tt_errors: ttErrors, yt_errors: ytErrors, fb_errors: fbErrors, tt_matched: ttMatched } };
 }
 
