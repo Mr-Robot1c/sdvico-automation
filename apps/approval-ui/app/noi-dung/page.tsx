@@ -9,6 +9,7 @@ import TrashActions from './trash-actions';
 import ShareGroups from './share-groups';
 import BangSection from './bang-section';
 import TongQuanSection from './tong-quan-section';
+import KhachHangSection from './khach-hang-section';
 import TikTokPrivateChip from './tiktok-private-chip';
 import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 
@@ -58,7 +59,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
   // viết / Video là danh sách chi tiết. Đo lường là trang riêng /do-luong.
   const loai = searchParams?.loai || '';
   if (loai === 'do-luong') redirect('/do-luong');
-  const tab = loai === 'video' ? 'video' : loai === 'bai-viet' ? 'baiviet' : loai === 'bang' ? 'bang' : loai === 'thung-rac' ? 'thung-rac' : 'tong-quan';
+  const tab = loai === 'video' ? 'video' : loai === 'bai-viet' ? 'baiviet' : loai === 'bang' ? 'bang' : loai === 'khach-hang' ? 'khach-hang' : loai === 'thung-rac' ? 'thung-rac' : 'tong-quan';
   const kinds = tab === 'video' ? ['video'] : ['article', 'social'];
   const statusFilter = searchParams?.trangthai && STATUS[searchParams.trangthai] ? searchParams.trangthai : null;
 
@@ -96,9 +97,9 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       <a className={`chip ${tab === 'baiviet' ? 'on' : ''}`} href={withParams({ loai: 'bai-viet', trangthai: null })}>
         <span aria-hidden="true">📝</span> Bài viết <span className="n">{cBai ?? 0}</span>
       </a>
-      {/* Tab Video BO (user 26/8: "du thua"). Video van xem duoc trong tab "Bang bai viet"
-          hoac tab "Bai viet" (chua kind=video). Thay bang link Khach hang sang /khach-hang. */}
-      <a className="chip" href="/khach-hang">
+      {/* Tab Khách hàng: kanban 3 cột dạng như Bảng bài viết (user 27/8: "làm như bảng bài
+          viết" — không nhảy trang /khach-hang, cùng layout tabs để quay lại được). */}
+      <a className={`chip ${tab === 'khach-hang' ? 'on' : ''}`} href={withParams({ loai: 'khach-hang', trangthai: null })}>
         <span aria-hidden="true">👥</span> Khách hàng <span className="n">{cLeadNew ?? 0}</span>
       </a>
       <a className={`chip ${tab === 'thung-rac' ? 'on' : ''}`} href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn — số liệu vẫn còn nguyên trong lịch sử. Khôi phục hoặc xoá hẳn tại đây.">
@@ -139,6 +140,26 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
         </header>
         {typeChips}
         <BangSection />
+      </main>
+    );
+  }
+
+  // Tab Khách hàng: kanban 3 cột (Mới / Đã liên hệ / Xong) — cùng layout với Bảng bài viết.
+  // User 27/8: "làm như bảng bài viết" để quay lại được qua tabs, không phải bấm back browser.
+  if (tab === 'khach-hang') {
+    return (
+      <main>
+        <header className="head-row">
+          <div>
+            <h1>Khách hỏi mua</h1>
+            <p className="sub">Lead từ comment/tin nhắn Facebook + nhập tay. Máy chỉ ĐỌC và LƯU, không tự nhắn khách.</p>
+          </div>
+          <div className="head-actions">
+            <AutoRefresh seconds={30} />
+          </div>
+        </header>
+        {typeChips}
+        <KhachHangSection />
       </main>
     );
   }
