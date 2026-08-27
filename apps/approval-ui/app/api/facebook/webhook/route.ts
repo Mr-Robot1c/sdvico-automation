@@ -30,18 +30,20 @@ export async function GET(req: Request) {
   return NextResponse.json({ error: 'verify_token khong khop' }, { status: 403 });
 }
 
-// Từ khóa lọc bớt spam/comment khen ngợi thông thường — chỉ giữ comment CÓ Ý HỎI MUA làm
-// lead. Heuristic đơn giản (không gọi AI phân loại để khỏi tốn thêm token — user "sếp bảo
-// đốt quá nhiều token"). Bỏ sót một số lead ngoài rìa còn hơn rác đầy danh sách.
-const INTENT_KEYWORDS = [
-  'giá', 'gia', 'bao nhiêu', 'bn', 'mua', 'lắp', 'lap', 'đặt', 'dat', 'tư vấn', 'tu van',
-  'liên hệ', 'lien he', 'ib', 'inbox', 'sđt', 'sdt', 'số đt', 'alo', 'gọi', 'goi', 'cần', 'can',
-  'muốn', 'muon', 'ở đâu', 'o dau', 'chỗ nào', 'cho nao',
-];
+// Playbook 26/8 (item 1 đo Zalo/inbox thay view): "Thước đo của SDVICO là số Zalo từ đúng
+// chủ tàu" — thà rác lọt vào danh sách còn hơn miss lead. Trước đây lọc bằng INTENT_KEYWORDS
+// (giá/mua/bn) — comment "hay quá, cảnh này chắc đi Long Hải" bị vứt oan dù là chủ tàu thật.
+// Nới rộng: chấp nhận MỌI comment >=4 ký tự có ít nhất 1 chữ cái, chỉ loại emoji đơn thuần
+// hoặc comment ngắn kiểu "ok/hay/wow". Admin thấy rác thì bấm status='spam' để loại khỏi
+// đếm (bảng mkt_leads có sẵn cột status check).
+const SHORT_STOPWORDS = new Set(['ok', 'oke', 'hay', 'wow', 'good', 'good.', 'chuẩn', 'chuan', 'đúng', 'dung', 'like', 'yes', 'no']);
 function looksLikeIntent(text: string): boolean {
-  const t = String(text || '').toLowerCase();
-  if (/0\d{8,9}/.test(t)) return true; // có số điện thoại
-  return INTENT_KEYWORDS.some((k) => t.includes(k));
+  const raw = String(text || '').trim();
+  if (raw.length < 4) return false;                    // "A", "hi" → bỏ
+  const t = raw.toLowerCase();
+  if (SHORT_STOPWORDS.has(t)) return false;            // "ok", "hay" → bỏ
+  if (!/[a-zàáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i.test(t)) return false; // chỉ số/emoji → bỏ
+  return true;                                          // còn lại: nhận, để admin lọc spam sau
 }
 
 // 25/8 (user "khong hien ten, khong bam vao xem cuoc tro chuyen"): Facebook Messenger
@@ -83,7 +85,9 @@ export async function POST(req: Request) {
 
   const entries: any[] = Array.isArray(body.entry) ? body.entry : [];
   let captured = 0;
+  let filtered = 0;                    // đếm số comment bị filter loại (debug — xem trong run_log detail)
   const errors: string[] = [];
+  const filteredSamples: string[] = []; // vài mẫu comment bị loại, giúp tinh chỉnh filter khi cần
 
   for (const entry of entries) {
     // 1) Tin nhắn Messenger (field 'messages' — cần pages_messaging, chưa duyệt tại 24/8).
@@ -122,7 +126,12 @@ export async function POST(req: Request) {
       const v = ch.value || {};
       if (v.item !== 'comment' || v.verb !== 'add') continue;
       const text = String(v.message || '').trim();
-      if (!text || !looksLikeIntent(text)) continue; // lọc spam/khen ngợi thông thường
+      if (!text) continue;
+      if (!looksLikeIntent(text)) {
+        filtered++;
+        if (filteredSamples.length < 5) filteredSamples.push(text.slice(0, 60));
+        continue;
+      }
       const postId = String(v.post_id || '');
       let contentId: string | null = null;
       if (postId) {
@@ -158,7 +167,7 @@ export async function POST(req: Request) {
   try {
     await client.from('run_log').insert({
       task: 'mkt.facebook_webhook', actor: 'facebook', status: errors.length ? 'error' : 'ok',
-      detail: { captured, errors: errors.slice(0, 5) },
+      detail: { captured, filtered, filteredSamples, errors: errors.slice(0, 5) },
     });
   } catch { /* bỏ qua lỗi ghi log */ }
 
