@@ -39,7 +39,7 @@ export default async function Page() {
   const client = getServerClient();
   const dayStart = todayIsoVN();
 
-  // Bài đăng HÔM NAY VN (tất cả kênh).
+  // Bài đăng HÔM NAY VN (tất cả kênh) - dùng cho phần Facebook.
   const { data: postsToday } = await client
     .from('mkt_posts')
     .select('content_id, channel, external_url, published_at')
@@ -49,34 +49,66 @@ export default async function Page() {
     .limit(200);
   const posts = (postsToday || []) as any[];
 
-  // Gom content_id để lấy tên bài + brief.
-  const cids = [...new Set(posts.map((p) => p.content_id).filter(Boolean))] as string[];
+  // 27/8: TikTok/YT KHÔNG dựa vào mkt_posts vì user hay link tay qua brief.tiktok_video_id
+  // (không tạo mkt_posts). Query mkt_metrics source='tiktok'/'youtube' created_at HÔM NAY:
+  // bài nào có snapshot mới hôm nay là bài "đang chạy", hiện lên bảng.
+  const { data: ttToday } = await client
+    .from('mkt_metrics')
+    .select('entity_ref, metrics, created_at')
+    .eq('source', 'tiktok')
+    .gte('created_at', dayStart)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  const { data: ytToday } = await client
+    .from('mkt_metrics')
+    .select('entity_ref, metrics, created_at')
+    .eq('source', 'youtube')
+    .gte('created_at', dayStart)
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  const ttLatest = new Map<string, { m: M; ts: string }>();
+  for (const r of (ttToday || []) as any[]) {
+    const cid = r.entity_ref;
+    if (cid && !ttLatest.has(cid)) ttLatest.set(cid, { m: r.metrics || {}, ts: r.created_at });
+  }
+  const ytLatest = new Map<string, { m: M; ts: string }>();
+  for (const r of (ytToday || []) as any[]) {
+    const cid = r.entity_ref;
+    if (cid && !ytLatest.has(cid)) ytLatest.set(cid, { m: r.metrics || {}, ts: r.created_at });
+  }
+
+  // Gom content_id để lấy tên bài + brief (bài Facebook hôm nay + snapshot TT/YT hôm nay).
+  const cids = [...new Set([
+    ...posts.map((p) => p.content_id).filter(Boolean),
+    ...ttLatest.keys(),
+    ...ytLatest.keys(),
+  ])] as string[];
   const contentsMap = new Map<string, { title: string; brief: any }>();
   if (cids.length) {
     const { data: cs } = await client.from('mkt_content').select('id, title, brief').in('id', cids);
     for (const c of cs || []) contentsMap.set((c as any).id, { title: (c as any).title || '(không tên)', brief: (c as any).brief || {} });
   }
 
-  // Số liệu mới nhất mỗi content_id, tách theo source.
-  const { data: metricsRows } = await client
-    .from('mkt_metrics')
-    .select('entity_ref, source, metrics, created_at')
-    .in('entity_ref', cids.length ? cids : ['__none__'])
-    .order('created_at', { ascending: false })
-    .limit(600);
+  // Số liệu Facebook mới nhất mỗi content_id (không giới hạn hôm nay - cần latest để so).
+  const fbCids = [...new Set(posts.map((p) => p.content_id).filter((c) => c) as string[])];
   const latestFB = new Map<string, M>();
-  const latestTT = new Map<string, M>();
-  const latestYT = new Map<string, M>();
-  for (const r of (metricsRows || []) as any[]) {
-    const cid = r.entity_ref;
-    const src = r.source;
-    if (src === 'facebook' && !latestFB.has(cid)) latestFB.set(cid, r.metrics || {});
-    if (src === 'tiktok' && !latestTT.has(cid)) latestTT.set(cid, r.metrics || {});
-    if (src === 'youtube' && !latestYT.has(cid)) latestYT.set(cid, r.metrics || {});
+  if (fbCids.length) {
+    const { data: fbMetricsRows } = await client
+      .from('mkt_metrics')
+      .select('entity_ref, metrics, created_at')
+      .eq('source', 'facebook')
+      .in('entity_ref', fbCids)
+      .order('created_at', { ascending: false })
+      .limit(400);
+    for (const r of (fbMetricsRows || []) as any[]) {
+      const cid = r.entity_ref;
+      if (!latestFB.has(cid)) latestFB.set(cid, r.metrics || {});
+    }
   }
 
   // Chia bài Facebook: page test vs page chính thức. Dùng lib/page-origin.mjs để nhận diện.
-  type Row = { cid: string; title: string; url: string; publishedAt: string; m: M };
+  type Row = { cid: string; title: string; url: string; publishedAt: string; m: M; timeLabel?: string };
   const fbTestRows: Row[] = [];
   const fbRealRows: Row[] = [];
   const ttRows: Row[] = [];
@@ -92,13 +124,30 @@ export default async function Page() {
       const m = latestFB.get(cid) || {};
       const isReal = !!(isOtherPage as (u: string, b: any) => boolean)(url, c?.brief || {});
       (isReal ? fbRealRows : fbTestRows).push({ cid, title, url, publishedAt, m });
-    } else if (p.channel === 'tiktok') {
-      const m = latestTT.get(cid) || {};
-      ttRows.push({ cid, title, url, publishedAt, m });
-    } else if (p.channel === 'youtube') {
-      const m = latestYT.get(cid) || {};
-      ytRows.push({ cid, title, url, publishedAt, m });
     }
+    // Ghi chú: TikTok/YT không lấy từ mkt_posts nữa, dùng snapshot mkt_metrics ở dưới.
+  }
+  for (const [cid, { m, ts }] of ttLatest) {
+    const c = contentsMap.get(cid);
+    ttRows.push({
+      cid,
+      title: c?.title || '(không tên)',
+      url: (m as any).shareUrl || '',
+      publishedAt: ts,
+      m,
+      timeLabel: 'Số',
+    });
+  }
+  for (const [cid, { m, ts }] of ytLatest) {
+    const c = contentsMap.get(cid);
+    ytRows.push({
+      cid,
+      title: c?.title || '(không tên)',
+      url: (m as any).videoId ? `https://youtube.com/shorts/${(m as any).videoId}` : '',
+      publishedAt: ts,
+      m,
+      timeLabel: 'Số',
+    });
   }
 
   // Lần nhập tay gần nhất (giữ khối import manual như trang cũ).
@@ -108,7 +157,7 @@ export default async function Page() {
   const impRow = (impRows || [])[0] as any;
   const lastImport = impRow ? { status: String(impRow.status), msg: String(impRow.detail?.msg || ''), link: String(impRow.detail?.link || '') } : null;
 
-  const empty = posts.length === 0;
+  const empty = posts.length === 0 && ttLatest.size === 0 && ytLatest.size === 0;
 
   return (
     <main>
@@ -200,7 +249,7 @@ function BangSoLieu({
   title: React.ReactNode;
   titleNote?: string;
   headers: string[];
-  rows: Array<{ cid: string; title: string; url: string; publishedAt: string; m: M }>;
+  rows: Array<{ cid: string; title: string; url: string; publishedAt: string; m: M; timeLabel?: string }>;
   renderMetrics: (m: M) => (string | number | React.ReactNode)[];
   customUrl?: (r: { cid: string; title: string; url: string; publishedAt: string; m: M }) => string;
 }) {
@@ -234,7 +283,7 @@ function BangSoLieu({
                 <tr key={r.cid}>
                   <td className="cell-title">
                     <b>{r.title}</b>
-                    <div className="sub" style={{ fontSize: '.78rem' }}>Đăng {fmtDT2(r.publishedAt)}</div>
+                    <div className="sub" style={{ fontSize: '.78rem' }}>{r.timeLabel || 'Đăng'} {fmtDT2(r.publishedAt)}</div>
                   </td>
                   {metricCells.map((cell, i) => <td key={i} className="num">{cell}</td>)}
                   <td>{url ? <a className="src" href={url} target="_blank" rel="noreferrer">↗ Mở</a> : <span className="muted">—</span>}</td>
