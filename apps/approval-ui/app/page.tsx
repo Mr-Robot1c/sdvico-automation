@@ -1,10 +1,9 @@
 import { redirect } from 'next/navigation';
 
-// Mở app là thấy Tổng quan (user 21/8: "đưa lên cái đầu tiên"). Tổng quan gộp với Bảng
-// bài viết tại /noi-dung (stat + kênh kết nối + kanban theo mẫu user). Hàng đợi duyệt
-// đầy đủ (HR + cảnh báo hệ thống) ở /hang-doi.
+// 27/8 redesign: mo app la thay Tong quan MOI (/tong-quan — dashboard 5 tab theo file
+// "redesign web.docx" cua sep). Bang bai viet chi tiet van o /noi-dung.
 export const dynamic = 'force-dynamic';
 
 export default function Page() {
-  redirect('/noi-dung');
+  redirect('/tong-quan');
 }

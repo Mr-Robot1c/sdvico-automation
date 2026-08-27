@@ -3,68 +3,50 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-type Tab = { href: string; label: string; icon: string; external?: boolean };
+type Tab = { href: string; label: string; icon: string; external?: boolean; also?: string[] };
 type Group = { title: string; items: Tab[] };
 
-// Sidebar chia nhóm theo dòng chảy công việc. Sếp chốt 20/8: Kết nối (3 kênh) và Quy tắc
-// (2 trang) mỗi thứ GỘP thành 1 mục duy nhất — trang gộp /ket-noi và /quy-tac, trang chi
-// tiết cũ vẫn sống làm trang con.
+// 27/8 REDESIGN theo file "redesign web.docx" cua sep: sidebar rut ve 5 muc chinh
+// Tong quan - Video - SEO - Kenh - Agent (giong ForLife Ops). Cac trang cu (/noi-dung,
+// /ke-hoach, /do-luong, /san-xuat, /tu-lieu...) VAN SONG, duoc link "Chi tiet" tu trong
+// tung tab; `also` liet ke cac route con de muc cha van sang khi dang o trang chi tiet.
 export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean }) {
   const path = usePathname();
 
+  const main: Group = {
+    title: 'SDVICO Ops',
+    items: [
+      { href: '/tong-quan', label: 'Tổng quan', icon: '📊', also: ['/noi-dung', '/ke-hoach', '/khach-hang', '/hang-doi'] },
+      { href: '/video', label: 'Video', icon: '🎬', also: ['/san-xuat', '/tu-lieu'] },
+      { href: '/seo', label: 'SEO', icon: '🔍', also: ['/tu-khoa', '/quang-cao', '/du-kien'] },
+      { href: '/kenh', label: 'Kênh', icon: '📡', also: ['/do-luong', '/ket-noi', '/facebook', '/youtube', '/tiktok'] },
+      { href: '/agent', label: 'Agent', icon: '🤖', also: ['/du-lieu-ai', '/kho-tri-thuc'] }
+    ]
+  };
   const heThong: Group = {
     title: 'Hệ thống',
     items: [
       { href: '/van-hanh', label: 'Vận hành', icon: '🛑' },
-      { href: '/ket-noi', label: 'Kết nối', icon: '🔌' },
-      { href: '/quy-tac', label: 'Quy tắc', icon: '📜' }
-    ]
-  };
-  // 21/8 gộp lớn (user): Tổng quan GỘP với Bảng bài viết thành MỘT mục /noi-dung theo mẫu
-  // (stat + kênh kết nối trái + kanban phải; tab Bài viết/Video là danh sách chi tiết).
-  // Hàng đợi duyệt + Vận hành cũng nằm trong đó; /hang-doi (HR + cảnh báo) và /van-hanh
-  // vẫn sống, đi vào từ thanh vận hành trên board. Đo lường là trang riêng.
-  const quanLySanXuat: Group = {
-    title: 'Quản lí và Sản xuất',
-    items: [
-      { href: '/noi-dung', label: 'Tổng quan', icon: '📊' },
-      { href: '/do-luong', label: 'Đo lường', icon: '📈' },
-      // 26/8: BO muc "Khach hang" khoi sidebar (user "trong tong quan co roi" — chip
-      // Khach hang trong thanh tab /noi-dung da dan sang /khach-hang). Trang /khach-hang
-      // van chay binh thuong theo URL truc tiep, chi khong xuat hien nav sidebar.
-      { href: '/san-xuat', label: 'Xưởng sản xuất', icon: '🎬' },
-      { href: '/tu-lieu', label: 'Kho tư liệu', icon: '🎞️' },
-      { href: '/ke-hoach', label: 'Kế hoạch', icon: '🧭' },
-      { href: '/quang-cao', label: 'Quảng cáo', icon: '📣' },
-      // 24/8 (user: "lấy link sdvico.vn cho lẹ, cần gì tạo mới"): trỏ thẳng ra web công ty
-      // thay vì trang /blog nội bộ (đang trên vercel.app, chưa SEO thật).
+      { href: '/quy-tac', label: 'Quy tắc', icon: '📜' },
       { href: 'https://sdvico.vn', label: 'Web SDVICO', icon: '🌐', external: true }
     ]
   };
-  // Nhóm AI (user 18/8): Nguồn = tri thức các AI đã học (nội bộ + public); Dữ liệu = 5 AI
-  // đang học tới đâu, kết quả gì — để người quản lý biết AI có thật sự học hay không.
-  const ai: Group = {
-    title: 'AI',
-    items: [
-      { href: '/kho-tri-thuc', label: 'Nguồn', icon: '🧠' },
-      { href: '/du-lieu-ai', label: 'Dữ liệu', icon: '🤖' }
-    ]
-  };
   const groups: Group[] = marketingOnly
-    ? [quanLySanXuat, ai, heThong]
+    ? [main, heThong]
     : [
-        quanLySanXuat,
-        ai,
+        main,
         {
           title: 'Tuyển dụng',
           items: [
-            { href: '/hang-doi', label: 'Hàng đợi HR', icon: '📥' },
             { href: '/ho-so', label: 'Hồ sơ ứng viên', icon: '👤' },
             { href: '/vi-tri', label: 'Vị trí tuyển dụng', icon: '📋' }
           ]
         },
         heThong
       ];
+
+  const isOn = (t: Tab) =>
+    path === t.href || (t.also || []).some((a) => path === a || (path || '').startsWith(a + '/')) || (path || '').startsWith(t.href + '/');
 
   return (
     <nav className="nav-groups" aria-label="Điều hướng chính">
@@ -79,7 +61,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
                   <span>{t.label} ↗</span>
                 </a>
               ) : (
-                <Link key={t.href} href={t.href} className={`tab ${path === t.href ? 'on' : ''}`}>
+                <Link key={t.href} href={t.href} className={`tab ${isOn(t) ? 'on' : ''}`}>
                   <span className="tab-icon" aria-hidden="true">{t.icon}</span>
                   <span>{t.label}</span>
                 </Link>
