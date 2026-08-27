@@ -484,7 +484,8 @@ async function main() {
   // 27/8: BAI TREND dung Pexels URL trong brief.video_scenes -> tu dung video luon
   // (khong dung brand_assets folder). User "ghep + long tieng + xuat" hoi 27/8 chieu.
   if (brief.generator === 'trend') {
-    return buildTrendVideoFromPexels(client, content, contentId, args);
+    // args duoc parse ngay trong function tren cung nen khong can truyen (arg helper).
+    return buildTrendVideoFromPexels(client, content, contentId);
   }
 
   let productGroup = brief.rotation_group
@@ -574,7 +575,7 @@ async function main() {
 // Flow: Download video/anh Pexels moi canh -> TTS narration -> ghep video +
 // audio moi canh -> concat tat ca canh -> upload Supabase Storage -> update
 // mkt_content.brief.assets.video.
-async function buildTrendVideoFromPexels(client, content, contentId, args) {
+async function buildTrendVideoFromPexels(client, content, contentId) {
   const brief = content.brief || {};
   const scenes = Array.isArray(brief.video_scenes) ? brief.video_scenes : [];
   if (!scenes.length) throw new Error('Bai trend khong co video_scenes trong brief.');
@@ -587,7 +588,8 @@ async function buildTrendVideoFromPexels(client, content, contentId, args) {
   const workDir = join(HERE, '..', '..', '..', '..', 'out', 'video', `trend_${contentId.slice(0, 8)}`);
   await mkdir(workDir, { recursive: true });
 
-  const voice = args.voice || 'vi-VN-HoaiMyNeural';
+  // Dung arg() helper co san (parse argv --voice), fallback edge-tts default.
+  const voice = arg('voice', 'vi-VN-HoaiMyNeural');
   // TARGET res: 16:9 landscape 1920x1080 (dep tren Facebook, TikTok co re-render doc sau).
   const W = 1920, H = 1080;
 
