@@ -604,6 +604,7 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
   const W = 1920, H = 1080;
 
   const clipPaths = [];
+  const sceneDurations = []; // theo dõi để build SRT sau khi concat
   for (let i = 0; i < usableScenes.length; i++) {
     const s = usableScenes[i];
     const sceneNo = i + 1;
@@ -668,16 +669,57 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
         '-map', '0:v:0', '-map', '1:a:0', clipPath]);
     }
     clipPaths.push(clipPath);
+    sceneDurations.push(finalDur);
   }
 
   // 4. Concat tat ca clips (concat demuxer - moi clip da re-encode chung codec).
   console.log(`\n  Concat ${clipPaths.length} clips...`);
   const listPath = join(workDir, 'concat.txt');
   await writeFile(listPath, clipPaths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join('\n'), 'utf8');
+  const concatPath = join(workDir, `sdvico_trend_${contentId.slice(0, 8)}_concat.mp4`);
+  await ffmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', concatPath]);
+  const concatDur = await probeDuration(concatPath);
+  console.log(`  Concat xong (${concatDur.toFixed(1)}s).`);
+
+  // 4b. THEM SUBTITLE (user 27/8): sinh SRT tu narration + sceneDurations, burn subtitle
+  //     vao video final. Style: Arial 20 chu trang vien den can duoi (Alignment=2, MarginV=40).
+  console.log(`  Sinh SRT + burn subtitle...`);
+  const fmtTs = (sec) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    const ms = Math.round((sec - Math.floor(sec)) * 1000);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+  };
+  let srt = '';
+  let cumTime = 0;
+  for (let i = 0; i < usableScenes.length; i++) {
+    const start = cumTime;
+    const end = cumTime + sceneDurations[i];
+    const narration = String(usableScenes[i].narration || '').trim() || `Cảnh ${i + 1}`;
+    srt += `${i + 1}\n${fmtTs(start)} --> ${fmtTs(end)}\n${narration}\n\n`;
+    cumTime = end;
+  }
+  const srtPath = join(workDir, 'subs.srt');
+  await writeFile(srtPath, srt, 'utf8');
+
   const outputPath = join(workDir, `sdvico_trend_${contentId.slice(0, 8)}.mp4`);
-  await ffmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', outputPath]);
+  const forceStyle = "FontName=Arial,FontSize=20,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,BorderStyle=1,Alignment=2,MarginV=40";
+  try {
+    await ffmpeg([
+      '-y', '-i', concatPath,
+      '-vf', `subtitles=subs.srt:force_style='${forceStyle}'`,
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'medium', '-crf', '23',
+      '-c:a', 'copy',
+      outputPath,
+    ], { cwd: workDir });
+  } catch (e) {
+    console.warn(`  (burn subtitle loi "${String(e?.message || e).slice(0, 100)}", dung video khong sub)`);
+    const { copyFile } = await import('node:fs/promises');
+    await copyFile(concatPath, outputPath);
+  }
   const finalTotalDur = await probeDuration(outputPath);
-  console.log(`  Xong. Video final: ${outputPath} (${finalTotalDur.toFixed(1)}s)`);
+  console.log(`  Xong. Video final co subtitle: ${outputPath} (${finalTotalDur.toFixed(1)}s)`);
 
   // 5. Upload len Supabase Storage + insert brand_assets + update mkt_content.brief.assets.
   console.log(`\n  Upload Supabase Storage...`);

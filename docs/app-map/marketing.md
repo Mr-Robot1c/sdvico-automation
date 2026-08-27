@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-26
 ttl_days: 180
+<!-- re-verified: 2026-08-27 15:50 - THEM SUBTITLE cho video trend (user 27/8: "them subtitle luon duoc khong?"): track sceneDurations trong loop, sau concat sinh SRT tu narration + duration (fmt HH:MM:SS,mmm), burn subtitle vao final video bang ffmpeg subtitles filter (subs.srt:force_style='FontName=Arial,FontSize=20,PrimaryColour=WHITE,OutlineColour=BLACK,Outline=2,Alignment=2 can duoi,MarginV=40'). Dung cwd=workDir + relative path 'subs.srt' de tranh Windows path escaping. Fallback: neu burn loi -> copyFile concat -> outputPath, khong mat cong build. -->
 <!-- re-verified: 2026-08-27 15:15 - Fix ffmpeg option force_original_aspect_ratio=cover (khong hop le trong ffmpeg) -> increase (co ho tro: disable/decrease/increase). Behavior cover-like van dat qua increase + crop. -->
 <!-- re-verified: 2026-08-27 15:00 - FIX buildTrendVideoFromPexels dung sai downloadAsset() (helper cho Supabase Storage path) voi URL Pexels https:// -> crash "Cannot read from undefined". Them helper downloadHttpToFile(url, dest) dung fetch() + writeFile. -->
 <!-- re-verified: 2026-08-27 14:45 - FIX buildTrendVideoFromPexels "args is not defined" (user 27/8 Watcher log): main() khong co bien 'args', truyen vao gay ReferenceError -> Node crash libuv assertion. Sua: bo param args, dung arg('voice', ...) helper co san trong file. -->
