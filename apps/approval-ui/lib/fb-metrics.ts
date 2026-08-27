@@ -183,9 +183,9 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
         const v = d?.values?.[0]?.value;
         return v == null ? null : Number(v);
       };
-      // Thử LẦN LƯỢT nhiều tên chỉ số cho cùng một ý (Meta đổi tên theo phiên bản: từ 15/11/2025
-      // `post_impressions` -> `post_media_view`, `post_impressions_unique` -> `post_total_media_view_unique`;
-      // 6/2026 bỏ tiếp các biến thể unique video). Cái nào FB trả số thì lấy, hết danh sách mới ghi lỗi.
+      // Meta v26 (t9/2026) đã BỎ hàng loạt tên cũ: post_impressions, post_impressions_unique,
+      // post_media_view (bị siết), blue_reels_play_count, post_video_views, post_video_views_unique.
+      // Bản còn dùng được (research 27/8/2026): tách paid + organic, cộng lại thành total.
       type Cand = { path: string; name: string; scale?: number };
       const grabFirst = async (key: string, cands: Cand[]) => {
         const errs: string[] = [];
@@ -202,37 +202,53 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
         }
         insightErr.push(`${key}: ${errs.join(' | ')}`.slice(0, 300));
       };
+      // Cộng SUM breakdown paid + organic — call 1 API với nhiều metric, cộng values. Nếu 1 tên
+      // bị FB reject, bỏ qua tên đó, dùng tên còn lại. Dùng cho v26 metric bị tách paid/organic.
+      const sumBreakdown = async (key: string, path: string, names: string[]) => {
+        try {
+          const r = await graph(path, 6000);
+          if (r?.error) { insightErr.push(`${key}: ${r.error.message}`.slice(0, 300)); return; }
+          let total = 0;
+          let got = false;
+          for (const n of names) {
+            const v = valOf(r, n);
+            if (v != null && !Number.isNaN(v)) { total += v; got = true; }
+          }
+          if (got) metrics[key] = total;
+          else insightErr.push(`${key}: khong metric nao co gia tri trong ${names.join('+')}`);
+        } catch (e: any) {
+          insightErr.push(`${key}: ${String(e?.message || e)}`.slice(0, 300));
+        }
+      };
       const vi = (metric: string) => `${objId}/video_insights?metric=${metric}`;
       const pi = (metric: string) => `${postId}/insights?metric=${metric}`;
       if (isVideo) {
-        // Lượt xem video + tổng thời gian xem (ms -> giây) + số NGƯỜI xem. video_insights nằm trên
-        // node VIDEO (objId); dự phòng bằng chỉ số bài (postId = PAGEID_VIDEOID) nếu Meta bỏ tên cũ.
-        await grabFirst('views', [
-          ...(postId ? [
-            { path: pi('post_media_view'), name: 'post_media_view' },
-            { path: pi('blue_reels_play_count'), name: 'blue_reels_play_count' },
-            { path: pi('post_video_views'), name: 'post_video_views' },
-          ] : []),
-          { path: vi('total_video_views'), name: 'total_video_views' },
-        ]);
-        await grabFirst('watchSec', [
-          { path: vi('total_video_view_total_time'), name: 'total_video_view_total_time', scale: 1 / 1000 },
-          ...(postId ? [{ path: pi('post_video_view_time'), name: 'post_video_view_time', scale: 1 / 1000 }] : []),
-        ]);
-        await grabFirst('reach', [
-          { path: vi('total_video_views_unique'), name: 'total_video_views_unique' },
-          ...(postId ? [{ path: pi('post_total_media_view_unique'), name: 'post_total_media_view_unique' }] : []),
-        ]);
+        // Video: cộng views paid + organic. Watch time có tên riêng còn dùng được.
+        if (postId) {
+          await sumBreakdown('views', pi('post_video_views_organic,post_video_views_paid'), ['post_video_views_organic', 'post_video_views_paid']);
+          if (metrics.views == null) {
+            // Fallback: impressions total (video cũng có impressions)
+            await sumBreakdown('views', pi('post_impressions_organic,post_impressions_paid'), ['post_impressions_organic', 'post_impressions_paid']);
+          }
+          await grabFirst('watchSec', [
+            { path: pi('post_video_view_time'), name: 'post_video_view_time', scale: 1 / 1000 },
+          ]);
+          await grabFirst('reach', [
+            { path: pi('post_total_media_view_unique'), name: 'post_total_media_view_unique' },
+          ]);
+        }
+        // Video node fallback (nếu postId rỗng hoặc /insights fail).
+        if (metrics.views == null) {
+          await grabFirst('views', [{ path: vi('total_video_views'), name: 'total_video_views' }]);
+        }
+        if (metrics.watchSec == null) {
+          await grabFirst('watchSec', [{ path: vi('total_video_view_total_time'), name: 'total_video_view_total_time', scale: 1 / 1000 }]);
+        }
       } else if (postId) {
-        // Bài ảnh/chữ: "lượt xem" = media view (tên mới) hoặc impressions (tên cũ);
-        // "người xem" = unique media viewers hoặc impressions_unique. /insights chỉ có trên node BÀI.
-        await grabFirst('views', [
-          { path: pi('post_media_view'), name: 'post_media_view' },
-          { path: pi('post_impressions'), name: 'post_impressions' },
-        ]);
+        // Bài ảnh/chữ: v26 bỏ post_impressions/post_impressions_unique. Dùng breakdown paid/organic.
+        await sumBreakdown('views', pi('post_impressions_organic,post_impressions_paid'), ['post_impressions_organic', 'post_impressions_paid']);
         await grabFirst('reach', [
           { path: pi('post_total_media_view_unique'), name: 'post_total_media_view_unique' },
-          { path: pi('post_impressions_unique'), name: 'post_impressions_unique' },
         ]);
       } else {
         insightErr.push('views/reach: chưa có id bài để hỏi /insights');
