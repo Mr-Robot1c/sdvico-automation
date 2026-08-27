@@ -86,12 +86,16 @@ export default async function TongQuanSection() {
     // modal chứ không chỉ count. Limit 50 (hôm nay hiếm khi vượt).
     client
       .from('mkt_leads')
-      .select('id, source, fb_user_name, fb_profile_url, message, created_at, content_id', { count: 'exact' })
+      .select('id, source, fb_user_name, fb_profile_url, message, created_at, content_id, status, note', { count: 'exact' })
       .neq('status', 'spam')
       .gte('created_at', todayStartIso)
       .order('created_at', { ascending: false })
       .limit(50),
   ]);
+
+  // NV kinh doanh nhan Zalo forward - LeadQuickView modal can de "Chuyen NV" button.
+  const { data: salesRow } = await client.from('app_config').select('value').eq('key', 'mkt_sales_zalo').maybeSingle();
+  const salesPeople: Array<{ name: string; phone: string }> = Array.isArray((salesRow as any)?.value?.people) ? (salesRow as any).value.people : [];
 
   // Bài đã đăng theo kênh + lần đăng gần nhất.
   const byChannel = new Map<string, { count: number; lastAt: string }>();
@@ -154,7 +158,10 @@ export default async function TongQuanSection() {
     fbProfileUrl: (l.fb_profile_url as string) || null,
     message: String(l.message || ''),
     createdAt: String(l.created_at || ''),
+    contentId: (l.content_id as string) || null,
     contentTitle: l.content_id ? (leadContentTitle.get(l.content_id) || null) : null,
+    status: String(l.status || 'new'),
+    note: String(l.note || ''),
   }));
 
   const fbPosts = byChannel.get('facebook') || { count: 0, lastAt: '' };
@@ -234,7 +241,7 @@ export default async function TongQuanSection() {
           <div className="stat-lbl">Bài chờ duyệt</div>
           <div className="stat-num">{fmt(pendingCount)}</div>
         </Link>
-        <LeadQuickView leads={leadsToday} count={leadTodayCount} />
+        <LeadQuickView leads={leadsToday} count={leadTodayCount} salesPeople={salesPeople} />
         <PlanQuickView todayPlan={(() => {
           if (!planRow) return null;
           const vnToday = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
