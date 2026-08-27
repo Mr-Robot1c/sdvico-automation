@@ -575,6 +575,16 @@ async function main() {
 // Flow: Download video/anh Pexels moi canh -> TTS narration -> ghep video +
 // audio moi canh -> concat tat ca canh -> upload Supabase Storage -> update
 // mkt_content.brief.assets.video.
+// Download HTTP URL (Pexels) → file. downloadAsset() cua ffmpeg.mjs chi dung cho Supabase
+// Storage path (chuoi noi bo), gap URL Pexels https:// se crash "Cannot read from undefined".
+async function downloadHttpToFile(url, destPath) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`tai ${url}: HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  await writeFile(destPath, buf);
+  return destPath;
+}
+
 async function buildTrendVideoFromPexels(client, content, contentId) {
   const brief = content.brief || {};
   const scenes = Array.isArray(brief.video_scenes) ? brief.video_scenes : [];
@@ -600,16 +610,17 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
     const narration = String(s.narration || '').trim();
     console.log(`\n  Canh ${sceneNo}/${usableScenes.length}: "${narration.slice(0, 50)}..."`);
 
-    // 1. Download media (uu tien video, fallback image).
+    // 1. Download media (uu tien video, fallback image). Dung downloadHttpToFile vi
+    // Pexels URL la http/https, KHONG phai Supabase Storage path.
     let rawPath;
     if (s.pexels_video_url) {
       rawPath = join(workDir, `scene${sceneNo}_raw.mp4`);
       console.log(`    Tai video Pexels...`);
-      await downloadAsset(s.pexels_video_url, rawPath);
+      await downloadHttpToFile(s.pexels_video_url, rawPath);
     } else {
       const imgPath = join(workDir, `scene${sceneNo}_raw.jpg`);
       console.log(`    Tai anh Pexels...`);
-      await downloadAsset(s.pexels_image_url, imgPath);
+      await downloadHttpToFile(s.pexels_image_url, imgPath);
       // Convert anh -> video 5s (Ken Burns nhe).
       rawPath = join(workDir, `scene${sceneNo}_raw.mp4`);
       await ffmpeg(['-y', '-loop', '1', '-i', imgPath, '-t', '5',
