@@ -378,6 +378,40 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
         </div>
       </section>
 
+      {/* ===== 3b. DO LUONG + BAO CAO TUAN (29/8, sếp: "đem đo lường và báo cáo tuần ra tổng quan") ===== */}
+      <section className="blk">
+        <h2>
+          📊 Đo lường
+          <span className="sub">tuần này (Thứ 2 → hôm nay) · kênh chính</span>
+        </h2>
+        {week ? (
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'baseline', marginBottom: 10 }}>
+            <div><span className="sub" style={{ fontSize: '.8rem' }}>Bài đã đăng</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.posts)}</b></div>
+            <div><span className="sub" style={{ fontSize: '.8rem' }}>Tương tác</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.engagement)}</b>{deltaTag(week.delta.engagement)}</div>
+            <div><span className="sub" style={{ fontSize: '.8rem' }}>Lượt xem</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.views)}</b>{deltaTag(week.delta.views)}</div>
+            <div><span className="sub" style={{ fontSize: '.8rem' }}>Khách hỏi mua</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.conversions)}</b>{deltaTag(week.delta.conversions)}</div>
+            <div><span className="sub" style={{ fontSize: '.8rem' }}>Hôm nay</span> <b style={{ fontSize: '1.1rem' }}>{vnI(postsTodayCount)}</b> <span className="sub" style={{ fontSize: '.8rem' }}>lượt đăng</span></div>
+          </div>
+        ) : (
+          <p className="sub">Chưa đọc được số liệu tuần.</p>
+        )}
+        {week && week.topPosts && week.topPosts.length ? (
+          <div style={{ marginBottom: 10 }}>
+            <span className="sub" style={{ fontSize: '.8rem' }}>Bài tốt nhất tuần:</span>
+            {week.topPosts.slice(0, 3).map((p: any, i: number) => (
+              <div key={i} className="sub" style={{ fontSize: '.85rem' }}>
+                {i + 1}. {String(p.title || '').slice(0, 70)} <b>· {vnI(p.m?.engagement || 0)} tương tác</b>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với hôm qua" />
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          <Link href="/do-luong" className="src" style={{ fontSize: '.85rem' }}>Đo lường ngày →</Link>
+          <Link href="/do-luong/tuan" className="src" style={{ fontSize: '.85rem' }}>Báo cáo tuần đầy đủ →</Link>
+        </div>
+      </section>
+
       {/* ===== 3. NGUOI HOI MUA + KE HOACH HOM NAY ===== */}
       <div className="blk-cols">
         <section className="blk">
@@ -456,40 +490,6 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           )}
         </section>
       </div>
-
-      {/* ===== 3b. DO LUONG + BAO CAO TUAN (29/8, sếp: "đem đo lường và báo cáo tuần ra tổng quan") ===== */}
-      <section className="blk">
-        <h2>
-          📊 Đo lường
-          <span className="sub">tuần này (Thứ 2 → hôm nay) · kênh chính</span>
-        </h2>
-        {week ? (
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'baseline', marginBottom: 10 }}>
-            <div><span className="sub" style={{ fontSize: '.8rem' }}>Bài đã đăng</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.posts)}</b></div>
-            <div><span className="sub" style={{ fontSize: '.8rem' }}>Tương tác</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.engagement)}</b>{deltaTag(week.delta.engagement)}</div>
-            <div><span className="sub" style={{ fontSize: '.8rem' }}>Lượt xem</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.views)}</b>{deltaTag(week.delta.views)}</div>
-            <div><span className="sub" style={{ fontSize: '.8rem' }}>Khách hỏi mua</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.conversions)}</b>{deltaTag(week.delta.conversions)}</div>
-            <div><span className="sub" style={{ fontSize: '.8rem' }}>Hôm nay</span> <b style={{ fontSize: '1.1rem' }}>{vnI(postsTodayCount)}</b> <span className="sub" style={{ fontSize: '.8rem' }}>lượt đăng</span></div>
-          </div>
-        ) : (
-          <p className="sub">Chưa đọc được số liệu tuần.</p>
-        )}
-        {week && week.topPosts && week.topPosts.length ? (
-          <div style={{ marginBottom: 10 }}>
-            <span className="sub" style={{ fontSize: '.8rem' }}>Bài tốt nhất tuần:</span>
-            {week.topPosts.slice(0, 3).map((p: any, i: number) => (
-              <div key={i} className="sub" style={{ fontSize: '.85rem' }}>
-                {i + 1}. {String(p.title || '').slice(0, 70)} <b>· {vnI(p.m?.engagement || 0)} tương tác</b>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với hôm qua" />
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-          <Link href="/do-luong" className="src" style={{ fontSize: '.85rem' }}>Đo lường ngày →</Link>
-          <Link href="/do-luong/tuan" className="src" style={{ fontSize: '.85rem' }}>Báo cáo tuần đầy đủ →</Link>
-        </div>
-      </section>
 
       {/* ===== 4. TAT CA NOI DUNG ===== */}
       <section className="blk">

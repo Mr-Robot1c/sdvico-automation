@@ -388,6 +388,10 @@ export default async function BangSection() {
                 if (col.key === 'scheduled') {
                   const hasSched = !!it.scheduledAt;
                   const future = hasSched && isFutureVN(it.scheduledAt);
+                  // 29/8 (user: "bài lên lịch t muốn coi được chứ không đứng yên"): thêm mục
+                  // Xem bài — ảnh/video + nguyên văn nội dung sẽ đăng.
+                  const schImg = (typeof p.assets?.image_url === 'string' && p.assets.image_url) || (typeof p.assets?.image === 'string' ? assetUrl.get(p.assets.image) : undefined);
+                  const schVid = typeof p.assets?.video === 'string' ? assetUrl.get(p.assets.video) : undefined;
                   return (
                     <div key={it.qid} className="card tone-mkt" style={{ display: 'grid', gap: 6, padding: 12 }}>
                       <b>{title}</b>
@@ -401,6 +405,12 @@ export default async function BangSection() {
                         )}
                         <span className="badge badge-format">📍 {channelsLabel(chans, p.post_reel === true)}</span>
                       </div>
+                      <details className="raw editbox">
+                        <summary>👁 Xem bài</summary>
+                        {schImg ? <img src={schImg} alt="" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 6 }} /> : null}
+                        {schVid ? <video src={schVid} controls preload="none" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 6 }} /> : null}
+                        <p style={{ whiteSpace: 'pre-wrap', margin: '6px 0 0', fontSize: '.88rem' }}>{c?.draft || '(chưa có nội dung)'}</p>
+                      </details>
                       {fbFailed.has(it.cid) ? (
                         <form action={retryFacebookPublish}>
                           <input type="hidden" name="content_id" value={it.cid} />
