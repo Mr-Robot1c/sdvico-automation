@@ -379,7 +379,11 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
       console.warn(`  (bản ${format}: ${engine} TTS không trọn bộ "${String(e?.message || e).slice(0, 140)}" — làm lại toàn bộ bằng engine kế tiếp)`);
     }
   }
-  console.log(`  Giọng bản ${format}: ${engineUsed === 'gemini' ? `Gemini TTS (${GEMINI_TTS_VOICE}, ${GEMINI_TTS_MODELS[Math.min(geminiModelIdx, GEMINI_TTS_MODELS.length - 1)]})` : 'edge-tts'}`);
+  // 29/8: nhãn từng in nhị phân gemini/edge — engine LOCAL cũng bị ghi "edge-tts" gây hiểu nhầm.
+  const engineLabel = engineUsed === 'gemini'
+    ? `Gemini TTS (${GEMINI_TTS_VOICE}, ${GEMINI_TTS_MODELS[Math.min(geminiModelIdx, GEMINI_TTS_MODELS.length - 1)]})`
+    : engineUsed === 'local' ? 'Giọng local (VieNeu — server 8199)' : 'edge-tts';
+  console.log(`  Giọng bản ${format}: ${engineLabel}`);
   const wa = await whisperArtifact(sceneAudios, fdir, format);
   const out = join(outDir, `sdvico_${contentId.slice(0, 8)}_${format}.mp4`);
   await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio });

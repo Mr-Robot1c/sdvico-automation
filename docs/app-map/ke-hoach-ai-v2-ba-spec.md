@@ -4,8 +4,8 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 90
+<!-- re-verified: 2026-08-29 08:20 - Doi chieu fix nhan log giong build-video: thuan hien thi, NV/AC khong doi. -->
 <!-- re-verified: 2026-08-29 06:50 - Doi chieu env.mjs fix + hen gio published_at: ky thuat nap env + ghi so, NV/AC khong doi. -->
-<!-- DOC-STATUS: SUSPECT (2026-08-28) — code 'packages/marketing/src' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- re-verified: 2026-08-29 05:40 - 70/30 doi sang ty le mem (chi doi loi dan prompt winnersBlock); chay thu rotate sau khi bo A/B PASS. NV/AC khong doi them. -->
 <!-- re-verified: 2026-08-29 05:10 - Doi chieu productOf guard siet them (lib/plan.ts): chi lam sach ten san pham fallback, khong doi NV/AC. -->
 <!-- re-verified: 2026-08-29 04:40 - DOI HANH VI LON theo user 29/8 ("bo han A/B", chot qua cau hoi): (1) rotate: moi huong di tuan ra DUNG 1 bai (goc = sug.why, tieu de = sug.title), used_at danh NGAY sau khi sinh (khong con pending_variant/ab_pair_id/ab_variant/CONTRAST_ANGLES); huong con pending_variant=B cu coi nhu DA DUNG (da ra ban A). (2) evaluateAbPairs TAT khoi cron metrics (code giu). (3) Hieu qua tuan so theo LOAI bai + san pham (week-report byKind/byProduct — san co). (4) LUAT 70/30 cua sep: generateContentDirections nhan winners[] (top 5 bai thang tu measurement.topPosts) — prompt yeu cau ~2/7 huong xoay lai chu de thang voi goc MOI, 5/7 tu tri thuc moi; ca plan tuan lan refill hang ngay deu truyen. (5) Video bai ban giu KIEU SHORT 10-20s qua co brief.video_short=true (rotate dat khi wantVideo; build-video isShort = video_short || ab_pair_id cu). Playbook 7 huong 2-2-1-1-1 GIU NGUYEN (da dung tu 26/8, khop van ban user). UI /ke-hoach bo nhan Ban A/Ban B -> Bai ban 1/Bai ban 2. -->
