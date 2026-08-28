@@ -130,10 +130,10 @@ export default function LinkTikTokButton({
       aria-label="Ghép video TikTok"
       style={{
         position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999,
-        background: 'var(--bg-1, #ffffff)', border: '1px solid var(--line, #d1d5db)', borderRadius: 10,
+        background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10,
         padding: 12, width: 420, maxHeight: '70vh', overflowY: 'auto',
         boxShadow: '0 14px 42px rgba(0,0,0,.28)',
-        color: 'var(--ink, #111827)',
+        color: 'var(--ink)',
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -141,7 +141,7 @@ export default function LinkTikTokButton({
         Chọn video TikTok tương ứng với bài. Sau khi ghép, view/like/comment sẽ tự cập nhật mỗi giờ.
       </div>
       {linkedVideoId ? (
-        <div style={{ padding: 8, background: 'var(--bg-2, #f3f4f6)', borderRadius: 6, marginBottom: 8, fontSize: 12 }}>
+        <div style={{ padding: 8, background: 'var(--surface-2)', borderRadius: 6, marginBottom: 8, fontSize: 12 }}>
           <b>Đã ghép:</b> video id <code>{linkedVideoId.slice(0, 20)}...</code>
           {linkedShareUrl ? <> · <a href={linkedShareUrl} target="_blank" rel="noreferrer" className="src">↗ Mở</a></> : null}
           <button type="button" className="btn ghost sm" onClick={unlink} disabled={pending} style={{ marginLeft: 6 }}>
@@ -163,7 +163,7 @@ export default function LinkTikTokButton({
               <li key={v.id} style={{
                 display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, alignItems: 'center',
                 padding: 8, border: '1px solid var(--line)', borderRadius: 6,
-                background: isLinked ? 'var(--tone-ok-bg, #ecfdf5)' : 'transparent',
+                background: isLinked ? 'var(--ok-bg)' : 'transparent',
               }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -191,7 +191,7 @@ export default function LinkTikTokButton({
           })}
         </ul>
       )}
-      {msg ? <div className="sub" style={{ marginTop: 8, fontSize: 12, padding: 6, background: 'var(--bg-2)', borderRadius: 6 }}>{msg}</div> : null}
+      {msg ? <div className="sub" style={{ marginTop: 8, fontSize: 12, padding: 6, background: 'var(--surface-2)', borderRadius: 6 }}>{msg}</div> : null}
       <div style={{ marginTop: 10, display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
         <button type="button" className="btn ghost sm" onClick={loadVideos} disabled={loading}>🔄 Tải lại</button>
         <button type="button" className="btn ghost sm" onClick={() => setOpen(false)}>Đóng</button>
@@ -207,7 +207,7 @@ export default function LinkTikTokButton({
         className="btn ghost sm"
         onClick={openAndLoad}
         title={linkedVideoId ? 'Đã ghép video TikTok — bấm để đổi/bỏ ghép' : 'Ghép bài này với video trên TikTok Studio để tự cập nhật view/like'}
-        style={linkedVideoId ? { color: 'var(--tone-ok, #16a34a)' } : undefined}
+        style={linkedVideoId ? { color: 'var(--ok)' } : undefined}
       >
         {linkedVideoId ? '🎵✓ Đã ghép TikTok' : '🎵 Ghép video TikTok'}
       </button>

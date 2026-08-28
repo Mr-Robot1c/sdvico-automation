@@ -424,6 +424,14 @@ export default async function BangSection() {
                             <span>{CH_LABEL[x.channel] || x.channel}</span>
                           </a>
                         ))}
+                        {/* 28/8 (user): bai da GHEP TAY video TikTok (brief.tiktok_video_id) —
+                            hien icon TikTok nhu cac kenh khac, link mo video that. */}
+                        {(brief as any).tiktok_video_id && (brief as any).tiktok_share_url && !posts.some((x) => x.channel === 'tiktok' && /^https?:/.test(x.url)) ? (
+                          <a className="ch-link" href={String((brief as any).tiktok_share_url)} target="_blank" rel="noreferrer" title="Video TikTok đã ghép tay — xem trên TikTok">
+                            <PlatformLogo platform="tiktok" size={15} />
+                            <span>TikTok</span>
+                          </a>
+                        ) : null}
                         {posts
                           .filter((x) => x.channel === 'tiktok' && !/^https?:/.test(x.url))
                           .map((x) => (
