@@ -161,7 +161,8 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
   // 28/8 chiều (user: 2 bài không liên quan cùng mang ảnh Zalo ăn mì): ảnh nhập từ Zalo là
   // ảnh chat đời thường — CHỈ được làm cover khi nằm ĐÚNG folder sản phẩm của bài (ảnh lắp
   // đặt thật); tuyệt đối không vào pool dự phòng CHUNG. Pool chung cạn thì thà placeholder logo.
-  const noZalo = (arr: PoolImg[]) => arr.filter((a) => a.source !== 'zalo');
+  // So TIỀN TỐ: source thật trong kho là 'zalo-auto' / 'zalo-backlog-tkkd' (không phải 'zalo' trần).
+  const noZalo = (arr: PoolImg[]) => arr.filter((a) => !String(a.source || '').startsWith('zalo'));
   const publicUrlOf = (sp: string) => client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
   // Chống TRÙNG ảnh giữa các thẻ trong cùng một trang danh sách (user 28/8 chụp 2 card y hệt):
   // ảnh nào đã cấp cho 1 bài thì bài sau dò tiếp vị trí kế trong pool; pool cạn mới cho lặp.

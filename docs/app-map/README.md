@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 180
+<!-- re-verified: 2026-08-28 17:30 - noZalo doi sang so TIEN TO source (du lieu that la zalo-auto/zalo-backlog-tkkd, khong phai 'zalo'). -->
 <!-- re-verified: 2026-08-28 17:20 - Blog fix 3 diem (loc deleted_at, anh Zalo khong vao pool du phong chung, chong trung cover cung trang) + plan-directions them luat thang tap trung chong loang + ne trung 14 ngay. -->
 <!-- re-verified: 2026-08-28 17:10 - Doi chieu loc 'Bai trend' khoi bang San pham uu tien /ke-hoach: thuan hien thi. -->
 <!-- re-verified: 2026-08-28 17:00 - Trang /ke-hoach LAM LAI toan bo (bang tuan T2..CN tu bai that + mo phong hang doi rotate, lib/week-plan.ts moi, khong phu thuoc ban live); rotate fix sang du 2 bai ban + content theo playbook thu (viral/seeding het bi chan); guessGroup tu khoa dai nhat thang; Actions nguong slot 8h/14h. Chi tiet o ke-hoach-ai-v2-ba-spec.md cung gio. -->
