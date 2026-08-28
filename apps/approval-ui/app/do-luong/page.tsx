@@ -89,10 +89,16 @@ export default async function Page() {
     ...posts.map((p) => p.content_id).filter(Boolean),
     ...ttLatest.keys(),
   ])] as string[];
+  // 28/8: bài đã vào Thùng rác (deleted_at) KHÔNG hiện ở bảng nào — trước đây quên lọc nên
+  // bài user vừa xoá vẫn nằm nguyên trong bảng FB (user: "vẫn chưa xoá bài của page test hả").
   const contentsMap = new Map<string, { title: string; brief: any }>();
+  const deletedCids = new Set<string>();
   if (cids.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, title, brief').in('id', cids);
-    for (const c of cs || []) contentsMap.set((c as any).id, { title: (c as any).title || '(không tên)', brief: (c as any).brief || {} });
+    const { data: cs } = await client.from('mkt_content').select('id, title, brief, deleted_at').in('id', cids);
+    for (const c of cs || []) {
+      if ((c as any).deleted_at) { deletedCids.add((c as any).id); continue; }
+      contentsMap.set((c as any).id, { title: (c as any).title || '(không tên)', brief: (c as any).brief || {} });
+    }
   }
 
   // Số liệu Facebook mới nhất mỗi content_id (không giới hạn hôm nay - cần latest để so).
@@ -121,7 +127,7 @@ export default async function Page() {
   const ytRows: Row[] = [];
   for (const p of posts) {
     const cid = p.content_id as string | null;
-    if (!cid) continue;
+    if (!cid || deletedCids.has(cid)) continue;
     const c = contentsMap.get(cid);
     const title = c?.title || '(không tên)';
     const url = String(p.external_url || '');
@@ -130,8 +136,11 @@ export default async function Page() {
       const brief = (c?.brief || {}) as any;
       const realUrl = String(brief.fb_real_url || '');
       const isReal = !!realUrl || !!(isOtherPage as (u: string, b: any) => boolean)(url, brief);
+      // 28/8 lần 2 (user thấy bài page test trong bảng kênh chính): bài CHỈ có bản page phụ
+      // KHÔNG liệt kê ở đây nữa — bảng kênh chính chỉ chứa bài kênh chính. Ghép link ở /noi-dung.
+      if (!isReal) continue;
       const m = latestFB.get(cid) || {};
-      fbRows.push({ cid, title, url: realUrl || url, publishedAt, m, noMetric: !isReal });
+      fbRows.push({ cid, title, url: realUrl || url, publishedAt, m });
     } else if (p.channel === 'youtube') {
       const m = latestYT.get(cid) || {};
       ytRows.push({ cid, title, url, publishedAt, m });
@@ -139,14 +148,22 @@ export default async function Page() {
     // TikTok không lấy từ mkt_posts (user thường link tay), dùng snapshot mkt_metrics ở dưới.
   }
   for (const [cid, { m, ts }] of ttLatest) {
+    if (deletedCids.has(cid)) continue;
     const c = contentsMap.get(cid);
+    // 28/8 (user: video đăng HÔM QUA hiện giờ y chang video hôm nay): snapshot giờ có
+    // createTime (giờ đăng thật từ TikTok API). Có createTime -> hiện giờ đăng thật, và video
+    // đăng trước hôm nay thì bỏ khỏi bảng NGÀY (đã có ở báo cáo tuần). Snapshot cũ chưa có
+    // createTime -> giữ nguyên kiểu cũ (nhãn "Số" = giờ chốt số liệu).
+    const ct = Number((m as any).createTime || 0);
+    const postedIso = ct > 0 ? new Date(ct * 1000).toISOString() : '';
+    if (postedIso && postedIso < dayStart) continue;
     ttRows.push({
       cid,
       title: c?.title || '(không tên)',
       url: (m as any).shareUrl || '',
-      publishedAt: ts,
+      publishedAt: postedIso || ts,
       m,
-      timeLabel: 'Số',
+      timeLabel: postedIso ? undefined : 'Số',
     });
   }
 
@@ -203,17 +220,15 @@ export default async function Page() {
       ) : (
         <>
           {/* 28/8 (user): TAT kenh phu — 1 bang Facebook KENH CHINH SDVICO VN duy nhat. Bai
-              chua ghep link kenh chinh van liet ke (noMetric) de biet ma bam Ghep FB chinh. */}
+              chi co ban page phu KHONG liet ke (user: bang kenh chinh khong duoc dinh bai
+              page test); muon do thi bam Ghep FB chinh o /noi-dung. */}
           <BangSoLieu
             title={<><PlatformLogo platform="facebook" size={20} /><span>Facebook — SDVICO VN (kênh chính)</span></>}
-            titleNote="Chỉ đo bài trên Page chính. Bài máy đăng ở kênh phụ cần bấm Ghép FB chính (dán link bài đã đăng tay) để có số liệu."
+            titleNote="Chỉ hiện và đo bài trên Page chính. Bài máy đăng ở kênh phụ không nằm ở đây — bấm Ghép FB chính ở Duyệt bài (dán link bài đã đăng tay) thì bài mới vào bảng."
             headers={['Bài', 'React', 'Comment', 'Share', 'Lượt xem', 'Người xem', 'Link']}
             rows={fbRows}
-            renderMetrics={(m, r) => (r?.noMetric
-              ? ['—', '—', '—', '—', '—']
-              : [fmt(m.reactions), fmt(m.comments), fmt(m.shares), m.views != null ? fmt(m.views) : '—', m.reach != null ? fmt(m.reach) : '—'])}
+            renderMetrics={(m) => [fmt(m.reactions), fmt(m.comments), fmt(m.shares), m.views != null ? fmt(m.views) : '—', m.reach != null ? fmt(m.reach) : '—']}
             channelLabel="Kênh chính · SDVICO VN"
-            rowNote={(r) => (r.noMetric ? 'chưa ghép link kênh chính — không đo' : null)}
           />
 
           <BangSoLieu

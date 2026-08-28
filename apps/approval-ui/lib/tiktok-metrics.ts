@@ -116,6 +116,8 @@ export async function pullTikTokMetrics(client: Client): Promise<{ pulled: numbe
     metrics: {
       videoId: video.id,
       shareUrl: video.share_url || null,
+      // 28/8: giờ đăng thật (epoch giây) để /do-luong hiện đúng ngày đăng thay vì giờ kéo số.
+      createTime: video.create_time || 0,
       views: video.view_count || 0,
       reactions: video.like_count || 0,
       comments: video.comment_count || 0,
