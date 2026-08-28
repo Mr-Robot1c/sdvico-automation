@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/rotate?slot=sang",
-      "schedule": "0 0 * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/rotate?slot=chieu",
-      "schedule": "30 5 * * *"
+      "schedule": "0 7 * * *"
     }
   ]
 }

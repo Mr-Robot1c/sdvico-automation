@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 90
+<!-- re-verified: 2026-08-29 11:40 - SPEC VONG LAP user hieu dinh (5 diem): (1) DATA 2 quet sau Gemini MOI NGAY (gate 48h->24h, knowledge-public). (2) BOSS hoc so TAT CA nen tang: week-report loadPostsInWindow + plan.ts loadMeasurement gop FB kenh chinh + YouTube + TikTok THEO BAI (1 bai da kenh = 1 dong cong don; TikTok ghep tay vao qua snapshot createTime; bai CHI co ban FB page phu va khong len YT/TT thi bo; so FB chi tinh khi kenh chinh). (3) Khung gio 8h sang + 14h chieu VN (vercel.json cron 0 1 / 0 7 UTC; nhan UI ke-hoach + plan-quick-view doi 7h/12h30 -> 8h/14h, bo not nhan Ban A/B). (4) Toi BOSS chinh + CN bao cao tuan doi 19h -> 20h (plan-live isEveningVN, learn-weekly shouldRunLearnWeekly). (5) Ghep FB chinh = dan link bai SDVICOVN de mo bai + do so lieu bai do; page phu tat do/tat hien link, may van dung lam cho dang nhap ky thuat vi chua co token dang thang SDVICOVN. -->
 <!-- re-verified: 2026-08-29 10:10 - Doi chieu trim lang + seed per-request server giong: thuan chat luong am thanh, NV/AC khong doi. -->
 <!-- re-verified: 2026-08-29 09:10 - Doi chieu fix seed + dai temperature giong local: thuan chat luong giong doc, NV/AC khong doi. -->
 <!-- re-verified: 2026-08-29 08:20 - Doi chieu fix nhan log giong build-video: thuan hien thi, NV/AC khong doi. -->

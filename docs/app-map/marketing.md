@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-28
 ttl_days: 180
+<!-- re-verified: 2026-08-29 11:40 - Doi chieu spec moi: khong file packages/marketing nao doi dot nay (thay doi nam o approval-ui + vercel.json). -->
 <!-- re-verified: 2026-08-29 10:10 - Server giong them: TRIM lang 2 dau (librosa top_db=32, do duoc 0,46s cam dau file -> user thay 1-2s cho; dem lai 0,12s) + per-request seed de chon seed mo dau sach (user: 1-2 chu dau khac giong). Da restart. -->
 <!-- re-verified: 2026-08-29 09:10 - GIONG LAP / DOI MAU GIUA VIDEO (user bao): duong CPU VieNeu lay mau bang np.random.choice KHONG seed -> moi lan goi (moi canh/video) trang thai ngau nhien khac, mau giong dao dong; temp 1.1 khuech dai them + de lap am. FIX: (1) server seed np.random.seed(SDVICO_TTS_SEED=42) truoc MOI infer (2 lan goi cung text ra file Y HET — da test), tran temperature ha 1.3->1.0, repetition_penalty 1.2->1.35 (env SDVICO_TTS_REP_PENALTY). (2) build-video voiceStyleOf ha ca dai ve 0.8-1.0 (ban hang/TU HAO 1.0, content 0.9, RUI RO/trend 0.85, quy dinh 0.8). Server may chu da restart. -->
 <!-- re-verified: 2026-08-29 08:20 - GIONG LOCAL CHAY THAT trong video sau fix env.mjs: build cd577c6b 15:05-15:08 goi dung 8 luot POST /tts (3 canh + outro x 2 ban), khong co dong fallthrough — video la VieNeu My Duyen. Dong log "Giong ban X" truoc in NHI PHAN gemini/edge nen engine local bi ghi nham "edge-tts" (nguon con hieu nham cua user) -> them nhanh label local. -->

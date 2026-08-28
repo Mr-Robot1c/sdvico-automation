@@ -204,22 +204,44 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
   // Cửa sổ 7 ngày gần nhất: chỉ dùng snapshot mới trong tuần để lên kế hoạch T4/CN, không lấy
   // lịch sử vĩnh viễn (bài cũ đã lỗi thời không đại diện tình hình bây giờ).
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  // 29/8 (user chốt spec): số liệu BOSS học = TẤT CẢ nền tảng (FB kênh chính + YouTube +
+  // TikTok), gộp theo bài — trước chỉ đếm Facebook.
   const { data: mrows } = await client
     .from('mkt_metrics')
-    .select('entity_ref, metrics, created_at')
-    .eq('source', 'facebook')
+    .select('entity_ref, source, metrics, created_at')
+    .in('source', ['facebook', 'youtube', 'tiktok'])
     .gte('created_at', sevenDaysAgo)
     .order('created_at', { ascending: false })
-    .limit(500);
+    .limit(1000);
 
-  const latest = new Map<string, FbMetrics>();
+  const latestBySrc = new Map<string, any>();
   for (const r of mrows || []) {
     const cid = (r as any).entity_ref as string | null;
     // Bỏ dòng PAGE-LEVEL (__page__/__page_real__ = đếm follower, thêm 19/8): không phải id
     // bài. Trước đây lọt vào danh sách cid làm query .in('id', ...) chết (không phải uuid)
     // -> tra tên bài về RỖNG -> mọi bài rơi vào "Khác" -> "Dẫn đầu là Khác" (gốc sâu nhất).
     if (!cid || cid.startsWith('__')) continue;
-    if (!latest.has(cid)) latest.set(cid, ((r as any).metrics || {}) as FbMetrics);
+    const k = `${cid}|${(r as any).source}`;
+    if (!latestBySrc.has(k)) latestBySrc.set(k, (r as any).metrics || {});
+  }
+  const numOf = (x: any, k: string) => Number(x?.[k]) || 0;
+  const latest = new Map<string, FbMetrics>();
+  for (const k of latestBySrc.keys()) {
+    const cid = k.slice(0, k.indexOf('|'));
+    if (latest.has(cid)) continue;
+    const fb = latestBySrc.get(`${cid}|facebook`);
+    const yt = latestBySrc.get(`${cid}|youtube`);
+    const tt = latestBySrc.get(`${cid}|tiktok`);
+    const reactions = numOf(fb, 'reactions') + numOf(yt, 'reactions') + numOf(tt, 'reactions');
+    const comments = numOf(fb, 'comments') + numOf(yt, 'comments') + numOf(tt, 'comments');
+    const shares = numOf(fb, 'shares') + numOf(tt, 'shares');
+    latest.set(cid, {
+      reactions, comments, shares,
+      engagement: reactions + comments + shares,
+      views: numOf(fb, 'views') + numOf(yt, 'views') + numOf(tt, 'views'),
+      watchSec: numOf(fb, 'watchSec'),
+      reach: numOf(fb, 'reach'),
+    } as FbMetrics);
   }
 
   const cids = [...latest.keys()];

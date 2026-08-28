@@ -186,5 +186,5 @@ export function shouldRunLearnWeekly(now: Date = new Date()): boolean {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
   const dow = vn.getUTCDay(); // 0 = CN
   const hour = vn.getUTCHours();
-  return dow === 0 && hour >= 19;
+  return dow === 0 && hour >= 20; // 29/8 user doi 19h -> 20h
 }

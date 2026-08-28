@@ -80,7 +80,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, created: 0, note: 'emergency_stop' });
   }
 
-  // NHIP 2 DOT/NGAY (user 20/8): 8h sang = 2 bai BAN; 13h chieu = 1 bai ban + 1 content. Guard theo
+  // NHIP 2 DOT/NGAY (29/8 user chot: 8h sang = 2 bai BAN; 14h chieu = 1 bai ban + 1 content). Guard theo
   // SLOT (mỗi slot chỉ chạy 1 lần trong ngày VN). ?slot=sang|chieu de ep slot (Vercel cron truyen).
   // Khong co ?slot: giu hanh vi cu (guard 1 lan/ngay). ?force=1 bỏ mọi guard.
   const slotParam = (new URL(req.url).searchParams.get('slot') || '').toLowerCase();

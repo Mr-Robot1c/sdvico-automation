@@ -144,48 +144,69 @@ function kindOf(brief: any): { isContent: boolean; contentType?: string } {
 }
 
 async function loadPostsInWindow(client: Client, win: WeekWindow): Promise<PostScore[]> {
-  // 1. Bài ĐĂNG trong tuần (mkt_posts.published_at giữa startIso và endIso).
+  // 29/8 (user chốt spec vòng lặp): BOSS học số liệu TẤT CẢ nền tảng — Facebook KÊNH CHÍNH
+  // + YouTube + TikTok — GỘP THEO BÀI (1 bài đăng 3 kênh = 1 dòng, số cộng dồn). Trước đây
+  // chỉ đếm Facebook nên bài video ăn khách trên YouTube/TikTok không được BOSS ghi nhận.
+  // 1. Bài ĐĂNG trong tuần: mkt_posts (facebook/youtube/tiktok) + TikTok GHÉP TAY (không có
+  //    mkt_posts) nhận diện qua snapshot mkt_metrics có createTime rơi trong tuần.
   const { data: postRows } = await client
     .from('mkt_posts')
     .select('content_id, channel, external_url, published_at, status')
     .eq('status', 'published')
-    .eq('channel', 'facebook')
+    .in('channel', ['facebook', 'youtube', 'tiktok'])
     .gte('published_at', win.startIso)
     .lt('published_at', win.endIso)
     .order('published_at', { ascending: false });
-  const byCid = new Map<string, { url: string; publishedAt: string }>();
+  type Entry = { fbUrl: string; url: string; publishedAt: string; channels: Set<string> };
+  const byCid = new Map<string, Entry>();
   for (const p of postRows || []) {
     const cid = (p as any).content_id as string | null;
     if (!cid) continue;
-    if (!byCid.has(cid)) byCid.set(cid, { url: String((p as any).external_url || ''), publishedAt: String((p as any).published_at || '') });
+    const ch = String((p as any).channel);
+    const url = String((p as any).external_url || '');
+    const at = String((p as any).published_at || '');
+    const cur = byCid.get(cid);
+    if (!cur) {
+      byCid.set(cid, { fbUrl: ch === 'facebook' ? url : '', url, publishedAt: at, channels: new Set([ch]) });
+    } else {
+      cur.channels.add(ch);
+      if (ch === 'facebook' && !cur.fbUrl) cur.fbUrl = url;
+      if (at && (!cur.publishedAt || at < cur.publishedAt)) cur.publishedAt = at;
+    }
+  }
+  const { data: ttSnapRows } = await client
+    .from('mkt_metrics')
+    .select('entity_ref, metrics, created_at')
+    .eq('source', 'tiktok')
+    .order('created_at', { ascending: false })
+    .limit(500);
+  for (const r of (ttSnapRows || []) as any[]) {
+    const cid = String(r.entity_ref || '');
+    const ct = Number((r.metrics || {}).createTime || 0);
+    if (!cid || !ct) continue;
+    const iso = new Date(ct * 1000).toISOString();
+    if (iso < win.startIso || iso >= win.endIso) continue;
+    const cur = byCid.get(cid);
+    if (!cur) byCid.set(cid, { fbUrl: '', url: String((r.metrics || {}).shareUrl || ''), publishedAt: iso, channels: new Set(['tiktok']) });
+    else cur.channels.add('tiktok');
   }
   const cids = [...byCid.keys()];
   if (!cids.length) return [];
 
-  // 2. Snapshot mkt_metrics MỚI NHẤT trong tuần cho mỗi bài (không lấy snapshot sau tuần).
+  // 2. Snapshot MỚI NHẤT TRONG TUẦN của mỗi (bài, nền tảng) — cộng dồn ở bước 4.
   const { data: metricRows } = await client
     .from('mkt_metrics')
-    .select('entity_ref, metrics, created_at')
-    .eq('source', 'facebook')
+    .select('entity_ref, source, metrics, created_at')
+    .in('source', ['facebook', 'youtube', 'tiktok'])
     .in('entity_ref', cids)
     .lt('created_at', win.endIso)                           // không lấy snapshot sau tuần
     .gte('created_at', win.startIso)                        // chỉ lấy snapshot trong tuần
     .order('created_at', { ascending: false })
-    .limit(2000);
-  const latest = new Map<string, PostMetric>();
+    .limit(3000);
+  const latestBySrc = new Map<string, any>();
   for (const r of metricRows || []) {
-    const cid = (r as any).entity_ref as string | null;
-    if (!cid || latest.has(cid)) continue;
-    const m = ((r as any).metrics || {}) as any;
-    latest.set(cid, {
-      reactions: Number(m.reactions) || 0,
-      comments: Number(m.comments) || 0,
-      shares: Number(m.shares) || 0,
-      engagement: Number(m.engagement) || (Number(m.reactions) || 0) + (Number(m.comments) || 0) + (Number(m.shares) || 0),
-      views: Number(m.views) || 0,
-      watchSec: Number(m.watchSec) || 0,
-      reach: Number(m.reach) || 0
-    });
+    const k = `${(r as any).entity_ref}|${(r as any).source}`;
+    if (!latestBySrc.has(k)) latestBySrc.set(k, (r as any).metrics || {});
   }
 
   // 3. mkt_content để lấy title, brief (sản phẩm + kind + conversions). 28/8: bỏ bài đã
@@ -214,19 +235,32 @@ async function loadPostsInWindow(client: Client, win: WeekWindow): Promise<PostS
     leadsPerContent.set(id, (leadsPerContent.get(id) || 0) + 1);
   }
 
-  // 28/8 (user "tắt kênh phụ" + "ghép link SDVICOVN phải vào cả báo cáo tuần"): tuần chỉ
-  // tính bài KÊNH CHÍNH — có brief.fb_real_url (ghép tay) hoặc vốn của page chính (import).
-  // Bài máy đăng chỉ nằm page phụ bị BỎ khỏi tuần (số 0 của nó kéo lệch trung bình mà BOSS
-  // học theo). Link ưu tiên fb_real_url. Content đã xoá mềm không có trong `contents` -> bỏ.
+  // 4. GỘP số 3 nền tảng theo bài. FB chỉ tính khi bài thuộc KÊNH CHÍNH (fb_real_url ghép tay
+  // hoặc import từ page chính — 28/8 "tắt kênh phụ"); bài CHỈ có bản FB page phụ và không lên
+  // YouTube/TikTok thì bỏ khỏi tuần. Content đã xoá mềm không có trong `contents` -> bỏ.
+  const num = (x: any, k: string) => Number(x?.[k]) || 0;
   const posts: PostScore[] = [];
   for (const cid of cids) {
-    const p = byCid.get(cid)!;
+    const e = byCid.get(cid)!;
     const c = contents.get(cid);
     if (!c) continue;
     const realUrl = String(c.brief?.fb_real_url || '');
-    const other = !!(isOtherPage as (u: string, b: any) => boolean)(p.url, c.brief);
-    if (!realUrl && !other) continue;
-    const m: PostMetric = latest.get(cid) || { reactions: 0, comments: 0, shares: 0, engagement: 0, views: 0, watchSec: 0, reach: 0 };
+    const fbIsMain = !!realUrl || (!!e.fbUrl && !!(isOtherPage as (u: string, b: any) => boolean)(e.fbUrl, c.brief));
+    const hasOtherPlatform = e.channels.has('youtube') || e.channels.has('tiktok');
+    if (!fbIsMain && !hasOtherPlatform) continue; // chỉ có bản FB page phụ -> bỏ
+    const fbM = fbIsMain ? latestBySrc.get(`${cid}|facebook`) : null;
+    const ytM = latestBySrc.get(`${cid}|youtube`);
+    const ttM = latestBySrc.get(`${cid}|tiktok`);
+    const m: PostMetric = {
+      reactions: num(fbM, 'reactions') + num(ytM, 'reactions') + num(ttM, 'reactions'),
+      comments: num(fbM, 'comments') + num(ytM, 'comments') + num(ttM, 'comments'),
+      shares: num(fbM, 'shares') + num(ttM, 'shares'),
+      engagement: 0,
+      views: num(fbM, 'views') + num(ytM, 'views') + num(ttM, 'views'),
+      watchSec: num(fbM, 'watchSec'),
+      reach: num(fbM, 'reach')
+    };
+    m.engagement = m.reactions + m.comments + m.shares;
     const product = productOf(c.brief, c.title, c.draft);
     const { isContent, contentType } = kindOf(c.brief);
     const leadCount = leadsPerContent.get(cid) || 0;
@@ -236,12 +270,12 @@ async function loadPostsInWindow(client: Client, win: WeekWindow): Promise<PostS
       product,
       isContent,
       contentType,
-      publishedAt: p.publishedAt || null,
-      url: realUrl || p.url,
+      publishedAt: e.publishedAt || null,
+      url: realUrl || (fbIsMain ? e.fbUrl : '') || e.url,
       m,
       conversions: (Number(c.brief?.conversions) || 0) + leadCount,
       score: scoreOf(m),
-      otherPage: other
+      otherPage: fbIsMain && !realUrl
     });
   }
   return posts;

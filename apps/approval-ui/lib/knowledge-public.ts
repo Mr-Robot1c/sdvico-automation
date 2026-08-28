@@ -148,7 +148,7 @@ export async function learnPublicKnowledge(
   client: Client
 ): Promise<{ topics: number; found: number; inserted: number; errors: string[]; skipped?: boolean }> {
   // Guard: đã chạy trong 48h qua chưa?
-  const gate = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+  const gate = new Date(Date.now() - 24 * 3600 * 1000).toISOString(); // 29/8 user: quet sau MOI NGAY (truoc 48h)
   const { data: ranRecent } = await client
     .from('run_log')
     .select('id')

@@ -408,7 +408,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               {todayPlan.direction ? (
                 <>
                   {todayPlan.direction.title}
-                  <span className="sub"> — {todayPlan.direction.variant === 'AB' ? 'bản A ra 7h, bản B ra 12h30' : `bản thử ${todayPlan.direction.variant}`}</span>
+                  <span className="sub"> — {todayPlan.direction.variant === 'AB' ? 'ra khung 8h/14h' : 'ra theo khung 8h/14h'}</span>
                   {todayPlan.direction.done ? <span className="badge tone-ok" style={{ marginLeft: 6 }}>✓ đã sinh</span> : null}
                 </>
               ) : (todayPlan.sales.length
@@ -416,7 +416,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 : 'không có bài bán hôm nay')}
             </div>
             <div>
-              <b>🕐 Content 12h30:</b> <span title={todayPlan.contentStructure || ''}>{todayPlan.contentKindLabel || vnInt(todayPlan.contentCount)}</span>
+              <b>🕐 Content 14h:</b> <span title={todayPlan.contentStructure || ''}>{todayPlan.contentKindLabel || vnInt(todayPlan.contentCount)}</span>
               {(todayPlan as any).contentPurpose ? <span className="sub"> — để {(todayPlan as any).contentPurpose}</span> : null}
             </div>
             <div>
@@ -424,7 +424,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               {todayPlan.groups.length ? todayPlan.groups.join(', ') : (shareGroups.length ? 'nghỉ hôm nay' : 'chưa nhập nhóm (mở Cài đặt bên dưới)')}
             </div>
             <p className="sub" style={{ margin: 0 }}>
-              Máy tự sinh lúc 7h và 12h30 rồi chờ trong Hàng đợi duyệt. Người bấm Duyệt và tự tay chia sẻ vào nhóm (Facebook không cho máy đăng nhóm).
+              Máy tự sinh lúc 8h và 14h rồi chờ trong Hàng đợi duyệt. Người bấm Duyệt và tự tay chia sẻ vào nhóm (Facebook không cho máy đăng nhóm).
             </p>
           </div>
         ) : (
@@ -516,7 +516,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                         <tbody>
                           <tr>
                             {/* 29/8: bỏ A/B — sáng 1 bài bán theo hướng đi, trưa 1 bài bán khác + content. */}
-                            <td style={{ whiteSpace: 'nowrap', width: 130 }}><b>🕗 7h — Bài bán 1</b><div className="sub">theo hướng đi</div></td>
+                            <td style={{ whiteSpace: 'nowrap', width: 130 }}><b>🕗 8h — Bài bán 1</b><div className="sub">theo hướng đi</div></td>
                             <td>
                               <b>{dayTitle}</b>
                               <div className="sub">{dayProduct}</div>
@@ -529,7 +529,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                             <td className="sub" style={{ whiteSpace: 'nowrap' }}>FB Post+Reel · YT Shorts · TikTok</td>
                           </tr>
                           <tr>
-                            <td style={{ whiteSpace: 'nowrap' }}><b>🕐 12h30 — Bài bán 2</b><div className="sub">hướng đi kế tiếp</div></td>
+                            <td style={{ whiteSpace: 'nowrap' }}><b>🕐 14h — Bài bán 2</b><div className="sub">hướng đi kế tiếp</div></td>
                             <td>
                               Hướng đi <b>khác</b> trong kế hoạch tuần, xoáy insight mới
                               {d.date === today && insightsByVariant.get('B') ? (
@@ -539,7 +539,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                             <td className="sub" style={{ whiteSpace: 'nowrap' }}>FB Post+Reel · YT Shorts · TikTok</td>
                           </tr>
                           <tr>
-                            <td style={{ whiteSpace: 'nowrap' }}><b>🕐 12h30 — Content</b><div className="sub">{kind}</div></td>
+                            <td style={{ whiteSpace: 'nowrap' }}><b>🕐 14h — Content</b><div className="sub">{kind}</div></td>
                             <td>
                               {(d as any).contentPurpose ? <>Mục đích: <b>{(d as any).contentPurpose}</b></> : <span className="sub">(theo lịch tuần)</span>}
                               {(d as any).contentStructure ? <div className="sub">Cấu trúc: {(d as any).contentStructure}</div> : null}

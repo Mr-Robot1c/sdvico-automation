@@ -383,7 +383,7 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
 // Tối (>=19h VN, user 24/8 dời từ 21h)? Dùng để cron biết có tự áp dụng đề xuất sống hôm nay chưa.
 export function isEveningVN(now: Date = new Date()): boolean {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-  return vn.getUTCHours() >= 19;
+  return vn.getUTCHours() >= 20; // 29/8 user doi 19h -> 20h
 }
 
 function vnDayStartIso(now: Date): string {

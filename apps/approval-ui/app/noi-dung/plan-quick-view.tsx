@@ -66,7 +66,7 @@ export default function PlanQuickView({ todayPlan }: { todayPlan: TodayPlan }) {
         <table className="datatable" style={{ margin: 0 }}>
           <tbody>
             <tr>
-              <td style={{ whiteSpace: 'nowrap', width: 130 }}><b>🕗 7h — Bản A</b><div className="sub">bài bán</div></td>
+              <td style={{ whiteSpace: 'nowrap', width: 130 }}><b>🕗 8h — Bài bán 1</b><div className="sub">theo hướng đi</div></td>
               <td>
                 <b>{dirTitle}</b>
                 {todayPlan.direction?.product ? <div className="sub">{todayPlan.direction.product}</div> : null}
@@ -74,11 +74,11 @@ export default function PlanQuickView({ todayPlan }: { todayPlan: TodayPlan }) {
               </td>
             </tr>
             <tr>
-              <td style={{ whiteSpace: 'nowrap' }}><b>🕐 12h30 — Bản B</b><div className="sub">bài bán A/B</div></td>
+              <td style={{ whiteSpace: 'nowrap' }}><b>🕐 14h — Bài bán 2</b><div className="sub">hướng đi kế tiếp</div></td>
               <td>Cùng hướng, xoáy insight khác để so bản nào bà con thích hơn.</td>
             </tr>
             <tr>
-              <td style={{ whiteSpace: 'nowrap' }}><b>🕐 12h30 — Content</b><div className="sub">{todayPlan.contentKindLabel || 'Content'}</div></td>
+              <td style={{ whiteSpace: 'nowrap' }}><b>🕐 14h — Content</b><div className="sub">{todayPlan.contentKindLabel || 'Content'}</div></td>
               <td>
                 {todayPlan.contentPurpose ? <>Mục đích: <b>{todayPlan.contentPurpose}</b></> : <span className="sub">(theo lịch tuần)</span>}
                 {todayPlan.contentStructure ? <div className="sub">Cấu trúc: {todayPlan.contentStructure}</div> : null}

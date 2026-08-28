@@ -33,7 +33,7 @@ export default function GeneratePostsButton({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="btn ok" type="button" onClick={run} disabled={state === 'busy'}
-          title="Sinh 1 đợt bài (A + B + content) theo kế hoạch đang áp NGAY, bỏ qua chờ cron 7h/12h30. Bài vào Hàng đợi duyệt, không tự đăng.">
+          title="Sinh 1 đợt bài (bài bán + content) theo kế hoạch đang áp NGAY, bỏ qua chờ cron 8h/14h. Bài vào Hàng đợi duyệt, không tự đăng.">
           {state === 'busy' ? '⏳ Đang sinh bài...' : '🔄 Sinh bài ngay theo kế hoạch'}
         </button>
         <span className="sub">Bỏ qua chờ cron — bài vào Hàng đợi duyệt để bạn bấm Duyệt.</span>
