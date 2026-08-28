@@ -25,9 +25,13 @@ import threading
 import soundfile as sf
 from flask import Flask, jsonify, request, Response
 
-VOICE = os.environ.get("SDVICO_TTS_VOICE", "Thùy Dung")
+VOICE = os.environ.get("SDVICO_TTS_VOICE", "Mỹ Duyên")  # user chốt 28/8: "thích giọng này nhất"
 PORT = int(os.environ.get("SDVICO_TTS_PORT", "8199"))
 SAMPLE_RATE = 48000
+# User 28/8: "điều chỉnh cho nó đọc cảm xúc lên xuống". temperature mặc định 0.8 của VieNeu
+# đọc hơi đều; 1.0 cho ngữ điệu lên xuống rõ hơn mà chưa sinh artifact. Chỉnh qua env nếu cần.
+TEMPERATURE = float(os.environ.get("SDVICO_TTS_TEMP", "1.0"))
+TOP_P = float(os.environ.get("SDVICO_TTS_TOP_P", "0.95"))
 
 print(f"[vieneu] dang nap model (giong: {VOICE})...", flush=True)
 from vieneu import Vieneu  # noqa: E402 — import sau print để log sớm khi khởi động chậm
@@ -42,7 +46,7 @@ lock = threading.Lock()  # 1 infer mỗi lúc, tránh tranh CPU khi Watcher gọ
 
 @app.get("/health")
 def health():
-    return jsonify({"ok": True, "engine": "vieneu-v3-turbo", "voice": VOICE, "model": "pnnbao-ump/VieNeu-TTS-v3-Turbo"})
+    return jsonify({"ok": True, "engine": "vieneu-v3-turbo", "voice": VOICE, "temperature": TEMPERATURE, "model": "pnnbao-ump/VieNeu-TTS-v3-Turbo"})
 
 
 @app.post("/tts")
@@ -52,7 +56,7 @@ def tts_route():
     if not text:
         return jsonify({"ok": False, "error": "thieu text"}), 400
     with lock:
-        wav = tts.infer(text, voice=VOICE)
+        wav = tts.infer(text, voice=VOICE, temperature=TEMPERATURE, top_p=TOP_P)
     buf = io.BytesIO()
     sf.write(buf, wav, SAMPLE_RATE, format="WAV")
     return Response(buf.getvalue(), mimetype="audio/wav")

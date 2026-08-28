@@ -305,13 +305,14 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
   // GIỌNG NGUYÊN KHỐI: thử Gemini TTS cho TOÀN BỘ cảnh + outro của bản này; bất kỳ cảnh nào
   // hỏng (hết hạn mức...) thì làm lại HẾT bằng edge-tts — không để video lẫn 2 giọng giữa chừng.
   // 28/8 (sep che giong edge): chen tang TTS LOCAL (env TTS_LOCAL_URL — server local giong
-  // Viet chat luong cao, contract POST /tts {"text"} -> audio/wav) giua gemini va edge.
-  // Chuoi: gemini -> local -> edge; TTS_ENGINE=edge ep edge; ca video luon MOT giong.
+  // Viet chat luong cao, contract POST /tts {"text"} -> audio/wav).
+  // 28/8 chieu (user chot giong My Duyen VieNeu): LOCAL LEN DAU — video sau nay lay giong nay,
+  // gemini thanh du phong. Chuoi: local -> gemini -> edge; TTS_ENGINE=edge ep edge; MOT giong/video.
   const engines = process.env.TTS_ENGINE === 'edge'
     ? ['edge']
     : [
-        ...(process.env.GEMINI_API_KEY ? ['gemini'] : []),
         ...(process.env.TTS_LOCAL_URL ? ['local'] : []),
+        ...(process.env.GEMINI_API_KEY ? ['gemini'] : []),
         'edge',
       ];
   const outroAudio = join(fdir, 'outro.mp3');
@@ -678,14 +679,14 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
     audioPaths.push(join(workDir, `scene${sceneNo}_audio.mp3`));
   }
 
-  // 2. TTS theo CHUOI ENGINE (28/8 sep che edge): gemini -> local (TTS_LOCAL_URL, giong Viet
-  //    chat luong cao tren may nay) -> edge. Moi engine thu TOAN BO canh; fail 1 canh nao la
-  //    bo ca pass, sang engine ke — ca video luon MOT giong.
+  // 2. TTS theo CHUOI ENGINE: local (TTS_LOCAL_URL, giong My Duyen user chot 28/8) -> gemini
+  //    -> edge. Moi engine thu TOAN BO canh; fail 1 canh nao la bo ca pass, sang engine ke —
+  //    ca video luon MOT giong.
   const trendEngines = process.env.TTS_ENGINE === 'edge'
     ? ['edge']
     : [
-        ...(process.env.GEMINI_API_KEY ? ['gemini'] : []),
         ...(process.env.TTS_LOCAL_URL ? ['local'] : []),
+        ...(process.env.GEMINI_API_KEY ? ['gemini'] : []),
         'edge',
       ];
   let usedEngine = 'edge';

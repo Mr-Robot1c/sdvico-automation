@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 90
+<!-- re-verified: 2026-08-28 20:30 - CHUOI GIONG VIDEO DOI HANH VI (user chot giong My Duyen local): build-video.mjs ca 2 duong doi thu tu engine thanh local -> gemini -> edge (truoc gemini dau). Video tu gio mac dinh giong local My Duyen; gemini/edge chi la du phong. Cac NV/AC khac cua ke hoach AI v2 khong doi. -->
 <!-- re-verified: 2026-08-28 19:50 - Doi chieu them file local-tts-server-vieneu.py (packages/marketing/src/voice): CHI la server HTTP giong local moi (VieNeu thay F5), cung contract /tts nen khong doi hanh vi NV/AC nao cua ke hoach AI v2 — chain giong video van gemini -> local -> edge nhu spec. -->
 <!-- re-verified: 2026-08-28 10:20 - TTS doc ten cong ty: cleanNarration them replace /SDVICO/gi -> "SD Vi Co" (user 28/8: doc "SD Vi Co" chu khong danh van "SD Vi C O"). Ap moi duong giong doc (gemini + edge + outro) vi tat ca deu qua cleanNarration; phu de/banner giu nguyen chu SDVICO. -->
 <!-- re-verified: 2026-08-28 17:40 - Voice server local (packages/marketing/src/voice/local-tts-server.py) da cai + chay tren may chu; TTS_LOCAL_URL da vao .env checkout chinh. -->
