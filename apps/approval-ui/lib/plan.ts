@@ -329,8 +329,11 @@ export async function loadMeasurement(client: Client): Promise<Measurement> {
 // prompt sinh hướng mới để Gemini KHÔNG lặp lại chủ đề na ná (21/8: hướng "Lap dat may loc
 // dau kip chuyen bien" trùng ý hướng vừa chạy hôm trước, dedupe theo title không bắt được).
 export async function loadRecentDirectionTitles(client: Client): Promise<string[]> {
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  // 1. Tiêu đề hướng đi của các bài ĐÃ ĐĂNG 7 ngày qua.
+  // 28/8 (tháng tập trung 2 sản phẩm): cửa sổ né trùng 7 -> 14 ngày. Cả tháng chỉ viết về
+  // lọc dầu + lọc nước thì hướng tuần trước rất dễ được sinh lại tuần sau với tiêu đề hơi
+  // khác; cho Gemini thấy đủ 2 tuần gần nhất để buộc đổi góc thật.
+  const sevenDaysAgo = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+  // 1. Tiêu đề hướng đi của các bài ĐÃ ĐĂNG 14 ngày qua.
   const { data: posted } = await client
     .from('mkt_content')
     .select('brief')
@@ -348,7 +351,8 @@ export async function loadRecentDirectionTitles(client: Client): Promise<string[
   const planTitles: string[] = Array.isArray((applied as any)?.data?.content_suggestions)
     ? (applied as any).data.content_suggestions.map((s: any) => String(s.title || '').trim()).filter(Boolean)
     : [];
-  return [...new Set([...planTitles, ...postedTitles])].slice(0, 30);
+  // 14 ngày x 3 bài bán/ngày ~ 42 tiêu đề + hướng trong plan đang áp -> nới trần 30 -> 45.
+  return [...new Set([...planTitles, ...postedTitles])].slice(0, 45);
 }
 
 // Thứ 4 (3) hoặc chủ nhật (0) theo giờ Việt Nam. Nhịp CŨ, giữ cho tương thích chỗ khác gọi.

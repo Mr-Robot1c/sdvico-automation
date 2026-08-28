@@ -197,7 +197,8 @@ Nhiệm vụ chi tiết: dựa vào NHỮNG GÌ ĐANG XẢY RA (tri thức trên
 QUY TẮC CHỐNG TRÙNG (BẮT BUỘC):
 - Mỗi hướng phải xoáy vào MỘT nỗi lo / góc nhìn KHÁC NHAU của bà con. Ví dụ với cùng máy lọc dầu: một hướng về tiết kiệm tiền dầu, một hướng về máy bền đỡ hỏng giữa biển, một hướng về lắp đặt tận nơi — KHÔNG được 3 hướng đều nói "lắp đặt lọc dầu".
 - KHÔNG được có 2 hướng cùng sản phẩm mà thông điệp na ná nhau. Nếu 2 sản phẩm tập trung, chia đều mỗi sản phẩm vài góc khác biệt.
-- Tránh mọi tiêu đề trùng hoặc gần giống "CÁC HƯỚNG ĐÃ CÓ" ở trên.
+- Tránh mọi tiêu đề trùng hoặc gần giống "CÁC HƯỚNG ĐÃ CÓ" ở trên — và tránh cả GÓC đã dùng: nhìn danh sách đó để đoán góc nào vừa chạy (tiền, sự cố, lắp đặt...) rồi chọn góc KHÁC, không phải chỉ đổi chữ trên tiêu đề.
+- THÁNG TẬP TRUNG ÍT SẢN PHẨM (mục tiêu chỉ nêu 1-2 sản phẩm): đây là lúc dễ loãng nhất vì tuần nào cũng viết về cùng món đồ. Rải các hướng của MỖI sản phẩm qua các Ô GÓC khác nhau, mỗi tuần đào sâu một mặt chưa kể: (1) sự cố kỹ thuật giữa biển, (2) tiền bạc và con số tiết kiệm mỗi chuyến, (3) người thật việc thật (chuyện lắp đặt, khách kể), (4) so sánh lựa chọn (chạy điện hay cơ, lọc hay thay), (5) mùa vụ thời điểm (con nước, mùa gió), (6) hỏi đáp kỹ thuật, (7) hậu trường xưởng và tay nghề. Nếu mục tiêu quản lý có ghi thang góc theo tuần thì tuần này bám ĐÚNG nấc thang của tuần đó.
 
 3 LỖI CHẾT NGƯỜI TUYỆT ĐỐI TRÁNH:
 1. Bán hàng quá sớm (chèn "sắm ngay X" ở câu mở) - não gắn nhãn quảng cáo, bà con lướt

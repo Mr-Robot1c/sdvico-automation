@@ -129,7 +129,13 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
   const cids = [...byCid.keys()];
   if (!cids.length) return [];
 
-  const { data: contents } = await client.from('mkt_content').select('id, title, brief, draft').in('id', cids);
+  // 28/8 chiều (user: blog hiện bài đã bỏ vào Thùng rác): lọc deleted_at — trước đây bài
+  // soft-delete vẫn nằm trên blog vì query này không nhìn cột đó.
+  const { data: contents } = await client
+    .from('mkt_content')
+    .select('id, title, brief, draft')
+    .in('id', cids)
+    .is('deleted_at', null);
 
   // 28/8 (user: "cac hinh anh da mat tieu"): nhieu bai (bai video, bai trend, bai nhap tay)
   // KHONG co brief.assets.image -> card blog roi ve placeholder logo het. Fallback: lay anh
@@ -137,26 +143,38 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
   // contentId de moi bai 1 anh co dinh giua cac lan render. Van con thieu -> folder Content.
   const { data: poolRows } = await client
     .from('brand_assets')
-    .select('id, storage_path, product_group')
+    .select('id, storage_path, product_group, source')
     .eq('kind', 'image')
     .not('product_group', 'eq', 'Bài trend')
     .order('created_at', { ascending: false })
     .limit(300);
+  type PoolImg = { storage_path: string; source?: string | null };
   const normName = (s: string) => String(s || '').replace(/^\s*\d+\.\s*/, '').trim().toLowerCase();
-  const poolByGroup = new Map<string, Array<{ storage_path: string }>>();
-  const poolAll: Array<{ storage_path: string }> = [];
+  const poolByGroup = new Map<string, PoolImg[]>();
+  const poolAll: PoolImg[] = [];
   for (const a of (poolRows || []) as any[]) {
     const g = normName(a.product_group);
     if (!poolByGroup.has(g)) poolByGroup.set(g, []);
     poolByGroup.get(g)!.push(a);
     poolAll.push(a);
   }
-  const stablePick = (arr: Array<{ storage_path: string }>, cid: string) => {
+  // 28/8 chiều (user: 2 bài không liên quan cùng mang ảnh Zalo ăn mì): ảnh nhập từ Zalo là
+  // ảnh chat đời thường — CHỈ được làm cover khi nằm ĐÚNG folder sản phẩm của bài (ảnh lắp
+  // đặt thật); tuyệt đối không vào pool dự phòng CHUNG. Pool chung cạn thì thà placeholder logo.
+  const noZalo = (arr: PoolImg[]) => arr.filter((a) => a.source !== 'zalo');
+  const publicUrlOf = (sp: string) => client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  // Chống TRÙNG ảnh giữa các thẻ trong cùng một trang danh sách (user 28/8 chụp 2 card y hệt):
+  // ảnh nào đã cấp cho 1 bài thì bài sau dò tiếp vị trí kế trong pool; pool cạn mới cho lặp.
+  const usedCovers = new Set<string>();
+  const stablePick = (arr: PoolImg[], cid: string) => {
     if (!arr.length) return null;
     const n = parseInt(cid.replace(/-/g, '').slice(0, 8), 16) || 0;
-    return arr[n % arr.length];
+    for (let k = 0; k < arr.length; k++) {
+      const cand = arr[(n + k) % arr.length];
+      if (!usedCovers.has(publicUrlOf(cand.storage_path))) return cand;
+    }
+    return arr[n % arr.length]; // toàn pool đã dùng — chấp nhận lặp còn hơn trống
   };
-  const publicUrlOf = (sp: string) => client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
 
   const posts: PublicPost[] = [];
   for (const c of contents || []) {
@@ -171,13 +189,15 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
     let imageUrl = String(brief?.assets?.image_url || '') || await imageUrlOf(client, brief?.assets?.image);
     if (!imageUrl) {
       const prodKey = normName(productOf(brief, title, draft));
-      const pool = poolByGroup.get(prodKey)
-        || [...poolByGroup.entries()].find(([g]) => g && (prodKey.includes(g) || g.includes(prodKey)))?.[1]
-        || poolByGroup.get('content')
-        || poolAll;
+      const prodPool = poolByGroup.get(prodKey)
+        || [...poolByGroup.entries()].find(([g]) => g && (prodKey.includes(g) || g.includes(prodKey)))?.[1];
+      const pool = (prodPool && prodPool.length)
+        ? prodPool
+        : (() => { const generic = noZalo(poolByGroup.get('content') || []); return generic.length ? generic : noZalo(poolAll); })();
       const pick = stablePick(pool, id);
       if (pick) imageUrl = publicUrlOf(pick.storage_path);
     }
+    if (imageUrl) usedCovers.add(imageUrl);
     posts.push({
       contentId: id,
       slug: `${slugify(title)}-${id.slice(0, 8)}`,
