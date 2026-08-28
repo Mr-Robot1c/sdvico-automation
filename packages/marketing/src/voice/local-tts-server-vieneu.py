@@ -22,6 +22,7 @@ import io
 import os
 import threading
 
+import numpy as np
 import soundfile as sf
 from flask import Flask, jsonify, request, Response
 
@@ -35,6 +36,12 @@ TOP_P = float(os.environ.get("SDVICO_TTS_TOP_P", "0.95"))
 # 28/8 tối: user thử nhanh 10% (librosa time_stretch) nhưng chê "rè và dở" -> mặc định 1.0
 # (tốc độ gốc, không qua time_stretch). Cơ chế giữ lại, chỉnh env/"speed" từng lần nếu cần.
 SPEED = float(os.environ.get("SDVICO_TTS_SPEED", "1.0"))
+# 29/8 (user: "giọng cứ bị lặp / mỗi video một giọng"): đường CPU của VieNeu lấy mẫu bằng
+# np.random.choice — không seed thì mỗi lần gọi (mỗi cảnh, mỗi video) trạng thái ngẫu nhiên
+# khác nhau, màu giọng dao động nghe như đổi giọng. SEED CỐ ĐỊNH trước MỖI lần infer để mọi
+# cảnh/video cùng một "màu"; phạt lặp nâng 1.2 -> 1.35 để bớt lặp âm cuối câu.
+SEED = int(os.environ.get("SDVICO_TTS_SEED", "42"))
+REP_PENALTY = float(os.environ.get("SDVICO_TTS_REP_PENALTY", "1.35"))
 
 print(f"[vieneu] dang nap model (giong: {VOICE})...", flush=True)
 from vieneu import Vieneu  # noqa: E402 — import sau print để log sớm khi khởi động chậm
@@ -62,7 +69,9 @@ def tts_route():
     # temperature/top_p/voice theo TỪNG lần gọi (build-video map theo loại bài). Kẹp biên
     # để giá trị lạ không phá giọng; sai kiểu thì rơi về mặc định.
     try:
-        temp = min(1.3, max(0.6, float(data.get("temperature") or TEMPERATURE)))
+        # 29/8: trần hạ 1.3 -> 1.0 — trên 1.0 giọng dao động mạnh giữa các lần gọi (nghe như
+        # đổi giọng giữa các cảnh/video) và dễ lặp âm.
+        temp = min(1.0, max(0.6, float(data.get("temperature") or TEMPERATURE)))
     except (TypeError, ValueError):
         temp = TEMPERATURE
     try:
@@ -79,10 +88,10 @@ def tts_route():
     except (TypeError, ValueError):
         speed = SPEED
     with lock:
-        wav = tts.infer(text, voice=voice, temperature=temp, top_p=top_p)
+        np.random.seed(SEED)  # cùng seed mọi lần gọi -> màu giọng nhất quán giữa cảnh/video
+        wav = tts.infer(text, voice=voice, temperature=temp, top_p=top_p, repetition_penalty=REP_PENALTY)
     if abs(speed - 1.0) > 0.01:
         import librosa  # có sẵn trong deps vieneu; giữ tông, chỉ đổi nhịp
-        import numpy as np
         wav = librosa.effects.time_stretch(np.asarray(wav, dtype="float32"), rate=speed)
     buf = io.BytesIO()
     sf.write(buf, wav, SAMPLE_RATE, format="WAV")

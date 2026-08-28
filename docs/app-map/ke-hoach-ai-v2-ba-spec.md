@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 90
+<!-- re-verified: 2026-08-29 09:10 - Doi chieu fix seed + dai temperature giong local: thuan chat luong giong doc, NV/AC khong doi. -->
 <!-- re-verified: 2026-08-29 08:20 - Doi chieu fix nhan log giong build-video: thuan hien thi, NV/AC khong doi. -->
 <!-- re-verified: 2026-08-29 06:50 - Doi chieu env.mjs fix + hen gio published_at: ky thuat nap env + ghi so, NV/AC khong doi. -->
 <!-- re-verified: 2026-08-29 05:40 - 70/30 doi sang ty le mem (chi doi loi dan prompt winnersBlock); chay thu rotate sau khi bo A/B PASS. NV/AC khong doi them. -->

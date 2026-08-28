@@ -194,15 +194,18 @@ async function geminiTTSWithRetry(cleanText, outPath, workDir, tag) {
 // BIỂU CẢM THEO LOẠI BÀI (user 28/8: "thêm biểu cảm cho từng loại bài để không 1 màu").
 // temperature VieNeu: cao = ngữ điệu dao động mạnh (sôi nổi), thấp = đều đặn nghiêm túc.
 // Đặt 1 lần cho mỗi bài (voiceStyle) trước khi dựng; localTTS gửi kèm mỗi lần gọi.
+// 29/8 (user: "giọng lặp / mỗi video một giọng"): temperature >1.0 làm màu giọng dao động
+// mạnh giữa các lần gọi + dễ lặp âm -> HẠ cả dải về 0.8–1.0 (server cũng kẹp trần 1.0 và
+// seed cố định). Vẫn phân biệt loại bài nhưng trong vùng an toàn.
 let voiceStyle = null;
 function voiceStyleOf(brief = {}, needsGov = false) {
   const emo = String(brief.emotion || '').toUpperCase();
   if (needsGov) return { temperature: 0.8, label: 'nghiem tuc (bai quy dinh)' };
-  if (emo.includes('RỦI RO')) return { temperature: 0.9, label: 'canh bao (RUI RO)' };
-  if (emo.includes('TỰ HÀO')) return { temperature: 1.15, label: 'hao hung (TU HAO)' };
-  if (brief.generator === 'trend') return { temperature: 0.9, label: 'tin tuc ro rang' };
-  if (brief.post_kind === 'content') return { temperature: 0.95, label: 'am, ke chuyen' };
-  return { temperature: 1.1, label: 'soi noi (ban hang)' };
+  if (emo.includes('RỦI RO')) return { temperature: 0.85, label: 'canh bao (RUI RO)' };
+  if (emo.includes('TỰ HÀO')) return { temperature: 1.0, label: 'hao hung (TU HAO)' };
+  if (brief.generator === 'trend') return { temperature: 0.85, label: 'tin tuc ro rang' };
+  if (brief.post_kind === 'content') return { temperature: 0.9, label: 'am, ke chuyen' };
+  return { temperature: 1.0, label: 'soi noi (ban hang)' };
 }
 
 async function localTTS(cleanText, outPath, workDir, tag) {
