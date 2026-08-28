@@ -114,6 +114,14 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
   const scanPrev = ((scanRows || []).find((r: any) => r.created_at < win.startIso) as any)?.metrics || null;
 
   const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
+  // 29/8 (user: "các nền tảng thêm ngày đăng và giờ đăng cho sếp biết"): giờ VN "HH:mm · dd/MM".
+  const fmtDT = (iso: string) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const p = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hourCycle: 'h23' }).formatToParts(d);
+    const g = (t: string) => p.find((x) => x.type === t)?.value || '';
+    return `${g('hour')}:${g('minute')} · ${g('day')}/${g('month')}`;
+  };
   const deltaStr = (v: number) => v === 0 ? null : (
     <span className={`sub ${v > 0 ? 'delta-up' : 'delta-down'}`} style={{ fontSize: '.85rem', marginLeft: 6 }}>
       {v > 0 ? '▲' : '▼'} {Math.abs(v)}%
@@ -342,7 +350,10 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
                           const link = linkOf(r);
                           return (
                             <tr key={`${r.cid}-${r.channel}`}>
-                              <td className="cell-title"><b>{r.title}</b></td>
+                              <td className="cell-title">
+                                <b>{r.title}</b>
+                                {r.publishedAt ? <div className="sub" style={{ fontSize: '.78rem' }}>Đăng {fmtDT(r.publishedAt)}</div> : null}
+                              </td>
                               <td className="num">{r.views != null ? fmt(r.views) : '—'}</td>
                               <td className="num">{vnInt(r.reactions)}</td>
                               <td className="num">{vnInt(r.comments)}</td>
