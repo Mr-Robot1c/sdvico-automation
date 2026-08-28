@@ -13,8 +13,9 @@ type Group = { title: string; items: Tab[] };
 export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean }) {
   const path = usePathname();
 
+  // 28/8 (user): bo nhan "SDVICO Ops" tren sidebar — brand logo ngay tren da du.
   const main: Group = {
-    title: 'SDVICO Ops',
+    title: '',
     items: [
       { href: '/tong-quan', label: 'Tổng quan', icon: '📊', also: ['/noi-dung', '/ke-hoach', '/khach-hang', '/hang-doi'] },
       { href: '/video', label: 'Video', icon: '🎬', also: ['/san-xuat', '/tu-lieu'] },
@@ -50,9 +51,9 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
 
   return (
     <nav className="nav-groups" aria-label="Điều hướng chính">
-      {groups.map((g) => (
-        <div className="nav-block" key={g.title}>
-          <div className="nav-group">{g.title}</div>
+      {groups.map((g, gi) => (
+        <div className="nav-block" key={g.title || `g${gi}`}>
+          {g.title ? <div className="nav-group">{g.title}</div> : null}
           <div className="tabs">
             {g.items.map((t) =>
               t.external ? (
