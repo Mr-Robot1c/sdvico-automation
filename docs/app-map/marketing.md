@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-28
 ttl_days: 180
+<!-- re-verified: 2026-08-29 01:10 - fb-suite-scan.mjs: them syncSession (muon cookie Brave hang ngay, chi doc), loop doi sang quet moi 2h + rinh chop cookie 5 phut/lan khi chua co ban; bo state file last-scan. Chi tiet README.md cung gio. -->
 <!-- re-verified: 2026-08-29 00:45 - fb-suite-scan.mjs thoat bang process.exitCode thay process.exit (tren Windows process.exit giet ngang handle mang dang dong -> node crash "Assertion failed UV_HANDLE_CLOSING"). Da test that: chay khi chua dang nhap -> exit 1 sach + run_log bao "CHUA DANG NHAP". Hanh vi quet khong doi. -->
 <!-- re-verified: 2026-08-29 00:20 - THEM fb-suite-scan.mjs (bo quet Business Suite chay may chu local, khong chay Vercel): dump-dom Brave headless profile rieng -> boc insight cap trang SDVICO VN -> ghi mkt_metrics __page_real__ suite28. Chi tiet o README.md re-verify cung gio. Khong dung toi cac script khac cua packages/marketing. -->
 <!-- re-verified: 2026-08-28 23:20 - HOAN TOC DO VE 1.0: user nghe mau 1.1 che "re va do" (time_stretch sinh nhieu) -> SDVICO_TTS_SPEED mac dinh 1.0, speed=1.0 bo qua time_stretch hoan toan (giong goc). Co che speed giu lai cho ai can. Server may chu da restart, health speed:1.0. -->

@@ -8,9 +8,11 @@
 //
 // Cách chạy (trên máy chủ local, không chạy trên Vercel):
 //   node packages/marketing/src/fb-suite-scan.mjs            # quét 1 lần ngay
-//   node packages/marketing/src/fb-suite-scan.mjs --loop     # vòng lặp: mỗi giờ kiểm, quét 1 lần/ngày (sau 8h)
-// Đăng nhập 1 LẦN trước khi dùng: chạy C:\Users\ADMIN\sdvico-fb-scan\login-fb-scan.bat
-// (mở Brave headed với profile riêng của bộ quét -> đăng nhập Facebook -> đóng).
+//   node packages/marketing/src/fb-suite-scan.mjs --loop     # quét mỗi 2h (FB_SUITE_EVERY_HOURS)
+// Phiên đăng nhập: MƯỢN từ Brave hằng ngày (syncSession bên dưới) — không cần login riêng.
+// Brave đang mở thì file cookie bị khoá (và CDP profile chính bị Chromium >=136 chặn), nên:
+// chưa có bản cookie -> loop rình 5 phút/lần chộp đúng lúc Brave tắt (thường là lúc khởi động
+// máy); có bản rồi -> quét thẳng mỗi 2h DÙ Brave đang mở, mỗi lần quét thử làm tươi bản cookie.
 //
 // Kỹ thuật: Brave/Chromium `--headless=new --dump-dom` với --user-data-dir RIÊNG (không đụng
 // Brave user đang mở) + --virtual-time-budget cho SPA render xong. Không cần Playwright/npm.
@@ -18,7 +20,7 @@
 // metrics.suite28 {views, viewers, visits, interactions, follows, netFollows} + followers.
 // Điều cấm 5: chỉ ghi số đọc được thật; field nào không bóc được thì để null, không đoán.
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadRealEnv } from './video/env.mjs';
 
@@ -47,6 +49,26 @@ async function runLog(status, msg, extra = {}) {
   try {
     await rest('run_log', { method: 'POST', body: JSON.stringify({ task: 'mkt.fb_suite_scan', actor: 'may-chu-local', status, detail: { msg, ...extra } }) });
   } catch { /* log lỗi thì thôi */ }
+}
+
+// 28/8 đêm: profile TRẮNG đăng nhập mới bị Facebook coi là thiết bị lạ ("không có trang đó")
+// -> MƯỢN phiên của Brave hằng ngày: copy Local State (giữ khoá giải mã cookie, DPAPI theo
+// user Windows nên cùng máy đọc được) + Network\Cookies sang profile quét TRƯỚC mỗi lần quét.
+// Chỉ ĐỌC profile thật, không ghi gì vào đó; Brave đang mở vẫn copy được.
+const LIVE_UD = env.FB_SUITE_LIVE_UD || join(process.env.LOCALAPPDATA || 'C:\\Users\\ADMIN\\AppData\\Local', 'BraveSoftware', 'Brave-Browser', 'User Data');
+const LIVE_PROFILE_NAME = env.FB_SUITE_LIVE_PROFILE_NAME || 'Default';
+function syncSession() {
+  try {
+    const srcState = join(LIVE_UD, 'Local State');
+    const srcCookies = join(LIVE_UD, LIVE_PROFILE_NAME, 'Network', 'Cookies');
+    if (!existsSync(srcState) || !existsSync(srcCookies)) return 'khong thay profile Brave song';
+    mkdirSync(join(PROFILE, 'Default', 'Network'), { recursive: true });
+    copyFileSync(srcState, join(PROFILE, 'Local State'));
+    copyFileSync(srcCookies, join(PROFILE, 'Default', 'Network', 'Cookies'));
+    return null;
+  } catch (e) {
+    return String(e?.message || e);
+  }
 }
 
 // Chụp DOM một URL bằng trình duyệt headless với profile đã đăng nhập.
@@ -110,11 +132,13 @@ function grab(text, labels) {
 async function scanOnce() {
   if (!existsSync(BROWSER)) { await runLog('error', 'khong thay trinh duyet: ' + BROWSER); return false; }
   const t0 = Date.now();
+  const syncErr = syncSession();
+  if (syncErr) console.log('sync session:', syncErr, '- dung ban cookie cu (neu co)');
   const ov = await dumpDom(OVERVIEW_URL);
   const ovText = htmlToText(ov.html);
   const loggedOut = /log in to facebook|log into facebook|đăng nhập facebook/i.test(ovText) || ovText.length < 3000;
   if (loggedOut) {
-    await runLog('error', 'profile quet CHUA DANG NHAP Facebook — chay login-fb-scan.bat dang nhap 1 lan roi quet lai', { textLen: ovText.length });
+    await runLog('error', 'phien Facebook khong dung — kiem tra Brave hang ngay con dang nhap Facebook khong (bo quet muon cookie tu do)', { textLen: ovText.length });
     return false;
   }
   const suite28 = {
@@ -156,20 +180,20 @@ async function scanOnce() {
   return true;
 }
 
-// --loop: mỗi giờ kiểm; quét 1 lần/ngày sau 8h sáng (máy bật trễ vẫn quét bù trong ngày).
+// --loop (user 29/8: "cứ 1-2h cho cron chạy quét thẳng lúc máy đang mở"): quét mỗi 2h.
+// Chưa có bản cookie thì rình 5 phút/lần để chộp khoảnh khắc Brave tắt; chộp được là quét ngay.
 async function loop() {
   mkdirSync(STATE_DIR, { recursive: true });
-  const stateFile = join(STATE_DIR, 'last-scan.txt');
+  const everyMs = Math.max(1, Number(env.FB_SUITE_EVERY_HOURS || 2)) * 3600 * 1000;
+  const snapshot = join(PROFILE, 'Default', 'Network', 'Cookies');
   for (;;) {
-    const nowVN = new Date(Date.now() + 7 * 3600 * 1000);
-    const today = nowVN.toISOString().slice(0, 10);
-    let last = '';
-    try { last = readFileSync(stateFile, 'utf8').trim(); } catch { /* lần đầu */ }
-    if (last !== today && nowVN.getUTCHours() >= 8) {
-      const ok = await scanOnce();
-      if (ok) writeFileSync(stateFile, today);
+    if (!existsSync(snapshot)) {
+      const err = syncSession();
+      if (err) { await new Promise((r) => setTimeout(r, 5 * 60 * 1000)); continue; }
+      console.log('da chop duoc cookie tu Brave, quet ngay');
     }
-    await new Promise((r) => setTimeout(r, 60 * 60 * 1000));
+    await scanOnce(); // tự thử làm tươi cookie mỗi lần (Brave mở thì dùng bản cũ)
+    await new Promise((r) => setTimeout(r, everyMs));
   }
 }
 

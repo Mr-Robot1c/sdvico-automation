@@ -168,7 +168,9 @@ export default async function Page() {
     });
   }
 
-  // 28/8: 2 lần quét Business Suite gần nhất (bộ quét máy chủ local) — khối sức khoẻ Trang.
+  // 28/8: lần quét Business Suite mới nhất (bộ quét máy chủ local quét mỗi 2h) — khối sức
+  // khoẻ Trang. Mốc so sánh: lần quét cuối của NGÀY HÔM TRƯỚC (so "lần quét trước" cách 2h
+  // thì lệch toàn 0, vô nghĩa).
   const { data: pageScans } = await client
     .from('mkt_metrics')
     .select('metrics, created_at')
@@ -176,9 +178,10 @@ export default async function Page() {
     .eq('entity_ref', '__page_real__')
     .not('metrics->suite28', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(2);
-  const scanCur = ((pageScans || [])[0] as any)?.metrics || null;
-  const scanPrev = ((pageScans || [])[1] as any)?.metrics || null;
+    .limit(30);
+  const scanList = (pageScans || []) as any[];
+  const scanCur = scanList[0]?.metrics || null;
+  const scanPrev = (scanList.find((r: any) => String(r.created_at) < dayStart) as any)?.metrics || null;
 
   // Lần nhập tay gần nhất (giữ khối import manual như trang cũ).
   const { data: impRows } = await client
@@ -203,7 +206,7 @@ export default async function Page() {
         </div>
       </header>
 
-      <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với lần quét trước" />
+      <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với hôm qua" />
 
       <section className="import-manual" style={{ marginBottom: 18 }}>
         <form action={importManualFacebookPost} className="import-manual-form">
