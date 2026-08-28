@@ -43,7 +43,7 @@ const DOW_VN = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Th�
 //   CN SEEDING    (seeding)    — chữ TIỀN  — checklist tuần → dẫn tự nhiên về sản phẩm
 // Quy tắc playbook: chỉ 2/7 bài trực tiếp bán (T4 nhắc nhẹ + CN seeding), 5 bài còn lại xây
 // niềm tin. Cả tuần phủ đủ 4 chữ.
-const CONTENT_KIND_BY_DOW: Record<number, { kind: string; label: string }> = {
+export const CONTENT_KIND_BY_DOW: Record<number, { kind: string; label: string }> = {
   1: { kind: 'checklist', label: 'Giáo dục · Rủi ro' },  // Thứ 2
   2: { kind: 'viral', label: 'Viral · Rủi ro' },         // Thứ 3
   3: { kind: 'tip', label: 'Giáo dục · Tiền' },          // Thứ 4
@@ -55,7 +55,7 @@ const CONTENT_KIND_BY_DOW: Record<number, { kind: string; label: string }> = {
 
 // 4 chữ cảm xúc theo playbook — mỗi ngày mặc một chữ, để BOSS/Creator biết bài này chạm chữ
 // nào (NGHỀ/TIỀN/RỦI RO/TỰ HÀO). Cả tuần phủ đủ 4 chữ, không được cả 7 bài cùng một chữ.
-const CONTENT_EMOTION_BY_DOW: Record<number, string> = {
+export const CONTENT_EMOTION_BY_DOW: Record<number, string> = {
   1: 'RỦI RO',   // T2 — giáo dục kỹ thuật, sợ mất chuyến/tiền/an toàn
   2: 'RỦI RO',   // T3 — cảnh báo hậu quả
   3: 'TIỀN',     // T4 — mẹo tiết kiệm
@@ -70,7 +70,7 @@ const CONTENT_EMOTION_BY_DOW: Record<number, string> = {
 // Playbook 26/8 (PHẦN 4): mỗi chữ cảm xúc ép người xem LÀM một việc riêng —
 //   RỦI RO -> cảnh báo nhau (comment); TIỀN -> hỏi giá (inbox);
 //   TỰ HÀO -> khoe (share);           NGHỀ  -> kể chuyện của họ.
-const CONTENT_PURPOSE: Record<string, string> = {
+export const CONTENT_PURPOSE: Record<string, string> = {
   qa: 'bà con có thêm kiến thức dùng thiết bị, đi biển',
   checklist: 'GIÁO DỤC (rủi ro) — bà con tự kiểm tra tàu/thiết bị trước chuyến, comment cảnh báo nhau',
   tip: 'GIÁO DỤC (tiền) — mẹo tiết kiệm, tránh mua hớ, có con số cụ thể để bà con tự tính vào túi',
@@ -87,7 +87,7 @@ const CONTENT_PURPOSE: Record<string, string> = {
 // Playbook 26/8 (PHẦN 6 — khung viral 6 nhịp): HOOK nghịch lý (≤15 chữ) → ĐỒNG CẢM bạn thuyền
 // (TIẾC+UẤT) → LỐI THOÁT nói bằng LỢI ÍCH (không thông số) → PHẦN THƯỞNG cụ thể → TIN CẬY 1
 // câu → CTA MỞ CHUYỆN (câu hỏi + từ khóa nhắn Page). CTA KHÔNG đòi gọi tổng đài với tệp lạ.
-const CONTENT_STRUCTURE: Record<string, string> = {
+export const CONTENT_STRUCTURE: Record<string, string> = {
   qa: '❓ 1 câu hỏi bà con hay gặp → 💡 đáp gọn 3-5 câu',
   checklist: '📋 mở 1 câu → 4-6 gạch ✅ việc kiểm tra trước chuyến → CTA nhắn Page',
   tip: '⚠️ 2-3 thói quen sai → ✅ 2-3 cách xử đúng, kèm CON SỐ tiết kiệm cụ thể',
@@ -139,9 +139,9 @@ function rankProducts(byProduct: Array<{ product: string; count: number; avgScor
 }
 
 // Dự kiến HƯỚNG ĐI cho từng ngày tới, mô phỏng đúng thứ tự vòng xoay sẽ rút.
-// v8 (user chốt 21/8 đêm): cặp A/B chạy TRONG CÙNG NGÀY — A slot sáng, B slot chiều, nên
-// mỗi hướng chưa dùng chiếm MỘT ngày (variant 'AB'). Hướng đang treo bản B (hôm trước lỡ
-// nhịp) chiếm ngày đầu chỉ với bản B.
+// 29/8 (user chốt "bỏ hẳn A/B"): mỗi hướng = ĐÚNG 1 bài; mỗi ngày tiêu 3 hướng (sáng 8h
+// 2 bài bán + chiều 14h 1 bài bán). Hướng còn pending_variant='B' thời nhịp cũ nghĩa là
+// ĐÃ ra 1 bài -> coi như đã dùng (cùng luật với /api/rotate).
 type DayDirection = { title: string; product: string; variant: 'A' | 'B' | 'AB'; done?: boolean };
 // Tên sản phẩm chuẩn (bỏ số thứ tự folder) để tra trọng số — suggestion.product ghi theo
 // danh mục prompt, weights ghi theo tên folder, phải quy về một mối qua guessGroup.
@@ -149,18 +149,17 @@ function productNameOf(raw: string): string {
   const g = (guessGroup as (t: string) => string | null)(String(raw || ''));
   return String(g || raw || '').replace(/^\s*\d+\.\s*/, '').trim();
 }
+export const DIRECTIONS_PER_DAY = 3; // 2 bài bán sáng 8h + 1 bài bán chiều 14h
 function buildDirectionQueue(suggestions: any[], weights: Record<string, number> = {}): DayDirection[] {
-  const out: DayDirection[] = [];
-  const pendingB = suggestions.filter((s) => !s.used_at && s.pending_variant === 'B');
   const fresh = suggestions.filter((s) => !s.used_at && !s.pending_variant);
   // BOSS truyền cho Creator (user 21/8: "BOSS có học và truyền cho Creator không?"): hướng
   // của sản phẩm đang được đánh trọng số cao (đang thắng) kéo lên đầu hàng — không chạy
   // lần lượt theo thứ tự Gemini sinh nữa. Sort ổn định: cùng trọng số giữ thứ tự cũ.
   const wOf = (s: any) => weights[productNameOf(s.product)] ?? 1;
   const freshSorted = [...fresh].sort((a, b) => wOf(b) - wOf(a));
-  for (const s of pendingB) out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'B' });
-  for (const s of freshSorted) out.push({ title: String(s.title || ''), product: String(s.product || ''), variant: 'AB' });
-  return out.slice(0, 7);
+  return freshSorted
+    .map((s) => ({ title: String(s.title || ''), product: String(s.product || ''), variant: 'A' as const }))
+    .slice(0, DIRECTIONS_PER_DAY * 7);
 }
 
 // Chia lịch 7 ngày tới: mỗi sản phẩm bán rải đều số bài/tuần ra các ngày; content 1 bài/ngày;
@@ -168,20 +167,24 @@ function buildDirectionQueue(suggestions: any[], weights: Record<string, number>
 function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: string[], dirQueue: DayDirection[] = []): DailyPlan[] {
   const remaining = new Map<string, number>(salesProducts.map((p) => [p.product, p.postsPerWeek]));
   const out: DailyPlan[] = [];
+  let qPos = 0; // vị trí đang rút trong hàng đợi hướng đi (3 hướng/ngày)
   for (let i = 0; i < 7; i++) {
     const { date, dow, dowIdx } = vnDayInfo(now, i);
     const daysLeft = 7 - i;
-    // Ngày CÓ hướng đi: bài bán trong ngày chính là cặp A/B của hướng đó (2 bài, hoặc 1 nếu
-    // chỉ còn bản B mồ côi) — hiển thị đúng cái máy sẽ làm (user 21/8: "lịch bảo 2 bài SEA-40
-    // + 1 lọc dầu mà sáng nay chỉ tạo 1 bản lọc dầu"). Không hướng mới rơi về chia trọng số.
-    const dir = dirQueue[i] || null;
+    // 29/8 (bỏ A/B): mỗi ngày rút 3 HƯỚNG = 3 bài bán (2 sáng + 1 chiều), mỗi hướng 1 bài.
+    // Hết hàng đợi thì ngày đó rơi về chia theo trọng số như cũ (refill hằng ngày sẽ bù hướng).
+    const dayDirs = dirQueue.slice(qPos, qPos + DIRECTIONS_PER_DAY);
+    qPos += dayDirs.length;
     const sales: Array<{ product: string; count: number }> = [];
-    if (dir) {
-      const name = productNameOf(dir.product);
-      const cnt = dir.variant === 'AB' ? 2 : 1;
-      sales.push({ product: name, count: cnt });
-      const rem = remaining.get(name);
-      if (rem != null) remaining.set(name, Math.max(0, rem - cnt));
+    if (dayDirs.length) {
+      const cnt = new Map<string, number>();
+      for (const d of dayDirs) {
+        const name = productNameOf(d.product);
+        cnt.set(name, (cnt.get(name) || 0) + 1);
+        const rem = remaining.get(name);
+        if (rem != null) remaining.set(name, Math.max(0, rem - 1));
+      }
+      for (const [product, count] of cnt) sales.push({ product, count });
     } else {
       for (const p of salesProducts) {
         const rem = remaining.get(p.product) || 0;
@@ -203,7 +206,7 @@ function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: str
       contentKind: ck?.kind, contentKindLabel: ck?.label, contentPurpose: ck ? CONTENT_PURPOSE[ck.kind] : undefined,
       contentStructure: ck ? CONTENT_STRUCTURE[ck.kind] : undefined,
       contentEmotion: CONTENT_EMOTION_BY_DOW[dowIdx],
-      direction: dirQueue[i] || null,
+      direction: dayDirs[0] || null,
       groups: dayGroups,
     });
   }
@@ -313,20 +316,17 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
       .map((r: any) => r.brief || {})
       .filter((b: any) => b.suggestion_title);
     if (doneToday.length) {
-      const b = doneToday[doneToday.length - 1];
-      // Hôm nay có thể đã ra cả A lẫn B (nhịp cùng-ngày) — gom biến thể đã sinh của hướng đó.
-      const variantsDone = new Set(doneToday.map((x: any) => (x.ab_variant === 'B' ? 'B' : 'A')));
-      const doneDir: DayDirection & { done: boolean } = {
+      // 29/8 (bỏ A/B): các bài bán ĐÃ sinh hôm nay (rotate đánh used_at ngay nên không còn
+      // trong queue fresh) — chèn lên đầu để ô "hôm nay" của lịch hiện đúng hướng đã chạy;
+      // slot còn thiếu của hôm nay lấy tiếp từ queue (3 hướng/ngày).
+      const doneDirs: (DayDirection & { done: boolean })[] = doneToday.map((b: any) => ({
         title: String(b.suggestion_title || ''),
         product: String(b.keyword || ''),
-        variant: variantsDone.size >= 2 ? 'AB' : (variantsDone.has('B') ? 'B' : 'A'),
+        variant: 'A' as const,
         done: true,
-      };
-      // Bỏ mục trùng (hướng hôm nay) khỏi đầu queue nếu nó chính là mục kế tiếp, rồi chèn
-      // hướng đã sinh vào vị trí hôm nay; phần còn lại dời sang từ ngày mai. GIỮ mục 'B' mồ
-      // côi cùng title (hôm nay mới ra A, bản B còn chờ ngày mai) — bỏ nó là lịch mai mất B.
-      const rest = dirQueue.filter((d, i) => !(i === 0 && d.title === doneDir.title && d.variant !== 'B'));
-      dirQueue = [doneDir, ...rest];
+      }));
+      const doneTitles = new Set(doneDirs.map((d) => d.title));
+      dirQueue = [...doneDirs, ...dirQueue.filter((d) => !doneTitles.has(d.title))];
     }
   } catch { /* không có bản áp -> lịch không ghi hướng */ }
 

@@ -252,7 +252,10 @@ export async function GET(req: Request) {
   const skipped: any[] = [];
   const logoActions: any[] = []; // nhat ky auto-logo cho moi anh (stamped/kept/already/skip)
   for (const s of candidateSuggestions) {
-    if (pickedFolders.length) break; // 1 hướng đi/run
+    // 29/8 (bỏ A/B): 1 hướng = 1 bài, nên slot sáng (salesCount=2) rút 2 HƯỚNG, chiều rút 1.
+    // Trước đây giới hạn cứng 1 hướng/run (di sản thời 1 suggestion = cặp A/B 2 bài) làm
+    // slot sáng chỉ ra 1 bài bán thay vì 2 như kế hoạch.
+    if (pickedFolders.length >= salesCount) break;
     const guessed = (guessGroup as (t: string) => string | null)(s.product);
     // guessGroup trả NHÃN FOLDER đầy đủ KÈM STT ("6. Thiết bị lọc dầu SF-50") — phải strip
     // STT CẢ HAI vế mới khớp (bug bắt được khi chạy thật 18/8).
@@ -280,7 +283,10 @@ export async function GET(req: Request) {
   // fallback random pick Ắc quy vì weights map dùng default 1). Nếu mọi folder trong
   // plan đã dùng vòng này → không sinh bài bán (chỉ log skip); thà thiếu 1 bài bán
   // còn hơn đăng bài ngoài kế hoạch.
-  if (!pickedFolders.length) {
+  // 29/8: bù cho ĐỦ salesCount bài (trước chỉ chạy khi 0 hướng nào khớp) — hướng cạn giữa
+  // tuần thì slot sáng vẫn đủ 2 bài, bài bù vẫn bị chặn trong danh sách sản phẩm của plan.
+  if (pickedFolders.length < salesCount) {
+    const need = salesCount - pickedFolders.length;
     let remaining = unused.filter((g) => !usedInThisRun.has(g));
     if (hasWeights) {
       const inPlan = remaining.filter((g) => weights[productName(g)] != null);
@@ -290,9 +296,9 @@ export async function GET(req: Request) {
       remaining = inPlan;
     }
     const extra = hasWeights
-      ? weightedSample(remaining, (g) => weights[productName(g)] ?? 1, salesCount)
-      : shuffle(remaining).slice(0, salesCount);
-    for (const g of extra) pickedFolders.push({ group: g });
+      ? weightedSample(remaining, (g) => weights[productName(g)] ?? 1, need)
+      : shuffle(remaining).slice(0, need);
+    for (const g of extra) { pickedFolders.push({ group: g }); usedInThisRun.add(g); }
   }
 
   // User 20/8: MOI DOT phai co it nhat 1 bai ban tu folder co CLIP NGUON (video AI dung duoc).
@@ -502,24 +508,30 @@ export async function GET(req: Request) {
     let r = Math.random() * kindTotal;
     let chosenKind = 'qa';
     for (const [k, w] of Object.entries(KIND_WEIGHT)) { r -= w; if (r <= 0) { chosenKind = k; break; } }
-    // v6 (20/8, user: "ghi rõ content gì"): KẾ HOẠCH SỐNG đã định loại content cho từng ngày
-    // (daily_schedule[hôm nay].contentKind) — máy làm ĐÚNG loại kế hoạch ghi, hết cảnh trang
-    // Kế hoạch nói một đằng máy sinh một nẻo. Không có lịch hôm nay -> giữ random theo weight.
-    // Playbook 26/8: đọc thêm contentEmotion để bài content chạm đúng 1 trong 4 chữ playbook.
+    // 29/8 (làm lại /ke-hoach): loại content THEO THỨ lấy THẲNG từ playbook CONTENT_KIND_BY_DOW
+    // (lib/plan-live) — trước đọc bản live trong DB, bản đó bị xoá là rơi về random sai lịch;
+    // và gate `KIND_WEIGHT[kind] !== undefined` chặn nhầm luôn viral/seeding (T3, T6, CN của
+    // playbook 2-2-1-1-1 chưa bao giờ chạy). Playbook cố định theo thứ, không cần DB.
     let contentEmotionOverride: string | null = null;
     try {
-      const { data: liveRow } = await client
-        .from('mkt_plans').select('data').eq('data->>origin', 'live')
-        .order('created_at', { ascending: false }).limit(1).maybeSingle();
-      const todayVNs = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
-      const todaySched = (liveRow as any)?.data?.daily_schedule?.find((d: any) => d.date === todayVNs);
-      if (todaySched?.contentKind && KIND_WEIGHT[todaySched.contentKind] !== undefined) {
-        chosenKind = todaySched.contentKind;
-      }
-      if (todaySched?.contentEmotion) contentEmotionOverride = String(todaySched.contentEmotion);
+      const { CONTENT_KIND_BY_DOW, CONTENT_EMOTION_BY_DOW } = await import('../../../lib/plan-live');
+      const dowIdxVN = new Date(Date.now() + 7 * 3600 * 1000).getUTCDay();
+      const ck = CONTENT_KIND_BY_DOW[dowIdxVN];
+      const SUPPORTED_KINDS = new Set(['qa', 'checklist', 'glossary', 'tip', 'engage', 'portrait', 'news', 'viral', 'seeding']);
+      if (ck?.kind && SUPPORTED_KINDS.has(ck.kind)) chosenKind = ck.kind;
+      if (CONTENT_EMOTION_BY_DOW[dowIdxVN]) contentEmotionOverride = CONTENT_EMOTION_BY_DOW[dowIdxVN];
     } catch { /* giữ random */ }
     const topicsOfKind = (CONTENT_TOPICS as any[]).filter((t) => t.type === chosenKind);
-    const chosenTopic = topicsOfKind.length ? pickRandom(topicsOfKind) : undefined;
+    // 29/8: kho CONTENT_TOPICS chưa có mục viral/seeding — generateContentPost nhận LOẠI bài
+    // qua topic.type, nên thiếu topic là loại bị rơi về random. Không có topic sẵn thì đưa
+    // chủ đề mở theo loại để Creator tự chọn tình huống, loại bài vẫn đúng playbook.
+    const KIND_FALLBACK_TOPIC: Record<string, string> = {
+      viral: 'một khoảnh khắc hoặc tình huống có thật trên biển khiến bà con phải bàn tán, tự chọn theo chữ cảm xúc đã giao',
+      seeding: 'một nỗi lo thật của bà con trước chuyến biển (nước ngọt, dầu máy, tín hiệu giám sát, chi phí...)',
+    };
+    const chosenTopic = topicsOfKind.length
+      ? pickRandom(topicsOfKind)
+      : (KIND_FALLBACK_TOPIC[chosenKind] ? { type: chosenKind, topic: KIND_FALLBACK_TOPIC[chosenKind] } : undefined);
 
     let gen: any;
     try {

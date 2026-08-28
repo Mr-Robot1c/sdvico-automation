@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 180
+<!-- re-verified: 2026-08-28 17:00 - Trang /ke-hoach LAM LAI toan bo (bang tuan T2..CN tu bai that + mo phong hang doi rotate, lib/week-plan.ts moi, khong phu thuoc ban live); rotate fix sang du 2 bai ban + content theo playbook thu (viral/seeding het bi chan); guessGroup tu khoa dai nhat thang; Actions nguong slot 8h/14h. Chi tiet o ke-hoach-ai-v2-ba-spec.md cung gio. -->
 <!-- re-verified: 2026-08-29 11:40 - Spec vong lap hieu dinh — chi tiet o ke-hoach-ai-v2-ba-spec.md cung gio (quet sau moi ngay, BOSS hoc 3 nen tang gop theo bai, khung 8h/14h, toi 20h). -->
 <!-- re-verified: 2026-08-29 10:50 - Card Trang thai BO day icon so lieu 👍💬👁▶️ (user: khong hien thi dung — tron nguon kenh phu cu; so chuan o Do luong). Chi giu 🎯 khach hoi mua (dem tu mkt_leads, luon dung). -->
 <!-- re-verified: 2026-08-29 10:30 - Popover Chia se vao group trang giua dark mode: share-groups.tsx dung var(--bg-1) KHONG ton tai -> fallback #ffffff thang luon (cung benh popover TikTok 28/8). Doi sang var(--surface) + bo fallback stale cua --ink. -->

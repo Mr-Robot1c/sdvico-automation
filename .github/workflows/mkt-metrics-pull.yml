@@ -3,8 +3,9 @@ name: Cron 1 tieng - so lieu + sinh noi dung
 # GỌI 2 endpoint trên Vercel mỗi 1 tiếng (26/8/2026 dời từ 30 phút xuống 1 tiếng để đỡ hao quota
 # GitHub Actions 2.000 phút/tháng miễn phí — 30 phút/lần đã đốt hết quota trước 26/8):
 #  1) /api/mkt-metrics-pull  - cập nhật mkt_metrics + học tri thức + sinh kế hoạch theo lịch.
-#  2) /api/rotate            - sinh bài A/B chờ duyệt. Route có GUARD 1 lần/ngày (VN) nên gọi
-#     nhiều lần vẫn chỉ tạo 1 đợt bài mỗi ngày; đây là LƯỚI AN TOÀN cho cron Vercel /api/rotate.
+#  2) /api/rotate            - sinh bài chờ duyệt (sang 2 bài bán, chieu 1 bán + 1 content).
+#     Route có GUARD 1 lần/slot/ngày (VN) nên gọi nhiều lần vẫn chỉ tạo 1 đợt bài mỗi slot;
+#     đây là LƯỚI AN TOÀN cho cron Vercel /api/rotate (8h + 14h VN).
 # Cả 2 bảo vệ bằng CRON_SECRET (đặt cùng giá trị trên GitHub secret + Vercel env production).
 
 on:
@@ -54,7 +55,7 @@ jobs:
           echo "metrics-pull HTTP $code"
           head -c 800 /tmp/resp.json; echo
           test "$code" = "200"
-      - name: Sinh nội dung 2 slot/ngày (sang 8h + chieu 13h VN) - luoi an toan neu cron Vercel truot
+      - name: Sinh nội dung 2 slot/ngày (sang 8h + chieu 14h VN) - luoi an toan neu cron Vercel truot
         if: always()
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
@@ -68,12 +69,12 @@ jobs:
             echo "rotate $NAME HTTP $code"
             head -c 500 /tmp/rot_${NAME}.json; echo
           }
-          M=$(TZ=Asia/Ho_Chi_Minh date +%M); M=$((10#$M))
           if [ "$FORCE_ROTATE" = "true" ]; then
             call_rotate "?force=1" "force"
           else
-            if [ $H -ge 7 ]; then call_rotate "?slot=sang" "sang"; fi
-            # Slot chieu tu 12h30 (truoc: H>=12 lam luoi goi tu 12h00 -> bai chieu sinh som
-            # 28 phut, user bat 21/8 "bai B ra 12:02").
-            if [ $H -gt 12 ] || { [ $H -eq 12 ] && [ $M -ge 30 ]; }; then call_rotate "?slot=chieu" "chieu"; fi
+            # 29/8 user chot khung gio 8h/14h VN (truoc: sang tu 7h, chieu tu 12h30 -> luoi
+            # Actions ban SOM hon cron Vercel 8h/14h, bai sang tung ra 7h41). Nguong = dung
+            # gio cron Vercel; Actions chi con vai tro luoi an toan khi cron Vercel truot.
+            if [ $H -ge 8 ]; then call_rotate "?slot=sang" "sang"; fi
+            if [ $H -ge 14 ]; then call_rotate "?slot=chieu" "chieu"; fi
           fi

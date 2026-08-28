@@ -179,10 +179,18 @@ function noAccent(s) {
 // Đoán product_group từ tên tư liệu. Trả về nhãn group hoặc null nếu không khớp.
 export function guessGroup(title) {
   const t = noAccent(title);
+  // 29/8: khớp theo TỪ KHÓA DÀI NHẤT thay vì nhóm đứng trước thắng — "Máy Lọc Dầu Diesel
+  // SD12-300" từng bị SF-50 (no 6, key 'loc dau') cướp trước khi xét tới nhóm 9, làm hướng
+  // đi của SD12-300 sinh bài bằng folder SF-50. Từ khóa dài hơn = cụ thể hơn = đúng hơn.
+  let best = null;
+  let bestLen = 0;
   for (const p of PRODUCTS) {
-    if (p.match.some((m) => t.includes(noAccent(m)))) return p.group;
+    for (const m of p.match) {
+      const k = noAccent(m);
+      if (k.length > bestLen && t.includes(k)) { best = p.group; bestLen = k.length; }
+    }
   }
-  return null;
+  return best;
 }
 
 export function findProduct(group) {
