@@ -132,8 +132,15 @@ export default async function Page() {
     if (!h.platforms.includes('tiktok')) h.platforms.push('tiktok');
     if (m.shareUrl) h.links.push({ platform: 'tiktok', url: String(m.shareUrl) });
   }
+  // 28/8 (user): chi xep bai NOI TRONG 7 NGAY (truoc lay ca lich su nen bai cu 18/08 dung
+  // dau mai). Bai khong co firstPostAt (TikTok ghep tay, khong tao mkt_posts) van cho qua.
+  const since7Iso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const hot = [...hotMap.values()]
     .filter((h) => h.eng + h.views > 0)
+    .filter((h) => {
+      const at = firstPostAt.get(h.cid);
+      return !at || at >= since7Iso;
+    })
     .sort((a, b) => (b.eng - a.eng) || (b.views - a.views))
     .slice(0, 8);
 
@@ -143,6 +150,8 @@ export default async function Page() {
     for (const c of cs || []) hotTitles.set(String((c as any).id), String((c as any).title || '(không tên)'));
   }
 
+  // 28/8 (user): BO dong so lieu phu (nguoi theo doi/like/share) — note CHI hien khi co
+  // bug/hong/han che, chu DO nhu ben Zalo OA.
   const cards = [
     {
       key: 'facebook' as PlatformKey,
@@ -154,7 +163,7 @@ export default async function Page() {
       posts: fbPosts.count,
       views: fbViews,
       cmts: fbCmts,
-      note: followers ? `📣 ${fmt(followers)} người theo dõi Page · ${fmt(fbReacts)} like · ${fmt(fbShares)} share` : `${fmt(fbReacts)} like · ${fmt(fbShares)} share`,
+      warn: fb.ok ? null : String(fb.text || 'Token Facebook lỗi — kiểm tra ở Kết nối.').slice(0, 120),
       link: fb.realPageUrl ? { url: fb.realPageUrl, label: 'Mở Page SDVICO ↗' } : null,
       detail: { href: '/do-luong', label: 'Số liệu từng bài' },
     },
@@ -168,7 +177,7 @@ export default async function Page() {
       posts: ytPosts.count,
       views: ytViews,
       cmts: ytCmts,
-      note: `${fmt(ytLikes)} like`,
+      warn: ytOk ? null : yt.configured ? `Token lỗi: ${String(yt.error || 'không rõ').slice(0, 90)} — lấy token mới theo runbook.` : 'Chưa cấu hình 3 biến YOUTUBE_* trên Vercel.',
       link: yt.channelUrl ? { url: yt.channelUrl, label: `Mở kênh ${yt.channelTitle || 'SDVICO'} ↗` } : null,
       detail: { href: '/do-luong', label: 'Số liệu từng video' },
     },
@@ -182,7 +191,7 @@ export default async function Page() {
       posts: ttPostCount,
       views: ttViews,
       cmts: ttCmts,
-      note: `${fmt(ttLikes)} like · đăng tay qua nút Xuất TikTok`,
+      warn: tt.ok ? 'App chưa qua audit TikTok — video đăng tay qua nút Xuất TikTok, ghép lại để kéo số.' : String((tt as any).text || 'Chưa kết nối TikTok.').slice(0, 120),
       link: { url: `https://www.tiktok.com/@${tiktokUser}`, label: `Mở @${tiktokUser} ↗` },
       detail: { href: '/tiktok', label: 'Kết nối và audit' },
     },
@@ -196,7 +205,7 @@ export default async function Page() {
       posts: 0,
       views: 0,
       cmts: 0,
-      note: za.configured ? String((za as any).text || '').slice(0, 80) : 'Khung dựng xong, chờ xác thực OA + token.',
+      warn: za.configured ? null : 'Khung dựng xong, chờ xác thực OA + token.',
       link: null,
       detail: { href: '/ket-noi', label: 'Xem thiết lập' },
     },
@@ -233,7 +242,7 @@ export default async function Page() {
               <span className="pf-stat"><b>{c.views || c.posts ? fmt(c.views) : '—'}</b><span>Tổng lượt xem</span></span>
               <span className="pf-stat"><b>{c.cmts || c.posts ? fmt(c.cmts) : '—'}</b><span>Tổng comment</span></span>
             </div>
-            <p className="pf-note" style={{ marginTop: 8 }}>{c.note}</p>
+            {c.warn ? <p className="pf-note" style={{ marginTop: 8, color: 'var(--no)' }}>⚠️ {c.warn}</p> : null}
             <div style={{ display: 'flex', gap: 12, marginTop: 'auto', paddingTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               {c.link ? (
                 <a href={c.link.url} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.82rem', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
@@ -248,7 +257,7 @@ export default async function Page() {
 
       {/* ===== BAI NOI BAT ===== */}
       <section className="blk" style={{ marginTop: 16 }}>
-        <h2>🔥 Bài nổi bật các nền tảng <span className="sub">xếp theo tương tác + lượt xem, bấm tiêu đề hoặc logo để mở bài thật</span></h2>
+        <h2>🔥 Bài nổi bật các nền tảng <span className="sub">7 ngày gần nhất, mọi nền tảng xếp chung theo tương tác + lượt xem — bấm tiêu đề hoặc logo để mở bài thật</span></h2>
         {hot.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Chưa có bài nào có số liệu.</p>
         ) : (
