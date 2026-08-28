@@ -159,7 +159,9 @@ async function publishContentToFacebook(
     return sp ? client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl : null;
   };
   const assets = (c as any).brief?.assets || {};
-  const imageUrl = await assetUrlOf(assets.image);
+  // 28/8 tối: bài content có thể mang ẢNH LINK NGOÀI (image_url — Google/Unsplash, không lưu
+  // kho). FB tự sao chép ảnh về máy chủ của nó lúc đăng nên link chết sau đó không sao.
+  const imageUrl = String(assets.image_url || '') || await assetUrlOf(assets.image);
   // Facebook ưu tiên bản NGANG 16:9 (video_h) nếu có, không thì dùng video chung.
   const videoUrl = await assetUrlOf(assets.video_h || assets.video);
   // Danh sách ẢNH DƯ (Xưởng sản xuất chọn nhiều ảnh): sẽ thả TỪNG cái vào bình luận sau khi đăng.

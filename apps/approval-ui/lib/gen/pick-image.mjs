@@ -12,7 +12,8 @@
 //      + GOOGLE_CSE_ID (Programmable Search Engine với "Search entire web" + "Image search" ON).
 //   3. Unsplash fallback với keyword TIẾNG ANH (Gemini sinh cùng lượt). Cần UNSPLASH_ACCESS_KEY.
 //   4. Cuối cùng mới rơi về ngẫu nhiên folder 'Content' như cũ.
-// Trả { id, via: 'product' | 'google-cse' | 'unsplash' | 'content-folder' | null, note }.
+// Trả { id, via: 'product' | 'google-cse' | 'unsplash' | 'content-folder' | null, note }
+// hoặc (chế độ link trực tiếp 28/8) { id: null, url, via: 'google-cse-link' | 'unsplash-link', credit, note }.
 // Dùng chung cho app/api/rotate/route.ts và scripts/rotate-now.mjs (module JS thuần).
 
 import { guessGroup } from './products.mjs';
@@ -170,6 +171,26 @@ async function saveUnsplashToAssets(client, photo, titleHint) {
   return data.id;
 }
 
+// 28/8 tối (user chốt): chế độ LINK TRỰC TIẾP — gọi API lấy URL ảnh dùng ngay, KHÔNG lưu
+// Storage. Kho Supabase chỉ dành cho ảnh/video thật của công ty (Zalo, folder sản phẩm).
+// Facebook SAO CHÉP ảnh về máy chủ của nó lúc đăng nên link nguồn có chết sau đó cũng không
+// ảnh hưởng bài đã đăng; web/blog của mình không hiển thị link ngoài (dùng ảnh kho) nên không
+// tốn egress và không sợ link mục.
+async function verifyImageLink(url) {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return false;
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.startsWith('image/')) return false;
+    const len = Number(r.headers.get('content-length') || 0);
+    if (len && len > 8 * 1024 * 1024) return false; // ảnh quá to, FB dễ từ chối
+    if (r.body && r.body.cancel) r.body.cancel().catch(() => {});
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Chọn 1 ảnh trong pool, NÉ ảnh đã dùng gần đây (user 22/8: ảnh bài content không được trùng
 // trong 14 ngày). recentlyUsed: Map<assetId, lastUsedISO>. Còn ảnh chưa dùng -> random trong đó;
 // hết sạch (folder nhỏ) -> lấy ảnh dùng LÂU NHẤT (ít trùng nhất có thể) thay vì random.
@@ -196,37 +217,55 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
   // (CC-filtered) thay vi lap anh san pham SDVICO nham chan. Folder san pham lui xuong lam
   // backup - chi dung khi Google + Unsplash deu khong co ket qua.
   //
-  // 28/8 (user: "Supabase qua tai, dung luu cac anh len web nua — nhu anh Unsplash do"):
-  // TAT tang Google CSE + Unsplash (moi anh tai tu mang deu upload Storage + insert
-  // brand_assets -> ngon dung luong). Chi dung ANH CO SAN trong kho (folder san pham +
-  // Content — user tu up tay o Kho tu lieu / script local). Muon bat lai tang mang:
-  // set env ALLOW_EXTERNAL_IMAGE_SAVE=1 (mac dinh TAT).
-  const allowExternal = process.env.ALLOW_EXTERNAL_IMAGE_SAVE === '1';
-  const kw = allowExternal && (process.env.GOOGLE_CSE_API_KEY || process.env.UNSPLASH_ACCESS_KEY)
+  // 28/8 toi (user chot lai): "moi lan tao content thi GOI API lay anh thoi chu KHONG luu —
+  // cai luu lai chinh la anh/video Zalo SDVICO duoc up len kho". Mac dinh: LINK TRUC TIEP
+  // (khong ton Storage/egress). EXTERNAL_IMAGE_MODE=off de tat han tang mang;
+  // ALLOW_EXTERNAL_IMAGE_SAVE=1 quay ve che do cu (tai anh ve luu kho).
+  const allowSave = process.env.ALLOW_EXTERNAL_IMAGE_SAVE === '1';
+  const hotlink = !allowSave && process.env.EXTERNAL_IMAGE_MODE !== 'off';
+  const useExternal = allowSave || hotlink;
+  const kw = useExternal && (process.env.GOOGLE_CSE_API_KEY || process.env.UNSPLASH_ACCESS_KEY)
     ? await imageKeywordsFor(text, client, bodyHint)
     : { vi: '', en: '' };
 
-  // 1. GOOGLE CSE — chi khi ALLOW_EXTERNAL_IMAGE_SAVE=1.
+  // 1. GOOGLE CSE — link trực tiếp (mặc định) hoặc lưu kho (chế độ cũ).
   try {
-    if (allowExternal && process.env.GOOGLE_CSE_API_KEY && process.env.GOOGLE_CSE_ID && kw.vi) {
+    if (useExternal && process.env.GOOGLE_CSE_API_KEY && process.env.GOOGLE_CSE_ID && kw.vi) {
       const items = await searchGoogleCSE(kw.vi);
       if (items && items.length) {
-        const item = pickRandom(items.slice(0, 5));
-        const id = await saveGoogleCseToAssets(client, item, text.slice(0, 60));
-        if (id) return { id, via: 'google-cse', note: `q="${kw.vi}"` };
+        if (allowSave) {
+          const item = pickRandom(items.slice(0, 5));
+          const id = await saveGoogleCseToAssets(client, item, text.slice(0, 60));
+          if (id) return { id, via: 'google-cse', note: `q="${kw.vi}"` };
+        } else {
+          // Thử lần lượt 5 ảnh đầu, lấy ảnh đầu tiên fetch được thật (site chặn hotlink thì
+          // FB cũng không kéo được lúc đăng -> bỏ qua ảnh đó).
+          for (const item of items.slice(0, 5)) {
+            const url = item?.link;
+            if (url && (await verifyImageLink(url))) {
+              return { id: null, url, via: 'google-cse-link', credit: item?.displayLink || null, note: `q="${kw.vi}" (link, khong luu)` };
+            }
+          }
+        }
       }
     }
   } catch { /* rơi xuống Unsplash */ }
 
-  // 2. Unsplash — chi khi ALLOW_EXTERNAL_IMAGE_SAVE=1.
+  // 2. Unsplash — link trực tiếp (Unsplash CHÍNH THỨC yêu cầu hotlink URL + ping download).
   try {
-    if (allowExternal && process.env.UNSPLASH_ACCESS_KEY && kw.en) {
+    if (useExternal && process.env.UNSPLASH_ACCESS_KEY && kw.en) {
       const results = await searchUnsplash(kw.en);
       if (results) {
         // Lấy 1 trong 5 ảnh đầu (đa dạng, vẫn sát chủ đề).
         const photo = pickRandom(results.slice(0, 5));
-        const id = await saveUnsplashToAssets(client, photo, text.slice(0, 60));
-        if (id) return { id, via: 'unsplash', note: `q="${kw.en}"` };
+        if (allowSave) {
+          const id = await saveUnsplashToAssets(client, photo, text.slice(0, 60));
+          if (id) return { id, via: 'unsplash', note: `q="${kw.en}"` };
+        } else if (photo?.urls?.regular) {
+          const dl = photo?.links?.download_location;
+          if (dl) fetch(`${dl}${dl.includes('?') ? '&' : '?'}client_id=${process.env.UNSPLASH_ACCESS_KEY}`).catch(() => {});
+          return { id: null, url: photo.urls.regular, via: 'unsplash-link', credit: photo?.user?.name ? `Unsplash/${photo.user.name}` : 'Unsplash', note: `q="${kw.en}" (link, khong luu)` };
+        }
       }
     }
   } catch { /* rơi xuống fallback */ }

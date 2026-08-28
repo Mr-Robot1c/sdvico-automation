@@ -48,7 +48,7 @@ function channelsShort(channels?: string[] | null, postReel?: boolean): string {
 }
 
 type Flags = Record<string, string[] | undefined>;
-type Assets = { image?: string | null; video?: string | null } | null;
+type Assets = { image?: string | null; image_url?: string | null; video?: string | null } | null;
 type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[]; video_requested?: boolean; post_reel?: boolean; ab_variant?: string; suggestion_title?: string; insight_line?: string; insight_situation?: string } | null;
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
@@ -388,7 +388,10 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                 const flagRows = Object.entries(COMPLIANCE_LABELS)
                   .map(([k, label]) => ({ label, items: Array.isArray(f[k]) ? (f[k] as string[]) : [] }))
                   .filter((x) => x.items.length > 0);
-                const img = c.brief?.assets?.image ? assetUrl.get(c.brief.assets.image) : undefined;
+                // 28/8: bài content có thể mang ảnh LINK NGOÀI (image_url, không lưu kho).
+                const img = c.brief?.assets?.image_url
+                  ? { url: c.brief.assets.image_url, kind: 'image', title: 'Ảnh minh hoạ (link ngoài)' }
+                  : (c.brief?.assets?.image ? assetUrl.get(c.brief.assets.image) : undefined);
                 const vid = c.brief?.assets?.video ? assetUrl.get(c.brief.assets.video) : undefined;
                 return (
                   <tr key={c.id} id={`row-${c.id}`}>

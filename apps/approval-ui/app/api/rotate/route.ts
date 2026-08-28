@@ -566,17 +566,21 @@ export async function GET(req: Request) {
     // 26/8 (sếp: "ảnh không liên quan"): truyền cả BODY bài để Gemini sinh keyword bám sự việc
     // (kim phun tắc, muối ăn mòn mạch...), không chung chung như trước.
     const picked = await (pickImageForContent as any)(client, folders, `${gen.topic || ''} ${displayTitle}`, recentlyUsedImages, gen.body || '');
-    if (!picked?.id) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
-    const media = { id: picked.id as string };
-    // Đánh dấu ngay để bài content thứ 2 trong cùng lượt (nếu có) cũng không trùng.
-    recentlyUsedImages.set(media.id, new Date().toISOString());
-    // Auto-logo cho ảnh bài content (in-place, giữ nguyên id). Ảnh Unsplash mới tải cũng đóng logo.
-    if (AUTO_LOGO) {
-      try { logoActions.push({ group: 'Bài content', via: picked.via, ...(await ensureLogoForPost(client, media.id)) }); }
-      catch (e) { logoActions.push({ group: 'Bài content', action: 'error', reason: String((e as any)?.message || e) }); }
+    // 28/8 tối: picked có thể là ẢNH KHO (id) hoặc LINK TRỰC TIẾP từ Google/Unsplash (url,
+    // không lưu Storage — user: "kho chỉ để ảnh/video Zalo SDVICO").
+    if (!picked?.id && !picked?.url) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
+    const media = picked.id ? { id: picked.id as string } : null;
+    if (media) {
+      // Đánh dấu ngay để bài content thứ 2 trong cùng lượt (nếu có) cũng không trùng.
+      recentlyUsedImages.set(media.id, new Date().toISOString());
+      // Auto-logo chỉ đóng được lên ảnh KHO (sửa file trong Storage); ảnh link ngoài bỏ qua.
+      if (AUTO_LOGO) {
+        try { logoActions.push({ group: 'Bài content', via: picked.via, ...(await ensureLogoForPost(client, media.id)) }); }
+        catch (e) { logoActions.push({ group: 'Bài content', action: 'error', reason: String((e as any)?.message || e) }); }
+      }
     }
 
-    const assets = { image: media.id, video: null };
+    const assets = { image: media?.id || null, image_url: (picked.url as string) || null, video: null };
     const channels = ['facebook'];
     const { data: ins, error: ce } = await client
       .from('mkt_content')
@@ -595,6 +599,7 @@ export async function GET(req: Request) {
           topic: gen.topic,
           content_type: kind,
           image_via: picked.via,
+          ...(picked.credit ? { image_credit: picked.credit } : {}),
         },
         draft: gen.text,
         status: 'review',

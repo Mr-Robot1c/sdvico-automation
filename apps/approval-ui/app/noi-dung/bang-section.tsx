@@ -266,7 +266,8 @@ export default async function BangSection() {
                 const p = it.payload || {};
                 const rk = riskMeta(p.risk);
                 const chans: string[] = Array.isArray(p.channels) ? p.channels : [];
-                const imgUrl = typeof p.assets?.image === 'string' ? assetUrl.get(p.assets.image) : undefined;
+                // 28/8: bài content có thể mang ảnh LINK NGOÀI (image_url, không lưu kho) — preview thẳng link.
+                const imgUrl = (typeof p.assets?.image_url === 'string' && p.assets.image_url) || (typeof p.assets?.image === 'string' ? assetUrl.get(p.assets.image) : undefined);
                 const vidUrl = typeof p.assets?.video === 'string' ? assetUrl.get(p.assets.video) : undefined;
                 const brief = c?.brief || {};
 
