@@ -174,4 +174,8 @@ async function loop() {
 }
 
 if (process.argv.includes('--loop')) loop();
-else scanOnce().then((ok) => process.exit(ok ? 0 : 1));
+else {
+  // Không dùng process.exit(): trên Windows giết ngang handle mạng đang đóng làm node
+  // crash "Assertion failed ... UV_HANDLE_CLOSING". Đặt exitCode rồi để node tự thoát.
+  scanOnce().then((ok) => { process.exitCode = ok ? 0 : 1; }).catch((e) => { console.error(String(e?.message || e)); process.exitCode = 1; });
+}
