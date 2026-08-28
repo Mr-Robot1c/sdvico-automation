@@ -47,6 +47,10 @@ function python(script, args) {
 function cleanNarration(text) {
   return String(text || '')
     .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu, ' ')
+    // 28/8 (user): TTS doc ten cong ty la "SD Vi Co" (et-de vi-co) chu khong danh van
+    // "S D V I C O" hay "SD Vi C O". Chi ap cho GIONG DOC — phu de/caption giu "SDVICO"
+    // vi cleanNarration chi chay trong duong tts().
+    .replace(/SDVICO/gi, 'SD Vi Co')
     .replace(/\s+/g, ' ')
     .trim();
 }
