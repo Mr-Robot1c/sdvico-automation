@@ -324,7 +324,7 @@ export default function SanXuatForm({
 
         <div className="sx-preview">
           {previewVid ? (
-            <video key={previewVid.id} src={previewVid.url} controls preload="metadata" />
+            <video key={previewVid.id} src={previewVid.url} controls preload="none" />
           ) : (
             <div className="sx-preview-empty">
               <span aria-hidden="true">🎬</span>
@@ -345,7 +345,7 @@ export default function SanXuatForm({
               <span key={a.id} className="chip on" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '3px 6px' }}>
                 <span style={{ background: '#16a34a', color: '#fff', width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
                 <span style={{ position: 'relative', width: 28, height: 28, flexShrink: 0, cursor: 'pointer' }} onClick={() => setPreviewVidId(a.id)} title="Chuyển preview sang video này">
-                  <video src={a.url} muted preload="metadata" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3, display: 'block' }} />
+                  <video src={a.url} muted preload="none" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3, display: 'block' }} />
                   <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, textShadow: '0 0 3px #000' }}>▶</span>
                 </span>
                 <button type="button" onClick={() => setPreviewVidId(a.id)} title="Bấm để chuyển preview sang video này" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, fontSize: '.75rem', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{a.title}</button>
@@ -372,7 +372,7 @@ export default function SanXuatForm({
                   title={a.title + ' — bấm để chọn/bỏ, bấm 🔍 để chỉ xem'}
                   style={{ position: 'relative', cursor: 'pointer', outline: isPreview ? '2px solid #3b82f6' : undefined }}
                 >
-                  <video src={a.url} muted preload="metadata" />
+                  <video src={a.url} muted preload="none" />
                   <span className="sx-thumb-badge" aria-hidden="true">▶</span>
                   <span
                     role="button"
@@ -558,7 +558,7 @@ export default function SanXuatForm({
                     <button type="button" className="btn ghost sm" onClick={() => setVideoJob(null)}>✕ Đóng</button>
                   </div>
                   {videoJob.videoUrl ? (
-                    <video src={videoJob.videoUrl} controls preload="metadata" style={{ marginTop: 10, maxWidth: '100%', maxHeight: 380, borderRadius: 6 }} />
+                    <video src={videoJob.videoUrl} controls preload="none" style={{ marginTop: 10, maxWidth: '100%', maxHeight: 380, borderRadius: 6 }} />
                   ) : null}
                 </>
               ) : (

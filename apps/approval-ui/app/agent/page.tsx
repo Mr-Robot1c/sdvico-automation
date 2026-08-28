@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
+import AgentRoster from './agent-roster';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang AGENT: theo doi qua trinh hoc va
 // chay cua cac AI trong he thong. 9 AI: BOSS (trung tam) + lam video + tao kich ban +
@@ -27,27 +28,16 @@ type LogRow = { task: string; status: string; detail: any; created_at: string };
 export default async function Page() {
   const client = getServerClient();
 
-  const [logRes, dataInternalCount, dataInternalLast, dataPublicCount, dataPublicRows, videoAssetRes] = await Promise.all([
-    client
-      .from('run_log')
-      .select('task, status, detail, created_at')
-      .in('task', [
-        'mkt.plan', 'mkt.plan_manual', 'mkt.live_apply', 'mkt.apply_learn',
-        'mkt.rotate', 'mkt.suggestions_refill',
-        'mkt.seo_audit', 'mkt.seed_keywords',
-        'mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull',
-        'mkt.learn_weekly',
-        'mkt.knowledge_public_deep',
-      ])
-      .order('created_at', { ascending: false })
-      .limit(300),
-    client.from('mkt_knowledge_internal').select('*', { count: 'exact', head: true }),
-    client.from('mkt_knowledge_internal').select('created_at').order('created_at', { ascending: false }).limit(1),
+  // 28/8: 9 AI card tach ra AgentRoster (dung chung voi trang Nguon hoc du lieu) — page nay
+  // chi con query cho phan Trending Digest + fallback list.
+  const [dataPublicCount, dataPublicRows, scoreLogRes] = await Promise.all([
     // 27/8 dot 2 fix: bang dung ten la mkt_knowledge_public (truoc query mkt_public_knowledge
     // KHONG TON TAI -> digest luon trong).
     client.from('mkt_knowledge_public').select('*', { count: 'exact', head: true }),
     client.from('mkt_knowledge_public').select('source_title, summary, created_at').order('created_at', { ascending: false }).limit(6),
-    client.from('brand_assets').select('title, created_at').in('kind', ['video', 'clip']).order('created_at', { ascending: false }).limit(1),
+    // Lan cham diem gan nhat — digest hien ro loi neu scoring dang fail (user 28/8: "AI
+    // data 2 van chua cham diem kia").
+    client.from('run_log').select('status, detail, created_at').eq('task', 'mkt.knowledge_score').order('created_at', { ascending: false }).limit(1),
   ]);
 
   // TRENDING DIGEST (dot 2): tri thuc 7 ngay kem tier/score/keywords/plan — can migration
@@ -87,84 +77,8 @@ export default async function Page() {
   const topKeywords = [...kwCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
   const TIER_CLS: Record<string, string> = { S: 'tone-no', A: 'tone-ok', B: 'tone-demo', C: 'tone-default' };
 
-  const logs = (logRes.data || []) as LogRow[];
-  const lastOf = (tasks: string[]): LogRow | null => logs.find((l) => tasks.includes(l.task)) || null;
-
-  const lastVideoAsset = ((videoAssetRes.data || [])[0] as any) || null;
-  const lastInternal = ((dataInternalLast.data || [])[0] as any) || null;
   const publicRows = (dataPublicRows.data || []) as any[];
-
-  type AgentDef = {
-    icon: string; name: string; role: string; boss?: boolean;
-    last: { at: string | null; ok: boolean | null; note: string };
-    href?: string;
-  };
-  const mkLast = (row: LogRow | null, okNote: string): AgentDef['last'] =>
-    row
-      ? { at: row.created_at, ok: row.status === 'ok', note: row.status === 'ok' ? okNote : `lỗi: ${String(row.detail?.error || row.detail?.msg || row.status).slice(0, 80)}` }
-      : { at: null, ok: null, note: 'chưa thấy lần chạy nào trong log' };
-
-  const bossRow = lastOf(['mkt.plan', 'mkt.plan_manual', 'mkt.live_apply', 'mkt.apply_learn']);
-  const agents: AgentDef[] = [
-    {
-      icon: '👑', name: 'AI BOSS', boss: true,
-      role: 'Quản lý tất cả: học số liệu tuần, ra kế hoạch tuần, mỗi tối 19h chỉnh trọng số nhẹ (±0,5). 70% học bài mới, 30% dùng lại bài cũ đã chỉnh trọng số.',
-      last: mkLast(bossRow, bossRow?.task === 'mkt.live_apply' ? 'chỉnh trọng số tối' : 'ra kế hoạch'),
-      href: '/ke-hoach',
-    },
-    {
-      icon: '✍️', name: 'AI tạo kịch bản', role: 'Viết bài + kịch bản video theo hướng đi BOSS giao (Gemini). Vòng xoay mỗi ngày 2 khung giờ.',
-      last: mkLast(lastOf(['mkt.rotate', 'mkt.suggestions_refill']), 'sinh bài theo lịch'),
-      href: '/noi-dung?loai=bang',
-    },
-    {
-      icon: '🎬', name: 'AI làm video', role: 'ffmpeg trên máy local (Watcher): ghép cảnh 9:16, burn phụ đề, cân âm lượng, đưa video lên kho.',
-      last: lastVideoAsset
-        ? { at: lastVideoAsset.created_at, ok: true, note: `video mới nhất: ${String(lastVideoAsset.title || '').slice(0, 50)}` }
-        : { at: null, ok: null, note: 'kho chưa có video nào' },
-      href: '/video',
-    },
-    {
-      icon: '🎙️', name: 'AI giọng nói', role: 'Gemini TTS giọng Leda đọc tiếng Việt; hết hạn mức tự lui edge-tts HoaiMy. Cả video luôn một giọng.',
-      last: lastVideoAsset
-        ? { at: lastVideoAsset.created_at, ok: true, note: 'chạy cùng lượt dựng video gần nhất' }
-        : { at: null, ok: null, note: 'chạy cùng Watcher, chưa có video' },
-      href: '/video',
-    },
-    {
-      icon: '🔍', name: 'AI quản lý SEO', role: 'Seed từ khóa, audit SEO trang công khai, giữ sitemap sạch cho Google đọc.',
-      last: mkLast(lastOf(['mkt.seo_audit', 'mkt.seed_keywords']), 'audit/seed từ khóa'),
-      href: '/seo',
-    },
-    {
-      icon: '📆', name: 'AI quản lý lịch và kênh', role: 'Bài duyệt xong tự đăng đúng kênh (FB, YouTube; TikTok xuất tay), kéo số liệu mỗi giờ.',
-      last: mkLast(lastOf(['mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull']), 'đăng bài / kéo số liệu'),
-      href: '/kenh',
-    },
-    {
-      icon: '📈', name: 'AI báo cáo tuần', role: 'Chủ nhật 19h gom số liệu tuần từ các bài đã đăng, gửi về BOSS học và đề xuất đổi trọng số.',
-      last: mkLast(lastOf(['mkt.learn_weekly']), 'học tuần xong, có đề xuất'),
-      href: '/do-luong/tuan',
-    },
-    {
-      icon: '🏠', name: 'AI DATA 1 — nội bộ', role: 'Học tri thức nội bộ (file Zalo/tài liệu người phụ trách thả vào kho) thành insight cho BOSS.',
-      last: lastInternal
-        ? { at: lastInternal.created_at, ok: true, note: `${fmt(dataInternalCount.count || 0)} mẩu tri thức trong kho` }
-        : { at: null, ok: null, note: 'kho tri thức nội bộ trống' },
-      href: '/kho-tri-thuc',
-    },
-    {
-      icon: '🌐', name: 'AI DATA 2 — trên mạng', role: 'Quét bài viết, video, keyword đang nóng trên mạng, chấm điểm, gợi ý trend cho BOSS.',
-      last: (() => {
-        const r = lastOf(['mkt.knowledge_public_deep']);
-        if (r) return mkLast(r, `quét xong, kho có ${fmt(dataPublicCount.count || 0)} mục`);
-        return publicRows[0]
-          ? { at: publicRows[0].created_at, ok: true, note: `kho có ${fmt(dataPublicCount.count || 0)} mục` }
-          : { at: null, ok: null as boolean | null, note: 'chưa quét lần nào' };
-      })(),
-      href: '/kho-tri-thuc?ai=public',
-    },
-  ];
+  const lastScoreLog = ((scoreLogRes.data || [])[0] as any) || null;
 
   const flow = [
     'DATA 1 + DATA 2 thu thập', 'Ý tưởng', 'AI BOSS ra kế hoạch', 'AI kịch bản viết',
@@ -198,26 +112,10 @@ export default async function Page() {
         </div>
       </section>
 
-      {/* ===== 9 AI CARD ===== */}
+      {/* ===== 9 AI CARD (component dung chung voi trang Nguon hoc du lieu) ===== */}
       <section className="blk">
         <h2>🤖 Các AI trong hệ thống</h2>
-        <div className="agent-grid">
-          {agents.map((a) => (
-            <div key={a.name} className="agent-card" style={a.boss ? { borderColor: 'var(--brand-red)', background: 'var(--brand-red-bg)' } : undefined}>
-              <div className="ag-head">
-                <span className="ag-name">{a.icon} {a.name}</span>
-                <span className={`badge ${a.last.ok === true ? 'tone-ok' : a.last.ok === false ? 'tone-no' : 'tone-demo'}`}>
-                  {a.last.ok === true ? 'Đang chạy' : a.last.ok === false ? 'Lỗi' : 'Chưa chạy'}
-                </span>
-              </div>
-              <p className="ag-role" style={{ margin: 0 }}>{a.role}</p>
-              <div className="ag-last">
-                {a.last.at ? `Gần nhất ${fmtDT(a.last.at)} — ${a.last.note}` : a.last.note}
-                {a.href ? <> · <Link className="src" href={a.href}>Chi tiết →</Link></> : null}
-              </div>
-            </div>
-          ))}
-        </div>
+        <AgentRoster />
       </section>
 
       {/* ===== TRENDING DIGEST — DATA 2 (dot 2: tier S/A/B/C + top keywords nhu ForLife) ===== */}
@@ -262,7 +160,16 @@ export default async function Page() {
                 ))}
               </div>
             ) : (
-              <p className="sub" style={{ margin: 0 }}>Đã có {fmt(digestRows.length)} mục nhưng chưa mục nào được chấm — cron giờ tới sẽ chấm tự động (20 mục/lượt).</p>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <p className="sub" style={{ margin: 0 }}>Đã có {fmt(digestRows.length)} mục nhưng chưa mục nào được chấm — cron giờ tới sẽ chấm tự động (20 mục/lượt).</p>
+                {lastScoreLog ? (
+                  <p className="sub" style={{ margin: 0, fontSize: '.82rem' }}>
+                    Lần chấm gần nhất {fmtDT(lastScoreLog.created_at)}: {lastScoreLog.status === 'ok' ? `✅ chấm ${fmt(Number(lastScoreLog.detail?.scored) || 0)} mục` : `⛔ ${String(lastScoreLog.detail?.errors?.[0] || 'lỗi không rõ').slice(0, 160)}`}
+                  </p>
+                ) : (
+                  <p className="sub" style={{ margin: 0, fontSize: '.82rem' }}>Chưa thấy lần chấm nào trong log — có thể cron bị hết giờ trước khi tới bước chấm. Chạy tay: <code>/api/knowledge-score?secret=...</code></p>
+                )}
+              </div>
             )}
             {/* Top keywords */}
             {topKeywords.length ? (

@@ -799,8 +799,10 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
   console.log(`\n  Upload Supabase Storage...`);
   const data = await readFile(outputPath);
   const storagePath = `videos/trend_${contentId.slice(0, 8)}_${Date.now()}.mp4`;
+  // cacheControl 1 nam (28/8, Supabase Cached Egress 280%): video final bat bien, cache
+  // browser/CDN cang lau cang do ton bang thong khi UI xem lai.
   const { error: upErr } = await client.storage.from('brand-assets').upload(storagePath, data, {
-    contentType: 'video/mp4', upsert: false,
+    contentType: 'video/mp4', upsert: false, cacheControl: '31536000',
   });
   if (upErr) throw new Error('Upload Storage loi: ' + upErr.message);
 

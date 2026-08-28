@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-27
 ttl_days: 180
+<!-- re-verified: 2026-08-28 09:40 - build-video.mjs upload video final them cacheControl 31536000 (1 nam) - giam Cached Egress khi UI/CDN xem lai video (Supabase 280% quota). -->
 <!-- re-verified: 2026-08-27 20:50 - VIDEO TREND cleanup asset cu moi lan rebuild (user 27/8: "chi luu 1 video cuoi cung"). buildTrendVideoFromPexels truoc khi upload video moi: cleanup old asset ID (brief.assets.video_v + brief.assets.video) - remove Storage file + delete brand_assets row. Moi bai chi giu 1 video final duy nhat. --> 
 <!-- re-verified: 2026-08-27 18:20 - VIDEO TREND giong dong deu ca video. TTS 2-pass: Gemini toan bo, fail thi re-TTS toan bo bang edge. loudnorm=I=-16 can am luong. -->
 <!-- re-verified: 2026-08-27 17:50 - VIDEO TREND thanh 9:16 vertical (YouTube Short + TikTok) - user 27/8. FIX W/H 1920x1080 -> 1080x1920; subtitle Font 20->32 MarginV 40->140; brief.assets.video_v = asset.id (nut "Xuat TikTok" hien duoc). -->

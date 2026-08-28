@@ -33,7 +33,7 @@ export default function AssetViewer({ url, kind, title }: { url: string; kind: s
           <img src={url} alt={title} loading="lazy" />
         ) : isVid ? (
           <>
-            <video src={url} muted preload="metadata" />
+            <video src={url} muted preload="none" />
             <span className="card-media-badge" aria-hidden="true">▶</span>
           </>
         ) : isAudio ? (

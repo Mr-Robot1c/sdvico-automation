@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { collectAbPairs, type AbPair } from '../../lib/evaluator';
+import AgentRoster from '../agent/agent-roster';
+import RecentActivity from '../agent/recent-activity';
 
 // NGUỒN (23/8, user: "sắp xếp lại, ghi rõ 5 AI đã học gì, nguồn nào, Evaluator so sánh thế nào"):
 // một tab mỗi AI, mỗi tab = đúng những gì AI đó đã đọc / đã kết luận, đọc thẳng từ bảng dữ liệu.
@@ -229,48 +231,25 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
 
   return (
     <main>
-      {/* 28/8 (user): gop "Nguon tri thuc" + "Du lieu AI hoc" thanh 1 thu chung "Nguon hoc
-          du lieu" — 2 view la 2 tab chip, /du-lieu-ai la tab thu 2. */}
+      {/* 28/8 v2 (user): GOP THAT — 1 trang duy nhat "Nguon hoc du lieu": tab Tong quan =
+          dashboard TAT CA agent (AgentRoster dung chung voi /agent, bo 5 card cu) + block
+          Hoat dong gan day (nhu ben Du lieu AI hoc cu). /du-lieu-ai redirect ve day. Cac
+          chip AI Data 1/2... van la kho chi tiet theo AI. */}
       <header className="head-row">
         <div>
           <h1>Nguồn học dữ liệu</h1>
-          <p className="sub">Tri thức các AI đã học (nội bộ + trên mạng) và tình trạng học của từng AI.</p>
+          <p className="sub">Tất cả AI đang chạy ở đâu, học được gì — kho tri thức chi tiết theo từng AI ở các tab dưới.</p>
         </div>
       </header>
-      <nav className="filters" aria-label="Khu vực">
-        <a className="chip on" href="/kho-tri-thuc"><span aria-hidden="true">🧠</span> Nguồn tri thức</a>
-        <a className="chip" href="/du-lieu-ai"><span aria-hidden="true">🤖</span> Dữ liệu AI học</a>
-      </nav>
       {chips}
 
       {tab === 'tong-quan' ? (
-        <div className="ai-grid">
-          <Link className="ai-card" href="/kho-tri-thuc?ai=noi-bo">
-            <div className="ai-head"><span className="ai-icon" aria-hidden="true">📁</span><b>AI Data 1</b><span className="muted">nội bộ</span></div>
-            <div className="ai-stats"><div className="ai-stat"><b>{vn(internal.length)}</b><span>tài liệu</span></div><div className="ai-stat"><b>{vn(internal.filter((r) => r.created_at >= since7).length)}</b><span>7 ngày</span></div></div>
-            <div className="ai-foot">Học từ file Zalo Phòng Kinh doanh · gần nhất {fmtDT(internal[0]?.created_at) || 'chưa có'}</div>
-          </Link>
-          <Link className="ai-card" href="/kho-tri-thuc?ai=public">
-            <div className="ai-head"><span className="ai-icon" aria-hidden="true">🌐</span><b>AI Data 2</b><span className="muted">public</span></div>
-            <div className="ai-stats"><div className="ai-stat"><b>{vn(pub.length)}</b><span>tin ngành</span></div><div className="ai-stat"><b>{vn(pub.filter((r) => r.created_at >= since7).length)}</b><span>7 ngày</span></div></div>
-            <div className="ai-foot">Học từ báo ngành hằng ngày · gần nhất {fmtDT(pub[0]?.created_at) || 'chưa có'}</div>
-          </Link>
-          <Link className="ai-card" href="/kho-tri-thuc?ai=danh-gia">
-            <div className="ai-head"><span className="ai-icon" aria-hidden="true">⚖️</span><b>AI Đánh giá</b><span className="muted">Evaluator</span></div>
-            <div className="ai-stats"><div className="ai-stat"><b>{vn(pairs.length)}</b><span>cặp A/B</span></div><div className="ai-stat"><b>{vn(concluded.length)}</b><span>đã kết luận</span></div></div>
-            <div className="ai-foot">So tương tác FB giữa bản A và B · {concluded[0] ? `mới nhất: bản ${concluded[0].winner} thắng` : 'chưa có kết luận'}</div>
-          </Link>
-          <Link className="ai-card" href="/kho-tri-thuc?ai=boss">
-            <div className="ai-head"><span className="ai-icon" aria-hidden="true">🧭</span><b>AI Kế hoạch</b><span className="muted">BOSS</span></div>
-            <div className="ai-stats"><div className="ai-stat"><b>{vn(products.length)}</b><span>sản phẩm xếp</span></div><div className="ai-stat"><b>{vn(sugs.length)}</b><span>hướng đi</span></div></div>
-            <div className="ai-foot">{applied ? `Bản đang áp ${fmtDT(plan.generatedAt || applied.created_at)} · ${plan.measurement_source || 'số liệu 7 ngày'}` : 'Chưa có bản kế hoạch nào được áp'}</div>
-          </Link>
-          <Link className="ai-card" href="/kho-tri-thuc?ai=creator">
-            <div className="ai-head"><span className="ai-icon" aria-hidden="true">✍️</span><b>AI Sáng tạo</b><span className="muted">Creator</span></div>
-            <div className="ai-stats"><div className="ai-stat"><b>{vn(creator.length)}</b><span>bài 7 ngày</span></div><div className="ai-stat"><b>{vn(creator.filter((c) => c.brief?.insight_id).length)}</b><span>có insight</span></div></div>
-            <div className="ai-foot">Viết theo hướng đi BOSS giao + insight khách · gần nhất {fmtDT(creator[0]?.created_at) || 'chưa có'}</div>
-          </Link>
-        </div>
+        <>
+          <AgentRoster />
+          <div style={{ marginTop: 18 }}>
+            <RecentActivity limit={20} />
+          </div>
+        </>
       ) : null}
 
       {tab === 'noi-bo' ? (

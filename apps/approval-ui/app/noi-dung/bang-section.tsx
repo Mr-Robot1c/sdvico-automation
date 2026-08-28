@@ -291,7 +291,7 @@ export default async function BangSection() {
                           {imgUrl ? <img src={imgUrl} alt="" loading="lazy" /> : null}
                           {vidUrl ? (
                             <span className="card-media-vid">
-                              <video src={`${vidUrl}#t=2`} muted preload="metadata" />
+                              <video src={vidUrl} muted preload="none" />
                               <span className="card-media-badge" aria-hidden="true">▶</span>
                             </span>
                           ) : null}
