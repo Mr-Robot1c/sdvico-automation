@@ -5,6 +5,7 @@ covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approv
 last_verified: 2026-08-27
 ttl_days: 90
 <!-- re-verified: 2026-08-28 10:20 - TTS doc ten cong ty: cleanNarration them replace /SDVICO/gi -> "SD Vi Co" (user 28/8: doc "SD Vi Co" chu khong danh van "SD Vi C O"). Ap moi duong giong doc (gemini + edge + outro) vi tat ca deu qua cleanNarration; phu de/banner giu nguyen chu SDVICO. -->
+<!-- re-verified: 2026-08-28 16:20 - build-video TTS chain gemini -> local (TTS_LOCAL_URL) -> edge; brief.fb_real_url ghep link bai Page chinh. -->
 <!-- re-verified: 2026-08-28 15:00 - productOf (plan.ts + week-report.ts) fallback an toan: ten > 60 ky tu / co xuong dong -> Khác (fix weights rac tu bai import). applyLiveEvening them chay bu sang <12h khi toi qua 0 luot (may local tat). Data ban applied da don 4 key rac. -->
 <!-- re-verified: 2026-08-28 09:40 - Route /api/knowledge-score cham tier DOC LAP (cron mkt-metrics-pull 90s nghi het gio truoc buoc cham - DATA 2 39 muc van 0 diem). build-video cacheControl 1 nam. -->
 <!-- re-verified: 2026-08-27 23:40 - DOT 2 REDESIGN: DATA 2 tier S/A/B/C (Trending Digest). Migration knowledge_tier them score/tier/angle/key_message/keywords/plan_suggestions vao mkt_knowledge_public. scoreUnscoredKnowledge cham batch 20 dong/luot bang Gemini trong cron. loadRecentKnowledge uu tien tier cao khi feed BOSS. FIX ten bang sai mkt_public_knowledge -> mkt_knowledge_public o actions.ts (trend gen) + agent page. -->

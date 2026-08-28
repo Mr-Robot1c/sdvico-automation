@@ -10,6 +10,7 @@ import PlatformLogo, { type PlatformKey } from './platform-logo';
 import TikTokPrivateChip from './tiktok-private-chip';
 import ExportTiktokButton from './export-tiktok-button';
 import AddLeadButton from './add-lead-button';
+import LinkFbButton from './link-fb-button';
 import LinkTikTokButton from './link-tiktok-button';
 import PexelsScenesButton from './pexels-scenes-button';
 
@@ -418,12 +419,19 @@ export default async function BangSection() {
                       {(brief as any).insight_line ? <span className="insight-line" title={(brief as any).insight_situation || ''}><span aria-hidden="true">🎯</span> {(brief as any).insight_line}</span> : null}
                       {lastAt ? <span className="muted" style={{ fontSize: '.8rem' }}>Đăng {formatRelative(lastAt)}</span> : null}
                       <div className="ch-links">
-                        {posts.filter((x) => /^https?:/.test(x.url)).map((x, i) => (
-                          <a key={i} className="ch-link" href={x.url} target="_blank" rel="noreferrer" title={`Xem bài trên ${CH_LABEL[x.channel] || x.channel}`}>
-                            {isPlat(x.channel) ? <PlatformLogo platform={x.channel} size={15} /> : <span aria-hidden="true">🔗</span>}
-                            <span>{CH_LABEL[x.channel] || x.channel}</span>
-                          </a>
-                        ))}
+                        {posts.filter((x) => /^https?:/.test(x.url)).map((x, i) => {
+                          // 28/8 (user): chip Facebook UU TIEN link bai tren Page CHINH SDVICOVN
+                          // (brief.fb_real_url — user dan qua nut Ghep FB chinh) thay link page phu.
+                          const fbReal = x.channel === 'facebook' ? String((brief as any).fb_real_url || '') : '';
+                          const href = fbReal || x.url;
+                          const label = fbReal ? 'FB SDVICO VN' : (CH_LABEL[x.channel] || x.channel);
+                          return (
+                            <a key={i} className="ch-link" href={href} target="_blank" rel="noreferrer" title={fbReal ? 'Mở bài trên Page chính SDVICO VN (đã ghép tay)' : `Xem bài trên ${CH_LABEL[x.channel] || x.channel}`}>
+                              {isPlat(x.channel) ? <PlatformLogo platform={x.channel} size={15} /> : <span aria-hidden="true">🔗</span>}
+                              <span>{label}</span>
+                            </a>
+                          );
+                        })}
                         {/* 28/8 (user): bai da GHEP TAY video TikTok (brief.tiktok_video_id) —
                             hien icon TikTok nhu cac kenh khac, link mo video that. */}
                         {(brief as any).tiktok_video_id && (brief as any).tiktok_share_url && !posts.some((x) => x.channel === 'tiktok' && /^https?:/.test(x.url)) ? (
@@ -476,6 +484,8 @@ export default async function BangSection() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
                               <AddLeadButton contentId={it.cid} />
                               {fbPost ? <ShareGroups postUrl={fbPost.url} planGroupsToday={groupsForDate(lastAt)} /> : null}
+                              {/* 28/8: dan link bai dang TAY tren Page chinh SDVICOVN — chip FB uu tien link nay. */}
+                              <LinkFbButton contentId={it.cid} linkedUrl={String((cnt?.brief as any)?.fb_real_url || '') || null} />
                             </div>
                             {/* Cột PHẢI: chỉ hiện nếu bài có video (bài content ảnh không có TikTok) */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>

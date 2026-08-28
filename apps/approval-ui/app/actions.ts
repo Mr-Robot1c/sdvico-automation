@@ -744,6 +744,28 @@ export async function linkTikTokVideoToContent(formData: FormData): Promise<{ ok
   return { ok: true, msg: 'Đã ghép video. Bấm "Kéo số liệu" để cập nhật view/like.' };
 }
 
+// 28/8 (user: "icon FB chuyen sang link bai tren Page SDVICO chinh"): bai may dang len page
+// phu, ban tren SDVICOVN la dang TAY -> user dan link vao day (giong ghep TikTok). Chip
+// Facebook tren card se uu tien link nay. Xoa: gui fb_url rong.
+export async function linkFacebookRealUrl(formData: FormData): Promise<{ ok: boolean; msg: string }> {
+  const contentId = String(formData.get('content_id') || '').trim();
+  const fbUrl = String(formData.get('fb_url') || '').trim();
+  if (!contentId) return { ok: false, msg: 'Thiếu content_id' };
+  if (fbUrl && !/^https?:\/\/(www\.|m\.|web\.)?(facebook\.com|fb\.watch|fb\.com)\//i.test(fbUrl)) {
+    return { ok: false, msg: 'Link không phải Facebook. Dán link bài trên facebook.com/SDVICOVN.' };
+  }
+  const client = getServerClient();
+  const { data: content } = await client.from('mkt_content').select('brief').eq('id', contentId).maybeSingle();
+  if (!content) return { ok: false, msg: 'Không tìm thấy bài' };
+  const brief = { ...((content as any).brief || {}) };
+  if (fbUrl) brief.fb_real_url = fbUrl; else delete brief.fb_real_url;
+  const { error } = await client.from('mkt_content').update({ brief }).eq('id', contentId);
+  if (error) return { ok: false, msg: 'Lỗi lưu: ' + error.message };
+  revalidatePath('/noi-dung');
+  revalidatePath('/tong-quan');
+  return { ok: true, msg: fbUrl ? 'Đã ghép link bài Page chính.' : 'Đã bỏ link Page chính.' };
+}
+
 export async function unlinkTikTokVideoFromContent(formData: FormData): Promise<{ ok: boolean; msg: string }> {
   const contentId = String(formData.get('content_id') || '').trim();
   if (!contentId) return { ok: false, msg: 'Thiếu content_id' };

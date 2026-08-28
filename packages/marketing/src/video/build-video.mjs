@@ -187,8 +187,31 @@ async function geminiTTSWithRetry(cleanText, outPath, workDir, tag) {
   throw lastGemErr || new Error('gemini-tts loi');
 }
 
+// 28/8 (sep che giong edge, muon giong local hay nhu Leda): engine 'local' goi TTS server
+// tren may local (env TTS_LOCAL_URL, contract POST {URL}/tts body {"text": "..."} tra
+// audio/wav) — chay F5-TTS-Vietnamese / viXTTS tuy cai. THROW khi hong de caller doi ca
+// ban sang engine ke (video luon MOT giong).
+async function localTTS(cleanText, outPath, workDir, tag) {
+  const base = String(process.env.TTS_LOCAL_URL || '').replace(/\/$/, '');
+  if (!base) throw new Error('TTS_LOCAL_URL chua dat');
+  const r = await fetch(base + '/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: cleanText }),
+    signal: AbortSignal.timeout(180000),
+  });
+  if (!r.ok) throw new Error('local-tts HTTP ' + r.status + ': ' + (await r.text().catch(() => '')).slice(0, 120));
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (buf.length < 1000) throw new Error('local-tts tra file qua nho (' + buf.length + ' bytes)');
+  const wav = join(workDir, `${tag}_local.wav`);
+  await writeFile(wav, buf);
+  await ffmpeg(['-y', '-i', wav, '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
+  return probeDuration(outPath);
+}
+
 // engine 'gemini': đọc bằng Gemini TTS, THROW khi hỏng (caller quyết làm lại cả bản bằng edge —
-// tránh video lẫn 2 giọng giữa chừng). engine 'edge': đường cũ, tự chống chịu, không bao giờ throw.
+// tránh video lẫn 2 giọng giữa chừng). engine 'local': TTS server local, cũng THROW khi hỏng.
+// engine 'edge': đường cũ, tự chống chịu, không bao giờ throw.
 async function tts(text, outPath, voice, workDir, tag, engine = 'edge') {
   // Đọc số điện thoại/tổng đài từng chữ số (chỉ cho giọng đọc, phụ đề giữ số gốc).
   const clean = spellPhones(cleanNarration(text));
@@ -197,6 +220,7 @@ async function tts(text, outPath, voice, workDir, tag, engine = 'edge') {
   if (!clean) return silentAudio(outPath, estSec);
 
   if (engine === 'gemini') return geminiTTSWithRetry(clean, outPath, workDir, tag);
+  if (engine === 'local') return localTTS(clean, outPath, workDir, tag);
 
   // LÊN XUỐNG GIỌNG: nhiều câu thì synth từng câu với ngữ điệu riêng rồi ghép. Một câu lỗi
   // sau 3 lần thử, hoặc chỉ có 1 câu -> rơi về cách cũ đọc cả đoạn một giọng bên dưới.
@@ -280,7 +304,16 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
   await mkdir(fdir, { recursive: true });
   // GIỌNG NGUYÊN KHỐI: thử Gemini TTS cho TOÀN BỘ cảnh + outro của bản này; bất kỳ cảnh nào
   // hỏng (hết hạn mức...) thì làm lại HẾT bằng edge-tts — không để video lẫn 2 giọng giữa chừng.
-  const engines = process.env.TTS_ENGINE !== 'edge' && process.env.GEMINI_API_KEY ? ['gemini', 'edge'] : ['edge'];
+  // 28/8 (sep che giong edge): chen tang TTS LOCAL (env TTS_LOCAL_URL — server local giong
+  // Viet chat luong cao, contract POST /tts {"text"} -> audio/wav) giua gemini va edge.
+  // Chuoi: gemini -> local -> edge; TTS_ENGINE=edge ep edge; ca video luon MOT giong.
+  const engines = process.env.TTS_ENGINE === 'edge'
+    ? ['edge']
+    : [
+        ...(process.env.GEMINI_API_KEY ? ['gemini'] : []),
+        ...(process.env.TTS_LOCAL_URL ? ['local'] : []),
+        'edge',
+      ];
   const outroAudio = join(fdir, 'outro.mp3');
   let built = [];
   let sceneAudios = [];
@@ -325,8 +358,10 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
       engineUsed = engine;
       break;
     } catch (e) {
-      if (engine !== 'gemini') throw e;
-      console.warn(`  (bản ${format}: Gemini TTS không trọn bộ "${String(e?.message || e).slice(0, 140)}" — làm lại toàn bộ bằng edge-tts)`);
+      // edge la tang cuoi cung (tu chong chiu) — loi o edge la loi that, throw. Cac engine
+      // truoc (gemini/local) fail -> lam lai TOAN BO bang engine ke tiep, giu 1 giong/video.
+      if (engine === 'edge') throw e;
+      console.warn(`  (bản ${format}: ${engine} TTS không trọn bộ "${String(e?.message || e).slice(0, 140)}" — làm lại toàn bộ bằng engine kế tiếp)`);
     }
   }
   console.log(`  Giọng bản ${format}: ${engineUsed === 'gemini' ? `Gemini TTS (${GEMINI_TTS_VOICE}, ${GEMINI_TTS_MODELS[Math.min(geminiModelIdx, GEMINI_TTS_MODELS.length - 1)]})` : 'edge-tts'}`);
@@ -643,48 +678,43 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
     audioPaths.push(join(workDir, `scene${sceneNo}_audio.mp3`));
   }
 
-  // 2. TTS PASS 1: thu Gemini cho tat ca canh.
-  console.log(`\n  TTS pass 1 (Gemini) cho ${usableScenes.length} canh...`);
-  let allGeminiOK = true;
-  for (let i = 0; i < usableScenes.length; i++) {
-    const narration = narrations[i];
-    const audioPath = audioPaths[i];
-    const sceneNo = i + 1;
-    if (narration) {
-      try {
-        console.log(`    TTS Gemini canh ${sceneNo}/${usableScenes.length}...`);
-        const dur = await tts(narration, audioPath, voice, workDir, `scene${sceneNo}`, 'gemini');
-        audioDurs.push(dur);
-      } catch (e) {
-        console.warn(`    (gemini-tts loi canh ${sceneNo}: ${String(e?.message || e).slice(0, 80)})`);
-        console.warn(`    -> RE-TTS TOAN BO bang edge de dong deu giong ca video.`);
-        allGeminiOK = false;
-        break;
-      }
-    } else {
-      const dur = await silentAudio(audioPath, usableScenes[i].duration_sec || 4);
-      audioDurs.push(dur);
-    }
-  }
-
-  // 3. TTS PASS 2 (chi neu Gemini fail): re-TTS TOAN BO bang edge cho dong deu giong.
-  if (!allGeminiOK) {
+  // 2. TTS theo CHUOI ENGINE (28/8 sep che edge): gemini -> local (TTS_LOCAL_URL, giong Viet
+  //    chat luong cao tren may nay) -> edge. Moi engine thu TOAN BO canh; fail 1 canh nao la
+  //    bo ca pass, sang engine ke — ca video luon MOT giong.
+  const trendEngines = process.env.TTS_ENGINE === 'edge'
+    ? ['edge']
+    : [
+        ...(process.env.GEMINI_API_KEY ? ['gemini'] : []),
+        ...(process.env.TTS_LOCAL_URL ? ['local'] : []),
+        'edge',
+      ];
+  let usedEngine = 'edge';
+  for (const engine of trendEngines) {
     audioDurs.length = 0;
-    console.log(`\n  TTS pass 2 (edge) cho toan bo ${usableScenes.length} canh...`);
+    let ok = true;
+    console.log(`\n  TTS (${engine}) cho ${usableScenes.length} canh...`);
     for (let i = 0; i < usableScenes.length; i++) {
       const narration = narrations[i];
       const audioPath = audioPaths[i];
       const sceneNo = i + 1;
-      if (narration) {
-        console.log(`    TTS edge canh ${sceneNo}/${usableScenes.length}...`);
-        const dur = await tts(narration, audioPath, voice, workDir, `scene${sceneNo}`, 'edge');
-        audioDurs.push(dur);
-      } else {
+      if (!narration) {
         const dur = await silentAudio(audioPath, usableScenes[i].duration_sec || 4);
         audioDurs.push(dur);
+        continue;
+      }
+      try {
+        console.log(`    TTS ${engine} canh ${sceneNo}/${usableScenes.length}...`);
+        const dur = await tts(narration, audioPath, voice, workDir, `scene${sceneNo}`, engine);
+        audioDurs.push(dur);
+      } catch (e) {
+        console.warn(`    (${engine} loi canh ${sceneNo}: ${String(e?.message || e).slice(0, 80)} -> lam lai TOAN BO bang engine ke)`);
+        ok = false;
+        break;
       }
     }
+    if (ok) { usedEngine = engine; break; }
   }
+  console.log(`  Giong video trend: ${usedEngine}`);
 
   // 4. GHEP CLIP tung canh: video + audio + loudnorm de am luong cac canh dong deu.
   const clipPaths = [];

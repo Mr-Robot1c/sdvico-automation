@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-27
 ttl_days: 180
+<!-- re-verified: 2026-08-28 16:20 - TTS chain them engine LOCAL (TTS_LOCAL_URL, POST /tts {text} -> wav): gemini -> local -> edge cho ca duong video thuong + trend. localTTS convert wav->mp3 ffmpeg, throw de doi ca ban. -->
 <!-- re-verified: 2026-08-28 10:20 - TTS doc ten cong ty: cleanNarration them replace /SDVICO/gi -> "SD Vi Co" (user 28/8: doc "SD Vi Co" chu khong danh van "SD Vi C O"). Ap moi duong giong doc (gemini + edge + outro) vi tat ca deu qua cleanNarration; phu de/banner giu nguyen chu SDVICO. -->
 <!-- re-verified: 2026-08-28 09:40 - build-video.mjs upload video final them cacheControl 31536000 (1 nam) - giam Cached Egress khi UI/CDN xem lai video (Supabase 280% quota). -->
 <!-- re-verified: 2026-08-27 20:50 - VIDEO TREND cleanup asset cu moi lan rebuild (user 27/8: "chi luu 1 video cuoi cung"). buildTrendVideoFromPexels truoc khi upload video moi: cleanup old asset ID (brief.assets.video_v + brief.assets.video) - remove Storage file + delete brand_assets row. Moi bai chi giu 1 video final duy nhat. --> 
