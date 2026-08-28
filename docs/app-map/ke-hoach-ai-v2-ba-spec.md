@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 90
+<!-- re-verified: 2026-08-28 23:00 - Doi chieu server VieNeu them SPEED (time_stretch sau infer): thuan trinh bay giong doc, khong doi NV/AC ke hoach AI v2. -->
 <!-- re-verified: 2026-08-28 21:40 - Doi chieu bieu cam giong theo loai bai: rotate route luu them brief.emotion (chu cam xuc BOSS chot, von da co trong suggestion); build-video map temperature giong local theo loai bai. Thuan trinh bay giong doc, khong doi NV/AC ke hoach AI v2 (suggestion/plan flow giu nguyen). -->
 <!-- re-verified: 2026-08-28 20:30 - CHUOI GIONG VIDEO DOI HANH VI (user chot giong My Duyen local): build-video.mjs ca 2 duong doi thu tu engine thanh local -> gemini -> edge (truoc gemini dau). Video tu gio mac dinh giong local My Duyen; gemini/edge chi la du phong. Cac NV/AC khac cua ke hoach AI v2 khong doi. -->
 <!-- re-verified: 2026-08-28 19:50 - Doi chieu them file local-tts-server-vieneu.py (packages/marketing/src/voice): CHI la server HTTP giong local moi (VieNeu thay F5), cung contract /tts nen khong doi hanh vi NV/AC nao cua ke hoach AI v2 — chain giong video van gemini -> local -> edge nhu spec. -->

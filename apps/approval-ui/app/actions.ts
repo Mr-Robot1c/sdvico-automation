@@ -744,6 +744,37 @@ export async function linkTikTokVideoToContent(formData: FormData): Promise<{ ok
   return { ok: true, msg: 'Đã ghép video. Bấm "Kéo số liệu" để cập nhật view/like.' };
 }
 
+// 28/8 tối: xác định CHỦ một bài/reel FB (from.id) — token nào đọc được cũng cho biết chủ.
+// Dùng để phân biệt bài page phụ với bài SDVICOVN thật (token phụ đọc được cả 2 loại nhờ
+// Page Public Content Access nên không thể suy chủ bài từ chuyện token nào đọc được).
+async function facebookObjectOwner(objId: string): Promise<{ ownerId: string | null; ownerName: string | null }> {
+  const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+  for (const t of fbPageTokens()) {
+    try {
+      const r = await fetch(`https://graph.facebook.com/${VERSION}/${encodeURIComponent(objId)}?fields=from&access_token=${t.token}`);
+      const j: any = await r.json().catch(() => ({}));
+      if (r.ok && j?.from?.id) return { ownerId: String(j.from.id), ownerName: String(j.from.name || '') };
+    } catch { /* thử token kế */ }
+  }
+  return { ownerId: null, ownerName: null };
+}
+
+// Id của các page PHỤ (page máy đăng nháp): gom cả FACEBOOK_PAGE_ID lẫn id thật từ /me của
+// từng token không phải 'real' (env có thể ghi id cũ/lệch với page token đang giữ).
+async function fbSubPageIds(): Promise<Set<string>> {
+  const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+  const out = new Set<string>();
+  for (const t of fbPageTokens().filter((x) => x.label !== 'real')) {
+    if (t.pageId) out.add(String(t.pageId));
+    try {
+      const r = await fetch(`https://graph.facebook.com/${VERSION}/me?fields=id&access_token=${t.token}`);
+      const j: any = await r.json().catch(() => ({}));
+      if (j?.id) out.add(String(j.id));
+    } catch { /* bỏ qua */ }
+  }
+  return out;
+}
+
 // 28/8 (user: "icon FB chuyen sang link bai tren Page SDVICO chinh"): bai may dang len page
 // phu, ban tren SDVICOVN la dang TAY -> user dan link vao day (giong ghep TikTok). Chip
 // Facebook tren card se uu tien link nay. Xoa: gui fb_url rong.
@@ -754,21 +785,16 @@ export async function linkFacebookRealUrl(formData: FormData): Promise<{ ok: boo
   if (fbUrl && !/^https?:\/\/(www\.|m\.|web\.)?(facebook\.com|fb\.watch|fb\.com)\//i.test(fbUrl)) {
     return { ok: false, msg: 'Link không phải Facebook. Dán link bài trên facebook.com/SDVICOVN.' };
   }
-  // 28/8: user dán nhầm link reel page PHỤ vào đây -> bảng kênh chính hiện bài kênh phụ.
-  // Chặn: nếu token page phụ đọc được bài (Graph chỉ đọc được bài của chính page đó) thì
-  // bài nằm trên page phụ -> từ chối. Graph lỗi mạng/không bóc được id thì vẫn cho ghép.
+  // 28/8: user dán nhầm link reel page PHỤ -> bảng kênh chính hiện bài kênh phụ. Chặn theo
+  // CHỦ BÀI (from.id): bản đầu chặn theo "token phụ đọc được" nhưng quyền Page Public Content
+  // Access làm token phụ đọc được cả bài page khác -> bắt oan link SDVICOVN thật (user 28/8
+  // tối: "t dán link SDVICOVN mà không nhận"). Không xác định được chủ bài thì vẫn cho ghép.
   if (fbUrl) {
     const parsed = facebookObjectIdFromLink(fbUrl);
     if (parsed) {
-      const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
-      for (const t of fbPageTokens().filter((x) => x.label !== 'real')) {
-        try {
-          const r = await fetch(`https://graph.facebook.com/${VERSION}/${encodeURIComponent(parsed.id)}?fields=id&access_token=${t.token}`);
-          const j: any = await r.json().catch(() => ({}));
-          if (r.ok && !j?.error && j?.id) {
-            return { ok: false, msg: 'Link này là bài trên page PHỤ (page máy đăng nháp), không phải kênh chính. Mở facebook.com/SDVICOVN, tìm bài đã đăng tay ở đó rồi copy link.' };
-          }
-        } catch { /* mạng lỗi thì bỏ qua, không chặn oan */ }
+      const { ownerId, ownerName } = await facebookObjectOwner(parsed.id);
+      if (ownerId && (await fbSubPageIds()).has(ownerId)) {
+        return { ok: false, msg: `Bài này nằm trên page PHỤ "${ownerName}" (page máy đăng nháp), không phải SDVICO VN. Nếu anh đã share nó lên SDVICOVN: mở BÀI SHARE trên trang SDVICOVN, bấm ⋯ → Sao chép liên kết (link bài share khác link reel gốc).` };
       }
     }
   }
@@ -1185,7 +1211,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
 
   // Kiểm bài có thật + tìm token của page SỞ HỮU bài (thử lần lượt; Graph trả lỗi nếu token không
   // có quyền đọc bài đó). Token nào đọc được là token đúng page -> dùng luôn pageId của token đó.
-  const fields = parsed.kind === 'video' || parsed.kind === 'reel' ? 'id,description,title,created_time' : 'id,message,story,created_time,permalink_url';
+  const fields = parsed.kind === 'video' || parsed.kind === 'reel' ? 'id,description,title,created_time,from' : 'id,message,story,created_time,permalink_url,from';
   let j: any = null; let usedToken: (typeof tokens)[number] | null = null; let lastErr = '';
   for (const t of tokens) {
     const r = await fetch(`https://graph.facebook.com/${VERSION}/${encodeURIComponent(parsed.id)}?fields=${fields}&access_token=${t.token}`);
@@ -1199,13 +1225,19 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
     return;
   }
   // 28/8: kênh phụ đã tắt đo lường -> nhập bài page phụ chỉ tạo bản trùng gây nhầm bảng
-  // kênh chính (đã xảy ra với reel 916795521025692). Chỉ nhận bài trên page chính.
-  if (usedToken.label !== 'real') {
-    await say('error', 'Bài này nằm trên page PHỤ (page máy đăng nháp). Kênh phụ đã tắt đo lường, không nhập. Chỉ dán link bài trên page chính SDVICO VN.');
+  // kênh chính (đã xảy ra với reel 916795521025692). Phân biệt theo CHỦ BÀI (from.id) chứ
+  // không theo token đọc được — token phụ đọc được cả bài SDVICOVN (Page Public Content
+  // Access) nên check theo token bắt oan bài page chính thật.
+  const ownerId = String((j as any)?.from?.id || '');
+  const ownerName = String((j as any)?.from?.name || '');
+  const subIds = await fbSubPageIds();
+  if (ownerId && subIds.has(ownerId)) {
+    await say('error', `Bài này nằm trên page PHỤ "${ownerName}" (page máy đăng nháp). Kênh phụ đã tắt đo lường, không nhập. Nếu đã share lên SDVICOVN thì copy link BÀI SHARE trên trang SDVICOVN (⋯ → Sao chép liên kết).`);
     revalidatePath('/do-luong');
     return;
   }
-  const pageId = usedToken.pageId || process.env.FACEBOOK_PAGE_ID || '';
+  const isRealOwner = !!ownerId && !subIds.has(ownerId);
+  const pageId = ownerId || usedToken.pageId || process.env.FACEBOOK_PAGE_ID || '';
   const graphId = String(j.id || parsed.id);
   const text = String(j.message || j.description || j.story || j.title || '').trim();
   const title = titleIn || (text ? text.split('\n')[0].slice(0, 90) : `Bài đăng tay ${graphId}`);
@@ -1218,7 +1250,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: parsed.kind === 'post' ? 'social' : 'video',
     title,
-    brief: { keyword: title, intent: 'giao_dich', channels: ['facebook'], generator: 'manual-import', imported_link: link, fb_object_id: graphId, fb_created_time: j.created_time || null, authored: 'human', page: usedToken.label },
+    brief: { keyword: title, intent: 'giao_dich', channels: ['facebook'], generator: 'manual-import', imported_link: link, fb_object_id: graphId, fb_created_time: j.created_time || null, authored: 'human', page: isRealOwner ? 'real' : usedToken.label },
     draft: text || null,
     status: 'published',
     needs_gov_review: false,
@@ -1230,7 +1262,7 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   });
   // Kéo số liệu ngay để người dùng thấy liền.
   await pullFacebookMetrics(client);
-  await say('ok', `đã nhập + kéo số liệu (page ${usedToken.label === 'real' ? 'chính thức' : 'test'})`, { content_id: (ins as any).id, graphId, page: usedToken.label });
+  await say('ok', `đã nhập + kéo số liệu (page ${isRealOwner ? 'chính thức' + (ownerName ? ` — ${ownerName}` : '') : 'test'})`, { content_id: (ins as any).id, graphId, ownerId, page: isRealOwner ? 'real' : usedToken.label });
   revalidatePath('/do-luong');
 }
 

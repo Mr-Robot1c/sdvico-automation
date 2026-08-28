@@ -32,6 +32,9 @@ SAMPLE_RATE = 48000
 # đọc hơi đều; 1.0 cho ngữ điệu lên xuống rõ hơn mà chưa sinh artifact. Chỉnh qua env nếu cần.
 TEMPERATURE = float(os.environ.get("SDVICO_TTS_TEMP", "1.0"))
 TOP_P = float(os.environ.get("SDVICO_TTS_TOP_P", "0.95"))
+# User 28/8 tối: "giọng Mỹ Duyên cần nhanh thêm xíu". Kéo giãn thời gian giữ nguyên tông
+# (librosa time_stretch), 1.1 = nhanh hơn 10%. Chỉnh env hoặc "speed" từng lần gọi.
+SPEED = float(os.environ.get("SDVICO_TTS_SPEED", "1.1"))
 
 print(f"[vieneu] dang nap model (giong: {VOICE})...", flush=True)
 from vieneu import Vieneu  # noqa: E402 — import sau print để log sớm khi khởi động chậm
@@ -46,7 +49,7 @@ lock = threading.Lock()  # 1 infer mỗi lúc, tránh tranh CPU khi Watcher gọ
 
 @app.get("/health")
 def health():
-    return jsonify({"ok": True, "engine": "vieneu-v3-turbo", "voice": VOICE, "temperature": TEMPERATURE, "model": "pnnbao-ump/VieNeu-TTS-v3-Turbo"})
+    return jsonify({"ok": True, "engine": "vieneu-v3-turbo", "voice": VOICE, "temperature": TEMPERATURE, "speed": SPEED, "model": "pnnbao-ump/VieNeu-TTS-v3-Turbo"})
 
 
 @app.post("/tts")
@@ -71,8 +74,16 @@ def tts_route():
         tts.get_preset_voice(voice)  # tên giọng lạ -> rơi về giọng mặc định, không 500
     except Exception:
         voice = VOICE
+    try:
+        speed = min(1.4, max(0.8, float(data.get("speed") or SPEED)))
+    except (TypeError, ValueError):
+        speed = SPEED
     with lock:
         wav = tts.infer(text, voice=voice, temperature=temp, top_p=top_p)
+    if abs(speed - 1.0) > 0.01:
+        import librosa  # có sẵn trong deps vieneu; giữ tông, chỉ đổi nhịp
+        import numpy as np
+        wav = librosa.effects.time_stretch(np.asarray(wav, dtype="float32"), rate=speed)
     buf = io.BytesIO()
     sf.write(buf, wav, SAMPLE_RATE, format="WAV")
     return Response(buf.getvalue(), mimetype="audio/wav")
