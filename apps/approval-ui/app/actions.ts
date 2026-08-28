@@ -754,6 +754,24 @@ export async function linkFacebookRealUrl(formData: FormData): Promise<{ ok: boo
   if (fbUrl && !/^https?:\/\/(www\.|m\.|web\.)?(facebook\.com|fb\.watch|fb\.com)\//i.test(fbUrl)) {
     return { ok: false, msg: 'Link không phải Facebook. Dán link bài trên facebook.com/SDVICOVN.' };
   }
+  // 28/8: user dán nhầm link reel page PHỤ vào đây -> bảng kênh chính hiện bài kênh phụ.
+  // Chặn: nếu token page phụ đọc được bài (Graph chỉ đọc được bài của chính page đó) thì
+  // bài nằm trên page phụ -> từ chối. Graph lỗi mạng/không bóc được id thì vẫn cho ghép.
+  if (fbUrl) {
+    const parsed = facebookObjectIdFromLink(fbUrl);
+    if (parsed) {
+      const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
+      for (const t of fbPageTokens().filter((x) => x.label !== 'real')) {
+        try {
+          const r = await fetch(`https://graph.facebook.com/${VERSION}/${encodeURIComponent(parsed.id)}?fields=id&access_token=${t.token}`);
+          const j: any = await r.json().catch(() => ({}));
+          if (r.ok && !j?.error && j?.id) {
+            return { ok: false, msg: 'Link này là bài trên page PHỤ (page máy đăng nháp), không phải kênh chính. Mở facebook.com/SDVICOVN, tìm bài đã đăng tay ở đó rồi copy link.' };
+          }
+        } catch { /* mạng lỗi thì bỏ qua, không chặn oan */ }
+      }
+    }
+  }
   const client = getServerClient();
   const { data: content } = await client.from('mkt_content').select('brief').eq('id', contentId).maybeSingle();
   if (!content) return { ok: false, msg: 'Không tìm thấy bài' };
@@ -1177,6 +1195,13 @@ export async function importManualFacebookPost(formData: FormData): Promise<void
   }
   if (!j || !usedToken) {
     await say('error', 'Facebook không trả bài này. Nếu là bài trên page chính thức, cần cấu hình FACEBOOK_REAL_PAGE_ACCESS_TOKEN (token page đó, có quyền read_insights). Lỗi cuối: ' + lastErr);
+    revalidatePath('/do-luong');
+    return;
+  }
+  // 28/8: kênh phụ đã tắt đo lường -> nhập bài page phụ chỉ tạo bản trùng gây nhầm bảng
+  // kênh chính (đã xảy ra với reel 916795521025692). Chỉ nhận bài trên page chính.
+  if (usedToken.label !== 'real') {
+    await say('error', 'Bài này nằm trên page PHỤ (page máy đăng nháp). Kênh phụ đã tắt đo lường, không nhập. Chỉ dán link bài trên page chính SDVICO VN.');
     revalidatePath('/do-luong');
     return;
   }
