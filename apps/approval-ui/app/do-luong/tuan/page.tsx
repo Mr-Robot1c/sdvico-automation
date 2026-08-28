@@ -7,6 +7,8 @@ import PostTitle from '../post-title';
 import CopyReport from './copy-report';
 import PlatformLogo from '../../noi-dung/platform-logo';
 import PullMetricsButton from '../../noi-dung/pull-metrics-button';
+// @ts-ignore — module .mjs dùng chung với fb-metrics (nhận diện bài thuộc page nào)
+import { isOtherPage } from '../../../lib/page-origin.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,11 +37,37 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
   const weekPosts: PostRow[] = (postsInWeek || []).map((p: any) => ({
     cid: String(p.content_id || ''), channel: p.channel, publishedAt: String(p.published_at || ''), url: String(p.external_url || ''),
   })).filter((p) => p.cid && ['facebook', 'tiktok', 'youtube'].includes(p.channel));
+  // 28/8: TikTok ghép tay KHÔNG có mkt_posts — lấy từ snapshot mkt_metrics có createTime
+  // (giờ đăng thật) rơi trong tuần, gộp với mkt_posts tiktok (thời Direct Post) khử trùng.
+  const { data: ttSnaps } = await client
+    .from('mkt_metrics')
+    .select('entity_ref, metrics, created_at')
+    .eq('source', 'tiktok')
+    .order('created_at', { ascending: false })
+    .limit(500);
+  const ttSeen = new Set(weekPosts.filter((p) => p.channel === 'tiktok').map((p) => p.cid));
+  for (const r of (ttSnaps || []) as any[]) {
+    const cid = String(r.entity_ref || '');
+    const ct = Number((r.metrics || {}).createTime || 0);
+    if (!cid || !ct || ttSeen.has(cid)) continue;
+    const iso = new Date(ct * 1000).toISOString();
+    if (iso < win.startIso || iso >= win.endIso) continue;
+    ttSeen.add(cid);
+    weekPosts.push({ cid, channel: 'tiktok', publishedAt: iso, url: '' });
+  }
   const weekCids = [...new Set(weekPosts.map((p) => p.cid))];
+  // 28/8: lấy brief + deleted_at — bài Thùng rác bỏ khỏi tuần; FB chỉ tính bài KÊNH CHÍNH
+  // (fb_real_url ghép tay hoặc import từ page chính), link ưu tiên fb_real_url.
   const weekTitles = new Map<string, string>();
+  const weekBriefs = new Map<string, any>();
+  const weekDeleted = new Set<string>();
   if (weekCids.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, title').in('id', weekCids);
-    for (const c of cs || []) weekTitles.set((c as any).id, (c as any).title || '(không tên)');
+    const { data: cs } = await client.from('mkt_content').select('id, title, brief, deleted_at').in('id', weekCids);
+    for (const c of cs || []) {
+      if ((c as any).deleted_at) { weekDeleted.add((c as any).id); continue; }
+      weekTitles.set((c as any).id, (c as any).title || '(không tên)');
+      weekBriefs.set((c as any).id, (c as any).brief || {});
+    }
   }
   const { data: weekMetrics } = await client
     .from('mkt_metrics')
@@ -53,11 +81,17 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
     const k = `${r.entity_ref}|${r.source}`;
     if (!latest.has(k)) latest.set(k, r.metrics || {});
   }
-  const rowsAllChannels = weekPosts.map((p) => {
+  const rowsAllChannels = weekPosts.filter((p) => {
+    if (weekDeleted.has(p.cid)) return false;
+    if (p.channel !== 'facebook') return true;
+    const brief = weekBriefs.get(p.cid) || {};
+    return !!brief.fb_real_url || !!(isOtherPage as (u: string, b: any) => boolean)(p.url, brief);
+  }).map((p) => {
     const m = latest.get(`${p.cid}|${p.channel}`) || {};
     const eng = (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
+    const realUrl = p.channel === 'facebook' ? String((weekBriefs.get(p.cid) || {}).fb_real_url || '') : '';
     return {
-      cid: p.cid, channel: p.channel, publishedAt: p.publishedAt, url: p.url,
+      cid: p.cid, channel: p.channel, publishedAt: p.publishedAt, url: realUrl || p.url,
       title: weekTitles.get(p.cid) || '(không tên)',
       reactions: m.reactions || 0, comments: m.comments || 0, shares: m.shares || 0,
       views: m.views || 0, engagement: eng, shareUrl: m.shareUrl, videoId: m.videoId,
@@ -229,7 +263,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
                     <td className="cell-title">
                       {i === 0 ? '🏆 ' : ''}
                       <PostTitle title={p.title} product={p.product} draft={''} url={p.url} />
-                      {p.otherPage ? <span className="badge tone-demo" style={{ marginLeft: 6 }} title="Bài nhập từ page khác, không phải page chính hệ thống đang đăng. Số liệu chỉ để tham khảo.">Page khác</span> : null}
+                      {/* 28/8: bỏ badge "Page khác" — tuần giờ CHỈ còn bài kênh chính nên nhãn hết nghĩa. */}
                     </td>
                     <td>{p.product}</td>
                     <td className="num"><b>{vnInt(p.score)}</b></td>

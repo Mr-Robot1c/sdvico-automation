@@ -102,6 +102,38 @@ export async function GET(req: Request) {
     }
   }
 
-  if (error) return NextResponse.json({ ok: false, tokenCheck, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, tokenCheck, object, count: data?.length || 0, logs: data || [] });
+  // 4) 28/8 (vu ghep link reel): kiem token page CHINH + doc thu 1 object bang TUNG token
+  //    (?obj_both=<id> — token nao doc duoc thi bai thuoc page do) + liet ke bai moi nhat
+  //    tren page chinh (?real_posts=1 — tim bai share/dang lai de lay permalink dung).
+  const REAL = process.env.FACEBOOK_REAL_PAGE_ACCESS_TOKEN;
+  const tokenCheckReal: any = { configured: !!REAL };
+  if (REAL) {
+    try {
+      const meRes = await fetch(`https://graph.facebook.com/${VERSION}/me?fields=id,name,category`, { headers: { Authorization: `Bearer ${REAL}` } });
+      const me: any = await meRes.json();
+      tokenCheckReal.me = me?.error ? { error: me.error?.message } : { id: me?.id, name: me?.name, category: me?.category };
+    } catch (e: any) { tokenCheckReal.me = { error: String(e?.message || e) }; }
+  }
+  const objBoth = (url.searchParams.get('obj_both') || '').replace(/[^0-9_]/g, '');
+  let objByToken: any = null;
+  if (objBoth) {
+    objByToken = {};
+    for (const [label, tok] of [['test', TOKEN], ['real', REAL]] as [string, string | undefined][]) {
+      if (!tok) { objByToken[label] = { error: 'no token' }; continue; }
+      try {
+        const r = await fetch(`https://graph.facebook.com/${VERSION}/${objBoth}?fields=id,created_time,permalink_url,from&access_token=${encodeURIComponent(tok)}`);
+        objByToken[label] = await r.json();
+      } catch (e: any) { objByToken[label] = { error: String(e?.message || e) }; }
+    }
+  }
+  let realPosts: any = null;
+  if (url.searchParams.get('real_posts') === '1' && REAL) {
+    try {
+      const r = await fetch(`https://graph.facebook.com/${VERSION}/me/published_posts?fields=id,created_time,permalink_url,message,attachments{type,url,target}&limit=10&access_token=${encodeURIComponent(REAL)}`);
+      realPosts = await r.json();
+    } catch (e: any) { realPosts = { error: String(e?.message || e) }; }
+  }
+
+  if (error) return NextResponse.json({ ok: false, tokenCheck, tokenCheckReal, error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, tokenCheck, tokenCheckReal, objByToken, realPosts, object, count: data?.length || 0, logs: data || [] });
 }

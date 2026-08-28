@@ -186,10 +186,12 @@ async function loadPostsInWindow(client: Client, win: WeekWindow): Promise<PostS
     });
   }
 
-  // 3. mkt_content để lấy title, brief (sản phẩm + kind + conversions).
-  const { data: contentRows } = await client.from('mkt_content').select('id, title, brief, draft').in('id', cids);
+  // 3. mkt_content để lấy title, brief (sản phẩm + kind + conversions). 28/8: bỏ bài đã
+  // vào Thùng rác (deleted_at) — trước đây bài xoá mềm vẫn được tính vào tuần.
+  const { data: contentRows } = await client.from('mkt_content').select('id, title, brief, draft, deleted_at').in('id', cids);
   const contents = new Map<string, { title: string; brief: any; draft: string }>();
   for (const c of contentRows || []) {
+    if ((c as any).deleted_at) continue;
     contents.set((c as any).id, { title: String((c as any).title || '(không tên)'), brief: (c as any).brief || {}, draft: String((c as any).draft || '') });
   }
 
@@ -210,27 +212,36 @@ async function loadPostsInWindow(client: Client, win: WeekWindow): Promise<PostS
     leadsPerContent.set(id, (leadsPerContent.get(id) || 0) + 1);
   }
 
-  const posts: PostScore[] = cids.map((cid) => {
+  // 28/8 (user "tắt kênh phụ" + "ghép link SDVICOVN phải vào cả báo cáo tuần"): tuần chỉ
+  // tính bài KÊNH CHÍNH — có brief.fb_real_url (ghép tay) hoặc vốn của page chính (import).
+  // Bài máy đăng chỉ nằm page phụ bị BỎ khỏi tuần (số 0 của nó kéo lệch trung bình mà BOSS
+  // học theo). Link ưu tiên fb_real_url. Content đã xoá mềm không có trong `contents` -> bỏ.
+  const posts: PostScore[] = [];
+  for (const cid of cids) {
     const p = byCid.get(cid)!;
-    const c = contents.get(cid) || { title: '(không rõ)', brief: {}, draft: '' };
+    const c = contents.get(cid);
+    if (!c) continue;
+    const realUrl = String(c.brief?.fb_real_url || '');
+    const other = !!(isOtherPage as (u: string, b: any) => boolean)(p.url, c.brief);
+    if (!realUrl && !other) continue;
     const m: PostMetric = latest.get(cid) || { reactions: 0, comments: 0, shares: 0, engagement: 0, views: 0, watchSec: 0, reach: 0 };
     const product = productOf(c.brief, c.title, c.draft);
     const { isContent, contentType } = kindOf(c.brief);
     const leadCount = leadsPerContent.get(cid) || 0;
-    return {
+    posts.push({
       cid,
       title: c.title,
       product,
       isContent,
       contentType,
       publishedAt: p.publishedAt || null,
-      url: p.url,
+      url: realUrl || p.url,
       m,
       conversions: (Number(c.brief?.conversions) || 0) + leadCount,
       score: scoreOf(m),
-      otherPage: !!(isOtherPage as (u: string, b: any) => boolean)(p.url, c.brief)
-    };
-  });
+      otherPage: other
+    });
+  }
   return posts;
 }
 
