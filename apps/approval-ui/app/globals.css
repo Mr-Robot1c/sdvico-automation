@@ -1189,8 +1189,13 @@ button.board-stat:hover { border-color: var(--accent, #1f5fbf); }
 .board-ops { flex: 1.6 1 260px; min-width: 240px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: grid; gap: 6px; align-content: center; }
 .board-body { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 .kanban-wrap { flex: 1 1 640px; min-width: 0; overflow-x: auto; padding-bottom: 8px; }
-/* 27/8: board 4 cot (them "Len lich" giua Cho duyet va Da dang). */
-.kanban { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 12px; min-width: 1040px; align-items: start; }
+/* 28/8: ve lai 3 cot (Cho duyet | Len lich | Trang thai gop Da dang + Tu choi) — 4 cot lam
+   card Cho duyet tran de cot ben canh (user bao bug UI). Kem guard chong tran:
+   min-width: 0 cho grid item + card/input co theo cot. */
+.kanban { display: grid; grid-template-columns: repeat(3, minmax(280px, 1fr)); gap: 12px; min-width: 900px; align-items: start; }
+.kanban-col { min-width: 0; }
+.kanban-col .card { min-width: 0; max-width: 100%; }
+.kanban-col input, .kanban-col select, .kanban-col textarea { max-width: 100%; min-width: 0; }
 .kanban-col { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 10px; align-content: start; }
 .kanban-col .card { box-shadow: none; }
 .kanban-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .9rem; padding: 6px 12px; border-radius: 999px; }

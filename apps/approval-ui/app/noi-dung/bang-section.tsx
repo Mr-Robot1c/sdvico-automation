@@ -220,14 +220,15 @@ export default async function BangSection() {
   const PUB_CAP = 4;
   const REJ_CAP = 4;
 
-  // 27/8 redesign (user: "bang hien Cho duyet - Len lich - Da dang - Tu choi"): board 4 cot.
-  // Cot "Len lich" = bai da duyet chua len kenh (hen gio hoac dang dang) — truoc nam trong
-  // banner canh bao phia tren, gio thanh cot rieng cho ro dong chay.
-  const columns: { key: string; label: string; icon: string; tone: string; items: QItem[]; cap: number; moreHref?: string }[] = [
+  // 28/8 (user thay 4 cot bi tran card -> "gop Da dang va Tu choi thanh 1 khoi Trang thai"):
+  // board 3 COT: Cho duyet | Len lich | Trang thai (4 bai Da dang + 4 bai Tu choi gan nhat,
+  // dem tong that o countOverride). Card trong cot Trang thai render theo it.status.
+  const statusItems = [...published.slice(0, PUB_CAP), ...rejected.slice(0, REJ_CAP)];
+  const statusTotal = published.length + rejected.length;
+  const columns: { key: string; label: string; icon: string; tone: string; items: QItem[]; cap: number; moreHref?: string; countOverride?: number }[] = [
     { key: 'pending', label: 'Chờ duyệt', icon: '📥', tone: 'pending', items: pending, cap: 50 },
     { key: 'scheduled', label: 'Lên lịch', icon: '⏰', tone: 'pending', items: approvedWaiting, cap: 10 },
-    { key: 'published', label: 'Đã đăng', icon: '🌐', tone: 'published', items: published, cap: PUB_CAP, moreHref: '/noi-dung?loai=bai-viet' },
-    { key: 'rejected', label: 'Từ chối', icon: '⛔', tone: 'rejected', items: rejected, cap: REJ_CAP, moreHref: '/noi-dung?loai=bai-viet&trangthai=rejected' }
+    { key: 'status', label: 'Trạng thái', icon: '🗂️', tone: 'published', items: statusItems, cap: PUB_CAP + REJ_CAP, moreHref: '/noi-dung?loai=bai-viet', countOverride: statusTotal }
   ];
 
   return (
@@ -251,7 +252,7 @@ export default async function BangSection() {
               <div className={`kanban-head tone-${col.tone}`}>
                 <span aria-hidden="true">{col.icon}</span>
                 <span>{col.label}</span>
-                <span className="n">{col.items.length}</span>
+                <span className="n">{col.countOverride ?? col.items.length}</span>
               </div>
 
               {col.items.length === 0 ? (
@@ -403,7 +404,9 @@ export default async function BangSection() {
                   );
                 }
 
-                if (col.key === 'published') {
+                // Cot Trang thai: bai Tu choi render card gon (default cuoi), bai Da dang
+                // render card day du ben duoi.
+                if (col.key === 'status' && it.status !== 'rejected') {
                   const posts = postsByContent.get(it.cid) || [];
                   const m = metricsByContent.get(it.cid);
                   const fbPost = posts.find((x) => x.channel === 'facebook' && /^https?:/.test(x.url) && !/\/reel\//.test(x.url));
@@ -506,8 +509,8 @@ export default async function BangSection() {
                 );
               })}
 
-              {col.items.length > col.cap && col.moreHref ? (
-                <Link className="src" href={col.moreHref} style={{ fontSize: '.85rem' }}>Xem tất cả {col.items.length} bài</Link>
+              {(col.countOverride ?? col.items.length) > col.cap && col.moreHref ? (
+                <Link className="src" href={col.moreHref} style={{ fontSize: '.85rem' }}>Xem tất cả {col.countOverride ?? col.items.length} bài</Link>
               ) : null}
             </div>
           ))}
