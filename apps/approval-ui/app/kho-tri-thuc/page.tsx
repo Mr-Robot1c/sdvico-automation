@@ -15,7 +15,7 @@ import RecentActivity from '../agent/recent-activity';
 
 export const dynamic = 'force-dynamic';
 
-type Tab = 'tong-quan' | 'noi-bo' | 'public' | 'danh-gia' | 'boss' | 'creator' | 'token';
+type Tab = 'tong-quan' | 'noi-bo' | 'public' | 'danh-gia' | 'boss' | 'creator' | 'video-ai' | 'lich-kenh' | 'bao-cao' | 'seo-ai' | 'token';
 const TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: 'tong-quan', label: 'Tổng quan', icon: '🧠' },
   { key: 'noi-bo', label: 'AI Data 1', icon: '📁' },
@@ -23,6 +23,11 @@ const TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: 'danh-gia', label: 'AI Đánh giá', icon: '⚖️' },
   { key: 'boss', label: 'AI Kế hoạch', icon: '🧭' },
   { key: 'creator', label: 'AI Sáng tạo', icon: '✍️' },
+  // 28/8 (user): tab chi tiet cho cac AI MOI ngoai bo cu — video/giong, lich kenh, bao cao, SEO.
+  { key: 'video-ai', label: 'AI Video + Giọng', icon: '🎬' },
+  { key: 'lich-kenh', label: 'AI Lịch và kênh', icon: '📆' },
+  { key: 'bao-cao', label: 'AI Báo cáo tuần', icon: '📈' },
+  { key: 'seo-ai', label: 'AI SEO', icon: '🔍' },
   // 24/8 (user "quản trị token các agent... sếp bảo đốt quá nhiều token rồi").
   { key: 'token', label: 'Quản trị token', icon: '⚡' },
 ];
@@ -61,6 +66,8 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     abPairs,
     { data: tokenRows },
     { data: claudeUsageRows },
+    { data: agentLogRows },
+    { data: videoAssetRows },
   ] = await Promise.all([
     client.from('mkt_knowledge_internal').select('id, source_path, title, summary, needs_gov_review, created_at').not('source_path', 'like', 'evaluator/%').order('created_at', { ascending: false }).limit(60),
     client.from('mkt_knowledge_public').select('id, source_url, source_title, summary, needs_gov_review, created_at').order('created_at', { ascending: false }).limit(60),
@@ -76,6 +83,9 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     // lượng token dùng + quy đổi ra tiền". Script upload-claude-usage.mjs cron 1h/lần đọc
     // jsonl ~/.claude/projects/*SDVICO* → upsert bảng claude_code_usage.
     client.from('claude_code_usage').select('ts, model, input_tokens, cache_creation_tokens, cache_read_tokens, output_tokens, estimated_cost_usd, estimated_cost_vnd').gte('ts', since30).order('ts', { ascending: false }).limit(10000),
+    // 28/8: log cho 4 tab AI moi (lich kenh / bao cao / SEO). Tab video dung brand_assets.
+    client.from('run_log').select('task, status, detail, created_at').in('task', ['mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull', 'mkt.metrics_pull_manual', 'mkt.learn_weekly', 'mkt.apply_learn', 'mkt.seo_audit', 'mkt.seed_keywords']).order('created_at', { ascending: false }).limit(120),
+    client.from('brand_assets').select('id, title, storage_path, product_group, created_at').in('kind', ['video', 'clip']).order('created_at', { ascending: false }).limit(12),
   ] as any);
 
   const internal = (internalRows || []) as any[];
@@ -422,6 +432,87 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
         </section>
       ) : null}
 
+      {/* ===== 28/8: 4 TAB AI MOI (user: "layout cho cac AI con lai + noi ro model, local thi ghi dia chi") ===== */}
+      {tab === 'video-ai' ? (
+        <section>
+          <div className="need-item" style={{ marginBottom: 12 }}>
+            <span>🎬</span>
+            <span style={{ flex: 1 }}>
+              <b>AI làm video + AI giọng nói</b> — ghép cảnh 9:16, burn phụ đề, cân âm lượng, đọc giọng.
+              <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
+                🧩 <b>Model:</b> ffmpeg (ghép, không LLM) · Gemini TTS <code>gemini-3.1-flash-tts-preview → 2.5-flash → 2.5-pro</code> giọng Leda, hết hạn mức lui edge-tts <code>vi-VN-HoaiMyNeural</code>.
+                <br />📍 <b>Chạy tại:</b> MÁY LOCAL — Watcher <code>C:/Users/ADMIN/Desktop/SDVICO Marketing/packages/marketing/src/video/build-video.mjs</code> (quét bài video_requested, cần máy bật). Video final đưa lên Supabase Storage <code>brand-assets/videos/</code>.
+              </span>
+            </span>
+          </div>
+          <p className="sub" style={{ margin: '8px 0 12px' }}>Video đã dựng gần nhất (kho brand-assets): {vn((videoAssetRows || []).length)} bản.</p>
+          {!(videoAssetRows || []).length ? <div className="empty"><p>Kho chưa có video nào.</p></div> : (
+            <div className="tablewrap">
+              <table className="datatable">
+                <thead><tr><th>Video</th><th>Folder</th><th>Tạo lúc</th></tr></thead>
+                <tbody>
+                  {(videoAssetRows as any[]).map((a) => (
+                    <tr key={a.id}>
+                      <td className="cell-title"><b>{String(a.title || a.storage_path).slice(0, 80)}</b></td>
+                      <td className="sub">{String(a.product_group || '—')}</td>
+                      <td className="sub">{fmtDT(a.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {tab === 'lich-kenh' ? (
+        <section>
+          <div className="need-item" style={{ marginBottom: 12 }}>
+            <span>📆</span>
+            <span style={{ flex: 1 }}>
+              <b>AI quản lý lịch và kênh</b> — bài duyệt xong tự đăng đúng kênh, kéo số liệu mỗi giờ.
+              <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
+                🧩 <b>Model:</b> không dùng LLM — gọi thẳng Facebook Graph API v26 · YouTube Data API v3 · TikTok Display API.
+                <br />📍 <b>Chạy tại:</b> Vercel serverless — cron <code>/api/mkt-metrics-pull</code> mỗi giờ + chạy ngay khi người bấm Duyệt.
+              </span>
+            </span>
+          </div>
+          <AgentLogTable rows={(agentLogRows as any[]).filter((l: any) => ['mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull', 'mkt.metrics_pull_manual'].includes(l.task))} />
+        </section>
+      ) : null}
+
+      {tab === 'bao-cao' ? (
+        <section>
+          <div className="need-item" style={{ marginBottom: 12 }}>
+            <span>📈</span>
+            <span style={{ flex: 1 }}>
+              <b>AI báo cáo tuần</b> — Chủ nhật 19h gom số liệu tuần, đề xuất đổi trọng số cho BOSS.
+              <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
+                🧩 <b>Model:</b> không dùng LLM — tính trực tiếp từ bảng <code>mkt_metrics</code> (view, tương tác từng bài).
+                <br />📍 <b>Chạy tại:</b> Vercel — cron Chủ nhật 19h (learn-weekly). Đề xuất hiện ở trang Kế hoạch, người bấm Áp dụng mới đổi.
+              </span>
+            </span>
+          </div>
+          <AgentLogTable rows={(agentLogRows as any[]).filter((l: any) => ['mkt.learn_weekly', 'mkt.apply_learn'].includes(l.task))} />
+        </section>
+      ) : null}
+
+      {tab === 'seo-ai' ? (
+        <section>
+          <div className="need-item" style={{ marginBottom: 12 }}>
+            <span>🔍</span>
+            <span style={{ flex: 1 }}>
+              <b>AI quản lý SEO</b> — seed từ khóa, audit trang công khai, giữ sitemap sạch cho Google.
+              <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
+                🧩 <b>Model:</b> Gemini flash-lite (seed từ khóa); audit là script thuần không LLM.
+                <br />📍 <b>Chạy tại:</b> Vercel (trang /blog, sitemap tự sinh) + script local <code>C:/Users/ADMIN/Desktop/SDVICO Marketing/packages/marketing</code> (seo_audit).
+              </span>
+            </span>
+          </div>
+          <AgentLogTable rows={(agentLogRows as any[]).filter((l: any) => ['mkt.seo_audit', 'mkt.seed_keywords'].includes(l.task))} />
+        </section>
+      ) : null}
+
       {tab === 'token' ? (
         <section>
           <p className="sub" style={{ margin: '8px 0 12px' }}>
@@ -581,5 +672,41 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
         </section>
       ) : null}
     </main>
+  );
+}
+
+// 28/8: bang log dung chung cho 4 tab AI moi (lich-kenh / bao-cao / seo-ai). Hien 12 lan
+// chay gan nhat: viec gi, ket qua, luc nao. Task dich sang tieng Viet de nguoi thuong doc.
+function AgentLogTable({ rows }: { rows: Array<{ task: string; status: string; detail: any; created_at: string }> }) {
+  const LABEL: Record<string, string> = {
+    'mkt.publish_facebook_ui': 'Đăng bài lên Facebook',
+    'mkt.publish_facebook': 'Đăng bài lên Facebook',
+    'mkt.publish_youtube': 'Đăng video lên YouTube',
+    'mkt.publish_tiktok': 'Đăng TikTok',
+    'mkt.metrics_pull': 'Kéo số liệu (cron)',
+    'mkt.metrics_pull_manual': 'Kéo số liệu (bấm tay)',
+    'mkt.learn_weekly': 'Học số liệu tuần',
+    'mkt.apply_learn': 'Áp đề xuất tuần',
+    'mkt.seo_audit': 'Audit SEO',
+    'mkt.seed_keywords': 'Seed từ khóa',
+  };
+  const top = rows.slice(0, 12);
+  if (!top.length) return <div className="empty"><p>Chưa thấy lần chạy nào trong log.</p></div>;
+  return (
+    <div className="tablewrap">
+      <table className="datatable">
+        <thead><tr><th style={{ width: 200 }}>Việc</th><th style={{ width: 90 }}>Kết quả</th><th>Chi tiết</th><th style={{ width: 110 }}>Lúc</th></tr></thead>
+        <tbody>
+          {top.map((l, i) => (
+            <tr key={i}>
+              <td><b>{LABEL[l.task] || l.task}</b></td>
+              <td><span className={`badge ${l.status === 'ok' ? 'tone-ok' : l.status === 'error' ? 'tone-no' : 'tone-demo'}`}>{l.status === 'ok' ? '✅ OK' : l.status === 'error' ? '⛔ Lỗi' : l.status}</span></td>
+              <td className="sub" style={{ fontSize: '.82rem' }}>{String(l.detail?.msg || l.detail?.error || JSON.stringify(l.detail || {})).slice(0, 120)}</td>
+              <td className="sub" style={{ fontSize: '.82rem' }}>{fmtDT(l.created_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

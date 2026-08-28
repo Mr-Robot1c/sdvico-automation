@@ -52,6 +52,7 @@ export default async function AgentRoster() {
 
   type AgentDef = {
     icon: string; name: string; role: string; boss?: boolean;
+    model: string; runsAt: string;
     last: { at: string | null; ok: boolean | null; note: string };
     href?: string;
   };
@@ -64,53 +65,62 @@ export default async function AgentRoster() {
   const agents: AgentDef[] = [
     {
       icon: '👑', name: 'AI BOSS', boss: true,
+      model: 'Gemini flash-lite (env MKT_MODEL, key GEMINI_API_KEY)', runsAt: 'Vercel — cron /api/mkt-metrics-pull mỗi giờ',
       role: 'Quản lý tất cả: học số liệu tuần, ra kế hoạch tuần, mỗi tối 19h chỉnh trọng số nhẹ (±0,5). 70% học bài mới, 30% dùng lại bài cũ đã chỉnh trọng số.',
       last: mkLast(bossRow, bossRow?.task === 'mkt.live_apply' ? 'chỉnh trọng số tối' : 'ra kế hoạch'),
       href: '/ke-hoach',
     },
     {
-      icon: '✍️', name: 'AI tạo kịch bản', role: 'Viết bài + kịch bản video theo hướng đi BOSS giao (Gemini). Vòng xoay mỗi ngày 2 khung giờ.',
+      icon: '✍️', name: 'AI tạo kịch bản',
+      model: 'Gemini flash-lite (env MKT_MODEL)', runsAt: 'Vercel — /api/rotate 2 khung giờ mỗi ngày', role: 'Viết bài + kịch bản video theo hướng đi BOSS giao (Gemini). Vòng xoay mỗi ngày 2 khung giờ.',
       last: mkLast(lastOf(['mkt.rotate', 'mkt.suggestions_refill']), 'sinh bài theo lịch'),
       href: '/noi-dung',
     },
     {
-      icon: '🎬', name: 'AI làm video', role: 'ffmpeg trên máy local (Watcher): ghép cảnh 9:16, burn phụ đề, cân âm lượng, đưa video lên kho.',
+      icon: '🎬', name: 'AI làm video',
+      model: 'ffmpeg (không dùng LLM)', runsAt: 'Máy local — C:/Users/ADMIN/Desktop/SDVICO Marketing/packages/marketing/src/video/build-video.mjs (Watcher)', role: 'ffmpeg trên máy local (Watcher): ghép cảnh 9:16, burn phụ đề, cân âm lượng, đưa video lên kho.',
       last: lastVideoAsset
         ? { at: lastVideoAsset.created_at, ok: true, note: `video mới nhất: ${String(lastVideoAsset.title || '').slice(0, 50)}` }
         : { at: null, ok: null, note: 'kho chưa có video nào' },
-      href: '/video',
+      href: '/kho-tri-thuc?ai=video-ai',
     },
     {
-      icon: '🎙️', name: 'AI giọng nói', role: 'Gemini TTS giọng Leda đọc tiếng Việt; hết hạn mức tự lui edge-tts HoaiMy. Cả video luôn một giọng.',
+      icon: '🎙️', name: 'AI giọng nói',
+      model: 'Gemini TTS 3.1-flash → 2.5-flash → 2.5-pro (giọng Leda); hết mức lui edge-tts vi-VN-HoaiMy', runsAt: 'Máy local — chạy cùng Watcher build-video.mjs', role: 'Gemini TTS giọng Leda đọc tiếng Việt; hết hạn mức tự lui edge-tts HoaiMy. Cả video luôn một giọng.',
       last: lastVideoAsset
         ? { at: lastVideoAsset.created_at, ok: true, note: 'chạy cùng lượt dựng video gần nhất' }
         : { at: null, ok: null, note: 'chạy cùng Watcher, chưa có video' },
-      href: '/video',
+      href: '/kho-tri-thuc?ai=video-ai',
     },
     {
-      icon: '🔍', name: 'AI quản lý SEO', role: 'Seed từ khóa, audit SEO trang công khai, giữ sitemap sạch cho Google đọc.',
+      icon: '🔍', name: 'AI quản lý SEO',
+      model: 'Gemini flash-lite (seed từ khóa)', runsAt: 'Vercel cron + script local packages/marketing (seo_audit)', role: 'Seed từ khóa, audit SEO trang công khai, giữ sitemap sạch cho Google đọc.',
       last: mkLast(lastOf(['mkt.seo_audit', 'mkt.seed_keywords']), 'audit/seed từ khóa'),
-      href: '/seo',
+      href: '/kho-tri-thuc?ai=seo-ai',
     },
     {
-      icon: '📆', name: 'AI quản lý lịch và kênh', role: 'Bài duyệt xong tự đăng đúng kênh (FB, YouTube; TikTok xuất tay), kéo số liệu mỗi giờ.',
+      icon: '📆', name: 'AI quản lý lịch và kênh',
+      model: 'Không LLM — Facebook Graph v26 · YouTube Data v3 · TikTok Display API', runsAt: 'Vercel — cron mỗi giờ + ngay khi bấm Duyệt', role: 'Bài duyệt xong tự đăng đúng kênh (FB, YouTube; TikTok xuất tay), kéo số liệu mỗi giờ.',
       last: mkLast(lastOf(['mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull']), 'đăng bài / kéo số liệu'),
-      href: '/kenh',
+      href: '/kho-tri-thuc?ai=lich-kenh',
     },
     {
-      icon: '📈', name: 'AI báo cáo tuần', role: 'Chủ nhật 19h gom số liệu tuần từ các bài đã đăng, gửi về BOSS học và đề xuất đổi trọng số.',
+      icon: '📈', name: 'AI báo cáo tuần',
+      model: 'Không LLM — tính trực tiếp từ mkt_metrics', runsAt: 'Vercel — cron Chủ nhật 19h', role: 'Chủ nhật 19h gom số liệu tuần từ các bài đã đăng, gửi về BOSS học và đề xuất đổi trọng số.',
       last: mkLast(lastOf(['mkt.learn_weekly']), 'học tuần xong, có đề xuất'),
-      href: '/do-luong/tuan',
+      href: '/kho-tri-thuc?ai=bao-cao',
     },
     {
-      icon: '🏠', name: 'AI DATA 1 — nội bộ', role: 'Học tri thức nội bộ (file Zalo/tài liệu người phụ trách thả vào kho) thành insight cho BOSS.',
+      icon: '🏠', name: 'AI DATA 1 — nội bộ',
+      model: 'Gemini flash-lite (đọc ảnh + tóm tắt file)', runsAt: 'Vercel cron hằng ngày — nguồn bucket Supabase kho-tri-thuc-noi-bo (file Zalo)', role: 'Học tri thức nội bộ (file Zalo/tài liệu người phụ trách thả vào kho) thành insight cho BOSS.',
       last: lastInternal
         ? { at: lastInternal.created_at, ok: true, note: `${fmt(dataInternalCount.count || 0)} mẩu tri thức trong kho` }
         : { at: null, ok: null, note: 'kho tri thức nội bộ trống' },
       href: '/kho-tri-thuc?ai=noi-bo',
     },
     {
-      icon: '🌐', name: 'AI DATA 2 — trên mạng', role: 'Quét bài viết, video, keyword đang nóng trên mạng, chấm điểm tier S/A/B/C, gợi ý trend cho BOSS.',
+      icon: '🌐', name: 'AI DATA 2 — trên mạng',
+      model: 'Google News RSS (miễn phí) + Gemini flash-lite (quét sâu CN + chấm tier)', runsAt: 'Vercel cron hằng ngày', role: 'Quét bài viết, video, keyword đang nóng trên mạng, chấm điểm tier S/A/B/C, gợi ý trend cho BOSS.',
       last: (() => {
         const r = lastOf(['mkt.knowledge_public_deep']);
         if (r) return mkLast(r, `quét xong, kho có ${fmt(dataPublicCount.count || 0)} mục`);
@@ -133,6 +143,8 @@ export default async function AgentRoster() {
             </span>
           </div>
           <p className="ag-role" style={{ margin: 0 }}>{a.role}</p>
+          <p className="ag-role" style={{ margin: 0, fontSize: '.76rem' }}>🧩 <b>Model:</b> {a.model}</p>
+          <p className="ag-role" style={{ margin: 0, fontSize: '.76rem' }}>📍 <b>Chạy tại:</b> {a.runsAt}</p>
           <div className="ag-last">
             {a.last.at ? `Gần nhất ${fmtDT(a.last.at)} — ${a.last.note}` : a.last.note}
             {a.href ? <> · <Link className="src" href={a.href}>Chi tiết →</Link></> : null}
