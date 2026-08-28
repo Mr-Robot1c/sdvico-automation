@@ -121,10 +121,11 @@ export async function generateContentDirections(
     ? `\nCÁC HƯỚNG ĐÃ CÓ (TUYỆT ĐỐI KHÔNG lặp lại, không viết na ná, không đổi vài chữ):\n${avoidTitles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n`
     : '';
 
-  // 29/8 — LUẬT 70/30 của sếp: phần lớn hướng đi từ tri thức MỚI, nhưng ~2/7 hướng xoay lại
-  // chủ đề ĐANG THẮNG (bài tương tác cao các tuần trước) với GÓC KỂ MỚI — không copy lại bài cũ.
+  // 29/8 — LUẬT 70/30 của sếp (user làm rõ: tỷ lệ MỀM): chủ đề cũ nào còn HỢP THỜI/NỔI BẬT
+  // thì GIỮ LẠI + TINH CHỈNH (góc kể mới, cập nhật theo tin tuần này); chủ đề hết thời thì bỏ.
+  // Thiếu bao nhiêu lấy tri thức MỚI bù — không ép đủ con số.
   const winnersBlock = winners.length
-    ? `\nCHỦ ĐỀ ĐANG THẮNG các tuần trước (luật 70/30: chọn ~2/7 hướng XOAY LẠI các chủ đề này với góc kể MỚI HOÀN TOÀN — cùng chủ đề nhưng không được trùng câu chuyện; 5 hướng còn lại phải từ tri thức mới ở trên):\n${winners.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n`
+    ? `\nCHỦ ĐỀ ĐANG THẮNG các tuần trước (luật 70/30 — tỷ lệ mềm): chủ đề nào DƯỚI ĐÂY còn hợp thời hoặc đang nổi bật thì GIỮ LẠI và TINH CHỈNH thành hướng mới (cùng chủ đề nhưng góc kể MỚI, cập nhật theo tin tuần này) — thường khoảng 2-3/7 hướng; chủ đề nào đã hết thời hoặc không nổi bật thì BỎ, đừng gượng ép. Số hướng còn thiếu lấy từ tri thức mới ở trên:\n${winners.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n`
     : '';
 
   const prompt = `Bạn là chuyên gia marketing cho SDVICO, công ty phân phối thiết bị cho ngư dân và tàu cá Việt Nam.
