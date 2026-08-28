@@ -479,23 +479,12 @@ export default async function BangSection() {
                             />
                           ))}
                       </div>
-                      {m || ytByContent.get(it.cid) ? (
-                        <span style={{ fontSize: '.85rem' }}>
-                          {m ? (
-                            <>
-                              👍 {m.reactions} <span style={{ marginLeft: 6 }}>💬 {m.comments}</span>
-                              {m.shares ? <span style={{ marginLeft: 6 }}>🔁 {m.shares}</span> : null}
-                              {m.views != null ? <span style={{ marginLeft: 6 }}>👁 {Number(m.views).toLocaleString('vi-VN')}</span> : null}
-                            </>
-                          ) : null}
-                          {ytByContent.get(it.cid) ? (
-                            <span style={{ marginLeft: m ? 6 : 0 }} title="Lượt xem trên YouTube Shorts">▶️ {fmtVN(ytByContent.get(it.cid)!.views)} xem</span>
-                          ) : null}
-                          {leadsByContent.get(it.cid) ? (
-                            <span style={{ marginLeft: 8, fontWeight: 600, color: 'var(--tone-ok, #16a34a)' }} title="Khách hỏi mua từ bài này (Zalo/inbox/gọi/gặp). BOSS ưu tiên bài ra nhiều Zalo hơn bài chỉ nhiều like.">🎯 {leadsByContent.get(it.cid)} khách hỏi</span>
-                          ) : null}
-                        </span>
-                      ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
+                      {/* 29/8 (user: "xoá mấy icon 👍💬👁▶️ đi — không hiển thị đúng"): số trên
+                          card trộn nguồn cũ (kênh phụ) gây nhiễu — số chuẩn xem ở Đo lường.
+                          Chỉ giữ 🎯 khách hỏi mua (đếm từ lead thật, luôn đúng). */}
+                      {leadsByContent.get(it.cid) ? (
+                        <span style={{ fontSize: '.85rem', fontWeight: 600, color: 'var(--ok)' }} title="Khách hỏi mua từ bài này (Zalo/inbox/gọi/gặp). BOSS ưu tiên bài ra nhiều Zalo hơn bài chỉ nhiều like.">🎯 {leadsByContent.get(it.cid)} khách hỏi</span>
+                      ) : null}
                       <ViewModal title={title} label="👁 Xem bài">
                         {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                         {pubImg || pubVid ? (

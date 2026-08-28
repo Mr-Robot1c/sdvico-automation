@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 180
+<!-- re-verified: 2026-08-29 10:50 - Card Trang thai BO day icon so lieu 👍💬👁▶️ (user: khong hien thi dung — tron nguon kenh phu cu; so chuan o Do luong). Chi giu 🎯 khach hoi mua (dem tu mkt_leads, luon dung). -->
 <!-- re-verified: 2026-08-29 10:30 - Popover Chia se vao group trang giua dark mode: share-groups.tsx dung var(--bg-1) KHONG ton tai -> fallback #ffffff thang luon (cung benh popover TikTok 28/8). Doi sang var(--surface) + bo fallback stale cua --ink. -->
 <!-- re-verified: 2026-08-29 10:10 - Xem bai o cot Len lich + Trang thai doi tu <details> inline sang MODAL ViewModal (user: "bam xem nhu ben cho duyet chu khong phai xo trong card") — draftbox + modal-media, media ho tro ca image_url link ngoai. -->
 <!-- re-verified: 2026-08-29 09:40 - Card TRANG THAI theo user: (1) them <details> "👁 Xem bai" (anh ke ca image_url link ngoai / video / nguyen van draft) giong cot Len lich. (2) Link "Xem tat ca N bai" hien LUON khi co moreHref (truoc chi hien khi vuot cap 8 nen 7 bai bi an — user: "sao xoa chi"). -->
