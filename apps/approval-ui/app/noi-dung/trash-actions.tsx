@@ -19,9 +19,12 @@ export default function TrashActions({ contentId, title, deletedAt }: Props) {
 
   const at = deletedAt ? new Date(deletedAt).toLocaleString('vi-VN') : '';
 
+  // 29/8 (sếp: "nút xoá hẳn lệch không đồng đều"): giờ xoá 1 dòng riêng, 2 nút LUÔN cùng 1
+  // hàng ngang — không wrap lệch giữa các dòng trong bảng nữa.
   return (
-    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-      {at ? <span className="sub" style={{ fontSize: '.75rem' }} title="Thời điểm ẩn">🗑️ {at}</span> : null}
+    <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+      {at ? <span className="sub" style={{ fontSize: '.75rem', whiteSpace: 'nowrap' }} title="Thời điểm ẩn">🗑️ {at}</span> : null}
+      <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', whiteSpace: 'nowrap' }}>
       <button
         type="button"
         className="btn ok sm"
@@ -49,16 +52,8 @@ export default function TrashActions({ contentId, title, deletedAt }: Props) {
         disabled={pending}
         title="Xoá HẲN bài + toàn bộ Like/View/Comment lịch sử. KHÔNG khôi phục được."
         onClick={() => {
-          const ok = confirm(
-            `⚠ CẢNH BÁO: Xoá hẳn "${title}"?\n\n` +
-            `Việc này sẽ MẤT VĨNH VIỄN:\n` +
-            `- Bản ghi bài (mkt_content)\n` +
-            `- Bản ghi đã đăng trên Facebook/YouTube/TikTok (mkt_posts)\n` +
-            `- TOÀN BỘ Like/View/Comment lịch sử (mkt_metrics)\n` +
-            `- Hàng đợi duyệt (approval_queue)\n\n` +
-            `Không phục hồi được. Chắc chưa?`
-          );
-          if (!ok) return;
+          // 29/8 (user: "đừng làm popup nữa, tốn thời gian"): bỏ hộp confirm — bài trong Thùng
+          // rác vốn đã qua một lớp xoá mềm rồi, bấm Xoá hẳn là đi luôn.
           setErr(null);
           const fd = new FormData();
           fd.set('content_id', contentId);
@@ -74,6 +69,7 @@ export default function TrashActions({ contentId, title, deletedAt }: Props) {
       >
         ✗ Xoá hẳn
       </button>
+      </span>
       {err ? <span className="sub err-note">{err}</span> : null}
     </span>
   );

@@ -264,13 +264,15 @@ export default async function Page() {
               <span className="pf-stat"><b>{c.cmts || c.posts ? fmt(c.cmts) : '—'}</b><span>Tổng comment</span></span>
             </div>
             {c.warn ? <p className="pf-note" style={{ marginTop: 8, color: 'var(--no)' }}>⚠️ {c.warn}</p> : null}
-            <div style={{ display: 'flex', gap: 12, marginTop: 'auto', paddingTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* 29/8 (sếp: "lệch chỗ mở page/số liệu từng bài"): thanh chân card CHUẨN 1 HÀNG cho cả
+                4 nền tảng — link tài khoản bên trái (dài thì cắt ...), link số liệu ghim phải. */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 'auto', paddingTop: 10, borderTop: '1px solid var(--line)', alignItems: 'center', minWidth: 0 }}>
               {c.link ? (
-                <a href={c.link.url} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.82rem', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
-                  <PlatformLogo platform={c.key} size={13} /> {c.link.label}
+                <a href={c.link.url} target="_blank" rel="noreferrer" className="src" title={c.link.label} style={{ fontSize: '.82rem', display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <PlatformLogo platform={c.key} size={13} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.link.label}</span>
                 </a>
-              ) : null}
-              <Link href={c.detail.href} className="src" style={{ fontSize: '.82rem', whiteSpace: 'nowrap' }}>{c.detail.label} →</Link>
+              ) : <span className="sub" style={{ fontSize: '.82rem' }}>—</span>}
+              <Link href={c.detail.href} className="src" style={{ fontSize: '.82rem', whiteSpace: 'nowrap', flexShrink: 0 }}>{c.detail.label} →</Link>
             </div>
           </div>
         ))}
