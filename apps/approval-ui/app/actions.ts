@@ -272,7 +272,9 @@ async function publishContentToFacebook(
       channel: 'facebook',
       status: 'published',
       external_url: externalUrl,
-      published_at: new Date().toISOString()
+      // 29/8 (user: "cho lên lịch mà nhảy sang đã đăng luôn"): bài HẸN GIỜ ghi published_at =
+      // GIỜ HẸN (tương lai) — bảng bài viết dựa vào đây để giữ bài ở cột Lên lịch tới giờ.
+      published_at: scheduledUnix ? new Date(scheduledUnix * 1000).toISOString() : new Date().toISOString()
     });
     await client.from('mkt_content').update({ status: 'published' }).eq('id', contentId);
 

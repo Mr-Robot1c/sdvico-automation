@@ -4,6 +4,7 @@
 covers: packages/marketing
 last_verified: 2026-08-28
 ttl_days: 180
+<!-- re-verified: 2026-08-29 06:50 - env.mjs loadRealEnv bo early-return isCloud (Watcher co san creds lam build bo qua .env -> TTS_LOCAL_URL khong nap -> video khong bao gio dung giong local). Gio luon doc .env dien bien thieu; khong ghi de bien co san; khong co .env + creds san thi van chay. Test gia lap PASS. Khong can restart Watcher (build-video spawn moi moi lan). -->
 <!-- re-verified: 2026-08-29 04:40 - build-video: isShort doi sang brief.video_short (ab_pair_id chi con cho bai cu); abMeta bo ma cap, chi ke thua suggestion_title. Hanh vi dung video khong doi. -->
 <!-- re-verified: 2026-08-29 03:30 - upload-zalo-to-bucket.mjs: nhanh MEDIA moi (anh/video Zalo -> brand-assets lam tu lieu bai dang, doan nhom tu ten file); ctype them gif/mp4/mov/webm. File chu giu nguyen duong kho-tri-thuc-noi-bo. -->
 <!-- re-verified: 2026-08-29 01:25 - Doi chieu vong rinh cookie fb-suite-scan 5 phut -> 15 giay/lan khi chua co ban (copy hut khong ton gi); hanh vi quet khong doi. -->

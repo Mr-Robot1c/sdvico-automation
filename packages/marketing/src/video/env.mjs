@@ -22,8 +22,11 @@ function isCloud(env) {
 }
 
 // Nạp env thật vào process.env (không ghi đè biến đã có). Trả về process.env.
+// 29/8 (bug giọng video vẫn Leda): BỎ early-return `isCloud(process.env)` — Watcher cha đã có
+// sẵn biến Supabase trong env nên nhánh đó làm build-video BỎ QUA .env hoàn toàn, các biến
+// thêm sau (TTS_LOCAL_URL...) không bao giờ được nạp -> engine local không chạy. Giờ luôn
+// đọc .env và chỉ điền biến còn THIẾU (không ghi đè), nên có sẵn creds vẫn an toàn.
 export function loadRealEnv() {
-  if (isCloud(process.env)) return process.env;
   let dir = dirname(fileURLToPath(import.meta.url));
   const root = parse(dir).root;
   const candidates = [];
@@ -42,6 +45,8 @@ export function loadRealEnv() {
       return process.env;
     }
   }
+  // Không thấy .env nào nhưng creds đã có sẵn trong env (vd chạy trên cloud) -> vẫn dùng được.
+  if (isCloud(process.env)) return process.env;
   throw new Error(
     'Khong tim thay .env co SUPABASE_URL cloud (supabase.co) + SERVICE_ROLE_KEY. ' +
     'May noi bo can .env that (khong commit).'

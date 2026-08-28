@@ -3,6 +3,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import { isEmergencyStopped } from '../../lib/safety';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
 import PlatformLogo, { type PlatformKey } from '../noi-dung/platform-logo';
+import PageSuiteBlock from '../do-luong/page-suite-block';
 
 // 27/8 REDESIGN theo file "redesign web.docx" cua sep — trang TONG QUAN kieu ForLife Ops.
 // v2 (feedback sep cung ngay): (1) icon kenh trong bang bam duoc -> mo bai tren nen tang do;
@@ -169,6 +170,29 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const today = todayVN();
   const dayStartIso = new Date(today + 'T00:00:00+07:00').toISOString();
   const leadToday = leads.filter((l) => String(l.created_at || '') >= dayStartIso);
+
+  // 29/8 (sếp: "đem đo lường và báo cáo tuần ra tổng quan"): số liệu TUẦN NÀY (kênh chính,
+  // buildWeekReport offset 0) + đếm lượt đăng hôm nay + sức khoẻ Trang từ bộ quét Business Suite.
+  let week: any = null;
+  try {
+    const { buildWeekReport } = await import('../../lib/week-report');
+    week = await buildWeekReport(client, 0);
+  } catch { /* thiếu số liệu thì block tự ẩn */ }
+  const { count: postsTodayCount } = await client
+    .from('mkt_posts').select('id', { count: 'exact', head: true })
+    .eq('status', 'published').gte('published_at', dayStartIso).lte('published_at', new Date().toISOString());
+  const { data: pageScans } = await client
+    .from('mkt_metrics').select('metrics, created_at')
+    .eq('source', 'facebook').eq('entity_ref', '__page_real__')
+    .not('metrics->suite28', 'is', null)
+    .order('created_at', { ascending: false }).limit(30);
+  const scanList = (pageScans || []) as any[];
+  const scanCur = scanList[0]?.metrics || null;
+  const scanPrev = (scanList.find((r: any) => String(r.created_at) < dayStartIso) as any)?.metrics || null;
+  const vnI = (n: number | null | undefined) => Number(n || 0).toLocaleString('vi-VN');
+  const deltaTag = (v: number) => (!v ? null : (
+    <span className={`sub ${v > 0 ? 'delta-up' : 'delta-down'}`} style={{ fontSize: '.78rem', marginLeft: 4 }}>{v > 0 ? '▲' : '▼'} {Math.abs(v)}%</span>
+  ));
 
   // 27/8 dot 2 (docx sep: "nguoi hoi mua danh cho so nguoi cmt tren cac bai... de ghi nhan
   // don lead"): dem lead theo TUNG BAI (content_id) -> bai nao hut khach nhat 7 ngay.
@@ -432,6 +456,40 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           )}
         </section>
       </div>
+
+      {/* ===== 3b. DO LUONG + BAO CAO TUAN (29/8, sếp: "đem đo lường và báo cáo tuần ra tổng quan") ===== */}
+      <section className="blk">
+        <h2>
+          📊 Đo lường
+          <span className="sub">tuần này (Thứ 2 → hôm nay) · kênh chính</span>
+        </h2>
+        {week ? (
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'baseline', marginBottom: 10 }}>
+            <div><span className="sub" style={{ fontSize: '.8rem' }}>Bài đã đăng</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.posts)}</b></div>
+            <div><span className="sub" style={{ fontSize: '.8rem' }}>Tương tác</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.engagement)}</b>{deltaTag(week.delta.engagement)}</div>
+            <div><span className="sub" style={{ fontSize: '.8rem' }}>Lượt xem</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.views)}</b>{deltaTag(week.delta.views)}</div>
+            <div><span className="sub" style={{ fontSize: '.8rem' }}>Khách hỏi mua</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.conversions)}</b>{deltaTag(week.delta.conversions)}</div>
+            <div><span className="sub" style={{ fontSize: '.8rem' }}>Hôm nay</span> <b style={{ fontSize: '1.1rem' }}>{vnI(postsTodayCount)}</b> <span className="sub" style={{ fontSize: '.8rem' }}>lượt đăng</span></div>
+          </div>
+        ) : (
+          <p className="sub">Chưa đọc được số liệu tuần.</p>
+        )}
+        {week && week.topPosts && week.topPosts.length ? (
+          <div style={{ marginBottom: 10 }}>
+            <span className="sub" style={{ fontSize: '.8rem' }}>Bài tốt nhất tuần:</span>
+            {week.topPosts.slice(0, 3).map((p: any, i: number) => (
+              <div key={i} className="sub" style={{ fontSize: '.85rem' }}>
+                {i + 1}. {String(p.title || '').slice(0, 70)} <b>· {vnI(p.m?.engagement || 0)} tương tác</b>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với hôm qua" />
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          <Link href="/do-luong" className="src" style={{ fontSize: '.85rem' }}>Đo lường ngày →</Link>
+          <Link href="/do-luong/tuan" className="src" style={{ fontSize: '.85rem' }}>Báo cáo tuần đầy đủ →</Link>
+        </div>
+      </section>
 
       {/* ===== 4. TAT CA NOI DUNG ===== */}
       <section className="blk">

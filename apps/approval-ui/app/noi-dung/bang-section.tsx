@@ -196,9 +196,14 @@ export default async function BangSection() {
   // Loc bo bai da soft-delete (contents.get(cid) undefined vi query mkt_content filter deleted_at null).
   const items = [...byContent.values()].filter((it) => contents.has(it.cid));
   const pending = items.filter((it) => it.status === 'pending');
-  const approvedWaiting = items.filter((it) => it.status === 'approved' && !(postsByContent.get(it.cid) || []).length);
+  // 29/8 (user: "lên lịch mà nhảy sang đã đăng"): bài hẹn giờ có mkt_posts với published_at
+  // TƯƠNG LAI (giờ hẹn) — chưa tới giờ thì vẫn là "Lên lịch", có ít nhất 1 bài đã tới giờ mới
+  // sang "Trạng thái".
+  const nowIso = new Date().toISOString();
+  const hasLivePost = (cid: string) => (postsByContent.get(cid) || []).some((p) => p.at && p.at <= nowIso);
+  const approvedWaiting = items.filter((it) => it.status === 'approved' && !hasLivePost(it.cid));
   const published = items
-    .filter((it) => (postsByContent.get(it.cid) || []).length > 0)
+    .filter((it) => hasLivePost(it.cid))
     .sort((a, b) => {
       const la = (postsByContent.get(a.cid) || [])[0]?.at || '';
       const lb = (postsByContent.get(b.cid) || [])[0]?.at || '';
