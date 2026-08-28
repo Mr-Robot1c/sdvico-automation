@@ -71,7 +71,7 @@ function fmtDate(d: string | null): string {
 // Tên sản phẩm rác lọt vào weights/products từ bài nhập tay lịch sử (cùng luật productOf
 // trong lib/plan.ts) — không hiện lên bảng Sản phẩm ưu tiên.
 function isJunkProduct(name: string): boolean {
-  if (!name || name === 'Khác' || name === 'Bài content') return true;
+  if (!name || name === 'Khác' || name === 'Bài content' || name === 'Bài trend') return true;
   if (name.length > 60 || name.includes('\n')) return true;
   return /\d{9,}/.test(name) || /^bài (fb|đăng tay)/i.test(name);
 }
