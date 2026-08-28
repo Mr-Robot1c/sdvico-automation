@@ -429,6 +429,10 @@ export default async function BangSection() {
                   const fbPost = posts.find((x) => x.channel === 'facebook' && /^https?:/.test(x.url) && !/\/reel\//.test(x.url));
                   const lastAt = posts[0]?.at || '';
                   const ab = (brief.ab_variant as string | undefined) || (p.ab_variant as string | undefined);
+                  // 29/8 (user: "thêm con mắt hiện layout xem như bên chờ duyệt"): xem lại
+                  // ảnh/video + nguyên văn bài đã đăng ngay trên card.
+                  const pubImg = (typeof p.assets?.image_url === 'string' && p.assets.image_url) || (typeof p.assets?.image === 'string' ? assetUrl.get(p.assets.image) : undefined);
+                  const pubVid = typeof p.assets?.video === 'string' ? assetUrl.get(p.assets.video) : undefined;
                   return (
                     <div key={it.qid} className="card tone-web" style={{ display: 'grid', gap: 6, padding: 12 }}>
                       <b>{title}{ab ? <span className="badge badge-ab" style={{ marginLeft: 6 }} title="Bài thử của cặp A/B theo hướng đi kế hoạch.">🧪 Thử {ab}</span> : null}</b>
@@ -487,6 +491,12 @@ export default async function BangSection() {
                           ) : null}
                         </span>
                       ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
+                      <details className="raw editbox">
+                        <summary>👁 Xem bài</summary>
+                        {pubImg ? <img src={pubImg} alt="" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 6 }} /> : null}
+                        {pubVid ? <video src={pubVid} controls preload="none" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 6 }} /> : null}
+                        <p style={{ whiteSpace: 'pre-wrap', margin: '6px 0 0', fontSize: '.88rem' }}>{c?.draft || '(chưa có nội dung)'}</p>
+                      </details>
                       {/* User 27/8 layout: chia 2 cột. TRÁI = Ghi Zalo/inbox + Chia sẻ group.
                           PHẢI = Xuất TikTok + Copy caption (dòng 1) + Ghép TikTok (dòng 2). */}
                       {it.cid ? (() => {
@@ -545,7 +555,9 @@ export default async function BangSection() {
                 );
               })}
 
-              {(col.countOverride ?? col.items.length) > col.cap && col.moreHref ? (
+              {/* 29/8 (user: "thêm chỗ xem tất cả bài như trước — sao xoá chi"): hiện LUÔN khi có
+                  moreHref, không chờ vượt sức chứa cột. */}
+              {col.moreHref ? (
                 <Link className="src" href={col.moreHref} style={{ fontSize: '.85rem' }}>Xem tất cả {col.countOverride ?? col.items.length} bài</Link>
               ) : null}
             </div>
