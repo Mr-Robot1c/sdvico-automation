@@ -12,6 +12,11 @@ type Client = ReturnType<typeof getServerClient>;
 
 function objectIdFromUrl(u: string | null): string | null {
   if (!u) return null;
+  // 28/8: bài /<pageId>/posts/<postId số> phải đọc bằng node id KÉP pageId_postId — id trần
+  // bị Graph trả "(#12) singular statuses API is deprecated" (2 bài import kênh chính 23+25/8
+  // mất số liệu vì vậy). pfbid giữ nguyên segment cuối (pfbid tự là node id đầy đủ).
+  const mP = u.match(/facebook\.com\/(\d{6,})\/posts\/(\d{6,})(?:$|[/?#])/);
+  if (mP) return `${mP[1]}_${mP[2]}`;
   const seg = u.split('?')[0].split('/').filter(Boolean);
   return seg.length ? seg[seg.length - 1] : null;
 }

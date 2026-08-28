@@ -191,13 +191,27 @@ async function geminiTTSWithRetry(cleanText, outPath, workDir, tag) {
 // tren may local (env TTS_LOCAL_URL, contract POST {URL}/tts body {"text": "..."} tra
 // audio/wav) — chay F5-TTS-Vietnamese / viXTTS tuy cai. THROW khi hong de caller doi ca
 // ban sang engine ke (video luon MOT giong).
+// BIỂU CẢM THEO LOẠI BÀI (user 28/8: "thêm biểu cảm cho từng loại bài để không 1 màu").
+// temperature VieNeu: cao = ngữ điệu dao động mạnh (sôi nổi), thấp = đều đặn nghiêm túc.
+// Đặt 1 lần cho mỗi bài (voiceStyle) trước khi dựng; localTTS gửi kèm mỗi lần gọi.
+let voiceStyle = null;
+function voiceStyleOf(brief = {}, needsGov = false) {
+  const emo = String(brief.emotion || '').toUpperCase();
+  if (needsGov) return { temperature: 0.8, label: 'nghiem tuc (bai quy dinh)' };
+  if (emo.includes('RỦI RO')) return { temperature: 0.9, label: 'canh bao (RUI RO)' };
+  if (emo.includes('TỰ HÀO')) return { temperature: 1.15, label: 'hao hung (TU HAO)' };
+  if (brief.generator === 'trend') return { temperature: 0.9, label: 'tin tuc ro rang' };
+  if (brief.post_kind === 'content') return { temperature: 0.95, label: 'am, ke chuyen' };
+  return { temperature: 1.1, label: 'soi noi (ban hang)' };
+}
+
 async function localTTS(cleanText, outPath, workDir, tag) {
   const base = String(process.env.TTS_LOCAL_URL || '').replace(/\/$/, '');
   if (!base) throw new Error('TTS_LOCAL_URL chua dat');
   const r = await fetch(base + '/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: cleanText }),
+    body: JSON.stringify({ text: cleanText, ...(voiceStyle ? { temperature: voiceStyle.temperature } : {}) }),
     signal: AbortSignal.timeout(180000),
   });
   if (!r.ok) throw new Error('local-tts HTTP ' + r.status + ': ' + (await r.text().catch(() => '')).slice(0, 120));
@@ -498,15 +512,15 @@ async function main() {
     // Nhận cả UUID đầy đủ lẫn prefix (vd 8 ký tự đầu) — tiện chạy tay. UUID không dùng LIKE được
     // nên với prefix phải quét rồi so trong JS.
     if (contentId.length >= 32) {
-      const { data } = await client.from('mkt_content').select('id, title, draft, brief').eq('id', contentId).maybeSingle();
+      const { data } = await client.from('mkt_content').select('id, title, draft, brief, needs_gov_review').eq('id', contentId).maybeSingle();
       content = data;
     } else {
-      const { data } = await client.from('mkt_content').select('id, title, draft, brief').order('created_at', { ascending: false }).limit(500);
+      const { data } = await client.from('mkt_content').select('id, title, draft, brief, needs_gov_review').order('created_at', { ascending: false }).limit(500);
       content = (data || []).find((c) => String(c.id).startsWith(contentId));
     }
     if (content?.id) contentId = content.id;
   } else {
-    const { data } = await client.from('mkt_content').select('id, title, draft, brief')
+    const { data } = await client.from('mkt_content').select('id, title, draft, brief, needs_gov_review')
       .not('draft', 'is', null).order('created_at', { ascending: false }).limit(1);
     content = data?.[0];
   }
@@ -520,6 +534,8 @@ async function main() {
   // draft (bài Xưởng sản xuất người tự soạn thường không có rotation_group).
   const { guessGroup, CONTENT_GROUP } = await import('../products.mjs');
   const brief = content.brief || {};
+  voiceStyle = voiceStyleOf(brief, !!content.needs_gov_review);
+  console.log(`Giọng đọc: kiểu "${voiceStyle.label}" (temperature ${voiceStyle.temperature})`);
 
   // 27/8: BAI TREND dung Pexels URL trong brief.video_scenes -> tu dung video luon
   // (khong dung brand_assets folder). User "ghep + long tieng + xuat" hoi 27/8 chieu.

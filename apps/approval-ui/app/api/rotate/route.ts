@@ -444,6 +444,9 @@ export async function GET(req: Request) {
               suggestion_index: pf.suggestionIdx,
               suggestion_title: sug.title,
               suggestion_sources: sug.sources,
+              // 28/8: chữ cảm xúc BOSS chốt (NGHỀ/TIỀN/RỦI RO/TỰ HÀO) — build-video đọc để
+              // chỉnh biểu cảm giọng theo loại bài (voiceStyleOf), tránh video 1 màu.
+              ...(sug.emotion ? { emotion: sug.emotion } : {}),
               ab_pair_id: pairId,
               ab_variant: variant,
             } : {}),

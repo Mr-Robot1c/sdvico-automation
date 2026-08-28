@@ -55,8 +55,24 @@ def tts_route():
     text = str(data.get("text") or "").strip()
     if not text:
         return jsonify({"ok": False, "error": "thieu text"}), 400
+    # 28/8 (user: "thêm biểu cảm cho từng loại bài để không 1 màu"): caller được chỉnh
+    # temperature/top_p/voice theo TỪNG lần gọi (build-video map theo loại bài). Kẹp biên
+    # để giá trị lạ không phá giọng; sai kiểu thì rơi về mặc định.
+    try:
+        temp = min(1.3, max(0.6, float(data.get("temperature") or TEMPERATURE)))
+    except (TypeError, ValueError):
+        temp = TEMPERATURE
+    try:
+        top_p = min(1.0, max(0.5, float(data.get("top_p") or TOP_P)))
+    except (TypeError, ValueError):
+        top_p = TOP_P
+    voice = str(data.get("voice") or VOICE)
+    try:
+        tts.get_preset_voice(voice)  # tên giọng lạ -> rơi về giọng mặc định, không 500
+    except Exception:
+        voice = VOICE
     with lock:
-        wav = tts.infer(text, voice=VOICE, temperature=TEMPERATURE, top_p=TOP_P)
+        wav = tts.infer(text, voice=voice, temperature=temp, top_p=top_p)
     buf = io.BytesIO()
     sf.write(buf, wav, SAMPLE_RATE, format="WAV")
     return Response(buf.getvalue(), mimetype="audio/wav")
