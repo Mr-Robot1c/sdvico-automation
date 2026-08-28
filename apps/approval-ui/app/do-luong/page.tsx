@@ -199,11 +199,13 @@ export default async function Page() {
         </div>
       ) : (
         <>
+          {/* 28/8 (user): kenh dang cu the — FB kenh chinh "SDVICO VN", kenh phu "SDVICO TBTC". */}
           <BangSoLieu
             title={<><PlatformLogo platform="facebook" size={20} /><span>Facebook — page hệ thống</span></>}
             headers={['Bài', 'React', 'Comment', 'Share', 'Lượt xem', 'Người xem', 'Link']}
             rows={fbTestRows}
             renderMetrics={(m) => [fmt(m.reactions), fmt(m.comments), fmt(m.shares), m.views != null ? fmt(m.views) : '—', m.reach != null ? fmt(m.reach) : '—']}
+            channelLabel="Kênh phụ · SDVICO TBTC"
           />
 
           <BangSoLieu
@@ -212,6 +214,7 @@ export default async function Page() {
             headers={['Bài', 'React', 'Comment', 'Share', 'Lượt xem', 'Người xem', 'Link']}
             rows={fbRealRows}
             renderMetrics={(m) => [fmt(m.reactions), fmt(m.comments), fmt(m.shares), m.views != null ? fmt(m.views) : '—', m.reach != null ? fmt(m.reach) : '—']}
+            channelLabel="Kênh chính · SDVICO VN"
           />
 
           <BangSoLieu
@@ -220,6 +223,7 @@ export default async function Page() {
             rows={ttRows}
             renderMetrics={(m) => [fmt(m.views), fmt(m.reactions), fmt(m.comments), fmt(m.shares)]}
             customUrl={(r) => r.m.shareUrl || r.url}
+            channelLabel="@sdvico_tbtc"
           />
 
           <BangSoLieu
@@ -228,6 +232,7 @@ export default async function Page() {
             rows={ytRows}
             renderMetrics={(m) => [fmt(m.views), fmt(m.reactions), fmt(m.comments)]}
             customUrl={(r) => r.m.videoId ? `https://youtube.com/shorts/${r.m.videoId}` : r.url}
+            channelLabel="Kênh SDVICO - Thiết bị tàu cá"
           />
         </>
       )}
@@ -242,6 +247,7 @@ function BangSoLieu({
   rows,
   renderMetrics,
   customUrl,
+  channelLabel,
 }: {
   title: React.ReactNode;
   titleNote?: string;
@@ -249,16 +255,19 @@ function BangSoLieu({
   rows: Array<{ cid: string; title: string; url: string; publishedAt: string; m: M; timeLabel?: string }>;
   renderMetrics: (m: M) => (string | number | React.ReactNode)[];
   customUrl?: (r: { cid: string; title: string; url: string; publishedAt: string; m: M }) => string;
+  // 28/8 (user): ke gio dang them NGAY DANG + KENH DANG cu the (FB chinh "SDVICO VN",
+  // phu "SDVICO TBTC"...) — dong sub thanh "Đăng 09:27 · 28/08 · SDVICO TBTC".
+  channelLabel?: string;
 }) {
   if (rows.length === 0) return null;
   const fmtDT2 = (iso: string) => {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
     const p = new Intl.DateTimeFormat('vi-VN', {
-      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hourCycle: 'h23',
+      hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hourCycle: 'h23',
     }).formatToParts(d);
     const g = (t: string) => p.find((x) => x.type === t)?.value || '';
-    return `${g('hour')}:${g('minute')}`;
+    return `${g('hour')}:${g('minute')} · ${g('day')}/${g('month')}`;
   };
   return (
     <section style={{ marginBottom: 22 }}>
@@ -280,7 +289,10 @@ function BangSoLieu({
                 <tr key={r.cid}>
                   <td className="cell-title">
                     <b>{r.title}</b>
-                    <div className="sub" style={{ fontSize: '.78rem' }}>{r.timeLabel || 'Đăng'} {fmtDT2(r.publishedAt)}</div>
+                    <div className="sub" style={{ fontSize: '.78rem' }}>
+                      {r.timeLabel || 'Đăng'} {fmtDT2(r.publishedAt)}
+                      {channelLabel ? <> · <b>{channelLabel}</b></> : null}
+                    </div>
                   </td>
                   {metricCells.map((cell, i) => <td key={i} className="num">{cell}</td>)}
                   <td>{url ? <a className="src" href={url} target="_blank" rel="noreferrer">↗ Mở</a> : <span className="muted">—</span>}</td>
