@@ -2,8 +2,9 @@
 
 > Đọc khi làm phần Marketing. Phụ trách Bạn B. Nền chung ở [README.md](README.md), điều cấm và giọng văn ở CLAUDE.md.
 covers: packages/marketing
-last_verified: 2026-08-27
+last_verified: 2026-08-28
 ttl_days: 180
+<!-- re-verified: 2026-08-28 19:50 - DOI ENGINE GIONG LOCAL: F5 -> VieNeu v3 Turbo (user 28/8 che giong F5 "do nhu edge"). File moi local-tts-server-vieneu.py (Flask port 8199, CUNG contract /health + /tts {text}->wav voi server cu nen build-video.mjs khong doi; model pnnbao-ump/VieNeu-TTS-v3-Turbo Apache 2.0 thuong mai OK, 21 giong preset 3 mien, ONNX CPU nhanh hon realtime, 48kHz; giong mac dinh Thuy Dung — user chot "Thuy Dung tot nhat", doi bang env SDVICO_TTS_VOICE). May chu: venv moi C:/Users/ADMIN/sdvico-voice/vieneu-venv, start-server.bat tro sang file moi, server F5 cu da tat (model F5 + venv cu van giu tren dia de quay lai duoc). Ung vien VoxCPM2 (Apache 2.0, GPU 2B) da test nhung cham hon realtime 3-5x -> chi du phong. -->
 <!-- re-verified: 2026-08-28 17:40 - local-tts-server.py MOI (Flask port 8199, F5-TTS zalopay CC-BY-4.0, ref Leda): server giong local cho engine local cua build-video. Cai dat that tren may chu, test HTTP pass. -->
 <!-- re-verified: 2026-08-28 16:20 - TTS chain them engine LOCAL (TTS_LOCAL_URL, POST /tts {text} -> wav): gemini -> local -> edge cho ca duong video thuong + trend. localTTS convert wav->mp3 ffmpeg, throw de doi ca ban. -->
 <!-- re-verified: 2026-08-28 10:20 - TTS doc ten cong ty: cleanNarration them replace /SDVICO/gi -> "SD Vi Co" (user 28/8: doc "SD Vi Co" chu khong danh van "SD Vi C O"). Ap moi duong giong doc (gemini + edge + outro) vi tat ca deu qua cleanNarration; phu de/banner giu nguyen chu SDVICO. -->
