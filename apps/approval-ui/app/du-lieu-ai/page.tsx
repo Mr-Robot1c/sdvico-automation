@@ -190,12 +190,17 @@ export default async function Page() {
 
   return (
     <main>
+      {/* 28/8 (user): gop chung voi /kho-tri-thuc thanh "Nguon hoc du lieu" — day la tab 2. */}
       <header className="head-row">
         <div>
-          <h1>Dữ liệu AI</h1>
+          <h1>Nguồn học dữ liệu</h1>
           <p className="sub">5 AI trong vòng lặp: Data 1 + Data 2 học nguyên liệu → BOSS lập kế hoạch → Creator viết bài dựng video → Evaluator so kết quả trả lại BOSS.</p>
         </div>
       </header>
+      <nav className="filters" aria-label="Khu vực">
+        <a className="chip" href="/kho-tri-thuc"><span aria-hidden="true">🧠</span> Nguồn tri thức</a>
+        <a className="chip on" href="/du-lieu-ai"><span aria-hidden="true">🤖</span> Dữ liệu AI học</a>
+      </nav>
 
       {alerts.length ? (
         <div className="ai-alerts" role="alert">

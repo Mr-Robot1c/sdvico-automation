@@ -180,8 +180,8 @@ export default async function Page() {
           <p className="sub">9 AI của SDVICO đang chạy ở đâu, học được gì. Máy soạn, người bấm Duyệt — không AI nào tự đăng.</p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Link href="/du-lieu-ai" className="btn ghost">🤖 Dữ liệu AI học</Link>
-          <Link href="/kho-tri-thuc" className="btn ghost">🧠 Nguồn tri thức</Link>
+          {/* 28/8 (user): gop 2 nut thanh 1 — "Nguon hoc du lieu" (trang gop 2 tab). */}
+          <Link href="/kho-tri-thuc" className="btn ghost">📚 Nguồn học dữ liệu</Link>
         </div>
       </header>
 

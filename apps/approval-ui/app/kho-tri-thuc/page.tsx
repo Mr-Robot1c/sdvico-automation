@@ -229,10 +229,18 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
 
   return (
     <main>
+      {/* 28/8 (user): gop "Nguon tri thuc" + "Du lieu AI hoc" thanh 1 thu chung "Nguon hoc
+          du lieu" — 2 view la 2 tab chip, /du-lieu-ai la tab thu 2. */}
       <header className="head-row">
-        <div><h1>Nguồn</h1></div>
-        <div className="head-actions"><Link className="src" href="/du-lieu-ai">Tình trạng học</Link></div>
+        <div>
+          <h1>Nguồn học dữ liệu</h1>
+          <p className="sub">Tri thức các AI đã học (nội bộ + trên mạng) và tình trạng học của từng AI.</p>
+        </div>
       </header>
+      <nav className="filters" aria-label="Khu vực">
+        <a className="chip on" href="/kho-tri-thuc"><span aria-hidden="true">🧠</span> Nguồn tri thức</a>
+        <a className="chip" href="/du-lieu-ai"><span aria-hidden="true">🤖</span> Dữ liệu AI học</a>
+      </nav>
       {chips}
 
       {tab === 'tong-quan' ? (

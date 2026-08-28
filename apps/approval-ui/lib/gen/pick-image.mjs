@@ -196,15 +196,19 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
   // (CC-filtered) thay vi lap anh san pham SDVICO nham chan. Folder san pham lui xuong lam
   // backup - chi dung khi Google + Unsplash deu khong co ket qua.
   //
-  // Sinh keyword 1 lượt (VI cho Google + EN cho Unsplash) — tiết kiệm 1 lần call Gemini.
-  const kw = (process.env.GOOGLE_CSE_API_KEY || process.env.UNSPLASH_ACCESS_KEY)
+  // 28/8 (user: "Supabase qua tai, dung luu cac anh len web nua — nhu anh Unsplash do"):
+  // TAT tang Google CSE + Unsplash (moi anh tai tu mang deu upload Storage + insert
+  // brand_assets -> ngon dung luong). Chi dung ANH CO SAN trong kho (folder san pham +
+  // Content — user tu up tay o Kho tu lieu / script local). Muon bat lai tang mang:
+  // set env ALLOW_EXTERNAL_IMAGE_SAVE=1 (mac dinh TAT).
+  const allowExternal = process.env.ALLOW_EXTERNAL_IMAGE_SAVE === '1';
+  const kw = allowExternal && (process.env.GOOGLE_CSE_API_KEY || process.env.UNSPLASH_ACCESS_KEY)
     ? await imageKeywordsFor(text, client, bodyHint)
     : { vi: '', en: '' };
 
-  // 1. GOOGLE CSE — keyword tiếng Việt + filter CC. Ảnh Việt Nam hợp topic ngư dân hơn.
-  // Hết quota (100/ngày) hoặc không có kết quả -> fallback.
+  // 1. GOOGLE CSE — chi khi ALLOW_EXTERNAL_IMAGE_SAVE=1.
   try {
-    if (process.env.GOOGLE_CSE_API_KEY && process.env.GOOGLE_CSE_ID && kw.vi) {
+    if (allowExternal && process.env.GOOGLE_CSE_API_KEY && process.env.GOOGLE_CSE_ID && kw.vi) {
       const items = await searchGoogleCSE(kw.vi);
       if (items && items.length) {
         const item = pickRandom(items.slice(0, 5));
@@ -214,9 +218,9 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
     }
   } catch { /* rơi xuống Unsplash */ }
 
-  // 2. Unsplash fallback — keyword tiếng Anh.
+  // 2. Unsplash — chi khi ALLOW_EXTERNAL_IMAGE_SAVE=1.
   try {
-    if (process.env.UNSPLASH_ACCESS_KEY && kw.en) {
+    if (allowExternal && process.env.UNSPLASH_ACCESS_KEY && kw.en) {
       const results = await searchUnsplash(kw.en);
       if (results) {
         // Lấy 1 trong 5 ảnh đầu (đa dạng, vẫn sát chủ đề).
@@ -227,7 +231,7 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
     }
   } catch { /* rơi xuống fallback */ }
 
-  // 3. Backup: folder sản phẩm SDVICO nếu chủ đề dính guessGroup (trước là tầng 1, nay backup).
+  // 3. TANG CHINH tu 28/8: folder sản phẩm SDVICO nếu chủ đề dính guessGroup.
   const grp = guessGroup(text);
   if (grp) {
     const key = [...folders.keys()].find((g) => productName(g).toLowerCase() === productName(grp).toLowerCase());
