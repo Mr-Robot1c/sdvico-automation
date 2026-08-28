@@ -32,9 +32,9 @@ SAMPLE_RATE = 48000
 # đọc hơi đều; 1.0 cho ngữ điệu lên xuống rõ hơn mà chưa sinh artifact. Chỉnh qua env nếu cần.
 TEMPERATURE = float(os.environ.get("SDVICO_TTS_TEMP", "1.0"))
 TOP_P = float(os.environ.get("SDVICO_TTS_TOP_P", "0.95"))
-# User 28/8 tối: "giọng Mỹ Duyên cần nhanh thêm xíu". Kéo giãn thời gian giữ nguyên tông
-# (librosa time_stretch), 1.1 = nhanh hơn 10%. Chỉnh env hoặc "speed" từng lần gọi.
-SPEED = float(os.environ.get("SDVICO_TTS_SPEED", "1.1"))
+# 28/8 tối: user thử nhanh 10% (librosa time_stretch) nhưng chê "rè và dở" -> mặc định 1.0
+# (tốc độ gốc, không qua time_stretch). Cơ chế giữ lại, chỉnh env/"speed" từng lần nếu cần.
+SPEED = float(os.environ.get("SDVICO_TTS_SPEED", "1.0"))
 
 print(f"[vieneu] dang nap model (giong: {VOICE})...", flush=True)
 from vieneu import Vieneu  # noqa: E402 — import sau print để log sớm khi khởi động chậm
