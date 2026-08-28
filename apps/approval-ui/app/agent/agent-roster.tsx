@@ -18,6 +18,19 @@ function fmtDT(iso: string | null): string {
 }
 const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 
+// 28/8 (user: "them so gio ma cac AI da hoc lan cuoi"): "X phut/gio/ngay truoc" kem gio tuyet doi.
+function ago(iso: string | null): string {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return '';
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return 'vừa xong';
+  if (min < 60) return `${min} phút trước`;
+  const h = Math.floor(min / 60);
+  if (h < 48) return `${h} giờ trước`;
+  return `${Math.floor(h / 24)} ngày trước`;
+}
+
 type LogRow = { task: string; status: string; detail: any; created_at: string };
 
 export default async function AgentRoster() {
@@ -146,7 +159,7 @@ export default async function AgentRoster() {
           <p className="ag-role" style={{ margin: 0, fontSize: '.76rem' }}>🧩 <b>Model:</b> {a.model}</p>
           <p className="ag-role" style={{ margin: 0, fontSize: '.76rem' }}>📍 <b>Chạy tại:</b> {a.runsAt}</p>
           <div className="ag-last">
-            {a.last.at ? `Gần nhất ${fmtDT(a.last.at)} — ${a.last.note}` : a.last.note}
+            {a.last.at ? `Học lần cuối ${ago(a.last.at)} (${fmtDT(a.last.at)}) — ${a.last.note}` : a.last.note}
             {a.href ? <> · <Link className="src" href={a.href}>Chi tiết →</Link></> : null}
           </div>
         </div>

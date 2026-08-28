@@ -320,9 +320,14 @@ function parseFirstJsonObject(raw: string): any | null {
   if (fence) {
     try { return JSON.parse(fence[1].trim()); } catch { t = fence[1].trim(); }
   }
-  // 3. Scan lay object dau tien theo depth.
-  const start = t.indexOf('{');
+  // 3. Scan lay JSON DAU TIEN theo depth — object {...} hoac MANG [...] (28/8: flash-lite
+  //    co luc tra mang truc tiep khong boc items).
+  const iObj = t.indexOf('{');
+  const iArr = t.indexOf('[');
+  const start = iObj < 0 ? iArr : iArr < 0 ? iObj : Math.min(iObj, iArr);
   if (start < 0) return null;
+  const open = t[start];
+  const close = open === '{' ? '}' : ']';
   let depth = 0;
   let inStr = false;
   let esc = false;
@@ -332,10 +337,10 @@ function parseFirstJsonObject(raw: string): any | null {
     if (ch === '\\') { if (inStr) esc = true; continue; }
     if (ch === '"') { inStr = !inStr; continue; }
     if (inStr) continue;
-    if (ch === '{') depth++;
-    else if (ch === '}') {
+    if (ch === '{' || ch === '[') depth++;
+    else if (ch === '}' || ch === ']') {
       depth--;
-      if (depth === 0) {
+      if (depth === 0 && ch === close) {
         try { return JSON.parse(t.slice(start, i + 1)); } catch { return null; }
       }
     }
@@ -423,7 +428,9 @@ export async function scoreUnscoredKnowledge(
   }
   if (!parsed) return { scored: 0, errors: ['gemini: khong parse duoc JSON tu response'] };
 
-  const items: any[] = Array.isArray(parsed?.items) ? parsed.items : [];
+  // 28/8 fix (rawSample tu route): flash-lite luc tra {"items":[...]}, luc tra MANG TRUC TIEP
+  // [{idx:1,...}] — chap nhan ca 2 dang.
+  const items: any[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.items) ? parsed.items : [];
   if (!items.length) return { scored: 0, errors: ['model tra 0 items (parse ok nhung mang rong)'], rawSample: rawText.slice(0, 500) };
   let scored = 0;
   for (const it of items) {
