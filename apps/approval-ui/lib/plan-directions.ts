@@ -88,7 +88,10 @@ export async function generateContentDirections(
   // ra huong "Lap dat may loc dau kip chuyen bien" gan giong huong vua chay hom truoc).
   avoidTitles: string[] = [],
   // 24/8: client Supabase de ghi log token (optional — thieu thi bo qua log, khong loi).
-  client: AnyClient | null = null
+  client: AnyClient | null = null,
+  // 29/8 (luật 70/30 của sếp): bài/hướng ĐANG THẮNG các tuần trước — ~2/7 hướng được xoay
+  // lại từ đây với góc MỚI; 5/7 hướng còn lại lấy từ tri thức mới tuần này.
+  winners: string[] = []
 ): Promise<ContentDirection[]> {
   if (!knowledge.internal.length && !knowledge.publicSrc.length) return [];
 
@@ -118,6 +121,12 @@ export async function generateContentDirections(
     ? `\nCÁC HƯỚNG ĐÃ CÓ (TUYỆT ĐỐI KHÔNG lặp lại, không viết na ná, không đổi vài chữ):\n${avoidTitles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n`
     : '';
 
+  // 29/8 — LUẬT 70/30 của sếp: phần lớn hướng đi từ tri thức MỚI, nhưng ~2/7 hướng xoay lại
+  // chủ đề ĐANG THẮNG (bài tương tác cao các tuần trước) với GÓC KỂ MỚI — không copy lại bài cũ.
+  const winnersBlock = winners.length
+    ? `\nCHỦ ĐỀ ĐANG THẮNG các tuần trước (luật 70/30: chọn ~2/7 hướng XOAY LẠI các chủ đề này với góc kể MỚI HOÀN TOÀN — cùng chủ đề nhưng không được trùng câu chuyện; 5 hướng còn lại phải từ tri thức mới ở trên):\n${winners.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n`
+    : '';
+
   const prompt = `Bạn là chuyên gia marketing cho SDVICO, công ty phân phối thiết bị cho ngư dân và tàu cá Việt Nam.
 
 ${goal
@@ -128,7 +137,7 @@ ${PRODUCTS.map((p) => '- ' + p).join('\n')}
 
 Nguyên liệu tri thức tuần này:
 ${knowledgeBlock}
-${avoidBlock}
+${avoidBlock}${winnersBlock}
 
 === PLAYBOOK MARKETING SDVICO (BẮT BUỘC BÁM) ===
 

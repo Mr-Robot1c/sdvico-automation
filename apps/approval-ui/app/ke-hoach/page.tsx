@@ -515,7 +515,8 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                         </thead>
                         <tbody>
                           <tr>
-                            <td style={{ whiteSpace: 'nowrap', width: 130 }}><b>🕗 7h — Bản A</b><div className="sub">bài bán</div></td>
+                            {/* 29/8: bỏ A/B — sáng 1 bài bán theo hướng đi, trưa 1 bài bán khác + content. */}
+                            <td style={{ whiteSpace: 'nowrap', width: 130 }}><b>🕗 7h — Bài bán 1</b><div className="sub">theo hướng đi</div></td>
                             <td>
                               <b>{dayTitle}</b>
                               <div className="sub">{dayProduct}</div>
@@ -528,9 +529,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                             <td className="sub" style={{ whiteSpace: 'nowrap' }}>FB Post+Reel · YT Shorts · TikTok</td>
                           </tr>
                           <tr>
-                            <td style={{ whiteSpace: 'nowrap' }}><b>🕐 12h30 — Bản B</b><div className="sub">bài bán A/B</div></td>
+                            <td style={{ whiteSpace: 'nowrap' }}><b>🕐 12h30 — Bài bán 2</b><div className="sub">hướng đi kế tiếp</div></td>
                             <td>
-                              Cùng hướng, <b>xoáy insight khác</b> để so
+                              Hướng đi <b>khác</b> trong kế hoạch tuần, xoáy insight mới
                               {d.date === today && insightsByVariant.get('B') ? (
                                 <div className="sub">🎯 {insightsByVariant.get('B')}</div>
                               ) : null}

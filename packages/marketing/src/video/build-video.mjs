@@ -465,18 +465,10 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   }
 
   // ===== Luồng cũ (bài content / thủ công): tạo bài video riêng =====
-  // Bài nguồn thuộc cặp thử A/B -> video kế thừa cặp, nhưng mã cặp RIÊNG '<pair>-video' để
-  // Evaluator so cặp VIDEO tách khỏi cặp bài text (không trộn 4 bài vào một cặp).
-  const abMeta = srcBrief.ab_pair_id
-    ? {
-        ab_pair_id: `${srcBrief.ab_pair_id}-video`,
-        ab_variant: srcBrief.ab_variant || null,
-        suggestion_title: srcBrief.suggestion_title || null,
-      }
-    : {};
-  // Nhan "Shorts" cho nguoi duyet biet day la ban ngan; KHONG lo A/B trong tieu de
-  // (payload.ab_variant -> badge "Thu A/B" tren Hang doi).
-  const isShortLabel = srcBrief.ab_pair_id ? 'Shorts ' : '';
+  // 29/8 (bỏ A/B): chỉ kế thừa suggestion_title để truy về hướng đi; không còn mã cặp.
+  const abMeta = srcBrief.suggestion_title ? { suggestion_title: srcBrief.suggestion_title } : {};
+  // Nhãn "Shorts" cho người duyệt biết đây là bản ngắn.
+  const isShortLabel = (srcBrief.video_short === true || srcBrief.ab_pair_id) ? 'Shorts ' : '';
 
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: 'social', title,
@@ -558,10 +550,10 @@ async function main() {
   if (!assets?.length) throw new Error(`Sản phẩm "${productGroup}" chưa có tư liệu trong brand_assets.`);
   console.log(`Sản phẩm: ${productGroup} (${assets.length} tư liệu)`);
 
-  // Kịch bản. Bài thuộc cặp thử A/B (rotate 🎯A/🎯B đặt brief.ab_pair_id) -> chế độ SHORTS
-  // 10-20 giây theo flowchart v3 (Creator viết 2 kịch bản A/B cho video shorts gây chú ý).
-  const isShort = !!brief.ab_pair_id;
-  console.log(`Sinh kịch bản (Gemini)${isShort ? ' - che do SHORTS 10-20s (cap A/B ' + String(brief.ab_variant || '?') + ')' : ''}...`);
+  // Kịch bản. 29/8 (bỏ A/B): chế độ SHORTS 10-20 giây giờ theo cờ brief.video_short (rotate
+  // đặt cho mọi bài bán có video); brief.ab_pair_id giữ cho bài cũ trước 29/8.
+  const isShort = brief.video_short === true || !!brief.ab_pair_id;
+  console.log(`Sinh kịch bản (Gemini)${isShort ? ' - che do SHORTS 10-20s' : ''}...`);
   const script = await generateVideoScript(
     content,
     assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title })),

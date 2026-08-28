@@ -4,7 +4,6 @@ import { pullFacebookMetrics } from '../../../lib/fb-metrics';
 import { generateAndStorePlan, planSlotVN, vnDayStartIso } from '../../../lib/plan';
 import { importInternalFromBucket } from '../../../lib/knowledge';
 import { learnPublicKnowledge, learnPublicDaily, scoreUnscoredKnowledge } from '../../../lib/knowledge-public';
-import { evaluateAbPairs } from '../../../lib/evaluator';
 import { pullTikTokMetrics } from '../../../lib/tiktok-metrics';
 import { pullFacebookInbox } from '../../../lib/fb-inbox';
 import { learnWeekly, shouldRunLearnWeekly } from '../../../lib/learn-weekly';
@@ -162,13 +161,9 @@ export async function GET(req: Request) {
 
   // HẰNG NGÀY — Evaluator so cặp A/B đủ số liệu, verdict ghi vào Kho tri thức nội bộ
   // (vòng lặp kín: bản kế hoạch nào sinh sau đó cũng đã học kết quả A/B). Chỉ query, rẻ.
-  let evaluation: { pairs: number; verdicts: number; skipped: number } | null = null;
-  try {
-    const ev = await evaluateAbPairs(client);
-    evaluation = { pairs: ev.pairs, verdicts: ev.verdicts, skipped: ev.skipped };
-  } catch (e: any) {
-    console.error('[evaluator] so cap A/B that bai:', e?.message || e);
-  }
+  // 29/8 (user chốt "bỏ hẳn A/B"): TẮT vòng so cặp A/B — hiệu quả tuần giờ so theo LOẠI bài +
+  // sản phẩm trong week-report/learn-weekly. Code evaluator giữ lại, không gọi nữa.
+  const evaluation: { pairs: number; verdicts: number; skipped: number } | null = null;
 
   // THỨ 2 (kế hoạch tuần) + THỨ 6 (cập nhật lần 1), từ 8h sáng VN, mỗi ngày đúng 1 bản cron.
   // Bản sinh ra TỰ KÈM hướng đi (generateAndStorePlan gọi Gemini directions bên trong).
@@ -270,7 +265,14 @@ export async function GET(req: Request) {
         const { data: goalRow } = await client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle();
         const goal = String(((goalRow as any)?.value?.text) || '').trim();
         const avoidTitles = await loadRecentDirectionTitles(client);
-        const fresh2 = await generateContentDirections({ internal: knowledge.internal, publicSrc: knowledge.publicSrc }, goal, avoidTitles);
+        // 29/8 (luật 70/30): refill hằng ngày cũng đưa top bài đang thắng cho Gemini xoay lại.
+        let winners2: string[] = [];
+        try {
+          const { loadMeasurement } = await import('../../../lib/plan');
+          const m2 = await loadMeasurement(client);
+          winners2 = (m2.topPosts || []).slice(0, 5).map((t: any) => `${t.title} (${t.product})`);
+        } catch { /* thiếu số liệu thì thôi */ }
+        const fresh2 = await generateContentDirections({ internal: knowledge.internal, publicSrc: knowledge.publicSrc }, goal, avoidTitles, client, winners2);
         if (fresh2.length) {
           const newData = { ...(ap as any).data, content_suggestions: [...sugs, ...fresh2] };
           await client.from('mkt_plans').update({ data: newData }).eq('id', (ap as any).id);

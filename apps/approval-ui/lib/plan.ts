@@ -448,11 +448,14 @@ export async function generateAndStorePlan(
   try {
     const { generateContentDirections } = await import('./plan-directions');
     const avoidTitles = await loadRecentDirectionTitles(client);
+    // 29/8 (luật 70/30): đưa top bài ĐANG THẮNG tuần trước cho Gemini xoay lại ~2/7 hướng.
+    const winners = (measurement.topPosts || []).slice(0, 5).map((t) => `${t.title} (${t.product})`);
     plan.content_suggestions = await generateContentDirections(
       { internal: knowledge.internal, publicSrc: knowledge.publicSrc },
       goal,
       avoidTitles,
-      client
+      client,
+      winners
     );
   } catch (e: any) {
     console.error('[plan] sinh huong di that bai (ke hoach van luu):', e?.message || e);
