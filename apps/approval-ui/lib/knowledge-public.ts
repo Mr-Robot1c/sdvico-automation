@@ -308,6 +308,41 @@ export async function learnPublicDaily(
   return { topics: SEARCH_TOPICS.length, found: all.length, inserted, errors };
 }
 
+// Boc JSON object DAU TIEN hop le tu text model tra ve. Chiu duoc: text truoc/sau JSON,
+// ```json fence, nhieu object noi nhau ("{...}\n{...}" — loi thuc te 28/8 lam scoring vo).
+// Dem depth { } nhung bo qua ngoac nam trong string literal (va escape \").
+function parseFirstJsonObject(raw: string): any | null {
+  let t = String(raw || '').trim();
+  // 1. Parse thang (responseMimeType json thuong tra sach).
+  try { return JSON.parse(t); } catch { /* thu cach sau */ }
+  // 2. Strip markdown fence neu co.
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) {
+    try { return JSON.parse(fence[1].trim()); } catch { t = fence[1].trim(); }
+  }
+  // 3. Scan lay object dau tien theo depth.
+  const start = t.indexOf('{');
+  if (start < 0) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < t.length; i++) {
+    const ch = t[i];
+    if (esc) { esc = false; continue; }
+    if (ch === '\\') { if (inStr) esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        try { return JSON.parse(t.slice(start, i + 1)); } catch { return null; }
+      }
+    }
+  }
+  return null;
+}
+
 // ===== 27/8 dot 2 redesign: CHAM DIEM TIER S/A/B/C (Trending Digest kieu ForLife) =====
 // Cham cac dong tier IS NULL (moi hoc, chua danh gia): score 0-100 theo do dung duoc cho
 // content marketing ngu dan + tier + angle + key_message + keywords + plan goi y gio dang.
@@ -374,11 +409,15 @@ export async function scoreUnscoredKnowledge(
     });
     logTokenUsage(client, 'knowledge_score', MKT_MODEL, (res as any).usageMetadata);
     const t = (res.text || '').trim();
-    const m = t.match(/\{[\s\S]*\}/);
-    parsed = m ? JSON.parse(m[0]) : null;
+    // Parse ben bi (fix 28/8: model tra "{...}\n{...}" hoac text thua sau JSON -> regex greedy
+    // \{[\s\S]*\} nuot 2 object lien nhau, JSON.parse vo "Unexpected non-whitespace character
+    // after JSON"). Thu tu: parse thang -> strip ```json fence -> boc object DAU TIEN theo
+    // dem depth ngoac (bo qua ngoac trong string literal).
+    parsed = parseFirstJsonObject(t);
   } catch (e: any) {
     return { scored: 0, errors: ['gemini: ' + String(e?.message || e).slice(0, 200)] };
   }
+  if (!parsed) return { scored: 0, errors: ['gemini: khong parse duoc JSON tu response'] };
 
   const items: any[] = Array.isArray(parsed?.items) ? parsed.items : [];
   const validIds = new Set(rows.map((r) => r.id));
