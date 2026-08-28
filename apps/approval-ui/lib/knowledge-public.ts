@@ -352,7 +352,7 @@ function parseFirstJsonObject(raw: string): any | null {
 export async function scoreUnscoredKnowledge(
   client: Client,
   opts: { limit?: number } = {}
-): Promise<{ scored: number; errors: string[]; skipped?: boolean }> {
+): Promise<{ scored: number; errors: string[]; skipped?: boolean; rawSample?: string }> {
   const limit = opts.limit ?? 20;
   const errors: string[] = [];
 
@@ -370,6 +370,7 @@ export async function scoreUnscoredKnowledge(
   if (!rows.length) return { scored: 0, errors: [] };
 
   let parsed: any;
+  let rawText = '';
   try {
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -411,6 +412,7 @@ export async function scoreUnscoredKnowledge(
     });
     logTokenUsage(client, 'knowledge_score', MKT_MODEL, (res as any).usageMetadata);
     const t = (res.text || '').trim();
+    rawText = t;
     // Parse ben bi (fix 28/8: model tra "{...}\n{...}" hoac text thua sau JSON -> regex greedy
     // \{[\s\S]*\} nuot 2 object lien nhau, JSON.parse vo "Unexpected non-whitespace character
     // after JSON"). Thu tu: parse thang -> strip ```json fence -> boc object DAU TIEN theo
@@ -422,7 +424,7 @@ export async function scoreUnscoredKnowledge(
   if (!parsed) return { scored: 0, errors: ['gemini: khong parse duoc JSON tu response'] };
 
   const items: any[] = Array.isArray(parsed?.items) ? parsed.items : [];
-  if (!items.length) return { scored: 0, errors: ['model tra 0 items (parse ok nhung mang rong)'] };
+  if (!items.length) return { scored: 0, errors: ['model tra 0 items (parse ok nhung mang rong)'], rawSample: rawText.slice(0, 500) };
   let scored = 0;
   for (const it of items) {
     // Map idx (1-based) -> row; fallback id UUID neu model van tra id.

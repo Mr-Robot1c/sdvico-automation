@@ -130,6 +130,34 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
   if (!cids.length) return [];
 
   const { data: contents } = await client.from('mkt_content').select('id, title, brief, draft').in('id', cids);
+
+  // 28/8 (user: "cac hinh anh da mat tieu"): nhieu bai (bai video, bai trend, bai nhap tay)
+  // KHONG co brief.assets.image -> card blog roi ve placeholder logo het. Fallback: lay anh
+  // KHO theo san pham cua bai (brand_assets kind=image cung folder), chon on dinh theo
+  // contentId de moi bai 1 anh co dinh giua cac lan render. Van con thieu -> folder Content.
+  const { data: poolRows } = await client
+    .from('brand_assets')
+    .select('id, storage_path, product_group')
+    .eq('kind', 'image')
+    .not('product_group', 'eq', 'Bài trend')
+    .order('created_at', { ascending: false })
+    .limit(300);
+  const normName = (s: string) => String(s || '').replace(/^\s*\d+\.\s*/, '').trim().toLowerCase();
+  const poolByGroup = new Map<string, Array<{ storage_path: string }>>();
+  const poolAll: Array<{ storage_path: string }> = [];
+  for (const a of (poolRows || []) as any[]) {
+    const g = normName(a.product_group);
+    if (!poolByGroup.has(g)) poolByGroup.set(g, []);
+    poolByGroup.get(g)!.push(a);
+    poolAll.push(a);
+  }
+  const stablePick = (arr: Array<{ storage_path: string }>, cid: string) => {
+    if (!arr.length) return null;
+    const n = parseInt(cid.replace(/-/g, '').slice(0, 8), 16) || 0;
+    return arr[n % arr.length];
+  };
+  const publicUrlOf = (sp: string) => client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+
   const posts: PublicPost[] = [];
   for (const c of contents || []) {
     const id = String((c as any).id);
@@ -138,7 +166,16 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
     if (!title || draft.length < 30) continue; // bỏ bài tiêu đề trống hoặc quá ngắn không nên public
     const brief = (c as any).brief || {};
     const info = byCid.get(id)!;
-    const imageUrl = await imageUrlOf(client, brief?.assets?.image);
+    let imageUrl = await imageUrlOf(client, brief?.assets?.image);
+    if (!imageUrl) {
+      const prodKey = normName(productOf(brief, title, draft));
+      const pool = poolByGroup.get(prodKey)
+        || [...poolByGroup.entries()].find(([g]) => g && (prodKey.includes(g) || g.includes(prodKey)))?.[1]
+        || poolByGroup.get('content')
+        || poolAll;
+      const pick = stablePick(pool, id);
+      if (pick) imageUrl = publicUrlOf(pick.storage_path);
+    }
     posts.push({
       contentId: id,
       slug: `${slugify(title)}-${id.slice(0, 8)}`,

@@ -39,6 +39,7 @@ export async function GET(req: Request) {
     scored: r.scored,
     skipped: r.skipped || false,
     errors: r.errors,
+    raw_sample: (r as any).rawSample || undefined,
     tiers_7_ngay: tiers,
     ms: Date.now() - startedAt,
     message: r.scored

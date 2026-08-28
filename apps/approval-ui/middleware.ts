@@ -13,6 +13,14 @@ export const config = {
 };
 
 export function middleware(req: NextRequest) {
+  // 28/8 FIX (user: "mac gi trang blog bat dang nhap"): file TINH trong /public
+  // (logo-sdvico.png...) khong nam trong matcher-except -> roi xuong basic-auth -> tra 401
+  // + WWW-Authenticate -> browser BAT POPUP dang nhap ngay tren trang blog cua khach vang
+  // lai (nguoi da login khong thay vi creds cache). Cho qua moi file tinh theo duoi.
+  if (/\.(png|jpg|jpeg|gif|svg|webp|avif|ico|txt|xml|webmanifest|woff2?|mp4)$/i.test(req.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   // Bản deploy marketing-only: chặn hẳn route dữ liệu ứng viên, kể cả vào bằng URL trực tiếp.
   const marketingOnly = process.env.MARKETING_ONLY === 'true' || process.env.MARKETING_ONLY === '1';
   if (marketingOnly && /^\/(ho-so|vi-tri)(\/|$)/.test(req.nextUrl.pathname)) {
