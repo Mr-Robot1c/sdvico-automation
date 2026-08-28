@@ -11,11 +11,15 @@ function mb(bytes: number) {
   return (bytes / (1024 * 1024)).toFixed(1);
 }
 
-export default function LibUploader() {
+// 28/8 (user: "up ảnh SD12-300 mà không thấy đâu"): thêm ô CHỌN FOLDER — trước đây upload
+// không gán folder, ảnh rơi vào "Chưa gán" và vòng xoay không dùng. defaultGroup = folder
+// đang mở ở sidebar (trang truyền vào) để up phát nào vào đúng folder phát đó.
+export default function LibUploader({ groups = [], defaultGroup = '' }: { groups?: string[]; defaultGroup?: string }) {
   const [kind, setKind] = useState('image');
   const [title, setTitle] = useState('');
   const [license, setLicense] = useState('owned');
   const [source, setSource] = useState('');
+  const [group, setGroup] = useState(defaultGroup);
   const [busy, setBusy] = useState(false);
   const [pct, setPct] = useState(0);
   const [msg, setMsg] = useState('');
@@ -75,8 +79,8 @@ export default function LibUploader() {
       const { path, uploadUrl } = await createAssetUploadUrl(file.name, kind);
       await putWithProgress(uploadUrl, file);
       setMsg('Đã tải xong, đang ghi nhận...');
-      await registerAsset({ path, kind, title: title.trim() || file.name, license, source });
-      setMsg('Đã tải tư liệu lên kho.');
+      await registerAsset({ path, kind, title: title.trim() || file.name, license, source, product_group: group });
+      setMsg(group ? `Đã tải lên folder "${group.replace(/^\s*\d+\.\s*/, '')}".` : 'Đã tải lên kho (chưa gán folder — gán ở nút chi tiết của ảnh).');
       setPct(0);
       setTitle('');
       setSource('');
@@ -104,6 +108,18 @@ export default function LibUploader() {
         <option value="video">Clip</option>
         <option value="audio">Âm thanh</option>
         <option value="logo">Logo</option>
+      </select>
+      <select
+        value={group}
+        onChange={(e) => setGroup(e.target.value)}
+        aria-label="Folder sản phẩm"
+        title="Tư liệu sẽ nằm trong folder này — vòng xoay chỉ dùng tư liệu ĐÃ gán folder"
+        disabled={busy}
+      >
+        <option value="">(chưa gán folder)</option>
+        {groups.map((g) => (
+          <option key={g} value={g}>{g.replace(/^\s*\d+\.\s*/, '')}</option>
+        ))}
       </select>
       <select value={license} onChange={(e) => setLicense(e.target.value)} aria-label="Giấy phép" disabled={busy}>
         <option value="owned">Công ty sở hữu</option>

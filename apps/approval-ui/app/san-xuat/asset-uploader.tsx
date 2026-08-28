@@ -11,7 +11,9 @@ function mb(bytes: number) {
   return (bytes / (1024 * 1024)).toFixed(1);
 }
 
-export default function AssetUploader({ kind }: { kind: 'image' | 'video' }) {
+// 28/8: nhận thêm group (folder đang lọc ở Xưởng) — upload trong lúc lọc folder nào thì tư
+// liệu vào đúng folder đó; không lọc thì vào "Chưa gán" như cũ (gán sau ở Kho tư liệu).
+export default function AssetUploader({ kind, group = '' }: { kind: 'image' | 'video'; group?: string }) {
   const [busy, setBusy] = useState(false);
   const [pct, setPct] = useState(0);
   const [msg, setMsg] = useState('');
@@ -65,8 +67,10 @@ export default function AssetUploader({ kind }: { kind: 'image' | 'video' }) {
       await putWithProgress(uploadUrl, file);
       // 3. Ghi nhận vào brand_assets để hiện trong kho. Chưa nhập tên thì giữ tên tệp gốc.
       setMsg('Đã tải xong, đang ghi nhận...');
-      await registerAsset({ path, kind, title: title.trim() || file.name, license: 'owned' });
-      setMsg('Đã tải lên xong. Chọn từ kho bên trên để gắn vào bài.');
+      await registerAsset({ path, kind, title: title.trim() || file.name, license: 'owned', product_group: group });
+      setMsg(group
+        ? `Đã tải lên folder "${group.replace(/^\s*\d+\.\s*/, '')}". Chọn từ kho bên trên để gắn vào bài.`
+        : 'Đã tải lên xong (chưa gán folder — lọc folder trước khi tải để tự gán). Chọn từ kho bên trên để gắn vào bài.');
       setPct(0);
       setTitle('');
       setFileName('');

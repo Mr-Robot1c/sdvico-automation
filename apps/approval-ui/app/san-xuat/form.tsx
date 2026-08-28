@@ -313,7 +313,7 @@ export default function SanXuatForm({
           <p className="muted">{images.length ? 'Không có ảnh trong folder này. Bỏ lọc để xem tất cả.' : 'Kho ảnh đang trống. Tải ảnh lên bên dưới.'}</p>
         )}
 
-        <AssetUploader kind="image" />
+        <AssetUploader kind="image" group={folder} />
       </section>
 
       <section className="sx-slot">
@@ -392,7 +392,7 @@ export default function SanXuatForm({
           <p className="muted">{videos.length ? 'Không có video trong folder này. Bỏ lọc để xem tất cả.' : 'Kho video đang trống. Tải video lên bên dưới.'}</p>
         )}
 
-        <AssetUploader kind="video" />
+        <AssetUploader kind="video" group={folder} />
       </section>
 
       <ImageStudio

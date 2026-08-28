@@ -1434,7 +1434,10 @@ export async function uploadAsset(formData: FormData) {
     storage_path: path,
     license,
     license_note: String(formData.get('license_note') || '').trim() || null,
-    source: String(formData.get('source') || '').trim() || null
+    source: String(formData.get('source') || '').trim() || null,
+    // 28/8 (user: "up ảnh SD12-300 mà không thấy đâu"): form không lưu folder -> mọi ảnh
+    // upload đều product_group=null, rơi vào "Chưa gán", vòng xoay không dùng được.
+    product_group: String(formData.get('product_group') || '').trim() || null
   });
   if (error) throw new Error(error.message);
   revalidatePath('/tu-lieu');
@@ -1464,6 +1467,7 @@ export async function registerAsset(input: {
   title?: string;
   license?: string;
   source?: string;
+  product_group?: string;
 }) {
   const path = String(input?.path || '').trim();
   if (!path) throw new Error('Thiếu đường dẫn file đã tải lên.');
@@ -1476,7 +1480,10 @@ export async function registerAsset(input: {
     title: String(input.title || '').trim() || path,
     storage_path: path,
     license,
-    source: String(input.source || '').trim() || null
+    source: String(input.source || '').trim() || null,
+    // 28/8 (user: "up ảnh SD12-300 mà không thấy đâu"): trước đây KHÔNG lưu folder -> mọi
+    // upload qua web rơi vào "Chưa gán", vòng xoay không đếm. Uploader giờ truyền folder.
+    product_group: String(input.product_group || '').trim() || null
   });
   if (error) throw new Error(error.message);
   revalidatePath('/tu-lieu');

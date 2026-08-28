@@ -156,7 +156,8 @@ export default async function Page({ searchParams }: { searchParams: { folder?: 
 
         {/* Lưới thumbnail bên phải */}
         <div className="lib-main">
-          <LibUploader />
+          {/* key theo folder đang mở: đổi folder là uploader nhận defaultGroup mới (state remount). */}
+          <LibUploader key={selected || 'all'} groups={ALL_GROUPS} defaultGroup={selected !== UNASSIGNED ? selected : ''} />
           <p className="sub" style={{ margin: '12px 0 0' }}>
             <b>{shownLabel}</b>: {shown.filter((a) => a.kind === 'image').length} ảnh, {shown.filter((a) => isVideo(a.kind)).length} video
             {selected && selected !== UNASSIGNED && shown.length > 0 && !shown.some((a) => isVideo(a.kind)) ? ' (chưa đăng TikTok được vì thiếu video)' : ''}
