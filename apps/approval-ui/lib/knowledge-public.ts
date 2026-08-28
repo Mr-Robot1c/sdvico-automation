@@ -373,8 +373,10 @@ export async function scoreUnscoredKnowledge(
   try {
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    // 28/8 fix scored:0 im lang: model KHONG chep lai noi UUID dai -> vong update validIds
+    // skip het. Doi sang danh so thu tu (idx 1..N), map idx -> rows[idx-1].id khi update.
     const itemsBlock = rows
-      .map((r, i) => `${i + 1}. [id=${r.id}] ${r.source_title || '(khong tieu de)'}\n   ${String(r.summary || '').slice(0, 400)}`)
+      .map((r, i) => `${i + 1}. ${r.source_title || '(khong tieu de)'}\n   ${String(r.summary || '').slice(0, 400)}`)
       .join('\n');
     const res = await ai.models.generateContent({
       model: MKT_MODEL,
@@ -398,8 +400,8 @@ export async function scoreUnscoredKnowledge(
                 'DANH SÁCH TIN:',
                 itemsBlock,
                 '',
-                'Trả JSON đúng dạng, không thêm chữ ngoài JSON:',
-                '{"items":[{"id":"...","score":75,"tier":"A","angle":"cam_xuc_tu_hao (8/10)","key_message":"...","keywords":["..."],"plan":[{"time":"19:30","kind":"video_short","title":"..."}]}]}',
+                'Trả JSON đúng dạng, không thêm chữ ngoài JSON. idx là SỐ THỨ TỰ của tin trong danh sách (1, 2, 3...):',
+                '{"items":[{"idx":1,"score":75,"tier":"A","angle":"cam_xuc_tu_hao (8/10)","key_message":"...","keywords":["..."],"plan":[{"time":"19:30","kind":"video_short","title":"..."}]}]}',
               ].join('\n'),
             },
           ],
@@ -420,11 +422,16 @@ export async function scoreUnscoredKnowledge(
   if (!parsed) return { scored: 0, errors: ['gemini: khong parse duoc JSON tu response'] };
 
   const items: any[] = Array.isArray(parsed?.items) ? parsed.items : [];
-  const validIds = new Set(rows.map((r) => r.id));
+  if (!items.length) return { scored: 0, errors: ['model tra 0 items (parse ok nhung mang rong)'] };
   let scored = 0;
   for (const it of items) {
-    const id = String(it?.id || '');
-    if (!validIds.has(id)) continue;
+    // Map idx (1-based) -> row; fallback id UUID neu model van tra id.
+    const idx = Number(it?.idx);
+    const row = Number.isInteger(idx) && idx >= 1 && idx <= rows.length
+      ? rows[idx - 1]
+      : rows.find((r) => r.id === String(it?.id || '')) || null;
+    if (!row) { errors.push(`item khong map duoc (idx=${String(it?.idx)}, id=${String(it?.id || '').slice(0, 12)})`); continue; }
+    const id = row.id;
     const score = Math.max(0, Math.min(100, Number(it.score) || 0));
     const tier = ['S', 'A', 'B', 'C'].includes(String(it.tier)) ? String(it.tier) : score >= 80 ? 'S' : score >= 60 ? 'A' : score >= 40 ? 'B' : 'C';
     const up = await client
