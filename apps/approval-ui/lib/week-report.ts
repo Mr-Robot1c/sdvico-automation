@@ -132,6 +132,8 @@ function productOf(brief: any, title: string, draft: string = ''): string {
   // hoac co xuong dong -> gop 'Khác'.
   const name = String((g ? g.replace(/^\s*\d+\.\s*/, '').trim() : '') || brief?.keyword || title || 'Khác').trim();
   if (!name || name.length > 60 || name.includes('\n')) return 'Khác';
+  // 29/8: tên fallback từ bài nhập tay/import ("Bài FB <id>_<id>") — không phải sản phẩm, gộp 'Khác'.
+  if (/\d{9,}/.test(name) || /^bài (fb|đăng tay)/i.test(name)) return 'Khác';
   return name;
 }
 
