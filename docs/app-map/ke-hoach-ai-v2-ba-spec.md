@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 90
+<!-- re-verified: 2026-08-29 00:20 - Doi chieu fb-suite-scan.mjs (file MOI trong packages/marketing/src): bo quet insight cap trang, chi GHI mkt_metrics __page_real__ — khong cham flow ke hoach/rotate/evaluator, NV/AC khong doi. -->
 <!-- re-verified: 2026-08-28 23:20 - Doi chieu hoan SPEED ve 1.0 (user che 1.1 re): thuan trinh bay giong doc, khong doi NV/AC. -->
 <!-- re-verified: 2026-08-28 23:00 - Doi chieu server VieNeu them SPEED (time_stretch sau infer): thuan trinh bay giong doc, khong doi NV/AC ke hoach AI v2. -->
 <!-- re-verified: 2026-08-28 21:40 - Doi chieu bieu cam giong theo loai bai: rotate route luu them brief.emotion (chu cam xuc BOSS chot, von da co trong suggestion); build-video map temperature giong local theo loai bai. Thuan trinh bay giong doc, khong doi NV/AC ke hoach AI v2 (suggestion/plan flow giu nguyen). -->

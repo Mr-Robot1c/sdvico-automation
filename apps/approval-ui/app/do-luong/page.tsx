@@ -4,6 +4,7 @@ import { refreshFacebookMetrics, importManualFacebookPost } from '../actions';
 import MetricsAuto from './metrics-auto';
 import RefreshButton from './refresh-button';
 import PlatformLogo, { type PlatformKey } from '../noi-dung/platform-logo';
+import PageSuiteBlock from './page-suite-block';
 // @ts-ignore — module JS thuần
 import { isOtherPage } from '../../lib/page-origin.mjs';
 
@@ -167,6 +168,18 @@ export default async function Page() {
     });
   }
 
+  // 28/8: 2 lần quét Business Suite gần nhất (bộ quét máy chủ local) — khối sức khoẻ Trang.
+  const { data: pageScans } = await client
+    .from('mkt_metrics')
+    .select('metrics, created_at')
+    .eq('source', 'facebook')
+    .eq('entity_ref', '__page_real__')
+    .not('metrics->suite28', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(2);
+  const scanCur = ((pageScans || [])[0] as any)?.metrics || null;
+  const scanPrev = ((pageScans || [])[1] as any)?.metrics || null;
+
   // Lần nhập tay gần nhất (giữ khối import manual như trang cũ).
   const { data: impRows } = await client
     .from('run_log').select('status, detail, created_at').eq('task', 'mkt.import_manual_post')
@@ -189,6 +202,8 @@ export default async function Page() {
           <RefreshButton action={refreshFacebookMetrics} />
         </div>
       </header>
+
+      <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với lần quét trước" />
 
       <section className="import-manual" style={{ marginBottom: 18 }}>
         <form action={importManualFacebookPost} className="import-manual-form">

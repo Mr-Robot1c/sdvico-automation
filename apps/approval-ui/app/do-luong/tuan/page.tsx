@@ -9,6 +9,7 @@ import PlatformLogo from '../../noi-dung/platform-logo';
 import PullMetricsButton from '../../noi-dung/pull-metrics-button';
 // @ts-ignore — module .mjs dùng chung với fb-metrics (nhận diện bài thuộc page nào)
 import { isOtherPage } from '../../../lib/page-origin.mjs';
+import PageSuiteBlock from '../page-suite-block';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,6 +98,20 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
       views: m.views || 0, engagement: eng, shareUrl: m.shareUrl, videoId: m.videoId,
     };
   }).sort((a, b) => (b.views + b.engagement) - (a.views + a.engagement));
+
+  // 28/8: sức khoẻ Trang từ bộ quét Business Suite — lần quét MỚI NHẤT trong tuần đang xem,
+  // so với lần quét cuối TRƯỚC tuần đó.
+  const { data: scanRows } = await client
+    .from('mkt_metrics')
+    .select('metrics, created_at')
+    .eq('source', 'facebook')
+    .eq('entity_ref', '__page_real__')
+    .not('metrics->suite28', 'is', null)
+    .lt('created_at', win.endIso)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  const scanCur = ((scanRows || []).find((r: any) => r.created_at >= win.startIso) as any)?.metrics || null;
+  const scanPrev = ((scanRows || []).find((r: any) => r.created_at < win.startIso) as any)?.metrics || null;
 
   const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
   const deltaStr = (v: number) => v === 0 ? null : (
@@ -275,6 +290,10 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div style={{ marginTop: 18 }}>
+            <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với tuần trước" />
           </div>
 
           {/* Từng bài trong tuần: user 26/8 chốt "chia ra 3 khung 3 nền tảng khác nhau chứa các
