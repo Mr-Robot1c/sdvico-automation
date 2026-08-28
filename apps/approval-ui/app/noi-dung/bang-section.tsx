@@ -405,12 +405,17 @@ export default async function BangSection() {
                         )}
                         <span className="badge badge-format">📍 {channelsLabel(chans, p.post_reel === true)}</span>
                       </div>
-                      <details className="raw editbox">
-                        <summary>👁 Xem bài</summary>
-                        {schImg ? <img src={schImg} alt="" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 6 }} /> : null}
-                        {schVid ? <video src={schVid} controls preload="none" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 6 }} /> : null}
-                        <p style={{ whiteSpace: 'pre-wrap', margin: '6px 0 0', fontSize: '.88rem' }}>{c?.draft || '(chưa có nội dung)'}</p>
-                      </details>
+                      {/* 29/8 (user: "bấm xem bài như bên chờ duyệt"): mở MODAL lớn ViewModal
+                          thay vì xổ inline trong card. */}
+                      <ViewModal title={title} label="👁 Xem bài">
+                        {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
+                        {schImg || schVid ? (
+                          <div className="modal-media">
+                            {schImg ? <img src={schImg} alt="Ảnh bài viết" /> : null}
+                            {schVid ? <video src={schVid} controls preload="none" playsInline /> : null}
+                          </div>
+                        ) : null}
+                      </ViewModal>
                       {fbFailed.has(it.cid) ? (
                         <form action={retryFacebookPublish}>
                           <input type="hidden" name="content_id" value={it.cid} />
@@ -491,12 +496,15 @@ export default async function BangSection() {
                           ) : null}
                         </span>
                       ) : <span className="muted" style={{ fontSize: '.8rem' }}>Chưa có số liệu.</span>}
-                      <details className="raw editbox">
-                        <summary>👁 Xem bài</summary>
-                        {pubImg ? <img src={pubImg} alt="" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 6 }} /> : null}
-                        {pubVid ? <video src={pubVid} controls preload="none" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 6 }} /> : null}
-                        <p style={{ whiteSpace: 'pre-wrap', margin: '6px 0 0', fontSize: '.88rem' }}>{c?.draft || '(chưa có nội dung)'}</p>
-                      </details>
+                      <ViewModal title={title} label="👁 Xem bài">
+                        {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
+                        {pubImg || pubVid ? (
+                          <div className="modal-media">
+                            {pubImg ? <img src={pubImg} alt="Ảnh bài viết" /> : null}
+                            {pubVid ? <video src={pubVid} controls preload="none" playsInline /> : null}
+                          </div>
+                        ) : null}
+                      </ViewModal>
                       {/* User 27/8 layout: chia 2 cột. TRÁI = Ghi Zalo/inbox + Chia sẻ group.
                           PHẢI = Xuất TikTok + Copy caption (dòng 1) + Ghép TikTok (dòng 2). */}
                       {it.cid ? (() => {

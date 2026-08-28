@@ -87,12 +87,23 @@ def tts_route():
         speed = min(1.4, max(0.8, float(data.get("speed") or SPEED)))
     except (TypeError, ValueError):
         speed = SPEED
+    try:
+        seed = int(data.get("seed") or SEED)  # per-request để thử/chọn seed mở đầu sạch
+    except (TypeError, ValueError):
+        seed = SEED
     with lock:
-        np.random.seed(SEED)  # cùng seed mọi lần gọi -> màu giọng nhất quán giữa cảnh/video
+        np.random.seed(seed)  # cùng seed mọi lần gọi -> màu giọng nhất quán giữa cảnh/video
         wav = tts.infer(text, voice=voice, temperature=temp, top_p=top_p, repetition_penalty=REP_PENALTY)
+    # 29/8 (user: "vào phải mất 1-2s mới chịu đọc"): model hay nhả ~0,5s câm ở đầu (đo được
+    # 0,46s), vào video cộng dồn nghe thành 1-2 giây chết. Cắt lặng 2 đầu rồi đệm lại 0,12s
+    # cho tự nhiên. top_db 32: chỉ coi là lặng khi thật sự câm, không cắt phụ âm nhẹ.
+    import librosa
+    wav = np.asarray(wav, dtype="float32")
+    wav, _ = librosa.effects.trim(wav, top_db=32)
+    pad = np.zeros(int(0.12 * SAMPLE_RATE), dtype="float32")
+    wav = np.concatenate([pad, wav, pad])
     if abs(speed - 1.0) > 0.01:
-        import librosa  # có sẵn trong deps vieneu; giữ tông, chỉ đổi nhịp
-        wav = librosa.effects.time_stretch(np.asarray(wav, dtype="float32"), rate=speed)
+        wav = librosa.effects.time_stretch(wav, rate=speed)
     buf = io.BytesIO()
     sf.write(buf, wav, SAMPLE_RATE, format="WAV")
     return Response(buf.getvalue(), mimetype="audio/wav")

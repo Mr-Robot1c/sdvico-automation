@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 180
+<!-- re-verified: 2026-08-29 10:10 - Xem bai o cot Len lich + Trang thai doi tu <details> inline sang MODAL ViewModal (user: "bam xem nhu ben cho duyet chu khong phai xo trong card") — draftbox + modal-media, media ho tro ca image_url link ngoai. -->
 <!-- re-verified: 2026-08-29 09:40 - Card TRANG THAI theo user: (1) them <details> "👁 Xem bai" (anh ke ca image_url link ngoai / video / nguyen van draft) giong cot Len lich. (2) Link "Xem tat ca N bai" hien LUON khi co moreHref (truoc chi hien khi vuot cap 8 nen 7 bai bi an — user: "sao xoa chi"). -->
 <!-- re-verified: 2026-08-29 08:40 - Khoi Do luong /tong-quan LAM RONG theo user: 5 o so lon pl-tile trai het be ngang (bam duoc -> tuan/khach-hang/do-luong), duoi chia 2 cot blk-cols Bai tot nhat | Suc khoe Trang (PageSuiteBlock, chua co lan quet thi hien ghi chu cho), 2 link chi tiet don ve goc phai. -->
 <!-- re-verified: 2026-08-29 07:50 - (1) Khoi Do luong tren /tong-quan DOI LEN ngay duoi Tien do theo giai doan (user: "van chua co phan do luong" — truoc nam duoi Ke hoach, cuon moi thay). (2) Card cot Len lich them <details> "Xem bai": anh (ke ca image_url link ngoai)/video + nguyen van draft (user: "bai len lich t muon coi duoc chu khong dung yen"). -->
