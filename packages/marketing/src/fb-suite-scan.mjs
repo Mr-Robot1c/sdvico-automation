@@ -188,8 +188,10 @@ async function loop() {
   const snapshot = join(PROFILE, 'Default', 'Network', 'Cookies');
   for (;;) {
     if (!existsSync(snapshot)) {
+      // Rình 15 giây/lần (thử copy hụt gần như không tốn gì) — user chỉ cần đóng Brave ~20
+      // giây là chộp được, không phải canh 5 phút.
       const err = syncSession();
-      if (err) { await new Promise((r) => setTimeout(r, 5 * 60 * 1000)); continue; }
+      if (err) { await new Promise((r) => setTimeout(r, 15 * 1000)); continue; }
       console.log('da chop duoc cookie tu Brave, quet ngay');
     }
     await scanOnce(); // tự thử làm tươi cookie mỗi lần (Brave mở thì dùng bản cũ)
