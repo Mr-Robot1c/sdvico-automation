@@ -185,9 +185,11 @@ export default function ShareGroups({
       aria-label="Chia sẻ vào group"
       style={{
         position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999,
-        background: 'var(--bg-1, #ffffff)', border: '1px solid var(--line, #d1d5db)', borderRadius: 10,
+        // 29/8 (user: "lỗi hiển thị màu"): --bg-1 KHÔNG tồn tại -> fallback #fff thắng luôn,
+        // popover trắng giữa dark mode (cùng bệnh với popover TikTok đã fix). Var thật: --surface.
+        background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10,
         padding: 12, width: 360, boxShadow: '0 14px 42px rgba(0,0,0,.28)',
-        color: 'var(--ink, #111827)',
+        color: 'var(--ink)',
       }}
       onClick={(e) => e.stopPropagation()}
     >
