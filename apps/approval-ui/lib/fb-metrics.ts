@@ -198,18 +198,33 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
       }
 
       // 2) Hỏi tương tác. Có post -> hỏi post đủ 3 chỉ số; lỗi -> lùi về hỏi node gốc không `shares`.
-      const askPost = postId ? await graph(`${postId}?fields=reactions.summary(total_count),comments.summary(total_count),shares`) : null;
+      // 28/8 tối: REEL là node VIDEO — không có field `reactions` (chỉ có `likes`), hỏi reactions
+      // là "(#100) nonexisting field" chết cả bài (reel SDVICOVN ghép tay mất số liệu). Reel hỏi
+      // likes + comments; các dạng khác giữ nguyên.
+      const isReelNode = /\/reel\//.test(url);
+      const postFields = isReelNode
+        ? 'likes.summary(total_count),comments.summary(total_count)'
+        : 'reactions.summary(total_count),comments.summary(total_count),shares';
+      const askPost = postId ? await graph(`${postId}?fields=${postFields}`) : null;
       let j: any = askPost && !askPost.error ? askPost : null;
       if (!j) {
         if (askPost?.error) note.push(`post ${postId}: ${askPost.error.message}`);
-        j = await graph(`${objId}?fields=reactions.summary(total_count),comments.summary(total_count)`);
+        j = await graph(`${objId}?fields=${isReelNode ? 'likes.summary(total_count),comments.summary(total_count)' : 'reactions.summary(total_count),comments.summary(total_count)'}`);
         if (j?.error) return { contentId: cid, objId, error: j.error.message, note } as any;
         if (kind !== 'post') postId = null; // không có node bài dùng được -> khỏi hỏi /insights bài
       }
-      const reactions = j?.reactions?.summary?.total_count ?? 0;
+      const reactions = (j?.reactions?.summary?.total_count ?? j?.likes?.summary?.total_count) ?? 0;
       const comments = j?.comments?.summary?.total_count ?? 0;
       const shares = j?.shares?.count ?? 0;
       const metrics: any = { reactions, comments, shares, engagement: reactions + comments + shares };
+      if (isReelNode) {
+        // Lượt phát reel: field `views` trên node video (Graph v22+). Page khác đọc công khai có
+        // thể bị chặn -> thử riêng, lỗi thì bỏ qua không ảnh hưởng chỉ số khác.
+        try {
+          const vr = await graph(`${objId}?fields=views`, 6000);
+          if (vr && !vr.error && vr.views != null && !Number.isNaN(Number(vr.views))) metrics.views = Number(vr.views);
+        } catch { /* bỏ qua */ }
+      }
       const isVideo = kind === 'video';
 
       // Chỉ số CẦN read_insights: lượt xem + số giây xem. Gọi RIÊNG + try/catch từng cái để một
