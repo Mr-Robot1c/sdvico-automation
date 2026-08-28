@@ -166,7 +166,9 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
     if (!title || draft.length < 30) continue; // bỏ bài tiêu đề trống hoặc quá ngắn không nên public
     const brief = (c as any).brief || {};
     const info = byCid.get(id)!;
-    let imageUrl = await imageUrlOf(client, brief?.assets?.image);
+    // 28/8 tối (user): blog ĐƯỢC dùng ảnh link ngoài (Google/Unsplash) khi bài mang image_url
+    // — miễn hợp bài; ảnh kho vẫn là fallback khi không có.
+    let imageUrl = String(brief?.assets?.image_url || '') || await imageUrlOf(client, brief?.assets?.image);
     if (!imageUrl) {
       const prodKey = normName(productOf(brief, title, draft));
       const pool = poolByGroup.get(prodKey)

@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 90
+<!-- re-verified: 2026-08-29 03:30 - Doi chieu upload-zalo (packages/marketing/src) nhanh media + BOSS an tier/angle/key_message DATA 2 qua plan-directions: lam GIAU dau vao sinh huong di, khong doi NV/AC (flow sinh ke hoach giu nguyen). -->
 <!-- re-verified: 2026-08-29 01:25 - Doi chieu vong rinh cookie 15s cua fb-suite-scan: ky thuat thuan tuy, NV/AC khong doi. -->
 <!-- re-verified: 2026-08-29 01:10 - Doi chieu fb-suite-scan doi nhip 2h + muon phien Brave: van chi ghi mkt_metrics __page_real__, NV/AC khong doi. -->
 <!-- re-verified: 2026-08-29 00:45 - Doi chieu fix thoat cua fb-suite-scan (exitCode thay exit): ky thuat thuan tuy, NV/AC khong doi. -->

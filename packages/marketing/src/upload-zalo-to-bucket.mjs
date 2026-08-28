@@ -22,8 +22,19 @@ function ctype(name) {
   if (n.endsWith('.png')) return 'image/png';
   if (n.endsWith('.jpg') || n.endsWith('.jpeg')) return 'image/jpeg';
   if (n.endsWith('.webp')) return 'image/webp';
+  if (n.endsWith('.gif')) return 'image/gif';
+  if (n.endsWith('.mp4') || n.endsWith('.m4v')) return 'video/mp4';
+  if (n.endsWith('.mov')) return 'video/quicktime';
+  if (n.endsWith('.webm')) return 'video/webm';
   return 'application/octet-stream';
 }
+
+// 28/8 tối (user): "zalo sẽ có mấy cái ảnh/video BÁN HÀNG lên — vẫn có thể dùng cho bài".
+// File MEDIA trong folder Zalo không phải tài liệu đọc — đưa vào KHO TƯ LIỆU bài đăng
+// (bucket brand-assets + dòng brand_assets) để rotate/bài sản phẩm chọn được như ảnh thật.
+// Nhóm sản phẩm đoán từ TÊN FILE (đặt tên có chữ sản phẩm, vd "sea40-khach-lap.jpg" -> SEA-40);
+// không đoán được thì vào 'Content'. Khử trùng theo title "Zalo: <tên file>".
+const MEDIA_RE = /\.(jpe?g|png|webp|gif|mp4|mov|m4v|webm)$/i;
 
 let items;
 try { items = readdirSync(localDir); }
@@ -50,6 +61,27 @@ for (const name of items) {
   if (SKIP_PATTERNS.some((re) => re.test(name))) { skipped += 1; console.log(`  - bo qua (tai lieu huong dan): ${name}`); continue; }
   const remote = `${bucketPrefix}/${name}`;
   const buf = readFileSync(full);
+
+  // File MEDIA (anh/video ban hang tu Zalo) -> KHO TU LIEU brand-assets, khong vao kho tri thuc.
+  if (MEDIA_RE.test(name)) {
+    const isVideo = /\.(mp4|mov|m4v|webm)$/i.test(name);
+    const title = `Zalo: ${name}`;
+    const { data: dup } = await client.from('brand_assets').select('id').eq('title', title).limit(1);
+    if (dup && dup.length) { skipped += 1; console.log(`  - da co trong kho tu lieu: ${name}`); continue; }
+    const safeName = name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const mediaPath = `zalo/${Date.now()}-${safeName}`;
+    const upM = await client.storage.from('brand-assets').upload(mediaPath, buf, { contentType: ctype(name) });
+    if (upM.error) { console.error(`  X media ${name}: ${upM.error.message}`); errors += 1; continue; }
+    const { guessGroup } = await import('./products.mjs');
+    const grp = guessGroup(name) || 'Content';
+    const ins = await client.from('brand_assets').insert({
+      kind: isVideo ? 'video' : 'image', title, storage_path: mediaPath, source: 'zalo', product_group: grp,
+    });
+    if (ins.error) { console.error(`  X brand_assets ${name}: ${ins.error.message}`); errors += 1; continue; }
+    uploaded += 1;
+    console.log(`  ✓ TU LIEU ${isVideo ? 'video' : 'anh'} -> nhom "${grp}": ${name} (${Math.round(buf.length / 1024)} KB)`);
+    continue;
+  }
 
   // So voi ban dang co tren bucket (neu co) de biet noi dung co doi khong.
   let changed = true;

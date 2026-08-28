@@ -33,7 +33,9 @@ const PRODUCTS = [
 
 type KnowledgeInput = {
   internal: Array<{ title: string | null; summary: string | null; needs_gov_review: boolean }>;
-  publicSrc: Array<{ source_title: string | null; summary: string; source_url: string; needs_gov_review: boolean }>;
+  // 28/8 tối: nhận thêm đánh giá của DATA 2 (tier S/A/B/C, góc tiếp cận, thông điệp, gợi ý
+  // lịch đăng) — trước đây BOSS chỉ thấy summary, các thông số DATA 2 chấm chỉ nằm trên UI.
+  publicSrc: Array<{ source_title: string | null; summary: string; source_url: string; needs_gov_review: boolean; tier?: string | null; angle?: string | null; key_message?: string | null; plan_suggestions?: any }>;
 };
 
 // 24/8 (user "bam sinh ke hoach qua lau dan den crash web"): 1 lan do that mat 133 GIAY.
@@ -94,8 +96,19 @@ export async function generateContentDirections(
     '## Nguon noi bo (Zalo Phong Kinh doanh + danh gia A/B vong truoc):',
     ...knowledge.internal.map((k, i) => `${i + 1}. ${k.title || ''}${k.needs_gov_review ? ' [can duyet QL]' : ''}\n   ${k.summary || ''}`),
     '',
-    '## Nguon public (tin nganh 7 ngay qua):',
-    ...knowledge.publicSrc.map((k, i) => `${i + 1}. ${k.source_title || ''}${k.needs_gov_review ? ' [can duyet QL]' : ''}\n   ${k.summary}\n   Nguon: ${k.source_url}`),
+    '## Nguon public (tin nganh 7 ngay qua, DATA 2 da cham diem — TIER S dung duoc nhat cho ngu dan, uu tien khai thac truoc):',
+    ...knowledge.publicSrc.map((k, i) => {
+      // 28/8 tối: đưa CẢ đánh giá DATA 2 vào cho Creator/BOSS dùng thật (góc tiếp cận,
+      // thông điệp chính, gợi ý khung giờ) thay vì chỉ hiển thị trên trang Agent.
+      const sug = Array.isArray(k.plan_suggestions)
+        ? k.plan_suggestions.slice(0, 2).map((s: any) => `${s?.time ? `[${s.time}] ` : ''}${s?.kind ? `${s.kind}: ` : ''}${s?.title || ''}`).filter((x: string) => x.trim()).join(' | ')
+        : '';
+      return `${i + 1}. ${k.tier ? `[TIER ${k.tier}] ` : ''}${k.source_title || ''}${k.needs_gov_review ? ' [can duyet QL]' : ''}\n   ${k.summary}`
+        + (k.angle ? `\n   Goc tiep can (DATA 2): ${k.angle}` : '')
+        + (k.key_message ? `\n   Thong diep chinh: ${k.key_message}` : '')
+        + (sug ? `\n   Goi y lich dang: ${sug}` : '')
+        + `\n   Nguon: ${k.source_url}`;
+    }),
   ].join('\n');
 
   // CẤM TRÙNG (user 24/8 gắt: "TAO BAO MAY LA KHONG DUOC TRUNG LAI"): liệt kê các hướng

@@ -265,7 +265,9 @@ export async function loadRecentKnowledge(
   limit = 30
 ): Promise<{
   internal: Array<{ id: string; title: string | null; summary: string | null; needs_gov_review: boolean; created_at: string }>;
-  publicSrc: Array<{ id: string; source_url: string; source_title: string | null; summary: string; needs_gov_review: boolean; created_at: string }>;
+  // 28/8 tối (user hỏi "BOSS có học DATA 2 không"): trả thêm tier/angle/key_message/
+  // plan_suggestions để prompt sinh hướng đi thấy CẢ đánh giá của DATA 2, không chỉ summary.
+  publicSrc: Array<{ id: string; source_url: string; source_title: string | null; summary: string; needs_gov_review: boolean; created_at: string; tier?: string | null; angle?: string | null; key_message?: string | null; plan_suggestions?: any }>;
 }> {
   const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
   const { data: iRows } = await client
@@ -281,7 +283,7 @@ export async function loadRecentKnowledge(
   let pRows: any[] = [];
   const pTier = await client
     .from('mkt_knowledge_public')
-    .select('id, source_url, source_title, summary, needs_gov_review, created_at, tier, score')
+    .select('id, source_url, source_title, summary, needs_gov_review, created_at, tier, score, angle, key_message, plan_suggestions')
     .gte('created_at', since)
     .order('created_at', { ascending: false })
     .limit(limit * 3);
