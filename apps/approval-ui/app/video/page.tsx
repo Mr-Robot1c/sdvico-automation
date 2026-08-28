@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
+import PlatformLogo from '../noi-dung/platform-logo';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang VIDEO: luong lam video bang AI cua
 // SDVICO (thay vidpod/OpenMontage cua ForLife bang Gemini + ffmpeg cua minh):
@@ -42,10 +43,10 @@ export default async function Page() {
       .limit(12),
     client
       .from('mkt_posts')
-      .select('channel')
+      .select('channel, content_id')
       .eq('status', 'published')
       .is('deleted_at', null)
-      .in('channel', ['youtube', 'tiktok'])
+      .in('channel', ['facebook', 'youtube', 'tiktok'])
       .limit(1000),
   ]);
 
@@ -58,6 +59,15 @@ export default async function Page() {
   const builtRecently = contents.filter((c) => c.brief?.trend_video_built_at || c.brief?.assets?.video_v || c.brief?.assets?.video);
   const ytCount = postRows.filter((p) => p.channel === 'youtube').length;
   const ttCount = postRows.filter((p) => p.channel === 'tiktok').length;
+
+  // So VIDEO da dang len Facebook: FB tron lan bai text/anh/video nen chi dem bai co video
+  // that (kind='video' hoac brief.assets.video/video_v). YT/TikTok von chi co video -> dem het.
+  const fbCids = [...new Set(postRows.filter((p) => p.channel === 'facebook').map((p) => String(p.content_id || '')).filter(Boolean))].slice(0, 500);
+  let fbVideoCount = 0;
+  if (fbCids.length) {
+    const { data: fbContents } = await client.from('mkt_content').select('id, kind, brief').in('id', fbCids);
+    fbVideoCount = (fbContents || []).filter((c: any) => c.kind === 'video' || c.brief?.assets?.video || c.brief?.assets?.video_v).length;
+  }
 
   const urlOf = (p: string) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
 
@@ -82,13 +92,28 @@ export default async function Page() {
         </div>
       </header>
 
-      {/* ===== TILE TRANG THAI ===== */}
+      {/* ===== TILE TRANG THAI (28/8: gop Da dang thanh 1 block chia 3 o FB | YT | TikTok) ===== */}
       <div className="pl-tiles">
         <div className={`pl-tile ${generating.length ? 'hot' : ''}`}><b>{fmt(generating.length)}</b><span>Đang sinh kịch bản</span></div>
         <div className={`pl-tile ${waiting.length ? 'hot' : ''}`}><b>{fmt(waiting.length)}</b><span>Chờ Watcher dựng</span></div>
         <div className="pl-tile"><b>{fmt(builtRecently.length)}</b><span>Video dựng xong (30 ngày)</span></div>
-        <div className="pl-tile"><b>{fmt(ytCount)}</b><span>Đã đăng YouTube</span></div>
-        <div className="pl-tile"><b>{fmt(ttCount)}</b><span>Đã đăng TikTok</span></div>
+        <div className="pl-tile" style={{ gridColumn: 'span 2', minWidth: 260 }}>
+          <span style={{ marginTop: 0, fontWeight: 600 }}>Đã đăng</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
+            <div style={{ textAlign: 'center', borderRight: '1px solid var(--line)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><PlatformLogo platform="facebook" size={15} /><b style={{ fontSize: '1.25rem' }}>{fmt(fbVideoCount)}</b></span>
+              <span style={{ display: 'block', fontSize: '.75rem', color: 'var(--ink-2)' }}>Video Facebook</span>
+            </div>
+            <div style={{ textAlign: 'center', borderRight: '1px solid var(--line)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><PlatformLogo platform="youtube" size={15} /><b style={{ fontSize: '1.25rem' }}>{fmt(ytCount)}</b></span>
+              <span style={{ display: 'block', fontSize: '.75rem', color: 'var(--ink-2)' }}>Video YouTube</span>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><PlatformLogo platform="tiktok" size={15} /><b style={{ fontSize: '1.25rem' }}>{fmt(ttCount)}</b></span>
+              <span style={{ display: 'block', fontSize: '.75rem', color: 'var(--ink-2)' }}>Video TikTok</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ===== LUONG LAM VIDEO ===== */}
