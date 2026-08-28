@@ -395,7 +395,25 @@ function vnDayStartIso(now: Date): string {
 // content_suggestions của BOSS). Chưa có bản đang áp -> áp thẳng bản 'live'. Guard 1 lần/ngày
 // bằng cột run_log task 'mkt.live_apply'.
 export async function applyLiveEvening(client: Client, opts: { force?: boolean } = {}, now: Date = new Date()): Promise<{ applied: boolean; skipped?: string }> {
-  if (!opts.force && !isEveningVN(now)) return { applied: false, skipped: 'chua toi buoi toi (>=19h VN)' };
+  if (!opts.force && !isEveningVN(now)) {
+    // 28/8 CHAY BU (user xac nhan may local tat toi 26-27/8 nen cron khong no khung 19h,
+    // BOSS mat 2 luot chinh): buoi SANG (< 12h VN) neu TOI QUA khong co luot live_apply ok
+    // nao -> cho chay bu 1 luot ngay bay gio. Luot bu thay luot toi cung ngay (guard "da ap
+    // dung dem nay" ben duoi van tinh) — moi ngay van dung 1 nhip chinh ±0,5.
+    const vnHour = new Date(now.getTime() + 7 * 3600 * 1000).getUTCHours();
+    if (vnHour >= 12) return { applied: false, skipped: 'chua toi buoi toi (>=19h VN)' };
+    const todayStart = vnDayStartIso(now);
+    const yesterdayStart = vnDayStartIso(new Date(now.getTime() - 24 * 3600 * 1000));
+    const { count: yCount } = await client
+      .from('run_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('task', 'mkt.live_apply')
+      .eq('status', 'ok')
+      .gte('created_at', yesterdayStart)
+      .lt('created_at', todayStart);
+    if (yCount && yCount > 0) return { applied: false, skipped: 'chua toi buoi toi (>=19h VN)' };
+    // toi qua 0 luot -> roi xuong chay bu (guard 1 luot/ngay hom nay van ap ben duoi).
+  }
 
   if (!opts.force) {
     const { count } = await client

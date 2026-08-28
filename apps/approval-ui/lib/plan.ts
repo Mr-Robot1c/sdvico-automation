@@ -154,8 +154,13 @@ function productOf(brief: any, title: string, draft: string = ''): string {
     `${g || ''} ${brief?.keyword || ''} ${title || ''} ${draftSnippet}`
   );
   if (guess) return guess.replace(/^\s*\d+\.\s*/, '').trim();
-  const name = (g ? g.replace(/^\s*\d+\.\s*/, '').trim() : '') || brief?.keyword || title || 'Khác';
-  return String(name).trim() || 'Khác';
+  // 28/8 FIX weights dinh rac: bai import lich su khong co rotation_group, guessGroup fail
+  // -> fallback lay NGUYEN VAN title dai lam "san pham" -> weights/products day key rac
+  // ("Anh Nam 32 tuoi o Long Hai..."). Ten fallback chi hop le khi NGAN (<= 60 ky tu,
+  // khong xuong dong) — con lai gop 'Khác'.
+  const name = String((g ? g.replace(/^\s*\d+\.\s*/, '').trim() : '') || brief?.keyword || title || 'Khác').trim();
+  if (!name || name.length > 60 || name.includes('\n')) return 'Khác';
+  return name;
 }
 
 // Cửa sổ tuần chạy từ thứ 2 tới chủ nhật, tính theo giờ Việt Nam (UTC+7). Trả về YYYY-MM-DD.

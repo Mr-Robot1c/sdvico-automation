@@ -128,8 +128,11 @@ function productOf(brief: any, title: string, draft: string = ''): string {
     `${g || ''} ${brief?.keyword || ''} ${title || ''} ${draftSnippet}`
   );
   if (guess) return guess.replace(/^\s*\d+\.\s*/, '').trim();
-  const name = (g ? g.replace(/^\s*\d+\.\s*/, '').trim() : '') || brief?.keyword || title || 'Khác';
-  return String(name).trim() || 'Khác';
+  // 28/8: cung fix voi plan.ts — fallback title dai thanh "san pham" rac. Ten > 60 ky tu
+  // hoac co xuong dong -> gop 'Khác'.
+  const name = String((g ? g.replace(/^\s*\d+\.\s*/, '').trim() : '') || brief?.keyword || title || 'Khác').trim();
+  if (!name || name.length > 60 || name.includes('\n')) return 'Khác';
+  return name;
 }
 
 function kindOf(brief: any): { isContent: boolean; contentType?: string } {
