@@ -384,29 +384,44 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           📊 Đo lường
           <span className="sub">tuần này (Thứ 2 → hôm nay) · kênh chính</span>
         </h2>
+        {/* 29/8 (user: "phần đo lường phải rộng ra"): ô số LỚN kiểu pl-tile trải hết bề ngang,
+            dưới chia 2 cột Bài tốt nhất | Sức khoẻ Trang. */}
         {week ? (
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'baseline', marginBottom: 10 }}>
-            <div><span className="sub" style={{ fontSize: '.8rem' }}>Bài đã đăng</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.posts)}</b></div>
-            <div><span className="sub" style={{ fontSize: '.8rem' }}>Tương tác</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.engagement)}</b>{deltaTag(week.delta.engagement)}</div>
-            <div><span className="sub" style={{ fontSize: '.8rem' }}>Lượt xem</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.views)}</b>{deltaTag(week.delta.views)}</div>
-            <div><span className="sub" style={{ fontSize: '.8rem' }}>Khách hỏi mua</span> <b style={{ fontSize: '1.1rem' }}>{vnI(week.totals.conversions)}</b>{deltaTag(week.delta.conversions)}</div>
-            <div><span className="sub" style={{ fontSize: '.8rem' }}>Hôm nay</span> <b style={{ fontSize: '1.1rem' }}>{vnI(postsTodayCount)}</b> <span className="sub" style={{ fontSize: '.8rem' }}>lượt đăng</span></div>
+          <div className="pl-tiles" style={{ margin: '12px 0' }}>
+            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.posts)}</b><span>Bài đã đăng tuần này</span></Link>
+            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.engagement)}{deltaTag(week.delta.engagement)}</b><span>Tương tác</span></Link>
+            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.views)}{deltaTag(week.delta.views)}</b><span>Lượt xem</span></Link>
+            <Link href="/khach-hang" className="pl-tile"><b>{vnI(week.totals.conversions)}{deltaTag(week.delta.conversions)}</b><span>Khách hỏi mua</span></Link>
+            <Link href="/do-luong" className="pl-tile"><b>{vnI(postsTodayCount)}</b><span>Lượt đăng hôm nay</span></Link>
           </div>
         ) : (
           <p className="sub">Chưa đọc được số liệu tuần.</p>
         )}
-        {week && week.topPosts && week.topPosts.length ? (
-          <div style={{ marginBottom: 10 }}>
-            <span className="sub" style={{ fontSize: '.8rem' }}>Bài tốt nhất tuần:</span>
-            {week.topPosts.slice(0, 3).map((p: any, i: number) => (
-              <div key={i} className="sub" style={{ fontSize: '.85rem' }}>
-                {i + 1}. {String(p.title || '').slice(0, 70)} <b>· {vnI(p.m?.engagement || 0)} tương tác</b>
-              </div>
-            ))}
+        <div className="blk-cols" style={{ marginBottom: 10 }}>
+          <div>
+            <b style={{ fontSize: '.9rem' }}>🏆 Bài tốt nhất tuần</b>
+            {week && week.topPosts && week.topPosts.length ? (
+              week.topPosts.slice(0, 3).map((p: any, i: number) => (
+                <div key={i} className="sub" style={{ fontSize: '.85rem', marginTop: 4 }}>
+                  {i + 1}. {String(p.title || '').slice(0, 70)} <b>· {vnI(p.m?.engagement || 0)} tương tác</b>
+                </div>
+              ))
+            ) : (
+              <p className="sub" style={{ margin: '4px 0 0' }}>Tuần này chưa có bài nào có số liệu.</p>
+            )}
           </div>
-        ) : null}
-        <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với hôm qua" />
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          <div>
+            {scanCur ? (
+              <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với hôm qua" />
+            ) : (
+              <div>
+                <b style={{ fontSize: '.9rem' }}>📈 Sức khoẻ Trang SDVICO VN</b>
+                <p className="sub" style={{ margin: '4px 0 0' }}>Chưa có lần quét Business Suite nào — bộ quét trên máy chủ sẽ tự chộp phiên Brave rồi quét mỗi 2 giờ.</p>
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <Link href="/do-luong" className="src" style={{ fontSize: '.85rem' }}>Đo lường ngày →</Link>
           <Link href="/do-luong/tuan" className="src" style={{ fontSize: '.85rem' }}>Báo cáo tuần đầy đủ →</Link>
         </div>
