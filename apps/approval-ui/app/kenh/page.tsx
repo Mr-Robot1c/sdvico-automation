@@ -95,7 +95,26 @@ export default async function Page() {
   let ttViews = 0, ttCmts = 0, ttLikes = 0;
   for (const m of latestTT.values()) { ttViews += m.views || 0; ttCmts += m.comments || 0; ttLikes += m.reactions || 0; }
 
-  const fbPosts = byChannel.get('facebook') || { count: 0, lastAt: '' };
+  const fbPostsAll = byChannel.get('facebook') || { count: 0, lastAt: '' };
+  // 28/8 (user: "lay so lieu tu KENH CHINH thoi"): dem bai FB = bai co mat tren Page chinh
+  // SDVICO VN (brief.fb_real_url ghep tay HOAC bai import tu page chinh). Ban page phu bo.
+  const fbAllCids = [...new Set(posts.filter((p) => p.channel === 'facebook').map((p) => String(p.content_id || '')).filter(Boolean))];
+  let fbRealCount = 0;
+  const fbRealUrlByCid = new Map<string, string>();
+  if (fbAllCids.length) {
+    // @ts-ignore — module JS thuần
+    const { isOtherPage } = await import('../../lib/page-origin.mjs');
+    const { data: fbContents } = await client.from('mkt_content').select('id, brief').in('id', fbAllCids.slice(0, 500));
+    const briefOf = new Map((fbContents || []).map((c: any) => [String(c.id), c.brief || {}]));
+    for (const cid of fbAllCids) {
+      const brief: any = briefOf.get(cid) || {};
+      const realUrl = String(brief.fb_real_url || '');
+      if (realUrl) { fbRealCount += 1; fbRealUrlByCid.set(cid, realUrl); continue; }
+      const postUrl = fbUrlByCid.get(cid) || '';
+      if ((isOtherPage as (u: string, b: any) => boolean)(postUrl, brief)) fbRealCount += 1;
+    }
+  }
+  const fbPosts = { count: fbRealCount, lastAt: fbPostsAll.lastAt };
   const ytPosts = byChannel.get('youtube') || { count: 0, lastAt: '' };
   const ttPostCount = typeof ttVideoCount === 'number' ? ttVideoCount : (byChannel.get('tiktok') || { count: 0 }).count;
 
@@ -114,7 +133,8 @@ export default async function Page() {
     h.eng += (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
     h.views += m.views || 0; h.cmts += m.comments || 0; h.shares += m.shares || 0;
     if (!h.platforms.includes('facebook')) h.platforms.push('facebook');
-    const u = fbUrlByCid.get(cid);
+    // 28/8: uu tien link bai KENH CHINH (fb_real_url) truoc link page phu.
+    const u = fbRealUrlByCid.get(cid) || fbUrlByCid.get(cid);
     if (u) h.links.push({ platform: 'facebook', url: u });
   }
   for (const [cid, m] of latestYT) {

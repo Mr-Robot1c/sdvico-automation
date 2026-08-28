@@ -58,7 +58,9 @@ type NodeKind = 'post' | 'photo' | 'video';
 function classify(url: string, objId: string): { kind: NodeKind; pageId: string | null } {
   const mVideo = url.match(/facebook\.com\/(\d+)\/videos\/(\d+)/);
   if (mVideo) return { kind: 'video', pageId: mVideo[1] };
-  if (/\/reel\//.test(url) || objId.includes('_')) return { kind: 'post', pageId: null };
+  // 28/8: link bai kenh chinh dang /SDVICOVN/posts/pfbid... — pfbid la alias id BAI (post
+  // node, co du reactions/shares/insights), khong phai photo.
+  if (/\/reel\//.test(url) || /\/posts\//.test(url) || objId.includes('_')) return { kind: 'post', pageId: null };
   return { kind: 'photo', pageId: null };
 }
 
@@ -116,16 +118,44 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
     if (!cur) { byCid.set(cid, { row: p, url, objId, isReel }); continue; }
     if (cur.isReel && !isReel) byCid.set(cid, { row: p, url, objId, isReel });
   }
-  const targets: { rowId: string; cid: string; objId: string; url: string; kind: NodeKind; pageId: string | null }[] = [];
+  // 28/8 (user: "ke tu bay gio lay so lieu tu KENH CHINH thoi - tat kenh phu"): moi bai
+  // quyet dinh URL DO theo thu tu:
+  //   1. brief.fb_real_url (user ghep link bai dang TAY tren SDVICOVN) -> do URL do.
+  //   2. Bai von thuoc page chinh (import tay, isOtherPage true) -> do external_url nhu cu.
+  //   3. Con lai (ban may dang tren page phu, chua ghep link chinh) -> SKIP, khong do nua.
+  const cidsAll = [...byCid.keys()];
+  const briefByCid = new Map<string, any>();
+  if (cidsAll.length) {
+    const { data: cs } = await client.from('mkt_content').select('id, brief').in('id', cidsAll);
+    for (const c of cs || []) briefByCid.set(String((c as any).id), (c as any).brief || {});
+  }
+  // @ts-ignore — module JS thuần
+  const { isOtherPage } = await import('./page-origin.mjs');
+  let skippedTestPage = 0;
+  for (const [cid, x] of [...byCid.entries()]) {
+    const brief = briefByCid.get(cid) || {};
+    const realUrl = String(brief.fb_real_url || '');
+    if (realUrl) {
+      const objId = objectIdFromUrl(realUrl);
+      if (objId) { x.url = realUrl; x.objId = objId; x.isReel = /\/reel\//.test(realUrl); x.viaReal = true; }
+      continue;
+    }
+    if (!(isOtherPage as (u: string, b: any) => boolean)(x.url, brief)) {
+      byCid.delete(cid);
+      skippedTestPage += 1;
+    }
+  }
+
+  const targets: { rowId: string; cid: string; objId: string; url: string; kind: NodeKind; pageId: string | null; viaReal?: boolean }[] = [];
   for (const [cid, x] of byCid) {
     const { kind, pageId } = classify(x.url, x.objId);
-    targets.push({ rowId: (x.row as any).id, cid, objId: x.objId, url: x.url, kind, pageId });
+    targets.push({ rowId: (x.row as any).id, cid, objId: x.objId, url: x.url, kind, pageId, viaReal: !!x.viaReal });
   }
 
   const day = todayVN();
 
   // Gọi Graph API song song (tối đa 8 việc cùng lúc), mỗi request có timeout riêng.
-  const results = await mapPool(targets, 8, async ({ rowId, cid, objId, url, kind, pageId }) => {
+  const results = await mapPool(targets, 8, async ({ rowId, cid, objId, url, kind, pageId, viaReal }) => {
     try {
       // 0) Chọn TOKEN của đúng page sở hữu bài. Biết pageId (video / bài PAGEID_POSTID) -> khớp
       // token theo pageId. Không biết (id ảnh trần) -> dò lần lượt token bằng call rẻ objId?fields=id;
@@ -152,7 +182,9 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
         if (pj?.page_story_id) {
           postId = String(pj.page_story_id);
           // Tự chữa: lưu id BÀI vào external_url để lần sau hỏi thẳng, link cũng mở đúng bài.
-          await client.from('mkt_posts').update({ external_url: `https://www.facebook.com/${postId}` }).eq('id', rowId);
+          // 28/8: KHONG self-heal khi dang do qua brief.fb_real_url — rowId la ban page phu,
+          // ghi de external_url cua no bang id bai kenh chinh se lam hong du lieu ban phu.
+          if (!viaReal) await client.from('mkt_posts').update({ external_url: `https://www.facebook.com/${postId}` }).eq('id', rowId);
         } else {
           note.push(pj?.error ? `photo: ${pj.error.message}` : 'photo: chưa có page_story_id (bài hẹn giờ chưa lên?)');
         }
@@ -269,7 +301,8 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
   // Số NGƯỜI THEO DÕI Trang (page-level) cho MỖI page cấu hình. Lưu dòng entity_ref='__page__'
   // (page test) và '__page_real__' (page chính thức) để trang Đo lường hiện "X follower" làm mốc
   // so với reach từng bài. followers_count/fan_count là field cơ bản của Page (không cần read_insights).
-  for (const t of tokens) {
+  // 28/8: chi keo follower PAGE CHINH (__page_real__) — page phu tat theo lenh user.
+  for (const t of tokens.filter((x) => x.label === 'real')) {
     try {
       const pj = await fetchJsonWithTimeout(`https://graph.facebook.com/${VERSION}/me?fields=followers_count,fan_count,name`, t.token);
       if (pj && !pj.error) {
@@ -278,7 +311,7 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
         if (followers || fans) {
           await client.from('mkt_metrics').insert({
             source: 'facebook',
-            entity_ref: t.label === 'real' ? '__page_real__' : '__page__',
+            entity_ref: '__page_real__',
             metric_date: day,
             metrics: { followers, fans, name: pj.name || null, page: t.label }
           });
@@ -287,5 +320,6 @@ export async function pullFacebookMetrics(client: Client): Promise<{ pulled: num
     } catch { /* bỏ qua lỗi lấy follower */ }
   }
 
+  if (skippedTestPage) results.push({ note: [`bo qua ${skippedTestPage} bai chi co ban page phu (kenh phu da tat do luong — ghep link FB chinh de do)`] } as any);
   return { pulled: rows.length, results };
 }

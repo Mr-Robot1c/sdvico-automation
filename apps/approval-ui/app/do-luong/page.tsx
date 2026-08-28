@@ -112,10 +112,11 @@ export default async function Page() {
     }
   }
 
-  // Chia bài Facebook: page test vs page chính thức. Dùng lib/page-origin.mjs để nhận diện.
-  type Row = { cid: string; title: string; url: string; publishedAt: string; m: M; timeLabel?: string };
-  const fbTestRows: Row[] = [];
-  const fbRealRows: Row[] = [];
+  // 28/8 (user: "lay so lieu tu KENH CHINH thoi - tat kenh phu"): MOT bang Facebook duy nhat.
+  // Bai thuoc kenh chinh = co brief.fb_real_url (ghep tay) HOAC von cua page chinh (import).
+  // Bai chi co ban page phu van liet ke nhung danh dau "chua ghep link kenh chinh" — khong do.
+  type Row = { cid: string; title: string; url: string; publishedAt: string; m: M; timeLabel?: string; noMetric?: boolean };
+  const fbRows: Row[] = [];
   const ttRows: Row[] = [];
   const ytRows: Row[] = [];
   for (const p of posts) {
@@ -126,9 +127,11 @@ export default async function Page() {
     const url = String(p.external_url || '');
     const publishedAt = String(p.published_at || '');
     if (p.channel === 'facebook') {
+      const brief = (c?.brief || {}) as any;
+      const realUrl = String(brief.fb_real_url || '');
+      const isReal = !!realUrl || !!(isOtherPage as (u: string, b: any) => boolean)(url, brief);
       const m = latestFB.get(cid) || {};
-      const isReal = !!(isOtherPage as (u: string, b: any) => boolean)(url, c?.brief || {});
-      (isReal ? fbRealRows : fbTestRows).push({ cid, title, url, publishedAt, m });
+      fbRows.push({ cid, title, url: realUrl || url, publishedAt, m, noMetric: !isReal });
     } else if (p.channel === 'youtube') {
       const m = latestYT.get(cid) || {};
       ytRows.push({ cid, title, url, publishedAt, m });
@@ -199,22 +202,18 @@ export default async function Page() {
         </div>
       ) : (
         <>
-          {/* 28/8 (user): kenh dang cu the — FB kenh chinh "SDVICO VN", kenh phu "SDVICO TBTC". */}
+          {/* 28/8 (user): TAT kenh phu — 1 bang Facebook KENH CHINH SDVICO VN duy nhat. Bai
+              chua ghep link kenh chinh van liet ke (noMetric) de biet ma bam Ghep FB chinh. */}
           <BangSoLieu
-            title={<><PlatformLogo platform="facebook" size={20} /><span>Facebook — page hệ thống</span></>}
+            title={<><PlatformLogo platform="facebook" size={20} /><span>Facebook — SDVICO VN (kênh chính)</span></>}
+            titleNote="Chỉ đo bài trên Page chính. Bài máy đăng ở kênh phụ cần bấm Ghép FB chính (dán link bài đã đăng tay) để có số liệu."
             headers={['Bài', 'React', 'Comment', 'Share', 'Lượt xem', 'Người xem', 'Link']}
-            rows={fbTestRows}
-            renderMetrics={(m) => [fmt(m.reactions), fmt(m.comments), fmt(m.shares), m.views != null ? fmt(m.views) : '—', m.reach != null ? fmt(m.reach) : '—']}
-            channelLabel="Kênh phụ · SDVICO TBTC"
-          />
-
-          <BangSoLieu
-            title={<><PlatformLogo platform="facebook" size={20} /><span>Facebook — Page chính thức</span></>}
-            titleNote="Bài nhập tay từ page thật của SDVICO"
-            headers={['Bài', 'React', 'Comment', 'Share', 'Lượt xem', 'Người xem', 'Link']}
-            rows={fbRealRows}
-            renderMetrics={(m) => [fmt(m.reactions), fmt(m.comments), fmt(m.shares), m.views != null ? fmt(m.views) : '—', m.reach != null ? fmt(m.reach) : '—']}
+            rows={fbRows}
+            renderMetrics={(m, r) => (r?.noMetric
+              ? ['—', '—', '—', '—', '—']
+              : [fmt(m.reactions), fmt(m.comments), fmt(m.shares), m.views != null ? fmt(m.views) : '—', m.reach != null ? fmt(m.reach) : '—'])}
             channelLabel="Kênh chính · SDVICO VN"
+            rowNote={(r) => (r.noMetric ? 'chưa ghép link kênh chính — không đo' : null)}
           />
 
           <BangSoLieu
@@ -248,16 +247,19 @@ function BangSoLieu({
   renderMetrics,
   customUrl,
   channelLabel,
+  rowNote,
 }: {
   title: React.ReactNode;
   titleNote?: string;
   headers: string[];
-  rows: Array<{ cid: string; title: string; url: string; publishedAt: string; m: M; timeLabel?: string }>;
-  renderMetrics: (m: M) => (string | number | React.ReactNode)[];
+  rows: Array<{ cid: string; title: string; url: string; publishedAt: string; m: M; timeLabel?: string; noMetric?: boolean }>;
+  renderMetrics: (m: M, r?: { noMetric?: boolean }) => (string | number | React.ReactNode)[];
   customUrl?: (r: { cid: string; title: string; url: string; publishedAt: string; m: M }) => string;
   // 28/8 (user): ke gio dang them NGAY DANG + KENH DANG cu the (FB chinh "SDVICO VN",
   // phu "SDVICO TBTC"...) — dong sub thanh "Đăng 09:27 · 28/08 · SDVICO TBTC".
   channelLabel?: string;
+  // Ghi chu rieng tung dong (28/8: bai FB chua ghep link kenh chinh -> "khong do").
+  rowNote?: (r: { noMetric?: boolean }) => string | null;
 }) {
   if (rows.length === 0) return null;
   const fmtDT2 = (iso: string) => {
@@ -284,7 +286,8 @@ function BangSoLieu({
           <tbody>
             {rows.map((r) => {
               const url = customUrl ? customUrl(r) : r.url;
-              const metricCells = renderMetrics(r.m);
+              const metricCells = renderMetrics(r.m, r);
+              const note = rowNote ? rowNote(r) : null;
               return (
                 <tr key={r.cid}>
                   <td className="cell-title">

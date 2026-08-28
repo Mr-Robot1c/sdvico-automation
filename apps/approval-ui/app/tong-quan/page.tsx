@@ -208,7 +208,9 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   }
 
   // Link mo bai tren tung nen tang cho icon kenh (user 27/8: "bam icon dan den link bai").
+  // 28/8: Facebook UU TIEN brief.fb_real_url (bai tren Page chinh SDVICO VN, ghep tay).
   function linkOf(c: ContentRow, ch: string): string | null {
+    if (ch === 'facebook' && c.brief?.fb_real_url) return String(c.brief.fb_real_url);
     const fromPost = urlByCidChannel.get(c.id)?.get(ch);
     if (fromPost) return fromPost;
     if (ch === 'tiktok' && c.brief?.tiktok_share_url) return String(c.brief.tiktok_share_url);
