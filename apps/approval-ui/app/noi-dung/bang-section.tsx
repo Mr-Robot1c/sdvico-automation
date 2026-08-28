@@ -421,9 +421,11 @@ export default async function BangSection() {
                       {lastAt ? <span className="muted" style={{ fontSize: '.8rem' }}>Đăng {formatRelative(lastAt)}</span> : null}
                       <div className="ch-links">
                         {posts.filter((x) => /^https?:/.test(x.url)).map((x, i) => {
-                          // 28/8 (user): chip Facebook UU TIEN link bai tren Page CHINH SDVICOVN
-                          // (brief.fb_real_url — user dan qua nut Ghep FB chinh) thay link page phu.
+                          // 29/8 (user): chip Facebook GIỐNG TikTok — CHỈ hiện khi đã Ghép FB chính
+                          // (brief.fb_real_url). Link page phụ vô nghĩa từ khi tắt kênh phụ, giấu đi;
+                          // chưa ghép thì bấm nút "Ghép FB chính" ngay dưới card.
                           const fbReal = x.channel === 'facebook' ? String((brief as any).fb_real_url || '') : '';
+                          if (x.channel === 'facebook' && !fbReal) return null;
                           const href = fbReal || x.url;
                           const label = fbReal ? 'FB SDVICO VN' : (CH_LABEL[x.channel] || x.channel);
                           return (

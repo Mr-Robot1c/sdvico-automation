@@ -133,8 +133,9 @@ export default async function Page() {
     h.eng += (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
     h.views += m.views || 0; h.cmts += m.comments || 0; h.shares += m.shares || 0;
     if (!h.platforms.includes('facebook')) h.platforms.push('facebook');
-    // 28/8: uu tien link bai KENH CHINH (fb_real_url) truoc link page phu.
-    const u = fbRealUrlByCid.get(cid) || fbUrlByCid.get(cid);
+    // 29/8 (user): link FB CHỈ khi đã ghép kênh chính (fb_real_url) — giống TikTok, không
+    // fallback link page phụ nữa (kênh phụ đã tắt).
+    const u = fbRealUrlByCid.get(cid);
     if (u) h.links.push({ platform: 'facebook', url: u });
   }
   for (const [cid, m] of latestYT) {

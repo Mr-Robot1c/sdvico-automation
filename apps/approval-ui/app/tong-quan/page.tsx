@@ -208,9 +208,10 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   }
 
   // Link mo bai tren tung nen tang cho icon kenh (user 27/8: "bam icon dan den link bai").
-  // 28/8: Facebook UU TIEN brief.fb_real_url (bai tren Page chinh SDVICO VN, ghep tay).
+  // 29/8 (user): Facebook GIỐNG TikTok — CHỈ có link khi đã Ghép FB chính (fb_real_url);
+  // link page phụ vô nghĩa từ khi tắt kênh phụ, không fallback nữa (icon mờ khi chưa ghép).
   function linkOf(c: ContentRow, ch: string): string | null {
-    if (ch === 'facebook' && c.brief?.fb_real_url) return String(c.brief.fb_real_url);
+    if (ch === 'facebook') return c.brief?.fb_real_url ? String(c.brief.fb_real_url) : null;
     const fromPost = urlByCidChannel.get(c.id)?.get(ch);
     if (fromPost) return fromPost;
     if (ch === 'tiktok' && c.brief?.tiktok_share_url) return String(c.brief.tiktok_share_url);
