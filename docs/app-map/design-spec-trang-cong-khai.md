@@ -1,7 +1,9 @@
 > Load khi: task chạm UI trang công khai /blog, /blog/[slug], /blog/chu-de/[slug], /san-pham, /san-pham/[slug] (shell công khai trong root-shell.tsx)
 covers: apps/approval-ui/app/blog, apps/approval-ui/app/san-pham, apps/approval-ui/app/root-shell.tsx
-last_verified: 2026-08-21
+last_verified: 2026-08-28
 ttl_days: 90
+<!-- re-verified: 2026-08-28 18:20 - Hotline nut Goi + footer public doi 0254 359 6868 (sep 28/8); cac hanh vi/bo cuc khac doi chieu root-shell + blog van dung. -->
+<!-- re-verified: 2026-08-28 17:20 - Doi chieu blog cover fix (deleted_at, pool khong zalo, chong trung cung trang): hanh vi the bai giu nguyen, chi nguon anh fallback sach hon. -->
 
 # DESIGN-SPEC — Trang công khai SDVICO (blog + sản phẩm)
 
@@ -43,7 +45,7 @@ Top nav 2 mục: Bài viết, Sản phẩm + nút Gọi (outline). Mobile: cùng
 |---|---|
 | Bấm card bài | trang bài, tiêu đề + ảnh trên fold |
 | Bấm Nhắn tin cho Page | Messenger mở tab mới, kèm UTM |
-| Bấm Gọi | quay số 1900 23 23 49 |
+| Bấm Gọi | quay số 0254 359 6868 (sếp đổi 28/8, số trên sdvico.vn; trước là 1900 23 23 49) |
 | Bấm chip chủ đề | trang hub, chip đó sáng |
 
 ## Quyết định đã chốt (không hỏi lại)

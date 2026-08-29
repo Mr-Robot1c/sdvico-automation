@@ -26,12 +26,13 @@ export default function ContactButtons({
       >
         💬 Nhắn tin cho Page SDVICO
       </a>
+      {/* 28/8 sếp đổi hotline nút liên hệ public: 0254 359 6868 (số trên sdvico.vn). */}
       <a
         className="contact-btn"
-        href="tel:1900232349"
+        href="tel:02543596868"
         onClick={() => trackContact('call', campaign)}
       >
-        📞 Gọi 1900 23 23 49
+        📞 Gọi 0254 359 6868
       </a>
       {zaloUrl ? (
         <a

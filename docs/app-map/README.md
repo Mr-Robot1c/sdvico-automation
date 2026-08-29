@@ -5,6 +5,7 @@
 covers: packages/core, apps/approval-ui, supabase/migrations
 last_verified: 2026-08-28
 ttl_days: 180
+<!-- re-verified: 2026-08-28 18:20 - UI DANG NHAP (sep yeu cau): trang /dang-nhap + cookie phien sdvico_auth (SHA-256 user:pass:salt) thay popup basic-auth; middleware thu tu cookie -> Basic (giu cho curl) -> redirect /dang-nhap (het WWW-Authenticate); /api/login dat cookie 60 ngay, /api/logout xoa; RootShell render /dang-nhap tran + link Dang xuat o chan sidebar. HOTLINE public doi 1900 23 23 49 -> 0254 359 6868 CHI o blog surfaces (pub-call header, footer, ContactButtons) theo user chot qua AskUserQuestion; privacy/terms/xoa-du-lieu/san-pham inline + prompt sinh bai GIU so cu. -->
 <!-- re-verified: 2026-08-28 17:45 - FIX BUG UPLOAD KHONG GAN FOLDER (user: "up anh SD12-300 ma khong thay dau"): registerAsset + uploadAsset truoc day KHONG luu product_group -> moi anh up qua web roi vao "Chua gan", vong xoay khong dem. Sua: 2 action nhan product_group; LibUploader (/tu-lieu) them o chon folder, mac dinh theo folder dang mo (key remount); AssetUploader (Xuong /san-xuat) tu gan theo folder dang loc. Data: 4 anh SD12-300 da gan folder 9 (1 ban up trung de o Chua gan cho user tu xoa). -->
 <!-- re-verified: 2026-08-28 17:30 - noZalo doi sang so TIEN TO source (du lieu that la zalo-auto/zalo-backlog-tkkd, khong phai 'zalo'). -->
 <!-- re-verified: 2026-08-28 17:20 - Blog fix 3 diem (loc deleted_at, anh Zalo khong vao pool du phong chung, chong trung cover cung trang) + plan-directions them luat thang tap trung chong loang + ne trung 14 ngay. -->

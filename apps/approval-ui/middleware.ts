@@ -7,12 +7,26 @@ import type { NextRequest } from 'next/server';
 // Chỉ ép đăng nhập ở production (khi deploy). Dev cục bộ để trống cho tiện.
 // Đặt hai biến môi trường trên Vercel: APPROVAL_UI_USER (tùy chọn, mặc định sdvico) và
 // APPROVAL_UI_PASSWORD (bắt buộc). Thiếu mật khẩu ở production thì KHÓA hết, không mở toang.
+//
+// 28/8 (sếp: "bổ sung UI đăng nhập"): thêm TRANG /dang-nhap + cookie phiên thay cho popup
+// basic-auth của trình duyệt. Thứ tự kiểm: cookie sdvico_auth -> header Basic (giữ cho
+// curl/script cũ) -> chưa có thì chuyển hướng trình duyệt về /dang-nhap (hết popup 401).
+// Cookie = SHA-256(user:pass:sdvico-auth-v1) — đổi mật khẩu trên Vercel là mọi phiên cũ
+// tự hết hạn. /api/login (đặt cookie) và /api/logout (xoá) nằm ở app/api.
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
 };
 
-export function middleware(req: NextRequest) {
+// Token phiên kỳ vọng — tính bằng Web Crypto (chạy được trên edge runtime của middleware).
+// PHẢI khớp cách tính createHash('sha256') trong app/api/login/route.ts.
+async function expectedToken(user: string, pass: string): Promise<string> {
+  const data = new TextEncoder().encode(`${user}:${pass}:sdvico-auth-v1`);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function middleware(req: NextRequest) {
   // 28/8 FIX (user: "mac gi trang blog bat dang nhap"): file TINH trong /public
   // (logo-sdvico.png...) khong nam trong matcher-except -> roi xuong basic-auth -> tra 401
   // + WWW-Authenticate -> browser BAT POPUP dang nhap ngay tren trang blog cua khach vang
@@ -63,6 +77,9 @@ export function middleware(req: NextRequest) {
   if (/^\/(blog|san-pham)(\/|$)/.test(pth)) return NextResponse.next();
   if (pth === '/sitemap.xml' || pth === '/robots.txt') return NextResponse.next();
 
+  // Trang đăng nhập phải MỞ (không thì vòng chuyển hướng vô tận).
+  if (pth === '/dang-nhap') return NextResponse.next();
+
   if (process.env.NODE_ENV !== 'production') return NextResponse.next();
 
   // .trim() phòng khi giá trị biến môi trường dính ký tự xuống dòng hoặc khoảng trắng thừa.
@@ -76,6 +93,11 @@ export function middleware(req: NextRequest) {
     });
   }
 
+  // 1. Cookie phiên từ trang /dang-nhap.
+  const cookieTok = req.cookies.get('sdvico_auth')?.value;
+  if (cookieTok && cookieTok === await expectedToken(user, pass)) return NextResponse.next();
+
+  // 2. Basic auth — giữ cho curl/script và trình duyệt còn nhớ mật khẩu cũ.
   const auth = req.headers.get('authorization');
   if (auth) {
     const [scheme, encoded] = auth.split(' ');
@@ -89,10 +111,7 @@ export function middleware(req: NextRequest) {
   }
 
   // Request PREFETCH/RSC (Next tu tai truoc khi hover Link, hoac tai RSC payload) tra 401
-  // KHONG kem WWW-Authenticate: header do la thu BAT popup dang nhap cua trinh duyet. Neu mot
-  // trang cong khai lo prefetch route noi bo, ta khong muon popup bung tren trang cong khai
-  // (20/8 - trieu chung "web crash hoai"). Voi navigation THAT (nguoi bam vao) thi van gui
-  // WWW-Authenticate de hien hop dang nhap binh thuong.
+  // tran — khong chuyen huong, khong popup (20/8 - trieu chung "web crash hoai").
   const isPrefetch = req.headers.get('next-router-prefetch') === '1'
     || req.headers.get('purpose') === 'prefetch'
     || req.headers.get('rsc') === '1';
@@ -100,8 +119,16 @@ export function middleware(req: NextRequest) {
     return new NextResponse(null, { status: 401 });
   }
 
-  return new NextResponse('Cần đăng nhập để xem giao diện duyệt SDVICO.', {
-    status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="SDVICO Duyet", charset="UTF-8"' }
-  });
+  // 3. Trình duyệt mở trang thật -> đưa về TRANG ĐĂNG NHẬP (28/8, thay popup basic-auth),
+  //    nhớ đường dẫn đang vào để đăng nhập xong quay lại đúng chỗ.
+  const wantsHtml = req.method === 'GET'
+    && (req.headers.get('sec-fetch-dest') === 'document' || (req.headers.get('accept') || '').includes('text/html'));
+  if (wantsHtml) {
+    const to = req.nextUrl.clone();
+    to.pathname = '/dang-nhap';
+    to.search = `?next=${encodeURIComponent(pth + (req.nextUrl.search || ''))}`;
+    return NextResponse.redirect(to);
+  }
+
+  return new NextResponse('Cần đăng nhập để xem giao diện duyệt SDVICO.', { status: 401 });
 }

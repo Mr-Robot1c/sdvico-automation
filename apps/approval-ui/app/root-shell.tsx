@@ -17,6 +17,9 @@ import Tracking from './tracking';
 
 export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: { children: ReactNode; marketingOnly: boolean; pixelId?: string | null; ga4Id?: string | null }) {
   const path = usePathname() || '/';
+  // Trang ĐĂNG NHẬP: render trần — không sidebar nội bộ (chưa đăng nhập), không header
+  // public (đây không phải trang cho khách). Form tự căn giữa bằng .login-wrap.
+  if (path === '/dang-nhap') return <>{children}</>;
   // Trang CONG KHAI (khong sidebar noi bo): blog, san-pham, va ca privacy/terms. Truoc day
   // privacy/terms dung shell noi bo -> hien sidebar day link can dang nhap, Next prefetch cac
   // route do -> loi 401 dồn dập tren console + co the bat popup dang nhap tren trang cong khai
@@ -43,9 +46,11 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
               <Link href="/blog" className={path.startsWith('/blog') ? 'on' : ''} aria-current={path.startsWith('/blog') ? 'page' : undefined}>Bài viết</Link>
               <Link href="/san-pham" className={path.startsWith('/san-pham') ? 'on' : ''} aria-current={path.startsWith('/san-pham') ? 'page' : undefined}>Sản phẩm</Link>
             </nav>
-            <a className="pub-call" href="tel:1900232349" aria-label="Gọi 1900 23 23 49">
+            {/* 28/8 sếp đổi hotline hiển thị trang public: 1900 23 23 49 -> 0254 359 6868
+                (số đang dùng trên sdvico.vn). Bài máy sinh + trang privacy/terms giữ số cũ. */}
+            <a className="pub-call" href="tel:02543596868" aria-label="Gọi 0254 359 6868">
               <span aria-hidden="true">📞</span>
-              <span className="pub-call-txt">1900 23 23 49</span>
+              <span className="pub-call-txt">0254 359 6868</span>
             </a>
           </div>
         </header>
@@ -60,7 +65,7 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
               </div>
             </div>
             <nav className="pub-footer-links" aria-label="Liên kết chân trang">
-              <a href="tel:1900232349">Hotline 1900 23 23 49</a>
+              <a href="tel:02543596868">Hotline 0254 359 6868</a>
               <a href="https://sdvico.vn" target="_blank" rel="noopener noreferrer">sdvico.vn</a>
               <Link href="/privacy">Chính sách</Link>
               <Link href="/terms">Điều khoản</Link>
@@ -88,6 +93,8 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
           <Nav marketingOnly={marketingOnly} />
           <div className="sidebar-foot">
             <p className="foot-note">Máy soạn, người bấm gửi.</p>
+            {/* a thường (không Link) để đi thẳng route handler xoá cookie, khỏi bị prefetch. */}
+            <a className="foot-note foot-logout" href="/api/logout">Đăng xuất</a>
           </div>
         </aside>
         <div className="main-col">
