@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../lib/supabase-server';
+import { isAuthorizedApiRequest } from '../../../lib/session-auth';
 
 // Danh sách NHÓM Facebook dùng chung một nguồn: app_config 'mkt_share_groups'
 // (user 20/8: nhóm lưu ở popover Quản lý bài viết phải khớp với lịch chia sẻ ở Kế hoạch —
 // trước đây popover lưu localStorage riêng nên hai nơi lệch nhau).
-// GET: trả { groups: [{id,label,url}] }. POST: ghi đè danh sách + làm mới đề xuất sống.
-// Route nằm sau basic-auth? /api/* được middleware miễn basic-auth — nhưng dữ liệu nhóm
-// không nhạy cảm (tên + link group công khai), và POST chỉ đổi app_config danh sách nhóm.
+// GET: trả { groups: [{id,label,url}] } — để mở, dữ liệu là tên + link group công khai.
+// POST: 29/8 (audit bảo mật) PHẢI đăng nhập — /api/* được middleware miễn khóa nên trước
+// đây ai cũng ghi đè được app_config và kích refreshLiveProposal (nhiều query + ghi
+// mkt_plans) làm nặng database. Browser đã đăng nhập gửi kèm cookie sdvico_auth là qua.
 export const dynamic = 'force-dynamic';
 // POST còn làm mới đề xuất sống (nhiều query) — nới thời gian chạy để lưu tên nhóm không
 // bị đứt giữa chừng trên Vercel.
@@ -39,6 +41,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!(await isAuthorizedApiRequest(req))) {
+    return NextResponse.json({ error: 'can dang nhap de doi danh sach nhom' }, { status: 401 });
+  }
   let body: any = null;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'body khong phai JSON' }, { status: 400 }); }
   const groups = normalize(body);

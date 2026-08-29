@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { getServerClient } from '../../../../lib/supabase-server';
 
 // Webhook Facebook — bắt lead từ comment/inbox hỏi mua (user 24/8: "khối theo dõi người mua").
@@ -9,6 +10,11 @@ import { getServerClient } from '../../../../lib/supabase-server';
 //   1. Facebook duyệt xong pages_messaging
 //   2. Đăng ký Webhook URL này trên Facebook Developer Console (App → Webhooks → Page →
 //      Subscribe field 'messages' + 'feed'), verify token = biến FACEBOOK_WEBHOOK_VERIFY_TOKEN.
+//   3. Đặt FACEBOOK_APP_SECRET trên Vercel (29/8) — có biến này thì POST chỉ nhận gói có
+//      chữ ký hợp lệ. User hiện KHÔNG truy cập được app Facebook để lấy App Secret nên tạm
+//      cho phép thiếu: webhook vẫn nhận nhưng run_log cảnh báo mỗi lần. Xin App Secret từ
+//      người quản trị app (developers.facebook.com → Settings → Basic) rồi đặt lên Vercel
+//      là tự siết lại, không cần sửa code.
 //
 // Comment (field 'feed') KHÔNG cần quyền đặc biệt ngoài pages_read_engagement (đã có) — có
 // thể test bắt lead từ comment NGAY, không cần chờ duyệt pages_messaging.
@@ -73,11 +79,44 @@ function messengerInboxUrl(): string | null {
   return `https://business.facebook.com/latest/inbox/messenger?asset_id=${pageId}`;
 }
 
+// 29/8 (audit bảo mật): Facebook ký MỌI gói POST bằng HMAC-SHA256(app secret, raw body),
+// gửi trong header X-Hub-Signature-256 dạng "sha256=<hex>". Trước đây route nhận thẳng
+// req.json() không kiểm — ai biết URL là bơm được lead giả vào mkt_leads, làm hỏng thước đo.
+// Có FACEBOOK_APP_SECRET: chữ ký sai là từ chối 403. Chưa có (user không truy cập được app
+// Facebook): vẫn nhận để lead không đứt, nhưng run_log gắn cảnh báo mỗi lần chạy.
+function verifyFacebookSignature(rawBody: string, header: string | null): 'ok' | 'thieu-secret' | 'sai-chu-ky' {
+  const secret = (process.env.FACEBOOK_APP_SECRET || '').trim();
+  if (!secret) return 'thieu-secret';
+  if (!header || !header.startsWith('sha256=')) return 'sai-chu-ky';
+  const expected = createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
+  const got = header.slice('sha256='.length).trim().toLowerCase();
+  if (got.length !== expected.length) return 'sai-chu-ky';
+  return timingSafeEqual(Buffer.from(got, 'utf8'), Buffer.from(expected, 'utf8')) ? 'ok' : 'sai-chu-ky';
+}
+
 export async function POST(req: Request) {
   const client = getServerClient();
+
+  // Đọc RAW body trước — chữ ký tính trên đúng chuỗi byte Facebook gửi, parse JSON sau.
+  const rawBody = await req.text();
+  const sig = verifyFacebookSignature(rawBody, req.headers.get('x-hub-signature-256'));
+  if (sig === 'sai-chu-ky') {
+    try {
+      await client.from('run_log').insert({
+        task: 'mkt.facebook_webhook', actor: 'facebook', status: 'error',
+        detail: { error: 'X-Hub-Signature-256 không khớp — gói tin không phải do Facebook ký, đã bỏ' },
+      });
+    } catch { /* bỏ qua lỗi ghi log */ }
+    return NextResponse.json({ ok: false, error: 'chu ky khong hop le' }, { status: 403 });
+  }
+  // Chưa có secret thì nhận tạm nhưng phải kêu to trong run_log, không để quên vĩnh viễn.
+  const unsignedWarning = sig === 'thieu-secret'
+    ? 'FACEBOOK_APP_SECRET chưa đặt — webhook đang chạy KHÔNG kiểm chữ ký. Xin App Secret từ người quản trị app Facebook rồi đặt lên Vercel.'
+    : null;
+
   let body: any;
   try {
-    body = await req.json();
+    body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ ok: false, error: 'body khong phai JSON' }, { status: 400 });
   }
@@ -167,7 +206,10 @@ export async function POST(req: Request) {
   try {
     await client.from('run_log').insert({
       task: 'mkt.facebook_webhook', actor: 'facebook', status: errors.length ? 'error' : 'ok',
-      detail: { captured, filtered, filteredSamples, errors: errors.slice(0, 5) },
+      detail: {
+        captured, filtered, filteredSamples, errors: errors.slice(0, 5),
+        ...(unsignedWarning ? { warning: unsignedWarning } : {}),
+      },
     });
   } catch { /* bỏ qua lỗi ghi log */ }
 

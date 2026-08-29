@@ -19,16 +19,24 @@ function safeNext(raw: string | undefined): string {
   return n;
 }
 
+// loi=1: sai tài khoản/mật khẩu. loi=khoa: quá 10 lần sai trong 15 phút (chặn dò mật khẩu).
+// loi=cfg: máy chủ thiếu AUTH_SECRET nên không phát hành được phiên (29/8, token HMAC v2).
+const ERROR_MESSAGES: Record<string, string> = {
+  '1': 'Sai tài khoản hoặc mật khẩu. Thử lại.',
+  khoa: 'Nhập sai quá nhiều lần. Chờ 15 phút rồi thử lại.',
+  cfg: 'Máy chủ chưa cấu hình AUTH_SECRET nên không tạo được phiên đăng nhập. Báo người quản trị đặt biến AUTH_SECRET trên Vercel rồi deploy lại.',
+};
+
 export default function Page({ searchParams }: { searchParams?: { next?: string; loi?: string } }) {
   const next = safeNext(searchParams?.next);
-  const hasError = searchParams?.loi === '1';
+  const errorMessage = ERROR_MESSAGES[searchParams?.loi || ''] || null;
   return (
     <main className="login-wrap">
       <form className="login-card" method="POST" action="/api/login">
         <img src="/logo-sdvico.png" alt="SDVICO" width={56} height={56} style={{ objectFit: 'contain' }} />
         <h1>Đăng nhập</h1>
         <p className="sub" style={{ textAlign: 'center' }}>Giao diện duyệt nội dung SDVICO</p>
-        {hasError ? <p className="login-err" role="alert">Sai tài khoản hoặc mật khẩu. Thử lại.</p> : null}
+        {errorMessage ? <p className="login-err" role="alert">{errorMessage}</p> : null}
         <label>
           Tài khoản
           <input name="user" defaultValue="sdvico" autoComplete="username" required />

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { verifySessionToken, safeEqualStrings } from './lib/session-auth';
 
 // Cổng đăng nhập cho giao diện duyệt. Giao diện này đọc và ghi approval_queue bằng service
 // role và hiển thị dữ liệu ứng viên, nên KHÔNG được để công khai không khóa (Điều cấm 6).
@@ -11,20 +12,14 @@ import type { NextRequest } from 'next/server';
 // 28/8 (sếp: "bổ sung UI đăng nhập"): thêm TRANG /dang-nhap + cookie phiên thay cho popup
 // basic-auth của trình duyệt. Thứ tự kiểm: cookie sdvico_auth -> header Basic (giữ cho
 // curl/script cũ) -> chưa có thì chuyển hướng trình duyệt về /dang-nhap (hết popup 401).
-// Cookie = SHA-256(user:pass:sdvico-auth-v1) — đổi mật khẩu trên Vercel là mọi phiên cũ
-// tự hết hạn. /api/login (đặt cookie) và /api/logout (xoá) nằm ở app/api.
+// 29/8 (audit bảo mật): cookie đổi sang token HMAC v2 có hạn dùng, ký bằng AUTH_SECRET
+// (lib/session-auth.ts) — bản cũ SHA-256(user:pass:salt) lộ cookie là dò ngược được mật
+// khẩu. Đổi mật khẩu HOẶC AUTH_SECRET trên Vercel là mọi phiên cũ tự hết hạn.
+// /api/login (đặt cookie) và /api/logout (xoá) nằm ở app/api.
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
 };
-
-// Token phiên kỳ vọng — tính bằng Web Crypto (chạy được trên edge runtime của middleware).
-// PHẢI khớp cách tính createHash('sha256') trong app/api/login/route.ts.
-async function expectedToken(user: string, pass: string): Promise<string> {
-  const data = new TextEncoder().encode(`${user}:${pass}:sdvico-auth-v1`);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 export async function middleware(req: NextRequest) {
   // 28/8 FIX (user: "mac gi trang blog bat dang nhap"): file TINH trong /public
@@ -93,20 +88,24 @@ export async function middleware(req: NextRequest) {
     });
   }
 
-  // 1. Cookie phiên từ trang /dang-nhap.
+  // 1. Cookie phiên từ trang /dang-nhap (token HMAC v2, xác minh trong lib/session-auth).
   const cookieTok = req.cookies.get('sdvico_auth')?.value;
-  if (cookieTok && cookieTok === await expectedToken(user, pass)) return NextResponse.next();
+  if (cookieTok && await verifySessionToken(cookieTok)) return NextResponse.next();
 
   // 2. Basic auth — giữ cho curl/script và trình duyệt còn nhớ mật khẩu cũ.
+  //    So hằng thời gian, không dùng === để khỏi lộ qua đo thời gian phản hồi.
   const auth = req.headers.get('authorization');
   if (auth) {
     const [scheme, encoded] = auth.split(' ');
     if (scheme === 'Basic' && encoded) {
-      const decoded = atob(encoded);
+      let decoded = '';
+      try { decoded = atob(encoded); } catch { /* base64 hỏng thì coi như sai */ }
       const idx = decoded.indexOf(':');
       const u = decoded.slice(0, idx);
       const p = decoded.slice(idx + 1);
-      if (u === user && p === pass) return NextResponse.next();
+      if (idx >= 0 && await safeEqualStrings(u, user) && await safeEqualStrings(p, pass)) {
+        return NextResponse.next();
+      }
     }
   }
 
