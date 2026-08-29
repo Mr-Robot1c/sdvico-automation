@@ -4,6 +4,7 @@
 covers: supabase/migrations
 last_verified: 2026-08-29
 ttl_days: 180
+<!-- re-verified: 2026-08-29 - Migration 20260829180000_reserve_daily_quota (audit bao mat muc 12+14): ham DB reserve_daily_quota(p_account, p_kind, p_day, p_limit) -> (allowed, new_count) — kiem tran + tang bo dem daily_counters trong MOT cau lenh (upsert co dieu kien, khoa hang), het race hai tien trinh cung doc so cu roi cung vuot tran. Ca 3 phia goi CHUNG ham nay: apps/approval-ui/lib/safety.ts reservePostQuota (kind 'post'), packages/core/src/quota.js incrementDailyCounter (khi co limit), api/rotate claim ve slot (kind 'rotate_run', account 'rotate:<slot>', limit 1 — chan 2 luot rotate cung luc sinh bai trung). REVOKE execute khoi anon/authenticated, chi service_role. Code co fallback loi cu khi ham chua ton tai (khong dut luong dang, race chi het sau khi dan). USER paste .sql vao Supabase SQL Editor de ap. -->
 <!-- re-verified: 2026-08-29 - Migration 20260829150000_rls_tighten_hr (audit bao mat muc 8): DROP policy hr_candidates_staff_all + hr_applications_staff_all (policy "for all to authenticated using(true)" tu 20260810090100_rls qua rong cho 2 bang du lieu ca nhan, dieu cam 6). App toan service_role (tu bo qua RLS) nen khong anh huong; ngay nao bat Supabase Auth thi 2 bang ho so mac dinh khong ai doc duoc ngoai service role. USER paste .sql vao Supabase SQL Editor de ap. -->
 
 <!-- re-verified: 2026-08-27 23:40 - Migration 20260827233000_knowledge_tier: them 6 cot vao mkt_knowledge_public cho Trending Digest kieu ForLife (dot 2 redesign docx sep): score int 0-100, tier text S/A/B/C (S>=80, A>=60, B>=40, C<40), angle text (goc tiep can + diem /10), key_message text, keywords jsonb (3-5 tu khoa), plan_suggestions jsonb ([{time,kind,title}] — goi y lich dang, chi tier S/A). Index (tier, created_at desc). Dong cu tier NULL = chua cham; cron mkt-metrics-pull goi scoreUnscoredKnowledge cham dan 20 dong/luot bang Gemini. USER paste .sql vao Supabase SQL Editor de ap. -->
@@ -45,7 +46,7 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 | hr_applications | Tuyển dụng | Hồ sơ ứng tuyển, dữ liệu cá nhân | Bật, dữ liệu cá nhân |
 | product_facts | Marketing | Dữ kiện sản phẩm SDVICO (chống bịa, điều cấm 5) | Bật, staff |
 | app_config | Chung | Cấu hình khóa–giá trị, có công tắc dừng khẩn (emergency_stop) | Bật, staff |
-| daily_counters | Chung | Bộ đếm hạn mức theo tài khoản/loại/ngày | Bật, staff |
+| daily_counters | Chung | Bộ đếm hạn mức theo tài khoản/loại/ngày. Giữ chỗ qua hàm nguyên tử `reserve_daily_quota` (kind `post` = trần đăng ngày, kind `rotate_run` = vé 1 lượt rotate/slot/ngày) | Bật, staff |
 
 ## Ghi chú
 

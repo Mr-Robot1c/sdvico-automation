@@ -47,12 +47,24 @@ export async function getPostCount(client: Client, account: string, day: string 
 }
 
 // Giữ chỗ 1 lượt đăng: tăng bộ đếm nếu chưa chạm trần. allowed=false nghĩa là đã hết hạn mức ngày.
+// 29/8 (audit mục 12): kiểm + tăng phải là MỘT câu lệnh trong database (reserve_daily_quota,
+// migration 20260829180000) — bản cũ đọc rồi ghi, hai lượt duyệt bấm cùng lúc cùng đọc số cũ
+// nên cùng lọt qua trần. Hàm DB chưa được dán (migration chờ) thì rơi về lối cũ để không đứt
+// luồng đăng — lối cũ vẫn race, dán migration là hết.
 export async function reservePostQuota(
   client: Client,
   account: string,
   limit: number
 ): Promise<{ allowed: boolean; count: number; limit: number }> {
   const day = todayVN();
+  const { data, error } = await client.rpc('reserve_daily_quota', {
+    p_account: account, p_kind: 'post', p_day: day, p_limit: limit,
+  });
+  if (!error && Array.isArray(data) && data.length) {
+    const row = data[0] as { allowed: boolean; new_count: number };
+    return { allowed: Boolean(row.allowed), count: Number(row.new_count) || 0, limit };
+  }
+  console.warn('[safety] reserve_daily_quota chưa gọi được (chưa dán migration?):', error?.message);
   const current = await getPostCount(client, account, day);
   if (current >= limit) return { allowed: false, count: current, limit };
   const next = current + 1;

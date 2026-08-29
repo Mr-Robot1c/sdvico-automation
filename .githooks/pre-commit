@@ -263,6 +263,16 @@ for f in $(echo "$CHANGED" | grep -E 'docs/app-map/.*\.md$' | grep -v '_generate
   fi
 done
 
+# ── 4b. Cổng duyệt approval_queue (điều cấm 1 — audit 29/8 mục 14) ─────
+# Nhiều chỗ ghi approval_queue (core + approval-ui + marketing) chưa gộp về một module —
+# máy canh thay người: insert phải status 'pending', update đổi status phải kèm guard pending.
+# Chỉ chạy khi commit có file code và máy có node; thiếu node thì bỏ qua (không chặn oan).
+if [ -f scripts/check-approval-gate.mjs ] && command -v node >/dev/null 2>&1; then
+  if echo "$CHANGED" | grep -qE '\.(ts|tsx|js|mjs)$'; then
+    node scripts/check-approval-gate.mjs || FAIL=1
+  fi
+fi
+
 # ── 5. Regenerate doc-status (cổng đọc luôn fresh — meta-rot guard) ─────
 # doc-status.md phải fresh theo COMMIT chứ không theo tuần; marker DOC-STATUS trong doc
 # được --status quản lý (xem report). Chỉ stage doc-status.md — KHÔNG auto-stage doc khác.

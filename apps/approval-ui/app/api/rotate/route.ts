@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../lib/supabase-server';
-import { isEmergencyStopped } from '../../../lib/safety';
+import { isEmergencyStopped, todayVN } from '../../../lib/safety';
 // @ts-ignore
 import { guessGroup } from '../../../lib/gen/products.mjs';
 
@@ -112,6 +112,20 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: true, created: 0, note: `da sinh ${madeToday} bai hom nay (guard 1 lan/ngay; ?force=1 de ep)` });
       }
     }
+
+    // 29/8 (audit mục 12): guard đếm ở trên đọc-rồi-quyết — hai lượt gọi CÙNG LÚC (cron trùng
+    // lượt bấm tay) cùng thấy 0 bài rồi cùng sinh -> bài trùng. Chốt thêm vé NGUYÊN TỬ trong
+    // database: mỗi slot 1 vé/ngày qua reserve_daily_quota, ai lấy sau bị từ chối ngay tại DB.
+    // Hàm chưa được dán (migration 20260829180000 chờ) thì đi tiếp như cũ, không đứt cron.
+    // Lượt chạy lỗi giữa chừng coi như đã dùng vé — chạy lại trong ngày bằng ?force=1.
+    const { data: claim, error: claimErr } = await client.rpc('reserve_daily_quota', {
+      p_account: `rotate:${slot || 'daily'}`, p_kind: 'rotate_run', p_day: todayVN(), p_limit: 1,
+    });
+    if (!claimErr && Array.isArray(claim) && claim.length && !(claim[0] as any).allowed) {
+      await logRotate('skipped', { reason: 'luot chay khac dang giu slot nay (ve nguyen tu)', slot });
+      return NextResponse.json({ ok: true, created: 0, note: 'slot da duoc luot chay khac giu, bo qua de khoi sinh bai trung' });
+    }
+    if (claimErr) console.warn('[rotate] reserve_daily_quota chưa gọi được (chưa dán migration?):', claimErr.message);
   }
   // So bai ban + co content theo slot. Slot sang: 2 ban, 0 content. Slot chieu: 1 ban + 1 content.
   const salesCount = slot === 'chieu' ? 1 : slot === 'sang' ? 2 : FOLDERS_PER_RUN;
