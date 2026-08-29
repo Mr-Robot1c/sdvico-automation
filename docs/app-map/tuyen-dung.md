@@ -2,8 +2,9 @@
 
 > Đọc khi làm phần Tuyển dụng. Phụ trách Bạn A. Nền chung ở [README.md](README.md), điều cấm và giọng văn ở CLAUDE.md.
 covers: packages/hr
-last_verified: 2026-08-12
+last_verified: 2026-08-29
 ttl_days: 180
+<!-- re-verified: 2026-08-29 - Audit bao mat muc 10: intake/run.mjs chay THAT bat buoc MAIL_INTAKE_ALLOWED_SENDERS (hoac --from) — rong la throw dung ngay, het che do "nhan CV tu bat ky ai" (du lieu nguoi la + file la vao pdf-parse het bao tri). Dry-run duoc mien. Phan con lai cua workflow doi chieu van dung. -->
 
 ## 1. Workflow tuyển dụng, từ đầu tới cuối
 

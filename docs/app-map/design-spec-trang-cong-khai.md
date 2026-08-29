@@ -1,7 +1,8 @@
 > Load khi: task chạm UI trang công khai /blog, /blog/[slug], /blog/chu-de/[slug], /san-pham, /san-pham/[slug] (shell công khai trong root-shell.tsx)
 covers: apps/approval-ui/app/blog, apps/approval-ui/app/san-pham, apps/approval-ui/app/root-shell.tsx
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 ttl_days: 90
+<!-- re-verified: 2026-08-29 - Audit bao mat muc 6: 3 trang blog/[slug], blog/chu-de/[slug], san-pham/[slug] doi JSON.stringify(jsonLd) sang safeJsonLd (thoat < chong XSS). Thay doi vo hinh voi nguoi xem va Google — khong dong nao cua spec giao dien doi. -->
 <!-- re-verified: 2026-08-28 18:20 - Hotline nut Goi + footer public doi 0254 359 6868 (sep 28/8); cac hanh vi/bo cuc khac doi chieu root-shell + blog van dung. -->
 <!-- re-verified: 2026-08-28 17:20 - Doi chieu blog cover fix (deleted_at, pool khong zalo, chong trung cung trang): hanh vi the bai giu nguyen, chi nguon anh fallback sach hon. -->
 

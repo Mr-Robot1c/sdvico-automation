@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { getServerClient } from '../../../lib/supabase-server';
 import { catalogItemOf, fmtDateVN, isProductOf, loadPublicPost, loadPublicPosts, siteUrl } from '../../../lib/seo';
 import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
+import { safeJsonLd } from '../../../lib/jsonld';
 import ContactButtons from '../../contact-buttons';
 import PostCard from '../post-card';
 
@@ -68,7 +69,7 @@ export default async function BlogDetailPage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
       <article className="pub-read">
         <nav className="pub-crumb" aria-label="Đường dẫn">

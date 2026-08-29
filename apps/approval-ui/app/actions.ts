@@ -1410,12 +1410,34 @@ export async function deleteFact(formData: FormData) {
   revalidatePath('/du-kien');
 }
 
+// 29/8 (audit bảo mật, mục 9): bucket brand-assets là CÔNG KHAI mà upload không kiểm loại
+// file — ai có tài khoản đẩy được HTML lên là thành XSS lưu trữ trên hạ tầng công ty.
+// Chỉ nhận đúng media dùng cho bài đăng; contentType do server suy từ ĐUÔI FILE, không tin
+// giá trị trình duyệt gửi. SVG cố tình không nằm trong danh sách (nhúng được script).
+const ASSET_EXT_MIME: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
+  mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/x-m4v',
+  mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav',
+};
+const ASSET_MAX_BYTES = 300 * 1024 * 1024; // trần cứng 300MB, video dài hơn thì nén trước
+const ASSET_TYPE_MSG =
+  'Chỉ nhận ảnh (jpg, png, webp, gif), video (mp4, webm, mov, m4v) hoặc âm thanh (mp3, m4a, wav).';
+
+function assetContentTypeOf(fileName: string): string | null {
+  const ext = (String(fileName).split('.').pop() || '').toLowerCase();
+  return ASSET_EXT_MIME[ext] || null;
+}
+
 // Tải tư liệu thật lên kho brand_assets (ảnh, clip, logo do công ty sở hữu hoặc có giấy phép).
 // Giới hạn kích thước qua server action khoảng 4,5MB. File lớn thì tải qua Supabase Storage.
 export async function uploadAsset(formData: FormData) {
   const file = formData.get('file') as File | null;
   const kind = String(formData.get('kind') || 'image');
   if (!file || file.size === 0) return;
+
+  const contentType = assetContentTypeOf(file.name);
+  if (!contentType) throw new Error(`${ASSET_TYPE_MSG} File "${file.name}" không thuộc loại này.`);
+  if (file.size > ASSET_MAX_BYTES) throw new Error('File quá 300MB. Nén hoặc cắt ngắn rồi tải lại.');
 
   const client = getServerClient();
   const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -1424,7 +1446,7 @@ export async function uploadAsset(formData: FormData) {
 
   const { error: upErr } = await client.storage
     .from('brand-assets')
-    .upload(path, buf, { contentType: file.type || 'application/octet-stream' });
+    .upload(path, buf, { contentType });
   if (upErr) throw new Error('Tải lên lỗi: ' + upErr.message);
 
   const license = String(formData.get('license') || 'owned') === 'licensed' ? 'licensed' : 'owned';
@@ -1447,6 +1469,10 @@ export async function uploadAsset(formData: FormData) {
 // Dùng cho video và ảnh lớn: đi thẳng browser -> Supabase, không qua server action,
 // nên không dính giới hạn body 4,5MB của hàm serverless trên Vercel.
 export async function createAssetUploadUrl(fileName: string, kind: string) {
+  // Chặn từ lúc xin URL: đuôi file không phải media thì không phát URL ký sẵn luôn.
+  if (!assetContentTypeOf(fileName || '')) {
+    throw new Error(`${ASSET_TYPE_MSG} File "${fileName}" không thuộc loại này.`);
+  }
   const client = getServerClient();
   const safe = (fileName || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `${Date.now()}-${safe}`;
@@ -1475,6 +1501,26 @@ export async function registerAsset(input: {
   const kind = KINDS.includes(input.kind) ? input.kind : 'image';
   const license = input.license === 'licensed' ? 'licensed' : 'owned';
   const client = getServerClient();
+
+  // File đã đi thẳng browser -> Storage bằng URL ký sẵn, server chưa nhìn thấy nó — kiểm
+  // TẠI ĐÂY trước khi ghi sổ: phải tồn tại, đuôi media hợp lệ, mimetype lúc PUT là
+  // image/video/audio (không svg), không quá trần. Sai là xóa khỏi bucket luôn, không để
+  // file lạ nằm lại trên bucket công khai.
+  const { data: found, error: listErr } = await client.storage
+    .from('brand-assets')
+    .list('', { search: path, limit: 10 });
+  if (listErr) throw new Error('Không kiểm được file vừa tải lên: ' + listErr.message);
+  const obj = (found || []).find((f) => f.name === path);
+  if (!obj) throw new Error('Không thấy file vừa tải lên trong kho. Tải lại từ đầu.');
+  const meta = (obj as { metadata?: { size?: number; mimetype?: string } }).metadata || {};
+  const mime = String(meta.mimetype || '').toLowerCase();
+  const mimeOk = /^(image|video|audio)\//.test(mime) && !mime.includes('svg');
+  const extOk = assetContentTypeOf(path) !== null;
+  const sizeOk = Number(meta.size || 0) <= ASSET_MAX_BYTES;
+  if (!extOk || !mimeOk || !sizeOk) {
+    try { await client.storage.from('brand-assets').remove([path]); } catch { /* xóa hụt thì thôi */ }
+    throw new Error(!sizeOk ? 'File quá 300MB. Nén hoặc cắt ngắn rồi tải lại.' : ASSET_TYPE_MSG);
+  }
   const { error } = await client.from('brand_assets').insert({
     kind,
     title: String(input.title || '').trim() || path,

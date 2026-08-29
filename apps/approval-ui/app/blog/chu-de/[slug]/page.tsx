@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { getServerClient } from '../../../../lib/supabase-server';
 import { isProductOf, loadPublicPosts, siteUrl } from '../../../../lib/seo';
 import { findProductBySlug, PRODUCT_CATALOG } from '../../../../lib/product-catalog';
+import { safeJsonLd } from '../../../../lib/jsonld';
 import PostCard from '../../post-card';
 
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,7 @@ export default async function TopicHubPage({ params }: Props) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       <main>
         <nav className="pub-crumb" aria-label="Đường dẫn">
           <Link href="/blog">Bài viết</Link>

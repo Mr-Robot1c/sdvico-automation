@@ -21,9 +21,17 @@ export async function GET(req: Request) {
   }
   if (!code) return NextResponse.redirect(`${APP_BASE}/tiktok?error=thieu_code`);
 
-  // Đối chiếu state chống CSRF (nếu có cookie).
+  // Đối chiếu state chống CSRF. 29/8 (audit bảo mật): bản cũ chỉ chặn khi CÓ ĐỦ cả state
+  // lẫn cookie mà lệch nhau — thiếu một trong hai là cho qua luôn (fail-open), kẻ tấn công
+  // dụ admin bấm link callback kèm code của hắn là gắn nhầm tài khoản TikTok của hắn vào
+  // hệ thống. Giờ thiếu hoặc lệch đều từ chối; /api/tiktok/connect luôn đặt cookie này
+  // (maxAge 600) nên luồng bấm nút Kết nối thật không bị ảnh hưởng.
   const cookieState = req.headers.get('cookie')?.match(/tiktok_oauth_state=([^;]+)/)?.[1];
-  if (state && cookieState && decodeURIComponent(cookieState) !== state) {
+  let cookieVal: string | null = null;
+  if (cookieState) {
+    try { cookieVal = decodeURIComponent(cookieState); } catch { cookieVal = cookieState; }
+  }
+  if (!state || !cookieVal || cookieVal !== state) {
     return NextResponse.redirect(`${APP_BASE}/tiktok?error=state_khong_khop`);
   }
 
@@ -68,7 +76,10 @@ export async function GET(req: Request) {
       { onConflict: 'provider' }
     );
 
-    return NextResponse.redirect(`${APP_BASE}/tiktok?connected=1`);
+    // State dùng một lần: xóa cookie sau khi đổi token thành công.
+    const done = NextResponse.redirect(`${APP_BASE}/tiktok?connected=1`);
+    done.cookies.set('tiktok_oauth_state', '', { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 0 });
+    return done;
   } catch (e: any) {
     return NextResponse.redirect(`${APP_BASE}/tiktok?error=${encodeURIComponent(String(e?.message || e))}`);
   }

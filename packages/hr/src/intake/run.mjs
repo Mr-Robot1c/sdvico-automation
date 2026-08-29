@@ -40,7 +40,9 @@ function parseArgs(argv) {
 
 // Danh sách người gửi được phép, từ biến môi trường hoặc cờ --from.
 // Giai đoạn test dùng hộp thư cá nhân có lẫn thư thật, chỉ nạp CV từ người gửi trong danh sách,
-// tránh ghi nhầm dữ liệu người thật (Nghị định 13, điều cấm 6). Rỗng nghĩa là nhận mọi người gửi.
+// tránh ghi nhầm dữ liệu người thật (Nghị định 13, điều cấm 6).
+// 29/8 (audit bảo mật, mục 10): chạy THẬT bắt buộc có danh sách — rỗng là dừng ngay trong
+// main(), không còn chế độ "nhận mọi người gửi" (file lạ đi thẳng vào pdf-parse hết bảo trì).
 function getAllowedSenders(args) {
   return (process.env.MAIL_INTAKE_ALLOWED_SENDERS || args.from || '')
     .split(',')
@@ -159,6 +161,17 @@ async function main() {
   const db = getServiceClient();
   const config = getMailConfig();
   const allowedSenders = getAllowedSenders(args);
+
+  // Chạy thật mà allowlist rỗng là nhận CV từ BẤT KỲ ai gửi tới hộp thư: dữ liệu người lạ
+  // vào DB (điều cấm 6) và file tùy ý đi thẳng vào pdf-parse. Dừng ngay, nói rõ cách điền.
+  // Dry-run được miễn vì không ghi gì.
+  if (!args.dryRun && allowedSenders.length === 0) {
+    throw new Error(
+      'MAIL_INTAKE_ALLOWED_SENDERS đang rỗng. Chạy thật phải khai danh sách địa chỉ người gửi '
+      + 'được phép (cách nhau dấu phẩy) trong biến môi trường này, hoặc dùng cờ --from. '
+      + 'Dừng để không nạp CV từ người lạ.'
+    );
+  }
 
   if (!args.dryRun) await ensureBucket(db);
   const processed = args.dryRun ? {} : await loadProcessed(db);

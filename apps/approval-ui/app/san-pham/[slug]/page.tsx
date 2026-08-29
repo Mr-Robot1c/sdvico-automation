@@ -5,6 +5,7 @@ import { findProductBySlug, PRODUCT_CATALOG } from '../../../lib/product-catalog
 import { isProductOf, loadPublicPosts, siteUrl, type PublicPost } from '../../../lib/seo';
 import { getServerClient } from '../../../lib/supabase-server';
 import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
+import { safeJsonLd } from '../../../lib/jsonld';
 import ContactButtons from '../../contact-buttons';
 import PostCard from '../../blog/post-card';
 
@@ -79,7 +80,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       <main>
         <nav className="pub-crumb" aria-label="Đường dẫn">
           <Link href="/san-pham">Sản phẩm</Link>
