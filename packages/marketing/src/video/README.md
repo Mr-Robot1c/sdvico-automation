@@ -40,11 +40,14 @@ Dựng video cho các bài `mkt_content` có `draft` mà chưa có video (bỏ q
 **"Bấm nút trên web là tự làm video":** hai cách:
 
 **(A) GitHub Actions (khuyến nghị, không cần bật máy)** — workflow `.github/workflows/video-build.yml`
-quét bài đã yêu cầu (cron */10 phút) hoặc chạy ngay khi backend Vercel POST `/api/trigger-video-build`
-(khi bấm nút 🎬). Chạy trên cloud GitHub, miễn phí ~250 video/tháng. Cần:
+quét bài đã yêu cầu 30 phút/lần trong 7h-23h30 giờ VN (lượt không có việc thoát sớm bằng bước
+ngó-trước curl nên không cháy phút free), hoặc chạy ngay khi backend Vercel POST
+`/api/trigger-video-build` (khi bấm nút 🎬, bất kể giờ). Từ 30/8 job tự bật server giọng
+Mỹ Duyên (VieNeu, `src/voice/local-tts-server-vieneu.py`) ngay trong runner nên video cloud
+cùng giọng với máy local; server không lên kịp mới rơi về giọng gemini/edge. Cần:
 - Secrets repo GitHub: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `MKT_MODEL` (đã có).
 - Vercel env: `GITHUB_REPO` = `Mr-Robot1c/sdvico-automation` + `GITHUB_TOKEN` = PAT có quyền `workflow`.
-- Thiếu `GITHUB_TOKEN` thì cron 10 phút vẫn quét (chỉ hơi trễ).
+- Thiếu `GITHUB_TOKEN` thì cron 30 phút vẫn quét (chỉ hơi trễ).
 
 **(B) Máy nội bộ** — cài `scripts/cai-tu-dong-video.bat` 1 lần (đăng ký Task Scheduler), watcher
 tự chạy khi đăng nhập Windows. File `video-watch.bat` để chạy tay, `go-tu-dong-video.bat` để gỡ.

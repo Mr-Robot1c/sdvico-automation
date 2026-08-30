@@ -4,22 +4,30 @@ name: Dựng video theo yêu cầu
 # video (FB 16:9 + TikTok dọc) rồi đẩy vào Hàng đợi duyệt. KHÔNG tự đăng — người bấm Duyệt mới
 # đăng (điều cấm 1). Xong lượt dựng thì cờ tự xóa để không dựng lại.
 #
+# 30/8 (user chốt "full cloud + giọng Mỹ Duyên") — máy local tắt video vẫn ra đúng giọng:
+#   - NGÓ TRƯỚC: lượt schedule hỏi Supabase bằng 1 lệnh curl TRƯỚC khi cài gì — không có bài
+#     chờ thì thoát trong ~15 giây (GitHub tính 1 phút). Nhờ vậy quét 30 phút/lần thay vì
+#     2 tiếng mà không cháy 2.000 phút free/tháng như hồi tháng 8 (mỗi lượt npm install 2-3
+#     phút dù không có việc).
+#   - GIỌNG MỸ DUYÊN TRÊN CLOUD: chạy chính packages/marketing/src/voice/local-tts-server-vieneu.py
+#     ngay trong job (ONNX CPU, nhanh hơn realtime), đặt TTS_LOCAL_URL=127.0.0.1:8199 — chuỗi
+#     engine của build-video (local -> gemini -> edge) tự dùng nó, cùng file cùng giọng cùng
+#     tham số với máy local. Model cache giữa các lần chạy; server không lên kịp thì chỉ warn
+#     và rơi về giọng gemini/edge, không chết job.
+#   - Watcher máy local vẫn chạy song song được: vé video_claimed_at (audit 29/8 mục 13)
+#     bảo đảm hai bên không dựng trùng một bài.
+#
+# Whisper vẫn --skip-whisper: phụ đề lấy từ kịch bản, không lệ thuộc ASR, đỡ phút CI.
+#
 # Trigger:
-#   - schedule mỗi 10 phút: check có yêu cầu mới không.
-#   - workflow_dispatch: chạy tay hoặc gọi từ backend Vercel (khi bấm nút -> trigger ngay).
-#
-# Bỏ Whisper artifact (--skip-whisper) trên CI để tiết kiệm ~2 phút cài faster-whisper mỗi lần.
-# Phụ đề vẫn có (lấy từ kịch bản, không lệ thuộc ASR).
-#
-# Tần suất: 2 tiếng/lần (26/8 user chốt "đỡ hao" — trước là 10 phút, đã hết Actions Free
-# minutes ngay trong tháng 8). Nếu cần bài GẤP thay vì chờ 2h, có 2 cách:
-#  1. Chạy tay ở máy local: `node packages/marketing/src/video/build-video-all.mjs --requested --skip-whisper`
-#     (env local có SUPABASE + GEMINI + edge-tts sẵn theo memory sdvico-env-setup).
-#  2. Trigger workflow_dispatch trên GitHub UI (Actions > Dựng video theo yêu cầu > Run workflow).
+#   - schedule 30 phút/lần trong 7h-23h30 giờ VN (cron chạy theo UTC, VN = UTC+7). Ban đêm
+#     không quét — cần gấp thì nút 🎬 (workflow_dispatch) vẫn chạy ngay bất kể giờ.
+#   - workflow_dispatch: chạy tay trên GitHub UI hoặc backend Vercel gọi khi bấm nút 🎬.
+#     Lượt dispatch KHÔNG ngó trước (bấm nút nghĩa là có việc).
 
 on:
   schedule:
-    - cron: '0 */2 * * *'
+    - cron: '*/30 0-16 * * *'
   workflow_dispatch:
     inputs:
       limit:
@@ -36,25 +44,85 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
+      # Ngó trước (chỉ lượt schedule): đếm bài video_requested chưa có video. curl/jq lỗi thì
+      # coi như CÓ việc (fail-open) để không bao giờ im lặng bỏ dựng.
+      - name: Ngo truoc co viec khong
+        id: peek
+        if: github.event_name == 'schedule'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          N=$(curl -s --max-time 20 "$SUPABASE_URL/rest/v1/mkt_content?select=id&brief-%3E%3Evideo_requested=eq.true&brief-%3Eassets-%3E%3Evideo_h=is.null&limit=3" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" | jq 'length' 2>/dev/null || echo 9)
+          case "$N" in ''|*[!0-9]*) N=9;; esac
+          echo "work=$N" >> "$GITHUB_OUTPUT"
+          if [ "$N" = "0" ]; then echo "Khong co bai cho dung video — thoat som."; else echo "Co ~$N bai cho dung."; fi
+
       - uses: actions/checkout@v4
+        if: github.event_name != 'schedule' || steps.peek.outputs.work != '0'
 
       - uses: actions/setup-node@v4
+        if: github.event_name != 'schedule' || steps.peek.outputs.work != '0'
         with:
           node-version: 22
 
+      # Cache nguyên node_modules theo package-lock — trúng cache thì bỏ hẳn npm install.
+      - name: Cache node_modules
+        id: npmcache
+        if: github.event_name != 'schedule' || steps.peek.outputs.work != '0'
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: node-modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
+
+      - name: Cai npm
+        if: (github.event_name != 'schedule' || steps.peek.outputs.work != '0') && steps.npmcache.outputs.cache-hit != 'true'
+        run: npm install
+
       - uses: actions/setup-python@v5
+        if: github.event_name != 'schedule' || steps.peek.outputs.work != '0'
         with:
           python-version: '3.11'
 
-      # Cai npm goi (co @ffmpeg-installer/ffmpeg, @google/genai, @supabase/supabase-js).
-      - name: Cai npm
-        run: npm install
+      # Cache pip + model VieNeu (tải từ HuggingFace lần đầu, vài trăm MB).
+      - name: Cache pip va model giong
+        if: github.event_name != 'schedule' || steps.peek.outputs.work != '0'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/huggingface
+          key: vieneu-tts-v1
 
-      # Chi can edge-tts (TTS giong Viet). Bo faster-whisper vi --skip-whisper (nhanh hon nhieu).
-      - name: Cai edge-tts
-        run: pip install --quiet edge-tts
+      - name: Cai goi tieng noi
+        if: github.event_name != 'schedule' || steps.peek.outputs.work != '0'
+        run: pip install --quiet vieneu flask librosa soundfile edge-tts
+
+      # Bật server giọng Mỹ Duyên NGAY TRONG job. /health chỉ trả lời khi model đã nạp xong
+      # (server warm-up trước khi mở cổng) nên health OK = giọng chắc chắn sẵn sàng.
+      # Không lên nổi trong 450s thì KHÔNG đặt TTS_LOCAL_URL -> build tự rơi về gemini/edge.
+      - name: Bat server giong My Duyen
+        if: github.event_name != 'schedule' || steps.peek.outputs.work != '0'
+        run: |
+          nohup python packages/marketing/src/voice/local-tts-server-vieneu.py > /tmp/vieneu.log 2>&1 &
+          echo "Cho model nap (lan dau phai tai model, cac lan sau co cache)..."
+          for i in $(seq 1 90); do
+            if curl -sf --max-time 3 http://127.0.0.1:8199/health > /dev/null; then
+              echo "TTS_LOCAL_URL=http://127.0.0.1:8199" >> "$GITHUB_ENV"
+              echo "Server giong OK sau ~$((i*5))s:"; curl -s http://127.0.0.1:8199/health
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::warning::Server VieNeu khong len sau 450s — luot nay dung giong du phong gemini/edge."
+          tail -30 /tmp/vieneu.log || true
 
       - name: Dung video cho bai da yeu cau
+        if: github.event_name != 'schedule' || steps.peek.outputs.work != '0'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -64,3 +132,7 @@ jobs:
           LIMIT="${{ github.event.inputs.limit || '3' }}"
           node packages/marketing/src/video/build-video-all.mjs \
             --requested --limit "$LIMIT" --skip-whisper
+
+      - name: Log server giong khi job loi
+        if: failure()
+        run: tail -50 /tmp/vieneu.log || true
