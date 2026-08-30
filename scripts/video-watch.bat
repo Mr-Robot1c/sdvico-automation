@@ -6,16 +6,12 @@ REM  video (FB 16:9 + TikTok doc) roi day vao Hang doi duyet. KHONG tu dang -
 REM  nguoi bam Duyet moi dang (dieu cam 1).
 REM  De cua so nay chay. Dong cua so = dung watcher.
 REM ============================================================================
+REM 30/8: logic vong lap + restart dua sang scripts/video-watch.mjs (chay chung ca Win/Mac/
+REM Linux). File .bat nay chi la loi tat bam-dup cho Windows, goi vao launcher Node do.
 title SDVICO Video Watcher
 cd /d "%~dp0.."
 set "NODE=C:\Program Files\nodejs\node.exe"
 if not exist "%NODE%" set "NODE=node"
-echo [SDVICO] Dang theo doi yeu cau "Lam video" (quet moi 60 giay).
-echo [SDVICO] Dong cua so nay de dung.
+echo [SDVICO] Dang theo doi yeu cau "Lam video". Dong cua so nay de dung.
 echo.
-:loop
-"%NODE%" packages\marketing\src\video\build-video-all.mjs --requested --watch --interval 60
-echo.
-echo [SDVICO] Watcher thoat (ma %errorlevel%). Chay lai sau 10 giay... Ctrl+C de dung han.
-timeout /t 10 /nobreak >nul
-goto loop
+"%NODE%" scripts\video-watch.mjs

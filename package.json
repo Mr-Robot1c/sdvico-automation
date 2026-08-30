@@ -10,6 +10,8 @@
     "demo:outbound": "node packages/marketing/src/demo-outbound.mjs",
     "test:compliance": "node packages/marketing/src/test-compliance.mjs",
     "check:gates": "node scripts/check-approval-gate.mjs",
+    "video:watch": "node scripts/video-watch.mjs",
+    "voice:server": "node scripts/voice-server.mjs",
     "test:skills": "node packages/marketing/src/test-skills.mjs",
     "content:run": "node packages/marketing/src/run-content.mjs",
     "publish:fb": "node packages/marketing/src/publish-facebook.mjs",

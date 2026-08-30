@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
 import { getServiceClient, logRun } from '@sdvico/core';
+import { findChromium } from './platform.mjs';
 
 const url = process.argv[2] || 'https://sdvico.vn';
 const strategy = process.argv[3] || 'mobile';
@@ -22,22 +23,12 @@ const CAT_LABEL = {
   'best-practices': 'Thực hành tốt'
 };
 
-// Tìm trình duyệt Chromium trên máy. Trả về undefined để chrome-launcher tự dò nếu không thấy.
-function findBrowser() {
-  const candidates = [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe'
-  ];
-  return candidates.find((p) => fs.existsSync(p));
-}
-
 console.log(`Rà SEO: ${url} (${strategy}). Đang mở trình duyệt và chạy Lighthouse, chờ chút...`);
 
+// findChromium (platform.mjs) dò Chrome/Edge/Brave/Chromium theo hệ điều hành; undefined thì
+// nhường cho chrome-launcher tự dò.
 const chrome = await chromeLauncher.launch({
-  chromePath: findBrowser(),
+  chromePath: findChromium(),
   chromeFlags: ['--headless=new', '--no-sandbox', '--disable-gpu']
 });
 

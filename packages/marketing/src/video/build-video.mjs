@@ -17,6 +17,7 @@ import { generateVideoScript } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
 import { logTokenUsage } from '../token-log.mjs';
+import { pythonCmd } from '../platform.mjs';
 
 // Supabase client dùng chung cho log token (script + TTS). Set 1 lần từ main() sau khi tạo
 // client bên dưới; các hàm sâu (geminiTTS) không cần thread qua từng call.
@@ -32,8 +33,9 @@ function arg(name, def) {
 }
 
 function python(script, args) {
+  // 30/8 (đa nền): Windows thường 'python', macOS/Linux 'python3' — đổi bằng env PYTHON.
   return new Promise((resolve, reject) => {
-    const proc = spawn('python', [join(HERE, script), ...args]);
+    const proc = spawn(pythonCmd(), [join(HERE, script), ...args]);
     let out = '';
     let err = '';
     proc.stdout.on('data', (d) => { out += d.toString(); });

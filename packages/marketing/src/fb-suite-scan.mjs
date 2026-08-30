@@ -22,14 +22,25 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { loadRealEnv } from './video/env.mjs';
+import { findChromium, braveUserDataDir, dataDir } from './platform.mjs';
 
 const env = loadRealEnv();
 const ASSET_ID = env.FB_SUITE_ASSET_ID || '101052306114292';      // page SDVICO VN
 const BUSINESS_ID = env.FB_SUITE_BUSINESS_ID || '805150207595333';
-const BROWSER = env.FB_SUITE_BROWSER || 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe';
-const PROFILE = env.FB_SUITE_PROFILE || 'C:\\Users\\ADMIN\\sdvico-fb-scan-profile';
-const STATE_DIR = 'C:\\Users\\ADMIN\\sdvico-fb-scan';
+// 30/8 (đa nền): tự dò Brave/Chrome theo hệ điều hành; profile + state để dưới ~/.sdvico.
+// Đổi bằng env FB_SUITE_BROWSER / FB_SUITE_PROFILE / FB_SUITE_STATE_DIR / SDVICO_DATA_DIR.
+// Tương thích ngược: máy đang chạy vốn để ở ~/sdvico-fb-scan-profile — còn thì dùng tiếp,
+// khỏi tạo profile trống mới (máy mới thì theo layout ~/.sdvico sạch sẽ).
+function pathPref(envVal, legacyName, cleanSub) {
+  if (envVal) return envVal;
+  const legacy = join(homedir(), legacyName);
+  return existsSync(legacy) ? legacy : dataDir(cleanSub);
+}
+const BROWSER = env.FB_SUITE_BROWSER || findChromium();
+const PROFILE = pathPref(env.FB_SUITE_PROFILE, 'sdvico-fb-scan-profile', 'fb-scan-profile');
+const STATE_DIR = pathPref(env.FB_SUITE_STATE_DIR, 'sdvico-fb-scan', 'fb-scan');
 const OVERVIEW_URL = `https://business.facebook.com/latest/insights/overview/?asset_id=${ASSET_ID}&business_id=${BUSINESS_ID}`;
 const AUDIENCE_URL = `https://business.facebook.com/latest/insights/audience/?asset_id=${ASSET_ID}&business_id=${BUSINESS_ID}`;
 
@@ -55,7 +66,7 @@ async function runLog(status, msg, extra = {}) {
 // -> MƯỢN phiên của Brave hằng ngày: copy Local State (giữ khoá giải mã cookie, DPAPI theo
 // user Windows nên cùng máy đọc được) + Network\Cookies sang profile quét TRƯỚC mỗi lần quét.
 // Chỉ ĐỌC profile thật, không ghi gì vào đó; Brave đang mở vẫn copy được.
-const LIVE_UD = env.FB_SUITE_LIVE_UD || join(process.env.LOCALAPPDATA || 'C:\\Users\\ADMIN\\AppData\\Local', 'BraveSoftware', 'Brave-Browser', 'User Data');
+const LIVE_UD = braveUserDataDir();
 const LIVE_PROFILE_NAME = env.FB_SUITE_LIVE_PROFILE_NAME || 'Default';
 function syncSession() {
   try {
@@ -130,6 +141,7 @@ function grab(text, labels) {
 }
 
 async function scanOnce() {
+  if (!BROWSER) { await runLog('error', 'khong tim thay Brave/Chrome tren may — dat env FB_SUITE_BROWSER tro toi trinh duyet'); return false; }
   if (!existsSync(BROWSER)) { await runLog('error', 'khong thay trinh duyet: ' + BROWSER); return false; }
   const t0 = Date.now();
   const syncErr = syncSession();

@@ -11,8 +11,10 @@ import { join, extname, basename } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { loadRealEnv } from './video/env.mjs';
 import { PRODUCTS } from './products.mjs';
+import { mediaDir } from './platform.mjs';
 
-const SRC = 'C:\\Users\\ADMIN\\Pictures\\SDViCo';
+// 30/8 (đa nền): mặc định ~/Pictures/SDViCo; đổi bằng env SDVICO_MEDIA_DIR.
+const SRC = mediaDir();
 const dry = process.argv.includes('--dry');
 const forceIdx = process.argv.indexOf('--force');
 const forced = forceIdx >= 0 ? process.argv.slice(forceIdx + 1).filter((x) => /^\d+$/.test(x)).map(Number) : [];

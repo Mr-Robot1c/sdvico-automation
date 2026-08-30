@@ -49,11 +49,23 @@ cùng giọng với máy local; server không lên kịp mới rơi về giọng
 - Vercel env: `GITHUB_REPO` = `Mr-Robot1c/sdvico-automation` + `GITHUB_TOKEN` = PAT có quyền `workflow`.
 - Thiếu `GITHUB_TOKEN` thì cron 30 phút vẫn quét (chỉ hơi trễ).
 
-**(B) Máy nội bộ** — cài `scripts/cai-tu-dong-video.bat` 1 lần (đăng ký Task Scheduler), watcher
-tự chạy khi đăng nhập Windows. File `video-watch.bat` để chạy tay, `go-tu-dong-video.bat` để gỡ.
-Nhanh hơn GitHub Actions (~5 phút vs ~8 phút) nhưng phải bật máy.
+**(B) Máy nội bộ (Windows/macOS/Linux, không cần Docker)** — chạy watcher bằng lệnh chung:
+```
+npm run video:watch      # theo doi bai da bam "Lam video", tu dung; Ctrl+C de dung
+npm run voice:server     # (tuy chon) bat server giong My Duyen tren may
+```
+Nhanh hơn GitHub Actions (~5 phút vs ~8 phút) nhưng phải bật máy. Vẫn phải người bấm Duyệt
+mới đăng (điều cấm 1). Đường dẫn máy (thư mục dữ liệu, ảnh nguồn, trình duyệt, lệnh Python)
+tự dò theo hệ điều hành; đè bằng env trong `.env` (`SDVICO_DATA_DIR`, `SDVICO_MEDIA_DIR`,
+`SDVICO_BROWSER`, `PYTHON` — xem `.env.example`).
 
-Cả hai đều dùng cùng batch runner `build-video-all.mjs --requested`. Vẫn phải người bấm Duyệt mới đăng (điều cấm 1).
+**Chạy nền đa nền (thay Task Scheduler):**
+- Windows: bấm đúp `scripts/cai-tu-dong-video.bat` 1 lần (đăng ký Task Scheduler, tự chạy khi
+  đăng nhập). `video-watch.bat` chạy tay, `go-tu-dong-video.bat` gỡ. Cả hai gọi vào
+  `scripts/video-watch.mjs`.
+- macOS: tạo `~/Library/LaunchAgents/com.sdvico.video.plist` gọi `npm run video:watch` (launchd).
+- Linux: tạo unit `~/.config/systemd/user/sdvico-video.service` chạy `npm run video:watch`
+  rồi `systemctl --user enable --now sdvico-video`, hoặc dùng `pm2 start npm -- run video:watch`.
 
 ## Thành phần
 | File | Việc |
