@@ -39,7 +39,8 @@ export default function Page({ searchParams }: { searchParams?: { next?: string;
         {errorMessage ? <p className="login-err" role="alert">{errorMessage}</p> : null}
         <label>
           Tài khoản
-          <input name="user" defaultValue="sdvico" autoComplete="username" required />
+          {/* 29/8 (user): KHÔNG điền sẵn tên tài khoản — ô trống, khỏi lộ tên mặc định cho người lạ. */}
+          <input name="user" autoComplete="username" required />
         </label>
         <label>
           Mật khẩu
