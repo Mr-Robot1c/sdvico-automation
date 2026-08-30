@@ -11,6 +11,7 @@ import TikTokPrivateChip from './tiktok-private-chip';
 import ExportTiktokButton from './export-tiktok-button';
 import AddLeadButton from './add-lead-button';
 import LinkFbButton from './link-fb-button';
+import PostFbButton from './post-fb-button';
 import LinkTikTokButton from './link-tiktok-button';
 import PexelsScenesButton from './pexels-scenes-button';
 
@@ -503,12 +504,21 @@ export default async function BangSection() {
                         const videoVId = cnt?.brief?.assets?.video_v as string | undefined;
                         const videoVUrl = videoVId ? assetUrl.get(videoVId) : null;
                         const hasVideo = !!videoVUrl;
+                        // Ảnh tốt nhất để đính khi đăng FB tay: link ngoài (image_url) hoặc ảnh kho.
+                        const fbImg = (typeof cnt?.brief?.assets?.image_url === 'string' && cnt.brief.assets.image_url)
+                          || (typeof cnt?.brief?.assets?.image === 'string' ? assetUrl.get(cnt.brief.assets.image) : undefined);
+                        // Ô soạn bài Page chính SDVICO VN (không cần page token). Đổi bằng env
+                        // FB_MANUAL_COMPOSER_URL nếu Business Suite composer không mở đúng.
+                        const fbComposerUrl = process.env.FB_MANUAL_COMPOSER_URL
+                          || `https://business.facebook.com/latest/composer?asset_id=${process.env.FB_SUITE_ASSET_ID || '101052306114292'}`;
                         return (
                           <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, alignItems: 'start' }}>
                             {/* Cột TRÁI */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
                               <AddLeadButton contentId={it.cid} />
                               {fbPost ? <ShareGroups postUrl={fbPost.url} planGroupsToday={groupsForDate(lastAt)} /> : null}
+                              {/* 30/8: đăng TAY lên Page chính (copy caption + tải ảnh + mở ô soạn bài), khỏi page token. */}
+                              <PostFbButton caption={cnt?.draft || cnt?.title || ''} imageUrl={fbImg} composerUrl={fbComposerUrl} contentTitle={cnt?.title || 'sdvico'} />
                               {/* 28/8: dan link bai dang TAY tren Page chinh SDVICOVN — chip FB uu tien link nay. */}
                               <LinkFbButton contentId={it.cid} linkedUrl={String((cnt?.brief as any)?.fb_real_url || '') || null} />
                             </div>
