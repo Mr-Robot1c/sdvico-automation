@@ -280,7 +280,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
 
       {/* ===== 1. CAN LAM ===== */}
       <section className="blk" style={{ marginTop: 16 }}>
-        <h2>🔔 Cần làm <span className="sub">({needCount} việc)</span></h2>
+        <h2><span aria-hidden="true">🔔</span> Cần làm <span className="sub">({needCount} việc)</span></h2>
         {needCount === 0 ? (
           <p className="sub" style={{ margin: 0 }}>✅ Không có việc gấp. Dây chuyền đang chạy bình thường.</p>
         ) : (
@@ -321,7 +321,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
 
       {/* ===== 2. TIEN DO THEO GIAI DOAN (dashboard nhu anh ForLife) ===== */}
       <section className="blk">
-        <h2>📶 Tiến độ theo giai đoạn <span className="sub">bài chạy từ trái sang phải — ô đỏ là chỗ cần người động tay</span></h2>
+        <h2><span aria-hidden="true">📶</span> Tiến độ theo giai đoạn <span className="sub">bài chạy từ trái sang phải — ô đỏ là chỗ cần người động tay</span></h2>
         {/* 27/8 v3 (user): pipeline = Y tuong -> Da viet -> Cho duyet -> Len lich -> Da dang.
             BO o Tu choi (van loc duoc qua dropdown bang duoi). */}
         <div className="stage-flow">
@@ -381,8 +381,8 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       {/* ===== 3b. DO LUONG + BAO CAO TUAN (29/8, sếp: "đem đo lường và báo cáo tuần ra tổng quan") ===== */}
       <section className="blk">
         <h2>
-          {/* 30/8 (audit M5): JSX xuống dòng nuốt khoảng trắng -> "Đo lườngtuần này" dính chữ. */}
-          📊 Đo lường{' '}
+          {/* 30/8 (audit M5+L2): JSX xuống dòng nuốt khoảng trắng -> dính chữ; emoji aria-hidden. */}
+          <span aria-hidden="true">📊</span> Đo lường{' '}
           <span className="sub">tuần này (Thứ 2 → hôm nay) · kênh chính</span>
         </h2>
         {/* 29/8 (user: "phần đo lường phải rộng ra"): ô số LỚN kiểu pl-tile trải hết bề ngang,
@@ -431,7 +431,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       {/* ===== 3. NGUOI HOI MUA + KE HOACH HOM NAY ===== */}
       <div className="blk-cols">
         <section className="blk">
-          <h2>🛒 Người hỏi mua <span className="sub">({fmt(leads.length)} trong 7 ngày · {fmt(leadToday.length)} hôm nay)</span></h2>
+          <h2><span aria-hidden="true">🛒</span> Người hỏi mua <span className="sub">({fmt(leads.length)} trong 7 ngày · {fmt(leadToday.length)} hôm nay)</span></h2>
           {leads.length === 0 ? (
             <p className="sub" style={{ margin: 0 }}>Chưa có ai hỏi mua trong 7 ngày. Bài đăng đều + chia sẻ group để tăng tiếp cận.</p>
           ) : (
@@ -458,7 +458,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
         </section>
 
         <section className="blk">
-          <h2>📅 Kế hoạch hôm nay <span className="sub">{todaySchedule?.dow ? `· ${todaySchedule.dow} ${today.slice(8, 10)}/${today.slice(5, 7)}` : appliedPlan ? `· tuần ${String(appliedPlan.period_start || '').slice(5)} đến ${String(appliedPlan.period_end || '').slice(5)}` : ''}</span></h2>
+          <h2><span aria-hidden="true">📅</span> Kế hoạch hôm nay <span className="sub">{todaySchedule?.dow ? `· ${todaySchedule.dow} ${today.slice(8, 10)}/${today.slice(5, 7)}` : appliedPlan ? `· tuần ${String(appliedPlan.period_start || '').slice(5)} đến ${String(appliedPlan.period_end || '').slice(5)}` : ''}</span></h2>
           {todaySchedule ? (
             <div style={{ display: 'grid', gap: 8, fontSize: '.9rem' }}>
               {todaySchedule.direction?.title ? (
@@ -510,12 +510,14 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       {/* ===== 4. TAT CA NOI DUNG ===== */}
       <section className="blk">
         <h2>
-          📄 Tất cả nội dung
+          {/* 30/8 (audit M5+L2): cùng bệnh dính chữ do JSX nuốt khoảng trắng. */}
+          <span aria-hidden="true">📄</span> Tất cả nội dung{' '}
           <span className="sub">bài ở giai đoạn nào, đăng kênh đâu, thuộc kế hoạch gì — bấm icon kênh để mở bài thật</span>
         </h2>
         <form method="get" style={{ margin: '0 0 10px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input className="search" type="search" name="q" defaultValue={q} placeholder="Tìm theo tiêu đề bài..." style={{ maxWidth: 300, flex: '1 1 220px' }} />
-          <select name="gd" defaultValue={fGd} className="note" style={{ maxWidth: 170 }}>
+          {/* 30/8 (audit L1): ô tìm + bộ lọc có aria-label, không chỉ dựa placeholder. */}
+          <input className="search" type="search" name="q" defaultValue={q} placeholder="Tìm theo tiêu đề bài..." aria-label="Tìm theo tiêu đề bài" style={{ maxWidth: 300, flex: '1 1 220px' }} />
+          <select name="gd" defaultValue={fGd} className="note" aria-label="Lọc theo giai đoạn" style={{ maxWidth: 170 }}>
             <option value="">Mọi giai đoạn</option>
             <option value="draft">Nháp / đang sinh</option>
             <option value="pending">Chờ duyệt</option>
@@ -523,14 +525,14 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
             <option value="published">Đã đăng</option>
             <option value="rejected">Từ chối</option>
           </select>
-          <select name="kenh" defaultValue={fKenh} className="note" style={{ maxWidth: 150 }}>
+          <select name="kenh" defaultValue={fKenh} className="note" aria-label="Lọc theo kênh" style={{ maxWidth: 150 }}>
             <option value="">Mọi kênh</option>
             <option value="facebook">Facebook</option>
             <option value="youtube">YouTube</option>
             <option value="tiktok">TikTok</option>
             <option value="zalo">Zalo</option>
           </select>
-          <select name="kh" defaultValue={fKh} className="note" style={{ maxWidth: 210 }}>
+          <select name="kh" defaultValue={fKh} className="note" aria-label="Lọc theo kế hoạch" style={{ maxWidth: 210 }}>
             <option value="">Mọi kế hoạch</option>
             {allCampaigns.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
@@ -564,7 +566,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
                       {fbUrl ? (
                         <a href={fbUrl} target="_blank" rel="noreferrer" className="src" title="Mở bài trên Facebook"><b>{String(c.title || '(không tên)').slice(0, 90)}</b></a>
                       ) : (
-                        <b>{String(c.title || '(không tên)').slice(0, 90)}</b>
+                        <b className="cell-title-nolink" title="Bài chưa có link đăng để mở">{String(c.title || '(không tên)').slice(0, 90)}</b>
                       )}
                     </td>
                     <td><span className={`stage-badge ${st.cls}`}>{st.label}</span></td>

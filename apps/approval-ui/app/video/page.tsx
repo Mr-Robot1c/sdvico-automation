@@ -118,7 +118,7 @@ export default async function Page() {
 
       {/* ===== LUONG LAM VIDEO ===== */}
       <section className="blk">
-        <h2>⚙️ Luồng làm video <span className="sub">5 bước, AI của SDVICO tự chạy — người chỉ bấm Duyệt</span></h2>
+        <h2><span aria-hidden="true">⚙️</span> Luồng làm video <span className="sub">5 bước, AI của SDVICO tự chạy — người chỉ bấm Duyệt</span></h2>
         <div className="blk-cols" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', marginBottom: 0 }}>
           {steps.map((s, i) => (
             <div key={s.name} className="agent-card">
@@ -135,7 +135,7 @@ export default async function Page() {
       {/* ===== BAI DANG CHO DUNG ===== */}
       {waiting.length || generating.length ? (
         <section className="blk">
-          <h2>⏳ Bài đang trong dây chuyền</h2>
+          <h2><span aria-hidden="true">⏳</span> Bài đang trong dây chuyền</h2>
           <div style={{ display: 'grid', gap: 8 }}>
             {generating.map((c) => (
               <div key={c.id} className="need-item">
@@ -156,7 +156,7 @@ export default async function Page() {
 
       {/* ===== ARTIFACT DANG NAM O DAU ===== */}
       <section className="blk">
-        <h2>📦 Video mới nhất trong kho <span className="sub">brand-assets trên Supabase Storage — bấm để mở xem</span></h2>
+        <h2><span aria-hidden="true">📦</span> Video mới nhất trong kho <span className="sub">brand-assets trên Supabase Storage — bấm để mở xem</span></h2>
         {assets.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Kho chưa có video nào.</p>
         ) : (

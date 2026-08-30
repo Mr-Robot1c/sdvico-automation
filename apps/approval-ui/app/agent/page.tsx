@@ -101,7 +101,7 @@ export default async function Page() {
 
       {/* ===== VONG LAP ===== */}
       <section className="blk">
-        <h2>🔁 Vòng lặp học và làm <span className="sub">chạy tự động mỗi ngày, người chỉ duyệt</span></h2>
+        <h2><span aria-hidden="true">🔁</span> Vòng lặp học và làm <span className="sub">chạy tự động mỗi ngày, người chỉ duyệt</span></h2>
         <div className="flow-strip">
           {flow.map((s, i) => (
             <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -114,14 +114,15 @@ export default async function Page() {
 
       {/* ===== 9 AI CARD (component dung chung voi trang Nguon hoc du lieu) ===== */}
       <section className="blk">
-        <h2>🤖 Các AI trong hệ thống</h2>
+        <h2><span aria-hidden="true">🤖</span> Các AI trong hệ thống</h2>
         <AgentRoster />
       </section>
 
       {/* ===== TRENDING DIGEST — DATA 2 (dot 2: tier S/A/B/C + top keywords nhu ForLife) ===== */}
       <section className="blk">
         <h2>
-          📈 Trending Digest — DATA 2
+          {/* 30/8 (audit M5+L2): cùng bệnh dính chữ do JSX nuốt khoảng trắng. */}
+          <span aria-hidden="true">📈</span> Trending Digest — DATA 2{' '}
           <span className="sub">
             7 ngày: {fmt(digestRows.length)} mục
             {digestReady ? <> · Tiers <b>S:{tierCount.S}</b> A:{tierCount.A} B:{tierCount.B} C:{tierCount.C}{unscored ? ` · ${fmt(unscored)} chưa chấm` : ''}</> : null}

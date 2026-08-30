@@ -16,7 +16,8 @@ export default async function Page() {
   ]);
 
   return (
-    <main>
+    // 30/8 (audit M3): trang cài đặt 1 cột — căn giữa (settings-col), hết bó trái trống nửa phải.
+    <main className="settings-col">
       <header className="head-row">
         <div>
           <h1>Vận hành</h1>
@@ -24,7 +25,7 @@ export default async function Page() {
         </div>
       </header>
 
-      <section className={`card tone-${stopped ? 'no' : 'ok'}`} style={{ display: 'grid', gap: 10, maxWidth: 620 }}>
+      <section className={`card tone-${stopped ? 'no' : 'ok'}`} style={{ display: 'grid', gap: 10 }}>
         <b>Công tắc dừng khẩn</b>
         <p>
           Trạng thái:{' '}
@@ -55,7 +56,7 @@ export default async function Page() {
         </p>
       </section>
 
-      <section className="card" style={{ display: 'grid', gap: 8, maxWidth: 620, marginTop: 16 }}>
+      <section className="card" style={{ display: 'grid', gap: 8, marginTop: 16 }}>
         <b>Hạn mức hôm nay ({todayVN()}) — tối đa {limit} bài mỗi kênh</b>
         <p>
           Trạng thái hạn mức:{' '}

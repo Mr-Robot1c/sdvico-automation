@@ -5,7 +5,9 @@ import { displayProduct, fmtDateVN, type PublicPost } from '../../lib/seo';
 // (design-spec-trang-cong-khai: ô ảnh 16:10 LUÔN có để các thẻ đều chiều cao, tiêu đề tối đa
 // 2 dòng, trích 3 dòng, meta = chip sản phẩm chỉ khi khớp danh mục + ngày).
 export default function PostCard({ post, hideProduct = false }: { post: PublicPost; hideProduct?: boolean }) {
-  const product = hideProduct ? '' : displayProduct(post.product);
+  // 30/8 (audit L6): mọi thẻ đều có nhãn danh mục cho đồng đều — bài không khớp danh mục
+  // sản phẩm thì nhãn chung "Bài viết" (trước chỉ vài thẻ có chip, nhìn như lỗi).
+  const product = hideProduct ? '' : (displayProduct(post.product) || 'Bài viết');
   const date = fmtDateVN(post.publishedAt);
   const href = `/blog/${post.slug}`;
   return (

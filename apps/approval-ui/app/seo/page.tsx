@@ -72,7 +72,7 @@ export default async function Page() {
 
       {/* ===== BAI SEO DA DANG ===== */}
       <section className="blk">
-        <h2>📰 Bài SEO đã đăng <span className="sub">10 bài mới nhất trên {base}/blog — bấm để mở bài công khai</span></h2>
+        <h2><span aria-hidden="true">📰</span> Bài SEO đã đăng <span className="sub">10 bài mới nhất trên {base}/blog — bấm để mở bài công khai</span></h2>
         {latest.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Chưa có bài công khai nào.</p>
         ) : (
@@ -107,7 +107,7 @@ export default async function Page() {
       {/* ===== TU KHOA + SUC KHOE ===== */}
       <div className="blk-cols">
         <section className="blk">
-          <h2>🔑 Từ khóa mới thêm</h2>
+          <h2><span aria-hidden="true">🔑</span> Từ khóa mới thêm</h2>
           {keywords.length === 0 ? (
             <p className="sub" style={{ margin: 0 }}>Kho từ khóa trống. Chạy seed keywords hoặc thêm tay ở trang Kho từ khóa.</p>
           ) : (
@@ -124,7 +124,7 @@ export default async function Page() {
         </section>
 
         <section className="blk">
-          <h2>🩺 Sức khỏe SEO</h2>
+          <h2><span aria-hidden="true">🩺</span> Sức khỏe SEO</h2>
           <div style={{ display: 'grid', gap: 8, fontSize: '.9rem' }}>
             <div className="need-item">
               <span>🗺️</span>

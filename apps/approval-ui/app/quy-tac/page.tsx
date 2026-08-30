@@ -6,7 +6,8 @@ export const dynamic = 'force-static';
 // riêng (TikTok/Facebook review bắt buộc trỏ thẳng), trang này chỉ là cửa vào từ sidebar.
 export default function Page() {
   return (
-    <main>
+    // 30/8 (audit M3): trang cài đặt 1 cột — căn giữa (settings-col), hết bó trái trống nửa phải.
+    <main className="settings-col">
       <header className="head-row">
         <div>
           <h1>Quy tắc</h1>
@@ -14,7 +15,7 @@ export default function Page() {
         </div>
       </header>
 
-      <section style={{ display: 'grid', gap: 12, maxWidth: 720 }}>
+      <section style={{ display: 'grid', gap: 12 }}>
         <div className="card" style={{ display: 'flex', gap: 14, alignItems: 'flex-start', padding: 16 }}>
           <span style={{ fontSize: 26 }} aria-hidden="true">🔒</span>
           <div style={{ flex: 1 }}>

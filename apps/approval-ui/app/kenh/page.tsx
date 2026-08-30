@@ -280,7 +280,7 @@ export default async function Page() {
 
       {/* ===== BAI NOI BAT ===== */}
       <section className="blk" style={{ marginTop: 16 }}>
-        <h2>🔥 Bài nổi bật các nền tảng <span className="sub">7 ngày gần nhất, mọi nền tảng xếp chung theo tương tác + lượt xem — bấm tiêu đề hoặc logo để mở bài thật</span></h2>
+        <h2><span aria-hidden="true">🔥</span> Bài nổi bật các nền tảng <span className="sub">7 ngày gần nhất, mọi nền tảng xếp chung theo tương tác + lượt xem — bấm tiêu đề hoặc logo để mở bài thật</span></h2>
         {hot.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Chưa có bài nào có số liệu.</p>
         ) : (
@@ -309,7 +309,7 @@ export default async function Page() {
                         {mainLink ? (
                           <a href={mainLink} target="_blank" rel="noreferrer" className="src"><b>{title.slice(0, 80)}</b></a>
                         ) : (
-                          <b>{title.slice(0, 80)}</b>
+                          <b className="cell-title-nolink" title="Bài chưa có link đăng để mở">{title.slice(0, 80)}</b>
                         )}
                       </td>
                       <td>
