@@ -95,7 +95,12 @@ function productOf(brief: any, title: string, draft: string = ''): string {
   const g = brief?.rotation_group as string | undefined;
   if (brief?.post_kind === 'content' || g === 'Bài content') return 'Bài content';
   if (g && g !== 'Content' && /^\d+\.\s/.test(g)) return g.replace(/^\s*\d+\.\s*/, '').trim();
-  return String(brief?.keyword || title || 'SDVICO').trim();
+  // 30/8 (audit H2): fallback cũ trả keyword/NGUYÊN TIÊU ĐỀ -> cột "Sản phẩm" trang SEO đổ
+  // nguyên câu rồi cắt cụt. Giờ chỉ nhận keyword NGẮN (tên sản phẩm thật); không rõ thì trả
+  // '' — nơi hiển thị tự quyết ('—' ở bảng, blog card vốn đã lọc qua displayProduct).
+  const kw = String(brief?.keyword || '').trim();
+  if (kw && kw.length <= 48 && !/[.!?…]/.test(kw)) return kw;
+  return '';
 }
 
 // Đọc ảnh CHÍNH của bài (brief.assets.image = brand_assets.id → storage URL public).

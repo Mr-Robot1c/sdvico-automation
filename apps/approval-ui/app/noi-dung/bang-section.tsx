@@ -12,6 +12,7 @@ import ExportTiktokButton from './export-tiktok-button';
 import AddLeadButton from './add-lead-button';
 import LinkFbButton from './link-fb-button';
 import PostFbButton from './post-fb-button';
+import CopyCaptionButton from './copy-caption-button';
 import LinkTikTokButton from './link-tiktok-button';
 import PexelsScenesButton from './pexels-scenes-button';
 
@@ -511,29 +512,32 @@ export default async function BangSection() {
                         // FB_MANUAL_COMPOSER_URL nếu Business Suite composer không mở đúng.
                         const fbComposerUrl = process.env.FB_MANUAL_COMPOSER_URL
                           || `https://business.facebook.com/latest/composer?asset_id=${process.env.FB_SUITE_ASSET_ID || '101052306114292'}`;
+                        // 30/8 (user: "gộp các chức năng lại" — thẻ từng có 8 nút xổ 2 cột, trùng
+                        // 2 nút Copy caption): sắp thành HÀNG THEO NỀN TẢNG, nhãn đầu hàng nói
+                        // platform nên nút trong hàng rút gọn chữ; 1 nút Copy caption chung.
+                        const rowStyle = { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' as const };
+                        const rowLabel = { fontSize: '.75rem', minWidth: 76, color: 'var(--ink-2)' };
+                        const capText = cnt?.draft || cnt?.title || '';
                         return (
-                          <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, alignItems: 'start' }}>
-                            {/* Cột TRÁI */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                              <AddLeadButton contentId={it.cid} />
+                          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div style={rowStyle}>
+                              <span style={rowLabel}>📘 Facebook</span>
+                              {/* Đăng TAY lên Page chính (copy caption + tải ảnh + mở ô soạn bài), khỏi page token. */}
+                              <PostFbButton caption={capText} imageUrl={fbImg} composerUrl={fbComposerUrl} contentTitle={cnt?.title || 'sdvico'} />
                               {fbPost ? <ShareGroups postUrl={fbPost.url} planGroupsToday={groupsForDate(lastAt)} /> : null}
-                              {/* 30/8: đăng TAY lên Page chính (copy caption + tải ảnh + mở ô soạn bài), khỏi page token. */}
-                              <PostFbButton caption={cnt?.draft || cnt?.title || ''} imageUrl={fbImg} composerUrl={fbComposerUrl} contentTitle={cnt?.title || 'sdvico'} />
-                              {/* 28/8: dan link bai dang TAY tren Page chinh SDVICOVN — chip FB uu tien link nay. */}
+                              {/* Dán link bài đăng tay trên Page chính SDVICOVN — chip FB ưu tiên link này. */}
                               <LinkFbButton contentId={it.cid} linkedUrl={String((cnt?.brief as any)?.fb_real_url || '') || null} />
                             </div>
-                            {/* Cột PHẢI: chỉ hiện nếu bài có video (bài content ảnh không có TikTok) */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                              {hasVideo ? (
-                                <ExportTiktokButton
-                                  videoUrl={videoVUrl!}
-                                  caption={cnt?.draft || cnt?.title || ''}
-                                  contentTitle={cnt?.title || 'sdvico'}
-                                />
-                              ) : null}
-                              {hasVideo ? (
+                            {hasVideo ? (
+                              <div style={rowStyle}>
+                                <span style={rowLabel}>🎵 TikTok</span>
+                                <ExportTiktokButton videoUrl={videoVUrl!} caption={capText} contentTitle={cnt?.title || 'sdvico'} />
                                 <LinkTikTokButton contentId={it.cid} linkedVideoId={linkedVid || null} linkedShareUrl={linkedUrl || null} />
-                              ) : null}
+                              </div>
+                            ) : null}
+                            <div style={rowStyle}>
+                              <AddLeadButton contentId={it.cid} />
+                              <CopyCaptionButton caption={capText} />
                             </div>
                           </div>
                         );

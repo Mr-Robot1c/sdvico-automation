@@ -473,7 +473,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
               <b>AI quản lý lịch và kênh</b> — bài duyệt xong tự đăng đúng kênh, kéo số liệu mỗi giờ.
               <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
                 🧩 <b>Model:</b> không dùng LLM — gọi thẳng Facebook Graph API v26 · YouTube Data API v3 · TikTok Display API.
-                <br />📍 <b>Chạy tại:</b> Vercel serverless — cron <code>/api/mkt-metrics-pull</code> mỗi giờ + chạy ngay khi người bấm Duyệt.
+                <br />📍 <b>Chạy tại:</b> cloud — tự động mỗi giờ + chạy ngay khi người bấm Duyệt.
               </span>
             </span>
           </div>
@@ -489,7 +489,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
               <b>AI báo cáo tuần</b> — Chủ nhật 19h gom số liệu tuần, đề xuất đổi trọng số cho BOSS.
               <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
                 🧩 <b>Model:</b> không dùng LLM — tính trực tiếp từ bảng <code>mkt_metrics</code> (view, tương tác từng bài).
-                <br />📍 <b>Chạy tại:</b> Vercel — cron Chủ nhật 19h (learn-weekly). Đề xuất hiện ở trang Kế hoạch, người bấm Áp dụng mới đổi.
+                <br />📍 <b>Chạy tại:</b> cloud — Chủ nhật 19h. Đề xuất hiện ở trang Kế hoạch, người bấm Áp dụng mới đổi.
               </span>
             </span>
           </div>
@@ -505,7 +505,8 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
               <b>AI quản lý SEO</b> — seed từ khóa, audit trang công khai, giữ sitemap sạch cho Google.
               <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
                 🧩 <b>Model:</b> Gemini flash-lite (seed từ khóa); audit là script thuần không LLM.
-                <br />📍 <b>Chạy tại:</b> Vercel (trang /blog, sitemap tự sinh) + script local <code>C:/Users/ADMIN/Desktop/SDVICO Marketing/packages/marketing</code> (seo_audit).
+                {/* 30/8 (audit H3): bỏ đường dẫn máy nội bộ khỏi giao diện. */}
+                <br />📍 <b>Chạy tại:</b> cloud (trang /blog, sitemap tự sinh) + máy nội bộ (rà SEO định kỳ).
               </span>
             </span>
           </div>

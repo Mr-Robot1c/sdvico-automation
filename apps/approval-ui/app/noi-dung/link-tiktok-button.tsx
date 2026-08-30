@@ -209,7 +209,8 @@ export default function LinkTikTokButton({
         title={linkedVideoId ? 'Đã ghép video TikTok — bấm để đổi/bỏ ghép' : 'Ghép bài này với video trên TikTok Studio để tự cập nhật view/like'}
         style={linkedVideoId ? { color: 'var(--ok)' } : undefined}
       >
-        {linkedVideoId ? '🎵✓ Đã ghép TikTok' : '🎵 Ghép video TikTok'}
+        {/* 30/8 gộp nút: nằm trong hàng có nhãn "🎵 TikTok" nên bỏ chữ TikTok lặp lại. */}
+        {linkedVideoId ? '✓ Đã ghép' : 'Ghép link'}
       </button>
       {mounted && popContent ? createPortal(popContent, document.body) : null}
     </span>

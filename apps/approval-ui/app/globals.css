@@ -56,7 +56,8 @@ body {
 
 /* Full-width: bỏ trần 1180px (user 18/8: "2 bên phình ra luôn, để giữa khó chịu").
    Giữ padding 2 bên cho chữ không dính mép màn hình. */
-main { padding: 24px 32px 64px; max-width: none; margin: 0; width: 100%; }
+/* padding-bottom 96px (30/8, audit H4): chừa chỗ cho chip Bot nổi góc phải-dưới, dòng cuối bảng không bị che. */
+main { padding: 24px 32px 96px; max-width: none; margin: 0; width: 100%; }
 
 .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 h1 { font-size: 22px; margin: 0 0 4px; }
@@ -397,6 +398,9 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
 .topbar-crumb { color: var(--ink-2); font-size: 14px; }
 .topbar-right { display: flex; align-items: center; gap: 12px; }
 .topbar-user { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; font-weight: 500; }
+/* 30/8 (audit H1): đăng xuất luôn có trên topbar — mobile sidebar-foot bị ẩn. */
+.topbar-logout { color: var(--ink-2); font-size: 13px; text-decoration: none; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.topbar-logout:hover { color: var(--ink); background: var(--surface-2); }
 .topbar-user-avatar {
   width: 30px; height: 30px; border-radius: 50%; background: var(--surface-2);
   display: grid; place-items: center; color: var(--ink-2); font-size: 15px; border: 1px solid var(--line);
@@ -429,8 +433,8 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
   .nav-block { flex: 1 1 45%; }
   .tabs { flex-direction: column; }
   .content { padding: 0; }
-  main { padding: 18px 14px 48px; }
-  .sidebar-foot { display: none; }
+  main { padding: 18px 14px 88px; } /* 88px: chừa chip Bot nổi (audit H4) */
+  .sidebar-foot { display: none; } /* Đăng xuất mobile: đã có trên topbar (audit H1) */
 }
 
 /* ===== Nút sinh nội dung và hàng nút phải header ===== */
@@ -881,7 +885,13 @@ a.chip:hover { filter: brightness(0.98); }
 @keyframes bot-alert-pulse { 0%, 100% { box-shadow: 0 4px 14px rgba(220,38,38,.35); } 50% { box-shadow: 0 4px 22px rgba(220,38,38,.7); } }
 .bot-alerts { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
 .bot-alert { margin: 4px 0; font-size: .88rem; line-height: 1.45; color: #7f1d1d; }
-:root[data-theme='dark'] .bot-alerts, @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .bot-alerts { background: #3f1515; border-color: #7f1d1d; } :root:not([data-theme='light']) .bot-alert { color: #fecaca; } }
+/* 30/8: rule cũ trộn @media vào selector list — CSS invalid, dark mode bot-alerts chưa từng ăn. Tách đúng cú pháp. */
+:root[data-theme='dark'] .bot-alerts { background: #3f1515; border-color: #7f1d1d; }
+:root[data-theme='dark'] .bot-alert { color: #fecaca; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bot-alerts { background: #3f1515; border-color: #7f1d1d; }
+  :root:not([data-theme='light']) .bot-alert { color: #fecaca; }
+}
 .bot-chip-icon { font-size: 1.2rem; line-height: 1; }
 .bot-chip-text { line-height: 1.2; }
 .bot-chip-text b { font-weight: 700; }
@@ -891,6 +901,16 @@ a.chip:hover { filter: brightness(0.98); }
   background: var(--surface-2); box-shadow: 0 2px 8px rgba(0,0,0,.2);
   cursor: pointer; font-size: 1.4rem;
 }
+/* 30/8 (audit H4): đã thu gọn nhưng có cảnh báo -> icon nhỏ viền đỏ nhấp nháy, không ép chip to. */
+.bot-reopen-alert { border: 2px solid #dc2626; animation: bot-alert-pulse 1.6s ease-in-out infinite; }
+/* Hàng chip + nút thu gọn cạnh nhau. */
+.bot-chip-row { display: inline-flex; align-items: center; gap: 6px; }
+.bot-chip-min {
+  width: 26px; height: 26px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink-2); cursor: pointer;
+  font-size: 15px; line-height: 1; display: grid; place-items: center;
+}
+.bot-chip-min:hover { color: var(--ink); }
 .bot-panel {
   width: 320px; padding: 14px 16px;
   background: var(--surface); color: var(--ink);

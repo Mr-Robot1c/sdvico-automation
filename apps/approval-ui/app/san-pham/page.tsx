@@ -56,7 +56,7 @@ export default async function ProductListPage() {
           <Link key={p.slug} href={`/san-pham/${p.slug}`} className="pub-card pub-pcard">
             <span className="pub-card-media">
               {images[p.slug] ? (
-                <img src={images[p.slug]} alt="" loading="lazy" />
+                <img src={images[p.slug]} alt={p.name} loading="lazy" />
               ) : (
                 <span className="pub-card-ph" aria-hidden="true"><img src="/logo-sdvico.png" alt="" /></span>
               )}

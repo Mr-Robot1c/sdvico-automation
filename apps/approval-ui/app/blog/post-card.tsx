@@ -12,7 +12,7 @@ export default function PostCard({ post, hideProduct = false }: { post: PublicPo
     <article className="pub-card">
       <Link href={href} className="pub-card-media" aria-label={post.title} tabIndex={-1}>
         {post.imageUrl ? (
-          <img src={post.imageUrl} alt="" loading="lazy" />
+          <img src={post.imageUrl} alt={post.title} loading="lazy" />
         ) : (
           <span className="pub-card-ph" aria-hidden="true">
             <img src="/logo-sdvico.png" alt="" />

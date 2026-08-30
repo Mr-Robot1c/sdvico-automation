@@ -103,7 +103,8 @@ export default function LinkFbButton({ contentId, linkedUrl }: { contentId: stri
         title={linkedUrl ? 'Đã ghép link bài trên Page chính SDVICO VN — bấm để đổi/bỏ' : 'Dán link bài đã đăng tay trên Page chính SDVICO VN'}
         style={linkedUrl ? { color: 'var(--ok)' } : undefined}
       >
-        {linkedUrl ? '📘✓ Đã ghép FB chính' : '📘 Ghép FB chính'}
+        {/* 30/8 gộp nút: nằm trong hàng có nhãn "📘 Facebook" nên bỏ chữ FB lặp lại. */}
+        {linkedUrl ? '✓ Đã ghép' : 'Ghép link'}
       </button>
       {mounted && pop ? createPortal(pop, document.body) : null}
     </span>

@@ -24,7 +24,16 @@ export default function ExportTiktokButton({ videoUrl, caption, contentTitle }: 
     let downloadOk = false;
     let copyOk = false;
 
-    // 1. Tải video về máy (blob download).
+    // 1. Copy caption TRƯỚC (30/8 đảo thứ tự: clipboard cần user-activation còn tươi — copy
+    //    sau fetch dài hay bị trình duyệt chặn, đó là lý do từng phải có nút copy riêng).
+    try {
+      await navigator.clipboard.writeText(caption || '');
+      copyOk = true;
+    } catch {
+      /* fallthrough — nút Copy caption chung của thẻ vẫn còn */
+    }
+
+    // 2. Tải video về máy (blob download).
     try {
       setStatus('Đang tải video...');
       const res = await fetch(videoUrl);
@@ -46,36 +55,19 @@ export default function ExportTiktokButton({ videoUrl, caption, contentTitle }: 
       /* fallthrough — user copy link tay */
     }
 
-    // 2. Copy caption.
-    try {
-      await navigator.clipboard.writeText(caption || '');
-      copyOk = true;
-    } catch {
-      /* fallthrough — user copy tay */
-    }
-
     // 3. Mở tab TikTok upload (bước cuối, không blocking nếu 1-2 fail).
     window.open('https://www.tiktok.com/upload', '_blank', 'noopener,noreferrer');
 
     if (downloadOk && copyOk) setStatus('✓ Tải video + copy caption xong. Vào tab TikTok Upload dán + upload.');
-    else if (downloadOk) setStatus('✓ Tải video xong. Copy caption tay ở nút bên (browser chặn tự copy).');
+    else if (downloadOk) setStatus('✓ Tải video xong. Copy caption ở nút 📋 của thẻ (browser chặn tự copy).');
     else if (copyOk) setStatus('✓ Copy caption xong. Tải video: chuột phải link video ở Xem trước → Lưu tay.');
-    else setStatus('⚠ Tải + copy đều fail. Mở link video tay, chuột phải Lưu. Caption copy tay ở nút bên.');
+    else setStatus('⚠ Tải + copy đều fail. Mở link video tay, chuột phải Lưu. Caption dùng nút 📋 của thẻ.');
 
     setBusy(false);
     setTimeout(() => setStatus(''), 8000);
   }
 
-  async function copyOnly() {
-    try {
-      await navigator.clipboard.writeText(caption || '');
-      setStatus('✓ Đã copy caption');
-      setTimeout(() => setStatus(''), 3000);
-    } catch {
-      setStatus('Copy fail — bôi đen caption trong modal Xem trước rồi Ctrl+C');
-    }
-  }
-
+  // 30/8 (gộp nút): nút Copy caption riêng bỏ — thẻ dùng CHUNG 1 nút copy-caption-button.tsx.
   return (
     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
       <button
@@ -83,18 +75,9 @@ export default function ExportTiktokButton({ videoUrl, caption, contentTitle }: 
         className="btn ghost sm"
         onClick={doExport}
         disabled={busy}
-        title="Tải video dọc + copy caption + mở tab TikTok Upload để bạn upload tay (API TikTok bị block cho app SDVICO chưa audit)"
+        title="Copy caption + tải video dọc + mở tab TikTok Upload để bạn upload tay (API TikTok bị block cho app SDVICO chưa audit)"
       >
-        {busy ? '⏳ Đang xuất...' : '📥 Xuất TikTok'}
-      </button>
-      <button
-        type="button"
-        className="btn ghost sm"
-        onClick={copyOnly}
-        style={{ padding: '4px 8px', fontSize: '.78rem' }}
-        title="Chỉ copy caption (không tải video, không mở tab)"
-      >
-        📋 Copy caption
+        {busy ? '⏳ Đang xuất...' : 'Xuất video'}
       </button>
       {status ? (
         <span className="sub" style={{ fontSize: '.78rem', maxWidth: 320 }}>{status}</span>

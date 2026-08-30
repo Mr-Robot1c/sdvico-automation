@@ -64,16 +64,8 @@ export default function PostFbButton({ caption, imageUrl, composerUrl, contentTi
     setTimeout(() => setStatus(''), 9000);
   }
 
-  async function copyOnly() {
-    try {
-      await navigator.clipboard.writeText(caption || '');
-      setStatus('✓ Đã copy caption');
-    } catch {
-      setStatus('Copy fail — bôi đen caption trong Xem trước rồi Ctrl+C');
-    }
-    setTimeout(() => setStatus(''), 3000);
-  }
-
+  // 30/8 (gộp nút): nút Copy caption riêng bỏ đi — cụm thẻ dùng CHUNG 1 nút
+  // (copy-caption-button.tsx), khỏi trùng 2 nút giống hệt với cụm TikTok.
   return (
     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
       <button
@@ -81,18 +73,9 @@ export default function PostFbButton({ caption, imageUrl, composerUrl, contentTi
         className="btn ghost sm"
         onClick={doPost}
         disabled={busy}
-        title="Copy caption + tải ảnh + mở ô soạn bài Page SDVICO VN để đăng tay (không cần page token). Đăng xong dán link vào 'Ghép FB chính'."
+        title="Copy caption + tải ảnh + mở ô soạn bài Page SDVICO VN để đăng tay (không cần page token). Đăng xong dán link vào 'Ghép'."
       >
-        {busy ? '⏳ Đang chuẩn bị...' : '📘 Đăng FB tay'}
-      </button>
-      <button
-        type="button"
-        className="btn ghost sm"
-        onClick={copyOnly}
-        style={{ padding: '4px 8px', fontSize: '.78rem' }}
-        title="Chỉ copy caption (không tải ảnh, không mở tab)"
-      >
-        📋 Copy caption
+        {busy ? '⏳ Đang chuẩn bị...' : 'Đăng tay'}
       </button>
       {status ? <span className="sub" style={{ fontSize: '.78rem', maxWidth: 340 }}>{status}</span> : null}
     </span>

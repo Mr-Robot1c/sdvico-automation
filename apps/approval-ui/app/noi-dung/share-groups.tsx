@@ -288,15 +288,16 @@ Bấm để đặt tên gợi nhớ`}
   ) : null;
 
   return (
-    <span style={{ marginLeft: 8, display: 'inline-block' }}>
+    <span style={{ display: 'inline-block' }}>
+      {/* 30/8 gộp nút: nằm trong hàng "📘 Facebook" nên nhãn rút gọn, bỏ marginLeft (hàng flex gap đều). */}
       <button
         ref={btnRef}
         type="button"
         className="btn ghost sm"
         onClick={() => setOpen((v) => !v)}
-        title="Chia sẻ vào group (rút gọn thao tác)"
+        title="Chia sẻ bài vào các group Facebook (rút gọn thao tác copy link + mở group)"
       >
-        📣 Chia sẻ vào group
+        📣 Chia sẻ group
       </button>
       {mounted && popContent ? createPortal(popContent, document.body) : null}
     </span>

@@ -60,15 +60,18 @@ export default function BotChip() {
   // Chua co gi de bao VA khong co canh bao -> an. Co canh bao thi LUON hien (ke ca da an truoc do).
   if (totalKnowledge === 0 && status.suggestions === 0 && alertsEarly.length === 0) return null;
 
-  if (dismissed && alertsEarly.length === 0) {
+  // 30/8 (audit H4): đã ẩn thì LUÔN tôn trọng — kể cả khi có cảnh báo (trước đây alert ép chip
+  // to hiện lại, che link "Mở" dòng cuối bảng). Cảnh báo thể hiện bằng chấm đỏ trên icon nhỏ.
+  const hasAlertEarly = alertsEarly.length > 0;
+  if (dismissed) {
     return (
       <button
-        className="bot-reopen"
-        aria-label="Mo lai thong bao BOT"
-        title="Mo lai thong bao BOT"
-        onClick={() => { setDismissed(false); try { localStorage.removeItem('bot-chip-dismiss'); } catch {} }}
+        className={`bot-reopen${hasAlertEarly ? ' bot-reopen-alert' : ''}`}
+        aria-label={hasAlertEarly ? 'Bot có cảnh báo — mở thông báo' : 'Mở lại thông báo Bot'}
+        title={hasAlertEarly ? 'Bot có cảnh báo — bấm để xem' : 'Mở lại thông báo Bot'}
+        onClick={() => { setDismissed(false); setOpen(true); try { localStorage.removeItem('bot-chip-dismiss'); } catch {} }}
       >
-        🤖
+        {hasAlertEarly ? '⚠️' : '🤖'}
       </button>
     );
   }
@@ -116,10 +119,21 @@ export default function BotChip() {
           </button>
         </div>
       ) : (
-        <button className={`bot-chip${hasAlert ? ' bot-chip-alert' : ''}`} onClick={() => setOpen(true)} aria-label="Xem chi tiết Bot AI">
-          <span className="bot-chip-icon" aria-hidden="true">{hasAlert ? '⚠️' : '🤖'}</span>
-          <span className="bot-chip-text">{hasAlert ? 'Bot cần chú ý' : 'Bot đã học'} · <b>{shortMsg}</b></span>
-        </button>
+        <span className="bot-chip-row">
+          <button className={`bot-chip${hasAlert ? ' bot-chip-alert' : ''}`} onClick={() => setOpen(true)} aria-label="Xem chi tiết Bot AI">
+            <span className="bot-chip-icon" aria-hidden="true">{hasAlert ? '⚠️' : '🤖'}</span>
+            <span className="bot-chip-text">{hasAlert ? 'Bot cần chú ý' : 'Bot đã học'} · <b>{shortMsg}</b></span>
+          </button>
+          {/* 30/8 (audit H4): thu gọn NGAY trên chip, khỏi phải mở panel mới thấy nút Ẩn. */}
+          <button
+            className="bot-chip-min"
+            aria-label="Thu gọn thông báo Bot"
+            title="Thu gọn thành icon nhỏ"
+            onClick={() => { setDismissed(true); try { localStorage.setItem('bot-chip-dismiss', '1'); } catch {} }}
+          >
+            ×
+          </button>
+        </span>
       )}
     </div>
   );

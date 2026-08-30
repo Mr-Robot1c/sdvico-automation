@@ -381,7 +381,8 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       {/* ===== 3b. DO LUONG + BAO CAO TUAN (29/8, sếp: "đem đo lường và báo cáo tuần ra tổng quan") ===== */}
       <section className="blk">
         <h2>
-          📊 Đo lường
+          {/* 30/8 (audit M5): JSX xuống dòng nuốt khoảng trắng -> "Đo lườngtuần này" dính chữ. */}
+          📊 Đo lường{' '}
           <span className="sub">tuần này (Thứ 2 → hôm nay) · kênh chính</span>
         </h2>
         {/* 29/8 (user: "phần đo lường phải rộng ra"): ô số LỚN kiểu pl-tile trải hết bề ngang,

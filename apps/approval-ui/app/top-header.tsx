@@ -42,6 +42,10 @@ export default function TopHeader({ marketingOnly = false }: { marketingOnly?: b
           <span className="topbar-user-avatar" aria-hidden="true">👤</span>
           <span className="topbar-user-name">Người duyệt</span>
         </span>
+        {/* 30/8 (audit H1): màn ≤760px sidebar-foot bị ẩn -> điện thoại KHÔNG có cách đăng
+            xuất. Đưa link vào topbar hiển thị mọi kích thước. a thường (không Link) để đi
+            thẳng route handler xoá cookie, khỏi bị prefetch. */}
+        <a className="topbar-logout" href="/api/logout" title="Đăng xuất khỏi giao diện duyệt">Đăng xuất</a>
       </div>
     </header>
   );

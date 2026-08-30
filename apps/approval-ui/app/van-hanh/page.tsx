@@ -1,6 +1,7 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { isEmergencyStopped, getPostCount, todayVN, isQuotaDisabled } from '../../lib/safety';
 import { toggleEmergencyStop, toggleQuotaDisabled } from '../actions';
+import ConfirmSubmitButton from '../confirm-submit-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,9 +36,18 @@ export default async function Page() {
         </p>
         <form action={toggleEmergencyStop}>
           <input type="hidden" name="on" value={stopped ? '0' : '1'} />
-          <button className={`btn ${stopped ? 'ok' : 'no'}`} type="submit">
-            {stopped ? '▶ Bật lại (cho phép đăng)' : '🛑 DỪNG KHẨN (chặn mọi đăng bài)'}
-          </button>
+          {/* 30/8 (audit M7): DỪNG KHẨN tác động toàn hệ thống -> hỏi xác nhận trước.
+              Bật lại thì không cần hỏi (hành động khôi phục). */}
+          {stopped ? (
+            <button className="btn ok" type="submit">▶ Bật lại (cho phép đăng)</button>
+          ) : (
+            <ConfirmSubmitButton
+              className="btn no"
+              message="DỪNG KHẨN sẽ chặn MỌI bài đăng lên nền tảng cho tới khi bật lại. Chắc chắn dừng?"
+            >
+              🛑 DỪNG KHẨN (chặn mọi đăng bài)
+            </ConfirmSubmitButton>
+          )}
         </form>
         <p className="muted">
           Khi bật, luồng Duyệt kiểm công tắc TRƯỚC khi đăng nên chặn ngay. Bài vẫn được đánh dấu đã duyệt,
@@ -60,8 +70,9 @@ export default async function Page() {
           </button>
         </form>
         <p className="muted">
-          Chạm trần thì kênh đó bị chặn tới hết ngày. Bộ đếm reset theo ngày (giờ VN). Đổi trần bằng env
-          MKT_MAX_POSTS_PER_DAY. Nhớ <b>bật lại hạn mức</b> sau khi test xong.
+          {/* 30/8 (audit H3): không phô tên biến môi trường ra giao diện — đổi trần là việc của quản trị hệ thống. */}
+          Chạm trần thì kênh đó bị chặn tới hết ngày. Bộ đếm reset theo ngày (giờ VN). Muốn đổi trần thì
+          báo người quản trị hệ thống. Nhớ <b>bật lại hạn mức</b> sau khi test xong.
         </p>
       </section>
     </main>

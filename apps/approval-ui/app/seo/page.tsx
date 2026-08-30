@@ -90,7 +90,10 @@ export default async function Page() {
                 {latest.map((p) => (
                   <tr key={p.slug}>
                     <td className="cell-title"><b>{String(p.title).slice(0, 90)}</b></td>
-                    <td className="sub" style={{ fontSize: '.82rem' }}>{String(p.product || '—')}</td>
+                    {/* 30/8 (audit H2): 1 dòng có "…" + tooltip; trống hiện "—". */}
+                    <td className="sub" style={{ fontSize: '.82rem', maxWidth: 150, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={String(p.product || '')}>
+                      {String(p.product || '—')}
+                    </td>
                     <td className="sub" style={{ fontSize: '.82rem' }}>{fmtDT(p.publishedAt || null)}</td>
                     <td><a className="src" href={`${base}/blog/${p.slug}`} target="_blank" rel="noreferrer">↗ Mở</a></td>
                   </tr>
