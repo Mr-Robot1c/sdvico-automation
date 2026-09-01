@@ -15,7 +15,8 @@
     "test:skills": "node packages/marketing/src/test-skills.mjs",
     "content:run": "node packages/marketing/src/run-content.mjs",
     "publish:fb": "node packages/marketing/src/publish-facebook.mjs",
-    "seo:audit": "node packages/marketing/src/seo-audit.mjs"
+    "seo:audit": "node packages/marketing/src/seo-audit.mjs",
+    "seo:suggest": "node packages/marketing/src/suggest-keywords.mjs"
   },
   "workspaces": [
     "packages/*",

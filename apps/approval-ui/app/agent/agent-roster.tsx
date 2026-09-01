@@ -43,7 +43,7 @@ export default async function AgentRoster() {
       .in('task', [
         'mkt.plan', 'mkt.plan_manual', 'mkt.live_apply', 'mkt.apply_learn',
         'mkt.rotate', 'mkt.suggestions_refill',
-        'mkt.seo_audit', 'mkt.seed_keywords',
+        'mkt.seo_audit', 'mkt.seed_keywords', 'mkt.keyword_suggest',
         'mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull',
         'mkt.learn_weekly',
         'mkt.knowledge_public_deep',
@@ -69,7 +69,7 @@ export default async function AgentRoster() {
   type AgentDef = {
     icon: string; name: string; role: string; boss?: boolean;
     model: string; runsAt: string;
-    last: { at: string | null; state: 'ok' | 'error' | 'skipped' | null; note: string };
+    last: { at: string | null; state: 'ok' | 'error' | 'skipped' | 'warn' | null; note: string };
     href?: string;
   };
   const mkLast = (row: LogRow | null, okNote: string): AgentDef['last'] => {
@@ -78,6 +78,9 @@ export default async function AgentRoster() {
     if (row.status === 'skipped') {
       const reason = String((row as any).detail?.reason || 'bỏ qua theo lịch').slice(0, 80);
       return { at: row.created_at, state: 'skipped', note: `bỏ qua có chủ đích: ${reason}` };
+    }
+    if (row.status === 'warn') {
+      return { at: row.created_at, state: 'warn', note: `có cảnh báo: ${String((row as any).detail?.msg || '').slice(0, 80)}` };
     }
     return { at: row.created_at, state: 'error', note: `lỗi: ${String((row as any).detail?.error || (row as any).detail?.msg || row.status).slice(0, 80)}` };
   };
@@ -118,8 +121,10 @@ export default async function AgentRoster() {
     },
     {
       icon: '🔍', name: 'AI quản lý SEO',
-      model: 'Gemini Flash Lite (seed từ khóa)', runsAt: 'Chạy trên cloud + máy nội bộ', role: 'Seed từ khóa, audit SEO trang công khai, giữ sitemap sạch cho Google đọc.',
-      last: mkLast(lastOf(['mkt.seo_audit', 'mkt.seed_keywords']), 'audit/seed từ khóa'),
+      model: 'Gemini Flash Lite (đề xuất từ khóa) + bộ rà điểm SEO (không LLM)',
+      runsAt: 'Chạy trên cloud — sáng thứ Hai hằng tuần',
+      role: 'Mỗi tuần tự rà điểm SEO trang sdvico.vn và trang bài viết, đề xuất từ khóa mới cho kho, giữ sitemap sạch cho Google đọc.',
+      last: mkLast(lastOf(['mkt.seo_audit', 'mkt.seed_keywords', 'mkt.keyword_suggest']), 'audit / đề xuất từ khóa'),
       href: '/kho-tri-thuc?ai=seo-ai',
     },
     {
@@ -167,7 +172,7 @@ export default async function AgentRoster() {
             {(() => {
               const s = a.last.state;
               const tone = s === 'ok' || s === 'skipped' ? 'tone-ok' : s === 'error' ? 'tone-no' : 'tone-demo';
-              const label = s === 'ok' ? 'Đang chạy' : s === 'skipped' ? 'Đang chạy' : s === 'error' ? 'Lỗi' : 'Chưa chạy';
+              const label = s === 'ok' ? 'Đang chạy' : s === 'skipped' ? 'Đang chạy' : s === 'error' ? 'Lỗi' : s === 'warn' ? 'Cảnh báo' : 'Chưa chạy';
               const title = s === 'skipped' ? 'Có lịch chạy đều — lần này bỏ qua có mục đích (đã đủ việc/hết trong ngày)' : undefined;
               return <span className={`badge ${tone}`} title={title}>{label}</span>;
             })()}

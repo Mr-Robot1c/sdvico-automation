@@ -35,11 +35,20 @@ export default async function Page() {
       .select('task, status, detail, created_at')
       .eq('task', 'mkt.seo_audit')
       .order('created_at', { ascending: false })
-      .limit(1),
+      .limit(12),
   ]);
 
   const keywords = (kwRes.data || []) as any[];
-  const audit = ((auditRes.data || [])[0] as any) || null;
+  const auditRows = (auditRes.data || []) as any[];
+  const audit = auditRows[0] || null;
+  // 1/9: audit chạy hằng tuần cho NHIỀU URL (sdvico.vn + trang bài viết) — lấy bản mới nhất
+  // của từng URL cho khối Sức khỏe SEO.
+  const auditByUrl: Array<[string, any]> = [];
+  for (const a of auditRows) {
+    const u = String(a.detail?.url || '');
+    if (u && !auditByUrl.some(([x]) => x === u)) auditByUrl.push([u, a]);
+  }
+  const hostOf = (u: string) => { try { return new URL(u).hostname; } catch { return u; } };
   const base = siteUrl();
   const sorted = [...posts].sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')));
   const latest = sorted.slice(0, 10);
@@ -130,14 +139,29 @@ export default async function Page() {
               <span>🗺️</span>
               <span style={{ flex: 1 }}>Sitemap + robots.txt tự sinh — <a className="src" href={`${base}/sitemap.xml`} target="_blank" rel="noreferrer">mở sitemap ↗</a></span>
             </div>
-            <div className="need-item">
-              <span>{audit ? (audit.status === 'ok' ? '✅' : '⚠️') : 'ℹ️'}</span>
-              <span style={{ flex: 1 }}>
-                {audit
-                  ? `Audit SEO gần nhất ${fmtDT(audit.created_at)} — ${audit.status === 'ok' ? 'không thấy vấn đề.' : String(audit.detail?.msg || 'có cảnh báo, mở chi tiết.')}`
-                  : 'Chưa có lần audit SEO nào được ghi.'}
-              </span>
-            </div>
+            {auditByUrl.length === 0 ? (
+              <div className="need-item">
+                <span>ℹ️</span>
+                <span style={{ flex: 1 }}>Chưa có lần audit SEO nào được ghi. Lịch tự động: sáng thứ Hai hằng tuần.</span>
+              </div>
+            ) : (
+              auditByUrl.map(([u, a]) => (
+                <div className="need-item" key={u}>
+                  <span>{a.status === 'ok' ? '✅' : '⚠️'}</span>
+                  <span style={{ flex: 1 }}>
+                    <b>{hostOf(u)}</b> — audit {fmtDT(a.created_at)}
+                    {a.detail?.scores ? (
+                      <span className="sub" style={{ display: 'block', fontSize: '.8rem' }}>
+                        Chuẩn SEO {a.detail.scores.seo} · Tốc độ {a.detail.scores.performance} · Truy cập {a.detail.scores.accessibility} · Thực hành tốt {a.detail.scores['best-practices']}
+                      </span>
+                    ) : null}
+                    {a.status !== 'ok' ? (
+                      <span className="sub" style={{ display: 'block', fontSize: '.8rem' }}>{String(a.detail?.msg || 'có cảnh báo')}</span>
+                    ) : null}
+                  </span>
+                </div>
+              ))
+            )}
             <div className="need-item">
               <span>📊</span>
               <span style={{ flex: 1 }}>Pixel / GA4 đo chuyển đổi cấu hình ở trang <Link href="/quang-cao" className="src">Quảng cáo →</Link></span>

@@ -4,6 +4,7 @@
 covers: supabase/migrations
 last_verified: 2026-08-29
 ttl_days: 180
+<!-- re-verified: 2026-09-01 - Migration 20260901160000: run_log.status them gia tri 'warn' (audit SEO diem duoi nguong — chay thanh cong nhung co canh bao; ok/error/skipped giu nguyen nghia). -->
 <!-- re-verified: 2026-08-29 - Migration 20260829180000_reserve_daily_quota (audit bao mat muc 12+14): ham DB reserve_daily_quota(p_account, p_kind, p_day, p_limit) -> (allowed, new_count) — kiem tran + tang bo dem daily_counters trong MOT cau lenh (upsert co dieu kien, khoa hang), het race hai tien trinh cung doc so cu roi cung vuot tran. Ca 3 phia goi CHUNG ham nay: apps/approval-ui/lib/safety.ts reservePostQuota (kind 'post'), packages/core/src/quota.js incrementDailyCounter (khi co limit), api/rotate claim ve slot (kind 'rotate_run', account 'rotate:<slot>', limit 1 — chan 2 luot rotate cung luc sinh bai trung). REVOKE execute khoi anon/authenticated, chi service_role. Code co fallback loi cu khi ham chua ton tai (khong dut luong dang, race chi het sau khi dan). USER paste .sql vao Supabase SQL Editor de ap. -->
 <!-- re-verified: 2026-08-29 - Migration 20260829150000_rls_tighten_hr (audit bao mat muc 8): DROP policy hr_candidates_staff_all + hr_applications_staff_all (policy "for all to authenticated using(true)" tu 20260810090100_rls qua rong cho 2 bang du lieu ca nhan, dieu cam 6). App toan service_role (tu bo qua RLS) nen khong anh huong; ngay nao bat Supabase Auth thi 2 bang ho so mac dinh khong ai doc duoc ngoai service role. USER paste .sql vao Supabase SQL Editor de ap. -->
 

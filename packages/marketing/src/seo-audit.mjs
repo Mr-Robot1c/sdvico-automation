@@ -4,8 +4,8 @@
 //       node packages/marketing/src/seo-audit.mjs https://sdvico.vn desktop
 //
 // Dùng trình duyệt nhân Chromium có sẵn trên máy (Chrome, nếu không có thì Edge, rồi Brave).
-// Kết quả xếp lỗi THEO MỨC TÁC ĐỘNG (trọng số nhóm nhân phần chưa đạt), ghi run_log và xuất
-// báo cáo seo-report.md để giao cho người sửa.
+// Kết quả xếp lỗi THEO MỨC TÁC ĐỘNG (trọng số nhóm nhân phần chưa đạt), ghi run_log
+// (status 'warn' khi có nhóm điểm dưới ngưỡng) và xuất báo cáo seo-report-<host>.md.
 
 import fs from 'node:fs';
 import lighthouse from 'lighthouse';
@@ -75,11 +75,13 @@ for (const it of issues.slice(0, 12)) {
   console.log(`- [${CAT_LABEL[it.category] || it.category}] ${it.title}${it.display ? ' (' + it.display + ')' : ''}`);
 }
 
-// Xuất báo cáo markdown đầy đủ.
+// Xuất báo cáo markdown đầy đủ. Tên file theo host để chạy nhiều URL không đè nhau.
+const host = new URL(url).hostname;
+const reportFile = `seo-report-${host}.md`;
 const out = [
   `# Báo cáo rà SEO: ${url}`,
   '',
-  `Chiến lược: ${strategy}. Nguồn: Lighthouse chạy cục bộ.`,
+  `Chiến lược: ${strategy}. Nguồn: Lighthouse chạy tự động.`,
   '',
   '## Điểm từng nhóm',
   ''
@@ -91,14 +93,26 @@ for (const it of issues.slice(0, 20)) {
   if (it.description) out.push(it.description);
   out.push('');
 }
-fs.writeFileSync('seo-report.md', out.join('\n'));
+fs.writeFileSync(reportFile, out.join('\n'));
+
+// Ngưỡng cảnh báo: nhóm nào dưới thì status 'warn' + msg cho UI (trang /seo và tab AI SEO
+// đọc detail.msg). Tốc độ mobile vốn thấp nên ngưỡng nới hơn 3 nhóm còn lại.
+const low = [];
+if (scores.seo < 90) low.push(`Chuẩn SEO ${scores.seo}`);
+if (scores.performance < 50) low.push(`Tốc độ ${scores.performance}`);
+if (scores.accessibility < 80) low.push(`Khả năng truy cập ${scores.accessibility}`);
+if (scores['best-practices'] < 80) low.push(`Thực hành tốt ${scores['best-practices']}`);
+const status = low.length ? 'warn' : 'ok';
+const msg = low.length
+  ? `${host}: ${low.join(', ')} dưới ngưỡng. Lỗi nặng nhất: ${issues[0]?.title || 'xem báo cáo'}`
+  : `${host}: cả 4 nhóm đạt ngưỡng (Chuẩn SEO ${scores.seo}, Tốc độ ${scores.performance}).`;
 
 // Ghi run_log.
 const client = getServiceClient();
 await logRun(client, {
   task: 'mkt.seo_audit',
-  status: 'ok',
-  detail: { url, strategy, scores, top_issues: issues.slice(0, 10).map((i) => i.title) }
+  status,
+  detail: { url, strategy, scores, msg, top_issues: issues.slice(0, 10).map((i) => i.title) }
 });
 
-console.log('\nXong. Báo cáo đầy đủ ở seo-report.md, điểm đã ghi vào run_log.');
+console.log(`\nXong (${status}). Báo cáo đầy đủ ở ${reportFile}, điểm đã ghi vào run_log.`);

@@ -84,7 +84,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     // jsonl ~/.claude/projects/*SDVICO* → upsert bảng claude_code_usage.
     client.from('claude_code_usage').select('ts, model, input_tokens, cache_creation_tokens, cache_read_tokens, output_tokens, estimated_cost_usd, estimated_cost_vnd').gte('ts', since30).order('ts', { ascending: false }).limit(10000),
     // 28/8: log cho 4 tab AI moi (lich kenh / bao cao / SEO). Tab video dung brand_assets.
-    client.from('run_log').select('task, status, detail, created_at').in('task', ['mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull', 'mkt.metrics_pull_manual', 'mkt.learn_weekly', 'mkt.apply_learn', 'mkt.seo_audit', 'mkt.seed_keywords']).order('created_at', { ascending: false }).limit(120),
+    client.from('run_log').select('task, status, detail, created_at').in('task', ['mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull', 'mkt.metrics_pull_manual', 'mkt.learn_weekly', 'mkt.apply_learn', 'mkt.seo_audit', 'mkt.seed_keywords', 'mkt.keyword_suggest']).order('created_at', { ascending: false }).limit(120),
     client.from('brand_assets').select('id, title, storage_path, product_group, created_at').in('kind', ['video', 'clip']).order('created_at', { ascending: false }).limit(12),
   ] as any);
 
@@ -110,6 +110,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     creator_pick_image: '🖼️ Chọn ảnh Unsplash (Creator)',
     creator_video_script: '🎬 Sinh kịch bản video (Creator)',
     voice_tts: '🔊 Đọc lời video TTS (Voice)',
+    keyword_suggest: '🔍 Đề xuất từ khóa (AI SEO)',
   };
   // 26/8: nhóm theo AI (user "quản trị token của từng AI"). Task nào chưa map thì gom "AI khác".
   const AI_OF_TASK: Record<string, string> = {
@@ -118,6 +119,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     plan_directions: 'BOSS',
     creator_social: 'Creator', creator_content: 'Creator', creator_content_old: 'Creator', creator_pick_image: 'Creator', creator_video_script: 'Creator',
     voice_tts: 'Voice',
+    keyword_suggest: 'SEO',
   };
   const AI_META: Record<string, { icon: string; note: string }> = {
     'Data 1': { icon: '📁', note: 'Đọc file Zalo Phòng Kinh doanh, tóm tắt về tri thức nội bộ' },
@@ -161,7 +163,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
 
   // Nhóm token theo AI. Evaluator luôn có row để user thấy nó KHÔNG đốt token (tránh hiểu nhầm
   // "sao thiếu Evaluator" — nó chỉ tính toán từ mkt_metrics, không gọi Gemini).
-  const AI_ORDER = ['Creator', 'Voice', 'BOSS', 'Data 1', 'Data 2', 'Evaluator', 'AI khác'];
+  const AI_ORDER = ['Creator', 'Voice', 'BOSS', 'Data 1', 'Data 2', 'Evaluator', 'SEO', 'AI khác'];
   const byAI = new Map<string, { calls: number; tokens: number; tasks: Set<string> }>();
   for (const [task, e] of byTask.entries()) {
     const ai = AI_OF_TASK[task] || 'AI khác';
@@ -502,15 +504,14 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
           <div className="need-item" style={{ marginBottom: 12 }}>
             <span>🔍</span>
             <span style={{ flex: 1 }}>
-              <b>AI quản lý SEO</b> — seed từ khóa, audit trang công khai, giữ sitemap sạch cho Google.
+              <b>AI quản lý SEO</b> — rà điểm SEO trang công khai hằng tuần, đề xuất từ khóa mới, giữ sitemap sạch cho Google.
               <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
-                🧩 <b>Model:</b> Gemini flash-lite (seed từ khóa); audit là script thuần không LLM.
-                {/* 30/8 (audit H3): bỏ đường dẫn máy nội bộ khỏi giao diện. */}
-                <br />📍 <b>Chạy tại:</b> cloud (trang /blog, sitemap tự sinh) + máy nội bộ (rà SEO định kỳ).
+                🧩 <b>Model:</b> Gemini flash-lite (đề xuất từ khóa); phần rà điểm là bộ đo tự động, không dùng AI.
+                <br />📍 <b>Chạy tại:</b> cloud — sáng thứ Hai hằng tuần: rà sdvico.vn + trang bài viết, rồi đề xuất từ khóa.
               </span>
             </span>
           </div>
-          <AgentLogTable rows={(agentLogRows as any[]).filter((l: any) => ['mkt.seo_audit', 'mkt.seed_keywords'].includes(l.task))} />
+          <AgentLogTable rows={(agentLogRows as any[]).filter((l: any) => ['mkt.seo_audit', 'mkt.seed_keywords', 'mkt.keyword_suggest'].includes(l.task))} />
         </section>
       ) : null}
 
@@ -690,6 +691,7 @@ function AgentLogTable({ rows }: { rows: Array<{ task: string; status: string; d
     'mkt.apply_learn': 'Áp đề xuất tuần',
     'mkt.seo_audit': 'Audit SEO',
     'mkt.seed_keywords': 'Seed từ khóa',
+    'mkt.keyword_suggest': 'Đề xuất từ khóa (Gemini)',
   };
   const top = rows.slice(0, 12);
   if (!top.length) return <div className="empty"><p>Chưa thấy lần chạy nào trong log.</p></div>;
@@ -701,7 +703,7 @@ function AgentLogTable({ rows }: { rows: Array<{ task: string; status: string; d
           {top.map((l, i) => (
             <tr key={i}>
               <td><b>{LABEL[l.task] || l.task}</b></td>
-              <td><span className={`badge ${l.status === 'ok' ? 'tone-ok' : l.status === 'error' ? 'tone-no' : 'tone-demo'}`}>{l.status === 'ok' ? '✅ OK' : l.status === 'error' ? '⛔ Lỗi' : l.status}</span></td>
+              <td><span className={`badge ${l.status === 'ok' ? 'tone-ok' : l.status === 'error' ? 'tone-no' : 'tone-demo'}`}>{l.status === 'ok' ? '✅ OK' : l.status === 'error' ? '⛔ Lỗi' : l.status === 'warn' ? '⚠️ Cảnh báo' : l.status}</span></td>
               <td className="sub" style={{ fontSize: '.82rem' }}>{String(l.detail?.msg || l.detail?.error || JSON.stringify(l.detail || {})).slice(0, 120)}</td>
               <td className="sub" style={{ fontSize: '.82rem' }}>{fmtDT(l.created_at)}</td>
             </tr>

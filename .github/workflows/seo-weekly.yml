@@ -1,0 +1,54 @@
+name: SEO hang tuan - audit + de xuat tu khoa
+
+# AI quản lý SEO chạy theo lịch thật (trước 1/9 chỉ chạy tay: audit đúng 1 lần 12/8,
+# seed đúng 1 lần 11/8). Sáng thứ Hai 8h30 VN: audit Lighthouse sdvico.vn + trang bài viết
+# công khai, rồi Gemini đề xuất tối đa 10 từ khóa đuôi dài mới (khử trùng với kho).
+# Kết quả ghi run_log (xem /kho-tri-thuc?ai=seo-ai), báo cáo md up làm artifact.
+# KHÔNG sinh bài, KHÔNG đăng gì - điều cấm 1 không bị đụng.
+# Audit trang bài viết chạy SAU sdvico.vn để dòng run_log mới nhất (ô Audit trang /seo)
+# phản ánh trang do hệ này quản.
+
+on:
+  schedule:
+    - cron: '30 1 * * 1' # 8h30 sáng thứ Hai giờ VN
+  workflow_dispatch:
+
+concurrency:
+  group: seo-weekly
+  cancel-in-progress: false
+
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Audit SEO sdvico.vn (mobile)
+        run: node packages/marketing/src/seo-audit.mjs https://sdvico.vn mobile
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Audit SEO trang bai viet (mobile)
+        if: always()
+        run: node packages/marketing/src/seo-audit.mjs https://sdvico-mktit.vercel.app/blog mobile
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Gemini de xuat tu khoa moi
+        if: always()
+        run: node packages/marketing/src/suggest-keywords.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MKT_MODEL: ${{ secrets.MKT_MODEL }}
+      - name: Up bao cao
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-report
+          path: seo-report-*.md
+          if-no-files-found: ignore
