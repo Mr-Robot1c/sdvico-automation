@@ -20,6 +20,15 @@ const ABSOLUTE_LEGAL = [
   'chắc chắn không bị bắt',
 ];
 
+// 1/9 (user feedback: "văn phong AI thô"): jargon kỹ thuật trong bài đăng cho ngư dân.
+// Bà con không cần biết ffmpeg/1080x1920/webhook — bài phải diễn đạt bằng lời thường
+// (video dọc / cân âm lượng / gắn phụ đề). Regex vì có nhiều biến thể (1080x1920 vs 1080×1920).
+const TECH_JARGON = [
+  /\bffmpeg\b/i, /\bwebhook\b/i, /\bendpoint\b/i, /\bcron\s?job\b/i, /\bAPI\b/, /\bLLM\b/,
+  /\bONNX\b/, /\bservice[- ]role\b/i, /burn phụ đề/i, /\d{3,4}\s?[x×]\s?\d{3,4}/,
+  /\b9\s*:\s*16\b/, /\b16\s*:\s*9\b/,
+];
+
 // Rà một đoạn, trả về danh sách lỗi giọng văn. Rỗng nghĩa là đạt.
 export function scanStyle(text) {
   const t = text || '';
@@ -34,6 +43,10 @@ export function scanStyle(text) {
 
   for (const w of ABSOLUTE_LEGAL) if (low.includes(w)) { issues.push('hứa pháp lý tuyệt đối'); break; }
   for (const w of OVERCLAIM) if (low.includes(w)) { issues.push('lời hoa mỹ hoặc khẳng định quá: ' + w); break; }
+  for (const re of TECH_JARGON) {
+    const m = t.match(re);
+    if (m) { issues.push('jargon kỹ thuật lộ ra bài: ' + m[0]); break; }
+  }
 
   return [...new Set(issues)];
 }

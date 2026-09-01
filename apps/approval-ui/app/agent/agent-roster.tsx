@@ -92,7 +92,8 @@ export default async function AgentRoster() {
     },
     {
       icon: '🎬', name: 'AI làm video',
-      model: 'ffmpeg (không dùng LLM)', runsAt: 'Máy nội bộ (Watcher) hoặc cloud GitHub', role: 'Dựng video: ghép cảnh 9:16, burn phụ đề, cân âm lượng, đưa video lên kho.',
+      /* 1/9 (user feedback): diễn đạt cho người dùng, bỏ jargon 9:16/burn/cân âm lượng. */
+      model: 'Dây chuyền dựng video (không dùng LLM)', runsAt: 'Máy nội bộ hoặc cloud', role: 'Ghép cảnh thành video dọc, gắn phụ đề, cân đều âm lượng, đưa vào kho tư liệu.',
       last: lastVideoAsset
         ? { at: lastVideoAsset.created_at, ok: true, note: `video mới nhất: ${String(lastVideoAsset.title || '').slice(0, 50)}` }
         : { at: null, ok: null, note: 'kho chưa có video nào' },

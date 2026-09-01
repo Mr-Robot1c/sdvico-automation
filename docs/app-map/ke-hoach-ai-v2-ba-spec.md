@@ -4,6 +4,7 @@
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 last_verified: 2026-08-29
 ttl_days: 90
+<!-- re-verified: 2026-09-01 - Van phong dot 1 (chi tiet o marketing.md cung gio): them brand-voice-check jargon rule + brand-dict.mjs skeleton (chua noi vao prompt sinh bai). Flow ke hoach/NV/AC khong doi. -->
 <!-- re-verified: 2026-08-30 - Da nen packages/marketing/src (chi tiet o marketing.md cung gio): them platform.mjs go duong ghim Windows o 4 script; launcher npm video:watch/voice:server chay Win/Mac/Linux. Flow ke hoach/NV/AC khong doi. -->
 <!-- re-verified: 2026-08-30 - Video build len full cloud (chi tiet o marketing.md cung gio): doi video/README.md muc (A) + workflow video-build.yml; flow ke hoach/NV/AC khong doi. -->
 <!-- re-verified: 2026-08-29 - Audit dot 3 cham vung covers nhung KHONG doi flow ke hoach: migration 20260829180000 them ham reserve_daily_quota (chi tiet o database.md); rotate them ve slot nguyen tu chan 2 luot cung luc (bai sinh ra van bam plan nhu cu); build-video-all them attempts/claim/run_log. NV/AC spec khong doi. -->

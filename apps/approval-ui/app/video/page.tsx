@@ -71,12 +71,14 @@ export default async function Page() {
 
   const urlOf = (p: string) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
 
+  // 1/9 (user feedback): văn phong cho NGƯỜI DÙNG, không phô jargon (ffmpeg, 1080x1920,
+  // burn phụ đề, cân âm lượng, brand-assets, Supabase). Diễn đạt việc bằng ngôn ngữ nghiệp vụ.
   const steps = [
-    { icon: '📝', name: 'Kịch bản', tool: 'Gemini flash', desc: 'BOSS ra hướng đi, máy viết kịch bản 3-8 cảnh (hook, đồng cảm, lối thoát) + kịch bản trend kèm cảnh Pexels.' },
-    { icon: '🎙️', name: 'Giọng đọc', tool: 'Gemini TTS (Leda)', desc: 'Đọc tiếng Việt giọng Leda; hết hạn mức tự lui về edge-tts HoaiMy. Cả video luôn dùng MỘT giọng.' },
-    { icon: '🎬', name: 'Ghép video', tool: 'ffmpeg — Watcher máy local', desc: 'Máy local quét bài chờ dựng, ghép cảnh 9:16 dọc 1080x1920, burn phụ đề, cân âm lượng.' },
-    { icon: '☁️', name: 'Lưu trữ', tool: 'Supabase Storage', desc: 'Video final duy nhất mỗi bài đưa lên kho brand-assets, bản cũ tự xoá.' },
-    { icon: '📤', name: 'Đăng', tool: 'FB Reel · YouTube Shorts · TikTok', desc: 'Người bấm Duyệt mới đăng. TikTok xuất tay qua nút Xuất TikTok (app chưa qua audit).' },
+    { icon: '📝', name: 'Viết kịch bản', tool: 'AI viết theo hướng đi của tuần', desc: 'BOSS ra hướng đi, máy viết kịch bản 3-8 cảnh (mở đầu hút mắt — đồng cảm — lối ra) và kịch bản bài trend kèm cảnh minh họa.' },
+    { icon: '🎙️', name: 'Đọc giọng', tool: 'Giọng Mỹ Duyên (dự phòng Gemini/Edge)', desc: 'Đọc tiếng Việt giọng Mỹ Duyên; máy chủ giọng bận thì tự lui giọng dự phòng. Cả video luôn dùng một giọng.' },
+    { icon: '🎬', name: 'Dựng video', tool: 'Máy nội bộ hoặc cloud', desc: 'Ghép các cảnh thành video dọc chuẩn TikTok/Reel, gắn phụ đề vào hình, cân đều âm lượng cho dễ nghe.' },
+    { icon: '☁️', name: 'Lưu vào kho', tool: 'Kho tư liệu của SDVICO', desc: 'Mỗi bài giữ MỘT video mới nhất trong kho, bản cũ tự dọn.' },
+    { icon: '📤', name: 'Đăng', tool: 'Facebook Reel · YouTube Shorts · TikTok', desc: 'Người bấm Duyệt mới đăng. TikTok xuất tay qua nút Xuất video (ứng dụng chưa qua duyệt của TikTok).' },
   ];
 
   return (
@@ -84,7 +86,7 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Video</h1>
-          <p className="sub">Dây chuyền làm video bằng AI của SDVICO — từ kịch bản đến video 9:16 có giọng đọc và phụ đề, chạy trên máy local.</p>
+          <p className="sub">Dây chuyền làm video bằng AI của SDVICO — từ kịch bản đến video dọc có giọng đọc và phụ đề, sẵn sàng đăng TikTok/Reel/Shorts.</p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link href="/san-xuat" className="btn ghost">🎬 Xưởng sản xuất</Link>

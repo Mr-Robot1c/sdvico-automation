@@ -438,7 +438,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
           <div className="need-item" style={{ marginBottom: 12 }}>
             <span>🎬</span>
             <span style={{ flex: 1 }}>
-              <b>AI làm video + AI giọng nói</b> — ghép cảnh 9:16, burn phụ đề, cân âm lượng, đọc giọng.
+              <b>AI làm video + AI giọng nói</b> — ghép các cảnh thành video dọc, gắn phụ đề, cân đều âm lượng, đọc giọng tiếng Việt.
               <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
                 🧩 <b>Model:</b> ffmpeg (ghép, không LLM) · Gemini TTS <code>gemini-3.1-flash-tts-preview → 2.5-flash → 2.5-pro</code> giọng Leda, hết hạn mức lui edge-tts <code>vi-VN-HoaiMyNeural</code>.
                 <br />📍 <b>Chạy tại:</b> MÁY LOCAL — Watcher <code>C:/Users/ADMIN/Desktop/SDVICO Marketing/packages/marketing/src/video/build-video.mjs</code> (quét bài video_requested, cần máy bật). Video final đưa lên Supabase Storage <code>brand-assets/videos/</code>.

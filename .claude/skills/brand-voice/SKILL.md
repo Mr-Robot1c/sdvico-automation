@@ -40,4 +40,8 @@ Không đạt: "Giải pháp giám sát hành trình tối tân, đẳng cấp, 
 
 ## Nối vào máy
 
-Bộ rà `packages/marketing/src/brand-voice-check.mjs` (hàm `scanStyle`) tự bắt lỗi giọng: gạch dài, mũi tên, dấu chấm tròn giữa câu, ký hiệu thay chữ và, số sai chuẩn Việt Nam, hứa pháp lý tuyệt đối, lời hoa mỹ và khẳng định quá. Cặp với `compliance.mjs` (lo ranh giới sản phẩm). Bộ kiểm thử 20 đoạn gài lỗi ở `test-skills.mjs`, chạy `npm run test:skills`.
+Bộ rà `packages/marketing/src/brand-voice-check.mjs` (hàm `scanStyle`) tự bắt lỗi giọng: gạch dài, mũi tên, dấu chấm tròn giữa câu, ký hiệu thay chữ và, số sai chuẩn Việt Nam, hứa pháp lý tuyệt đối, lời hoa mỹ và khẳng định quá, và **jargon kỹ thuật lộ ra bài** (1/9: ffmpeg, webhook, endpoint, cronjob, LLM, ONNX, service-role, "burn phụ đề", các cụm kích thước `1080x1920`, tỷ lệ `9:16` — bà con không cần biết những thứ này). Cặp với `compliance.mjs` (lo ranh giới sản phẩm) và `brand-dict.mjs` (từ điển thương hiệu — biệt ngữ nội bộ, viết tắt, tên đối tác, chính tả chuẩn). Bộ kiểm thử 20 đoạn gài lỗi ở `test-skills.mjs`, chạy `npm run test:skills`.
+
+## Từ điển thương hiệu
+
+`packages/marketing/src/brand-dict.mjs` là nguồn sự thật cho các cụm đặc thù mà ngư dân không tự hiểu. Trước khi viết bài, gọi `dictBrief()` để lấy bảng định nghĩa dán vào prompt; sau khi viết, gọi `warnUndefined(text)` để phát hiện cụm dùng mà chưa có định nghĩa (báo người duyệt hỏi lại người phụ trách rồi điền), và `scanSpelling(text)` để bắt biến thể chính tả sai. **Ai điền dict?** Người phụ trách nghiệp vụ — Claude **không** được tự đoán (điều cấm 5). Slot còn `null` nghĩa là còn chờ chốt.
