@@ -63,16 +63,24 @@ export default async function AgentRoster() {
   const lastInternal = ((dataInternalLast.data || [])[0] as any) || null;
   const lastPublic = ((dataPublicLast.data || [])[0] as any) || null;
 
+  // 1/9 (user hỏi vì sao có AI "Lỗi"/"Chưa chạy"): run_log có 3 status ok/error/skipped —
+  // skipped là "bỏ qua có mục đích" (rotate đã sinh xong slot hôm nay, guard chặn dư),
+  // KHÔNG phải lỗi. Trước gộp !== 'ok' thành ok:false -> UI in "Lỗi" oan.
   type AgentDef = {
     icon: string; name: string; role: string; boss?: boolean;
     model: string; runsAt: string;
-    last: { at: string | null; ok: boolean | null; note: string };
+    last: { at: string | null; state: 'ok' | 'error' | 'skipped' | null; note: string };
     href?: string;
   };
-  const mkLast = (row: LogRow | null, okNote: string): AgentDef['last'] =>
-    row
-      ? { at: row.created_at, ok: row.status === 'ok', note: row.status === 'ok' ? okNote : `lỗi: ${String(row.detail?.error || row.detail?.msg || row.status).slice(0, 80)}` }
-      : { at: null, ok: null, note: 'chưa thấy lần chạy nào trong log' };
+  const mkLast = (row: LogRow | null, okNote: string): AgentDef['last'] => {
+    if (!row) return { at: null, state: null, note: 'chưa thấy lần chạy nào trong log' };
+    if (row.status === 'ok') return { at: row.created_at, state: 'ok', note: okNote };
+    if (row.status === 'skipped') {
+      const reason = String((row as any).detail?.reason || 'bỏ qua theo lịch').slice(0, 80);
+      return { at: row.created_at, state: 'skipped', note: `bỏ qua có chủ đích: ${reason}` };
+    }
+    return { at: row.created_at, state: 'error', note: `lỗi: ${String((row as any).detail?.error || (row as any).detail?.msg || row.status).slice(0, 80)}` };
+  };
 
   const bossRow = lastOf(['mkt.plan', 'mkt.plan_manual', 'mkt.live_apply', 'mkt.apply_learn']);
   const agents: AgentDef[] = [
@@ -95,8 +103,8 @@ export default async function AgentRoster() {
       /* 1/9 (user feedback): diễn đạt cho người dùng, bỏ jargon 9:16/burn/cân âm lượng. */
       model: 'Dây chuyền dựng video (không dùng LLM)', runsAt: 'Máy nội bộ hoặc cloud', role: 'Ghép cảnh thành video dọc, gắn phụ đề, cân đều âm lượng, đưa vào kho tư liệu.',
       last: lastVideoAsset
-        ? { at: lastVideoAsset.created_at, ok: true, note: `video mới nhất: ${String(lastVideoAsset.title || '').slice(0, 50)}` }
-        : { at: null, ok: null, note: 'kho chưa có video nào' },
+        ? { at: lastVideoAsset.created_at, state: 'ok', note: `video mới nhất: ${String(lastVideoAsset.title || '').slice(0, 50)}` }
+        : { at: null, state: null, note: 'kho chưa có video nào' },
       href: '/kho-tri-thuc?ai=video-ai',
     },
     {
@@ -104,8 +112,8 @@ export default async function AgentRoster() {
       /* 30/8: cập nhật thực tế 28/8 — giọng chính là Mỹ Duyên (VieNeu), Gemini/edge chỉ dự phòng. */
       model: 'VieNeu giọng Mỹ Duyên; dự phòng Gemini TTS rồi edge-tts', runsAt: 'Chạy cùng lượt dựng video', role: 'Đọc lời thoại tiếng Việt giọng Mỹ Duyên; máy chủ giọng bận thì tự lui giọng dự phòng. Cả video luôn một giọng.',
       last: lastVideoAsset
-        ? { at: lastVideoAsset.created_at, ok: true, note: 'chạy cùng lượt dựng video gần nhất' }
-        : { at: null, ok: null, note: 'chạy cùng Watcher, chưa có video' },
+        ? { at: lastVideoAsset.created_at, state: 'ok', note: 'chạy cùng lượt dựng video gần nhất' }
+        : { at: null, state: null, note: 'chạy cùng Watcher, chưa có video' },
       href: '/kho-tri-thuc?ai=video-ai',
     },
     {
@@ -130,8 +138,8 @@ export default async function AgentRoster() {
       icon: '🏠', name: 'AI DATA 1 — nội bộ',
       model: 'Gemini Flash Lite (đọc ảnh + tóm tắt file)', runsAt: 'Chạy trên cloud hằng ngày — nguồn kho tri thức nội bộ (file Zalo)', role: 'Học tri thức nội bộ (file Zalo/tài liệu người phụ trách thả vào kho) thành insight cho BOSS.',
       last: lastInternal
-        ? { at: lastInternal.created_at, ok: true, note: `${fmt(dataInternalCount.count || 0)} mẩu tri thức trong kho` }
-        : { at: null, ok: null, note: 'kho tri thức nội bộ trống' },
+        ? { at: lastInternal.created_at, state: 'ok', note: `${fmt(dataInternalCount.count || 0)} mẩu tri thức trong kho` }
+        : { at: null, state: null, note: 'kho tri thức nội bộ trống' },
       href: '/kho-tri-thuc?ai=noi-bo',
     },
     {
@@ -141,8 +149,8 @@ export default async function AgentRoster() {
         const r = lastOf(['mkt.knowledge_public_deep']);
         if (r) return mkLast(r, `quét xong, kho có ${fmt(dataPublicCount.count || 0)} mục`);
         return lastPublic
-          ? { at: lastPublic.created_at, ok: true, note: `kho có ${fmt(dataPublicCount.count || 0)} mục` }
-          : { at: null, ok: null as boolean | null, note: 'chưa quét lần nào' };
+          ? { at: lastPublic.created_at, state: 'ok', note: `kho có ${fmt(dataPublicCount.count || 0)} mục` }
+          : { at: null, state: null, note: 'chưa quét lần nào' };
       })(),
       href: '/kho-tri-thuc?ai=public',
     },
@@ -154,15 +162,22 @@ export default async function AgentRoster() {
         <div key={a.name} className="agent-card" style={a.boss ? { borderColor: 'var(--brand-red)', background: 'var(--brand-red-bg)' } : undefined}>
           <div className="ag-head">
             <span className="ag-name">{a.icon} {a.name}</span>
-            <span className={`badge ${a.last.ok === true ? 'tone-ok' : a.last.ok === false ? 'tone-no' : 'tone-demo'}`}>
-              {a.last.ok === true ? 'Đang chạy' : a.last.ok === false ? 'Lỗi' : 'Chưa chạy'}
-            </span>
+            {/* 1/9 (user hỏi): "Lỗi" chỉ dành cho error thật; skipped = bỏ qua có mục đích (xanh),
+                null = chưa từng chạy (xám). */}
+            {(() => {
+              const s = a.last.state;
+              const tone = s === 'ok' || s === 'skipped' ? 'tone-ok' : s === 'error' ? 'tone-no' : 'tone-demo';
+              const label = s === 'ok' ? 'Đang chạy' : s === 'skipped' ? 'Đang chạy' : s === 'error' ? 'Lỗi' : 'Chưa chạy';
+              const title = s === 'skipped' ? 'Có lịch chạy đều — lần này bỏ qua có mục đích (đã đủ việc/hết trong ngày)' : undefined;
+              return <span className={`badge ${tone}`} title={title}>{label}</span>;
+            })()}
           </div>
           <p className="ag-role" style={{ margin: 0 }}>{a.role}</p>
           <p className="ag-role" style={{ margin: 0, fontSize: '.76rem' }}>🧩 <b>Model:</b> {a.model}</p>
           <p className="ag-role" style={{ margin: 0, fontSize: '.76rem' }}>📍 <b>Chạy tại:</b> {a.runsAt}</p>
           <div className="ag-last">
-            {a.last.at ? `Học lần cuối ${ago(a.last.at)} (${fmtDT(a.last.at)}) — ${a.last.note}` : a.last.note}
+            {/* 1/9: đổi "Học lần cuối" -> "Chạy lần cuối" cho đúng — AI làm việc chứ đâu chỉ học. */}
+            {a.last.at ? `Chạy lần cuối ${ago(a.last.at)} (${fmtDT(a.last.at)}) — ${a.last.note}` : a.last.note}
             {a.href ? <> · <Link className="src" href={a.href}>Chi tiết →</Link></> : null}
           </div>
         </div>
