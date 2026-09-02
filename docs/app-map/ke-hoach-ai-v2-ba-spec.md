@@ -2,8 +2,9 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
-last_verified: 2026-08-29
+last_verified: 2026-09-02
 ttl_days: 90
+<!-- re-verified: 2026-09-02 - hoc-video.mjs nen tam video lon (>14,5MB) bang ffmpeg de Gemini xem duoc (chi tiet o marketing.md cung gio): NV1 nap tri thuc noi bo het bo sot video lon trong Zalo/media, kho tu lieu (up-media) theo do het hoan. Flow ke hoach/NV/AC khong doi. -->
 <!-- re-verified: 2026-09-01 - Sua AI quan ly SEO cham vung packages/marketing/src (chi tiet o marketing.md cung gio): seo-audit warn + suggest-keywords moi. Flow ke hoach/NV/AC KHONG doi. -->
 <!-- re-verified: 2026-09-01 - Van phong dot 1 (chi tiet o marketing.md cung gio): them brand-voice-check jargon rule + brand-dict.mjs skeleton (chua noi vao prompt sinh bai). Flow ke hoach/NV/AC khong doi. -->
 <!-- re-verified: 2026-08-30 - Da nen packages/marketing/src (chi tiet o marketing.md cung gio): them platform.mjs go duong ghim Windows o 4 script; launcher npm video:watch/voice:server chay Win/Mac/Linux. Flow ke hoach/NV/AC khong doi. -->
