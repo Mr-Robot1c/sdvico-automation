@@ -38,6 +38,7 @@ export default async function BlogListPage() {
       </header>
 
       <nav className="pub-chips" aria-label="Chủ đề">
+        <Link key="chuyen-nghe-bien" href="/blog/chu-de/chuyen-nghe-bien">Chuyện nghề</Link>
         {PRODUCT_CATALOG.map((t) => (
           <Link key={t.slug} href={`/blog/chu-de/${t.slug}`}>{t.shortName}</Link>
         ))}

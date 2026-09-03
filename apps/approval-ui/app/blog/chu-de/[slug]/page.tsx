@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getServerClient } from '../../../../lib/supabase-server';
-import { isProductOf, loadPublicPosts, siteUrl } from '../../../../lib/seo';
+import { displayProduct, isProductOf, loadPublicPosts, siteUrl } from '../../../../lib/seo';
 import { findProductBySlug, PRODUCT_CATALOG } from '../../../../lib/product-catalog';
 import { safeJsonLd } from '../../../../lib/jsonld';
 import PostCard from '../../post-card';
@@ -18,8 +18,18 @@ export const revalidate = 600;
 
 type Props = { params: { slug: string } };
 
+// 3/9: chủ đề ảo "Chuyện nghề biển" gom bài content (không thuộc sản phẩm nào) — nhóm bài
+// đông nhất trên blog mà trước không lọc được. Không có trang sản phẩm đi kèm.
+const STORY_TOPIC = {
+  slug: 'chuyen-nghe-bien',
+  name: 'Chuyện nghề biển',
+  shortName: 'Chuyện nghề',
+  short: 'Câu chuyện, kinh nghiệm đời đi biển của bà con ngư dân.',
+};
+const isStory = (slug: string) => slug === STORY_TOPIC.slug;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const p = findProductBySlug(params.slug);
+  const p = isStory(params.slug) ? STORY_TOPIC : findProductBySlug(params.slug);
   if (!p) return { title: 'Không tìm thấy chủ đề — SDVICO' };
   const url = `${siteUrl()}/blog/chu-de/${p.slug}`;
   const title = `${p.name} — bài viết và kinh nghiệm | SDVICO`;
@@ -32,12 +42,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function TopicHubPage({ params }: Props) {
-  const p = findProductBySlug(params.slug);
+  const p = isStory(params.slug) ? STORY_TOPIC : findProductBySlug(params.slug);
   if (!p) notFound();
 
   const client = getServerClient();
   const posts = await loadPublicPosts(client, 300);
-  const matched = posts.filter((x) => isProductOf(p, x.product));
+  const matched = isStory(params.slug)
+    ? posts.filter((x) => !displayProduct(x.product))
+    : posts.filter((x) => isProductOf(p as any, x.product));
 
   const url = `${siteUrl()}/blog/chu-de/${p.slug}`;
   const jsonLd = {
@@ -60,10 +72,13 @@ export default async function TopicHubPage({ params }: Props) {
         </nav>
         <header className="pub-head">
           <h1>{p.name}</h1>
-          <p>{p.short} <Link href={`/san-pham/${p.slug}`}>Xem trang sản phẩm</Link></p>
+          <p>{p.short}{' '}{isStory(params.slug) ? null : <Link href={`/san-pham/${p.slug}`}>Xem trang sản phẩm</Link>}</p>
         </header>
 
         <nav className="pub-chips" aria-label="Chủ đề">
+          <Link key={STORY_TOPIC.slug} href={`/blog/chu-de/${STORY_TOPIC.slug}`} className={isStory(params.slug) ? 'on' : ''} aria-current={isStory(params.slug) ? 'page' : undefined}>
+            {STORY_TOPIC.shortName}
+          </Link>
           {PRODUCT_CATALOG.map((t) => (
             <Link key={t.slug} href={`/blog/chu-de/${t.slug}`} className={t.slug === p.slug ? 'on' : ''} aria-current={t.slug === p.slug ? 'page' : undefined}>
               {t.shortName}
@@ -74,7 +89,7 @@ export default async function TopicHubPage({ params }: Props) {
         {matched.length === 0 ? (
           <div className="pub-empty">
             <p>Chưa có bài viết về {p.shortName}</p>
-            <Link href={`/san-pham/${p.slug}`}>Xem trang sản phẩm</Link>
+            {isStory(params.slug) ? <Link href="/blog">Xem tất cả bài viết</Link> : <Link href={`/san-pham/${p.slug}`}>Xem trang sản phẩm</Link>}
           </div>
         ) : (
           <div className="pub-grid">
@@ -87,5 +102,5 @@ export default async function TopicHubPage({ params }: Props) {
 }
 
 export function generateStaticParams() {
-  return PRODUCT_CATALOG.map((p) => ({ slug: p.slug }));
+  return [{ slug: STORY_TOPIC.slug }, ...PRODUCT_CATALOG.map((p) => ({ slug: p.slug }))];
 }

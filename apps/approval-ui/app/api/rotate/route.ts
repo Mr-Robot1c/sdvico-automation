@@ -605,6 +605,7 @@ export async function GET(req: Request) {
           content_type: kind,
           image_via: picked.via,
           ...(picked.credit ? { image_credit: picked.credit } : {}),
+          ...(picked.note ? { image_note: picked.note } : {}),
         },
         draft: gen.text,
         status: 'review',

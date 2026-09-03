@@ -279,3 +279,15 @@ export function optImgAbs(url: string | null | undefined, w: 640 | 1080 | 1200 =
   if (!o) return null;
   return o.startsWith('http') ? o : `${siteUrl()}${o}`;
 }
+
+// 3/9 (UI): tiêu đề THẺ danh sách gọn — bài bán dùng caption nguyên văn làm title nên thẻ
+// tràn CTA ("... Lắp ngay ..."). Cắt tại kết câu đầu khi dài, bỏ đuôi kêu gọi. CHỈ dùng cho
+// thẻ; title/H1/og của trang bài lẻ giữ nguyên (SEO không đổi).
+export function cardTitle(title: string): string {
+  let t = String(title || '').trim();
+  if (t.length <= 70) return t;
+  const m = t.match(/^(.{25,90}?[.!?…])\s/);
+  if (m) t = m[1].replace(/[.…]\s*$/, '');
+  t = t.replace(/\s*(Lắp ngay|Gọi ngay|Liên hệ|Nhắn tin|Inbox)[^]*$/i, '').trim() || String(title).slice(0, 70);
+  return t.length > 90 ? t.slice(0, 89).replace(/\s\S*$/, '') + '…' : t;
+}

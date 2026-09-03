@@ -1,6 +1,6 @@
 import { getServerClient } from '../../lib/supabase-server';
-import { addKeyword, deleteKeyword } from '../actions';
-import { generateFromKeyword } from '../generate-action';
+import { addKeyword } from '../actions';
+import KeywordList, { type KwRow } from './keyword-list';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +47,11 @@ export default async function Page({ searchParams }: { searchParams: { intent?: 
   const order = ['thong_tin', 'thuong_mai', 'giao_dich', 'dieu_huong'];
   const chipKeys = [...counts.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b));
 
+  const kwRows: KwRow[] = rows.map((r) => ({
+    id: r.id, keyword: r.keyword, intent: r.intent, landing_url: r.landing_url, source: r.source,
+    hasPost: done.has(String(r.keyword || '').toLowerCase().replace(/\s+/g, ' ').trim()),
+  }));
+
   return (
     <main>
       <header className="head-row">
@@ -80,37 +85,7 @@ export default async function Page({ searchParams }: { searchParams: { intent?: 
         <button className="btn ok" type="submit">Thêm</button>
       </form>
 
-      <ul className="list">
-        {rows.map((r) => {
-          const it = r.intent || 'khac';
-          const hasPost = done.has(String(r.keyword || '').toLowerCase().replace(/\s+/g, ' ').trim());
-          return (
-            <li key={r.id} className="card kwrow">
-              <div>
-                <div className="title">{r.keyword}</div>
-                <div className="badges">
-                  <span className={`badge tone-${INTENT_TONE[it] || 'default'}`}>{INTENT_LABEL[it] || 'Khác'}</span>
-                  {hasPost ? <span className="badge tone-ok">đã có bài</span> : null}
-                  {r.landing_url ? <span className="src">{r.landing_url}</span> : null}
-                  {r.source ? <span className="src">nguồn: {r.source}</span> : null}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {!hasPost ? (
-                  <form action={generateFromKeyword}>
-                    <input type="hidden" name="id" value={r.id} />
-                    <button className="btn" type="submit" title="Sinh 3 bản (web, Facebook, video) vào hàng đợi duyệt — không tự đăng, chạy chừng nửa phút">Viết bài</button>
-                  </form>
-                ) : null}
-                <form action={deleteKeyword}>
-                  <input type="hidden" name="id" value={r.id} />
-                  <button className="btn no" type="submit" aria-label="Xóa từ khóa">Xóa</button>
-                </form>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <KeywordList rows={kwRows} />
     </main>
   );
 }

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { displayProduct, fmtDateVN, optImg, type PublicPost } from '../../lib/seo';
+import { cardTitle, displayProduct, fmtDateVN, optImg, type PublicPost } from '../../lib/seo';
 
 // Thẻ bài viết dùng chung cho /blog, /blog/chu-de, bài liên quan ở /san-pham/[slug]
 // (design-spec-trang-cong-khai: ô ảnh 16:10 LUÔN có để các thẻ đều chiều cao, tiêu đề tối đa
@@ -29,7 +29,7 @@ export default function PostCard({ post, hideProduct = false }: { post: PublicPo
           </div>
         ) : null}
         <h3 className="pub-card-title">
-          <Link href={href}>{post.title}</Link>
+          <Link href={href}>{cardTitle(post.title)}</Link>
         </h3>
         <p className="pub-card-excerpt">{post.excerpt}</p>
       </div>

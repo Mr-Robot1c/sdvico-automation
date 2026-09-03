@@ -45,6 +45,7 @@ async function imageKeywordsFor(topicText, client = null, bodyHint = '') {
         'Cả 2 phải bám SỰ VIỆC/HIỆN TƯỢNG cụ thể trong bài, không chung chung.',
         'VN đúng (bám sự việc): "kim phun tàu cá bám cặn dầu", "mạch điện tàu gỉ sét muối biển", "cạn nước ngọt giữa biển", "cặn dầu diesel đóng đặc", "ngư dân trúng luồng cá đêm".',
         'EN đúng (bám sự việc): "marine electronics corrosion", "diesel injector clogged carbon", "salt water damage boat panel", "fresh water tank empty ocean", "abundant fish catch".',
+        'EN: khi chủ đề là đời sống/nghề cá, ưu tiên thêm bối cảnh châu Á ("vietnam"/"asian fishing village") để ảnh không lệch văn hóa.',
         'CẤM chung (dùng khi bài không có sự việc cụ thể): "tàu cá" / "biển" / "ngư dân" / "fishing boat vietnam" / "sea ocean" / "fisherman".',
         'Nếu bài về THIẾT BỊ/HỎNG HÓC/RỦI RO: keyword phải chứa từ hiện tượng đó (rỉ sét/hỏng/bám cặn/rò rỉ tiếng Việt; rust/corrosion/leak/damage/clogged tiếng Anh). Nếu về TIỀN/HIỆU QUẢ: "tiết kiệm dầu"/"money"/"fuel gauge". Nếu về TỰ HÀO: "trúng cá"/"abundant catch"/"sunrise fishing".',
         'Chỉ trả về JSON: {"vi":"...","en":"..."} không thêm chữ.',
@@ -171,6 +172,62 @@ async function saveUnsplashToAssets(client, photo, titleHint) {
   return data.id;
 }
 
+// 3/9 (user: "bài content lựa ảnh không đúng với bài"): THẨM ĐỊNH ảnh ứng viên bằng mắt AI
+// trước khi chốt. Nhận tối đa 5 ứng viên {url, thumb}, tải THUMBNAIL (nhẹ), 1 lượt Gemini
+// vision chấm 0-10 độ khớp bài + bối cảnh ngư dân/tàu cá Việt Nam. Trả { index, score } của
+// ảnh tốt nhất khi score >= 6; điểm thấp hết -> null (người gọi rơi xuống tầng ảnh nhà).
+// LỖI KỸ THUẬT (Gemini sập, thumbnail không tải được...) -> throw để người gọi giữ hành vi
+// cũ — thà ảnh có thể lệch còn hơn tịt sinh bài.
+async function assessCandidates(client, candidates, topicText, bodyHint) {
+  const { GoogleGenAI } = await import('@google/genai');
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const parts = [];
+  const kept = [];
+  for (const c of candidates.slice(0, 5)) {
+    try {
+      const r = await fetch(c.thumb || c.url, { signal: AbortSignal.timeout(6000) });
+      if (!r.ok) continue;
+      const ct = r.headers.get('content-type') || 'image/jpeg';
+      if (!ct.startsWith('image/')) continue;
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length > 300 * 1024) continue; // thumbnail mà quá 300KB thì bỏ, đỡ tốn token
+      parts.push({ inlineData: { mimeType: ct.split(';')[0], data: buf.toString('base64') } });
+      kept.push(c);
+    } catch { /* bỏ ảnh lỗi */ }
+  }
+  if (!kept.length) throw new Error('khong tai duoc thumbnail nao');
+  const res = await ai.models.generateContent({
+    model: MKT_MODEL,
+    contents: [{
+      role: 'user',
+      parts: [
+        {
+          text: [
+            `Bài đăng cho ngư dân Việt Nam, tiêu đề: "${String(topicText).slice(0, 160)}".`,
+            bodyHint ? `Nội dung chính: ${String(bodyHint).slice(0, 500)}` : '',
+            `Dưới đây là ${kept.length} ảnh ứng viên theo THỨ TỰ. Chấm từng ảnh 0-10:`,
+            'khớp SỰ VIỆC của bài (quan trọng nhất), hợp bối cảnh ngư dân/tàu cá/biển Việt Nam,',
+            'không phải logo/bản đồ/ảnh chụp màn hình/đồ họa chữ. Ảnh sai sự việc thì dưới 4.',
+            `Chỉ trả JSON: {"scores":[${kept.map(() => '0').join(',')}]} đúng ${kept.length} số.`,
+          ].filter(Boolean).join('\n'),
+        },
+        ...parts,
+      ],
+    }],
+    config: { responseMimeType: 'application/json', temperature: 0 },
+  });
+  logTokenUsage(client, 'creator_pick_image', MKT_MODEL, res?.usageMetadata);
+  const j = JSON.parse((res.text || '').match(/\{[\s\S]*\}/)?.[0] || '{}');
+  const scores = Array.isArray(j.scores) ? j.scores.map(Number) : [];
+  let best = -1, bestScore = -1;
+  for (let i = 0; i < kept.length; i++) {
+    const s = Number.isFinite(scores[i]) ? scores[i] : -1;
+    if (s > bestScore) { bestScore = s; best = i; }
+  }
+  if (best < 0 || bestScore < 6) return null;
+  return { candidate: kept[best], score: bestScore };
+}
+
 // 28/8 tối (user chốt): chế độ LINK TRỰC TIẾP — gọi API lấy URL ảnh dùng ngay, KHÔNG lưu
 // Storage. Kho Supabase chỉ dành cho ảnh/video thật của công ty (Zalo, folder sản phẩm).
 // Facebook SAO CHÉP ảnh về máy chủ của nó lúc đăng nên link nguồn có chết sau đó cũng không
@@ -238,12 +295,26 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
           const id = await saveGoogleCseToAssets(client, item, text.slice(0, 60));
           if (id) return { id, via: 'google-cse', note: `q="${kw.vi}"` };
         } else {
-          // Thử lần lượt 5 ảnh đầu, lấy ảnh đầu tiên fetch được thật (site chặn hotlink thì
-          // FB cũng không kéo được lúc đăng -> bỏ qua ảnh đó).
-          for (const item of items.slice(0, 5)) {
-            const url = item?.link;
-            if (url && (await verifyImageLink(url))) {
-              return { id: null, url, via: 'google-cse-link', credit: item?.displayLink || null, note: `q="${kw.vi}" (link, khong luu)` };
+          // 3/9: thẩm định bằng mắt AI thay vì lấy ảnh đầu tiên fetch được. Lỗi kỹ thuật
+          // khi chấm -> giữ hành vi cũ (ảnh đầu fetch được); điểm thấp hết -> bỏ CSE.
+          const cands = items.slice(0, 5)
+            .filter((it) => it?.link)
+            .map((it) => ({ url: it.link, thumb: it?.image?.thumbnailLink || it.link, credit: it?.displayLink || null }));
+          let judged;
+          try { judged = await assessCandidates(client, cands, text, bodyHint); }
+          catch { judged = undefined; }
+          if (judged === null) {
+            // ảnh CSE đều lệch bài — nhường Unsplash/ảnh nhà
+          } else if (judged) {
+            if (await verifyImageLink(judged.candidate.url)) {
+              return { id: null, url: judged.candidate.url, via: 'google-cse-link', credit: judged.candidate.credit, note: `q="${kw.vi}" cham ${judged.score}/10 (link, khong luu)` };
+            }
+          } else {
+            for (const item of items.slice(0, 5)) {
+              const url = item?.link;
+              if (url && (await verifyImageLink(url))) {
+                return { id: null, url, via: 'google-cse-link', credit: item?.displayLink || null, note: `q="${kw.vi}" (link, cham loi - lay anh dau)` };
+              }
             }
           }
         }
@@ -256,16 +327,23 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
     if (useExternal && process.env.UNSPLASH_ACCESS_KEY && kw.en) {
       const results = await searchUnsplash(kw.en);
       if (results) {
-        // Lấy 1 trong 5 ảnh đầu (đa dạng, vẫn sát chủ đề).
-        const photo = pickRandom(results.slice(0, 5));
-        if (allowSave) {
+        // 3/9: thẩm định 5 ảnh đầu bằng mắt AI thay vì random (root cause ảnh Tây lệch bài).
+        const cands = results.slice(0, 5)
+          .filter((p) => p?.urls?.regular)
+          .map((p) => ({ url: p.urls.regular, thumb: p.urls.small || p.urls.regular, photo: p }));
+        let judged;
+        try { judged = await assessCandidates(client, cands, text, bodyHint); }
+        catch { judged = undefined; }
+        const photo = judged === null ? null : judged ? judged.candidate.photo : pickRandom(results.slice(0, 5));
+        if (photo && allowSave) {
           const id = await saveUnsplashToAssets(client, photo, text.slice(0, 60));
           if (id) return { id, via: 'unsplash', note: `q="${kw.en}"` };
         } else if (photo?.urls?.regular) {
           const dl = photo?.links?.download_location;
           if (dl) fetch(`${dl}${dl.includes('?') ? '&' : '?'}client_id=${process.env.UNSPLASH_ACCESS_KEY}`).catch(() => {});
-          return { id: null, url: photo.urls.regular, via: 'unsplash-link', credit: photo?.user?.name ? `Unsplash/${photo.user.name}` : 'Unsplash', note: `q="${kw.en}" (link, khong luu)` };
+          return { id: null, url: photo.urls.regular, via: 'unsplash-link', credit: photo?.user?.name ? `Unsplash/${photo.user.name}` : 'Unsplash', note: `q="${kw.en}"${judged ? ` cham ${judged.score}/10` : ' (cham loi - random)'} (link, khong luu)` };
         }
+        // judged === null (ảnh Unsplash đều lệch) -> rơi xuống tầng folder sản phẩm/Content
       }
     }
   } catch { /* rơi xuống fallback */ }

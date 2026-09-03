@@ -2,6 +2,7 @@
 covers: apps/approval-ui/app/blog, apps/approval-ui/app/san-pham, apps/approval-ui/app/root-shell.tsx
 last_verified: 2026-08-30
 ttl_days: 90
+<!-- re-verified: 2026-09-03 - Man danh sach blog: tieu de the dung cardTitle (cat tai cau dau, bo duoi keu goi "Lap ngay/Goi ngay..."), title day du van o aria-label/alt + trang bai le. Hang chip them "Chuyen nghe" dau hang -> /blog/chu-de/chuyen-nghe-bien (chu de ao gom bai content, khong link trang san pham). Cac man khac khong doi. -->
 <!-- re-verified: 2026-09-03 - Giam can egress (docs/plans/plan-giam-can-egress.md): post-card.tsx, blog/[slug]/page.tsx, san-pham/page.tsx, san-pham/[slug]/page.tsx doi src anh tu URL Supabase thang sang optImg()/optImgAbs() (di qua /_next/image cua Vercel). Alt text, bo cuc, hanh vi the/hero/gallery KHONG doi - chi doi nguon anh de giam Cached Egress Supabase. -->
 <!-- re-verified: 2026-08-30 - Audit UI muc L6: MOI the blog co chip danh muc — khong khop danh muc san pham thi chip chung "Bai viet" (truoc chi vai the co chip, nhin nhu loi). hideProduct giu nguyen hanh vi (trang chu de van an chip). -->
 <!-- re-verified: 2026-08-30 - Audit UI muc M6 (28 anh blog thieu alt): post-card anh cover alt={post.title} (truoc alt="" du la anh noi dung), san-pham card alt={p.name}; logo placeholder giu alt="" (trang tri). productOf trong lib/seo.ts doi fallback (het tra nguyen tieu de) — blog card KHONG doi hanh vi vi da loc qua displayProduct/catalogItemOf tu truoc. -->
