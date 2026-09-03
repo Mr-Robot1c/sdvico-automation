@@ -239,31 +239,50 @@ export async function GET(req: Request) {
     }
   }
 
-  // NẠP LẠI HƯỚNG ĐI khi cạn (user 20/8: "Creator nhớ nhận hướng từ BOSS, học song song"):
-  // bản đang áp hết suggestion chưa dùng -> Creator sẽ rơi về vòng xoay random. Mỗi ngày tối đa
-  // 1 lần (guard run_log mkt.suggestions_refill), BOSS sinh thêm hướng đi MỚI từ tri thức mới
-  // nhất (Gemini) nối vào bản đang áp — Creator luôn có hướng tươi bám tri thức.
-  let refill: { added?: number; skipped?: string; error?: string } | null = null;
+  // NẠP LẠI HƯỚNG ĐI khi cạn (user 20/8: "Creator nhớ nhận hướng từ BOSS, học song song").
+  // SỬA 3/9 (sự cố plan cạn hướng SẠCH): điều kiện cũ `fresh === 0` đếm CẢ hướng
+  // needs_gov_review lẫn hướng kẹt (product không map ra folder — rotate bỏ qua, không bao giờ
+  // đánh used_at), nên chỉ cần 1 hướng kẹt là refill bị khoá vĩnh viễn: 3/9 plan còn đúng 2
+  // hướng đều needs_gov_review -> rotate rơi fallback (fromPlan=0) bài generic bị từ chối cả
+  // loạt, mà run_log CHƯA TỪNG có dòng mkt.suggestions_refill nào. Giờ đếm hướng SẠCH (chưa
+  // dùng + không needs_gov_review); dưới 3 là nạp thêm ngay trong lượt cron — cùng đường
+  // plan-directions của BOSS (goal + mkt_focus như plan.ts, né trùng 14 ngày qua
+  // loadRecentDirectionTitles, luật 70/30 winners). Guard đổi từ "1 lượt ok/ngày" thành trần
+  // 4 lượt ghi log/ngày: bình thường 1 lượt ok đã đủ >=3 hướng sạch nên các lượt cron sau tự
+  // skip theo điều kiện; trần chỉ chặn đốt token khi Gemini liên tục sinh hướng bẩn/rỗng.
+  let refill: { added?: number; addedClean?: number; freshCleanBefore?: number; skipped?: string; error?: string } | null = null;
   try {
     const { data: ap } = await client
       .from('mkt_plans').select('id, data').eq('applied', true)
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
     const sugs: any[] = Array.isArray((ap as any)?.data?.content_suggestions) ? (ap as any).data.content_suggestions : [];
-    const fresh = sugs.filter((s) => !s.used_at).length;
-    if (ap && fresh === 0) {
-      const { count: doneToday } = await client
+    // Hướng SẠCH = Creator dùng được ngay: chưa dùng, không phải bản B di sản A/B, không chờ
+    // duyệt quản lý (điều cấm 3 — hướng gov vẫn nằm trong plan, chỉ không tính vào mức đầy).
+    const freshClean = sugs.filter((s) => !s.used_at && !s.pending_variant && !s.needs_gov_review).length;
+    if (ap && freshClean < 3) {
+      const { count: attemptsToday } = await client
         .from('run_log').select('id', { count: 'exact', head: true })
-        .eq('task', 'mkt.suggestions_refill').eq('status', 'ok')
+        .eq('task', 'mkt.suggestions_refill')
         .gte('created_at', vnDayStartIso(new Date()));
-      if (doneToday && doneToday > 0) {
-        refill = { skipped: 'da nap hom nay' };
+      if ((attemptsToday || 0) >= 4) {
+        refill = { skipped: 'du 4 luot refill hom nay', freshCleanBefore: freshClean };
       } else {
         const { loadRecentKnowledge } = await import('../../../lib/knowledge');
         const { generateContentDirections } = await import('../../../lib/plan-directions');
         const { loadRecentDirectionTitles } = await import('../../../lib/plan');
-        const knowledge = await loadRecentKnowledge(client, 7, 30);
-        const { data: goalRow } = await client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle();
-        const goal = String(((goalRow as any)?.value?.text) || '').trim();
+        const knowledge2 = await loadRecentKnowledge(client, 7, 30);
+        const [goalRes, focusRes] = await Promise.all([
+          client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
+          client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle(),
+        ]);
+        let goal = String(((goalRes.data as any)?.value?.text) || '').trim();
+        // Nối mkt_focus vào goal Y HỆT đường BOSS (plan.ts generateAndStorePlan) — refill cũ
+        // quên focus nên hướng nạp thêm có thể lạc khỏi sản phẩm tập trung tháng.
+        const fv = ((focusRes.data as any)?.value || {}) as { groups?: string[]; until?: string };
+        const fGroups = Array.isArray(fv.groups) ? fv.groups.filter(Boolean) : [];
+        if (fGroups.length && (!fv.until || new Date(fv.until).getTime() > Date.now())) {
+          goal = `${goal ? goal + '\n' : ''}TẬP TRUNG TUẦN NÀY: chỉ đề xuất hướng đi bài bán cho các sản phẩm: ${fGroups.join(', ')} (tới ${fv.until ? new Date(fv.until).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'hết tuần'}). Bài content nuôi trang vẫn giữ.`;
+        }
         const avoidTitles = await loadRecentDirectionTitles(client);
         // 29/8 (luật 70/30): refill hằng ngày cũng đưa top bài đang thắng cho Gemini xoay lại.
         let winners2: string[] = [];
@@ -272,19 +291,22 @@ export async function GET(req: Request) {
           const m2 = await loadMeasurement(client);
           winners2 = (m2.topPosts || []).slice(0, 5).map((t: any) => `${t.title} (${t.product})`);
         } catch { /* thiếu số liệu thì thôi */ }
-        const fresh2 = await generateContentDirections({ internal: knowledge.internal, publicSrc: knowledge.publicSrc }, goal, avoidTitles, client, winners2);
+        const fresh2 = await generateContentDirections({ internal: knowledge2.internal, publicSrc: knowledge2.publicSrc }, goal, avoidTitles, client, winners2);
+        const addedClean = fresh2.filter((s: any) => !s.needs_gov_review).length;
         if (fresh2.length) {
           const newData = { ...(ap as any).data, content_suggestions: [...sugs, ...fresh2] };
           await client.from('mkt_plans').update({ data: newData }).eq('id', (ap as any).id);
-          try { await client.from('run_log').insert({ task: 'mkt.suggestions_refill', actor: 'cron', status: 'ok', detail: { added: fresh2.length } }); } catch { /* bo qua */ }
-          refill = { added: fresh2.length };
+          try { await client.from('run_log').insert({ task: 'mkt.suggestions_refill', actor: 'cron', status: 'ok', detail: { added: fresh2.length, addedClean, freshCleanBefore: freshClean, planId: (ap as any).id } }); } catch { /* bo qua */ }
+          refill = { added: fresh2.length, addedClean, freshCleanBefore: freshClean };
         } else {
-          refill = { skipped: 'gemini khong sinh duoc huong nao' };
+          try { await client.from('run_log').insert({ task: 'mkt.suggestions_refill', actor: 'cron', status: 'skipped', detail: { reason: 'gemini khong sinh duoc huong nao', freshCleanBefore: freshClean } }); } catch { /* bo qua */ }
+          refill = { skipped: 'gemini khong sinh duoc huong nao', freshCleanBefore: freshClean };
         }
       }
     }
   } catch (e: any) {
     console.error('[refill] nap huong di that bai:', e?.message || e);
+    try { await client.from('run_log').insert({ task: 'mkt.suggestions_refill', actor: 'cron', status: 'error', detail: { error: String(e?.message || e).slice(0, 300) } }); } catch { /* bo qua */ }
     refill = { error: String(e?.message || e) };
   }
 
