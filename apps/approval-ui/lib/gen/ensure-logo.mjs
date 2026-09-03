@@ -67,7 +67,7 @@ export async function stampLogoInPlace(client, asset, preBuf = null) {
   const outBuf = await overlayLogo(buf, { position: 'br', scale: 0.14, format: 'jpeg' });
   const stamp = Date.now();
   const newPath = asset.storage_path.replace(/(\.[a-z0-9]+)?$/i, `-logo-${stamp}.jpg`);
-  const up = await client.storage.from(BUCKET).upload(newPath, outBuf, { contentType: 'image/jpeg', upsert: false });
+  const up = await client.storage.from(BUCKET).upload(newPath, outBuf, { contentType: 'image/jpeg', upsert: false, cacheControl: '31536000' });
   if (up.error) throw new Error('Không tải ảnh mới lên được: ' + up.error.message);
   const upd = await client.from('brand_assets').update({ storage_path: newPath }).eq('id', asset.id);
   if (upd.error) throw new Error(upd.error.message);

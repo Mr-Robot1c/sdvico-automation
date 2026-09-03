@@ -57,7 +57,7 @@ for (const dir of dirs) {
     total++;
     if (dry) continue;
     const buf = readFileSync(join(SRC, dir, f));
-    const { error: upErr } = await client.storage.from('brand-assets').upload(key, buf, { contentType: CT[ext], upsert: false });
+    const { error: upErr } = await client.storage.from('brand-assets').upload(key, buf, { contentType: CT[ext], upsert: false, cacheControl: '31536000' });
     if (upErr) { console.log(`     Lỗi tải: ${upErr.message}`); continue; }
     const { error: insErr } = await client.from('brand_assets').insert({ kind, title, storage_path: key, license: 'owned', product_group: group });
     if (insErr) console.log(`     Lỗi ghi bản ghi: ${insErr.message}`);

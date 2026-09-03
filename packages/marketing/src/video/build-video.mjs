@@ -406,7 +406,7 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   const uploadVideo = async (path, tag) => {
     const buf = await readFile(path);
     const sp = `video/sdvico_${content.id.slice(0, 8)}_${tag}_${Date.now()}.mp4`;
-    const up = await client.storage.from('brand-assets').upload(sp, buf, { contentType: 'video/mp4', upsert: false });
+    const up = await client.storage.from('brand-assets').upload(sp, buf, { contentType: 'video/mp4', upsert: false, cacheControl: '31536000' });
     if (up.error) throw new Error(`upload ${tag}: ` + up.error.message);
     const { data: a, error } = await client.from('brand_assets')
       .insert({ kind: 'video', title: `${title} (${tag})`, storage_path: sp, source: 'video-pipeline' }).select('id').single();

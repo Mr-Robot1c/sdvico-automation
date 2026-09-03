@@ -70,7 +70,7 @@ for (const name of items) {
     if (dup && dup.length) { skipped += 1; console.log(`  - da co trong kho tu lieu: ${name}`); continue; }
     const safeName = name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_');
     const mediaPath = `zalo/${Date.now()}-${safeName}`;
-    const upM = await client.storage.from('brand-assets').upload(mediaPath, buf, { contentType: ctype(name) });
+    const upM = await client.storage.from('brand-assets').upload(mediaPath, buf, { contentType: ctype(name), cacheControl: '31536000' });
     if (upM.error) { console.error(`  X media ${name}: ${upM.error.message}`); errors += 1; continue; }
     const { guessGroup } = await import('./products.mjs');
     const grp = guessGroup(name) || 'Content';

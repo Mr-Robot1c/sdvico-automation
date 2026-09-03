@@ -6,6 +6,16 @@ const nextConfig = {
   // bỏ auto-redirect; link nội bộ vẫn không dấu "/" cuối).
   skipTrailingSlashRedirect: true,
 
+  // 3/9 GIẢM EGRESS: ảnh bucket Supabase đi qua máy nén ảnh Vercel (/_next/image) — khách và
+  // Facebook kéo webp đúng cỡ từ CDN Vercel, Supabase chỉ bị gọi 1 lần mỗi cỡ. Wildcard
+  // **.supabase.co để đổi project không phải sửa config. Cache tối thiểu 31 ngày.
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**.supabase.co', pathname: '/storage/v1/object/public/**' },
+    ],
+    minimumCacheTTL: 2678400,
+  },
+
   // Native binary (.node / ffmpeg) — để Next require lúc chạy, không nhồi vào bundle webpack.
   // Ghép logo dùng @napi-rs/canvas (external, tự trace như banner) + logo nhúng base64, không cần
   // trace thêm sharp/asset nữa.

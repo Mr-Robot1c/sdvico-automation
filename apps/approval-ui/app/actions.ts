@@ -1446,7 +1446,7 @@ export async function uploadAsset(formData: FormData) {
 
   const { error: upErr } = await client.storage
     .from('brand-assets')
-    .upload(path, buf, { contentType });
+    .upload(path, buf, { contentType, cacheControl: '31536000' });
   if (upErr) throw new Error('Tải lên lỗi: ' + upErr.message);
 
   const license = String(formData.get('license') || 'owned') === 'licensed' ? 'licensed' : 'owned';
@@ -1554,7 +1554,7 @@ async function uploadImageBuffer(
   const ext = contentType.includes('png') ? 'png' : 'jpg';
   const safe = (title || 'anh').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
   const path = `${Date.now()}-${safe}.${ext}`;
-  const { error: upErr } = await client.storage.from('brand-assets').upload(path, buf, { contentType });
+  const { error: upErr } = await client.storage.from('brand-assets').upload(path, buf, { contentType, cacheControl: '31536000' });
   if (upErr) throw new Error('Tải lên Storage lỗi: ' + upErr.message);
   const { data, error } = await client
     .from('brand_assets')

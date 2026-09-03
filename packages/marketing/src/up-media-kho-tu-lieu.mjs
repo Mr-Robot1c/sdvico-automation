@@ -154,7 +154,7 @@ for (const m of media) {
   const sp = `zalo-auto/${Date.now()}-${m.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const buf = readFileSync(m.full);
 
-  const upRes = await client.storage.from('brand-assets').upload(sp, buf, { contentType: mime, upsert: false });
+  const upRes = await client.storage.from('brand-assets').upload(sp, buf, { contentType: mime, upsert: false, cacheControl: '31536000' });
   if (upRes.error) { loi += 1; console.error(`  X ${m.name}: upload ${upRes.error.message}`); continue; }
   const ins = await client.from('brand_assets').insert({
     kind: isVideo ? 'video' : 'image',

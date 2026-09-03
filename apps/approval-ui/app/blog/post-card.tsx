@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { displayProduct, fmtDateVN, type PublicPost } from '../../lib/seo';
+import { displayProduct, fmtDateVN, optImg, type PublicPost } from '../../lib/seo';
 
 // Thẻ bài viết dùng chung cho /blog, /blog/chu-de, bài liên quan ở /san-pham/[slug]
 // (design-spec-trang-cong-khai: ô ảnh 16:10 LUÔN có để các thẻ đều chiều cao, tiêu đề tối đa
@@ -14,7 +14,7 @@ export default function PostCard({ post, hideProduct = false }: { post: PublicPo
     <article className="pub-card">
       <Link href={href} className="pub-card-media" aria-label={post.title} tabIndex={-1}>
         {post.imageUrl ? (
-          <img src={post.imageUrl} alt={post.title} loading="lazy" />
+          <img src={optImg(post.imageUrl, 640) || undefined} alt={post.title} loading="lazy" />
         ) : (
           <span className="pub-card-ph" aria-hidden="true">
             <img src="/logo-sdvico.png" alt="" />

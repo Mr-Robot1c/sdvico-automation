@@ -306,14 +306,14 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                     {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} loading="lazy" /> : null}
                     {vid ? (
                       <span className="card-media-vid">
-                        <video src={`${vid.url}#t=2`} muted preload="metadata" />
+                        <video src={`${vid.url}#t=2`} muted preload="none" />
                         <span className="card-media-badge" aria-hidden="true">▶</span>
                       </span>
                     ) : null}
                     {/* Thumbnail video Shorts đi kèm (bài riêng) — hiện cạnh ảnh để thấy đủ bộ. */}
                     {!vid && cid && linkedVideo.get(cid)?.videoAssetId && assetUrl.get(linkedVideo.get(cid)!.videoAssetId!) ? (
                       <span className="card-media-vid card-media-linked" title={`Video Shorts đi kèm: ${linkedVideo.get(cid)!.title} (bài riêng, ${linkedVideo.get(cid)!.queueStatus === 'pending' ? 'đang chờ duyệt' : linkedVideo.get(cid)!.queueStatus === 'approved' ? 'đã duyệt' : linkedVideo.get(cid)!.queueStatus})`}>
-                        <video src={assetUrl.get(linkedVideo.get(cid)!.videoAssetId!)!.url} muted preload="metadata" />
+                        <video src={assetUrl.get(linkedVideo.get(cid)!.videoAssetId!)!.url} muted preload="none" />
                         <span className="card-media-badge" aria-hidden="true">▶</span>
                         <span className="card-media-linked-tag">Shorts đi kèm</span>
                       </span>

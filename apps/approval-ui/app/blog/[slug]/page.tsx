@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getServerClient } from '../../../lib/supabase-server';
-import { catalogItemOf, fmtDateVN, isProductOf, loadPublicPost, loadPublicPosts, siteUrl } from '../../../lib/seo';
+import { catalogItemOf, fmtDateVN, isProductOf, loadPublicPost, loadPublicPosts, optImg, optImgAbs, siteUrl } from '../../../lib/seo';
 import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
 import { safeJsonLd } from '../../../lib/jsonld';
 import ContactButtons from '../../contact-buttons';
@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url,
       type: 'article',
       siteName: 'SDVICO',
-      images: post.imageUrl ? [{ url: post.imageUrl }] : [],
+      images: post.imageUrl ? [{ url: optImgAbs(post.imageUrl, 1200)! }] : [],
       publishedTime: post.publishedAt || undefined
     },
     alternates: { canonical: url }
@@ -58,7 +58,7 @@ export default async function BlogDetailPage({ params }: Props) {
     '@type': 'BlogPosting',
     headline: post.title,
     description: post.excerpt,
-    image: post.imageUrl ? [post.imageUrl] : undefined,
+    image: post.imageUrl ? [optImgAbs(post.imageUrl, 1200)!] : undefined,
     datePublished: post.publishedAt || undefined,
     author: { '@type': 'Organization', name: 'SDVICO', url: siteUrl() },
     publisher: { '@type': 'Organization', name: 'SDVICO', url: siteUrl() },
@@ -90,7 +90,7 @@ export default async function BlogDetailPage({ params }: Props) {
           ) : null}
         </div>
         {post.imageUrl ? (
-          <img className="pub-read-hero" src={post.imageUrl} alt={post.title} />
+          <img className="pub-read-hero" src={optImg(post.imageUrl, 1080) || undefined} alt={post.title} />
         ) : null}
         <div className="pub-read-body">{post.body}</div>
 

@@ -261,3 +261,21 @@ export function fmtDateVN(iso: string | null | undefined): string {
   const get = (t: string) => parts.find((x) => x.type === t)?.value || '';
   return `${get('day')}/${get('month')}/${get('year')}`;
 }
+
+// ===== 3/9 GIẢM EGRESS: ảnh Supabase đi qua /_next/image của chính app =====
+// Chỉ proxy URL bucket public của Supabase; nguồn khác (Unsplash, ảnh local /public) giữ
+// nguyên vì không tốn egress Supabase. w chỉ dùng 640 (thẻ), 1080 (hero), 1200 (og) —
+// nằm trong bộ deviceSizes mặc định của Next, số khác sẽ bị /_next/image trả 400.
+const SUPA_PUB_PREFIX = `${(process.env.SUPABASE_URL || '').replace(/\/$/, '')}/storage/v1/object/public/`;
+export function optImg(url: string | null | undefined, w: 640 | 1080 | 1200 = 640): string | null {
+  const u = String(url || '');
+  if (!u) return null;
+  if (!process.env.SUPABASE_URL || !u.startsWith(SUPA_PUB_PREFIX)) return u;
+  return `/_next/image?url=${encodeURIComponent(u)}&w=${w}&q=70`;
+}
+// Bản TUYỆT ĐỐI cho og:image + JSON-LD (Facebook/Google đòi URL đầy đủ).
+export function optImgAbs(url: string | null | undefined, w: 640 | 1080 | 1200 = 1200): string | null {
+  const o = optImg(url, w);
+  if (!o) return null;
+  return o.startsWith('http') ? o : `${siteUrl()}${o}`;
+}

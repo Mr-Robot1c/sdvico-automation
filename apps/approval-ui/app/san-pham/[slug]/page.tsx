@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { findProductBySlug, PRODUCT_CATALOG } from '../../../lib/product-catalog';
-import { isProductOf, loadPublicPosts, siteUrl, type PublicPost } from '../../../lib/seo';
+import { isProductOf, loadPublicPosts, optImg, siteUrl, type PublicPost } from '../../../lib/seo';
 import { getServerClient } from '../../../lib/supabase-server';
 import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
 import { safeJsonLd } from '../../../lib/jsonld';
@@ -91,7 +91,7 @@ export default async function ProductDetailPage({ params }: Props) {
         <section className="pub-hero">
           <div className="pub-hero-media">
             {images[0] ? (
-              <img src={images[0]} alt={p.name} />
+              <img src={optImg(images[0], 1080) || undefined} alt={p.name} />
             ) : (
               <span className="pub-card-ph" aria-hidden="true"><img src="/logo-sdvico.png" alt="" /></span>
             )}
@@ -129,7 +129,7 @@ export default async function ProductDetailPage({ params }: Props) {
           <section className="pub-section">
             <h2>Ảnh sản phẩm và lắp đặt</h2>
             <div className="pub-gallery">
-              {images.slice(1).map((src, i) => (<img key={i} src={src} alt={`${p.name} ${i + 2}`} loading="lazy" />))}
+              {images.slice(1).map((src, i) => (<img key={i} src={optImg(src, 640) || undefined} alt={`${p.name} ${i + 2}`} loading="lazy" />))}
             </div>
           </section>
         ) : null}
