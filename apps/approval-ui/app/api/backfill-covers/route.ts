@@ -36,13 +36,32 @@ export async function POST(req: Request) {
     if (cid && !seen.has(cid)) { seen.add(cid); cids.push(cid); }
   }
 
-  const taken = new Set<string>(); // cấp lại từ đầu theo thứ tự mới -> cũ, mỗi ảnh 1 bài
+  // 3/9 khuya: PRE-PASS chống hở thứ tự — trước đây taken xây DẦN trong lúc quét, nên ảnh
+  // của bài đứng SAU (cũ hơn) chưa vào sổ khi bài đứng trước được vá; 2 lô khác nhau đã cấp
+  // trùng 1 ảnh Pexels cho 2 bài (dính thật, photo 38828586). Giờ: quét briefs một lượt,
+  // bài ĐẦU TIÊN (mới nhất) giữ mỗi ảnh là CHỦ; taken khởi tạo = toàn bộ ảnh có chủ; bài
+  // là chủ thì bỏ qua luôn (khỏi HEAD-check), bài trùng/thiếu mới gọi ensure.
+  const { data: briefRows } = await client
+    .from('mkt_content').select('id, brief').in('id', cids).is('deleted_at', null);
+  const briefBy = new Map<string, any>((briefRows || []).map((r: any) => [String(r.id), r.brief || {}]));
+  const owner = new Map<string, string>();
+  for (const cid of cids) {
+    const a = briefBy.get(cid)?.assets || {};
+    for (const k of [a.image, a.image_url]) {
+      const key = k ? String(k) : '';
+      if (key && !owner.has(key)) owner.set(key, cid);
+    }
+  }
+  const taken = new Set<string>(owner.keys());
   const results: Array<{ id: string; via: string; note?: string }> = [];
   let fixed = 0;
   let remaining = 0;
   for (const cid of cids) {
-    // Bài đã có ảnh riêng sống + chưa ai giữ thì ensure trả 'giu-nguyen' rất nhanh;
-    // chỉ bài hỏng/trùng mới tốn lượt Gemini — đếm vào limit.
+    const a = briefBy.get(cid)?.assets || {};
+    const mine = [a.image, a.image_url].filter(Boolean).map(String);
+    if (mine.some((k) => owner.get(k) === cid)) continue; // chủ thật của ảnh — giữ, khỏi tốn lượt
+    // Bài trùng (ảnh có chủ là bài khác) hoặc thiếu ảnh -> ensure sẽ vá; taken đã đầy đủ
+    // nên không thể cấp lại ảnh đang có chủ.
     const r = await ensureCoverForContent(client, cid, { taken });
     if (r.via !== 'giu-nguyen' && r.via !== 'skip') {
       fixed++;
