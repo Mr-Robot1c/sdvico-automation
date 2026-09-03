@@ -194,9 +194,15 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
     // — miễn hợp bài; ảnh kho vẫn là fallback khi không có.
     let imageUrl = String(brief?.assets?.image_url || '') || await imageUrlOf(client, brief?.assets?.image);
     if (!imageUrl) {
+      // 3/9 tối (user: "các blog dùng hình y chang nhau"): prodKey RỖNG (bài content) làm vế
+      // g.includes('') LUÔN đúng -> khớp mờ vớ ngay nhóm ĐỨNG ĐẦU pool (nhóm của ảnh up mới
+      // nhất — chiều 3/9 là Sơn RARE, pool đúng 1 ảnh) -> 22 thẻ trùng 1 ảnh. Rỗng thì bỏ
+      // khớp nhóm, đi thẳng pool chung bên dưới.
       const prodKey = normName(productOf(brief, title, draft));
-      const prodPool = poolByGroup.get(prodKey)
-        || [...poolByGroup.entries()].find(([g]) => g && (prodKey.includes(g) || g.includes(prodKey)))?.[1];
+      const prodPool = prodKey
+        ? (poolByGroup.get(prodKey)
+          || [...poolByGroup.entries()].find(([g]) => g && (prodKey.includes(g) || g.includes(prodKey)))?.[1])
+        : undefined;
       const pool = (prodPool && prodPool.length)
         ? prodPool
         : (() => { const generic = noZalo(poolByGroup.get('content') || []); return generic.length ? generic : noZalo(poolAll); })();
@@ -216,6 +222,9 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
       fbUrl: info.fbUrl
     });
   }
+  // 3/9 tối (user: "không sắp xếp theo ngày"): /blog và trang chủ đề render THẲNG thứ tự này
+  // (trước chỉ /seo tự sort) — trả về đã sắp mới đăng trước cho mọi nơi dùng chung.
+  posts.sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')));
   return posts;
 }
 
