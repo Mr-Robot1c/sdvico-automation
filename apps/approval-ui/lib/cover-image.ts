@@ -68,15 +68,23 @@ export async function ensureCoverForContent(
     const assets = brief.assets || {};
     const taken = opts.taken || (await collectTakenCovers(client, contentId));
 
-    // Đã có ảnh riêng, còn sống và không trùng bài khác -> giữ.
+    // Đã có ảnh riêng, còn sống và không trùng bài khác -> giữ. PHẢI add vào taken TRƯỚC
+    // khi return — 3/9 tối dính bug quên add: 5 bài cùng giữ 1 ảnh đều thấy "chưa ai giữ"
+    // nên cả 5 được giu-nguyen, backfill báo remaining 0 mà trang vẫn trùng nguyên cụm.
     if (!opts.force) {
-      if (assets.image_url && !taken.has(String(assets.image_url))) return { via: 'giu-nguyen' };
+      if (assets.image_url && !taken.has(String(assets.image_url))) {
+        taken.add(String(assets.image_url));
+        return { via: 'giu-nguyen' };
+      }
       if (assets.image && !taken.has(String(assets.image))) {
         const { data: row } = await client.from('brand_assets').select('storage_path').eq('id', assets.image).maybeSingle();
         if (row?.storage_path) {
           const url = client.storage.from('brand-assets').getPublicUrl(row.storage_path).data.publicUrl;
           const res = await fetch(url, { method: 'HEAD' }).catch(() => null);
-          if (res?.ok) return { via: 'giu-nguyen' };
+          if (res?.ok) {
+            taken.add(String(assets.image));
+            return { via: 'giu-nguyen' };
+          }
         }
       }
     }
