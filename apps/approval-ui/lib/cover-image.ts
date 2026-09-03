@@ -131,6 +131,15 @@ export async function ensureCoverForContent(
       taken.add(String(picked.id));
       return { via: picked.via || 'pool' };
     }
+    // 3/9 khuya: bài ĐANG giữ ảnh (nhưng rơi tới đây = ảnh đó trùng bài khác hoặc chết) mà
+    // không kiếm được ảnh thay -> phải GỠ ảnh về placeholder, kẻo cặp trùng lì mãi trên
+    // trang (đã dính: photo Pexels 38828586 dính 2 bài, backfill chạy bao lượt vẫn nguyên).
+    if (assets.image || assets.image_url) {
+      await client.from('mkt_content').update({
+        brief: { ...brief, assets: { ...assets, image: null, image_url: null }, image_via: 'placeholder' },
+      }).eq('id', contentId);
+      return { via: 'go-anh-trung', note: 'gỡ ảnh trùng/chết, thẻ hiện placeholder — không lặp ảnh bài khác' };
+    }
     return { via: 'khong-tim-duoc', note: 'thẻ sẽ hiện placeholder logo' };
   } catch (e: any) {
     return { via: 'loi', note: String(e?.message || e).slice(0, 120) };

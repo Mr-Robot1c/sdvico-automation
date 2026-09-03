@@ -340,3 +340,4 @@ Chi tiết cột + RLS: [database.md](database.md).
 
 Lịch sử re-verify chi tiết ở [reverify-log.md](reverify-log.md). Từ đây, các dòng `<!-- re-verified -->` mới do hook doc-health sinh ra sẽ nằm bên dưới; định kỳ dồn sang file nhật ký khi phình.
 <!-- re-verified: 2026-09-03 khuya (2) - backfill-covers PRE-PASS: taken khoi tao tu TOAN BO anh dang co chu (bai moi nhat = chu) truoc khi va, bai la chu thi skip — bit ho thu tu lam 2 lo cap trung 1 anh Pexels cho 2 bai. -->
+<!-- re-verified: 2026-09-03 khuya (3) - ensureCoverForContent: bai dang giu anh TRUNG/chet ma khong kiem duoc anh thay thi GO anh ve placeholder (via go-anh-trung) thay vi return khong-tim-duoc de nguyen — cap trung Pexels 38828586 li mai vi thieu nhanh nay. -->
