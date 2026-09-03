@@ -156,12 +156,10 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
   type PoolImg = { storage_path: string; source?: string | null };
   const normName = (s: string) => String(s || '').replace(/^\s*\d+\.\s*/, '').trim().toLowerCase();
   const poolByGroup = new Map<string, PoolImg[]>();
-  const poolAll: PoolImg[] = [];
   for (const a of (poolRows || []) as any[]) {
     const g = normName(a.product_group);
     if (!poolByGroup.has(g)) poolByGroup.set(g, []);
     poolByGroup.get(g)!.push(a);
-    poolAll.push(a);
   }
   // 28/8 chiều (user: 2 bài không liên quan cùng mang ảnh Zalo ăn mì): ảnh nhập từ Zalo là
   // ảnh chat đời thường — CHỈ được làm cover khi nằm ĐÚNG folder sản phẩm của bài (ảnh lắp
@@ -179,7 +177,10 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
       const cand = arr[(n + k) % arr.length];
       if (!usedCovers.has(publicUrlOf(cand.storage_path))) return cand;
     }
-    return arr[n % arr.length]; // toàn pool đã dùng — chấp nhận lặp còn hơn trống
+    // 3/9 tối (user: "blog không được dính trùng ảnh"): pool cạn thì trả TRỐNG (placeholder
+    // logo) chứ KHÔNG lặp ảnh bài khác. Bài từ giờ có ảnh riêng gắn lúc đăng (cover-image.ts),
+    // nhánh pool này chỉ còn là lưới cuối cho bài cũ chưa backfill.
+    return null;
   };
 
   const posts: PublicPost[] = [];
@@ -203,9 +204,12 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
         ? (poolByGroup.get(prodKey)
           || [...poolByGroup.entries()].find(([g]) => g && (prodKey.includes(g) || g.includes(prodKey)))?.[1])
         : undefined;
+      // 3/9 tối (user bắt bài máy lọc NƯỚC mang ảnh máy lọc DẦU): bài KHÔNG rõ nhóm chỉ được
+      // dùng ảnh folder Content — TUYỆT ĐỐI không rơi về poolAll (ảnh sản phẩm để dành cho
+      // bài đúng nhóm). Hết ảnh thì placeholder, cover-image.ts sẽ đi kiếm ảnh riêng.
       const pool = (prodPool && prodPool.length)
         ? prodPool
-        : (() => { const generic = noZalo(poolByGroup.get('content') || []); return generic.length ? generic : noZalo(poolAll); })();
+        : noZalo(poolByGroup.get('content') || []);
       const pick = stablePick(pool, id);
       if (pick) imageUrl = publicUrlOf(pick.storage_path);
     }

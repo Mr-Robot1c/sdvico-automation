@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../lib/supabase-server';
 import { slugify, siteUrl } from '../lib/seo';
+import { ensureCoverForContent } from '../lib/cover-image';
 // Các module sinh nội dung dùng chung (bản .mjs chép từ packages/marketing).
 // @ts-ignore module JS không có kiểu
 import { generateAllFormats } from '../lib/gen/content.mjs';
@@ -70,11 +71,15 @@ async function generateForKw(client: any, kw: any): Promise<{ count: number; gen
       });
       if (!postErr) {
         blogUrl = url;
+        // 3/9 (user: "blog không được dính trùng ảnh"): gắn ảnh RIÊNG cho bài ngay lúc đăng
+        // — folder nhóm trước, không có thì Gemini kiếm Google/Unsplash có chấm điểm.
+        // Best effort: thiếu ảnh chỉ ra placeholder, không chặn việc đăng.
+        const cover = await ensureCoverForContent(client, inserted.id);
         await client.from('run_log').insert({
           task: 'mkt.blog_publish',
           actor: 'nguoi-bam',
           status: 'ok',
-          detail: { content_id: inserted.id, url, keyword: kw.keyword, msg: 'bài Website sạch tự đăng blog' }
+          detail: { content_id: inserted.id, url, keyword: kw.keyword, cover: cover.via, msg: 'bài Website sạch tự đăng blog' }
         });
         count++;
         continue; // đã đăng blog — KHÔNG vào hàng đợi duyệt
