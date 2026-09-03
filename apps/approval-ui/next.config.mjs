@@ -7,11 +7,13 @@ const nextConfig = {
   skipTrailingSlashRedirect: true,
 
   // 3/9 GIẢM EGRESS: ảnh bucket Supabase đi qua máy nén ảnh Vercel (/_next/image) — khách và
-  // Facebook kéo webp đúng cỡ từ CDN Vercel, Supabase chỉ bị gọi 1 lần mỗi cỡ. Wildcard
-  // **.supabase.co để đổi project không phải sửa config. Cache tối thiểu 31 ngày.
+  // Facebook kéo webp đúng cỡ từ CDN Vercel, Supabase chỉ bị gọi 1 lần mỗi cỡ. hostname CHỈ
+  // nhận wildcard `*` MỘT cấp con (Next.js không cho `**` ở hostname, chỉ pathname) — bản đầu
+  // dùng "**.supabase.co" bị Next lặng lẽ không khớp, /_next/image trả 400 (phát hiện lúc
+  // verify production 3/9). Cache tối thiểu 31 ngày.
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '**.supabase.co', pathname: '/storage/v1/object/public/**' },
+      { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/object/public/**' },
     ],
     minimumCacheTTL: 2678400,
   },
