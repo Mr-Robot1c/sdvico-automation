@@ -3,6 +3,8 @@
 > Load khi / Load when: cần hiểu hệ thống chạy thế nào, con AI nào làm gì, file nào ở đâu, hoặc trước khi sửa code chạm nhiều mảng. Đây là trang chỉ mục + bản đồ tổng.
 > Nguồn sự thật khác: `CLAUDE.md` (bảy điều cấm + giọng văn), `supabase/migrations` (lược đồ), các file bên dưới cho chi tiết từng mảng.
 covers: packages/core, apps/approval-ui, supabase/migrations
+<!-- re-verified: 2026-09-03 khuya - TANG GOOGLE CSE CHET HAN (Google khai tu "search the entire web" cho Programmable Search Engine — tooltip console 3/9 xac nhan, engine moi lan cu deu khong bat duoc; khong phai thieu key, GOOGLE_CSE_API_KEY/ID co tren Vercel tu 26/8 nhung engine chi tim images.google.com nen luon rong). pick-image.mjs them tang PEXELS the cho (1b, giua CSE va Unsplash): search kw.en per_page 10, vision cham 5 ung vien nhu cac tang, via 'pexels-link' + credit Pexels/<photographer>; PEXELS_API_KEY co san tren Vercel (video pipeline dung tu truoc), 200 req/gio, license CC0. Gate sinh keyword them PEXELS_API_KEY. -->
+
 <!-- re-verified: 2026-09-03 dem - HOTFIX cover-image.ts ensureCoverForContent: 2 nhanh 'giu-nguyen' QUEN taken.add truoc khi return -> N bai cung giu 1 anh deu duoc coi 'chua ai giu', backfill-covers bao remaining 0 ma /blog van 5 cum trung (user bat lan 2). Fix: add anh dang giu vao taken roi moi return. Chay lai backfill sau deploy la cac bai trung duoc va that. -->
 last_verified: 2026-09-03
 ttl_days: 180

@@ -281,7 +281,7 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
   const allowSave = process.env.ALLOW_EXTERNAL_IMAGE_SAVE === '1';
   const hotlink = !allowSave && process.env.EXTERNAL_IMAGE_MODE !== 'off';
   const useExternal = allowSave || hotlink;
-  const kw = useExternal && (process.env.GOOGLE_CSE_API_KEY || process.env.UNSPLASH_ACCESS_KEY)
+  const kw = useExternal && (process.env.GOOGLE_CSE_API_KEY || process.env.PEXELS_API_KEY || process.env.UNSPLASH_ACCESS_KEY)
     ? await imageKeywordsFor(text, client, bodyHint)
     : { vi: '', en: '' };
 
@@ -318,6 +318,41 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
             }
           }
         }
+      }
+    }
+  } catch { /* rơi xuống Pexels */ }
+
+  // 1b. PEXELS — thế chân tầng Google (3/9 đêm: Google KHAI TỬ "tìm toàn bộ web" cho
+  // Programmable Search Engine, engine mới không bật được nữa — tooltip console xác nhận;
+  // nhánh CSE trên giữ lại phòng khi có engine đời cũ còn sống, thực tế đang trả rỗng).
+  // Pexels: license CC0 dùng thương mại thoải mái, 200 req/giờ (gấp 4 Unsplash demo),
+  // PEXELS_API_KEY có sẵn trên Vercel (video pipeline dùng từ trước). Vẫn qua thẩm định
+  // bằng mắt AI như mọi tầng.
+  try {
+    if (useExternal && process.env.PEXELS_API_KEY && kw.en) {
+      const r = await fetch(
+        `https://api.pexels.com/v1/search?query=${encodeURIComponent(kw.en.slice(0, 100))}&per_page=10&orientation=landscape`,
+        { headers: { Authorization: process.env.PEXELS_API_KEY } }
+      );
+      const photos = r.ok ? (await r.json())?.photos || [] : [];
+      if (photos.length) {
+        const cands = photos.slice(0, 5)
+          .filter((p) => p?.src?.large || p?.src?.large2x)
+          .map((p) => ({ url: p.src.large2x || p.src.large, thumb: p.src.medium || p.src.small, photo: p }));
+        let judged;
+        try { judged = await assessCandidates(client, cands, text, bodyHint); }
+        catch { judged = undefined; }
+        const chosen = judged === null ? null : judged ? judged.candidate : cands.length ? pickRandom(cands) : null;
+        if (chosen) {
+          return {
+            id: null,
+            url: chosen.url,
+            via: 'pexels-link',
+            credit: chosen.photo?.photographer ? `Pexels/${chosen.photo.photographer}` : 'Pexels',
+            note: `q="${kw.en}"${judged ? ` cham ${judged.score}/10` : ' (cham loi - random)'} (link, khong luu)`,
+          };
+        }
+        // judged === null: ảnh Pexels đều lệch bài -> thử Unsplash rồi tới ảnh nhà
       }
     }
   } catch { /* rơi xuống Unsplash */ }
