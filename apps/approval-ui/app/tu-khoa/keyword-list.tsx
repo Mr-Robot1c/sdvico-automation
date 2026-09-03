@@ -23,7 +23,7 @@ function WriteButton({ id }: { id: string }) {
   const [pending, startTransition] = useTransition();
   return (
     <button
-      className="btn"
+      className="btn ok"
       type="button"
       disabled={pending}
       title="Sinh 3 bản (web, Facebook, video) vào hàng đợi duyệt — không tự đăng"

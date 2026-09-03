@@ -235,7 +235,10 @@ button.chip { font: inherit; cursor: pointer; line-height: 1.3; }
 @keyframes vp-blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 :root[data-theme='dark'] .badge-video-pending, @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .badge-video-pending { background: #4a3a12; color: #fde68a; } }
 :root[data-theme='dark'] .badge-ab, @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .badge-ab { background: #3b2a6b; color: #ddd6fe; } }
-.btn { font-family: inherit; font-size: 14px; font-weight: 600; border: 0; border-radius: 8px; padding: 9px 18px; cursor: pointer; color: #fff; }
+/* 3/9 tối (user: nút "Viết bài" dark mode nền trắng chữ trắng mất chữ): base trước đây KHÔNG
+   đặt background (ngầm định luôn kèm tone .ok/.no/.ghost) — nút dùng "btn" TRẦN rơi về nền
+   mặc định trình duyệt (sáng) + chữ #fff. Cho base nền accent; các tone vẫn ghi đè như cũ. */
+.btn { font-family: inherit; font-size: 14px; font-weight: 600; border: 0; border-radius: 8px; padding: 9px 18px; cursor: pointer; color: #fff; background: var(--accent, #1f5fbf); }
 .btn:disabled { opacity: 0.6; cursor: default; }
 .ok { background: var(--ok); }
 .no { background: var(--no); }
