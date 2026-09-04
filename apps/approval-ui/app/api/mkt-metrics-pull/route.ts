@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../lib/supabase-server';
 import { pullFacebookMetrics } from '../../../lib/fb-metrics';
-import { generateAndStorePlan, planSlotVN, vnDayStartIso } from '../../../lib/plan';
+import { generateAndStorePlan, planSlotVN, vnDayStartIso, weekWindowVN } from '../../../lib/plan';
 import { importInternalFromBucket } from '../../../lib/knowledge';
 import { learnPublicKnowledge, learnPublicDaily, scoreUnscoredKnowledge } from '../../../lib/knowledge-public';
 import { pullTikTokMetrics } from '../../../lib/tiktok-metrics';
 import { pullFacebookInbox } from '../../../lib/fb-inbox';
 import { learnWeekly, shouldRunLearnWeekly } from '../../../lib/learn-weekly';
 import { refreshLiveProposal, applyLiveEvening } from '../../../lib/plan-live';
+import { loadPostingPlan, buildBossPostingPlan, savePostingPlan, pruneOverrides, isPlanForCurrentWeek } from '../../../lib/posting-plan';
 
 // Kéo số liệu tương tác Facebook về mkt_metrics. Gọi bởi Vercel Cron (Authorization: Bearer
 // CRON_SECRET) hoặc thủ công (?secret=CRON_SECRET).
@@ -26,6 +27,18 @@ import { refreshLiveProposal, applyLiveEvening } from '../../../lib/plan-live';
 export const dynamic = 'force-dynamic';
 // 90s: metrics + import + RSS + evaluator (+ Gemini directions ngày sinh kế hoạch).
 export const maxDuration = 90;
+
+// 4/9 khuya (user: "xếp lại mỗi Thứ 2, chỉ cố định trong 1 tuần, tuần sau là plan mới"):
+// BOSS xếp lịch đăng cố định cho tuần chứa `now`, GHI ĐÈ lịch tuần trước (kể cả ô người sửa tuần
+// trước), override ngày cũ bỏ, override ngày tới giữ. Trả về tóm tắt để ghi run_log.
+async function bossProposePostingPlan(client: ReturnType<typeof getServerClient>, reason: string, now = new Date()) {
+  const cur = await loadPostingPlan(client);
+  const { plan, input } = await buildBossPostingPlan(client, now);
+  await savePostingPlan(client, { ...plan, overrides: pruneOverrides(cur.plan.overrides, plan.week_start || '') });
+  const detail = { reason, weekStart: plan.week_start, groups: input.shareGroups.length, youtubeReady: input.youtubeReady, clipFolders: input.clipFolders, replacedSource: cur.saved ? cur.plan.source || 'default' : 'none' };
+  try { await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'cron', status: 'ok', detail }); } catch { /* bo qua */ }
+  return detail;
+}
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -190,6 +203,7 @@ export async function GET(req: Request) {
     }
     return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan, forced: true });
   }
+  let postingPlan: Record<string, unknown> | null = null;
   const slot = planSlotVN(new Date());
   if (slot) {
     const { count: cronToday } = await client
@@ -211,6 +225,9 @@ export async function GET(req: Request) {
           await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
           await client.from('mkt_plans').update({ applied: true, applied_at: new Date().toISOString() }).eq('id', id);
           applied = true;
+          // Thứ 2: xếp LỊCH ĐĂNG CỐ ĐỊNH tuần mới cùng lượt với kế hoạch tuần.
+          try { postingPlan = await bossProposePostingPlan(client, 'thu 2 - ke hoach tuan moi'); }
+          catch (e: any) { try { await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'cron', status: 'error', detail: { error: String(e?.message || e).slice(0, 300) } }); } catch { /* bo qua */ } }
         }
         plan = { id, ranked: p.summary.ranked, cadence: slot, directions: p.content_suggestions?.length || 0 };
         try {
@@ -220,6 +237,20 @@ export async function GET(req: Request) {
         console.error('[plan] sinh ke hoach that bai:', e?.message || e);
         try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'error', detail: { cadence: slot, error: String(e?.message || e) } }); } catch { /* bỏ qua */ }
       }
+    }
+  }
+
+  // LƯỚI AN TOÀN: lịch đang lưu không phải của tuần này (cron Thứ 2 trượt / lần đầu chưa có lịch)
+  // thì xếp ngay lượt này. Lịch đã đúng tuần (boss hay user) thì KHÔNG đụng — cố định trong tuần.
+  if (!postingPlan) {
+    try {
+      const cur = await loadPostingPlan(client);
+      const ws = weekWindowVN(new Date()).start;
+      if (!cur.saved || !isPlanForCurrentWeek(cur.plan, ws)) {
+        postingPlan = await bossProposePostingPlan(client, cur.saved ? `lich cu tuan ${cur.plan.week_start || '?'}` : 'chua co lich');
+      }
+    } catch (e: any) {
+      try { await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'cron', status: 'error', detail: { error: String(e?.message || e).slice(0, 300) } }); } catch { /* bo qua */ }
     }
   }
 
@@ -324,5 +355,5 @@ export async function GET(req: Request) {
     live = { error: String(e?.message || e) };
   }
 
-  return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan, learn, live, refill });
+  return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan, learn, live, refill, postingPlan });
 }

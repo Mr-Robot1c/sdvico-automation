@@ -37,6 +37,14 @@ export type PostingPlan = {
   version: 1;
   days: Record<string, PostingDay>;      // key '0'..'6' theo getUTCDay của ngày VN (0 = CN, 1 = T2)
   overrides: Record<string, PostingDay>; // key 'YYYY-MM-DD' -> lịch riêng chỉ ngày đó
+  // 4/9 khuya: ai xếp lịch này. 'boss' = thuật toán xếp (proposePostingPlan), 'user' = người sửa
+  // form, 'default' = chưa ai xếp (lịch tạm trong code). Lịch CỐ ĐỊNH TRONG TUẦN: BOSS xếp bản
+  // mới mỗi sáng Thứ 2 (user: "chỉ cố định trong 1 tuần, tuần sau là plan mới"); trong tuần chỉ
+  // người sửa hoặc bấm "BOSS xếp lại" mới đổi.
+  source?: 'boss' | 'user' | 'default';
+  week_start?: string;    // 'YYYY-MM-DD' Thứ 2 của tuần lịch này áp dụng (weekWindowVN.start)
+  proposed_at?: string;   // lần BOSS xếp gần nhất
+  notes?: string[];       // BOSS giải thích cách chia (hiện dưới bảng)
   updated_at?: string;
 };
 export type ShareGroup = { id: string; label: string; url: string };
@@ -108,7 +116,10 @@ export function normalizePostingPlan(raw: any): PostingPlan | null {
   for (const k of Object.keys(ov)) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(k)) overrides[k] = normalizeDay(ov[k]);
   }
-  return { version: 1, days, overrides, updated_at: raw.updated_at ? String(raw.updated_at) : undefined };
+  const source: PostingPlan['source'] = raw.source === 'boss' || raw.source === 'user' ? raw.source : 'default';
+  const notes = Array.isArray(raw.notes) ? raw.notes.map((x: any) => String(x)).slice(0, 12) : [];
+  const week_start = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.week_start || '')) ? String(raw.week_start) : undefined;
+  return { version: 1, days, overrides, source, notes, week_start, proposed_at: raw.proposed_at ? String(raw.proposed_at) : undefined, updated_at: raw.updated_at ? String(raw.updated_at) : undefined };
 }
 
 // Lịch mặc định = nhịp đang chạy trước plan này (rotate 4/9): 8h 1 bài bán, 14h 1 bài bán + 1
@@ -126,7 +137,99 @@ export function defaultPostingPlan(shareGroups: ShareGroup[] = []): PostingPlan 
       ],
     };
   });
-  return { version: 1, days, overrides: {} };
+  return { version: 1, days, overrides: {}, source: 'default', notes: [] };
+}
+
+// ===== BOSS XẾP LỊCH (user 4/9 khuya: "kế hoạch đăng cố định là kế hoạch con BOSS đưa ra, cố định
+// luôn cho tới khi ta tự thay đổi"). Thuật toán tất định, không LLM — mỗi ngày 2 bài bán + 1 content
+// (khớp WEEKLY_SALES_BUDGET 14), chia để KHÔNG LOÃNG:
+//   giờ trải 08:00 bán / 14:00 bán / 19:30 content; YouTube (nếu sẵn) rải T3-T5-T7 chiều;
+//   group xoay đều, không trùng trong ngày; content không group trừ CN (seeding).
+export type ProposeInput = { shareGroups: ShareGroup[]; youtubeReady: boolean; clipFolders: number; weekStart: string };
+export const BOSS_TIMES = { sale1: '08:00', sale2: '14:00', content: '19:30' } as const;
+const YOUTUBE_DOWS = new Set([2, 4, 6]); // T3, T5, T7
+
+// Số tuần kể từ epoch của một ngày YYYY-MM-DD — để xoay điểm bắt đầu group theo tuần.
+export function weekIndexOf(date: string): number {
+  return Math.floor(new Date(date + 'T00:00:00Z').getTime() / (7 * 24 * 3600 * 1000));
+}
+function fmtDM(date: string): string { return `${date.slice(8, 10)}/${date.slice(5, 7)}`; }
+
+export function proposePostingPlan(input: ProposeInput, now: Date = new Date()): PostingPlan {
+  const groups = input.shareGroups;
+  const n = groups.length;
+  // Xoay điểm bắt đầu theo tuần: tuần sau group khác đứng đầu T2 sáng (giờ vàng chia đều cả tháng).
+  let cursor = n ? weekIndexOf(input.weekStart) % n : 0;
+  const nextGroup = (usedToday: Set<string>): string | null => {
+    if (!n) return null;
+    for (let tries = 0; tries < n; tries++) {
+      const g = groups[cursor % n].id;
+      cursor++;
+      if (!usedToday.has(g)) { usedToday.add(g); return g; }
+    }
+    return null; // mọi group đã dùng hôm nay (N nhỏ) -> không gắn
+  };
+  const days: Record<string, PostingDay> = {};
+  const usage = new Map<string, number>();
+  for (const dowIdx of DOW_ORDER) {
+    const usedToday = new Set<string>();
+    const slots: PostingSlot[] = [];
+    const g1 = nextGroup(usedToday);
+    slots.push({ time: BOSS_TIMES.sale1, channel: 'facebook', kind: 'sale', group_id: g1 });
+    if (input.youtubeReady && YOUTUBE_DOWS.has(dowIdx)) {
+      slots.push({ time: BOSS_TIMES.sale2, channel: 'youtube', kind: 'sale', group_id: null });
+    } else {
+      slots.push({ time: BOSS_TIMES.sale2, channel: 'facebook', kind: 'sale', group_id: nextGroup(usedToday) });
+    }
+    const contentGroup = dowIdx === 0 ? nextGroup(usedToday) : null; // CN seeding mới chia group
+    slots.push({ time: BOSS_TIMES.content, channel: 'facebook', kind: 'content', group_id: contentGroup });
+    for (const s of slots) if (s.group_id) usage.set(s.group_id, (usage.get(s.group_id) || 0) + 1);
+    days[String(dowIdx)] = { slots };
+  }
+  const labelOf = (id: string) => groups.find((g) => g.id === id)?.label || id;
+  const weekEnd = new Date(new Date(input.weekStart + 'T00:00:00Z').getTime() + 6 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const notes: string[] = [
+    `Lịch tuần ${fmtDM(input.weekStart)} đến ${fmtDM(weekEnd)}. Sáng Thứ 2 tuần sau BOSS xếp bản mới; trong tuần chỉ bạn sửa mới đổi.`,
+    `Giờ trải 3 khung: ${BOSS_TIMES.sale1} bài bán, ${BOSS_TIMES.sale2} bài bán, ${BOSS_TIMES.content} bài content (tối, giờ bà con lướt Facebook).`,
+    input.youtubeReady
+      ? `YouTube rải cách ngày: T3, T5, T7 lúc ${BOSS_TIMES.sale2} (${input.clipFolders} folder sản phẩm có clip để dựng video).`
+      : 'Chưa dùng YouTube: cần YOUTUBE_REFRESH_TOKEN trên Vercel và folder sản phẩm có clip gốc.',
+    n
+      ? `Group xoay đều ${n} nhóm, mỗi bài bán Facebook 1 group, không trùng group trong ngày: ${[...usage.entries()].map(([id, c]) => `${labelOf(id)} ${c} lượt`).join(', ')}.`
+      : 'Chưa có group nào: thêm ở popover 📣 Chia sẻ group rồi bấm BOSS xếp lại.',
+    'Bài content không chia group (nuôi trang), riêng Chủ nhật (seeding dẫn về sản phẩm) có group.',
+  ];
+  return { version: 1, days, overrides: {}, source: 'boss', week_start: input.weekStart, proposed_at: now.toISOString(), notes };
+}
+
+// Override còn nghĩa: chỉ giữ ngày >= đầu tuần đang xếp (ngày cũ bỏ, ngày tương lai người đặt trước giữ).
+export function pruneOverrides(overrides: Record<string, PostingDay> | undefined, weekStart: string): Record<string, PostingDay> {
+  const out: Record<string, PostingDay> = {};
+  for (const [d, v] of Object.entries(overrides || {})) if (d >= weekStart) out[d] = v;
+  return out;
+}
+
+// Lịch đang lưu có phải của TUẦN HIỆN TẠI không (để cron biết cần xếp bản mới chưa).
+export function isPlanForCurrentWeek(plan: PostingPlan, weekStart: string): boolean {
+  return (plan.source === 'boss' || plan.source === 'user') && plan.week_start === weekStart;
+}
+
+// Đọc điều kiện thật từ DB + env rồi xếp cho tuần chứa `now`. KHÔNG tự lưu — nơi gọi quyết định.
+export async function buildBossPostingPlan(client: Client, now: Date = new Date()): Promise<{ plan: PostingPlan; input: ProposeInput }> {
+  const { weekWindowVN } = await import('./plan');
+  const weekStart = weekWindowVN(now).start;
+  const [shareGroups, { data: clips }] = await Promise.all([
+    loadShareGroups(client),
+    client.from('brand_assets').select('product_group, kind, source').in('kind', ['video', 'clip']).not('product_group', 'is', null).limit(2000),
+  ]);
+  const clipFolders = new Set(
+    ((clips || []) as any[])
+      .filter((a) => a.source !== 'video-pipeline' && a.product_group && a.product_group !== 'Content')
+      .map((a) => String(a.product_group))
+  ).size;
+  const youtubeReady = !!(process.env.YOUTUBE_REFRESH_TOKEN || '').trim() && clipFolders > 0;
+  const input: ProposeInput = { shareGroups, youtubeReady, clipFolders, weekStart };
+  return { plan: proposePostingPlan(input, now), input };
 }
 
 // Danh sách group dùng chung với popover 📣 (app_config mkt_share_groups, cùng luật normalize

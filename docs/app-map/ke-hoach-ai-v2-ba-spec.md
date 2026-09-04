@@ -2,6 +2,7 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
+<!-- re-verified: 2026-09-04 khuya - /ke-hoach khoi Lich dang co dinh: BOSS xep lich MOI THU 2 cung luot ke hoach tuan (thuat toan tat dinh, chi tiet README cung gio), trong tuan co dinh, nguoi Luu/sua giu toi het CN. Flow BOSS sinh huong di / NV / AC KHONG doi. -->
 <!-- re-verified: 2026-09-04 toi - /ke-hoach them khoi Lich dang co dinh (chi tiet README cung gio). Flow BOSS sinh huong di / NV / AC KHONG doi; BOSS khong duoc doi lich (lich do nguoi dat trong app_config mkt_posting_plan). -->
 <!-- re-verified: 2026-09-04 chieu - build-video.mjs: cleanNarration map "Page"->"pây" (sep doi 4/9 chieu) cho giong doc outro + stripGreeting canh 1 (bo loi chao, sep 4/9). Khong doi luong ke hoach/BA. -->
 <!-- re-verified: 2026-09-04 sang - packages/marketing/src doi (chi tiet o marketing.md cung gio): PRODUCTS them muc 9 SD12-300 + RULES phan loai anh nghiem hon. Flow ke hoach/BOSS/NV/AC KHONG doi. -->

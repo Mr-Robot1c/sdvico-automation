@@ -1520,9 +1520,11 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .tq-details > summary .sub { font-weight: 400; font-size: .85rem; }
 .tq-details[open] > summary { margin-bottom: 10px; }
 /* form Lịch đăng cố định (/ke-hoach) */
-.pp-slot { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 4px 0; }
-.pp-slot + .pp-slot { border-top: 1px dashed var(--line); }
-.pp-slot .pp-on { display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; color: var(--ink-2); min-width: 64px; }
-.pp-slot input[type='time'], .pp-slot select { padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-family: inherit; font-size: .85rem; }
-.pp-slot input[type='time'] { width: 92px; }
-.pp-table td { vertical-align: top; }
+/* form Lịch đăng cố định (/ke-hoach) — 4/9 khuya: mỗi bài 1 hàng, cột tách rõ */
+.pp-table td { vertical-align: middle; }
+.pp-table .pp-c-day { vertical-align: top; }
+.pp-table input[type='time'], .pp-table select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-family: inherit; font-size: .85rem; width: 100%; max-width: 100%; }
+.pp-table input[type='time'] { width: 104px; }
+.pp-table .pp-c-on label { display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; color: var(--ink-2); white-space: nowrap; }
+.pp-row:not(.on) td:not(.pp-c-day):not(.pp-c-on) { opacity: .45; }
+.pp-notes { margin: 0 0 10px; padding-left: 18px; font-size: .85rem; color: var(--ink-2); display: grid; gap: 2px; }

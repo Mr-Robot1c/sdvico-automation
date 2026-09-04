@@ -7,9 +7,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../../lib/supabase-server';
-import { generateAndStorePlan } from '../../lib/plan';
+import { generateAndStorePlan, weekWindowVN } from '../../lib/plan';
 import { refreshLiveProposal } from '../../lib/plan-live';
-import { loadPostingPlan, savePostingPlan, normalizeSlot, MAX_SLOTS_PER_DAY, type PostingDay, type PostingSlot } from '../../lib/posting-plan';
+import { loadPostingPlan, savePostingPlan, buildBossPostingPlan, pruneOverrides, normalizeSlot, MAX_SLOTS_PER_DAY, type PostingDay, type PostingSlot } from '../../lib/posting-plan';
 
 // NGƯỜI GIAO VIỆC vừa đổi mục tiêu / sản phẩm tập trung -> BOSS sinh lại kế hoạch NGAY và ÁP DỤNG
 // luôn (user 19/8: "đã note mục tiêu mới mà BOSS vẫn giữ kế hoạch cũ không cập nhật"). Đây là
@@ -178,7 +178,8 @@ export async function savePostingPlanAction(formData: FormData) {
   const current = await loadPostingPlan(client);
   const days: Record<string, PostingDay> = {};
   for (let d = 0; d < 7; d++) days[String(d)] = { slots: readSlots(formData, `s_${d}`) };
-  await savePostingPlan(client, { version: 1, days, overrides: current.plan.overrides || {} });
+  // Người sửa = lịch của TUẦN NÀY (week_start hôm nay); BOSS Thứ 2 tuần sau vẫn ra bản mới.
+  await savePostingPlan(client, { version: 1, days, overrides: current.plan.overrides || {}, source: 'user', week_start: weekWindowVN(new Date()).start, notes: current.plan.notes || [], proposed_at: current.plan.proposed_at });
   await afterPlanSaved(client, { kind: 'week', slotsPerDay: Object.fromEntries(Object.entries(days).map(([k, v]) => [k, v.slots.length])) });
 }
 export async function savePostingOverrideAction(formData: FormData) {
@@ -198,4 +199,16 @@ export async function clearPostingOverrideAction(formData: FormData) {
   delete overrides[date];
   await savePostingPlan(client, { ...current.plan, overrides });
   await afterPlanSaved(client, { kind: 'override-clear', date });
+}
+
+// BOSS XẾP LẠI LỊCH (user 4/9 khuya): người bấm giữa tuần → xếp lại cho TUẦN NÀY; override ngày cũ bỏ, ngày tới giữ.
+export async function proposePostingPlanAction() {
+  const client = getServerClient();
+  const current = await loadPostingPlan(client);
+  const { plan, input } = await buildBossPostingPlan(client);
+  await savePostingPlan(client, { ...plan, overrides: pruneOverrides(current.plan.overrides, plan.week_start || '') });
+  try {
+    await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'user', status: 'ok', detail: { groups: input.shareGroups.length, youtubeReady: input.youtubeReady, clipFolders: input.clipFolders, replaced: current.saved } });
+  } catch { /* bo qua */ }
+  await afterPlanSaved(client, { kind: 'boss', groups: input.shareGroups.length, youtubeReady: input.youtubeReady });
 }
