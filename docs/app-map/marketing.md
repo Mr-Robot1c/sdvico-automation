@@ -2,6 +2,7 @@
 
 > Đọc khi làm phần Marketing. Phụ trách Bạn B. Nền chung ở [README.md](README.md), điều cấm và giọng văn ở CLAUDE.md.
 covers: packages/marketing
+<!-- re-verified: 2026-09-04 sang - products.mjs them muc 9 SD12-300 (match + hashtag + FEATURES 6 dong); up-media-kho-tu-lieu SIET RULES phan loai: chi vao folder san pham khi anh CHINH LA thiet bi do, anh khoang may/hau truong -> Content. -->
 last_verified: 2026-09-02
 ttl_days: 180
 <!-- re-verified: 2026-09-03 - Giam can egress phia packages/marketing: up-media-kho-tu-lieu / upload-folders / upload-zalo-to-bucket (dong 73, nhanh media brand-assets) / build-video dong 409 (video trend) them cacheControl 31536000 khi upload. Duong upload kho-tri-thuc-noi-bo (private, doc 1 lan) giu nguyen. -->

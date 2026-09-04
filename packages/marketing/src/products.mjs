@@ -29,6 +29,10 @@ export const PRODUCTS = [
   { no: 8, group: '8. Sơn RARE',
     match: ['son rare', 'son-rare', 'rare'],
     hashtags: ['#sơn_RARE', '#sơn_chống_nóng', '#chống_nóng_tàu', '#làm_mát_tàu'] },
+  // 4/9 (user: bài SD12-300 mang ảnh máy phát sà lan vì Gemini phân loại ẩu + PRODUCTS thiếu mục 9):
+  { no: 9, group: '9. Máy Lọc Dầu Diesel SD12-300',
+    match: ['sd12-300', 'sd12 300', 'sd12300', 'may loc dau diesel', 'loc dau diesel', 'diesel sd12'],
+    hashtags: ['#máy_lọc_dầu_diesel', '#SD12_300', '#bảo_vệ_kim_phun', '#lọc_nước_trong_dầu'] },
 ];
 
 // Tính năng - thông số THẬT của từng sản phẩm (nguồn: file "tính năng N.txt" trong kho tư liệu).
@@ -80,6 +84,14 @@ export const FEATURES = {
     'Phản xạ tới 95% năng lượng mặt trời, từ vùng khả kiến tới hồng ngoại nhiệt',
     'Làm mát bằng bức xạ trong vùng 8 tới 14 micromet, tỏa nhiệt trực tiếp ra ngoài',
     'Chống nóng vượt trội so với sơn thường trên thị trường',
+  ],
+  '9. Máy Lọc Dầu Diesel SD12-300': [
+    'Lọc nước và cặn bẩn trong dầu diesel',
+    'Hỗ trợ bảo vệ kim phun, bơm cao áp',
+    'Giúp nhiên liệu sạch hơn trước khi vào máy',
+    'Hỗ trợ động cơ vận hành ổn định',
+    'Khung inox 304, phù hợp môi trường tàu biển',
+    'Thiết kế dễ lắp đặt, vệ sinh và bảo dưỡng',
   ],
 };
 

@@ -82,7 +82,13 @@ const RULES = [
   'loai "giay_to_ca_nhan": can cuoc, ho chieu, bang lai, giay to co ten/so ca nhan (KE CA chup mot phan).',
   'loai "man_hinh_app": screenshot man hinh dien thoai/app/phan mem.',
   'loai "khong_dung_duoc": mo nhoe, khong lien quan san pham hay doi song nghe ca.',
+  // 4/9 SIET: bai hoc user - anh khoang may sa lan (thay may phat trong hau canh) bi phan loai
+  // vao folder san pham (SD12-300, PV Engine) roi may sinh bai bai boc dung -> anh "rau ong no
+  // cam cam ba kia". Luat cung: CHI chon folder san pham khi anh chinh la CHINH SAN PHAM DO
+  // (nhin ro san pham, thiet bi la doi tuong chinh); anh chi CO san pham lam hau canh, chi thay
+  // khoang may/thiet bi khac, canh lap dat nhung san pham bi che khuat -> "Content".
   'folder: chon DUNG MOT dong trong danh sach sau (anh doi song nghe ca/hau truong khong ro san pham -> "Content"):',
+  'QUAN TRONG: chi dat vao folder san pham khi anh CHINH LA thiet bi do (thiet bi la chu the trung tam, chiem phan lon khung hinh, nhan dien duoc). Anh khoang may/dong co chung/hau truong -> "Content" du co ke san pham gan do. Nghi ngo -> "Content".',
   FOLDER_LIST,
 ].join('\n');
 
