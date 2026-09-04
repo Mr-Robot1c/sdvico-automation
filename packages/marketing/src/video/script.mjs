@@ -27,6 +27,19 @@ async function generateWithRetry(ai, params, tries = 4) {
   throw lastErr;
 }
 
+// 4/9 (sếp): bỏ hẳn lời chào đầu video ("Alo alo bà con ơi!", "Hello các thuyền trưởng!"...).
+// Prompt đã cấm, nhưng model quen mẫu cũ (21/8 tới 3/9) vẫn có thể chào -> cắt câu chào ở đầu
+// cảnh 1 cho chắc. Chỉ cắt khi câu mở đầu là chào rõ ràng (alo/hello/xin chào/chào...) hoặc
+// câu gọi ngắn kết bằng "ơi!" / "ơi," ("Bà con ơi!", "Anh em đi biển ơi,"). Không đụng câu hook.
+// (Không dùng \b vì \b trong JS chỉ hiểu chữ ASCII, đứng cạnh "ô", "ơ" là hỏng.)
+const GREETING_RE = /^(?:(?:(?:a\s?l[oô]\s*)+|hell?o|hê\s?lô|xin chào|chào)(?=[\s,!.?]|$)[^.!?,]{0,40}[.!?,]\s*|[^.!?,]{0,20}(?:^|\s)ơi\s*[!,.]\s*)+/iu;
+export function stripGreeting(text) {
+  const t = String(text || '').trim();
+  const out = t.replace(GREETING_RE, '').trim();
+  if (!out || out === t) return t;
+  return out.charAt(0).toUpperCase() + out.slice(1);
+}
+
 function parseJson(text) {
   let t = (text || '').trim();
   const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -57,8 +70,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'Bạn dựng kịch bản video ngắn cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     'Giọng gần gũi bà con ngư dân, câu ngắn gọn, dễ nghe khi lồng tiếng. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM trong bài nguồn (xem SỰ THẬT NGHỀ bên dưới); KHÔNG tự thêm lợi ích không có trong bài.',
     'LỜI THOẠI PHẢI CÓ CẢM XÚC như người kể chuyện cho bạn nghe (sếp góp ý 21/8: giọng đọc đều đều buồn ngủ): xen câu hỏi tu từ ("Bà con có thấy vậy không?"), câu cảm ngắn ("Đã lắm!", "Yên tâm hẳn!"), ngắt nhịp bằng dấu phẩy và câu ngắn 6 tới 12 chữ. Máy đọc lên xuống giọng THEO DẤU CÂU, nên dấu chấm hỏi, chấm than, dấu phẩy đặt đúng chỗ là giọng có hồn.',
-    'CẢNH ĐẦU TIÊN PHẢI MỞ BẰNG LỜI CHÀO BẮT TAI THEO TREND GIỚI TRẺ (user 21/8), chọn hoặc biến tấu: "Hello anh em đi biển ơi!", "Hello các thuyền trưởng!", "Alo alo bà con ơi!", "Hello các con vợ ơi!", "Anh em ơi, nghe nè!" — rồi vào thẳng vấn đề. Cả video nói như TikToker trẻ kể chuyện cho anh em nghe: năng lượng cao, tự nhiên, có thể chêm "nha", "nè", "luôn á"; NHƯNG vẫn tôn trọng bà con, không chửi bậy, không lố tới mức mất uy tín thiết bị.',
-    'PLAYBOOK 24/8 (bộ lọc vàng): CẢNH ĐẦU sau lời chào phải chứa 1 CÂU HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (thành quả lớn bị phá bởi nguyên nhân nhỏ) — ví dụ sau "Alo alo bà con ơi!" nói ngay "Trúng luồng cá mà phải quay vào bờ vì hết nước." Cảnh đầu = 2 câu: chào + hook. Bám 1 trong 4 CHỮ CẢM XÚC: NGHỀ (khoe kinh nghiệm) / TIỀN (con số túi tiền) / RỦI RO (cảnh báo sai lầm, mất chuyến) / TỰ HÀO (lộc biển, danh dự nghề). Bài phải chạm đúng 1 chữ, không sáo rỗng.',
+    'KHÔNG MỞ ĐẦU BẰNG LỜI CHÀO (sếp bỏ 4/9): CẤM mọi câu chào kiểu "Alo alo bà con ơi!", "Hello anh em đi biển ơi!", "Hello các thuyền trưởng!", "Hello các con vợ ơi!", "Anh em ơi, nghe nè!", "Xin chào bà con", "Chào cả nhà"... Câu ĐẦU TIÊN của video phải là HOOK vào thẳng vấn đề, không chào, không xưng tên kênh. Cả video vẫn nói như người trẻ kể chuyện cho anh em đi biển nghe: năng lượng cao, tự nhiên, có thể chêm "nha", "nè", "luôn á"; NHƯNG vẫn tôn trọng bà con, không chửi bậy, không lố tới mức mất uy tín thiết bị.',
+    'PLAYBOOK 24/8 (bộ lọc vàng): CẢNH ĐẦU phải MỞ NGAY bằng 1 CÂU HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (thành quả lớn bị phá bởi nguyên nhân nhỏ) — ví dụ câu đầu tiên của video: "Trúng luồng cá mà phải quay vào bờ vì hết nước." Cảnh đầu = hook + 1 câu tô đậm nỗi mất, KHÔNG có câu chào phía trước. Bám 1 trong 4 CHỮ CẢM XÚC: NGHỀ (khoe kinh nghiệm) / TIỀN (con số túi tiền) / RỦI RO (cảnh báo sai lầm, mất chuyến) / TỰ HÀO (lộc biển, danh dự nghề). Bài phải chạm đúng 1 chữ, không sáo rỗng.',
     'HOOK NGHỊCH LÝ = CÂU KHẲNG ĐỊNH có 2 mảnh đối lập: THÀNH QUẢ LỚN + MẤT MÁT BẤT NGỜ. Ví dụ ĐÚNG: "Trúng luồng cá phải quay bờ vì cặn dầu.", "Đổ đầy dầu mà máy vẫn lịm giữa lộng.", "Dầu 38.000đ/lít đốt trôi vì kim phun bẩn." Ví dụ SAI (cấm): "Máy nổ có xót ruột không?", "Bà con có thấy vậy không?", "Anh em có gặp chưa?" — CÂU HỎI thăm/tu từ KHÔNG THAY THẾ được hook nghịch lý. Câu hỏi để dành cảnh cuối.',
     'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển tiếc nuối, tàu nằm bờ). Không lan man.',
     'CẢNH GIỮA: lối thoát bằng LỢI ÍCH cụ thể (không liệt kê thông số kỹ thuật khô) → phần thưởng cụ thể (đỡ tốn bao nhiêu, đi được bao xa, chở thêm được gì) → tin cậy 1 câu ngắn (lắp tận bến, bảo hành).',
@@ -97,9 +110,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
           'Bản dọc (vertical) VÀ Bản ngang (horizontal): mỗi bản 3 cảnh, tổng lời thoại 40-55 giây (~120-160 từ tiếng Việt). Cả video DƯỚI 60 giây (kể cả outro cố định ~5s).',
           '',
           'CẢNH 1 role="hook" (8-12s, ~25-35 từ):',
-          '  "[lời chào trend]. [HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ, câu KHẲNG ĐỊNH 2 mảnh đối lập]. [1 câu tô đậm nỗi mất]."',
-          '  Ví dụ ĐÚNG: "Alo bà con ơi! Mua dầu tưởng sạch, ai ngờ dính cặn nước làm nghẹt máy giữa biển. Thế là cả chuyến đi đứt trong nháy mắt."',
-          '  CẤM: câu hỏi thay hook ("xót ruột không?", "có thấy vậy không?"), câu chung chung, thiếu 2 mảnh đối lập.',
+          '  "[HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ, câu KHẲNG ĐỊNH 2 mảnh đối lập — là câu ĐẦU TIÊN, không chào]. [1 câu tô đậm nỗi mất]."',
+          '  Ví dụ ĐÚNG: "Mua dầu tưởng sạch, ai ngờ dính cặn nước làm nghẹt máy giữa biển. Thế là cả chuyến đi đứt trong nháy mắt."',
+          '  CẤM: câu chào mở đầu ("Alo alo", "Hello anh em", "Xin chào bà con"...), câu hỏi thay hook ("xót ruột không?", "có thấy vậy không?"), câu chung chung, thiếu 2 mảnh đối lập.',
           '',
           'CẢNH 2 role="empathy" (15-20s, ~45-60 từ) — CẢNH DÀI NHẤT, nhịp cảm xúc mạnh nhất playbook. BẮT BUỘC, KHÔNG được gộp/bỏ:',
           '  Tả 3-4 HẬU QUẢ CỤ THỂ để bà con thấy TIẾC + UẤT + LO đầy đủ. PHẢI nêu đủ:',
@@ -120,7 +133,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
           'Bản ngang (horizontal): 5 cảnh, tổng lời thoại 40-50 giây (~100-130 từ tiếng Việt).',
           'Lời thoại mỗi cảnh 8-12 giây (~20-30 từ). Súc tích, không lặp ý.',
           '',
-          'CẢNH 1 role="hook": chào trend + HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (câu khẳng định 2 mảnh đối lập). Cấm câu hỏi.',
+          'CẢNH 1 role="hook": vào thẳng HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (câu khẳng định 2 mảnh đối lập) rồi 1 câu tô đậm nỗi mất. KHÔNG câu chào mở đầu. Cấm câu hỏi.',
           'CẢNH 2 role="empathy" (BẮT BUỘC, không bỏ): tả HẬU QUẢ TIẾC + UẤT + LO cụ thể (số tiền mất, thời gian mất, tâm trạng). Không nhắc sản phẩm SDVICO.',
           'CẢNH 3 role="solution": sản phẩm xuất hiện như LỐI THOÁT, nói bằng LỢI ÍCH (không thông số kỹ thuật khô).',
           'CẢNH 4 role="reward": PHẦN THƯỞNG cụ thể (chở thêm bao nhiêu, đi xa bao nhiêu, tiết kiệm gì).',
@@ -171,7 +184,14 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     .map((s, i) => {
       let assetId = s.asset_id;
       if (!ids.has(assetId)) assetId = assets[i % assets.length]?.id; // fallback vòng xoay
-      return { narration: String(s.narration || '').trim(), assetId };
+      let narration = String(s.narration || '').trim();
+      // 4/9: cảnh 1 không được mở bằng câu chào (xem stripGreeting).
+      if (i === 0) {
+        const cut = stripGreeting(narration);
+        if (cut !== narration) console.warn(`[script] ${kind}: da cat cau chao dau canh 1: "${narration.slice(0, 60)}"`);
+        narration = cut;
+      }
+      return { narration, assetId };
     })
     .filter((s) => s.narration && s.assetId);
 

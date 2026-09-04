@@ -13,7 +13,7 @@ import { join, dirname } from 'node:path';
 import { loadRealEnv } from './env.mjs';
 import { downloadAsset, probeDuration, ffmpeg, splitAtSilence } from './ffmpeg.mjs';
 import { assembleVideo } from './assemble.mjs';
-import { generateVideoScript } from './script.mjs';
+import { generateVideoScript, stripGreeting } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
 import { logTokenUsage } from '../token-log.mjs';
@@ -53,6 +53,11 @@ function cleanNarration(text) {
     // "S D V I C O" hay "SD Vi C O". Chi ap cho GIONG DOC — phu de/caption giu "SDVICO"
     // vi cleanNarration chi chay trong duong tts().
     .replace(/SDVICO/gi, 'SD Vi Co')
+    // 4/9 (sep): giong doc doc SAI chu "Page" trong outro ("Nhan tin cho Page SDVICO"). Doc theo
+    // cach ba con van noi: "pết" (fanpage -> "phen pết"). Chi ap cho GIONG DOC, chu tren man
+    // hinh / caption giu nguyen "Page".
+    .replace(/\bfan\s?page\b/gi, 'phen pết')
+    .replace(/\bpage\b/gi, 'pết')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -673,7 +678,8 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
   for (let i = 0; i < usableScenes.length; i++) {
     const s = usableScenes[i];
     const sceneNo = i + 1;
-    const narration = String(s.narration || '').trim();
+    // 4/9 (sep): canh 1 khong mo bang cau chao (video_scenes sinh san trong brief co the con mau cu).
+    const narration = i === 0 ? stripGreeting(s.narration) : String(s.narration || '').trim();
     narrations.push(narration);
     console.log(`\n  Canh ${sceneNo}/${usableScenes.length}: "${narration.slice(0, 50)}..."`);
 
