@@ -16,6 +16,10 @@
   --brand-red: #e2492e;
   --brand-red-bg: #fdece8;
   --chip: #eef1f6;
+  /* 4/9 màu kênh cho chip Tổng quan / Hôm nay (logo thật vẫn qua PlatformLogo) */
+  --ch-facebook: #1877f2;
+  --ch-youtube: #d61c1c;
+  --ch-group: #6d3fc0;
   /* Màu nhấn theo loại mục */
   --tone-hr: #1f4e79;
   --tone-mkt: #8a5a00;
@@ -35,6 +39,7 @@
     --no: #f06a6a; --no-bg: #341717; --accent: #7fb2e5; --accent-bg: #16273a;
     --brand-red: #f0765c; --brand-red-bg: #3a1c14; --chip: #1e2733;
     --tone-hr: #7fb2e5; --tone-mkt: #e0b354; --tone-web: #b79ae0; --tone-demo: #9aa7b6; --tone-default: #9aa7b6;
+    --ch-facebook: #6fa8f5; --ch-youtube: #ff6b6b; --ch-group: #b39ddb;
   }
 }
 :root[data-theme='dark'] {
@@ -43,6 +48,7 @@
   --no: #f06a6a; --no-bg: #341717; --accent: #7fb2e5; --accent-bg: #16273a;
   --brand-red: #f0765c; --brand-red-bg: #3a1c14; --chip: #1e2733;
   --tone-hr: #7fb2e5; --tone-mkt: #e0b354; --tone-web: #b79ae0; --tone-demo: #9aa7b6; --tone-default: #9aa7b6;
+  --ch-facebook: #6fa8f5; --ch-youtube: #ff6b6b; --ch-group: #b39ddb;
 }
 
 * { box-sizing: border-box; }
@@ -1493,3 +1499,30 @@ button.topbar-back { font: inherit; cursor: pointer; }
   border-radius: 8px; padding: 8px 12px; margin: 0; font-size: .9rem;
 }
 .foot-logout { display: block; margin-top: 6px; text-decoration: underline; cursor: pointer; }
+
+/* ===== 4/9 TỔNG QUAN GỌN + LỊCH ĐĂNG CỐ ĐỊNH ===== */
+.blk.tone-red { border-left: 5px solid var(--brand-red); }
+.blk.tone-accent { border-left: 5px solid var(--accent); }
+.blk.tone-ok { border-left: 5px solid var(--ok); }
+.ok-line { display: flex; align-items: center; gap: 8px; margin: 12px 0 16px; padding: 8px 14px; border-radius: 10px; background: var(--ok-bg); color: var(--ok); font-size: .9rem; font-weight: 600; }
+.delta-up { color: var(--ok); }
+.delta-down { color: var(--no); }
+.ch-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: .8rem; font-weight: 600; white-space: nowrap; }
+.ch-chip.facebook { background: color-mix(in srgb, var(--ch-facebook) 14%, transparent); color: var(--ch-facebook); }
+.ch-chip.youtube { background: color-mix(in srgb, var(--ch-youtube) 12%, transparent); color: var(--ch-youtube); }
+.ch-chip.group { background: color-mix(in srgb, var(--ch-group) 14%, transparent); color: var(--ch-group); }
+.today-table td { vertical-align: top; }
+.today-time { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 1rem; }
+.today-row.is-done td { opacity: .72; }
+.stage-waiting { background: var(--chip); color: var(--ink-2); }
+.stage-missed { background: var(--brand-red-bg); color: var(--brand-red); }
+.tq-details > summary { cursor: pointer; font-weight: 700; font-size: 1.02rem; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tq-details > summary .sub { font-weight: 400; font-size: .85rem; }
+.tq-details[open] > summary { margin-bottom: 10px; }
+/* form Lịch đăng cố định (/ke-hoach) */
+.pp-slot { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 4px 0; }
+.pp-slot + .pp-slot { border-top: 1px dashed var(--line); }
+.pp-slot .pp-on { display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; color: var(--ink-2); min-width: 64px; }
+.pp-slot input[type='time'], .pp-slot select { padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-family: inherit; font-size: .85rem; }
+.pp-slot input[type='time'] { width: 92px; }
+.pp-table td { vertical-align: top; }

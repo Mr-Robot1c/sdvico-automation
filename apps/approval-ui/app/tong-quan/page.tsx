@@ -3,6 +3,8 @@ import { getServerClient } from '../../lib/supabase-server';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
 import PlatformLogo, { type PlatformKey } from '../noi-dung/platform-logo';
 import PageSuiteBlock from '../do-luong/page-suite-block';
+import { buildTodayView, TODAY_STAGE_LABEL } from '../../lib/today-plan';
+import { CHANNEL_LABEL, DOW_LONG } from '../../lib/posting-plan';
 
 // 27/8 REDESIGN theo file "redesign web.docx" cua sep — trang TONG QUAN kieu ForLife Ops.
 // v2 (feedback sep cung ngay): (1) icon kenh trong bang bam duoc -> mo bai tren nen tang do;
@@ -66,7 +68,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, planLiveRes, leadsRes, yt] = await Promise.all([
+  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, todayView, leadsRes, yt] = await Promise.all([
     client
       .from('approval_queue')
       .select('id, title, status, payload, created_at')
@@ -96,13 +98,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    client
-      .from('mkt_plans')
-      .select('data, created_at')
-      .eq('data->>origin', 'live')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    buildTodayView(client),
     client
       .from('mkt_leads')
       .select('id, source, fb_user_name, message, created_at, status, content_id')
@@ -206,14 +202,6 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     for (const c of lp || []) leadPostTitles.set(String((c as any).id), String((c as any).title || '(không tên)'));
   }
 
-  // Ke hoach hom nay (tu ban live) — doc DUNG shape DailyPlan (lib/plan.ts):
-  // direction {title, product, variant} + sales[{product,count}] + contentKindLabel +
-  // contentPurpose + groups[].
-  const planLive = planLiveRes.data as any;
-  const todaySchedule = Array.isArray(planLive?.data?.daily_schedule)
-    ? planLive.data.daily_schedule.find((d: any) => d.date === today) || null
-    : null;
-
   // Giai doan cua tung bai trong bang Tat ca noi dung.
   function stageOf(c: ContentRow): { key: string; cls: string; label: string } {
     const qr = queueByCid.get(c.id);
@@ -259,29 +247,34 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     if (fKh && campaignOf(c.brief) !== fKh) return false;
     return true;
   });
-  const shown = filtered.slice(0, 60);
+  const shown = filtered.slice(0, 30);
+  const hasFilter = !!(q || fGd || fKenh || fKh);
 
   const needCount = (pendingStale.length ? 1 : 0) + (failedStuckCids.length ? 1 : 0) + (yt.configured && yt.error ? 1 : 0) + (leadNew.length ? 1 : 0);
+
+  const stageCls = (s: string) => ({ waiting: 'stage-waiting', missed: 'stage-missed', draft: 'stage-draft', pending: 'stage-pending', scheduled: 'stage-scheduled', published: 'stage-published', rejected: 'stage-rejected' } as Record<string, string>)[s] || 'stage-draft';
+  const todayLabel = `${DOW_LONG[todayView.dowIdx]} ${today.slice(8, 10)}/${today.slice(5, 7)}`;
 
   return (
     <main>
       <header className="head-row">
         <div>
           <h1>Tổng quan</h1>
-          <p className="sub">Dây chuyền nội dung SDVICO — bài đi từ Ý tưởng đến Đã đăng. Máy soạn, người bấm Duyệt mới đăng.</p>
+          <p className="sub">Hôm nay đăng gì, giờ nào, kênh nào. Máy soạn, người bấm Duyệt mới đăng.</p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Link href="/noi-dung" className="btn ok">📥 Duyệt bài ({fmt(pending.length)})</Link>
-          <Link href="/ke-hoach" className="btn ghost">🧭 Kế hoạch chi tiết</Link>
+          <Link href="/san-xuat" className="btn ghost">➕ Thêm bài ngoài lịch</Link>
+          <Link href="/ke-hoach#lich-dang" className="btn ghost">🗓 Sửa lịch đăng</Link>
         </div>
       </header>
 
-      {/* ===== 1. CAN LAM ===== */}
-      <section className="blk" style={{ marginTop: 16 }}>
-        <h2><span aria-hidden="true">🔔</span> Cần làm <span className="sub">({needCount} việc)</span></h2>
-        {needCount === 0 ? (
-          <p className="sub" style={{ margin: 0 }}>✅ Không có việc gấp. Dây chuyền đang chạy bình thường.</p>
-        ) : (
+      {/* ===== 1. CẦN LÀM — chỉ hiện khi có việc; không có thì 1 dòng xanh ===== */}
+      {needCount === 0 ? (
+        <p className="ok-line"><span aria-hidden="true">✅</span> Không có việc gấp. Dây chuyền đang chạy bình thường.</p>
+      ) : (
+        <section className="blk tone-red" style={{ marginTop: 16 }}>
+          <h2><span aria-hidden="true">🔔</span> Cần làm <span className="sub">({needCount} việc)</span></h2>
           <div className="need-list">
             {pendingStale.length ? (
               <div className="need-item warn">
@@ -308,127 +301,118 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
               </div>
             ) : null}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* ===== 2. TIEN DO THEO GIAI DOAN (dashboard nhu anh ForLife) ===== */}
-      <section className="blk">
-        <h2><span aria-hidden="true">📶</span> Tiến độ theo giai đoạn <span className="sub">bài chạy từ trái sang phải — ô đỏ là chỗ cần người động tay</span></h2>
-        {/* 27/8 v3 (user): pipeline = Y tuong -> Da viet -> Cho duyet -> Len lich -> Da dang.
-            BO o Tu choi (van loc duoc qua dropdown bang duoi). */}
-        <div className="stage-flow">
-          <Link href="/ke-hoach" className="stage-node" title="Hướng đi bài viết BOSS đề xuất trong bản kế hoạch đang áp">
-            <b>{fmt(ideaCount)}</b><span>Ý tưởng</span>
-          </Link>
-          <span className="stage-sep" aria-hidden="true">→</span>
-          <Link href="/tong-quan?gd=draft" className="stage-node" title="Bài đã viết xong còn ở bước nháp / đang sinh (trong 200 bài mới nhất)">
-            <b>{fmt(writtenCount)}</b><span>Đã viết</span>
-          </Link>
-          <span className="stage-sep" aria-hidden="true">→</span>
-          <Link href="/noi-dung" className={`stage-node ${pending.length ? 'act' : ''}`} title="Bài chờ người bấm Duyệt">
-            <b>{fmt(pending.length)}</b><span>Chờ duyệt</span>
-          </Link>
-          <span className="stage-sep" aria-hidden="true">→</span>
-          <Link href="/noi-dung" className="stage-node" title="Bài đã duyệt kèm giờ hẹn, tới giờ máy tự đăng">
-            <b>{fmt(scheduled.length)}</b><span>Đã lên lịch</span>
-          </Link>
-          <span className="stage-sep" aria-hidden="true">→</span>
-          <Link href="/kenh" className="stage-node done" title="Bài đã đăng thật lên các kênh">
-            <b>{fmt(publishedCids.size)}</b><span>Đã đăng</span>
-          </Link>
-        </div>
-        {/* 2 the giai doan can dong tay, nhu anh ForLife ("Cho duyet: khong co muc nao"...). */}
-        <div className="blk-cols" style={{ marginTop: 12, marginBottom: 0 }}>
-          <div className="agent-card">
-            <div className="ag-head"><span className="ag-name">📥 Chờ duyệt</span><span className="badge tone-demo">{fmt(pending.length)} bài</span></div>
-            {pending.length === 0 ? (
-              <p className="ag-role" style={{ margin: 0 }}>Trống — không bài nào đợi duyệt.</p>
-            ) : (
-              <div style={{ display: 'grid', gap: 4, fontSize: '.85rem' }}>
-                {pending.slice(0, 3).map((r) => (
-                  <div key={r.id} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>• {String(r.title || '(không tên)').slice(0, 70)}</div>
-                ))}
-                <Link href="/noi-dung" className="src" style={{ fontSize: '.82rem' }}>Duyệt ngay →</Link>
-              </div>
-            )}
-          </div>
-          <div className="agent-card">
-            <div className="ag-head"><span className="ag-name">⏰ Đã lên lịch</span><span className="badge tone-demo">{fmt(scheduled.length)} bài</span></div>
-            {scheduled.length === 0 ? (
-              <p className="ag-role" style={{ margin: 0 }}>Chưa bài nào được xếp lịch đăng.</p>
-            ) : (
-              <div style={{ display: 'grid', gap: 4, fontSize: '.85rem' }}>
-                {scheduled.slice(0, 3).map((r) => (
-                  <div key={r.id} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    • {fmtSched(String(r.payload?.scheduled_at || ''))} — {String(r.title || '(không tên)').slice(0, 55)}
-                  </div>
-                ))}
-                <Link href="/noi-dung" className="src" style={{ fontSize: '.82rem' }}>Xem bảng →</Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ===== 3b. DO LUONG + BAO CAO TUAN (29/8, sếp: "đem đo lường và báo cáo tuần ra tổng quan") ===== */}
-      <section className="blk">
+      {/* ===== 2. KẾ HOẠCH HÔM NAY — bảng giờ · kênh · group · bài · trạng thái ===== */}
+      <section className="blk tone-accent">
         <h2>
-          {/* 30/8 (audit M5+L2): JSX xuống dòng nuốt khoảng trắng -> dính chữ; emoji aria-hidden. */}
-          <span aria-hidden="true">📊</span> Đo lường{' '}
-          <span className="sub">tuần này (Thứ 2 → hôm nay) · kênh chính</span>
+          <span aria-hidden="true">📅</span> Kế hoạch hôm nay{' '}
+          <span className="sub">· {todayLabel} · {fmt(todayView.counts.total)} bài theo lịch{todayView.overridden ? ' · ✏️ lịch riêng hôm nay' : ''}{!todayView.saved ? ' · lịch mặc định (chưa lưu)' : ''}</span>
         </h2>
-        {/* 29/8 (user: "phần đo lường phải rộng ra"): ô số LỚN kiểu pl-tile trải hết bề ngang,
-            dưới chia 2 cột Bài tốt nhất | Sức khoẻ Trang. */}
-        {week ? (
-          <div className="pl-tiles" style={{ margin: '12px 0' }}>
-            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.posts)}</b><span>Bài đã đăng tuần này</span></Link>
-            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.engagement)}{deltaTag(week.delta.engagement)}</b><span>Tương tác</span></Link>
-            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.views)}{deltaTag(week.delta.views)}</b><span>Lượt xem</span></Link>
-            <Link href="/khach-hang" className="pl-tile"><b>{vnI(week.totals.conversions)}{deltaTag(week.delta.conversions)}</b><span>Khách hỏi mua</span></Link>
-            <Link href="/do-luong" className="pl-tile"><b>{vnI(postsTodayCount)}</b><span>Lượt đăng hôm nay</span></Link>
-          </div>
+        {todayView.rows.length === 0 ? (
+          <p className="sub" style={{ margin: 0 }}>Hôm nay lịch không có bài nào. <Link href="/ke-hoach#lich-dang" className="src">Sửa lịch đăng →</Link></p>
         ) : (
-          <p className="sub">Chưa đọc được số liệu tuần.</p>
+          <div className="tablewrap">
+            <table className="datatable today-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 70 }}>Giờ</th>
+                  <th style={{ width: 150 }}>Kênh</th>
+                  <th style={{ width: 170 }}>Chia sẻ group</th>
+                  <th>Bài</th>
+                  <th style={{ width: 170 }}>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {todayView.rows.map((r, i) => (
+                  <tr key={i} className={`today-row ${r.stage === 'published' ? 'is-done' : ''}`}>
+                    <td className="today-time">{r.slot.time}</td>
+                    <td>
+                      <span className={`ch-chip ${r.slot.channel}`}>
+                        <PlatformLogo platform={r.slot.channel} size={14} /> {CHANNEL_LABEL[r.slot.channel]}
+                      </span>
+                      <div className="sub" style={{ fontSize: '.78rem', marginTop: 2 }}>{r.slot.kind === 'sale' ? 'Bài bán' : 'Bài content'}</div>
+                    </td>
+                    <td>{r.slot.group_label ? <span className="ch-chip group">👥 {r.slot.group_label}</span> : <span className="muted">—</span>}</td>
+                    <td className="cell-title">
+                      {r.title ? (
+                        r.publishedUrl
+                          ? <a href={r.publishedUrl} target="_blank" rel="noreferrer" className="src" title="Mở bài đã đăng"><b>{r.title.slice(0, 90)}</b></a>
+                          : <b className="cell-title-nolink">{r.title.slice(0, 90)}</b>
+                      ) : (
+                        <span className="sub">{r.stage === 'waiting' ? `Máy viết lúc ${r.slot.window === 'sang' ? '8h' : '14h'}` : 'Chưa có bài cho ô này'}</span>
+                      )}
+                      {r.product ? <div className="sub" style={{ fontSize: '.8rem' }}>{r.product}</div> : null}
+                    </td>
+                    <td>
+                      <span className={`stage-badge ${stageCls(r.stage)}`}>
+                        {r.stage === 'scheduled' && r.scheduledAt ? `Lên lịch ${fmtSched(r.scheduledAt)}` : TODAY_STAGE_LABEL[r.stage]}
+                      </span>
+                      {r.stage === 'pending' ? <div><Link href="/noi-dung" className="src" style={{ fontSize: '.8rem' }}>Duyệt →</Link></div> : null}
+                      {r.stage === 'missed' ? <div><Link href="/ke-hoach" className="src" style={{ fontSize: '.8rem' }}>Sinh bài ngay →</Link></div> : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-        <div className="blk-cols" style={{ marginBottom: 10 }}>
-          <div>
-            <b style={{ fontSize: '.9rem' }}>🏆 Bài tốt nhất tuần</b>
-            {week && week.topPosts && week.topPosts.length ? (
-              week.topPosts.slice(0, 3).map((p: any, i: number) => (
-                <div key={i} className="sub" style={{ fontSize: '.85rem', marginTop: 4 }}>
-                  {i + 1}. {String(p.title || '').slice(0, 70)} <b>· {vnI(p.m?.engagement || 0)} tương tác</b>
+        {todayView.extras.length ? (
+          <div style={{ marginTop: 10 }}>
+            <b style={{ fontSize: '.9rem' }}>➕ Bài ngoài lịch hôm nay ({fmt(todayView.extras.length)})</b>
+            <div style={{ display: 'grid', gap: 4, marginTop: 4, fontSize: '.85rem' }}>
+              {todayView.extras.slice(0, 6).map((e) => (
+                <div key={e.contentId} style={{ display: 'flex', gap: 8, alignItems: 'baseline', minWidth: 0 }}>
+                  <span className={`stage-badge ${stageCls(e.stage)}`}>{TODAY_STAGE_LABEL[e.stage]}</span>
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {e.publishedUrl ? <a href={e.publishedUrl} target="_blank" rel="noreferrer" className="src">{e.title.slice(0, 80)}</a> : e.title.slice(0, 80)}
+                  </span>
+                  <span className="sub" style={{ fontSize: '.78rem', flexShrink: 0 }}>{e.generator} · {fmtDT(e.createdAt)}</span>
                 </div>
-              ))
-            ) : (
-              <p className="sub" style={{ margin: '4px 0 0' }}>Tuần này chưa có bài nào có số liệu.</p>
-            )}
+              ))}
+            </div>
           </div>
-          <div>
-            {scanCur ? (
-              <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với hôm qua" />
-            ) : (
-              <div>
-                <b style={{ fontSize: '.9rem' }}>📈 Sức khoẻ Trang SDVICO VN</b>
-                <p className="sub" style={{ margin: '4px 0 0' }}>Chưa có lần quét Business Suite nào — bộ quét trên máy chủ sẽ tự chộp phiên Brave rồi quét mỗi 2 giờ.</p>
-              </div>
-            )}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <Link href="/do-luong" className="src" style={{ fontSize: '.85rem' }}>Đo lường ngày →</Link>
-          <Link href="/do-luong/tuan" className="src" style={{ fontSize: '.85rem' }}>Báo cáo tuần đầy đủ →</Link>
+        ) : null}
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 8 }}>
+          <Link href="/ke-hoach" className="src" style={{ fontSize: '.85rem' }}>Kế hoạch tuần →</Link>
+          <Link href="/ke-hoach#lich-dang" className="src" style={{ fontSize: '.85rem' }}>Sửa lịch đăng cố định →</Link>
         </div>
       </section>
 
-      {/* ===== 3. NGUOI HOI MUA + KE HOACH HOM NAY ===== */}
+      {/* ===== 3. TIẾN ĐỘ | NGƯỜI HỎI MUA (2 cột) ===== */}
       <div className="blk-cols">
+        <section className="blk">
+          <h2><span aria-hidden="true">📶</span> Tiến độ theo giai đoạn <span className="sub">ô đỏ = cần người động tay</span></h2>
+          <div className="stage-flow">
+            <Link href="/ke-hoach" className="stage-node" title="Hướng đi bài viết BOSS đề xuất trong bản kế hoạch đang áp">
+              <b>{fmt(ideaCount)}</b><span>Ý tưởng</span>
+            </Link>
+            <span className="stage-sep" aria-hidden="true">→</span>
+            <Link href="/tong-quan?gd=draft" className="stage-node" title="Bài đã viết xong còn ở bước nháp / đang sinh (trong 200 bài mới nhất)">
+              <b>{fmt(writtenCount)}</b><span>Đã viết</span>
+            </Link>
+            <span className="stage-sep" aria-hidden="true">→</span>
+            <Link href="/noi-dung" className={`stage-node ${pending.length ? 'act' : ''}`} title="Bài chờ người bấm Duyệt">
+              <b>{fmt(pending.length)}</b><span>Chờ duyệt</span>
+            </Link>
+            <span className="stage-sep" aria-hidden="true">→</span>
+            <Link href="/noi-dung" className="stage-node" title="Bài đã duyệt kèm giờ hẹn, tới giờ máy tự đăng">
+              <b>{fmt(scheduled.length)}</b><span>Đã lên lịch</span>
+            </Link>
+            <span className="stage-sep" aria-hidden="true">→</span>
+            <Link href="/kenh" className="stage-node done" title="Bài đã đăng thật lên các kênh">
+              <b>{fmt(publishedCids.size)}</b><span>Đã đăng</span>
+            </Link>
+          </div>
+        </section>
         <section className="blk">
           <h2><span aria-hidden="true">🛒</span> Người hỏi mua <span className="sub">({fmt(leads.length)} trong 7 ngày · {fmt(leadToday.length)} hôm nay)</span></h2>
           {leads.length === 0 ? (
             <p className="sub" style={{ margin: 0 }}>Chưa có ai hỏi mua trong 7 ngày. Bài đăng đều + chia sẻ group để tăng tiếp cận.</p>
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
-              {leads.slice(0, 6).map((l) => (
+              {leads.slice(0, 4).map((l) => (
                 <div key={l.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: '.88rem', borderBottom: '1px dashed var(--line)', paddingBottom: 6 }}>
                   <span className={`badge ${String(l.status || 'new') === 'new' ? 'tone-no' : 'tone-ok'}`} style={{ flexShrink: 0 }}>
                     {String(l.status || 'new') === 'new' ? 'Mới' : String(l.status) === 'done' ? 'Xong' : 'Đã liên hệ'}
@@ -448,64 +432,61 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
             </div>
           )}
         </section>
-
-        <section className="blk">
-          <h2><span aria-hidden="true">📅</span> Kế hoạch hôm nay <span className="sub">{todaySchedule?.dow ? `· ${todaySchedule.dow} ${today.slice(8, 10)}/${today.slice(5, 7)}` : appliedPlan ? `· tuần ${String(appliedPlan.period_start || '').slice(5)} đến ${String(appliedPlan.period_end || '').slice(5)}` : ''}</span></h2>
-          {todaySchedule ? (
-            <div style={{ display: 'grid', gap: 8, fontSize: '.9rem' }}>
-              {todaySchedule.direction?.title ? (
-                <div className="need-item">
-                  <span>🎯</span>
-                  <span style={{ flex: 1 }}>
-                    <b>Bài bán:</b> {String(todaySchedule.direction.title).slice(0, 120)}
-                    <span className="sub" style={{ display: 'block', fontSize: '.8rem' }}>
-                      Sản phẩm {String(todaySchedule.direction.product || '')}
-                      {todaySchedule.direction.done ? ' · ✓ đã sinh' : ' · chưa sinh'}
-                    </span>
-                  </span>
-                </div>
-              ) : Array.isArray(todaySchedule.sales) && todaySchedule.sales.length ? (
-                <div className="need-item">
-                  <span>🎯</span>
-                  <span style={{ flex: 1 }}><b>Bài bán:</b> {todaySchedule.sales.map((s: any) => `${s.product} (${s.count} bài)`).join(', ')}</span>
-                </div>
-              ) : null}
-              {todaySchedule.contentKindLabel ? (
-                <div className="need-item">
-                  <span>📚</span>
-                  <span style={{ flex: 1 }}>
-                    <b>Bài content:</b> {String(todaySchedule.contentKindLabel)}
-                    {todaySchedule.contentEmotion ? ` · chạm chữ ${String(todaySchedule.contentEmotion)}` : ''}
-                    {todaySchedule.contentPurpose ? (
-                      <span className="sub" style={{ display: 'block', fontSize: '.8rem' }}>{String(todaySchedule.contentPurpose).slice(0, 140)}</span>
-                    ) : null}
-                  </span>
-                </div>
-              ) : null}
-              {Array.isArray(todaySchedule.groups) && todaySchedule.groups.length ? (
-                <div className="need-item">
-                  <span>📣</span>
-                  <span style={{ flex: 1 }}><b>Chia sẻ nhóm:</b> {todaySchedule.groups.join(' · ')}</span>
-                </div>
-              ) : null}
-              <Link href="/ke-hoach" className="src" style={{ fontSize: '.85rem' }}>Xem kế hoạch tuần đầy đủ →</Link>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: 6 }}>
-              <p className="sub" style={{ margin: 0 }}>Chưa đọc được lịch hôm nay từ bản kế hoạch sống.</p>
-              <Link href="/ke-hoach" className="src" style={{ fontSize: '.85rem' }}>Mở trang Kế hoạch →</Link>
-            </div>
-          )}
-        </section>
       </div>
 
-      {/* ===== 4. TAT CA NOI DUNG ===== */}
-      <section className="blk">
+      {/* ===== 4. ĐO LƯỜNG — 5 tile, phần chi tiết gấp lại ===== */}
+      <section className="blk tone-ok">
         <h2>
-          {/* 30/8 (audit M5+L2): cùng bệnh dính chữ do JSX nuốt khoảng trắng. */}
-          <span aria-hidden="true">📄</span> Tất cả nội dung{' '}
-          <span className="sub">bài ở giai đoạn nào, đăng kênh đâu, thuộc kế hoạch gì — bấm icon kênh để mở bài thật</span>
+          <span aria-hidden="true">📊</span> Đo lường{' '}
+          <span className="sub">tuần này (Thứ 2 → hôm nay) · kênh chính</span>
         </h2>
+        {week ? (
+          <div className="pl-tiles" style={{ margin: '12px 0' }}>
+            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.posts)}</b><span>Bài đã đăng tuần này</span></Link>
+            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.engagement)}{deltaTag(week.delta.engagement)}</b><span>Tương tác</span></Link>
+            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.views)}{deltaTag(week.delta.views)}</b><span>Lượt xem</span></Link>
+            <Link href="/khach-hang" className="pl-tile"><b>{vnI(week.totals.conversions)}{deltaTag(week.delta.conversions)}</b><span>Khách hỏi mua</span></Link>
+            <Link href="/do-luong" className="pl-tile"><b>{vnI(postsTodayCount)}</b><span>Lượt đăng hôm nay</span></Link>
+          </div>
+        ) : (
+          <p className="sub">Chưa đọc được số liệu tuần.</p>
+        )}
+        <details className="tq-details">
+          <summary>🏆 Bài tốt nhất tuần và sức khoẻ Trang <span className="sub">bấm để mở</span></summary>
+          <div className="blk-cols" style={{ marginBottom: 10 }}>
+            <div>
+              <b style={{ fontSize: '.9rem' }}>🏆 Bài tốt nhất tuần</b>
+              {week && week.topPosts && week.topPosts.length ? (
+                week.topPosts.slice(0, 3).map((p: any, i: number) => (
+                  <div key={i} className="sub" style={{ fontSize: '.85rem', marginTop: 4 }}>
+                    {i + 1}. {String(p.title || '').slice(0, 70)} <b>· {vnI(p.m?.engagement || 0)} tương tác</b>
+                  </div>
+                ))
+              ) : (
+                <p className="sub" style={{ margin: '4px 0 0' }}>Tuần này chưa có bài nào có số liệu.</p>
+              )}
+            </div>
+            <div>
+              {scanCur ? (
+                <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với hôm qua" />
+              ) : (
+                <div>
+                  <b style={{ fontSize: '.9rem' }}>📈 Sức khoẻ Trang SDVICO VN</b>
+                  <p className="sub" style={{ margin: '4px 0 0' }}>Chưa có lần quét Business Suite nào — bộ quét trên máy chủ sẽ tự chộp phiên Brave rồi quét mỗi 2 giờ.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </details>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Link href="/do-luong" className="src" style={{ fontSize: '.85rem' }}>Đo lường ngày →</Link>
+          <Link href="/do-luong/tuan" className="src" style={{ fontSize: '.85rem' }}>Báo cáo tuần đầy đủ →</Link>
+        </div>
+      </section>
+
+      {/* ===== 5. TẤT CẢ NỘI DUNG — gấp mặc định, mở khi đang lọc ===== */}
+      <details className="blk tq-details" open={hasFilter}>
+        <summary><span aria-hidden="true">📄</span> Tất cả nội dung <span className="sub">{fmt(filtered.length)} bài trong 200 bài mới nhất · bấm để mở bảng và bộ lọc</span></summary>
         <form method="get" style={{ margin: '0 0 10px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* 30/8 (audit L1): ô tìm + bộ lọc có aria-label, không chỉ dựa placeholder. */}
           <input className="search" type="search" name="q" defaultValue={q} placeholder="Tìm theo tiêu đề bài..." aria-label="Tìm theo tiêu đề bài" style={{ maxWidth: 300, flex: '1 1 220px' }} />
@@ -529,7 +510,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
             {allCampaigns.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           <button className="btn ghost sm" type="submit">Lọc</button>
-          {q || fGd || fKenh || fKh ? <Link href="/tong-quan" className="src" style={{ fontSize: '.85rem' }}>Bỏ lọc</Link> : null}
+          {hasFilter ? <Link href="/tong-quan" className="src" style={{ fontSize: '.85rem' }}>Bỏ lọc</Link> : null}
         </form>
         <p className="sub" style={{ margin: '0 0 8px', fontSize: '.82rem' }}>Hiện {fmt(shown.length)} / {fmt(filtered.length)} bài khớp (trong 200 bài mới nhất).</p>
         <div className="tablewrap">
@@ -584,7 +565,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
                 );
               })}
               {shown.length === 0 ? (
-                <tr><td colSpan={5} className="sub" style={{ textAlign: 'center', padding: 20 }}>{q || fGd || fKenh || fKh ? 'Không có bài nào khớp bộ lọc.' : 'Chưa có bài nào.'}</td></tr>
+                <tr><td colSpan={5} className="sub" style={{ textAlign: 'center', padding: 20 }}>{hasFilter ? 'Không có bài nào khớp bộ lọc.' : 'Chưa có bài nào.'}</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -596,7 +577,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           {' · '}
           <Link href="/noi-dung?loai=thung-rac" className="src">Thùng rác →</Link>
         </p>
-      </section>
+      </details>
     </main>
   );
 }
