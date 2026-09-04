@@ -10,6 +10,7 @@
 import { useState, useTransition } from 'react';
 import PlatformLogo from './platform-logo';
 import { markTikTokPublic, undoMarkTikTokPublic, markTikTokDeleted, undoMarkTikTokDeleted } from './tiktok-public-actions';
+import { formatDateTimeVN } from '../labels';
 
 type Props = {
   postId: string;
@@ -24,7 +25,8 @@ export default function TikTokPrivateChip({ postId, madePublicAt, deletedAt, tik
   const [pending, start] = useTransition();
 
   if (deletedAt) {
-    const at = new Date(deletedAt).toLocaleString('vi-VN');
+    // 4/9: ép múi giờ VN (server Vercel chạy UTC), cùng lý do sửa ở trash-actions.tsx.
+    const at = formatDateTimeVN(deletedAt);
     return (
       <span className="ch-link" title={`Đã đánh dấu xoá lúc ${at}. Tile Tổng quan không đếm bài này. Bấm ↺ để bỏ đánh dấu.`}
         style={{ borderColor: 'var(--muted, #9ca3af)', color: 'var(--muted, #6b7280)', opacity: 0.85 }}>
@@ -43,7 +45,7 @@ export default function TikTokPrivateChip({ postId, madePublicAt, deletedAt, tik
   }
 
   if (madePublicAt) {
-    const at = new Date(madePublicAt).toLocaleString('vi-VN');
+    const at = formatDateTimeVN(madePublicAt);
     return (
       <span className="ch-link" title={`Đã đánh dấu công khai lúc ${at}. Bấm ↺ để bỏ đánh dấu.`}
         style={{ borderColor: 'var(--ok)', color: 'var(--ok)' }}>

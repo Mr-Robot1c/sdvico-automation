@@ -13,6 +13,10 @@ export default function ThemeToggle() {
       (document.documentElement.getAttribute('data-theme') as 'light' | 'dark' | null) ||
       (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     setTheme(current);
+    // 4/9: áp LẠI thuộc tính sau hydration. Khi một trang hydration lỗi (chữ server/client
+    // lệch), React vẽ lại <html> từ JSX và xoá data-theme mà script trong <head> đã đặt ->
+    // trang đang sáng bỗng tối (bug Thùng rác). Effect này chạy sau cùng nên khôi phục được.
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
   }, []);
 
   const toggle = () => {

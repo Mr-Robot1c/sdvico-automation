@@ -1,4 +1,5 @@
 import { Fragment } from 'react';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
@@ -95,12 +96,14 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
   // tren board), chi khong chiem cho tren thanh chip.
   const typeChips = (
     <nav className="filters" aria-label="Loại nội dung">
-      <a className={`chip ${tab === 'bang' ? 'on' : ''}`} href={withParams({ loai: 'bang', trangthai: null })}>
+      {/* 4/9: dùng Link (chuyển trang phía client) thay <a> tải lại cả trang — giữ nguyên
+          data-theme và vị trí, không nháy. */}
+      <Link className={`chip ${tab === 'bang' ? 'on' : ''}`} href={withParams({ loai: 'bang', trangthai: null })}>
         <span aria-hidden="true">📋</span> Bảng bài viết
-      </a>
-      <a className={`chip ${tab === 'thung-rac' ? 'on' : ''}`} href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn — giữ 7 ngày rồi máy tự xoá hẳn. Khôi phục hoặc xoá ngay tại đây.">
+      </Link>
+      <Link className={`chip ${tab === 'thung-rac' ? 'on' : ''}`} href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn — giữ 7 ngày rồi máy tự xoá hẳn. Khôi phục hoặc xoá ngay tại đây.">
         <span aria-hidden="true">🗑️</span> Thùng rác <span className="n">{cTrash ?? 0}</span>
-      </a>
+      </Link>
     </nav>
   );
 
@@ -308,8 +311,13 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     <main>
       <header className="head-row">
         <div>
-          <h1>Tổng quan</h1>
-          <p className="sub">Danh sách bài đã sinh, đã duyệt, đã từ chối, đã đăng. Bấm mắt để xem nội dung.</p>
+          {/* 4/9: tiêu đề theo tab — trước để cứng "Tổng quan" nên tab Thùng rác cũng ghi Tổng quan. */}
+          <h1>{tab === 'thung-rac' ? 'Thùng rác' : tab === 'video' ? 'Kịch bản video' : tab === 'baiviet' ? 'Bài viết' : 'Tổng quan'}</h1>
+          <p className="sub">
+            {tab === 'thung-rac'
+              ? 'Bài đã ẩn, giữ 7 ngày rồi máy tự xoá hẳn. Khôi phục hoặc xoá hẳn tại đây.'
+              : 'Danh sách bài đã sinh, đã duyệt, đã từ chối, đã đăng. Bấm mắt để xem nội dung.'}
+          </p>
         </div>
         <div className="head-actions">
           <AutoRefresh seconds={30} />
