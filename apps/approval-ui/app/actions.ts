@@ -619,6 +619,12 @@ export async function decideForm(formData: FormData) {
           if (ch === 'youtube') jobs.push(publishContentToYoutube(bgClient, contentId));
         }
         await Promise.allSettled(jobs);
+        // 4/9 khuya (ô TikTok trong lịch cố định): bài CHỈ TikTok không có API đăng -> ghi log
+        // rõ để /noi-dung + Tổng quan hiện "chờ bạn xuất tay" (trạng thái suy từ queue approved +
+        // channels chỉ tiktok + chưa có mkt_posts tiktok, không thêm cờ).
+        if (channels.length && channels.every((c) => c === 'tiktok')) {
+          try { await bgClient.from('run_log').insert({ task: 'mkt.publish_tiktok', actor: 'decideForm', status: 'skipped', detail: { contentId, reason: 'o TikTok lich co dinh: cho nguoi Xuat TikTok + Ghep TikTok o /noi-dung' } }); } catch { /* bo qua */ }
+        }
         // Bài vừa đăng thật xong, cập nhật lại trang cho lần render kế tiếp.
         revalidatePath('/hang-doi');
         revalidatePath('/noi-dung');
@@ -705,6 +711,18 @@ export async function linkTikTokVideoToContent(formData: FormData): Promise<{ ok
   const brief = { ...((content as any).brief || {}), tiktok_video_id: videoId, tiktok_share_url: shareUrl || null };
   const { error } = await client.from('mkt_content').update({ brief }).eq('id', contentId);
   if (error) return { ok: false, msg: 'Lỗi lưu: ' + error.message };
+  // 4/9 khuya: ghép xong = bài ĐÃ LÊN TikTok (đăng tay). Tạo mkt_posts để thẻ sang cột Đã đăng,
+  // Tổng quan/Hôm nay và báo cáo tuần đếm được. Chỉ tạo khi chưa có dòng tiktok nào cho bài này.
+  const { data: existed } = await client.from('mkt_posts').select('id').eq('content_id', contentId).eq('channel', 'tiktok').eq('status', 'published').limit(1);
+  if (!existed || !existed.length) {
+    const { error: pe } = await client.from('mkt_posts').insert({
+      content_id: contentId, channel: 'tiktok', status: 'published',
+      external_url: shareUrl || `tiktok:${videoId}`, published_at: new Date().toISOString(),
+    });
+    if (pe) console.error('[tiktok-link] insert mkt_posts loi:', pe.message);
+    else { try { await client.from('run_log').insert({ task: 'mkt.publish_tiktok', actor: 'user', status: 'ok', detail: { contentId, videoId, shareUrl: shareUrl || null, via: 'ghep-tay' } }); } catch { /* bo qua */ } }
+  }
+  revalidatePath('/tong-quan');
   revalidatePath('/noi-dung');
   revalidatePath('/do-luong');
   return { ok: true, msg: 'Đã ghép video. Bấm "Kéo số liệu" để cập nhật view/like.' };

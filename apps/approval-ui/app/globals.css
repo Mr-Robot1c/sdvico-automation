@@ -19,6 +19,7 @@
   /* 4/9 màu kênh cho chip Tổng quan / Hôm nay (logo thật vẫn qua PlatformLogo) */
   --ch-facebook: #1877f2;
   --ch-youtube: #d61c1c;
+  --ch-tiktok: #101010;
   --ch-group: #6d3fc0;
   /* Màu nhấn theo loại mục */
   --tone-hr: #1f4e79;
@@ -39,7 +40,7 @@
     --no: #f06a6a; --no-bg: #341717; --accent: #7fb2e5; --accent-bg: #16273a;
     --brand-red: #f0765c; --brand-red-bg: #3a1c14; --chip: #1e2733;
     --tone-hr: #7fb2e5; --tone-mkt: #e0b354; --tone-web: #b79ae0; --tone-demo: #9aa7b6; --tone-default: #9aa7b6;
-    --ch-facebook: #6fa8f5; --ch-youtube: #ff6b6b; --ch-group: #b39ddb;
+    --ch-facebook: #6fa8f5; --ch-youtube: #ff6b6b; --ch-tiktok: #e8e8e8; --ch-group: #b39ddb;
   }
 }
 :root[data-theme='dark'] {
@@ -48,7 +49,7 @@
   --no: #f06a6a; --no-bg: #341717; --accent: #7fb2e5; --accent-bg: #16273a;
   --brand-red: #f0765c; --brand-red-bg: #3a1c14; --chip: #1e2733;
   --tone-hr: #7fb2e5; --tone-mkt: #e0b354; --tone-web: #b79ae0; --tone-demo: #9aa7b6; --tone-default: #9aa7b6;
-  --ch-facebook: #6fa8f5; --ch-youtube: #ff6b6b; --ch-group: #b39ddb;
+  --ch-facebook: #6fa8f5; --ch-youtube: #ff6b6b; --ch-tiktok: #e8e8e8; --ch-group: #b39ddb;
 }
 
 * { box-sizing: border-box; }
@@ -1510,7 +1511,9 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .ch-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: .8rem; font-weight: 600; white-space: nowrap; }
 .ch-chip.facebook { background: color-mix(in srgb, var(--ch-facebook) 14%, transparent); color: var(--ch-facebook); }
 .ch-chip.youtube { background: color-mix(in srgb, var(--ch-youtube) 12%, transparent); color: var(--ch-youtube); }
+.ch-chip.tiktok { background: color-mix(in srgb, var(--ch-tiktok) 12%, transparent); color: var(--ch-tiktok); }
 .ch-chip.group { background: color-mix(in srgb, var(--ch-group) 14%, transparent); color: var(--ch-group); }
+.stage-manual { background: color-mix(in srgb, var(--ch-tiktok) 12%, transparent); color: var(--ch-tiktok); }
 .today-table td { vertical-align: top; }
 .today-time { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 1rem; }
 .today-row.is-done td { opacity: .72; }

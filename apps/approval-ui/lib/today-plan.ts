@@ -12,13 +12,14 @@ import { CONTENT_KIND_BY_DOW } from './plan-live';
 
 type Client = ReturnType<typeof getServerClient>;
 
-export type TodayStage = 'waiting' | 'missed' | 'draft' | 'pending' | 'scheduled' | 'published' | 'rejected';
+export type TodayStage = 'waiting' | 'missed' | 'draft' | 'pending' | 'scheduled' | 'manual' | 'published' | 'rejected';
 export const TODAY_STAGE_LABEL: Record<TodayStage, string> = {
   waiting: 'Chưa tới giờ máy viết',
   missed: 'Máy chưa ra bài',
   draft: 'Nháp',
   pending: 'Chờ duyệt',
   scheduled: 'Đã lên lịch',
+  manual: 'Chờ xuất TikTok tay',
   published: 'Đã đăng',
   rejected: 'Từ chối',
 };
@@ -93,7 +94,11 @@ export async function buildTodayView(client: Client, now: Date = new Date()): Pr
       return { stage: 'published', scheduledAt: null, url: fbReal || (first ? String(first.external_url) : null), channels: [...new Set(posts.map((p) => p.channel))] };
     }
     if (q?.status === 'rejected') return { stage: 'rejected', scheduledAt: null, url: null, channels: [] };
-    if (q?.status === 'approved') return { stage: 'scheduled', scheduledAt: q.payload?.scheduled_at ? String(q.payload.scheduled_at) : null, url: null, channels: [] };
+    if (q?.status === 'approved') {
+      const ch: string[] = Array.isArray(q.payload?.channels) ? q.payload.channels : (Array.isArray(c.brief?.channels) ? c.brief.channels : []);
+      if (ch.length && ch.every((x) => x === 'tiktok')) return { stage: 'manual', scheduledAt: null, url: null, channels: [] };
+      return { stage: 'scheduled', scheduledAt: q.payload?.scheduled_at ? String(q.payload.scheduled_at) : null, url: null, channels: [] };
+    }
     if (q?.status === 'pending') return { stage: 'pending', scheduledAt: null, url: null, channels: [] };
     return { stage: 'draft', scheduledAt: null, url: null, channels: [] };
   };
@@ -140,7 +145,7 @@ export async function buildTodayView(client: Client, now: Date = new Date()): Pr
     counts: {
       total: rows.length,
       done: rows.filter((r) => r.stage === 'published' || r.stage === 'scheduled').length,
-      pending: rows.filter((r) => r.stage === 'pending').length,
+      pending: rows.filter((r) => r.stage === 'pending' || r.stage === 'manual').length,
       missed: rows.filter((r) => r.stage === 'missed').length,
     },
   };

@@ -25,7 +25,7 @@ export type WeekCellItem = {
   state: 'done' | 'planned' | 'fallback';
   contentId?: string;
   time?: string;
-  channel?: 'facebook' | 'youtube';
+  channel?: 'facebook' | 'youtube' | 'tiktok';
   group?: string | null;
 };
 

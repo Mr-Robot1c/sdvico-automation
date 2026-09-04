@@ -47,6 +47,7 @@ function SlotTr({ prefix, i, slot, groups, dowIdx, dayCell }: {
         <select name={`${prefix}_${i}_channel`} defaultValue={slot?.channel || 'facebook'} aria-label="Nền tảng đăng">
           <option value="facebook">{CHANNEL_LABEL.facebook}</option>
           <option value="youtube">{CHANNEL_LABEL.youtube}</option>
+          <option value="tiktok">{CHANNEL_LABEL.tiktok}</option>
         </select>
       </td>
       <td className="pp-c-group">
@@ -126,7 +127,7 @@ export default function PostingPlanForm({ pp }: { pp: LoadedPostingPlan }) {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
           <button className="btn ok" type="submit">💾 Lưu lịch đăng</button>
-          <span className="sub">Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h; giờ ở đây được điền sẵn vào ô hẹn giờ khi Duyệt. Group lấy từ popover 📣 Chia sẻ group. YouTube chỉ ra bài khi folder sản phẩm có clip.</span>
+          <span className="sub">Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h; giờ ở đây được điền sẵn vào ô hẹn giờ khi Duyệt. Group lấy từ popover 📣 Chia sẻ group. YouTube chỉ ra bài khi folder sản phẩm có clip. TikTok: máy dựng video, bạn Duyệt rồi Xuất TikTok tay.</span>
         </div>
       </form>
 

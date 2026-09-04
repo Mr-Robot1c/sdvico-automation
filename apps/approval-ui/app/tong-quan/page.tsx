@@ -252,7 +252,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
 
   const needCount = (pendingStale.length ? 1 : 0) + (failedStuckCids.length ? 1 : 0) + (yt.configured && yt.error ? 1 : 0) + (leadNew.length ? 1 : 0);
 
-  const stageCls = (s: string) => ({ waiting: 'stage-waiting', missed: 'stage-missed', draft: 'stage-draft', pending: 'stage-pending', scheduled: 'stage-scheduled', published: 'stage-published', rejected: 'stage-rejected' } as Record<string, string>)[s] || 'stage-draft';
+  const stageCls = (s: string) => ({ waiting: 'stage-waiting', missed: 'stage-missed', draft: 'stage-draft', pending: 'stage-pending', scheduled: 'stage-scheduled', manual: 'stage-manual', published: 'stage-published', rejected: 'stage-rejected' } as Record<string, string>)[s] || 'stage-draft';
   const todayLabel = `${DOW_LONG[todayView.dowIdx]} ${today.slice(8, 10)}/${today.slice(5, 7)}`;
 
   return (
@@ -351,6 +351,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
                       </span>
                       {r.stage === 'pending' ? <div><Link href="/noi-dung" className="src" style={{ fontSize: '.8rem' }}>Duyệt →</Link></div> : null}
                       {r.stage === 'missed' ? <div><Link href="/ke-hoach" className="src" style={{ fontSize: '.8rem' }}>Sinh bài ngay →</Link></div> : null}
+                      {r.stage === 'manual' ? <div><Link href="/noi-dung" className="src" style={{ fontSize: '.8rem' }}>Xuất TikTok →</Link></div> : null}
                     </td>
                   </tr>
                 ))}

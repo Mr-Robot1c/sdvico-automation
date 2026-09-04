@@ -27,7 +27,6 @@ type Client = ReturnType<typeof getServerClient>;
 
 const WEIGHT_BY_TIER: Record<Tier, number> = { winner: 3, watch: 2, weak: 1, insufficient: 1 };
 const MIN_POSTS = 2;              // ngưỡng bài để xếp thắng/thua
-const WEEKLY_SALES_BUDGET = 14;   // tổng bài bán/tuần để chia theo trọng số
 const CONTENT_PER_DAY = 1;        // 1 bài content nuôi trang mỗi ngày
 
 const DOW_VN = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -139,9 +138,9 @@ function rankProducts(byProduct: Array<{ product: string; count: number; avgScor
 }
 
 // Dự kiến HƯỚNG ĐI cho từng ngày tới, mô phỏng đúng thứ tự vòng xoay sẽ rút.
-// 29/8 (user chốt "bỏ hẳn A/B"): mỗi hướng = ĐÚNG 1 bài; mỗi ngày tiêu 2 hướng (sáng 8h
-// 1 bài bán + chiều 14h 1 bài bán, từ 4/9). Hướng còn pending_variant='B' thời nhịp cũ nghĩa là
-// ĐÃ ra 1 bài -> coi như đã dùng (cùng luật với /api/rotate).
+// 29/8 (user chốt "bỏ hẳn A/B"): mỗi hướng = ĐÚNG 1 bài; mỗi ngày tiêu đúng số ô bài bán trong
+// lịch (mặc định 1, đợt 3 4/9). Hướng còn pending_variant='B' thời nhịp cũ nghĩa là ĐÃ ra 1
+// bài -> coi như đã dùng (cùng luật với /api/rotate).
 type DayDirection = { title: string; product: string; variant: 'A' | 'B' | 'AB'; done?: boolean };
 // Tên sản phẩm chuẩn (bỏ số thứ tự folder) để tra trọng số — suggestion.product ghi theo
 // danh mục prompt, weights ghi theo tên folder, phải quy về một mối qua guessGroup.
@@ -257,6 +256,9 @@ async function loadFocusKeys(client: Client): Promise<string[]> {
 export async function refreshLiveProposal(client: Client, now: Date = new Date()): Promise<{ id: string | null; skipped?: string }> {
   const report = await buildWeekReport(client, 0, now);
   const [shareGroups, focusKeys, pp] = await Promise.all([loadShareGroups(client), loadFocusKeys(client), loadPostingPlan(client)]);
+  // 4/9 khuya (đợt 3, bỏ hằng ngân sách cứng cũ): ngân sách bài bán/tuần = tổng ô bài bán
+  // thật trong lịch cố định 7 ngày tới (mặc định 1/ngày = 7/tuần, tự đổi khi lịch đổi).
+  const weeklyBudget = Array.from({ length: 7 }, (_, i) => vnDayInfo(now, i).date).reduce((s, d) => s + slotsForDate(pp.plan, d).filter((x) => x.kind === 'sale').length, 0) || 7;
 
   let products = rankProducts(report.byProduct.map((p) => ({ product: p.product, count: p.count, avgScore: p.avgScore, avgEng: p.avgEng, conversions: p.conversions })));
 
@@ -283,7 +285,7 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
   // Chia số bài bán/tuần theo trọng số (tối thiểu 1 mỗi sản phẩm bán).
   const salesProducts = products.filter((p) => p.product !== 'Bài content');
   const sumW = salesProducts.reduce((s, p) => s + p.weight, 0) || 1;
-  for (const p of salesProducts) p.postsPerWeek = Math.max(1, Math.round((p.weight / sumW) * WEEKLY_SALES_BUDGET));
+  for (const p of salesProducts) p.postsPerWeek = Math.max(1, Math.round((p.weight / sumW) * weeklyBudget));
 
   const weights: Record<string, number> = {};
   for (const p of salesProducts) weights[p.product] = p.weight;
@@ -298,8 +300,7 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
       .from('mkt_plans').select('data').eq('applied', true)
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
     const sugs = Array.isArray((apRow as any)?.data?.content_suggestions) ? (apRow as any).data.content_suggestions : [];
-    const limit = Array.from({ length: 7 }, (_, i) => vnDayInfo(now, i).date).reduce((s, d) => s + slotsForDate(pp.plan, d).filter((x) => x.kind === 'sale').length, 0);
-    dirQueue = buildDirectionQueue(sugs, weights, Math.max(1, limit));
+    dirQueue = buildDirectionQueue(sugs, weights, Math.max(1, weeklyBudget));
 
     // Bài BÁN đã sinh hôm nay theo hướng nào (brief.suggestion_title + ab_variant)?
     const vnToday = new Date(now.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
@@ -334,7 +335,7 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
   const plan: Plan = {
     generatedAt: now.toISOString(),
     threshold: MIN_POSTS,
-    weeklyBudget: WEEKLY_SALES_BUDGET,
+    weeklyBudget,
     products: salesProducts,
     weights,
     narrative,
@@ -457,11 +458,13 @@ export async function applyLiveEvening(client: Client, opts: { force?: boolean }
       p.weight = damped[name];
       return p;
     });
-    const sumW = products.reduce((s, p) => s + p.weight, 0) || 1;
-    for (const p of products) p.postsPerWeek = Math.max(1, Math.round((p.weight / sumW) * WEEKLY_SALES_BUDGET));
     const pp = await loadPostingPlan(client);
-    const limit = Array.from({ length: 7 }, (_, i) => vnDayInfo(now, i).date).reduce((s, d) => s + slotsForDate(pp.plan, d).filter((x) => x.kind === 'sale').length, 0);
-    const dirQueue = buildDirectionQueue(Array.isArray(base.content_suggestions) ? base.content_suggestions : [], damped, Math.max(1, limit));
+    // 4/9 khuya (đợt 3, bỏ hằng ngân sách cứng cũ): ngân sách bài bán/tuần = tổng ô bài bán
+    // thật trong lịch cố định 7 ngày tới (mặc định 1/ngày = 7/tuần, tự đổi khi lịch đổi).
+    const weeklyBudget = Array.from({ length: 7 }, (_, i) => vnDayInfo(now, i).date).reduce((s, d) => s + slotsForDate(pp.plan, d).filter((x) => x.kind === 'sale').length, 0) || 7;
+    const sumW = products.reduce((s, p) => s + p.weight, 0) || 1;
+    for (const p of products) p.postsPerWeek = Math.max(1, Math.round((p.weight / sumW) * weeklyBudget));
+    const dirQueue = buildDirectionQueue(Array.isArray(base.content_suggestions) ? base.content_suggestions : [], damped, Math.max(1, weeklyBudget));
     const dailySchedule = buildDailySchedule(now, products, pp, dirQueue);
     const adjustNote = (describeChanges as any)(changes) as string;
     const prevLog = Array.isArray(base.adjust_log) ? base.adjust_log : [];

@@ -12,8 +12,8 @@
 //   - lib/week-plan.ts (bảng tuần /ke-hoach), lib/plan-live.ts (bản sống), lib/today-plan.ts
 //     (khối Kế hoạch hôm nay /tong-quan), noi-dung/bang-section.tsx (lọc group popover 📣).
 //
-// Chưa có key trong DB -> lịch MẶC ĐỊNH = đúng nhịp đang chạy (8h 1 bài bán FB, 14h 1 bài bán FB
-// + 1 content FB, group xoay 2 nhóm/ngày như công thức cũ) để hành vi không đổi tới khi người Lưu.
+// Chưa có key trong DB -> lịch MẶC ĐỊNH = nhịp mới nhất (4/9 khuya, đợt 3): mỗi ngày ĐÚNG 1 bài
+// bán + 1 bài content, ở 2 khung 08:00 và 19:30, tất cả Facebook, group xoay theo công thức cũ.
 
 import type { getServerClient } from './supabase-server';
 
@@ -24,7 +24,7 @@ export const MAX_SLOTS_PER_DAY = 4;
 
 // Kênh v1: chỉ 2 kênh máy đăng được qua API khi bấm Duyệt (actions.ts decideForm).
 // TikTok (xuất tay) và Zalo (chưa nối API) KHÔNG đưa vào lịch.
-export type PostingChannel = 'facebook' | 'youtube';
+export type PostingChannel = 'facebook' | 'youtube' | 'tiktok';
 export type PostingKind = 'sale' | 'content';
 export type PostingSlot = {
   time: string;                 // "HH:mm" giờ VN
@@ -57,7 +57,7 @@ export type EffectiveSlot = PostingSlot & {
   overridden: boolean;          // ngày này đang dùng lịch riêng
 };
 
-export const CHANNEL_LABEL: Record<PostingChannel, string> = { facebook: 'Facebook Page', youtube: 'YouTube' };
+export const CHANNEL_LABEL: Record<PostingChannel, string> = { facebook: 'Facebook Page', youtube: 'YouTube', tiktok: 'TikTok (xuất tay)' };
 export const KIND_LABEL: Record<PostingKind, string> = { sale: 'Bài bán', content: 'Bài content' };
 export const DOW_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 export const DOW_LONG = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -93,7 +93,7 @@ export function normalizeSlot(raw: any): PostingSlot | null {
   if (!raw || typeof raw !== 'object') return null;
   const time = String(raw.time || '').trim();
   if (!TIME_RE.test(time)) return null;
-  const channel: PostingChannel = raw.channel === 'youtube' ? 'youtube' : 'facebook';
+  const channel: PostingChannel = raw.channel === 'youtube' ? 'youtube' : raw.channel === 'tiktok' ? 'tiktok' : 'facebook';
   const kind: PostingKind = raw.kind === 'content' ? 'content' : 'sale';
   const gid = raw.group_id ? String(raw.group_id).trim().slice(0, 120) : '';
   return { time, channel, kind, group_id: channel === 'facebook' && gid ? gid : null };
@@ -122,9 +122,8 @@ export function normalizePostingPlan(raw: any): PostingPlan | null {
   return { version: 1, days, overrides, source, notes, week_start, proposed_at: raw.proposed_at ? String(raw.proposed_at) : undefined, updated_at: raw.updated_at ? String(raw.updated_at) : undefined };
 }
 
-// Lịch mặc định = nhịp đang chạy trước plan này (rotate 4/9): 8h 1 bài bán, 14h 1 bài bán + 1
-// content, tất cả Facebook; group xoay 2 nhóm/ngày đúng công thức cũ (i*2+k) % n với i = vị trí
-// ngày trong tuần T2..CN — để lịch mặc định hiện y hệt bảng tuần trước đây.
+// Lịch mặc định = nhịp mới nhất (4/9 khuya, đợt 3): 08:00 1 bài bán, 19:30 1 bài content, tất cả
+// Facebook; group xoay theo công thức cũ (i*2+k) % n với i = vị trí ngày trong tuần T2..CN.
 export function defaultPostingPlan(shareGroups: ShareGroup[] = []): PostingPlan {
   const days: Record<string, PostingDay> = {};
   DOW_ORDER.forEach((dowIdx, i) => {
@@ -132,22 +131,25 @@ export function defaultPostingPlan(shareGroups: ShareGroup[] = []): PostingPlan 
     days[String(dowIdx)] = {
       slots: [
         { time: '08:00', channel: 'facebook', kind: 'sale', group_id: g(0) },
-        { time: '14:00', channel: 'facebook', kind: 'sale', group_id: g(1) },
-        { time: '14:00', channel: 'facebook', kind: 'content', group_id: null },
+        { time: '19:30', channel: 'facebook', kind: 'content', group_id: null },
       ],
     };
   });
   return { version: 1, days, overrides: {}, source: 'default', notes: [] };
 }
 
-// ===== BOSS XẾP LỊCH (user 4/9 khuya: "kế hoạch đăng cố định là kế hoạch con BOSS đưa ra, cố định
-// luôn cho tới khi ta tự thay đổi"). Thuật toán tất định, không LLM — mỗi ngày 2 bài bán + 1 content
-// (khớp WEEKLY_SALES_BUDGET 14), chia để KHÔNG LOÃNG:
-//   giờ trải 08:00 bán / 14:00 bán / 19:30 content; YouTube (nếu sẵn) rải T3-T5-T7 chiều;
-//   group xoay đều, không trùng trong ngày; content không group trừ CN (seeding).
-export type ProposeInput = { shareGroups: ShareGroup[]; youtubeReady: boolean; clipFolders: number; weekStart: string };
-export const BOSS_TIMES = { sale1: '08:00', sale2: '14:00', content: '19:30' } as const;
-const YOUTUBE_DOWS = new Set([2, 4, 6]); // T3, T5, T7
+// ===== BOSS XẾP LỊCH (user 4/9 khuya, chốt qua 3 lần): "kế hoạch đăng cố định là kế hoạch con
+// BOSS đưa ra, cố định luôn cho tới khi ta tự thay đổi"; "3 nền tảng chia ra trong 7 ngày để
+// không loãng"; "bài bán chia đều, không nhất thiết 1 ngày 2 bài bán"; "không nhất thiết sáng
+// bán tối content, đổi chỗ được; thứ 2 không nhất thiết Facebook, tuần sau có thể YouTube".
+// => MỖI NGÀY 1 bài bán + 1 content ở 2 khung 08:00 / 19:30. BOSS tự quyết theo TUẦN:
+//   - Nền tảng bài bán: chuỗi SALE_CYCLE (3 FB + 2 YT + 2 TT, hai ngày video không liền nhau)
+//     DỊCH đi (tuần % 7) nấc mỗi tuần -> thứ nào nền tảng nào đổi theo tuần.
+//   - Khung giờ: bài bán sáng hay tối luân phiên theo ngày, đảo chiều mỗi tuần.
+// Nền tảng chưa sẵn sàng (thiếu token / không folder có clip) thì ngày đó rơi về Facebook.
+export type ProposeInput = { shareGroups: ShareGroup[]; youtubeReady: boolean; tiktokReady: boolean; clipFolders: number; weekStart: string };
+export const BOSS_TIMES = { morning: '08:00', evening: '19:30' } as const;
+const SALE_CYCLE: PostingChannel[] = ['facebook', 'youtube', 'tiktok', 'facebook', 'youtube', 'tiktok', 'facebook'];
 
 // Số tuần kể từ epoch của một ngày YYYY-MM-DD — để xoay điểm bắt đầu group theo tuần.
 export function weekIndexOf(date: string): number {
@@ -160,6 +162,7 @@ export function proposePostingPlan(input: ProposeInput, now: Date = new Date()):
   const n = groups.length;
   // Xoay điểm bắt đầu theo tuần: tuần sau group khác đứng đầu T2 sáng (giờ vàng chia đều cả tháng).
   let cursor = n ? weekIndexOf(input.weekStart) % n : 0;
+  const wk = weekIndexOf(input.weekStart);
   const nextGroup = (usedToday: Set<string>): string | null => {
     if (!n) return null;
     for (let tries = 0; tries < n; tries++) {
@@ -171,33 +174,42 @@ export function proposePostingPlan(input: ProposeInput, now: Date = new Date()):
   };
   const days: Record<string, PostingDay> = {};
   const usage = new Map<string, number>();
-  for (const dowIdx of DOW_ORDER) {
+  DOW_ORDER.forEach((dowIdx, i) => {
     const usedToday = new Set<string>();
-    const slots: PostingSlot[] = [];
-    const g1 = nextGroup(usedToday);
-    slots.push({ time: BOSS_TIMES.sale1, channel: 'facebook', kind: 'sale', group_id: g1 });
-    if (input.youtubeReady && YOUTUBE_DOWS.has(dowIdx)) {
-      slots.push({ time: BOSS_TIMES.sale2, channel: 'youtube', kind: 'sale', group_id: null });
-    } else {
-      slots.push({ time: BOSS_TIMES.sale2, channel: 'facebook', kind: 'sale', group_id: nextGroup(usedToday) });
-    }
-    const contentGroup = dowIdx === 0 ? nextGroup(usedToday) : null; // CN seeding mới chia group
-    slots.push({ time: BOSS_TIMES.content, channel: 'facebook', kind: 'content', group_id: contentGroup });
+    // Nền tảng bài bán: chuỗi 7 ngày dịch theo tuần (tuần này T2 = FB, tuần sau T2 = YT, ...).
+    const want = SALE_CYCLE[(i + wk) % 7];
+    const ready = want === 'youtube' ? input.youtubeReady : want === 'tiktok' ? input.tiktokReady : true;
+    const saleCh: PostingChannel = ready ? want : 'facebook';
+    // Khung giờ: ngày chẵn/lẻ đổi chỗ bán/content, tuần sau đảo lại -> không tuần nào giống tuần nào.
+    const saleMorning = (i + wk) % 2 === 0;
+    // Mỗi ngày ĐÚNG 1 lượt chia sẻ group: bài bán nếu lên Facebook, không thì bài content.
+    const saleGroup = saleCh === 'facebook' ? nextGroup(usedToday) : null;
+    const contentGroup = saleCh === 'facebook' ? null : nextGroup(usedToday);
+    const sale: PostingSlot = { time: saleMorning ? BOSS_TIMES.morning : BOSS_TIMES.evening, channel: saleCh, kind: 'sale', group_id: saleGroup };
+    const content: PostingSlot = { time: saleMorning ? BOSS_TIMES.evening : BOSS_TIMES.morning, channel: 'facebook', kind: 'content', group_id: contentGroup };
+    const slots = saleMorning ? [sale, content] : [content, sale];
     for (const s of slots) if (s.group_id) usage.set(s.group_id, (usage.get(s.group_id) || 0) + 1);
     days[String(dowIdx)] = { slots };
-  }
+  });
   const labelOf = (id: string) => groups.find((g) => g.id === id)?.label || id;
   const weekEnd = new Date(new Date(input.weekStart + 'T00:00:00Z').getTime() + 6 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const chLabelShort: Record<PostingChannel, string> = { facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok' };
+  const saleLine = DOW_ORDER.map((d) => {
+    const s = days[String(d)].slots.find((x) => x.kind === 'sale')!;
+    return `${DOW_SHORT[d]} ${s.time.slice(0, 2)}h ${chLabelShort[s.channel]}`;
+  }).join(' · ');
   const notes: string[] = [
-    `Lịch tuần ${fmtDM(input.weekStart)} đến ${fmtDM(weekEnd)}. Sáng Thứ 2 tuần sau BOSS xếp bản mới; trong tuần chỉ bạn sửa mới đổi.`,
-    `Giờ trải 3 khung: ${BOSS_TIMES.sale1} bài bán, ${BOSS_TIMES.sale2} bài bán, ${BOSS_TIMES.content} bài content (tối, giờ bà con lướt Facebook).`,
+    `Lịch tuần ${fmtDM(input.weekStart)} đến ${fmtDM(weekEnd)}. Sáng Thứ 2 tuần sau BOSS xếp bản mới (đổi thứ tự nền tảng và khung giờ); trong tuần chỉ bạn sửa mới đổi.`,
+    `Mỗi ngày 1 bài bán + 1 bài content ở 2 khung ${BOSS_TIMES.morning} và ${BOSS_TIMES.evening}, bán sáng hay bán tối luân phiên. Bài bán tuần này: ${saleLine}. Content luôn Facebook ở khung còn lại.`,
     input.youtubeReady
-      ? `YouTube rải cách ngày: T3, T5, T7 lúc ${BOSS_TIMES.sale2} (${input.clipFolders} folder sản phẩm có clip để dựng video).`
-      : 'Chưa dùng YouTube: cần YOUTUBE_REFRESH_TOKEN trên Vercel và folder sản phẩm có clip gốc.',
+      ? `YouTube: máy tự đăng khi Duyệt (${input.clipFolders} folder sản phẩm có clip để dựng video).`
+      : 'YouTube chưa vào lịch: cần YOUTUBE_REFRESH_TOKEN trên Vercel và folder sản phẩm có clip gốc (ngày YouTube tạm về Facebook).',
+    input.tiktokReady
+      ? 'TikTok: máy viết bài + dựng video dọc, bạn Duyệt rồi bấm Xuất TikTok và Ghép TikTok (TikTok không cho đăng qua API).'
+      : 'TikTok chưa vào lịch: cần folder sản phẩm có clip gốc để dựng video (ngày TikTok tạm về Facebook).',
     n
-      ? `Group xoay đều ${n} nhóm, mỗi bài bán Facebook 1 group, không trùng group trong ngày: ${[...usage.entries()].map(([id, c]) => `${labelOf(id)} ${c} lượt`).join(', ')}.`
+      ? `Mỗi ngày 1 lượt chia sẻ group (bài bán nếu lên Facebook, không thì bài content), xoay đều ${n} nhóm: ${[...usage.entries()].map(([id, c]) => `${labelOf(id)} ${c} lượt`).join(', ')}.`
       : 'Chưa có group nào: thêm ở popover 📣 Chia sẻ group rồi bấm BOSS xếp lại.',
-    'Bài content không chia group (nuôi trang), riêng Chủ nhật (seeding dẫn về sản phẩm) có group.',
   ];
   return { version: 1, days, overrides: {}, source: 'boss', week_start: input.weekStart, proposed_at: now.toISOString(), notes };
 }
@@ -228,7 +240,8 @@ export async function buildBossPostingPlan(client: Client, now: Date = new Date(
       .map((a) => String(a.product_group))
   ).size;
   const youtubeReady = !!(process.env.YOUTUBE_REFRESH_TOKEN || '').trim() && clipFolders > 0;
-  const input: ProposeInput = { shareGroups, youtubeReady, clipFolders, weekStart };
+  const tiktokReady = clipFolders > 0; // xuất tay, không cần token
+  const input: ProposeInput = { shareGroups, youtubeReady, tiktokReady, clipFolders, weekStart };
   return { plan: proposePostingPlan(input, now), input };
 }
 

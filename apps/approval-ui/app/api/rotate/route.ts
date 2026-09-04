@@ -6,7 +6,7 @@ import { guessGroup } from '../../../lib/gen/products.mjs';
 
 // Lịch hàng ngày: chọn NGẪU NHIÊN 1 folder sản phẩm (product_group) theo VÒNG XOAY
 // (mỗi folder dùng 1 lần mỗi vòng, hết cả folder mới sang vòng mới), rồi sinh bài chờ duyệt.
-// Số bài mỗi slot + kênh (facebook/youtube) + group chia sẻ tay theo LỊCH ĐĂNG CỐ ĐỊNH
+// Số bài mỗi slot + kênh (facebook/youtube/tiktok xuất tay) + group chia sẻ tay theo LỊCH ĐĂNG CỐ ĐỊNH
 // app_config mkt_posting_plan (lib/posting-plan.ts, user chốt 4/9/2026: "chia kênh, cố định").
 // KHÔNG tự đăng — người bấm Duyệt mới đăng (điều cấm 1). Bảo vệ bằng CRON_SECRET.
 //
@@ -390,14 +390,19 @@ export async function GET(req: Request) {
         try { logoActions.push({ group, ...(await ensureLogoForPost(client, img.id)) }); }
         catch (e) { logoActions.push({ group, action: 'error', reason: String((e as any)?.message || e) }); }
       }
-      // Kênh theo LỊCH CỐ ĐỊNH: bài bán thứ k ứng với ô giờ saleSlots[k]. Ô YouTube chỉ dùng được
-      // khi folder có clip gốc (video AI dựng được) + đã cấu hình YOUTUBE_REFRESH_TOKEN; không thì
-      // rơi về Facebook và ghi lý do vào skipped để đọc run_log là biết.
+      // Kênh theo LỊCH CỐ ĐỊNH: bài bán thứ k ứng với ô giờ saleSlots[k].
+      //   YouTube: cần folder có clip gốc (dựng video AI) + YOUTUBE_REFRESH_TOKEN, máy tự đăng khi Duyệt.
+      //   TikTok (4/9 khuya): cần folder có clip gốc; máy viết bài + dựng video dọc, người Duyệt rồi
+      //   XUẤT TAY (nút Xuất TikTok + Ghép TikTok ở /noi-dung) vì TikTok API không cho đăng.
+      //   Không đủ điều kiện -> rơi về Facebook, ghi lý do vào skipped để đọc run_log là biết.
       const ps = saleSlots[k] || saleSlots[saleSlots.length - 1] || null;
       let channels: string[] = ['facebook'];
       if (ps?.channel === 'youtube') {
         if (wantVideo && process.env.YOUTUBE_REFRESH_TOKEN) channels = ['youtube'];
         else skipped.push({ group, reason: `o ${ps.time} la YouTube nhung ${wantVideo ? 'chua co YOUTUBE_REFRESH_TOKEN' : 'folder khong co clip goc'} -> dang Facebook` });
+      } else if (ps?.channel === 'tiktok') {
+        if (wantVideo) channels = ['tiktok'];
+        else skipped.push({ group, reason: `o ${ps.time} la TikTok nhung folder khong co clip goc -> dang Facebook` });
       }
       const planSlot = ps ? { date: todayDate, index: ps.index, time: ps.time, channel: channels[0], group_id: ps.group_id || null, group_label: ps.group_label } : null;
       const assets = { image: img.id, video: null };
@@ -612,7 +617,7 @@ export async function GET(req: Request) {
     // vẫn đăng Facebook (YouTube cần video).
     const cs = contentSlots[i] || null;
     const channels: string[] = ['facebook'];
-    if (cs?.channel === 'youtube') skipped.push({ group: 'Bài content', reason: `o ${cs.time} la YouTube nhung bai content khong co video -> dang Facebook` });
+    if (cs?.channel === 'youtube' || cs?.channel === 'tiktok') skipped.push({ group: 'Bài content', reason: `o ${cs.time} la ${cs.channel} nhung bai content khong co video -> dang Facebook` });
     const planSlotC = cs ? { date: todayDate, index: cs.index, time: cs.time, channel: 'facebook', group_id: cs.group_id || null, group_label: cs.group_label } : null;
     const { data: ins, error: ce } = await client
       .from('mkt_content')

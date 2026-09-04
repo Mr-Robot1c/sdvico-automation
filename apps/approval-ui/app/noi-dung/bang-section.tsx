@@ -258,7 +258,7 @@ export default async function BangSection() {
                         {p.ab_variant ? <span className="badge badge-ab">🧪 Thử {p.ab_variant}</span> : null}
                         {brief.video_requested === true ? <span className="badge badge-video-pending">🎬 Đang làm video AI</span> : null}
                         <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
-                        {p.plan_time ? <span className="badge tone-default" title="Ô giờ trong Lịch đăng cố định">🗓 {String(p.plan_time).slice(11, 16)} · {CHANNEL_LABEL[(p.plan_channel === 'youtube' ? 'youtube' : 'facebook') as 'facebook' | 'youtube']}{p.plan_group ? ` · 👥 ${p.plan_group}` : ''}</span> : null}
+                        {p.plan_time ? <span className="badge tone-default" title="Ô giờ trong Lịch đăng cố định">🗓 {String(p.plan_time).slice(11, 16)} · {CHANNEL_LABEL[(p.plan_channel === 'youtube' ? 'youtube' : p.plan_channel === 'tiktok' ? 'tiktok' : 'facebook') as 'facebook' | 'youtube' | 'tiktok']}{p.plan_group ? ` · 👥 ${p.plan_group}` : ''}</span> : null}
                       </div>
                       {(brief as any).insight_line ? (
                         <p className="insight-line" title={(brief as any).insight_situation || 'Insight/painpoint bài này xoáy vào'}>
@@ -351,7 +351,7 @@ export default async function BangSection() {
                         hasTiktok={chans.includes('tiktok')}
                         videoUrl={vidUrl ?? null}
                         caption={c?.draft ?? null}
-                        defaultSchedule={typeof p.plan_time === 'string' && isFutureVNLocal(p.plan_time, 15) ? String(p.plan_time) : ''}
+                        defaultSchedule={typeof p.plan_time === 'string' && p.plan_channel !== 'tiktok' && isFutureVNLocal(p.plan_time, 15) ? String(p.plan_time) : ''}
                       />
                     </div>
                   );
@@ -365,11 +365,18 @@ export default async function BangSection() {
                   // Xem bài — ảnh/video + nguyên văn nội dung sẽ đăng.
                   const schImg = (typeof p.assets?.image_url === 'string' && p.assets.image_url) || (typeof p.assets?.image === 'string' ? assetUrl.get(p.assets.image) : undefined);
                   const schVid = typeof p.assets?.video === 'string' ? assetUrl.get(p.assets.video) : undefined;
+                  // 4/9 khuya: ô TikTok của lịch cố định — API không đăng được, người XUẤT TAY.
+                  const tiktokOnly = chans.length > 0 && chans.every((x) => x === 'tiktok');
+                  const tiktokLinked = !!(brief as any).tiktok_share_url;
+                  const ttVideoVId = brief?.assets?.video_v as string | undefined;
+                  const ttVideoUrl = ttVideoVId ? assetUrl.get(ttVideoVId) : undefined;
                   return (
                     <div key={it.qid} className="card tone-mkt" style={{ display: 'grid', gap: 6, padding: 12 }}>
                       <b>{title}</b>
                       <div className="badges">
-                        {hasSched ? (
+                        {tiktokOnly ? (
+                          <span className="badge tone-demo" title="TikTok không cho đăng qua API. Bấm Xuất TikTok để tải video dọc + copy caption, đăng trên app/web TikTok, rồi Ghép TikTok để hệ thống tính là đã đăng.">🎵 Chờ bạn xuất TikTok tay</span>
+                        ) : hasSched ? (
                           <span className={`badge ${future ? 'tone-demo' : 'tone-ok'}`} title="Giờ hẹn đăng người duyệt đã chọn. Tới giờ máy tự đăng.">
                             ⏰ Hẹn {fmtSchedule(it.scheduledAt)}{future ? '' : ' (đang đăng)'}
                           </span>
@@ -389,6 +396,18 @@ export default async function BangSection() {
                           </div>
                         ) : null}
                       </ViewModal>
+                      {tiktokOnly && !tiktokLinked ? (
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+                          <span style={{ fontSize: '.75rem', minWidth: 76, color: 'var(--ink-2)' }}>🎵 TikTok</span>
+                          {ttVideoUrl ? (
+                            <ExportTiktokButton videoUrl={ttVideoUrl} caption={c?.draft || title} contentTitle={c?.title || 'sdvico'} />
+                          ) : (
+                            <span className="badge badge-video-pending" title="Máy đang dựng video dọc cho TikTok (10 tới 30 phút). Xong sẽ hiện nút Xuất TikTok.">🎬 Đang làm video AI</span>
+                          )}
+                          <LinkTikTokButton contentId={it.cid} linkedVideoId={(brief as any).tiktok_video_id || null} linkedShareUrl={(brief as any).tiktok_share_url || null} />
+                          <CopyCaptionButton caption={c?.draft || title} />
+                        </div>
+                      ) : null}
                       {fbFailed.has(it.cid) ? (
                         <form action={retryFacebookPublish}>
                           <input type="hidden" name="content_id" value={it.cid} />

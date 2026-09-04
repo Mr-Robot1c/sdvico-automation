@@ -66,6 +66,7 @@ export async function pullTikTokMetrics(client: Client): Promise<{ pulled: numbe
     const vid = String(brief.tiktok_video_id || '');
     if (vid) manualMap.set(vid, String((c as any).id));
   }
+  const manualCids = new Set(manualMap.values());
 
   // 2b. Bài TikTok đã đăng gần nhất trong hệ thống (30 ngày) — cho MATCH BY TIME fallback.
   const since30 = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
@@ -92,6 +93,7 @@ export async function pullTikTokMetrics(client: Client): Promise<{ pulled: numbe
   }
 
   for (const p of posts as any[]) {
+    if (manualCids.has(String(p.content_id))) continue; // 4/9: bài đã ghép tay không khớp lại theo giờ
     const postTs = Math.floor(new Date(p.published_at).getTime() / 1000);
     let best: { video: typeof videos[number]; delta: number } | null = null;
     for (const v of videos) {
