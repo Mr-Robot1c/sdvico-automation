@@ -54,10 +54,10 @@ function cleanNarration(text) {
     // vi cleanNarration chi chay trong duong tts().
     .replace(/SDVICO/gi, 'SD Vi Co')
     // 4/9 (sep): giong doc doc SAI chu "Page" trong outro ("Nhan tin cho Page SDVICO"). Doc theo
-    // cach ba con van noi: "pết" (fanpage -> "phen pết"). Chi ap cho GIONG DOC, chu tren man
-    // hinh / caption giu nguyen "Page".
-    .replace(/\bfan\s?page\b/gi, 'phen pết')
-    .replace(/\bpage\b/gi, 'pết')
+    // "pây" (sep nghe thu 4/9 chieu: "pết" khong ung, muon nghe kieu "pay"). Fanpage -> "phen pây".
+    // Chi ap cho GIONG DOC, chu tren man hinh / caption giu nguyen "Page".
+    .replace(/\bfan\s?page\b/gi, 'phen pây')
+    .replace(/\bpage\b/gi, 'pây')
     .replace(/\s+/g, ' ')
     .trim();
 }
