@@ -101,16 +101,19 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: true, created: 0, note: `da sinh ${madeSlot} bai slot ${slot} hom nay` });
       }
     } else {
-      // Khong truyen slot: dem tong bai hom nay (guard cu, cho cac tinh huong thu cong).
+      // 4/9 (user chot "moi ngay dung 3 bai"): KHONG slot va KHONG force thi BO QUA HAN.
+      // Truoc day guard "da sinh hom nay" chi chan khi hom nay DA co bai: task Windows
+      // SDVICO-BossCron1h goi /api/rotate khong slot moi gio phut :01 -> neu may bat truoc
+      // cron sang 08:23 thi 08:01 chua co bai -> sinh 2 ban + 1 content, roi 2 cron slot sinh
+      // them 3 -> 6 bai/ngay. Sinh bai gio CHI qua cron Vercel (?slot=sang|chieu) hoac bam
+      // tay co ?force=1. madeToday chi de ghi log cho de doi chieu.
       const { count: madeToday } = await client
         .from('mkt_content')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', dayStartIso)
         .eq('brief->>generator', 'rotation');
-      if (madeToday && madeToday > 0) {
-        await logRotate('skipped', { reason: 'da sinh hom nay', madeToday });
-        return NextResponse.json({ ok: true, created: 0, note: `da sinh ${madeToday} bai hom nay (guard 1 lan/ngay; ?force=1 de ep)` });
-      }
+      await logRotate('skipped', { reason: 'khong co slot (chi cron ?slot= hoac ?force=1 moi sinh bai)', madeToday: madeToday || 0 });
+      return NextResponse.json({ ok: true, created: 0, note: `khong co slot, bo qua (hom nay da co ${madeToday || 0} bai; ?slot=sang|chieu hoac ?force=1 de sinh)` });
     }
 
     // 29/8 (audit mục 12): guard đếm ở trên đọc-rồi-quyết — hai lượt gọi CÙNG LÚC (cron trùng
