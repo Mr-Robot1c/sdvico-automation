@@ -80,7 +80,7 @@ const RULES = [
   'Chi tra JSON dung dang, khong them chu nao ngoai JSON:',
   '{"loai":"tu_lieu"|"giay_to_ca_nhan"|"man_hinh_app"|"khong_dung_duoc","folder":"<mot dong trong danh sach>","tieu_de":"<8-12 chu tieng Viet mo ta noi dung>"}',
   'loai "giay_to_ca_nhan": can cuoc, ho chieu, bang lai, giay to co ten/so ca nhan (KE CA chup mot phan).',
-  'loai "man_hinh_app": screenshot man hinh dien thoai/app/phan mem.',
+  'loai "man_hinh_app": screenshot man hinh dien thoai/app/phan mem. KE CA anh chup THAT nhung co OVERLAY cua app (logo TikTok/YouTube/Facebook/Instagram, nut like/tim, so hotline, ten kenh, sub-title, chu keu goi ghim tren anh) => day la screenshot tu nen tang khac, KHONG dung lam tu lieu san pham cua SDVICO — TUYET DOI khong dat vao folder san pham.',
   'loai "khong_dung_duoc": mo nhoe, khong lien quan san pham hay doi song nghe ca.',
   // 4/9 SIET: bai hoc user - anh khoang may sa lan (thay may phat trong hau canh) bi phan loai
   // vao folder san pham (SD12-300, PV Engine) roi may sinh bai bai boc dung -> anh "rau ong no
