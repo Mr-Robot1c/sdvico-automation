@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../../lib/supabase-server';
 import { generateAndStorePlan } from '../../lib/plan';
 import { refreshLiveProposal } from '../../lib/plan-live';
+import { loadPostingPlan, savePostingPlan, normalizeSlot, MAX_SLOTS_PER_DAY, type PostingDay, type PostingSlot } from '../../lib/posting-plan';
 
 // NGƯỜI GIAO VIỆC vừa đổi mục tiêu / sản phẩm tập trung -> BOSS sinh lại kế hoạch NGAY và ÁP DỤNG
 // luôn (user 19/8: "đã note mục tiêu mới mà BOSS vẫn giữ kế hoạch cũ không cập nhật"). Đây là
@@ -150,3 +151,51 @@ export async function generatePostsNow(): Promise<{ ok: boolean; created: number
 // Nhóm chia sẻ: từ 20/8 quản lý DUY NHẤT qua popover 📣 ở Quản lý bài viết (/api/share-groups,
 // app_config 'mkt_share_groups' dạng {groups: [{id,label,url}]}). Trang Kế hoạch chỉ hiển thị.
 // (saveShareGroups nhập tay cũ đã bỏ — hai nguồn từng lệch nhau, user bắt lỗi 20/8.)
+
+// LỊCH ĐĂNG CỐ ĐỊNH (user 4/9: "kế hoạch cố định, muốn chỉnh thì chỉnh ngay hôm đó"). Form ở
+// ke-hoach/posting-plan-form.tsx: mỗi thứ tối đa MAX_SLOTS_PER_DAY ô, tên field s_<dow>_<i>_{on,time,kind,channel,group}.
+function readSlots(formData: FormData, prefix: string): PostingSlot[] {
+  const slots: PostingSlot[] = [];
+  for (let i = 0; i < MAX_SLOTS_PER_DAY; i++) {
+    if (String(formData.get(`${prefix}_${i}_on`) || '') !== '1') continue;
+    const s = normalizeSlot({
+      time: formData.get(`${prefix}_${i}_time`),
+      channel: formData.get(`${prefix}_${i}_channel`),
+      kind: formData.get(`${prefix}_${i}_kind`),
+      group_id: formData.get(`${prefix}_${i}_group`),
+    });
+    if (s) slots.push(s);
+  }
+  return slots;
+}
+async function afterPlanSaved(client: ReturnType<typeof getServerClient>, detail: Record<string, unknown>) {
+  try { await refreshLiveProposal(client); } catch (e: any) { console.error('[posting-plan] refresh live loi:', e?.message || e); }
+  try { await client.from('run_log').insert({ task: 'mkt.posting_plan_save', actor: 'user', status: 'ok', detail }); } catch { /* bo qua */ }
+  revalidatePath('/ke-hoach'); revalidatePath('/tong-quan'); revalidatePath('/noi-dung');
+}
+export async function savePostingPlanAction(formData: FormData) {
+  const client = getServerClient();
+  const current = await loadPostingPlan(client);
+  const days: Record<string, PostingDay> = {};
+  for (let d = 0; d < 7; d++) days[String(d)] = { slots: readSlots(formData, `s_${d}`) };
+  await savePostingPlan(client, { version: 1, days, overrides: current.plan.overrides || {} });
+  await afterPlanSaved(client, { kind: 'week', slotsPerDay: Object.fromEntries(Object.entries(days).map(([k, v]) => [k, v.slots.length])) });
+}
+export async function savePostingOverrideAction(formData: FormData) {
+  const date = String(formData.get('ov_date') || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Ngày sửa riêng không hợp lệ');
+  const client = getServerClient();
+  const current = await loadPostingPlan(client);
+  const overrides = { ...(current.plan.overrides || {}), [date]: { slots: readSlots(formData, 'ov') } };
+  await savePostingPlan(client, { ...current.plan, overrides });
+  await afterPlanSaved(client, { kind: 'override', date, slots: overrides[date].slots.length });
+}
+export async function clearPostingOverrideAction(formData: FormData) {
+  const date = String(formData.get('ov_date') || '').trim();
+  const client = getServerClient();
+  const current = await loadPostingPlan(client);
+  const overrides = { ...(current.plan.overrides || {}) };
+  delete overrides[date];
+  await savePostingPlan(client, { ...current.plan, overrides });
+  await afterPlanSaved(client, { kind: 'override-clear', date });
+}

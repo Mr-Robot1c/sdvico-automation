@@ -5,8 +5,9 @@ import { isEmergencyStopped, todayVN } from '../../../lib/safety';
 import { guessGroup } from '../../../lib/gen/products.mjs';
 
 // Lịch hàng ngày: chọn NGẪU NHIÊN 1 folder sản phẩm (product_group) theo VÒNG XOAY
-// (mỗi folder dùng 1 lần mỗi vòng, hết cả folder mới sang vòng mới), rồi sinh bài chờ duyệt:
-//   Facebook: 1 ảnh (kèm video nếu folder có) — TikTok: 1 video (nếu folder có).
+// (mỗi folder dùng 1 lần mỗi vòng, hết cả folder mới sang vòng mới), rồi sinh bài chờ duyệt.
+// Số bài mỗi slot + kênh (facebook/youtube) + group chia sẻ tay theo LỊCH ĐĂNG CỐ ĐỊNH
+// app_config mkt_posting_plan (lib/posting-plan.ts, user chốt 4/9/2026: "chia kênh, cố định").
 // KHÔNG tự đăng — người bấm Duyệt mới đăng (điều cấm 1). Bảo vệ bằng CRON_SECRET.
 //
 // v2 (18/8/2026): Nếu Kế hoạch đã áp có content_suggestions[] (hướng đi tuần tới sinh
@@ -17,11 +18,6 @@ import { guessGroup } from '../../../lib/gen/products.mjs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// Số bài BÁN (theo folder sản phẩm) mỗi lần chạy. Mặc định 2. Ngoài ra mỗi lần còn sinh
-// thêm 1 bài CONTENT (không bán, nuôi trang) -> tổng 2 bán + 1 content.
-const FOLDERS_PER_RUN = Number(process.env.ROTATE_FOLDERS_PER_RUN) || 2;
-// Bật/tắt bài content mỗi lần chạy.
-const CONTENT_PER_RUN = process.env.ROTATE_CONTENT === '0' ? 0 : 1;
 // Tự đóng logo SDVICO lên ảnh của bài (kiểm tra ảnh đã có logo chưa rồi mới đóng). Tắt: ROTATE_AUTO_LOGO=0.
 const AUTO_LOGO = process.env.ROTATE_AUTO_LOGO !== '0';
 
@@ -80,8 +76,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, created: 0, note: 'emergency_stop' });
   }
 
-  // NHIP 2 DOT/NGAY (29/8 user chot: 8h sang = 2 bai BAN; 14h chieu = 1 bai ban + 1 content). Guard theo
-  // SLOT (mỗi slot chỉ chạy 1 lần trong ngày VN). ?slot=sang|chieu de ep slot (Vercel cron truyen).
+  // NHIP 2 DOT/NGAY: so bai moi slot + kenh + group theo LICH DANG CO DINH (mkt_posting_plan,
+  // xem duoi). Guard theo SLOT (mỗi slot chỉ chạy 1 lần trong ngày VN). ?slot=sang|chieu de ep
+  // slot (Vercel cron truyen).
   // Khong co ?slot: giu hanh vi cu (guard 1 lan/ngay). ?force=1 bỏ mọi guard.
   const slotParam = (new URL(req.url).searchParams.get('slot') || '').toLowerCase();
   const slot: 'sang' | 'chieu' | null = slotParam === 'sang' ? 'sang' : slotParam === 'chieu' ? 'chieu' : null;
@@ -130,10 +127,22 @@ export async function GET(req: Request) {
     }
     if (claimErr) console.warn('[rotate] reserve_daily_quota chưa gọi được (chưa dán migration?):', claimErr.message);
   }
-  // 4/9 (user: "sáng nhiều quá làm loãng sản phẩm, như spam"): slot sáng 1 bài bán, 0 content.
-  // Slot chiều 1 bài bán + 1 content. Tổng 2 bài bán/ngày = 14/tuần, khớp WEEKLY_SALES_BUDGET.
-  const salesCount = slot === 'chieu' ? 1 : slot === 'sang' ? 1 : FOLDERS_PER_RUN;
-  const contentCount = slot === 'sang' ? 0 : CONTENT_PER_RUN;
+  // 4/9 tối (user: "chia việc đăng bài trên từng kênh, kế hoạch cố định"): số bài + kênh + group
+  // của từng lượt đọc từ LỊCH ĐĂNG CỐ ĐỊNH app_config mkt_posting_plan (lib/posting-plan.ts).
+  // Cửa sổ sang = các ô giờ < 12h, chieu = từ 12h. Không truyền slot (?force=1) = sinh cả ngày.
+  const { loadPostingPlan, slotsForDate, planTimeLocal } = await import('../../../lib/posting-plan');
+  const postingPlan = await loadPostingPlan(client);
+  const todayDate = todayVN();
+  const todaySlots = slotsForDate(postingPlan.plan, todayDate, postingPlan.shareGroups);
+  const winSlots = slot ? todaySlots.filter((s) => s.window === slot) : todaySlots;
+  const saleSlots = winSlots.filter((s) => s.kind === 'sale');
+  const contentSlots = winSlots.filter((s) => s.kind === 'content');
+  const salesCount = saleSlots.length;
+  const contentCount = contentSlots.length;
+  if (!winSlots.length) {
+    await logRotate('skipped', { reason: `lich co dinh: ${slot ? 'slot ' + slot : 'hom nay'} khong co o gio nao`, slot, date: todayDate, planSaved: postingPlan.saved });
+    return NextResponse.json({ ok: true, created: 0, note: `lich dang co dinh khong co bai cho ${slot || 'hom nay'} (${todayDate})` });
+  }
 
   // 1. Gom tư liệu đã gán folder theo product_group.
   //    videos = CLIP GỐC do người upload (loại video-pipeline đã dựng ra) — dùng để quyết
@@ -209,8 +218,9 @@ export async function GET(req: Request) {
     unused = [...eligible];
   }
 
-  // 3. Chọn FOLDERS_PER_RUN folder chưa dùng. Nếu có kế hoạch đã áp (trang Kế hoạch bấm
-  //    "Áp dụng trọng số"), ưu tiên folder theo trọng số sản phẩm. Chưa áp thì chọn đều như cũ.
+  // 3. Chọn salesCount (số ô bài bán theo Lịch đăng cố định) folder chưa dùng. Nếu có kế hoạch
+  //    đã áp (trang Kế hoạch bấm "Áp dụng trọng số"), ưu tiên folder theo trọng số sản phẩm.
+  //    Chưa áp thì chọn đều như cũ.
   const { data: appliedPlanRaw } = await client
     .from('mkt_plans')
     .select('id, data')
@@ -361,7 +371,7 @@ export async function GET(req: Request) {
   // Track suggestion đã dùng trong run này, cuối vòng update plan.data một lần.
   const suggestionsTouched: Array<{ idx: number; imgId: string }> = [];
 
-  for (const pf of pickedFolders) {
+  for (const [k, pf] of pickedFolders.entries()) {
     const group = pf.group;
     const f = folders.get(group)!;
     const name = productName(group);
@@ -380,10 +390,16 @@ export async function GET(req: Request) {
         try { logoActions.push({ group, ...(await ensureLogoForPost(client, img.id)) }); }
         catch (e) { logoActions.push({ group, action: 'error', reason: String((e as any)?.message || e) }); }
       }
-      // YouTube: bat khi da cau hinh YOUTUBE_REFRESH_TOKEN (xem runbook YouTube). Chi them
-      // vao channels khi folder co CLIP (video AI se dung ban doc video_v). Bai chi anh -> bo qua.
-      const channels = ['facebook'];
-      if (wantVideo && process.env.YOUTUBE_REFRESH_TOKEN) channels.push('youtube');
+      // Kênh theo LỊCH CỐ ĐỊNH: bài bán thứ k ứng với ô giờ saleSlots[k]. Ô YouTube chỉ dùng được
+      // khi folder có clip gốc (video AI dựng được) + đã cấu hình YOUTUBE_REFRESH_TOKEN; không thì
+      // rơi về Facebook và ghi lý do vào skipped để đọc run_log là biết.
+      const ps = saleSlots[k] || saleSlots[saleSlots.length - 1] || null;
+      let channels: string[] = ['facebook'];
+      if (ps?.channel === 'youtube') {
+        if (wantVideo && process.env.YOUTUBE_REFRESH_TOKEN) channels = ['youtube'];
+        else skipped.push({ group, reason: `o ${ps.time} la YouTube nhung ${wantVideo ? 'chua co YOUTUBE_REFRESH_TOKEN' : 'folder khong co clip goc'} -> dang Facebook` });
+      }
+      const planSlot = ps ? { date: todayDate, index: ps.index, time: ps.time, channel: channels[0], group_id: ps.group_id || null, group_label: ps.group_label } : null;
       const assets = { image: img.id, video: null };
 
       // A bám góc tri thức (sug.why + tiêu đề gợi ý). B dùng góc đối chứng, tự do tiêu đề.
@@ -438,6 +454,7 @@ export async function GET(req: Request) {
             rotation: true, rotation_slot: slot || null,
             rotation_cycle: cycle,
             rotation_group: group,
+            ...(planSlot ? { plan_slot: planSlot } : {}),
             // Insight/painpoint bài này xoáy vào (STMI) — để chống lặp + hiện cho người duyệt.
             ...(chosenInsight ? { insight_id: chosenInsight.id, insight_situation: chosenInsight.situation, insight_line: chosenInsight.insight } : {}),
             // Chỉ yêu cầu dựng video AI khi folder có clip gốc (SEA-40, SF-50, Ắc quy...).
@@ -477,10 +494,11 @@ export async function GET(req: Request) {
           content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich',
           risk, assets, channels, authored: 'ai',
           ...(sug ? { from_plan_direction: true, suggestion_sources: sug.sources } : {}),
+          ...(planSlot ? { plan_time: planTimeLocal(todayDate, planSlot.time), plan_channel: planSlot.channel, plan_group: planSlot.group_label, plan_slot_index: planSlot.index } : {}),
         },
         status: 'pending',
       });
-      results.push({ group, channels, contentId, risk, from_suggestion: !!sug, video_requested: wantVideo });
+      results.push({ group, channels, contentId, risk, from_suggestion: !!sug, video_requested: wantVideo, slot_time: planSlot?.time || null });
       if (sug && typeof pf.suggestionIdx === 'number') {
         suggestionsTouched.push({ idx: pf.suggestionIdx, imgId: img.id });
       }
@@ -590,7 +608,12 @@ export async function GET(req: Request) {
     }
 
     const assets = { image: media?.id || null, image_url: (picked.url as string) || null, video: null };
-    const channels = ['facebook'];
+    // Bài content luôn là bài ẢNH nên chỉ đăng được Facebook; ô content đặt YouTube thì ghi chú và
+    // vẫn đăng Facebook (YouTube cần video).
+    const cs = contentSlots[i] || null;
+    const channels: string[] = ['facebook'];
+    if (cs?.channel === 'youtube') skipped.push({ group: 'Bài content', reason: `o ${cs.time} la YouTube nhung bai content khong co video -> dang Facebook` });
+    const planSlotC = cs ? { date: todayDate, index: cs.index, time: cs.time, channel: 'facebook', group_id: cs.group_id || null, group_label: cs.group_label } : null;
     const { data: ins, error: ce } = await client
       .from('mkt_content')
       .insert({
@@ -604,6 +627,7 @@ export async function GET(req: Request) {
           generator: 'rotation',
           rotation: true, rotation_slot: slot || null,
           rotation_group: 'Bài content',
+          ...(planSlotC ? { plan_slot: planSlotC } : {}),
           post_kind: 'content',
           topic: gen.topic,
           content_type: kind,
@@ -621,7 +645,7 @@ export async function GET(req: Request) {
     await client.from('approval_queue').insert({
       kind: 'mkt_publish_content',
       title: `${kindTag} ${displayTitle}`,
-      payload: { content_id: (ins as { id: string }).id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels, authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov },
+      payload: { content_id: (ins as { id: string }).id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels, authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov, ...(planSlotC ? { plan_time: planTimeLocal(todayDate, planSlotC.time), plan_channel: 'facebook', plan_group: planSlotC.group_label, plan_slot_index: planSlotC.index } : {}) },
       status: 'pending',
     });
     results.push({ group: 'Bài content', kind, channels, contentId: (ins as { id: string }).id, risk, needsGov });
@@ -680,6 +704,7 @@ export async function GET(req: Request) {
     focus: focusNote,
     videoTriggered,
     ...(videoTriggerError ? { videoTriggerError } : {}),
+    slots: winSlots.map((s) => `${s.time} ${s.kind} ${s.channel}${s.group_label ? ' 👥' + s.group_label : ''}`), planSaved: postingPlan.saved,
   });
   return NextResponse.json({
     ok: true, cycle,

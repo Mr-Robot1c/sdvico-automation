@@ -15,6 +15,7 @@ import { weekWindowVN } from './plan';
 // @ts-ignore — module JS thuần
 import { guessGroup } from './gen/products.mjs';
 import { CONTENT_KIND_BY_DOW, CONTENT_PURPOSE } from './plan-live';
+import { loadPostingPlan, slotsForDate, groupsForDate, type EffectiveSlot } from './posting-plan';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -23,6 +24,9 @@ export type WeekCellItem = {
   product?: string;
   state: 'done' | 'planned' | 'fallback';
   contentId?: string;
+  time?: string;
+  channel?: 'facebook' | 'youtube';
+  group?: string | null;
 };
 
 export type WeekDayView = {
@@ -30,12 +34,14 @@ export type WeekDayView = {
   dowLabel: string;  // "Thứ 2".."Chủ nhật"
   isToday: boolean;
   isPast: boolean;
-  morning: WeekCellItem[];       // 🕗 8h — 2 bài bán
-  afternoonSale: WeekCellItem[]; // 🕐 14h — 1 bài bán
-  content: WeekCellItem | null;  // 🕐 14h — 1 bài content
+  morning: WeekCellItem[];       // sáng = ô giờ < 12h (lịch cố định)
+  afternoonSale: WeekCellItem[]; // chiều = ô giờ từ 12h, bài bán
+  content: WeekCellItem | null;  // ô content trong ngày (giờ tuỳ lịch)
   contentLabel: string;          // nhãn playbook ("Viral · Tự hào")
   contentPurpose?: string;
-  groups: string[];              // nhóm FB gợi ý chia sẻ hôm đó
+  groups: string[];              // nhóm FB cần chia sẻ hôm đó (theo Lịch đăng cố định)
+  contentWindow: 'sang' | 'chieu';
+  overridden: boolean;           // ngày này đang dùng lịch riêng
 };
 
 export type WeekPlanView = {
@@ -88,7 +94,8 @@ export async function buildWeekPlanView(
     const a = actualByDate.get(date)!;
     const slot = b.rotation_slot === 'sang' ? 'sang' : b.rotation_slot === 'chieu' ? 'chieu' : (vn.getUTCHours() < 12 ? 'sang' : 'chieu');
     if (slot === 'sang') a.ranMorning = true; else a.ranAfternoon = true;
-    const item: WeekCellItem = { text: String(r.title || '(không tên)'), state: 'done', contentId: String(r.id) };
+    const psl = b.plan_slot || null;
+    const item: WeekCellItem = { text: String(r.title || '(không tên)'), state: 'done', contentId: String(r.id), time: psl?.time, channel: psl?.channel, group: psl?.group_label ?? null };
     if (b.post_kind === 'content' || b.rotation_group === 'Bài content') {
       if (!a.content) a.content = item;
       continue;
@@ -134,12 +141,8 @@ export async function buildWeekPlanView(
   )];
   const hasImages = (product: string) => productsWithImages.some((p) => p.toLowerCase() === product.toLowerCase());
 
-  // Nhóm chia sẻ: xoay vòng 2 nhóm/ngày theo vị trí ngày trong tuần (nguồn chung app_config).
-  const { data: sgRow } = await client.from('app_config').select('value').eq('key', 'mkt_share_groups').maybeSingle();
-  const sgArr = Array.isArray((sgRow as any)?.value?.groups) ? (sgRow as any).value.groups : [];
-  const shareGroups: string[] = sgArr
-    .map((x: any) => (typeof x === 'string' ? x.trim() : String(x?.label || x?.id || '').trim()))
-    .filter(Boolean);
+  // Số bài/ngày + nhóm chia sẻ đọc từ LỊCH ĐĂNG CỐ ĐỊNH (app_config mkt_posting_plan).
+  const pp = await loadPostingPlan(client);
 
   // Rút n hướng dự kiến cho 1 lượt chạy: mỗi bài trong lượt phải KHÁC sản phẩm
   // (usedInThisRun của rotate); hết hướng hợp lệ thì ô đó rơi về "theo trọng số".
@@ -168,6 +171,11 @@ export async function buildWeekPlanView(
     const isToday = date === todayVN;
     const isPast = date < todayVN;
     const ck = CONTENT_KIND_BY_DOW[dowIdx];
+    const daySlots = slotsForDate(pp.plan, date, pp.shareGroups);
+    const mSale = daySlots.filter((s) => s.window === 'sang' && s.kind === 'sale');
+    const aSale = daySlots.filter((s) => s.window === 'chieu' && s.kind === 'sale');
+    const cSlot = daySlots.find((s) => s.kind === 'content') || null;
+    const decorate = (items: WeekCellItem[], slots: EffectiveSlot[]) => items.map((it, k) => (it.time ? it : { ...it, time: slots[k]?.time, channel: slots[k]?.channel, group: slots[k]?.group_label ?? null }));
 
     let morning: WeekCellItem[] = actual?.morning ? [...actual.morning] : [];
     let afternoonSale: WeekCellItem[] = actual?.afternoon ? [...actual.afternoon] : [];
@@ -175,21 +183,19 @@ export async function buildWeekPlanView(
     if (!isPast) {
       // Slot đã chạy hôm nay thì giữ đúng bài thật (guard 1 lần/slot — thiếu bài cũng không
       // sinh thêm); slot chưa chạy (hôm nay hoặc ngày tới) mới điền dự kiến.
-      if (!(isToday && actual?.ranMorning) && morning.length < 2) {
-        morning = [...morning, ...draw(date, 2 - morning.length)];
+      if (!(isToday && actual?.ranMorning) && morning.length < mSale.length) {
+        morning = [...morning, ...draw(date, mSale.length - morning.length)];
       }
       if (!(isToday && actual?.ranAfternoon)) {
-        if (afternoonSale.length < 1) afternoonSale = [...afternoonSale, ...draw(date, 1 - afternoonSale.length)];
-        if (!content) content = { text: ck?.label || 'Content', state: 'planned' };
+        if (afternoonSale.length < aSale.length) afternoonSale = [...afternoonSale, ...draw(date, aSale.length - afternoonSale.length)];
+        if (!content && cSlot) content = { text: ck?.label || 'Content', state: 'planned', time: cSlot.time, channel: cSlot.channel, group: cSlot.group_label };
       }
+      morning = decorate(morning, mSale);
+      afternoonSale = decorate(afternoonSale, aSale);
+      if (content && !content.time && cSlot) content = { ...content, time: cSlot.time, channel: cSlot.channel, group: cSlot.group_label };
     }
 
-    let groups: string[] = [];
-    if (shareGroups.length) {
-      const picked = new Set<string>();
-      for (let k = 0; k < 2; k++) picked.add(shareGroups[(i * 2 + k) % shareGroups.length]);
-      groups = [...picked];
-    }
+    const groups = groupsForDate(pp.plan, date, pp.shareGroups);
 
     return {
       date,
@@ -202,6 +208,8 @@ export async function buildWeekPlanView(
       contentLabel: ck?.label || 'Content',
       contentPurpose: ck ? CONTENT_PURPOSE[ck.kind] : undefined,
       groups,
+      contentWindow: cSlot ? cSlot.window : 'chieu',
+      overridden: daySlots[0]?.overridden ?? false,
     };
   });
 

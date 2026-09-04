@@ -9,6 +9,8 @@ import SaveGenerateButton from './save-generate-button';
 import GenerateButton from './generate-button';
 import SevenAnglesButton from '../noi-dung/seven-angles-button';
 import TrendPostButton from './trend-post-button';
+import PostingPlanForm from './posting-plan-form';
+import { loadPostingPlan, summarizePlan, CHANNEL_LABEL } from '../../lib/posting-plan';
 
 export const dynamic = 'force-dynamic';
 // Sinh kế hoạch gọi Gemini mất 30 giây tới ~2 phút (chuỗi 4 model fallback khi model đầu bị
@@ -78,7 +80,7 @@ function isJunkProduct(name: string): boolean {
 
 export default async function Page({ searchParams }: { searchParams?: { xem?: string } }) {
   const client = getServerClient();
-  const [{ data, error }, { data: goalRow }, { data: focusRow }, { data: sgRow }] = await Promise.all([
+  const [{ data, error }, { data: goalRow }, { data: focusRow }, pp] = await Promise.all([
     client
       .from('mkt_plans')
       .select('id, period_start, period_end, generated_by, data, applied, applied_at, created_at')
@@ -86,7 +88,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       .limit(12),
     client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
     client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle(),
-    client.from('app_config').select('value').eq('key', 'mkt_share_groups').maybeSingle()
+    loadPostingPlan(client),
   ]);
   const goalText = ((goalRow as any)?.value?.text as string) || '';
   const focusVal = ((focusRow as any)?.value || {}) as { groups?: string[]; until?: string };
@@ -94,10 +96,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   const focusUntil = focusVal.until ? String(focusVal.until).slice(0, 10) : '';
   const focusActive = focusGroups.length > 0 && (!focusVal.until || new Date(focusVal.until).getTime() > Date.now());
   // Nhóm chia sẻ: nguồn CHUNG với popover 📣 ở Quản lý bài viết (app_config qua /api/share-groups).
-  const shareGroupsRaw = Array.isArray((sgRow as any)?.value?.groups) ? (sgRow as any).value.groups : [];
-  const shareGroups: string[] = shareGroupsRaw
-    .map((x: any) => (typeof x === 'string' ? x.trim() : String(x?.label || x?.id || '').trim()))
-    .filter(Boolean);
+  const shareGroups: string[] = pp.shareGroups.map((g) => g.label);
 
   const rowsInit = (data || []) as Row[];
   // Bản live (origin='live') chỉ phục vụ tile Tổng quan/Quản lý bài viết — trang này không dùng.
@@ -181,7 +180,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <div>
           <h1>Kế hoạch</h1>
           <p className="sub">
-            Sáng 8h máy ra 2 bài bán, chiều 14h thêm 1 bài bán và 1 bài content. Tối 20h BOSS chỉnh nhẹ theo số liệu ngày, Chủ nhật 20h học số cả tuần, Thứ 2 8h ra kế hoạch tuần mới. Bài luôn chờ người bấm Duyệt.
+            Lịch đăng cố định: {summarizePlan(pp.plan)}. Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h. Tối 20h BOSS chỉnh nhẹ trọng số theo số liệu ngày, Chủ nhật 20h học số cả tuần, Thứ 2 8h ra hướng đi tuần mới. Bài luôn chờ người bấm Duyệt.
           </p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -275,17 +274,30 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             <thead>
               <tr>
                 <th style={{ width: 92 }}>Ngày</th>
-                <th>🕗 8h sáng — 2 bài bán</th>
-                <th>🕐 14h chiều — 1 bài bán + 1 content</th>
+                <th>🕗 Sáng (ô giờ trước 12h)</th>
+                <th>🕐 Chiều (ô giờ từ 12h)</th>
                 <th style={{ width: 190 }}>📣 Chia sẻ nhóm (tay)</th>
               </tr>
             </thead>
             <tbody>
-              {week.days.map((d) => (
+              {week.days.map((d) => {
+                const contentNode = d.content ? (
+                  <div className="wk-item">
+                    <span aria-hidden="true">{d.content.state === 'done' ? '✅' : '📰'}</span>
+                    <span title={d.contentPurpose || ''}>
+                      {d.content.state === 'done'
+                        ? <><span className="wk-t">{d.content.text}</span><span className="wk-sub"> · content {d.contentLabel}</span></>
+                        : <><span className="wk-t">Content {d.contentLabel}</span><span className="wk-sub"> · máy viết theo playbook</span></>}
+                      {d.content.time ? <span className="wk-sub"> · {d.content.time} · {d.content.channel ? CHANNEL_LABEL[d.content.channel] : 'Facebook Page'}{d.content.group ? ` · 👥 ${d.content.group}` : ''}</span> : null}
+                    </span>
+                  </div>
+                ) : null;
+                return (
                 <tr key={d.date} className={d.isToday ? 'row-today' : undefined}>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <b>{d.dowLabel.replace('Chủ nhật', 'CN').replace('Thứ ', 'T')}</b> <span className="sub">{fmtDate(d.date).slice(0, 5)}</span>
                     {d.isToday ? <div className="sub">👉 hôm nay</div> : null}
+                    {d.overridden ? <div className="sub">✏️ lịch riêng</div> : null}
                   </td>
                   <td>
                     {d.morning.length ? d.morning.map((it, k) => (
@@ -294,9 +306,12 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                         <span>
                           <span className="wk-t">{it.text}</span>
                           {it.product ? <span className="wk-sub"> · {it.product}</span> : null}
+                          {it.time ? <span className="wk-sub"> · {it.time} · {it.channel ? CHANNEL_LABEL[it.channel] : 'Facebook Page'}{it.group ? ` · 👥 ${it.group}` : ''}</span> : null}
                         </span>
                       </div>
-                    )) : <span className="sub">— máy nghỉ</span>}
+                    )) : null}
+                    {d.contentWindow === 'sang' ? contentNode : null}
+                    {!d.morning.length && !(d.contentWindow === 'sang' && d.content) ? <span className="sub">— máy nghỉ</span> : null}
                   </td>
                   <td>
                     {d.afternoonSale.map((it, k) => (
@@ -305,35 +320,31 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                         <span>
                           <span className="wk-t">{it.text}</span>
                           {it.product ? <span className="wk-sub"> · {it.product}</span> : null}
+                          {it.time ? <span className="wk-sub"> · {it.time} · {it.channel ? CHANNEL_LABEL[it.channel] : 'Facebook Page'}{it.group ? ` · 👥 ${it.group}` : ''}</span> : null}
                         </span>
                       </div>
                     ))}
-                    {d.content ? (
-                      <div className="wk-item">
-                        <span aria-hidden="true">{d.content.state === 'done' ? '✅' : '📰'}</span>
-                        <span title={d.contentPurpose || ''}>
-                          {d.content.state === 'done'
-                            ? <><span className="wk-t">{d.content.text}</span><span className="wk-sub"> · content {d.contentLabel}</span></>
-                            : <><span className="wk-t">Content {d.contentLabel}</span><span className="wk-sub"> · máy viết theo playbook</span></>}
-                        </span>
-                      </div>
-                    ) : null}
-                    {!d.afternoonSale.length && !d.content ? <span className="sub">— máy nghỉ</span> : null}
+                    {d.contentWindow === 'chieu' ? contentNode : null}
+                    {!d.afternoonSale.length && !(d.contentWindow === 'chieu' && d.content) ? <span className="sub">— máy nghỉ</span> : null}
                   </td>
                   <td className="sub">{d.groups.length ? d.groups.join(', ') : '—'}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
         <p className="sub" style={{ margin: '10px 0 0' }}>
           Tối 20h BOSS tự chỉnh trọng số theo số liệu ngày (tối đa 0,5 điểm). Chủ nhật 20h học số cả tuần trên Facebook, YouTube và TikTok. Thứ 2 8h ra kế hoạch tuần mới theo luật 70/30.
           {week.hasFallback ? ' Ô "theo trọng số" nghĩa là hướng đi đã cạn — máy tự nạp thêm hướng mới trong ngày.' : ''}
+          {' '}Đổi giờ/kênh/group ở khối Lịch đăng cố định ngay bên dưới.
         </p>
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
           <GeneratePostsButton action={generatePostsNow} />
         </div>
       </section>
+
+      <PostingPlanForm pp={pp} />
 
       {/* ===== 3. HƯỚNG ĐI BÀI VIẾT ===== */}
       <section className="blk">
@@ -470,7 +481,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
               </div>
             ) : <p className="sub" style={{ margin: 0 }}>Chưa có nhóm nào.</p>}
-            <p className="sub" style={{ margin: '6px 0 0' }}>Sửa danh sách ở <a href="/noi-dung">Quản lý bài viết</a>. Máy chia lịch 2 nhóm/ngày, người chia sẻ tay.</p>
+            <p className="sub" style={{ margin: '6px 0 0' }}>Sửa danh sách ở <a href="/noi-dung">Quản lý bài viết</a>. Group nào chia sẻ ngày nào đặt ở khối Lịch đăng cố định, người chia sẻ tay.</p>
           </div>
         </section>
       </div>

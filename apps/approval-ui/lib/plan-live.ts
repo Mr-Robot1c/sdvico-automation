@@ -10,8 +10,8 @@
 //     sinh bài). Hôm sau vòng xoay dùng trọng số mới.
 //   - CUỐI TUẦN: báo cáo tuần ở /do-luong/tuan (item 1a) + đề xuất Chủ nhật (learn-weekly).
 //
-// Lịch theo ngày + nhóm chia sẻ CHỈ để hiển thị cho người làm; rotate không đọc (rotate vẫn
-// chạy theo slot + focus + weights). Nhóm chia sẻ lấy từ app_config 'mkt_share_groups'.
+// Lịch theo ngày chỉ để hiển thị; số bài/ngày + group đọc từ lịch cố định app_config
+// mkt_posting_plan (rotate vẫn chạy theo slot + focus + weights, KHÔNG đọc phần này).
 
 import type { getServerClient } from './supabase-server';
 import { buildWeekReport } from './week-report';
@@ -21,6 +21,7 @@ import { vnInt, weekWindowVN } from './plan';
 import { guessGroup } from './gen/products.mjs';
 // @ts-ignore — module JS thuần (test được bằng node)
 import { dampWeights, describeChanges, DEFAULT_STEP } from './plan-damp.mjs';
+import { loadPostingPlan, slotsForDate, groupsForDate, type LoadedPostingPlan } from './posting-plan';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -28,7 +29,6 @@ const WEIGHT_BY_TIER: Record<Tier, number> = { winner: 3, watch: 2, weak: 1, ins
 const MIN_POSTS = 2;              // ngưỡng bài để xếp thắng/thua
 const WEEKLY_SALES_BUDGET = 14;   // tổng bài bán/tuần để chia theo trọng số
 const CONTENT_PER_DAY = 1;        // 1 bài content nuôi trang mỗi ngày
-const GROUPS_PER_DAY = 2;         // mỗi ngày gợi ý chia sẻ vào 2 nhóm (xoay vòng)
 
 const DOW_VN = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
@@ -149,8 +149,7 @@ function productNameOf(raw: string): string {
   const g = (guessGroup as (t: string) => string | null)(String(raw || ''));
   return String(g || raw || '').replace(/^\s*\d+\.\s*/, '').trim();
 }
-export const DIRECTIONS_PER_DAY = 2; // 1 bài bán sáng 8h + 1 bài bán chiều 14h (4/9)
-function buildDirectionQueue(suggestions: any[], weights: Record<string, number> = {}): DayDirection[] {
+function buildDirectionQueue(suggestions: any[], weights: Record<string, number> = {}, limit = 14): DayDirection[] {
   const fresh = suggestions.filter((s) => !s.used_at && !s.pending_variant);
   // BOSS truyền cho Creator (user 21/8: "BOSS có học và truyền cho Creator không?"): hướng
   // của sản phẩm đang được đánh trọng số cao (đang thắng) kéo lên đầu hàng — không chạy
@@ -159,21 +158,23 @@ function buildDirectionQueue(suggestions: any[], weights: Record<string, number>
   const freshSorted = [...fresh].sort((a, b) => wOf(b) - wOf(a));
   return freshSorted
     .map((s) => ({ title: String(s.title || ''), product: String(s.product || ''), variant: 'A' as const }))
-    .slice(0, DIRECTIONS_PER_DAY * 7);
+    .slice(0, limit);
 }
 
 // Chia lịch 7 ngày tới: mỗi sản phẩm bán rải đều số bài/tuần ra các ngày; content 1 bài/ngày;
-// nhóm chia sẻ xoay vòng GROUPS_PER_DAY nhóm/ngày; hướng đi dự kiến theo hàng đợi vòng xoay.
-function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: string[], dirQueue: DayDirection[] = []): DailyPlan[] {
+// nhóm chia sẻ + số bài bán/ngày đọc từ LỊCH ĐĂNG CỐ ĐỊNH (pp); hướng đi dự kiến theo hàng đợi
+// vòng xoay.
+function buildDailySchedule(now: Date, salesProducts: PlanProduct[], pp: LoadedPostingPlan, dirQueue: DayDirection[] = []): DailyPlan[] {
   const remaining = new Map<string, number>(salesProducts.map((p) => [p.product, p.postsPerWeek]));
   const out: DailyPlan[] = [];
-  let qPos = 0; // vị trí đang rút trong hàng đợi hướng đi (2 hướng/ngày, 4/9)
+  let qPos = 0; // vị trí đang rút trong hàng đợi hướng đi
   for (let i = 0; i < 7; i++) {
     const { date, dow, dowIdx } = vnDayInfo(now, i);
     const daysLeft = 7 - i;
-    // 29/8 (bỏ A/B), 4/9 (sáng còn 1 bài): mỗi ngày rút 2 HƯỚNG = 2 bài bán (1 sáng + 1 chiều).
-    // Hết hàng đợi thì ngày đó rơi về chia theo trọng số như cũ (refill hằng ngày sẽ bù hướng).
-    const dayDirs = dirQueue.slice(qPos, qPos + DIRECTIONS_PER_DAY);
+    // Mỗi ngày rút số HƯỚNG = số ô bài bán trong Lịch đăng cố định của ngày đó. Hết hàng đợi
+    // thì ngày đó rơi về chia theo trọng số như cũ (refill hằng ngày sẽ bù hướng).
+    const perDay = slotsForDate(pp.plan, date).filter((s) => s.kind === 'sale').length;
+    const dayDirs = dirQueue.slice(qPos, qPos + perDay);
     qPos += dayDirs.length;
     const sales: Array<{ product: string; count: number }> = [];
     if (dayDirs.length) {
@@ -193,12 +194,7 @@ function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: str
         if (todayCount > 0) { sales.push({ product: p.product, count: todayCount }); remaining.set(p.product, rem - todayCount); }
       }
     }
-    let dayGroups: string[] = [];
-    if (groups.length) {
-      const picked = new Set<string>();
-      for (let k = 0; k < GROUPS_PER_DAY; k++) picked.add(groups[(i * GROUPS_PER_DAY + k) % groups.length]);
-      dayGroups = [...picked];
-    }
+    const dayGroups = groupsForDate(pp.plan, date, pp.shareGroups);
     const ck = CONTENT_KIND_BY_DOW[dowIdx];
     out.push({
       date, dow, sales,
@@ -228,7 +224,7 @@ function buildLiveNarrative(salesProducts: PlanProduct[], groups: string[], tota
   );
   if (focusActive) paras.push('Đang tập trung theo ô "Tuần này chỉ đăng sản phẩm", nên chỉ chia bài cho các sản phẩm đó.');
   if (groups.length) {
-    paras.push(`Mỗi ngày gợi ý chia sẻ bài vào ${Math.min(GROUPS_PER_DAY, groups.length)} nhóm (xoay vòng ${vnInt(groups.length)} nhóm đã lưu). Xem bảng lịch theo ngày bên dưới.`);
+    paras.push(`Group chia sẻ theo LỊCH ĐĂNG CỐ ĐỊNH (sửa ở Kế hoạch, khối Lịch đăng cố định); đã lưu ${vnInt(groups.length)} nhóm.`);
   } else {
     paras.push('Chưa nhập nhóm chia sẻ. Điền tên các nhóm Facebook bạn đang ở vào ô "Nhóm chia sẻ" để BOSS xếp lịch chia sẻ theo ngày.');
   }
@@ -260,7 +256,7 @@ async function loadFocusKeys(client: Client): Promise<string[]> {
 // Cập nhật/đề xuất SỐNG: tính lại từ số liệu mới nhất, lưu 1 bản 'live' (update tại chỗ).
 export async function refreshLiveProposal(client: Client, now: Date = new Date()): Promise<{ id: string | null; skipped?: string }> {
   const report = await buildWeekReport(client, 0, now);
-  const [shareGroups, focusKeys] = await Promise.all([loadShareGroups(client), loadFocusKeys(client)]);
+  const [shareGroups, focusKeys, pp] = await Promise.all([loadShareGroups(client), loadFocusKeys(client), loadPostingPlan(client)]);
 
   let products = rankProducts(report.byProduct.map((p) => ({ product: p.product, count: p.count, avgScore: p.avgScore, avgEng: p.avgEng, conversions: p.conversions })));
 
@@ -302,7 +298,8 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
       .from('mkt_plans').select('data').eq('applied', true)
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
     const sugs = Array.isArray((apRow as any)?.data?.content_suggestions) ? (apRow as any).data.content_suggestions : [];
-    dirQueue = buildDirectionQueue(sugs, weights);
+    const limit = Array.from({ length: 7 }, (_, i) => vnDayInfo(now, i).date).reduce((s, d) => s + slotsForDate(pp.plan, d).filter((x) => x.kind === 'sale').length, 0);
+    dirQueue = buildDirectionQueue(sugs, weights, Math.max(1, limit));
 
     // Bài BÁN đã sinh hôm nay theo hướng nào (brief.suggestion_title + ab_variant)?
     const vnToday = new Date(now.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
@@ -330,7 +327,7 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
     }
   } catch { /* không có bản áp -> lịch không ghi hướng */ }
 
-  const daily = buildDailySchedule(now, salesProducts, shareGroups, dirQueue);
+  const daily = buildDailySchedule(now, salesProducts, pp, dirQueue);
   const narrative = buildLiveNarrative(salesProducts, shareGroups, { posts: report.totals.posts, engagement: report.totals.engagement, views: report.totals.views }, focusActive);
 
   const win = weekWindowVN(now);
@@ -462,8 +459,10 @@ export async function applyLiveEvening(client: Client, opts: { force?: boolean }
     });
     const sumW = products.reduce((s, p) => s + p.weight, 0) || 1;
     for (const p of products) p.postsPerWeek = Math.max(1, Math.round((p.weight / sumW) * WEEKLY_SALES_BUDGET));
-    const dirQueue = buildDirectionQueue(Array.isArray(base.content_suggestions) ? base.content_suggestions : [], damped);
-    const dailySchedule = buildDailySchedule(now, products, liveData.share_groups || base.share_groups || [], dirQueue);
+    const pp = await loadPostingPlan(client);
+    const limit = Array.from({ length: 7 }, (_, i) => vnDayInfo(now, i).date).reduce((s, d) => s + slotsForDate(pp.plan, d).filter((x) => x.kind === 'sale').length, 0);
+    const dirQueue = buildDirectionQueue(Array.isArray(base.content_suggestions) ? base.content_suggestions : [], damped, Math.max(1, limit));
+    const dailySchedule = buildDailySchedule(now, products, pp, dirQueue);
     const adjustNote = (describeChanges as any)(changes) as string;
     const prevLog = Array.isArray(base.adjust_log) ? base.adjust_log : [];
     const adjustLog = [...prevLog, ...changes.map((c) => ({ at: now.toISOString(), ...c }))].slice(-30);

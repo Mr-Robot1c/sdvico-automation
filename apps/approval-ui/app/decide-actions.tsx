@@ -144,15 +144,19 @@ export default function DecideActions({
   hasTiktok = false,
   videoUrl = null,
   caption = null,
+  defaultSchedule = '',
 }: {
   id: string;
   title: string;
   hasTiktok?: boolean;
   videoUrl?: string | null;
   caption?: string | null;
+  defaultSchedule?: string;
 }) {
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
-  const [schedule, setSchedule] = useState('');
+  // 4/9: Lịch đăng cố định điền sẵn giờ ô (payload.plan_time) khi còn ≥ 15 phút; người duyệt
+  // vẫn xóa/đổi được, để trống = đăng ngay. hang-doi/page.tsx không truyền prop → mặc định rỗng.
+  const [schedule, setSchedule] = useState(defaultSchedule);
   const preview = humanVN(schedule);
 
   return (

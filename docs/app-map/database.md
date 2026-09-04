@@ -46,7 +46,7 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 | hr_candidates | Tuyển dụng | Ứng viên, dữ liệu cá nhân (consent_at, retention_until, dedup_key) | Bật, dữ liệu cá nhân |
 | hr_applications | Tuyển dụng | Hồ sơ ứng tuyển, dữ liệu cá nhân | Bật, dữ liệu cá nhân |
 | product_facts | Marketing | Dữ kiện sản phẩm SDVICO (chống bịa, điều cấm 5) | Bật, staff |
-| app_config | Chung | Cấu hình khóa–giá trị, có công tắc dừng khẩn (emergency_stop) | Bật, staff |
+| app_config | Chung | Cấu hình khóa–giá trị, có công tắc dừng khẩn (emergency_stop), lịch đăng cố định (mkt_posting_plan), nhóm chia sẻ (mkt_share_groups), focus (mkt_focus), mục tiêu tuần (mkt_weekly_goal) | Bật, staff |
 | daily_counters | Chung | Bộ đếm hạn mức theo tài khoản/loại/ngày. Giữ chỗ qua hàm nguyên tử `reserve_daily_quota` (kind `post` = trần đăng ngày, kind `rotate_run` = vé 1 lượt rotate/slot/ngày) | Bật, staff |
 
 ## Ghi chú

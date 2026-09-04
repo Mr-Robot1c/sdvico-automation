@@ -14,6 +14,7 @@ import PostFbButton from './post-fb-button';
 import CopyCaptionButton from './copy-caption-button';
 import LinkTikTokButton from './link-tiktok-button';
 import PexelsScenesButton from './pexels-scenes-button';
+import { loadPostingPlan, groupsForDate, isFutureVNLocal, CHANNEL_LABEL } from '../../lib/posting-plan';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -47,7 +48,7 @@ const fmtVN = (n: number) => (n || 0).toLocaleString('vi-VN');
 export default async function BangSection() {
   const client = getServerClient();
 
-  const [queueRes, alertRes, planRes] = await Promise.all([
+  const [queueRes, alertRes, pp] = await Promise.all([
     client
       .from('approval_queue')
       .select('id, title, payload, status, created_at, decided_at')
@@ -59,37 +60,18 @@ export default async function BangSection() {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending')
       .neq('kind', 'mkt_publish_content'),
-    // Plan live (có daily_schedule 7 ngày) để lọc groups chia sẻ theo lịch ngày (user 26/8:
-    // "chia sẻ vào group này có thể nhìn vào bảng kế hoạch ngày đó để hiển thị chỉ đăng vào
-    // group đó không?"). Không có plan → ShareGroups hiện tất cả groups như trước (fallback).
-    client
-      .from('mkt_plans')
-      .select('data')
-      .eq('data->>origin', 'live')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    // Lịch đăng cố định (user 26/8: "chia sẻ vào group này có thể nhìn vào bảng kế hoạch ngày
+    // đó để hiển thị chỉ đăng vào group đó không?"). Chưa lưu lịch → dùng lịch mặc định.
+    loadPostingPlan(client),
   ]);
 
-  // Extract groups theo ngày cho từng bài đã đăng. Key = date YYYY-MM-DD, value = mảng tên
-  // group. Bài đăng ngày nào -> lấy groups của ngày đó từ daily_schedule; bài đăng ngoài
-  // tuần plan -> mảng rỗng, ShareGroups tự hiện tất cả.
-  const planData = planRes.data as any;
-  const scheduleByDate = new Map<string, string[]>();
-  if (planData?.data?.daily_schedule && Array.isArray(planData.data.daily_schedule)) {
-    for (const d of planData.data.daily_schedule) {
-      if (d?.date && Array.isArray(d?.groups)) {
-        scheduleByDate.set(String(d.date), d.groups.map(String));
-      }
-    }
-  }
-  const groupsForDate = (isoDatetime: string): string[] => {
+  // Group chia sẻ theo LỊCH ĐĂNG CỐ ĐỊNH của ngày bài được đăng (trước đọc bản live xoay vòng).
+  const groupsOfDay = (isoDatetime: string): string[] => {
     if (!isoDatetime) return [];
-    // Convert ISO datetime UTC -> YYYY-MM-DD VN (UTC+7)
     const t = new Date(isoDatetime).getTime();
     if (!Number.isFinite(t)) return [];
     const vnDate = new Date(t + 7 * 3600 * 1000).toISOString().slice(0, 10);
-    return scheduleByDate.get(vnDate) || [];
+    return groupsForDate(pp.plan, vnDate, pp.shareGroups);
   };
 
   const queue = (queueRes.data || []) as any[];
@@ -276,6 +258,7 @@ export default async function BangSection() {
                         {p.ab_variant ? <span className="badge badge-ab">🧪 Thử {p.ab_variant}</span> : null}
                         {brief.video_requested === true ? <span className="badge badge-video-pending">🎬 Đang làm video AI</span> : null}
                         <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
+                        {p.plan_time ? <span className="badge tone-default" title="Ô giờ trong Lịch đăng cố định">🗓 {String(p.plan_time).slice(11, 16)} · {CHANNEL_LABEL[(p.plan_channel === 'youtube' ? 'youtube' : 'facebook') as 'facebook' | 'youtube']}{p.plan_group ? ` · 👥 ${p.plan_group}` : ''}</span> : null}
                       </div>
                       {(brief as any).insight_line ? (
                         <p className="insight-line" title={(brief as any).insight_situation || 'Insight/painpoint bài này xoáy vào'}>
@@ -368,6 +351,7 @@ export default async function BangSection() {
                         hasTiktok={chans.includes('tiktok')}
                         videoUrl={vidUrl ?? null}
                         caption={c?.draft ?? null}
+                        defaultSchedule={typeof p.plan_time === 'string' && isFutureVNLocal(p.plan_time, 15) ? String(p.plan_time) : ''}
                       />
                     </div>
                   );
@@ -511,7 +495,7 @@ export default async function BangSection() {
                               <span style={rowLabel}>📘 Facebook</span>
                               {/* Đăng TAY lên Page chính (copy caption + tải ảnh + mở ô soạn bài), khỏi page token. */}
                               <PostFbButton caption={capText} imageUrl={fbImg} composerUrl={fbComposerUrl} contentTitle={cnt?.title || 'sdvico'} />
-                              {fbPost ? <ShareGroups postUrl={fbPost.url} planGroupsToday={groupsForDate(lastAt)} /> : null}
+                              {fbPost ? <ShareGroups postUrl={fbPost.url} planGroupsToday={groupsOfDay(lastAt)} /> : null}
                               {/* Dán link bài đăng tay trên Page chính SDVICOVN — chip FB ưu tiên link này. */}
                               <LinkFbButton contentId={it.cid} linkedUrl={String((cnt?.brief as any)?.fb_real_url || '') || null} />
                             </div>
