@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { waitUntil } from '@vercel/functions';
 import { getServerClient } from '../lib/supabase-server';
 import { postVideoToTikTok } from '../lib/tiktok';
-import { isEmergencyStopped, reservePostQuota, setEmergencyStop, isQuotaDisabled, setQuotaDisabled } from '../lib/safety';
+import { isEmergencyStopped } from '../lib/safety';
 import { fetchWithRetry } from '../lib/retry';
 import { pullFacebookMetrics, fbPageTokens } from '../lib/fb-metrics';
 import { generateAndStorePlan } from '../lib/plan';
@@ -590,7 +590,8 @@ export async function decideForm(formData: FormData) {
     if (contentId) {
       const bgClient = getServerClient();
       const bgJob = (async () => {
-        const LIMIT = Number(process.env.MKT_MAX_POSTS_PER_DAY) || 3;
+        // 4/9 (user chốt "bỏ hẳn 2 công tắc" + phương án 1): không còn hạn mức bài/ngày trong
+        // code. Máy không tự đăng (điều cấm 1), số bài lên kênh mỗi ngày = số lần người bấm Duyệt.
         if (await isEmergencyStopped(bgClient)) {
           await bgClient.from('run_log').insert({
             task: 'mkt.publish_blocked',
@@ -600,24 +601,11 @@ export async function decideForm(formData: FormData) {
           });
           return;
         }
-        const quotaOff = await isQuotaDisabled(bgClient);
         const jobs: Promise<unknown>[] = [];
         // 21/8: vòng lặp từng thiếu 'youtube' -> nhánh youtube phía dưới KHÔNG BAO GIỜ chạy,
         // bài duyệt xong chỉ lên FB + TikTok dù channels có youtube (user báo).
         for (const ch of ['facebook', 'tiktok', 'youtube']) {
           if (!channels.includes(ch)) continue;
-          if (!quotaOff) {
-            const q = await reservePostQuota(bgClient, ch, LIMIT);
-            if (!q.allowed) {
-              await bgClient.from('run_log').insert({
-                task: 'mkt.publish_blocked',
-                actor: 'decideForm',
-                status: 'skipped',
-                detail: { contentId, channel: ch, reason: 'quota', count: q.count, limit: LIMIT }
-              });
-              continue;
-            }
-          }
           if (ch === 'facebook') jobs.push(publishContentToFacebook(bgClient, contentId, scheduledAt));
           // TikTok API bỏ (user 26/8): app SDVICO không được TikTok audit ("internal company
           // use" — Google/TikTok reject) → chỉ post được vào tài khoản PRIVATE, nhưng account
@@ -641,32 +629,6 @@ export async function decideForm(formData: FormData) {
   }
 
   revalidatePath('/hang-doi');
-  revalidatePath('/noi-dung');
-}
-
-// Người vận hành bật/tắt công tắc dừng khẩn. Bật thì mọi thao tác đăng bị chặn (kiểm trước khi đăng).
-export async function toggleEmergencyStop(formData: FormData) {
-  const on = String(formData.get('on') || '') === '1';
-  const client = getServerClient();
-  await setEmergencyStop(client, on);
-  await client.from('run_log').insert({
-    task: 'ops.emergency_stop',
-    actor: 'ui',
-    status: 'ok',
-    detail: { stopped: on }
-  });
-  revalidatePath('/van-hanh');
-  revalidatePath('/hang-doi');
-  revalidatePath('/noi-dung');
-}
-
-// Bật/tắt "bỏ hạn mức" — khi bật thì đăng không kiểm trần ngày (dùng để test).
-export async function toggleQuotaDisabled(formData: FormData) {
-  const off = String(formData.get('off') || '') === '1';
-  const client = getServerClient();
-  await setQuotaDisabled(client, off);
-  await client.from('run_log').insert({ task: 'ops.quota_disabled', actor: 'ui', status: 'ok', detail: { disabled: off } });
-  revalidatePath('/van-hanh');
   revalidatePath('/noi-dung');
 }
 

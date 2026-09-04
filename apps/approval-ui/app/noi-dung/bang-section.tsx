@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { isEmergencyStopped, getPostCount, isQuotaDisabled } from '../../lib/safety';
 import { editDraft, retryFacebookPublish, requestVideoForContent } from '../actions';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
@@ -18,9 +17,9 @@ import PexelsScenesButton from './pexels-scenes-button';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
-// qua decideForm — điều cấm 1) rồi Đã duyệt rồi Đã đăng (kèm số liệu) rồi Từ chối. Thanh
-// vận hành (dừng khẩn + hạn mức) nằm ngay trên board; trang /van-hanh và /hang-doi vẫn sống
-// cho bản đầy đủ.
+// qua decideForm — điều cấm 1) rồi Đã duyệt rồi Đã đăng (kèm số liệu) rồi Từ chối.
+// 4/9: trang Vận hành và 2 công tắc đã bỏ theo yêu cầu user; cổng an toàn trong lib/safety.ts
+// vẫn chạy ngầm với giá trị app_config hiện có.
 
 type M = { reactions?: number; comments?: number; shares?: number; views?: number };
 
@@ -47,13 +46,8 @@ const fmtVN = (n: number) => (n || 0).toLocaleString('vi-VN');
 
 export default async function BangSection() {
   const client = getServerClient();
-  const limit = Number(process.env.MKT_MAX_POSTS_PER_DAY) || 3;
 
-  const [stopped, quotaOff, fbCount, ttCount, queueRes, alertRes, planRes] = await Promise.all([
-    isEmergencyStopped(client),
-    isQuotaDisabled(client),
-    getPostCount(client, 'facebook'),
-    getPostCount(client, 'tiktok'),
+  const [queueRes, alertRes, planRes] = await Promise.all([
     client
       .from('approval_queue')
       .select('id, title, payload, status, created_at, decided_at')
@@ -241,15 +235,8 @@ export default async function BangSection() {
 
   return (
     <section>
-      {/* 23/8 (user: "bỏ cái dòng chạy"): thanh vận hành thường trực đã bỏ — dừng khẩn, hạn mức
-          nằm ở mục Vận hành (menu Hệ thống). Bảng chỉ còn cảnh báo KHI CẦN: đang dừng khẩn, hoặc
-          có bài đã duyệt mà chưa lên kênh (kèm nút đăng lại FB). */}
-      {stopped ? (
-        <div className="card tone-no" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', padding: '10px 14px', marginBottom: 14 }}>
-          <b style={{ color: 'var(--no)' }}>🔴 Đang dừng khẩn, bài Duyệt sẽ không đăng</b>
-          <Link className="src" href="/van-hanh">Bật lại ở Vận hành</Link>
-        </div>
-      ) : null}
+      {/* 4/9: trang Vận hành + công tắc dừng khẩn đã bỏ hẳn — banner dừng khẩn không còn.
+          Bảng chỉ còn cảnh báo KHI CẦN: có bài đã duyệt mà chưa lên kênh (kèm nút đăng lại FB). */}
       {/* 27/8: banner "da duyet chua len kenh" bo — thanh cot "Len lich" rieng tren board. */}
 
       {/* Board 4 cột theo dòng chảy bài viết, chiếm trọn chiều ngang. */}

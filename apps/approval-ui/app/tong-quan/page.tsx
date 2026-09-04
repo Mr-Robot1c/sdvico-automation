@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { isEmergencyStopped } from '../../lib/safety';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
 import PlatformLogo, { type PlatformKey } from '../noi-dung/platform-logo';
 import PageSuiteBlock from '../do-luong/page-suite-block';
@@ -67,7 +66,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, planLiveRes, leadsRes, emergencyStopped, yt] = await Promise.all([
+  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, planLiveRes, leadsRes, yt] = await Promise.all([
     client
       .from('approval_queue')
       .select('id, title, status, payload, created_at')
@@ -111,7 +110,6 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       .gte('created_at', since7)
       .order('created_at', { ascending: false })
       .limit(100),
-    isEmergencyStopped(client),
     getYouTubeChannelInfo(),
   ]);
 
@@ -263,7 +261,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   });
   const shown = filtered.slice(0, 60);
 
-  const needCount = (pendingStale.length ? 1 : 0) + (failedStuckCids.length ? 1 : 0) + (emergencyStopped ? 1 : 0) + (yt.configured && yt.error ? 1 : 0) + (leadNew.length ? 1 : 0);
+  const needCount = (pendingStale.length ? 1 : 0) + (failedStuckCids.length ? 1 : 0) + (yt.configured && yt.error ? 1 : 0) + (leadNew.length ? 1 : 0);
 
   return (
     <main>
@@ -285,12 +283,6 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           <p className="sub" style={{ margin: 0 }}>✅ Không có việc gấp. Dây chuyền đang chạy bình thường.</p>
         ) : (
           <div className="need-list">
-            {emergencyStopped ? (
-              <div className="need-item warn">
-                <span>🛑</span>
-                <span style={{ flex: 1 }}><b>Đang DỪNG KHẨN</b> — mọi lượt đăng bị chặn. <Link href="/van-hanh">Vào Vận hành để gỡ →</Link></span>
-              </div>
-            ) : null}
             {pendingStale.length ? (
               <div className="need-item warn">
                 <span className="need-n">{fmt(pendingStale.length)}</span>

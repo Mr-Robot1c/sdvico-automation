@@ -1303,6 +1303,11 @@ button.board-stat:hover { border-color: var(--accent, #1f5fbf); }
 .tq-item { display: flex; gap: 10px; align-items: center; text-decoration: none; color: inherit; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; transition: border-color .12s ease; }
 .tq-item:hover { border-color: var(--accent); }
 .tq-rank { flex: 0 0 24px; width: 24px; height: 24px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 700; font-size: .8rem; display: flex; align-items: center; justify-content: center; }
+
+/* 4/9 (user): bài nổi bật — icon nền tảng ăn nhất có aura + nhãn TOP, icon khác giữ nguyên. */
+.hot-pf { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; color: inherit; }
+.hot-pf-top { box-shadow: 0 0 0 2px var(--accent), 0 0 10px 2px color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-bg); }
+.hot-pf-lbl { position: absolute; top: -9px; right: -10px; font-size: 8px; font-weight: 800; line-height: 1; padding: 2px 4px; border-radius: 999px; background: var(--accent); color: #fff; letter-spacing: .3px; }
 .tq-item-title { display: block; font-weight: 600; font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tq-act { display: flex; gap: 10px; align-items: baseline; font-size: .88rem; padding: 5px 2px; border-bottom: 1px dashed var(--line); }
 .tq-act:last-child { border-bottom: 0; }

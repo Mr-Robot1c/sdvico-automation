@@ -127,8 +127,9 @@ export async function GET(req: Request) {
     }
     if (claimErr) console.warn('[rotate] reserve_daily_quota chưa gọi được (chưa dán migration?):', claimErr.message);
   }
-  // So bai ban + co content theo slot. Slot sang: 2 ban, 0 content. Slot chieu: 1 ban + 1 content.
-  const salesCount = slot === 'chieu' ? 1 : slot === 'sang' ? 2 : FOLDERS_PER_RUN;
+  // 4/9 (user: "sáng nhiều quá làm loãng sản phẩm, như spam"): slot sáng 1 bài bán, 0 content.
+  // Slot chiều 1 bài bán + 1 content. Tổng 2 bài bán/ngày = 14/tuần, khớp WEEKLY_SALES_BUDGET.
+  const salesCount = slot === 'chieu' ? 1 : slot === 'sang' ? 1 : FOLDERS_PER_RUN;
   const contentCount = slot === 'sang' ? 0 : CONTENT_PER_RUN;
 
   // 1. Gom tư liệu đã gán folder theo product_group.
@@ -266,7 +267,7 @@ export async function GET(req: Request) {
   const skipped: any[] = [];
   const logoActions: any[] = []; // nhat ky auto-logo cho moi anh (stamped/kept/already/skip)
   for (const s of candidateSuggestions) {
-    // 29/8 (bỏ A/B): 1 hướng = 1 bài, nên slot sáng (salesCount=2) rút 2 HƯỚNG, chiều rút 1.
+    // 29/8 (bỏ A/B): 1 hướng = 1 bài. 4/9: mỗi slot rút 1 HƯỚNG (sáng còn 1 bài bán).
     // Trước đây giới hạn cứng 1 hướng/run (di sản thời 1 suggestion = cặp A/B 2 bài) làm
     // slot sáng chỉ ra 1 bài bán thay vì 2 như kế hoạch.
     if (pickedFolders.length >= salesCount) break;

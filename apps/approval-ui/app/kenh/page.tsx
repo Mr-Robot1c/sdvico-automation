@@ -122,15 +122,16 @@ export default async function Page() {
   const ytOk = !!(yt.configured && yt.channelTitle);
 
   // ===== BAI NOI BAT: gop diem tat ca nen tang theo content =====
-  type Hot = { cid: string; eng: number; views: number; cmts: number; shares: number; platforms: PlatformKey[]; links: Array<{ platform: PlatformKey; url: string }> };
+  type Hot = { cid: string; eng: number; views: number; cmts: number; shares: number; platforms: PlatformKey[]; links: Array<{ platform: PlatformKey; url: string }>; engBy: Partial<Record<PlatformKey, number>> };
   const hotMap = new Map<string, Hot>();
   const ensure = (cid: string): Hot => {
-    if (!hotMap.has(cid)) hotMap.set(cid, { cid, eng: 0, views: 0, cmts: 0, shares: 0, platforms: [], links: [] });
+    if (!hotMap.has(cid)) hotMap.set(cid, { cid, eng: 0, views: 0, cmts: 0, shares: 0, platforms: [], links: [], engBy: {} });
     return hotMap.get(cid)!;
   };
   for (const [cid, m] of latestFB) {
     const h = ensure(cid);
     h.eng += (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
+    h.engBy.facebook = (h.engBy.facebook || 0) + (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
     h.views += m.views || 0; h.cmts += m.comments || 0; h.shares += m.shares || 0;
     if (!h.platforms.includes('facebook')) h.platforms.push('facebook');
     // 29/8 (user): link FB CHỈ khi đã ghép kênh chính (fb_real_url) — giống TikTok, không
@@ -141,6 +142,7 @@ export default async function Page() {
   for (const [cid, m] of latestYT) {
     const h = ensure(cid);
     h.eng += (m.reactions || 0) + (m.comments || 0);
+    h.engBy.youtube = (h.engBy.youtube || 0) + (m.reactions || 0) + (m.comments || 0);
     h.views += m.views || 0; h.cmts += m.comments || 0;
     if (!h.platforms.includes('youtube')) h.platforms.push('youtube');
     const u = m.videoId ? `https://youtube.com/shorts/${m.videoId}` : ytUrlByCid.get(cid);
@@ -149,6 +151,7 @@ export default async function Page() {
   for (const [cid, m] of latestTT) {
     const h = ensure(cid);
     h.eng += (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
+    h.engBy.tiktok = (h.engBy.tiktok || 0) + (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
     h.views += m.views || 0; h.cmts += m.comments || 0; h.shares += m.shares || 0;
     if (!h.platforms.includes('tiktok')) h.platforms.push('tiktok');
     if (m.shareUrl) h.links.push({ platform: 'tiktok', url: String(m.shareUrl) });
@@ -280,7 +283,7 @@ export default async function Page() {
 
       {/* ===== BAI NOI BAT ===== */}
       <section className="blk" style={{ marginTop: 16 }}>
-        <h2><span aria-hidden="true">🔥</span> Bài nổi bật các nền tảng <span className="sub">7 ngày gần nhất, mọi nền tảng xếp chung theo tương tác + lượt xem — bấm tiêu đề hoặc logo để mở bài thật</span></h2>
+        <h2><span aria-hidden="true">🔥</span> Bài nổi bật các nền tảng <span className="sub">7 ngày gần nhất, mọi nền tảng xếp chung theo tương tác + lượt xem — icon có nhãn TOP là nền tảng bài đó ăn nhất; bấm tiêu đề hoặc logo để mở bài thật</span></h2>
         {hot.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Chưa có bài nào có số liệu.</p>
         ) : (
@@ -302,6 +305,10 @@ export default async function Page() {
                 {hot.map((h, i) => {
                   const mainLink = h.links[0]?.url || null;
                   const title = hotTitles.get(h.cid) || '(không tên)';
+                  // 4/9 (user): icon nền tảng ĂN NHẤT được gắn TOP + aura; các icon khác giữ nguyên.
+                  const topPf = (Object.entries(h.engBy) as Array<[PlatformKey, number]>)
+                    .filter(([, v]) => v > 0)
+                    .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
                   return (
                     <tr key={h.cid}>
                       <td><span className="tq-rank" aria-hidden="true">{i + 1}</span></td>
@@ -313,14 +320,16 @@ export default async function Page() {
                         )}
                       </td>
                       <td>
-                        <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                          {h.links.length
-                            ? h.links.map((l) => (
-                                <a key={l.platform + l.url} href={l.url} target="_blank" rel="noreferrer" title={`Mở bài trên ${l.platform}`}>
-                                  <PlatformLogo platform={l.platform} size={16} />
-                                </a>
-                              ))
-                            : h.platforms.map((p) => <PlatformLogo key={p} platform={p} size={16} />)}
+                        <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                          {(h.links.length ? h.links.map((l) => ({ platform: l.platform, url: l.url as string | null })) : h.platforms.map((p) => ({ platform: p, url: null as string | null }))).map((l) => {
+                            const isTop = topPf === l.platform;
+                            const inner = <PlatformLogo platform={l.platform} size={16} />;
+                            const cls = `hot-pf${isTop ? ' hot-pf-top' : ''}`;
+                            const ttl = isTop ? `Ăn nhất trên ${l.platform}: ${fmt(h.engBy[l.platform] || 0)} tương tác` : `Mở bài trên ${l.platform}`;
+                            return l.url
+                              ? <a key={l.platform + l.url} className={cls} href={l.url} target="_blank" rel="noreferrer" title={ttl}>{inner}{isTop ? <span className="hot-pf-lbl">TOP</span> : null}</a>
+                              : <span key={l.platform} className={cls} title={ttl}>{inner}{isTop ? <span className="hot-pf-lbl">TOP</span> : null}</span>;
+                          })}
                         </span>
                       </td>
                       <td className="sub" style={{ fontSize: '.82rem' }}>{fmtDT(firstPostAt.get(h.cid) || null) || '—'}</td>

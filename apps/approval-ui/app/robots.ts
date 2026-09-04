@@ -16,7 +16,6 @@ export default function robots(): MetadataRoute.Robots {
           '/noi-dung',
           '/do-luong',
           '/ke-hoach',
-          '/van-hanh',
           '/ho-so',
           '/vi-tri',
           '/kho-tri-thuc',

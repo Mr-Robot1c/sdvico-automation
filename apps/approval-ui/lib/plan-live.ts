@@ -139,8 +139,8 @@ function rankProducts(byProduct: Array<{ product: string; count: number; avgScor
 }
 
 // Dự kiến HƯỚNG ĐI cho từng ngày tới, mô phỏng đúng thứ tự vòng xoay sẽ rút.
-// 29/8 (user chốt "bỏ hẳn A/B"): mỗi hướng = ĐÚNG 1 bài; mỗi ngày tiêu 3 hướng (sáng 8h
-// 2 bài bán + chiều 14h 1 bài bán). Hướng còn pending_variant='B' thời nhịp cũ nghĩa là
+// 29/8 (user chốt "bỏ hẳn A/B"): mỗi hướng = ĐÚNG 1 bài; mỗi ngày tiêu 2 hướng (sáng 8h
+// 1 bài bán + chiều 14h 1 bài bán, từ 4/9). Hướng còn pending_variant='B' thời nhịp cũ nghĩa là
 // ĐÃ ra 1 bài -> coi như đã dùng (cùng luật với /api/rotate).
 type DayDirection = { title: string; product: string; variant: 'A' | 'B' | 'AB'; done?: boolean };
 // Tên sản phẩm chuẩn (bỏ số thứ tự folder) để tra trọng số — suggestion.product ghi theo
@@ -149,7 +149,7 @@ function productNameOf(raw: string): string {
   const g = (guessGroup as (t: string) => string | null)(String(raw || ''));
   return String(g || raw || '').replace(/^\s*\d+\.\s*/, '').trim();
 }
-export const DIRECTIONS_PER_DAY = 3; // 2 bài bán sáng 8h + 1 bài bán chiều 14h
+export const DIRECTIONS_PER_DAY = 2; // 1 bài bán sáng 8h + 1 bài bán chiều 14h (4/9)
 function buildDirectionQueue(suggestions: any[], weights: Record<string, number> = {}): DayDirection[] {
   const fresh = suggestions.filter((s) => !s.used_at && !s.pending_variant);
   // BOSS truyền cho Creator (user 21/8: "BOSS có học và truyền cho Creator không?"): hướng
@@ -167,11 +167,11 @@ function buildDirectionQueue(suggestions: any[], weights: Record<string, number>
 function buildDailySchedule(now: Date, salesProducts: PlanProduct[], groups: string[], dirQueue: DayDirection[] = []): DailyPlan[] {
   const remaining = new Map<string, number>(salesProducts.map((p) => [p.product, p.postsPerWeek]));
   const out: DailyPlan[] = [];
-  let qPos = 0; // vị trí đang rút trong hàng đợi hướng đi (3 hướng/ngày)
+  let qPos = 0; // vị trí đang rút trong hàng đợi hướng đi (2 hướng/ngày, 4/9)
   for (let i = 0; i < 7; i++) {
     const { date, dow, dowIdx } = vnDayInfo(now, i);
     const daysLeft = 7 - i;
-    // 29/8 (bỏ A/B): mỗi ngày rút 3 HƯỚNG = 3 bài bán (2 sáng + 1 chiều), mỗi hướng 1 bài.
+    // 29/8 (bỏ A/B), 4/9 (sáng còn 1 bài): mỗi ngày rút 2 HƯỚNG = 2 bài bán (1 sáng + 1 chiều).
     // Hết hàng đợi thì ngày đó rơi về chia theo trọng số như cũ (refill hằng ngày sẽ bù hướng).
     const dayDirs = dirQueue.slice(qPos, qPos + DIRECTIONS_PER_DAY);
     qPos += dayDirs.length;
@@ -318,7 +318,7 @@ export async function refreshLiveProposal(client: Client, now: Date = new Date()
     if (doneToday.length) {
       // 29/8 (bỏ A/B): các bài bán ĐÃ sinh hôm nay (rotate đánh used_at ngay nên không còn
       // trong queue fresh) — chèn lên đầu để ô "hôm nay" của lịch hiện đúng hướng đã chạy;
-      // slot còn thiếu của hôm nay lấy tiếp từ queue (3 hướng/ngày).
+      // slot còn thiếu của hôm nay lấy tiếp từ queue (2 hướng/ngày, 4/9).
       const doneDirs: (DayDirection & { done: boolean })[] = doneToday.map((b: any) => ({
         title: String(b.suggestion_title || ''),
         product: String(b.keyword || ''),

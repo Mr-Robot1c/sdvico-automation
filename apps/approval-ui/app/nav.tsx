@@ -27,7 +27,6 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   const heThong: Group = {
     title: 'Hệ thống',
     items: [
-      { href: '/van-hanh', label: 'Vận hành', icon: '🛑' },
       { href: '/quy-tac', label: 'Quy tắc', icon: '📜' },
       // 29/8 (user): thay link sdvico.vn bang BLOG cua chinh he thong (trang cong khai /blog).
       { href: '/blog', label: 'Blog SDVICO', icon: '🌐', external: true }

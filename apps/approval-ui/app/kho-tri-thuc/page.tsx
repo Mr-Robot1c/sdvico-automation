@@ -1,14 +1,17 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { collectAbPairs, type AbPair } from '../../lib/evaluator';
+import { buildWeekReport, type WeekReport } from '../../lib/week-report';
 import AgentRoster from '../agent/agent-roster';
 import RecentActivity from '../agent/recent-activity';
+import AgentHeadCard from '../agent/agent-head-card';
+import { loadAgentDefs, type AgentDef } from '../../lib/agent-defs';
 
 // NGUỒN (23/8, user: "sắp xếp lại, ghi rõ 5 AI đã học gì, nguồn nào, Evaluator so sánh thế nào"):
 // một tab mỗi AI, mỗi tab = đúng những gì AI đó đã đọc / đã kết luận, đọc thẳng từ bảng dữ liệu.
 //   AI Data 1 (nội bộ)  -> mkt_knowledge_internal (trừ evaluator/*)
 //   AI Data 2 (public)  -> mkt_knowledge_public
-//   Evaluator           -> cặp A/B + số liệu (collectAbPairs) + verdict đã ghi (evaluator/*)
+//   AI Đánh giá         -> bài tuần này chấm điểm (buildWeekReport) + xếp bậc học tuần (mkt_plans
+//                          origin learn-weekly) + verdict A/B cũ giữ làm lịch sử (4/9)
 //   BOSS (Kế hoạch)     -> mkt_plans bản đang áp (nguồn số liệu, trọng số, hướng đi + nguồn, nhật ký chỉnh)
 //   Creator             -> mkt_content generator=rotation 7 ngày (hướng đi + insight đã dùng)
 // Chỉ đọc, không tự động hóa gì. Máy soạn, người bấm (điều cấm 1) giữ nguyên.
@@ -43,13 +46,6 @@ function fmtDT(iso: string | null | undefined): string {
 function vn(n: number | null | undefined): string { return Math.round(Number(n) || 0).toLocaleString('vi-VN'); }
 function vnDec(n: number | null | undefined): string { return (Math.round((Number(n) || 0) * 10) / 10).toLocaleString('vi-VN'); }
 
-const STATUS_LABEL: Record<AbPair['status'], { text: string; tone: string }> = {
-  thieu_ben: { text: 'Chờ bản B', tone: 'demo' },
-  cho_so_lieu: { text: 'Chờ số liệu', tone: 'demo' },
-  ca_hai_0: { text: 'Cả hai 0', tone: 'default' },
-  da_ket_luan: { text: 'Đã kết luận', tone: 'ok' },
-};
-
 export default async function Page({ searchParams }: { searchParams: { ai?: string } }) {
   const tab: Tab = (TABS.some((t) => t.key === searchParams?.ai) ? searchParams!.ai : 'tong-quan') as Tab;
   const client = getServerClient();
@@ -63,11 +59,12 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     { data: appliedRows },
     { data: learnRows },
     { data: creatorRows },
-    abPairs,
+    weekNow,
     { data: tokenRows },
     { data: claudeUsageRows },
     { data: agentLogRows },
     { data: videoAssetRows },
+    agentDefs,
   ] = await Promise.all([
     client.from('mkt_knowledge_internal').select('id, source_path, title, summary, needs_gov_review, created_at').not('source_path', 'like', 'evaluator/%').order('created_at', { ascending: false }).limit(60),
     client.from('mkt_knowledge_public').select('id, source_url, source_title, summary, needs_gov_review, created_at').order('created_at', { ascending: false }).limit(60),
@@ -75,7 +72,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     client.from('mkt_plans').select('id, created_at, applied_at, generated_by, data').eq('applied', true).order('created_at', { ascending: false }).limit(1),
     client.from('mkt_plans').select('id, created_at, applied, data').eq('data->>origin', 'learn-weekly').order('created_at', { ascending: false }).limit(1),
     client.from('mkt_content').select('id, title, created_at, status, brief').eq('brief->>generator', 'rotation').gte('created_at', since7).order('created_at', { ascending: false }).limit(60),
-    collectAbPairs(client),
+    buildWeekReport(client, 0),
     // 24/8: token Gemini đã dùng (mkt.token_usage, ghi bởi lib/gen/token-log.mjs).
     client.from('run_log').select('detail, created_at').eq('task', 'mkt.token_usage').gte('created_at', since30).order('created_at', { ascending: false }).limit(3000),
     // 26/8: token Claude Code (Anthropic Max) đã dùng khi chat với Claude Code — nguồn khác
@@ -86,7 +83,11 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     // 28/8: log cho 4 tab AI moi (lich kenh / bao cao / SEO). Tab video dung brand_assets.
     client.from('run_log').select('task, status, detail, created_at').in('task', ['mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull', 'mkt.metrics_pull_manual', 'mkt.learn_weekly', 'mkt.apply_learn', 'mkt.seo_audit', 'mkt.seed_keywords', 'mkt.keyword_suggest']).order('created_at', { ascending: false }).limit(120),
     client.from('brand_assets').select('id, title, storage_path, product_group, created_at').in('kind', ['video', 'clip']).order('created_at', { ascending: false }).limit(12),
+    // 4/9: định nghĩa 10 AI dùng chung (agent-defs.ts) — thẻ đầu mỗi tab AI (AgentHeadCard).
+    loadAgentDefs(client),
   ] as any);
+
+  const agentOf = (k: string) => (agentDefs as AgentDef[]).find((a) => a.key === k)!;
 
   const internal = (internalRows || []) as any[];
   const pub = (publicRows || []) as any[];
@@ -95,7 +96,16 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
   const plan = (applied?.data || {}) as any;
   const learn = ((learnRows || []) as any[])[0] || null;
   const creator = (creatorRows || []) as any[];
-  const pairs = abPairs as AbPair[];
+
+  // 4/9 (kiến trúc 29/8, bỏ A/B): bài tuần này đã chấm điểm sẵn ở weekNow (buildWeekReport).
+  // Lấy hướng đi (suggestion_title) gắn với từng bài để hiện ở bảng tab AI Đánh giá.
+  const wk = weekNow as WeekReport;
+  const wkCids = wk.posts.map((p) => p.cid);
+  const { data: wkBriefs } = wkCids.length
+    ? await client.from('mkt_content').select('id, brief').in('id', wkCids.slice(0, 200))
+    : { data: [] as any[] };
+  const sugOf = new Map((wkBriefs || []).map((c: any) => [String(c.id), String(c.brief?.suggestion_title || '')]));
+  const avgScoreOfProduct = new Map(wk.byProduct.map((p) => [p.product, p.avgScore]));
 
   // Tổng hợp token: theo NGÀY (VN, 7 ngày gần nhất cho chart) + theo TÁC VỤ (30 ngày, cho
   // biết cái gì đang "đốt" nhiều nhất — user "sếp bảo đốt quá nhiều token").
@@ -127,7 +137,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
     'BOSS':   { icon: '🧭', note: 'Sinh hướng đi tuần, cập nhật kế hoạch từ tri thức + số liệu' },
     'Creator':{ icon: '✍️', note: 'Viết bài bán, bài nuôi trang, kịch bản video, chọn ảnh Unsplash' },
     'Voice':  { icon: '🔊', note: 'Đọc lời video bằng Gemini TTS (Leda), fallback edge-tts miễn phí' },
-    'Evaluator': { icon: '⚖️', note: 'So cặp A/B — chỉ đọc mkt_metrics, không dùng token AI' },
+    'Evaluator': { icon: '⚖️', note: 'Chấm điểm bài + xếp bậc sản phẩm theo tuần — chỉ đọc số liệu, không dùng token AI' },
   };
   const dayOfVN = (iso: string) => {
     const d = new Date(new Date(iso).getTime() + 7 * 3600 * 1000);
@@ -229,7 +239,6 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
   const products: any[] = Array.isArray(plan.products) ? plan.products : [];
   const adjustLog: any[] = Array.isArray(plan.adjust_log) ? plan.adjust_log : [];
   const kn = plan.summary?.knowledge || {};
-  const concluded = pairs.filter((p) => p.status === 'da_ket_luan');
 
   const chips = (
     <nav className="filters" aria-label="Từng AI">
@@ -266,7 +275,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
 
       {tab === 'noi-bo' ? (
         <section>
-          <p className="sub" style={{ margin: '8px 0 12px' }}>Nguồn: file Phòng Kinh doanh thả qua Zalo vào bucket kho-tri-thuc-noi-bo, máy đọc và tóm tắt mỗi ngày 16h. {vn(internal.length)} tài liệu.</p>
+          <AgentHeadCard a={agentOf('data1')} extra={<>📂 <b>Nguồn:</b> file Phòng Kinh doanh thả qua Zalo, phiên 16h tải về, task 20h đẩy bucket kho-tri-thuc-noi-bo và tóm tắt. {vn(internal.length)} tài liệu gần nhất.</>} />
           {internal.length === 0 ? <div className="empty"><p>Chưa có tài liệu nội bộ.</p></div> : (
             <ul className="kt-list">
               {internal.map((r) => (
@@ -283,7 +292,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
 
       {tab === 'public' ? (
         <section>
-          <p className="sub" style={{ margin: '8px 0 12px' }}>Nguồn: báo ngành cá và biển (Google News RSS hằng ngày, tìm sâu Chủ nhật), máy lọc tin liên quan và tóm tắt. {vn(pub.length)} tin.</p>
+          <AgentHeadCard a={agentOf('data2')} extra={<>📂 <b>Nguồn:</b> báo ngành cá và biển (Google News RSS hằng ngày, tìm sâu Chủ nhật), máy lọc tin liên quan và tóm tắt. {vn(pub.length)} tin gần nhất.</>} />
           {pub.length === 0 ? <div className="empty"><p>Chưa có tin public.</p></div> : (
             <ul className="kt-list">
               {pub.map((r) => (
@@ -299,34 +308,32 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
 
       {tab === 'danh-gia' ? (
         <section>
+          <AgentHeadCard a={agentOf('danh-gia')} />
           <div className="card" style={{ padding: '10px 14px', marginBottom: 14 }}>
-            <b>Cách so:</b> mỗi hướng đi có 2 bài thử (A sáng, B chiều). Khi cả hai đã có số liệu Facebook, máy cộng like + bình luận + chia sẻ của từng bản; bản cao hơn thắng, kết luận ghi vào kho nội bộ để BOSS đọc khi lên kế hoạch tuần sau. Cả hai bằng 0 thì chờ thêm, không kết luận.
+            <b>Cách chấm (từ 29/8, bỏ hẳn A/B):</b> mỗi hướng đi BOSS giao ra đúng 1 bài. Điểm bài = tương tác + 0,1 × lượt xem + 0,02 × giây xem + 0,05 × tiếp cận.
+            Bài được so với điểm trung bình của cùng sản phẩm trong tuần. Chủ nhật 19h máy gom theo sản phẩm: một phần ba đầu là Thắng (ưu tiên 3), giữa là Theo dõi (2), một phần ba cuối chưa ra đơn là Đuối (1), dưới 2 bài thì chưa xếp.
+            Đề xuất chờ người bấm Áp dụng ở trang Kế hoạch. Mỗi tối 19h máy chỉnh trọng số tối đa 0,5 theo số liệu ngày. Tuần sau giữ 70% hướng mới, 30% dùng lại bài thắng.
           </div>
-          {pairs.length === 0 ? <div className="empty"><p>Chưa có cặp A/B nào.</p></div> : (
+
+          <h2 style={{ fontSize: '1.05rem', margin: '0 0 8px' }}>Bài {wk.window.label.toLowerCase()} ({vn(wk.posts.length)} bài)</h2>
+          {wk.posts.length === 0 ? <div className="empty"><p>Tuần này chưa có bài nào có số liệu.</p></div> : (
             <div className="tablewrap">
               <table className="datatable">
-                <thead><tr><th>Hướng đi</th><th>Bản A</th><th className="num">A</th><th>Bản B</th><th className="num">B</th><th>Kết luận</th></tr></thead>
+                <thead><tr><th>Bài</th><th>Hướng đi</th><th>Sản phẩm / loại</th><th className="num">Tương tác</th><th className="num">Lượt xem</th><th className="num">Điểm</th><th>So với TB nhóm</th></tr></thead>
                 <tbody>
-                  {pairs.map((p) => {
-                    const a = p.sides.find((s) => s.variant === 'A');
-                    const b = p.sides.find((s) => s.variant === 'B');
-                    const st = STATUS_LABEL[p.status];
-                    const cell = (s: typeof a) => s ? (
-                      <div>
-                        <div>{s.title}</div>
-                        {s.insightLine ? <div className="sub" title="Insight bài này xoáy vào">🎯 {s.insightLine}</div> : null}
-                        <div className="sub">{fmtDT(s.createdAt)}</div>
-                      </div>
-                    ) : <span className="muted">chưa sinh</span>;
-                    const num = (s: typeof a) => s ? (s.engagement == null ? <span className="muted">—</span> : <span title={`${vn(s.reactions)} like, ${vn(s.comments)} bình luận, ${vn(s.shares)} chia sẻ`}>{vn(s.engagement)}</span>) : '—';
+                  {[...wk.posts].sort((a, b) => b.score - a.score).map((p) => {
+                    const avg = avgScoreOfProduct.get(p.product) || 0;
+                    const hasData = p.m.engagement + p.m.views > 0;
+                    const verdict = !hasData ? { t: 'Chưa có số', tone: 'default' } : p.score >= avg * 1.2 ? { t: 'Trên TB', tone: 'ok' } : p.score <= avg * 0.8 ? { t: 'Dưới TB', tone: 'no' } : { t: 'Ngang TB', tone: 'demo' };
                     return (
-                      <tr key={p.key}>
-                        <td className="cell-title"><b>{p.sugTitle}</b></td>
-                        <td style={{ background: p.winner === 'A' ? 'var(--ok-bg)' : undefined }}>{cell(a)}</td>
-                        <td className="num" style={{ background: p.winner === 'A' ? 'var(--ok-bg)' : undefined }}><b>{num(a)}</b></td>
-                        <td style={{ background: p.winner === 'B' ? 'var(--ok-bg)' : undefined }}>{cell(b)}</td>
-                        <td className="num" style={{ background: p.winner === 'B' ? 'var(--ok-bg)' : undefined }}><b>{num(b)}</b></td>
-                        <td><span className={`badge tone-${st.tone}`}>{p.winner ? `🏆 Bản ${p.winner}` : st.text}</span></td>
+                      <tr key={p.cid}>
+                        <td className="cell-title">{p.url ? <a className="src" href={p.url} target="_blank" rel="noreferrer"><b>{p.title}</b></a> : <b>{p.title}</b>}<div className="sub">{fmtDT(p.publishedAt)}</div></td>
+                        <td className="sub">{sugOf.get(p.cid) || (p.isContent ? 'Bài nuôi trang theo lịch' : 'Vòng xoay')}</td>
+                        <td>{p.product}{p.contentType ? <div className="sub">{p.contentType}</div> : null}</td>
+                        <td className="num">{vn(p.m.engagement)}</td>
+                        <td className="num">{vn(p.m.views)}</td>
+                        <td className="num"><b>{vnDec(p.score)}</b></td>
+                        <td><span className={`badge tone-${verdict.tone}`} title={`TB ${p.product}: ${vnDec(avg)} điểm`}>{verdict.t}</span></td>
                       </tr>
                     );
                   })}
@@ -334,10 +341,35 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
               </table>
             </div>
           )}
-          {verdicts.length ? (
+
+          <h2 style={{ fontSize: '1.05rem', margin: '18px 0 8px' }}>Xếp bậc tuần vừa rồi (học tuần Chủ nhật)</h2>
+          {!learn ? <p className="sub">Chưa có lần học tuần nào.</p> : (
             <>
-              <h2 style={{ fontSize: '1.05rem', margin: '18px 0 8px' }}>Kết luận đã ghi vào kho nội bộ ({vn(verdicts.length)})</h2>
-              <ul className="kt-list">
+              <p className="sub" style={{ margin: '0 0 8px' }}>Tạo {fmtDT(learn.created_at)} · {learn.applied ? <span className="badge tone-ok">Đã áp dụng</span> : <span className="badge tone-demo">Chờ người bấm Áp dụng ở Kế hoạch</span>}</p>
+              <div className="tablewrap">
+                <table className="datatable">
+                  <thead><tr><th>Sản phẩm</th><th className="num">Bài</th><th className="num">TB tương tác</th><th>Bậc</th><th className="num">Ưu tiên</th><th>Ghi chú</th></tr></thead>
+                  <tbody>
+                    {((learn.data?.products || []) as any[]).map((p) => (
+                      <tr key={p.product}>
+                        <td>{p.product}</td><td className="num">{vn(p.count)}</td><td className="num">{vn(p.avgEng)}</td>
+                        <td><span className={`badge tone-${p.tier === 'winner' ? 'ok' : p.tier === 'weak' ? 'no' : 'demo'}`}>{p.tier === 'winner' ? 'Thắng' : p.tier === 'watch' ? 'Theo dõi' : p.tier === 'weak' ? 'Đuối' : 'Chưa đủ bài'}</span></td>
+                        <td className="num"><b>×{vnDec(p.weight)}</b></td><td className="sub">{p.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {Array.isArray(learn.data?.narrative) && learn.data.narrative.length ? (
+                <ul className="kt-list" style={{ marginTop: 10 }}>{(learn.data.narrative as string[]).map((s, i) => <li key={i} className="kt-item">{s}</li>)}</ul>
+              ) : null}
+            </>
+          )}
+
+          {verdicts.length ? (
+            <details style={{ marginTop: 18 }}>
+              <summary className="sub">Kết luận A/B cũ trước 29/8 ({vn(verdicts.length)}), giữ làm lịch sử</summary>
+              <ul className="kt-list" style={{ marginTop: 8 }}>
                 {verdicts.map((r) => (
                   <li key={r.id} className="kt-item">
                     <div className="kt-item-head"><b>{r.title}</b><span className="muted" style={{ fontSize: '.8rem' }}>{fmtDT(r.imported_at || r.created_at)}</span></div>
@@ -345,19 +377,20 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
                   </li>
                 ))}
               </ul>
-            </>
+            </details>
           ) : null}
         </section>
       ) : null}
 
       {tab === 'boss' ? (
         <section>
+          <AgentHeadCard a={agentOf('boss')} />
           {!applied ? <div className="empty"><p>Chưa có bản kế hoạch nào được áp.</p><p className="sub">Bản tuần sinh Thứ 2 8h từ đo lường tuần vừa xong.</p></div> : (
             <>
               <div className="card" style={{ padding: '10px 14px', marginBottom: 14, display: 'grid', gap: 4 }}>
                 <div><b>Bản đang áp</b> · tạo {fmtDT(plan.generatedAt || applied.created_at)} · nhịp {plan.cadence === 'weekly' ? 'tuần (Thứ 2)' : plan.cadence === 'update' ? 'cập nhật' : 'bấm tay'}</div>
                 <div>Nguồn số liệu: <b>{plan.measurement_source || '7 ngày gần nhất'}</b></div>
-                <div>Tri thức đã đọc khi lập: <b>{vn(kn.internal)}</b> nội bộ, <b>{vn(kn.publicSrc)}</b> public{concluded.length ? <>, <b>{vn(verdicts.length)}</b> kết luận A/B</> : null}</div>
+                <div>Tri thức đã đọc khi lập: <b>{vn(kn.internal)}</b> nội bộ, <b>{vn(kn.publicSrc)}</b> public{verdicts.length ? <>, <b>{vn(verdicts.length)}</b> kết luận đánh giá</> : null}</div>
                 <div className="sub">Lịch: học tuần Chủ nhật 19h · kế hoạch tuần Thứ 2 8h (tự áp) · chỉnh dần mỗi tối 19h theo số liệu ngày, tối đa 0,5 điểm{learn ? ` · đề xuất học tuần gần nhất ${fmtDT(learn.created_at)}${learn.applied ? ' (đã áp)' : ' (chờ áp)'}` : ''}</div>
               </div>
 
@@ -409,6 +442,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
 
       {tab === 'creator' ? (
         <section>
+          <AgentHeadCard a={agentOf('creator')} />
           <p className="sub" style={{ margin: '8px 0 12px' }}>Bài máy viết 7 ngày qua: theo hướng đi nào của BOSS, xoáy vào insight nào. {vn(creator.length)} bài.</p>
           {creator.length === 0 ? <div className="empty"><p>Chưa có bài nào trong 7 ngày.</p></div> : (
             <div className="tablewrap">
@@ -437,16 +471,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
       {/* ===== 28/8: 4 TAB AI MOI (user: "layout cho cac AI con lai + noi ro model, local thi ghi dia chi") ===== */}
       {tab === 'video-ai' ? (
         <section>
-          <div className="need-item" style={{ marginBottom: 12 }}>
-            <span>🎬</span>
-            <span style={{ flex: 1 }}>
-              <b>AI làm video + AI giọng nói</b> — ghép các cảnh thành video dọc, gắn phụ đề, cân đều âm lượng, đọc giọng tiếng Việt.
-              <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
-                🧩 <b>Model:</b> ffmpeg (ghép, không LLM) · Gemini TTS <code>gemini-3.1-flash-tts-preview → 2.5-flash → 2.5-pro</code> giọng Leda, hết hạn mức lui edge-tts <code>vi-VN-HoaiMyNeural</code>.
-                <br />📍 <b>Chạy tại:</b> MÁY LOCAL — Watcher <code>C:/Users/ADMIN/Desktop/SDVICO Marketing/packages/marketing/src/video/build-video.mjs</code> (quét bài video_requested, cần máy bật). Video final đưa lên Supabase Storage <code>brand-assets/videos/</code>.
-              </span>
-            </span>
-          </div>
+          <AgentHeadCard a={agentOf('video')} extra={<>🎙 <b>Giọng:</b> {agentOf('voice').model} — {agentOf('voice').runsAt}</>} />
           <p className="sub" style={{ margin: '8px 0 12px' }}>Video đã dựng gần nhất (kho brand-assets): {vn((videoAssetRows || []).length)} bản.</p>
           {!(videoAssetRows || []).length ? <div className="empty"><p>Kho chưa có video nào.</p></div> : (
             <div className="tablewrap">
@@ -469,48 +494,21 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
 
       {tab === 'lich-kenh' ? (
         <section>
-          <div className="need-item" style={{ marginBottom: 12 }}>
-            <span>📆</span>
-            <span style={{ flex: 1 }}>
-              <b>AI quản lý lịch và kênh</b> — bài duyệt xong tự đăng đúng kênh, kéo số liệu mỗi giờ.
-              <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
-                🧩 <b>Model:</b> không dùng LLM — gọi thẳng Facebook Graph API v26 · YouTube Data API v3 · TikTok Display API.
-                <br />📍 <b>Chạy tại:</b> cloud — tự động mỗi giờ + chạy ngay khi người bấm Duyệt.
-              </span>
-            </span>
-          </div>
+          <AgentHeadCard a={agentOf('lich-kenh')} />
           <AgentLogTable rows={(agentLogRows as any[]).filter((l: any) => ['mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull', 'mkt.metrics_pull_manual'].includes(l.task))} />
         </section>
       ) : null}
 
       {tab === 'bao-cao' ? (
         <section>
-          <div className="need-item" style={{ marginBottom: 12 }}>
-            <span>📈</span>
-            <span style={{ flex: 1 }}>
-              <b>AI báo cáo tuần</b> — Chủ nhật 19h gom số liệu tuần, đề xuất đổi trọng số cho BOSS.
-              <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
-                🧩 <b>Model:</b> không dùng LLM — tính trực tiếp từ bảng <code>mkt_metrics</code> (view, tương tác từng bài).
-                <br />📍 <b>Chạy tại:</b> cloud — Chủ nhật 19h. Đề xuất hiện ở trang Kế hoạch, người bấm Áp dụng mới đổi.
-              </span>
-            </span>
-          </div>
+          <AgentHeadCard a={agentOf('bao-cao')} />
           <AgentLogTable rows={(agentLogRows as any[]).filter((l: any) => ['mkt.learn_weekly', 'mkt.apply_learn'].includes(l.task))} />
         </section>
       ) : null}
 
       {tab === 'seo-ai' ? (
         <section>
-          <div className="need-item" style={{ marginBottom: 12 }}>
-            <span>🔍</span>
-            <span style={{ flex: 1 }}>
-              <b>AI quản lý SEO</b> — rà điểm SEO trang công khai hằng tuần, đề xuất từ khóa mới, giữ sitemap sạch cho Google.
-              <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
-                🧩 <b>Model:</b> Gemini flash-lite (đề xuất từ khóa); phần rà điểm là bộ đo tự động, không dùng AI.
-                <br />📍 <b>Chạy tại:</b> cloud — sáng thứ Hai hằng tuần: rà sdvico.vn + trang bài viết, rồi đề xuất từ khóa.
-              </span>
-            </span>
-          </div>
+          <AgentHeadCard a={agentOf('seo')} />
           <AgentLogTable rows={(agentLogRows as any[]).filter((l: any) => ['mkt.seo_audit', 'mkt.seed_keywords', 'mkt.keyword_suggest'].includes(l.task))} />
         </section>
       ) : null}
