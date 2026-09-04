@@ -317,7 +317,7 @@ INPUT  →  PROCESS  →  OUTPUT  →  (số liệu quay lại INPUT)
 ## Cổng an toàn chung
 
 - Máy soạn, người bấm. Mọi bài đi qua `approval_queue`, người bấm mới chuyển approved (điều cấm 1, 2).
-- Dừng khẩn + hạn mức ngày: `lib/safety.ts` (app_config `emergency_stop`, `daily_counters`). Trang `/van-hanh`.
+- Dừng khẩn: `lib/safety.ts` vẫn đọc app_config `emergency_stop` (luôn false, không còn công tắc, chỉ đổi được bằng SQL). Hạn mức bài/ngày: đã bỏ khỏi luồng Duyệt 4/9, số bài lên kênh mỗi ngày = số lần người bấm Duyệt. Trang Vận hành đã bỏ 4/9 (user chốt).
 - RLS bật cho bảng dữ liệu cá nhân (`hr_candidates`, `hr_applications`) — điều cấm 6.
 - Nội dung chạm quy định nhà nước/IUU: cờ `needs_gov_review`, chờ người duyệt (điều cấm 3).
 
