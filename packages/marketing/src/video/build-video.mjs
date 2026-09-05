@@ -70,7 +70,7 @@ function cleanNarration(text) {
 // TTS_PITCH_SEMI=0 la ve giong goc.
 // 5/9 (2): sep chot mau 2 nhung "cho vui ve, len xuong giong": them semiDelta / tempoMul theo
 // TUNG CAU (xem localProsody) cong dồn lên nen mac dinh.
-function livelyArgs(sampleRate, { semiDelta = 0, tempoMul = 1 } = {}) {
+function livelyFilter(sampleRate, { semiDelta = 0, tempoMul = 1 } = {}) {
   // 5/9 (3): sep nghe lai chon NEN MAU 1 (tempo 1.12, KHONG nang cao do) + len xuong theo cau
   // -> TTS_PITCH_SEMI mac dinh 0; cao do chi doi theo tung cau qua semiDelta.
   const tempo = (Number(process.env.TTS_TEMPO ?? 1.12) || 1) * tempoMul;
@@ -84,8 +84,19 @@ function livelyArgs(sampleRate, { semiDelta = 0, tempoMul = 1 } = {}) {
   } else if (Math.abs(tempo - 1) > 0.005) {
     filters.push(`atempo=${tempo.toFixed(4)}`);
   }
-  return filters.length ? ['-af', filters.join(',')] : [];
+  return filters.join(',');
 }
+function livelyArgs(sampleRate, opts) {
+  const f = livelyFilter(sampleRate, opts);
+  return f ? ['-af', f] : [];
+}
+// 5/9 (4) (sep: "giong doi khi nghi hoi giua chung"): khi doc TUNG CAU, moi khuc mang ~0,12s lang
+// 2 dau tu server + mp3 moi khuc them dem dau/cuoi frame -> noi lai thanh khoang nghi 0,3-0,4s
+// giua cac cau, nghe nhu hut hoi. Nay: cat lang 2 dau moi khuc (silenceremove, -45dB), dem
+// dung 0,10s, xuat WAV (khong dem frame), noi WAV roi moi nen mp3 MOT lan.
+const TRIM_EDGES = 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,' +
+  'areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,areverse';
+const SENTENCE_GAP = 'apad=pad_dur=0.10';
 
 // Tạo mp3 LẶNG dài `sec` giây (dự phòng khi TTS lỗi: cảnh vẫn dựng, có phụ đề, chỉ mất tiếng cảnh đó).
 async function silentAudio(outPath, sec) {
@@ -111,9 +122,11 @@ function spellPhones(text) {
 }
 
 // Tách lời thoại thành từng câu (theo . ! ? …) để đọc mỗi câu một ngữ điệu.
+// 5/9 (sep: "giong doi khi nghi hoi giua chung"): regex cu tach ca dau chấm TRONG SO ("3.000.000
+// đồng" -> "3." + "000." + "000 đồng"), moi khuc doc rieng -> ngat hoi vo ly giua cau. Nay chi tach
+// khi dau cau co KHOANG TRANG hoac het chuoi phia sau.
 function splitSentences(text) {
-  const parts = String(text || '').match(/[^.!?…]+[.!?…]+|[^.!?…]+$/g) || [];
-  return parts.map((s) => s.trim()).filter(Boolean);
+  return String(text || '').trim().split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
 }
 
 // Ngữ điệu theo LOẠI câu (user 21/8: "giọng đọc ngang quá, có thể lên xuống được không"):
@@ -278,8 +291,9 @@ async function localTTS(cleanText, outPath, workDir, tag) {
       const parts = [];
       for (let i = 0; i < sentences.length; i++) {
         const wav = await localTTSWav(sentences[i], workDir, `${tag}_s${i}`);
-        const piece = `${tag}_s${i}.mp3`;
-        await ffmpeg(['-y', '-i', wav, ...livelyArgs(48000, localProsody(sentences[i], i)), '-c:a', 'libmp3lame', '-q:a', '4', join(workDir, piece)]);
+        const piece = `${tag}_s${i}_p.wav`;
+        const af = [livelyFilter(48000, localProsody(sentences[i], i)), TRIM_EDGES, SENTENCE_GAP].filter(Boolean).join(',');
+        await ffmpeg(['-y', '-i', wav, '-af', af, '-c:a', 'pcm_s16le', join(workDir, piece)]);
         parts.push(piece);
       }
       const list = join(workDir, `${tag}_lcat.txt`);
@@ -480,8 +494,10 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
     if (error || !a) throw new Error(`brand_assets ${tag}: ` + (error?.message || ''));
     return a.id;
   };
-  const videoH = await uploadVideo(horizontalPath, 'ngang'); // 16:9 -> FB
-  const videoV = verticalPath ? await uploadVideo(verticalPath, 'doc') : videoH; // 9:16 -> TikTok
+  // 5/9 (sep): chi con BAN DOC; upload 1 file, video_h va video_v tro cung asset (FB Post/Reel +
+  // TikTok deu dung ban doc). Van nhan horizontalPath cho truong hop goi tay ban cu.
+  const videoV = await uploadVideo(verticalPath, 'doc');
+  const videoH = horizontalPath ? await uploadVideo(horizontalPath, 'ngang') : videoV;
 
   // Caption ngắn + hashtag đúng sản phẩm.
   const { guessGroup, productHashtags, DEFAULT_HASHTAGS } = await import('../products.mjs');
@@ -639,7 +655,7 @@ async function main() {
   );
   console.log('Tiêu đề:', script.titles);
   console.log('Rủi ro tuân thủ:', script.assessment.risk, JSON.stringify(script.assessment.flags));
-  console.log('Cảnh: dọc', script.vertical.length, '| ngang', script.horizontal.length);
+  console.log('Cảnh: dọc', script.vertical.length);
 
   const workDir = join(HERE, '..', '..', '..', '..', 'out', 'video', `work_${contentId.slice(0, 8)}`);
   await mkdir(workDir, { recursive: true });
@@ -657,36 +673,34 @@ async function main() {
   }
   console.log('Đã tải', assetPaths.size, 'tư liệu.');
 
-  console.log('\n== Dựng bản horizontal (16:9) cho Facebook ==');
-  const horizontal = await buildFormat('horizontal', script.horizontal, assetPaths, voice, workDir, outDir, contentId);
-  console.log(`  -> ${horizontal.out} (${horizontal.totalDur.toFixed(1)}s, ${horizontal.scenes} cảnh)`);
-
-  console.log('\n== Dựng bản vertical (9:16) cho TikTok ==');
+  // 5/9 (sep): CHI DUNG BAN DOC 9:16 cho moi kenh (FB Post/Reel + TikTok + YouTube Shorts) de dong
+  // bo. Truoc day dung them ban ngang 16:9 cho FB Post — bo han, do nua thoi gian TTS + ghep.
+  console.log('\n== Dựng bản vertical (9:16) dùng chung mọi kênh ==');
   const vertical = await buildFormat('vertical', script.vertical, assetPaths, voice, workDir, outDir, contentId);
   console.log(`  -> ${vertical.out} (${vertical.totalDur.toFixed(1)}s, ${vertical.scenes} cảnh)`);
 
-  // 3 ảnh đại diện từ bản ngang.
+  // 3 ảnh đại diện từ bản dọc.
   const thumbs = [];
   for (let i = 0; i < 3; i++) {
-    const t = Math.max(0.5, (horizontal.totalDur * (i + 1)) / 4);
+    const t = Math.max(0.5, (vertical.totalDur * (i + 1)) / 4);
     const th = join(outDir, `sdvico_${contentId.slice(0, 8)}_thumb${i + 1}.jpg`);
-    await ffmpeg(['-y', '-ss', t.toFixed(2), '-i', horizontal.out, '-frames:v', '1', '-q:v', '3', th]);
+    await ffmpeg(['-y', '-ss', t.toFixed(2), '-i', vertical.out, '-frames:v', '1', '-q:v', '3', th]);
     thumbs.push(th);
   }
 
   const summary = {
     contentId, title: content.title, titles: script.titles,
     compliance: script.assessment,
-    horizontal, vertical, thumbnails: thumbs,
+    vertical, thumbnails: thumbs,
   };
   await writeFile(join(outDir, `sdvico_${contentId.slice(0, 8)}_summary.json`), JSON.stringify(summary, null, 2), 'utf8');
   console.log('\nXONG. Tóm tắt:', join(outDir, `sdvico_${contentId.slice(0, 8)}_summary.json`));
-  console.log(JSON.stringify({ horizontal: horizontal.out, vertical: vertical.out, thumbs }, null, 2));
+  console.log(JSON.stringify({ vertical: vertical.out, thumbs }, null, 2));
 
-  // Đẩy vào Hàng đợi duyệt (bản ngang cho FB + bản dọc cho TikTok, đăng cả 2 kênh).
+  // Đẩy vào Hàng đợi duyệt (một file dọc dùng cho cả FB lẫn TikTok).
   if (!process.argv.includes('--no-queue')) {
     try {
-      await pushToApprovalQueue(client, { content, script, horizontalPath: horizontal.out, verticalPath: vertical.out });
+      await pushToApprovalQueue(client, { content, script, horizontalPath: null, verticalPath: vertical.out });
     } catch (e) {
       console.warn('Không đẩy được vào Hàng đợi duyệt:', e.message, '(video vẫn có ở out/video/).');
     }
@@ -874,7 +888,7 @@ async function buildTrendVideoFromPexels(client, content, contentId) {
 
   const outputPath = join(workDir, `sdvico_trend_${contentId.slice(0, 8)}.mp4`);
   // Video doc 1080x1920 -> font to hon + margin day cao (tranh che nut Shorts).
-  const forceStyle = "FontName=Arial,FontSize=32,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=3,Shadow=1,BorderStyle=1,Alignment=2,MarginV=140";
+  const forceStyle = "FontName=Arial,FontSize=29,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=3,Shadow=1,BorderStyle=1,Alignment=2,MarginV=110";
   try {
     await ffmpeg([
       '-y', '-i', concatPath,

@@ -8,7 +8,8 @@ import { ensureFonts, FONT_REGULAR, FONT_BLACK } from './fonts.mjs';
 import { buildBumpers } from './bumpers.mjs';
 
 export const FORMATS = {
-  vertical: { w: 1080, h: 1920, subFont: 15, subMargin: 90 },
+  // 5/9 (sếp): phụ đề nhỏ đi 10% (15 -> 13.5) và hạ thấp hơn một chút (MarginV 90 -> 70).
+  vertical: { w: 1080, h: 1920, subFont: 13.5, subMargin: 70 },
   horizontal: { w: 1920, h: 1080, subFont: 13, subMargin: 55 },
 };
 

@@ -100,15 +100,15 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'Trả về JSON đúng cấu trúc sau, không thêm chữ ngoài JSON:',
     '{',
     '  "titles": ["ba tiêu đề khác nhau, ngắn, hấp dẫn"],',
-    '  "vertical": {"scenes": [{"role": "hook|empathy|solution|reward|closing", "narration": "câu thoại", "asset_id": "id"}]},',
-    '  "horizontal": {"scenes": [{"role": "hook|empathy|solution|reward|closing", "narration": "câu thoại", "asset_id": "id"}]}',
+    '  "vertical": {"scenes": [{"role": "hook|empathy|solution|reward|closing", "narration": "câu thoại", "asset_id": "id"}]}',
+    'CHỈ CÓ BẢN DỌC (vertical). Không sinh "horizontal" (sếp 5/9: mọi video đăng lên chỉ 1 dạng dọc cho đồng bộ).',
     '}',
     'FIELD "role" BẮT BUỘC — không được thiếu, không được trùng. Model hay bỏ qua role và gộp/bỏ nhịp; đây là cách ép cấu trúc.',
     ...(short
       ? [
           'ĐÂY LÀ VIDEO SHORTS GÂY CHÚ Ý (40-55 giây, tăng từ 18-25s để cảnh empathy có chỗ nêu HẬU QUẢ CHI TIẾT — user 26/8: "thời gian có thể tăng miễn dưới 1 phút").',
           'CHÍNH XÁC 3 CẢNH, role LẦN LƯỢT: "hook", "empathy", "solution". KHÔNG thêm cảnh, KHÔNG bớt cảnh, KHÔNG lặp role.',
-          'Bản dọc (vertical) VÀ Bản ngang (horizontal): mỗi bản 3 cảnh, tổng lời thoại 40-55 giây (~120-160 từ tiếng Việt). Cả video DƯỚI 60 giây (kể cả outro cố định ~5s).',
+          'Bản dọc (vertical): 3 cảnh, tổng lời thoại 40-55 giây (~120-160 từ tiếng Việt). Cả video DƯỚI 60 giây (kể cả outro cố định ~5s).',
           '',
           'CẢNH 1 role="hook" (8-12s, ~25-35 từ):',
           '  "[HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ, câu KHẲNG ĐỊNH 2 mảnh đối lập — là câu ĐẦU TIÊN, không chào]. [1 câu tô đậm nỗi mất]."',
@@ -131,7 +131,6 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       : [
           'ĐÂY LÀ VIDEO DÀI (40-60 giây). CHÍNH XÁC 5 CẢNH, role LẦN LƯỢT: "hook", "empathy", "solution", "reward", "closing".',
           'Bản dọc (vertical): 5 cảnh, tổng lời thoại 55-60 giây.',
-          'Bản ngang (horizontal): 5 cảnh, tổng lời thoại 40-50 giây (~100-130 từ tiếng Việt).',
           'Lời thoại mỗi cảnh 8-12 giây (~20-30 từ). Súc tích, không lặp ý.',
           '',
           'CẢNH 1 role="hook": vào thẳng HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (câu khẳng định 2 mảnh đối lập) rồi 1 câu tô đậm nỗi mất. KHÔNG câu chào mở đầu. Cấm câu hỏi.',
@@ -197,11 +196,12 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     .filter((s) => s.narration && s.assetId);
 
   const vertical = fix(parsed.vertical?.scenes, 'vertical');
-  const horizontal = fix(parsed.horizontal?.scenes, 'horizontal');
+  // 5/9 (sếp): chỉ dựng BẢN DỌC. Giữ key horizontal trỏ cùng mảng để code gọi không đổi.
+  const horizontal = vertical;
   const titles = Array.isArray(parsed.titles) ? parsed.titles.filter(Boolean).slice(0, 3) : [];
 
   // Quét tuân thủ trên toàn bộ lời thoại (điều cấm 3, 4, 5).
-  const allText = [...vertical, ...horizontal].map((s) => s.narration).join('\n');
+  const allText = [...vertical].map((s) => s.narration).join('\n');
   const assessment = assessDraft(allText, {
     knownFactValues: knownFactValues(facts),
     testFactValues: testFactValues(facts),
