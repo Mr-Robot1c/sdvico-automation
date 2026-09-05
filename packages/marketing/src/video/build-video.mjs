@@ -71,8 +71,10 @@ function cleanNarration(text) {
 // 5/9 (2): sep chot mau 2 nhung "cho vui ve, len xuong giong": them semiDelta / tempoMul theo
 // TUNG CAU (xem localProsody) cong dồn lên nen mac dinh.
 function livelyArgs(sampleRate, { semiDelta = 0, tempoMul = 1 } = {}) {
+  // 5/9 (3): sep nghe lai chon NEN MAU 1 (tempo 1.12, KHONG nang cao do) + len xuong theo cau
+  // -> TTS_PITCH_SEMI mac dinh 0; cao do chi doi theo tung cau qua semiDelta.
   const tempo = (Number(process.env.TTS_TEMPO ?? 1.12) || 1) * tempoMul;
-  const semi = (Number(process.env.TTS_PITCH_SEMI ?? 1) || 0) + semiDelta;
+  const semi = (Number(process.env.TTS_PITCH_SEMI ?? 0) || 0) + semiDelta;
   const sr = Number(sampleRate) || 48000;
   const filters = [];
   if (semi) {
