@@ -98,7 +98,12 @@ const TRIM_EDGES = 'silenceremove=start_periods=1:start_threshold=-45dB:start_si
   'areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,areverse';
 // ffmpeg dong goi (@ffmpeg-installer, ban 2018) chua co apad=pad_dur -> dung pad_len theo mau
 // (0,10s x 48kHz = 4800 mau). CI dung cung binary nay.
-const SENTENCE_GAP = 'apad=pad_len=4800';
+// 5/9 (sep: "nghi hoi giua cac dau nhu ! lau them xiu"): sau cau cam/cau hoi nghi 0,26s, sau cau
+// thuong 0,16s (truoc do 0,10s deu).
+function sentenceGap(sentence) {
+  const sec = /[!?]$/.test(sentence) ? 0.26 : 0.16;
+  return `apad=pad_len=${Math.round(sec * 48000)}`;
+}
 
 // Tạo mp3 LẶNG dài `sec` giây (dự phòng khi TTS lỗi: cảnh vẫn dựng, có phụ đề, chỉ mất tiếng cảnh đó).
 async function silentAudio(outPath, sec) {
@@ -294,7 +299,7 @@ async function localTTS(cleanText, outPath, workDir, tag) {
       for (let i = 0; i < sentences.length; i++) {
         const wav = await localTTSWav(sentences[i], workDir, `${tag}_s${i}`);
         const piece = `${tag}_s${i}_p.wav`;
-        const af = [livelyFilter(48000, localProsody(sentences[i], i)), TRIM_EDGES, SENTENCE_GAP].filter(Boolean).join(',');
+        const af = [livelyFilter(48000, localProsody(sentences[i], i)), TRIM_EDGES, sentenceGap(sentences[i])].filter(Boolean).join(',');
         await ffmpeg(['-y', '-i', wav, '-af', af, '-c:a', 'pcm_s16le', join(workDir, piece)]);
         parts.push(piece);
       }
@@ -306,8 +311,10 @@ async function localTTS(cleanText, outPath, workDir, tag) {
       console.warn(`  (canh ${tag}: doc tung cau loi "${String(e?.message || e).slice(0, 100)}", lui ve doc ca doan)`);
     }
   }
+  // Duong 1 cau / du phong: cung cat lang 2 dau + nghi cuoi cau nhu duong tung cau cho dong nhat.
   const wav = await localTTSWav(cleanText, workDir, tag);
-  await ffmpeg(['-y', '-i', wav, ...livelyArgs(48000), '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
+  const af = [livelyFilter(48000), TRIM_EDGES, sentenceGap(cleanText)].filter(Boolean).join(',');
+  await ffmpeg(['-y', '-i', wav, '-af', af, '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
   return probeDuration(outPath);
 }
 
@@ -399,7 +406,10 @@ async function whisperArtifact(sceneAudios, workDir, tag) {
   }
 }
 
-const OUTRO_TEXT = 'Nhắn tin cho Page SDVICO hoặc gọi số 0939 243 222 để được hỗ trợ.';
+// 5/9 (sep: "outro khac giong voi giong doc"): do f0 outro 233Hz vs cac canh 246-259Hz, vi outro la
+// 1 cau dai doc ca doan (khong qua duong tung cau + prosody). Tach thanh 2 cau, cau dau cam than
+// -> di cung duong localTTS tung cau nhu loi doc, len giong nhu cau cam trong cac canh.
+const OUTRO_TEXT = 'Nhắn tin cho Page SDVICO nha! Hoặc gọi số 0939 243 222 để được hỗ trợ.';
 
 async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, contentId) {
   const fdir = join(workDir, format);
