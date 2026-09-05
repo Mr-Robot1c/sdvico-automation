@@ -68,9 +68,11 @@ function cleanNarration(text) {
 // Ap cho giong LOCAL (My Duyen) va GEMINI; edge da co rate/pitch rieng. Mac dinh = mau 2 sep
 // nghe 5/9 (nhanh 12%, cao 1 nua cung). Env TTS_TEMPO / TTS_PITCH_SEMI doi duoc; TTS_TEMPO=1
 // TTS_PITCH_SEMI=0 la ve giong goc.
-function livelyArgs(sampleRate) {
-  const tempo = Number(process.env.TTS_TEMPO ?? 1.12) || 1;
-  const semi = Number(process.env.TTS_PITCH_SEMI ?? 1) || 0;
+// 5/9 (2): sep chot mau 2 nhung "cho vui ve, len xuong giong": them semiDelta / tempoMul theo
+// TUNG CAU (xem localProsody) cong dồn lên nen mac dinh.
+function livelyArgs(sampleRate, { semiDelta = 0, tempoMul = 1 } = {}) {
+  const tempo = (Number(process.env.TTS_TEMPO ?? 1.12) || 1) * tempoMul;
+  const semi = (Number(process.env.TTS_PITCH_SEMI ?? 1) || 0) + semiDelta;
   const sr = Number(sampleRate) || 48000;
   const filters = [];
   if (semi) {
@@ -236,13 +238,15 @@ function voiceStyleOf(brief = {}, needsGov = false) {
   return { temperature: 1.0, label: 'soi noi (ban hang)' };
 }
 
-async function localTTS(cleanText, outPath, workDir, tag) {
+// Goi server VieNeu doc MOT khuc, tra ve duong dan WAV (48kHz, SAMPLE_RATE trong
+// local-tts-server-vieneu.py). Throw khi hong de caller quyet.
+async function localTTSWav(text, workDir, tag) {
   const base = String(process.env.TTS_LOCAL_URL || '').replace(/\/$/, '');
   if (!base) throw new Error('TTS_LOCAL_URL chua dat');
   const r = await fetch(base + '/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: cleanText, ...(voiceStyle ? { temperature: voiceStyle.temperature } : {}) }),
+    body: JSON.stringify({ text, ...(voiceStyle ? { temperature: voiceStyle.temperature } : {}) }),
     signal: AbortSignal.timeout(180000),
   });
   if (!r.ok) throw new Error('local-tts HTTP ' + r.status + ': ' + (await r.text().catch(() => '')).slice(0, 120));
@@ -250,7 +254,41 @@ async function localTTS(cleanText, outPath, workDir, tag) {
   if (buf.length < 1000) throw new Error('local-tts tra file qua nho (' + buf.length + ' bytes)');
   const wav = join(workDir, `${tag}_local.wav`);
   await writeFile(wav, buf);
-  // Server VieNeu tra WAV 48kHz (SAMPLE_RATE trong local-tts-server-vieneu.py).
+  return wav;
+}
+
+// 5/9 (2) — sep: "giong nay (mau 2) nhung cho no vui ve, len xuong giong". Server VieNeu kep
+// temperature <= 1.0 (29/8, tren do doi mau giong giua cac canh) nen khong tang bieu cam bang
+// tham so model duoc. Cach lam: doc TUNG CAU rieng, moi cau chinh cao do + toc do theo LOAI cau
+// (cung y tuong prosodyFor cua edge): cau hoi len giong va cham lai chut, cau cam cao + nhanh
+// hon, cau thuong xen ke cao/thap de khong mot duong thang. Seed server co dinh nen mau giong
+// giua cac cau van la mot.
+function localProsody(sentence, idx) {
+  if (/\?$/.test(sentence)) return { semiDelta: 1.0, tempoMul: 0.97 };
+  if (/!$/.test(sentence)) return { semiDelta: 1.0, tempoMul: 1.05 };
+  return idx % 2 === 0 ? { semiDelta: 0, tempoMul: 1.0 } : { semiDelta: 0.7, tempoMul: 1.03 };
+}
+
+async function localTTS(cleanText, outPath, workDir, tag) {
+  const sentences = splitSentences(cleanText);
+  if (sentences.length > 1 && process.env.TTS_LOCAL_PROSODY !== 'off') {
+    try {
+      const parts = [];
+      for (let i = 0; i < sentences.length; i++) {
+        const wav = await localTTSWav(sentences[i], workDir, `${tag}_s${i}`);
+        const piece = `${tag}_s${i}.mp3`;
+        await ffmpeg(['-y', '-i', wav, ...livelyArgs(48000, localProsody(sentences[i], i)), '-c:a', 'libmp3lame', '-q:a', '4', join(workDir, piece)]);
+        parts.push(piece);
+      }
+      const list = join(workDir, `${tag}_lcat.txt`);
+      await writeFile(list, parts.map((p) => `file ${p}`).join('\n'), 'utf8');
+      await ffmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c:a', 'libmp3lame', '-q:a', '4', outPath], { cwd: workDir });
+      return probeDuration(outPath);
+    } catch (e) {
+      console.warn(`  (canh ${tag}: doc tung cau loi "${String(e?.message || e).slice(0, 100)}", lui ve doc ca doan)`);
+    }
+  }
+  const wav = await localTTSWav(cleanText, workDir, tag);
   await ffmpeg(['-y', '-i', wav, ...livelyArgs(48000), '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
   return probeDuration(outPath);
 }
