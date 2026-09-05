@@ -96,7 +96,9 @@ function livelyArgs(sampleRate, opts) {
 // dung 0,10s, xuat WAV (khong dem frame), noi WAV roi moi nen mp3 MOT lan.
 const TRIM_EDGES = 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,' +
   'areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,areverse';
-const SENTENCE_GAP = 'apad=pad_dur=0.10';
+// ffmpeg dong goi (@ffmpeg-installer, ban 2018) chua co apad=pad_dur -> dung pad_len theo mau
+// (0,10s x 48kHz = 4800 mau). CI dung cung binary nay.
+const SENTENCE_GAP = 'apad=pad_len=4800';
 
 // Tạo mp3 LẶNG dài `sec` giây (dự phòng khi TTS lỗi: cảnh vẫn dựng, có phụ đề, chỉ mất tiếng cảnh đó).
 async function silentAudio(outPath, sec) {
