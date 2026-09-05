@@ -276,6 +276,17 @@ export default async function BangSection() {
                           ) : null}
                         </div>
                       ) : null}
+                      {/* 5/9 (user bắt bài chân dung lấy ảnh không thấy mặt): người duyệt thấy máy chọn ảnh
+                          theo từ khóa nào, mắt AI chấm bao nhiêu, lý do; cảnh báo khi ảnh chưa qua thẩm định.
+                          Chỉ bài content mới có các trường này, bài bán tự ẩn. */}
+                      {(brief as any).image_note || (brief as any).image_warn ? (
+                        <p className="sub" style={{ margin: 0, fontSize: '.76rem' }} title="Máy chọn ảnh theo từ khóa này, mắt AI chấm điểm khớp bài">
+                          {(brief as any).image_warn
+                            ? <span className="badge tone-no" style={{ marginRight: 6 }}>⚠️ {String((brief as any).image_warn)}</span>
+                            : null}
+                          🖼 {String((brief as any).image_via || '')}{(brief as any).image_note ? ` · ${String((brief as any).image_note).replace(' (link, khong luu)', '')}` : ''}
+                        </p>
+                      ) : null}
                       <div className="card-actions">
                         <ViewModal title={title} label="Xem bài viết">
                           {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}

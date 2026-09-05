@@ -597,7 +597,9 @@ export async function GET(req: Request) {
     // Chọn ảnh KHỚP chủ đề (sau khi đã biết chủ đề + tiêu đề).
     // 26/8 (sếp: "ảnh không liên quan"): truyền cả BODY bài để Gemini sinh keyword bám sự việc
     // (kim phun tắc, muối ăn mòn mạch...), không chung chung như trước.
-    const picked = await (pickImageForContent as any)(client, folders, `${gen.topic || ''} ${displayTitle}`, recentlyUsedImages, gen.body || '');
+    // 5/9 (user: bài chân dung lấy ảnh không thấy mặt, sai loại tàu): truyền LOẠI BÀI để keyword
+    // và mắt AI biết chủ thể là NGƯỜI (phải thấy mặt) và loại phương tiện phải khớp bài.
+    const picked = await (pickImageForContent as any)(client, folders, `${gen.topic || ''} ${displayTitle}`, recentlyUsedImages, gen.body || '', { contentType: kind });
     // 28/8 tối: picked có thể là ẢNH KHO (id) hoặc LINK TRỰC TIẾP từ Google/Unsplash (url,
     // không lưu Storage — user: "kho chỉ để ảnh/video Zalo SDVICO").
     if (!picked?.id && !picked?.url) { skipped.push({ group: 'Bài content', reason: 'khong co anh' }); break; }
@@ -639,6 +641,8 @@ export async function GET(req: Request) {
           image_via: picked.via,
           ...(picked.credit ? { image_credit: picked.credit } : {}),
           ...(picked.note ? { image_note: picked.note } : {}),
+          ...(picked.reason ? { image_reason: picked.reason } : {}),
+          ...(picked.warn ? { image_warn: picked.warn } : {}),
         },
         draft: gen.text,
         status: 'review',
@@ -653,7 +657,7 @@ export async function GET(req: Request) {
       payload: { content_id: (ins as { id: string }).id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels, authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov, ...(planSlotC ? { plan_time: planTimeLocal(todayDate, planSlotC.time), plan_channel: 'facebook', plan_group: planSlotC.group_label, plan_slot_index: planSlotC.index } : {}) },
       status: 'pending',
     });
-    results.push({ group: 'Bài content', kind, channels, contentId: (ins as { id: string }).id, risk, needsGov });
+    results.push({ group: 'Bài content', kind, channels, contentId: (ins as { id: string }).id, risk, needsGov, image_via: picked.via, image_note: picked.note });
   }
 
   // 29/8 (bỏ A/B): mỗi hướng đi = 1 bài — sinh xong đánh used_at NGAY (kèm a_image_id để
