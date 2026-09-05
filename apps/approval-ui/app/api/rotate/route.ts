@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { autoApplyWeeklyProposal } from '../../../lib/plan';
 import { getServerClient } from '../../../lib/supabase-server';
 import { isEmergencyStopped, todayVN } from '../../../lib/safety';
 // @ts-ignore
@@ -221,6 +222,10 @@ export async function GET(req: Request) {
   // 3. Chọn salesCount (số ô bài bán theo Lịch đăng cố định) folder chưa dùng. Nếu có kế hoạch
   //    đã áp (trang Kế hoạch bấm "Áp dụng trọng số"), ưu tiên folder theo trọng số sản phẩm.
   //    Chưa áp thì chọn đều như cũ.
+  // 5/9 (user: "tạo kế hoạch ngày CN, sáng T2 áp dụng"): rotate 8:00 Thứ 2 chạy TRƯỚC cron
+  // metrics-pull 8:01 nên tự áp bản đề xuất Chủ nhật ngay đây, để bài đầu tuần đã theo kế hoạch
+  // mới. Ngoài sáng Thứ 2 hàm trả về ngay. Lỗi thì đi tiếp với bản đang áp.
+  try { await autoApplyWeeklyProposal(client, 'rotate'); } catch (e: any) { console.error('[rotate] ap ban de xuat loi (bo qua):', e?.message || e); }
   const { data: appliedPlanRaw } = await client
     .from('mkt_plans')
     .select('id, data')

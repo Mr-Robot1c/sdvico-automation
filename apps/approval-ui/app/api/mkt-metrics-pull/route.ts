@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../lib/supabase-server';
 import { pullFacebookMetrics } from '../../../lib/fb-metrics';
-import { generateAndStorePlan, planSlotVN, vnDayStartIso, weekWindowVN } from '../../../lib/plan';
+import { generateAndStorePlan, planSlotVN, vnDayStartIso, weekWindowVN, nextWeekWindowVN, vnLocalIso, findWeeklyProposal, autoApplyWeeklyProposal } from '../../../lib/plan';
 import { importInternalFromBucket } from '../../../lib/knowledge';
 import { learnPublicKnowledge, learnPublicDaily, scoreUnscoredKnowledge } from '../../../lib/knowledge-public';
 import { pullTikTokMetrics } from '../../../lib/tiktok-metrics';
@@ -19,7 +19,10 @@ import { loadPostingPlan, buildBossPostingPlan, savePostingPlan, pruneOverrides,
 //               + Evaluator so các cặp A/B đủ số liệu (chỉ query, rẻ)
 //   CHỦ NHẬT  : thêm lượt quét public SÂU bằng Gemini grounding (hay 429, lỗi bỏ qua)
 //               — ngày BOSS "thu thập tổng" trước kế hoạch tuần
-//   THỨ 2 8h+ : BOSS sinh KẾ HOẠCH TUẦN (cadence weekly) từ mọi thứ đã gom, TỰ KÈM hướng đi
+//   CHỦ NHẬT 8h+: BOSS SOẠN KẾ HOẠCH TUẦN SAU (cadence weekly, applied=false, data.proposal)
+//               để người xem và sửa cả ngày (user 5/9: "tạo kế hoạch ngày CN, sáng T2 áp dụng")
+//   THỨ 2 8h+ : máy TỰ ÁP bản đề xuất đó (rotate 8:00 áp trước, đây là lưới an toàn) + xếp lịch
+//               đăng; CN cron trượt (máy ngủ) thì sinh bản tuần ngay như nhịp cũ rồi áp
 //   THỨ 6 8h+ : BOSS sinh bản CẬP NHẬT lần 1 (cadence update) — 4 ngày số liệu sau Thứ 2
 //   Chặn trùng: mỗi ngày chỉ 1 bản cron (đếm mkt_plans generated_by=cron từ đầu ngày VN) —
 //   trước đây thiếu chốt này nên ngày kế hoạch cron 30 phút sinh bản mới liên tục.
@@ -185,6 +188,29 @@ export async function GET(req: Request) {
   // 1 bản/ngày. Dùng khi người giao việc đổi mục tiêu/sản phẩm tập trung và muốn thấy liền
   // (GitHub workflow mkt-metrics-pull input force_plan=true).
   const planParam = new URL(req.url).searchParams.get('plan');
+  // ?plan=propose (5/9): soạn NGAY bản đề xuất cho tuần sau (không áp), dùng khi muốn có bản
+  // để sửa sớm hơn Chủ nhật. Đã có bản đề xuất tuần đó thì thay bằng bản mới (bản cũ xóa).
+  if (planParam === 'propose') {
+    const nowP = new Date();
+    const win = nextWeekWindowVN(nowP);
+    try {
+      const { id, plan: p } = await generateAndStorePlan(client, 'cron', {
+        cadence: 'weekly', weekOffset: 0, periodFrom: new Date(nowP.getTime() + 7 * 24 * 3600 * 1000),
+        proposal: { week_start: win.start, week_end: win.end, auto_apply_at: vnLocalIso(win.start, '08:00') },
+      });
+      if (id) {
+        const { data: olds } = await client.from('mkt_plans').select('id, data').eq('applied', false).eq('period_start', win.start).neq('id', id);
+        const ids = ((olds || []) as any[]).filter((r) => r.data?.proposal?.week_start === win.start).map((r) => r.id);
+        if (ids.length) await client.from('mkt_plans').delete().in('id', ids);
+      }
+      try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'manual', status: 'ok', detail: { cadence: 'weekly', planId: id, applied: false, proposal: true, weekStart: win.start, directions: p.content_suggestions?.length || 0, measurement_source: p.measurement_source || null } }); } catch { /* bỏ qua */ }
+      plan = { id, ranked: p.summary.ranked, cadence: 'weekly', directions: p.content_suggestions?.length || 0 };
+    } catch (e: any) {
+      try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'manual', status: 'error', detail: { cadence: 'weekly', proposal: true, error: String(e?.message || e) } }); } catch { /* bỏ qua */ }
+      plan = { skipped: 'loi: ' + String(e?.message || e) };
+    }
+    return NextResponse.json({ ok: true, ...res, knowledge, evaluation, plan, forced: 'propose' });
+  }
   const forcePlan = planParam === '1' || planParam === 'weekly';
   if (forcePlan) {
     // ?plan=weekly (24/8): ép ra BẢN TUẦN ngay (số liệu tuần vừa xong) không chờ 8h Thứ 2.
@@ -205,37 +231,79 @@ export async function GET(req: Request) {
   }
   let postingPlan: Record<string, unknown> | null = null;
   const slot = planSlotVN(new Date());
-  if (slot) {
-    const { count: cronToday } = await client
+  const cronPlansToday = async () => {
+    const { count } = await client
       .from('mkt_plans')
       .select('id', { count: 'exact', head: true })
       .eq('generated_by', 'cron')
       .gte('created_at', vnDayStartIso(new Date()));
-    if (cronToday && cronToday > 0) {
-      plan = { skipped: 'da co ban cron hom nay' };
-    } else {
-      try {
-        const { id, plan: p } = await generateAndStorePlan(client, 'cron', { cadence: slot });
-        // THỨ 2 = bản TUẦN: TỰ ÁP làm xương sống tuần (nguyên tắc user 22/8: đo lường tuần ->
-        // kế hoạch tổng quát tuần sau; trước đây bản cron nằm applied=false nên không ai thấy
-        // BOSS "ra kế hoạch tuần"). Hướng đi chưa dùng đã được carry-over bên trong. Bản cập nhật
-        // thứ 6 vẫn chỉ đề xuất (số liệu ngày đã chỉnh dần mỗi tối rồi).
-        let applied = false;
-        if (slot === 'weekly' && id) {
-          await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
-          await client.from('mkt_plans').update({ applied: true, applied_at: new Date().toISOString() }).eq('id', id);
-          applied = true;
-          // Thứ 2: xếp LỊCH ĐĂNG CỐ ĐỊNH tuần mới cùng lượt với kế hoạch tuần.
-          try { postingPlan = await bossProposePostingPlan(client, 'thu 2 - ke hoach tuan moi'); }
-          catch (e: any) { try { await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'cron', status: 'error', detail: { error: String(e?.message || e).slice(0, 300) } }); } catch { /* bo qua */ } }
+    return count || 0;
+  };
+  if (slot === 'apply') {
+    // THỨ 2: áp bản đề xuất Chủ nhật. rotate 8:00 thường đã áp; ở đây là lưới an toàn. Chỉ khi
+    // ÁP được ở lượt này mới xếp lịch đăng (tránh xếp lại mỗi giờ; lưới an toàn lịch ở dưới lo
+    // trường hợp lịch còn của tuần cũ).
+    try {
+      const r = await autoApplyWeeklyProposal(client, 'metrics-pull');
+      if (r.applied) {
+        try { postingPlan = await bossProposePostingPlan(client, 'thu 2 - ke hoach tuan moi'); }
+        catch (e: any) { try { await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'cron', status: 'error', detail: { error: String(e?.message || e).slice(0, 300) } }); } catch { /* bo qua */ } }
+        try { const { refreshLiveProposal } = await import('../../../lib/plan-live'); await refreshLiveProposal(client); } catch { /* bỏ qua */ }
+        plan = { id: r.planId || null, ranked: 0, cadence: 'weekly', directions: 0 };
+      } else if (r.skipped === 'khong co ban de xuat') {
+        // Chủ nhật cron trượt (máy ngủ) -> nhịp cũ: sinh bản tuần từ số liệu tuần vừa xong, áp ngay.
+        if ((await cronPlansToday()) > 0) {
+          plan = { skipped: 'da co ban cron hom nay' };
+        } else {
+          const { id, plan: p } = await generateAndStorePlan(client, 'cron', { cadence: 'weekly' });
+          if (id) {
+            await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
+            await client.from('mkt_plans').update({ applied: true, applied_at: new Date().toISOString() }).eq('id', id);
+            try { postingPlan = await bossProposePostingPlan(client, 'thu 2 - ke hoach tuan moi (CN truot)'); }
+            catch (e: any) { try { await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'cron', status: 'error', detail: { error: String(e?.message || e).slice(0, 300) } }); } catch { /* bo qua */ } }
+          }
+          plan = { id, ranked: p.summary.ranked, cadence: 'weekly', directions: p.content_suggestions?.length || 0 };
+          try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'ok', detail: { cadence: 'weekly', planId: id, applied: !!id, from: 'CN truot, sinh thu 2', directions: p.content_suggestions?.length || 0, measurement_source: p.measurement_source || null } }); } catch { /* bỏ qua */ }
         }
-        plan = { id, ranked: p.summary.ranked, cadence: slot, directions: p.content_suggestions?.length || 0 };
-        try {
-          await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'ok', detail: { cadence: slot, planId: id, applied, directions: p.content_suggestions?.length || 0, measurement_source: p.measurement_source || null } });
-        } catch { /* bỏ qua */ }
+      } else {
+        plan = { skipped: r.skipped || 'bo qua' };
+      }
+    } catch (e: any) {
+      console.error('[plan] ap ban de xuat that bai:', e?.message || e);
+      try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'error', detail: { cadence: 'weekly', step: 'apply', error: String(e?.message || e) } }); } catch { /* bỏ qua */ }
+    }
+  } else if (slot === 'propose' || slot === 'update') {
+    if ((await cronPlansToday()) > 0) {
+      plan = { skipped: 'da co ban cron hom nay' };
+    } else if (slot === 'propose') {
+      // CHỦ NHẬT: soạn bản tuần SAU, số liệu = tuần đang chạy (T2 tới hôm nay), KHÔNG áp.
+      // Đã có bản đề xuất tuần sau (người bấm Soạn hoặc ?plan=propose) thì giữ bản đó.
+      try {
+        const win = nextWeekWindowVN(new Date());
+        const existing = await findWeeklyProposal(client, win.start);
+        if (existing) {
+          plan = { skipped: 'da co ban de xuat tuan sau ' + existing.id.slice(0, 8) };
+        } else {
+          const { id, plan: p } = await generateAndStorePlan(client, 'cron', {
+            cadence: 'weekly', weekOffset: 0, periodFrom: new Date(Date.now() + 7 * 24 * 3600 * 1000),
+            proposal: { week_start: win.start, week_end: win.end, auto_apply_at: vnLocalIso(win.start, '08:00') },
+          });
+          plan = { id, ranked: p.summary.ranked, cadence: 'weekly', directions: p.content_suggestions?.length || 0 };
+          try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'ok', detail: { cadence: 'weekly', planId: id, applied: false, proposal: true, weekStart: win.start, directions: p.content_suggestions?.length || 0, measurement_source: p.measurement_source || null } }); } catch { /* bỏ qua */ }
+        }
+      } catch (e: any) {
+        console.error('[plan] soan ban de xuat that bai:', e?.message || e);
+        try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'error', detail: { cadence: 'weekly', proposal: true, error: String(e?.message || e) } }); } catch { /* bỏ qua */ }
+      }
+    } else {
+      // THỨ 6: bản cập nhật, chỉ đề xuất như cũ.
+      try {
+        const { id, plan: p } = await generateAndStorePlan(client, 'cron', { cadence: 'update' });
+        plan = { id, ranked: p.summary.ranked, cadence: 'update', directions: p.content_suggestions?.length || 0 };
+        try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'ok', detail: { cadence: 'update', planId: id, applied: false, directions: p.content_suggestions?.length || 0, measurement_source: p.measurement_source || null } }); } catch { /* bỏ qua */ }
       } catch (e: any) {
         console.error('[plan] sinh ke hoach that bai:', e?.message || e);
-        try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'error', detail: { cadence: slot, error: String(e?.message || e) } }); } catch { /* bỏ qua */ }
+        try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'error', detail: { cadence: 'update', error: String(e?.message || e) } }); } catch { /* bỏ qua */ }
       }
     }
   }

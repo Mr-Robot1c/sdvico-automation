@@ -1,9 +1,10 @@
 import { getServerClient } from '../../lib/supabase-server';
 import type { Plan, Tier } from '../../lib/plan';
-import { vnInt } from '../../lib/plan';
+import { vnInt, proposalTargetWeekVN } from '../../lib/plan';
 import { buildWeekPlanView, productNameOf } from '../../lib/week-plan';
 import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
-import { saveGoalFocusAndRegenerate, generatePostsNow } from './goal-actions';
+import { saveGoalFocusAndRegenerate, generatePostsNow, regenerateWeeklyProposalAction } from './goal-actions';
+import ProposeButton from './propose-button';
 import GeneratePostsButton from './generate-posts-button';
 import SaveGenerateButton from './save-generate-button';
 import GenerateButton from './generate-button';
@@ -103,6 +104,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   const planRows = rowsInit.filter((r) => r.data?.origin !== 'live');
   const appliedRow = rowsInit.find((r) => r.applied);
   const learnSuggestion = rowsInit.find((r) => r.data?.origin === 'learn-weekly' && !r.applied);
+  // 5/9: bản ĐỀ XUẤT tuần sau (BOSS soạn Chủ nhật 8h, hoặc người bấm Soạn), chờ Thứ 2 8h máy áp.
+  const proposalWeek = proposalTargetWeekVN(new Date());
+  const weeklyProposal = rowsInit.find((r) => !r.applied && r.data?.proposal?.week_start === proposalWeek.start) || null;
 
   // ?xem=<id>: xem lại bản cũ — bảng Hướng đi + Sản phẩm hiển thị theo bản đó.
   const viewId = searchParams?.xem || null;
@@ -180,7 +184,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <div>
           <h1>Kế hoạch</h1>
           <p className="sub">
-            Lịch đăng cố định: {summarizePlan(pp.plan)}. Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h. Tối 20h BOSS chỉnh nhẹ trọng số theo số liệu ngày, Chủ nhật 20h học số cả tuần, Thứ 2 8h ra hướng đi tuần mới. Bài luôn chờ người bấm Duyệt.
+            Lịch đăng cố định: {summarizePlan(pp.plan)}. Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h. Tối 20h BOSS chỉnh nhẹ trọng số theo số liệu ngày, Chủ nhật 8h BOSS soạn kế hoạch tuần sau để bạn xem và sửa cả ngày, Thứ 2 8h máy tự áp (hoặc bạn bấm Áp ngay). Bài luôn chờ người bấm Duyệt.
           </p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -190,6 +194,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               <button className="btn ok" type="submit">🧪 Áp dụng đề xuất mới</button>
             </form>
           ) : null}
+          <ProposeButton action={regenerateWeeklyProposalAction} label={weeklyProposal ? '📝 Soạn lại đề xuất tuần sau' : '📝 Soạn đề xuất tuần sau'} />
           <TrendPostButton />
           <SevenAnglesButton />
           <GenerateButton action={generatePlanNow} />
@@ -209,10 +214,12 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             <div className="kh-strip">
               <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>{ok ? '✅' : '⛔'}</span>
               <div className="grow">
-                <b>{ok ? 'Đã thay đổi kế hoạch mới' : 'Sinh kế hoạch thất bại'}</b>
+                <b>{ok ? (lastPlanLog.detail?.proposal ? 'Đã soạn đề xuất tuần sau' : 'Đã thay đổi kế hoạch mới') : 'Sinh kế hoạch thất bại'}</b>
                 <div className="sub" style={{ marginTop: 2 }}>
                   {ok
-                    ? <>Bản mới có {vnInt(Number(lastPlanLog.detail?.suggestions) || 0)} hướng đi và đã được áp. Bảng tuần bên dưới đã theo bản mới.</>
+                    ? (lastPlanLog.detail?.proposal
+                        ? <>Bản đề xuất có {vnInt(Number(lastPlanLog.detail?.suggestions) || 0)} hướng đi, chưa áp. Thứ 2 8h máy tự áp, hoặc bấm Áp ngay ở banner trên.</>
+                        : <>Bản mới có {vnInt(Number(lastPlanLog.detail?.suggestions) || 0)} hướng đi và đã được áp. Bảng tuần bên dưới đã theo bản mới.</>)
                     : <>Lý do: {String(lastPlanLog.detail?.error || 'không rõ').slice(0, 200)}. Kế hoạch cũ vẫn giữ nguyên.</>}
                 </div>
               </div>
@@ -235,6 +242,22 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               </form>
             ) : null}
             <a className="btn ghost sm" href="/ke-hoach">Về bản đang áp</a>
+          </div>
+        </section>
+      ) : null}
+
+      {/* 5/9: bản đề xuất tuần sau đang chờ Thứ 2 8h máy áp */}
+      {weeklyProposal ? (
+        <section className="blk" style={{ borderColor: 'var(--accent)', borderLeftWidth: 5 }} role="status">
+          <div className="kh-strip">
+            <div className="grow">
+              📝 BOSS đã soạn <b>kế hoạch tuần {fmtDate(proposalWeek.start)} tới {fmtDate(proposalWeek.end)}</b> lúc {fmtDateTime(weeklyProposal.created_at)}, {vnInt((weeklyProposal.data.content_suggestions || []).length)} hướng đi. Máy tự áp <b>Thứ 2 8h sáng</b>. Muốn đổi: sửa mục tiêu hoặc tập trung ở khối Cài đặt tuần rồi bấm Soạn lại đề xuất.
+            </div>
+            <a className="btn ghost sm" href={`/ke-hoach?xem=${weeklyProposal.id}`}>Xem bản này</a>
+            <form action={applyPlanWeights}>
+              <input type="hidden" name="plan_id" value={weeklyProposal.id} />
+              <button className="btn ok sm" type="submit">Áp ngay</button>
+            </form>
           </div>
         </section>
       ) : null}
@@ -520,7 +543,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                   {history.slice(0, 6).map((r) => (
                     <tr key={r.id}>
                       <td><a href={`/ke-hoach?xem=${r.id}`}>{fmtDateTime(r.created_at)}</a></td>
-                      <td className="sub">{r.data?.cadence === 'weekly' ? 'Tuần' : r.data?.cadence === 'update' ? 'Cập nhật' : r.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}</td>
+                      <td className="sub">{r.data?.proposal ? `Đề xuất tuần ${fmtDate(r.data.proposal.week_start)}` : r.data?.cadence === 'weekly' ? 'Tuần' : r.data?.cadence === 'update' ? 'Cập nhật' : r.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}</td>
                       <td className="center">
                         <form action={deletePlan} style={{ display: 'inline' }}>
                           <input type="hidden" name="plan_id" value={r.id} />

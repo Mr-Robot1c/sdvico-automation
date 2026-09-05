@@ -7,7 +7,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../../lib/supabase-server';
-import { generateAndStorePlan, weekWindowVN } from '../../lib/plan';
+import { generateAndStorePlan, weekWindowVN, proposalTargetWeekVN, vnLocalIso } from '../../lib/plan';
 import { refreshLiveProposal } from '../../lib/plan-live';
 import { loadPostingPlan, savePostingPlan, buildBossPostingPlan, pruneOverrides, normalizeSlot, MAX_SLOTS_PER_DAY, type PostingDay, type PostingSlot } from '../../lib/posting-plan';
 
@@ -211,4 +211,35 @@ export async function proposePostingPlanAction() {
     await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'user', status: 'ok', detail: { groups: input.shareGroups.length, youtubeReady: input.youtubeReady, clipFolders: input.clipFolders, replaced: current.saved } });
   } catch { /* bo qua */ }
   await afterPlanSaved(client, { kind: 'boss', groups: input.shareGroups.length, youtubeReady: input.youtubeReady });
+}
+
+// 5/9 (user: "tạo kế hoạch ngày CN, sáng T2 áp dụng để còn chỉnh sửa sớm"): người sửa mục tiêu
+// hoặc tập trung rồi bấm "Soạn (lại) đề xuất tuần sau" -> BOSS soạn bản tuần sau theo cài đặt
+// hiện tại, vẫn applied=false, Thứ 2 8h máy tự áp. Bản đề xuất cũ của tuần đó bị xóa để Thứ 2
+// chỉ có đúng 1 bản. Số liệu = tuần đang chạy (tới hôm nay). Ghi run_log mkt.plan_manual kèm
+// proposal=true để banner trang Kế hoạch nói đúng ("đã soạn đề xuất", không phải "đã áp").
+export async function regenerateWeeklyProposalAction() {
+  const client = getServerClient();
+  const startedAt = Date.now();
+  const now = new Date();
+  const win = proposalTargetWeekVN(now);
+  const periodFrom = new Date(`${win.start}T12:00:00+07:00`);
+  try {
+    const { id, plan } = await generateAndStorePlan(client, 'manual', {
+      cadence: 'weekly', weekOffset: 0, periodFrom,
+      proposal: { week_start: win.start, week_end: win.end, auto_apply_at: vnLocalIso(win.start, '08:00') },
+    });
+    if (!id) throw new Error('generateAndStorePlan tra ve id rong');
+    const { data: olds } = await client.from('mkt_plans').select('id, data').eq('applied', false).eq('period_start', win.start).neq('id', id);
+    const ids = ((olds || []) as any[]).filter((r) => r.data?.proposal?.week_start === win.start).map((r) => r.id);
+    if (ids.length) await client.from('mkt_plans').delete().in('id', ids);
+    try {
+      await client.from('run_log').insert({ task: 'mkt.plan_manual', actor: 'user', status: 'ok', detail: { proposal: true, weekStart: win.start, planId: id, suggestions: plan.content_suggestions?.length || 0, replaced: ids.length, ms: Date.now() - startedAt } });
+    } catch { /* bỏ qua */ }
+  } catch (e: any) {
+    try {
+      await client.from('run_log').insert({ task: 'mkt.plan_manual', actor: 'user', status: 'error', detail: { proposal: true, weekStart: win.start, error: String(e?.message || e).slice(0, 300), ms: Date.now() - startedAt } });
+    } catch { /* bỏ qua */ }
+  }
+  revalidatePath('/ke-hoach');
 }

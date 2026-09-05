@@ -1,7 +1,8 @@
 # ba-spec: Kế hoạch AI v2 và mở rộng kênh (SEO, Social đa kênh, AD trả phí)
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
-covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
+covers: apps/approval-ui/app/ke-hoach
+<!-- re-verified: 2026-09-05 toi - BOSS SOAN KE HOACH TUAN VAO CHU NHAT, THU 2 TU AP (user 5/9: "tao ke hoach ngay CN, sang T2 ap dung de con chinh sua som"; chi tiet README cung gio): lib/plan.ts planSlotVN CN>=8h propose / T2>=8h apply / T6 update, generateAndStorePlan opts weekOffset/periodFrom/proposal, autoApplyWeeklyProposal (T2 sang, bo qua neu tuan nay da co ban ap), /ke-hoach banner de xuat + nut Soan (lai) de xuat tuan sau (regenerateWeeklyProposalAction) + Ap ngay. Flow BOSS de xuat / NGUOI quyet KHONG doi: ban CN van applied=false toi khi nguoi Ap ngay hoac T2 8h may ap; NV/AC giu nguyen. -->, apps/approval-ui/lib/plan.ts, apps/approval-ui/app/api/plan, packages/marketing/src, supabase/migrations
 <!-- re-verified: 2026-09-05 trua - SDFish vao danh muc san pham (packages/marketing/src + app, chi tiet README cung gio). Flow BOSS/NV/AC KHONG doi; SDFish vao ke hoach qua mkt_focus + mkt_weekly_goal nhu san pham khac. -->
 <!-- re-verified: 2026-09-04 khuya (2) - Lich dang co dinh them kenh TikTok (xuat tay), moi ngay 1 ban + 1 content, khung gio va nen tang do BOSS xoay theo tuan (chi tiet README cung gio). Flow BOSS sinh huong di / NV / AC KHONG doi. -->
 <!-- re-verified: 2026-09-04 khuya - /ke-hoach khoi Lich dang co dinh: BOSS xep lich MOI THU 2 cung luot ke hoach tuan (thuat toan tat dinh, chi tiet README cung gio), trong tuan co dinh, nguoi Luu/sua giu toi het CN. Flow BOSS sinh huong di / NV / AC KHONG doi. -->

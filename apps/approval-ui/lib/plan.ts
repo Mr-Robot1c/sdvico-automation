@@ -114,6 +114,11 @@ export type Plan = {
   // v3 (18/8): nhịp bản này — 'weekly' (Thứ 2, kế hoạch tuần), 'update' (Thứ 4, cập nhật lần 1),
   // 'manual' (bấm tay). Bản cũ không có -> undefined.
   cadence?: 'weekly' | 'update' | 'manual';
+  // 5/9 (user: "tạo kế hoạch ngày CN, sáng T2 áp dụng để còn chỉnh sửa sớm"): bản TUẦN do BOSS
+  // soạn Chủ nhật cho tuần kế (hoặc người bấm "Soạn đề xuất tuần sau"), nằm applied=false tới
+  // sáng Thứ 2 8h thì máy tự áp (autoApplyWeeklyProposal), trừ khi người đã tự áp bản khác SAU
+  // lúc đề xuất. auto_applied_at/by ghi lúc máy áp.
+  proposal?: { week_start: string; week_end: string; auto_apply_at: string; auto_applied_at?: string; auto_applied_by?: 'metrics-pull' | 'rotate' };
   // v4 (20/8, item 1b): nguồn sinh — 'boss' hoặc undefined = BOSS đề xuất từ tri thức + số liệu
   // (chức năng cũ), 'learn-weekly' = vòng học tự động Chủ nhật, đề xuất trọng số dựa CHỦ YẾU
   // vào số liệu tuần vừa qua. Khối riêng ở /ke-hoach; khi bấm Áp dụng thì rotate đọc weights.
@@ -366,12 +371,16 @@ export function isPlanDayVN(now: Date): boolean {
 // đủ thông tin Chủ nhật); Thứ 6 từ 8h sáng VN = CẬP NHẬT lần 1 (user dời từ Thứ 4 sang Thứ 6
 // "cho nó xa tí, vậy mới có số liệu" — 4 ngày bài chạy sau kế hoạch Thứ 2). Ngoài 2 khung đó
 // không sinh. Cron 30 phút/lần nên chỗ gọi phải tự chặn trùng (1 bản cron mỗi ngày).
-export function planSlotVN(now: Date): 'weekly' | 'update' | null {
+// 5/9 (user): CHỦ NHẬT từ 8h = 'propose' (BOSS soạn bản tuần SAU, applied=false để người xem
+// và sửa cả ngày); THỨ 2 từ 8h = 'apply' (máy tự áp bản đề xuất đó, rotate 8:00 áp trước, cron
+// 8:01 là lưới an toàn); THỨ 6 từ 8h = 'update' giữ nguyên.
+export function planSlotVN(now: Date): 'propose' | 'apply' | 'update' | null {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
   const dow = vn.getUTCDay();
   const hour = vn.getUTCHours();
   if (hour < 8) return null;
-  if (dow === 1) return 'weekly';
+  if (dow === 0) return 'propose';
+  if (dow === 1) return 'apply';
   if (dow === 5) return 'update';
   return null;
 }
@@ -381,6 +390,77 @@ export function vnDayStartIso(now: Date): string {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
   const startUtcMs = Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - 7 * 60 * 60 * 1000;
   return new Date(startUtcMs).toISOString();
+}
+
+// 5/9: tuần KẾ TIẾP theo giờ VN (Thứ 2 tới Chủ nhật), cho bản đề xuất soạn Chủ nhật.
+export function nextWeekWindowVN(now: Date): { start: string; end: string } {
+  return weekWindowVN(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000));
+}
+// ISO có múi giờ VN cho một giờ trong ngày (mặc định 08:00), để ghi auto_apply_at cho người đọc.
+export function vnLocalIso(date: string, time = '08:00'): string {
+  return `${date}T${time}:00+07:00`;
+}
+// Tuần mà bản đề xuất kế tiếp nhắm tới: bình thường là tuần sau; riêng sáng Thứ 2 trước 8h
+// (máy chưa áp) thì vẫn là tuần này, để người bấm "Soạn lại" không nhảy sang tuần sau nữa.
+export function proposalTargetWeekVN(now: Date = new Date()): { start: string; end: string } {
+  const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  if (vn.getUTCDay() === 1 && vn.getUTCHours() < 8) return weekWindowVN(now);
+  return nextWeekWindowVN(now);
+}
+
+type ProposalRow = { id: string; data: any; applied: boolean; applied_at: string | null; created_at: string; generated_by: string };
+// Bản đề xuất (chưa áp) của tuần weekStart, mới nhất trước.
+export async function findWeeklyProposal(client: Client, weekStart: string): Promise<ProposalRow | null> {
+  const { data } = await client
+    .from('mkt_plans')
+    .select('id, data, applied, applied_at, created_at, generated_by')
+    .eq('applied', false)
+    .eq('period_start', weekStart)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  const rows = (data || []) as ProposalRow[];
+  return rows.find((r) => r.data?.proposal?.week_start === weekStart && r.data?.origin !== 'live' && r.data?.origin !== 'learn-weekly') || null;
+}
+
+// Sáng Thứ 2 (từ 8h VN): áp bản đề xuất soạn Chủ nhật cho tuần này. Người thắng máy: tuần này
+// đã có bản ĐƯỢC ÁP (người bấm Áp ngay / Lưu & sinh sáng T2, hay chính bản đề xuất đã áp bởi
+// rotate 8:00) thì không làm gì, KHÔNG rơi xuống nhánh sinh bản mới đè lên. Hướng đi mang sang
+// (carried) đã bị dùng trong lúc chờ (CN tối) được đánh used_at luôn để không ra bài trùng.
+// Gọi từ /api/rotate (8:00, trước khi viết bài) và cron metrics-pull (8:01+, lưới an toàn).
+export async function autoApplyWeeklyProposal(
+  client: Client,
+  by: 'metrics-pull' | 'rotate',
+  now: Date = new Date()
+): Promise<{ applied: boolean; planId?: string; skipped?: string }> {
+  const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  if (vn.getUTCDay() !== 1 || vn.getUTCHours() < 8) return { applied: false, skipped: 'khong phai sang thu 2' };
+  const ws = weekWindowVN(now).start;
+  const { data: cur } = await client
+    .from('mkt_plans').select('id, period_start, data').eq('applied', true)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const curRow = cur as { id: string; period_start: string | null; data: any } | null;
+  if (curRow && (curRow.period_start === ws || curRow.data?.proposal?.week_start === ws)) {
+    return { applied: false, skipped: 'ban tuan nay da ap', planId: curRow.id };
+  }
+  const prop = await findWeeklyProposal(client, ws);
+  if (!prop) return { applied: false, skipped: 'khong co ban de xuat' };
+  const usedTitles = new Map<string, string>();
+  for (const s of ((curRow?.data?.content_suggestions || []) as any[])) {
+    if (s?.used_at) usedTitles.set(String(s.title || '').toLowerCase().trim(), String(s.used_at));
+  }
+  const sugs = (Array.isArray(prop.data?.content_suggestions) ? prop.data.content_suggestions : []).map((s: any) => {
+    const u = usedTitles.get(String(s.title || '').toLowerCase().trim());
+    return u && !s.used_at ? { ...s, used_at: u } : s;
+  });
+  const nowIso = now.toISOString();
+  const data = { ...prop.data, content_suggestions: sugs, proposal: { ...(prop.data.proposal || {}), auto_applied_at: nowIso, auto_applied_by: by } };
+  await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
+  const { error } = await client.from('mkt_plans').update({ data, applied: true, applied_at: nowIso }).eq('id', prop.id);
+  if (error) throw new Error(error.message);
+  try {
+    await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'ok', detail: { cadence: 'weekly', planId: prop.id, applied: true, from: 'de xuat chu nhat', by, directions: sugs.length, weekStart: ws } });
+  } catch { /* bỏ qua */ }
+  return { applied: true, planId: prop.id };
 }
 
 // Sinh 1 bản kế hoạch từ số liệu hiện tại rồi lưu vào mkt_plans (applied = false).
@@ -421,7 +501,10 @@ export async function loadMeasurementFromWeekReport(client: Client, weekOffset: 
 export async function generateAndStorePlan(
   client: Client,
   generatedBy: 'cron' | 'manual',
-  opts: { cadence?: 'weekly' | 'update' } = {}
+  // 5/9: weekOffset = tuần lấy số liệu cho bản weekly (1 = tuần vừa xong, 0 = tuần đang chạy khi
+  // soạn Chủ nhật); periodFrom = mốc tính period_start/end (bản đề xuất = tuần sau); proposal =
+  // gắn nhãn đề xuất để Thứ 2 máy tự áp.
+  opts: { cadence?: 'weekly' | 'update'; weekOffset?: number; periodFrom?: Date; proposal?: Plan['proposal'] } = {}
 ): Promise<{ id: string | null; plan: Plan }> {
   const now = new Date();
   // Bản TUẦN (thứ 2): số liệu = báo cáo TUẦN VỪA XONG. Bản cập nhật/tay: 7 ngày gần nhất.
@@ -430,8 +513,9 @@ export async function generateAndStorePlan(
   if (opts.cadence === 'weekly') {
     // weekWindowVNOffset: offset DUONG = lui ve qua khu (+1 = tuan truoc). 24/8 tung truyen -1
     // (tuan sau, 0 bai) nen ban tuan dau tien roi ve "7 ngay gan nhat".
-    const r = await loadMeasurementFromWeekReport(client, 1, now);
-    if (r) { weeklyMeasurement = r.m; measurementSource = `đo lường ${r.label} (tuần vừa xong)`; }
+    const off = opts.weekOffset ?? 1;
+    const r = await loadMeasurementFromWeekReport(client, off, now);
+    if (r) { weeklyMeasurement = r.m; measurementSource = `đo lường ${r.label}${off === 0 ? ' (tuần đang chạy, số tới hôm nay)' : ' (tuần vừa xong)'}`; }
   }
   const [measurement, knowledge, goalRes, focusRes] = await Promise.all([
     weeklyMeasurement ? Promise.resolve(weeklyMeasurement) : loadMeasurement(client),
@@ -469,6 +553,7 @@ export async function generateAndStorePlan(
   });
   plan.cadence = opts.cadence || (generatedBy === 'manual' ? 'manual' : undefined);
   plan.measurement_source = measurementSource;
+  if (opts.proposal) plan.proposal = opts.proposal;
   plan.narrative = [`Nguồn số liệu của bản này: ${measurementSource}. Số liệu từng ngày chỉ điều chỉnh dần trọng số mỗi tối (tối đa 0,5 điểm), không thay kế hoạch tuần.`, ...plan.narrative];
 
   // Chỉ đạo cho AI Creator: sinh hướng đi từ chính tri thức vừa nạp. Lỗi -> bản kế hoạch
@@ -533,7 +618,7 @@ export async function generateAndStorePlan(
     console.error('[plan] carry-over huong di loi (bo qua):', e?.message || e);
   }
 
-  const win = weekWindowVN(now);
+  const win = weekWindowVN(opts.periodFrom || now);
   const { data, error } = await client
     .from('mkt_plans')
     .insert({

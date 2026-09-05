@@ -1,11 +1,11 @@
 @echo off
 rem Goi endpoint Vercel mkt-metrics-pull de BOSS cap nhat metrics + trong so ke hoach + nap huong di.
 rem Task Scheduler goi file nay moi gio (task "SDVICO-BossCron1h"). Tu 4/9 KHONG goi rotate nua.
-rem Thay cho GitHub Actions het quota. Chu Nhat skip (user chot 26/8/2026);
+rem Thay cho GitHub Actions het quota. Chu Nhat chi chay 8h-10h (5/9: BOSS soan ke hoach tuan sau luc 8h, phan con lai CN im nhu user chot 26/8);
 rem toi CN muon chay vong hoc tuan thi bam tay: boss-cron.bat force
 setlocal
 if /i not "%~1"=="force" (
-  powershell -NoProfile -Command "if ((Get-Date).DayOfWeek -eq 'Sunday') { exit 1 }"
+  powershell -NoProfile -Command "$d = Get-Date; if ($d.DayOfWeek -eq 'Sunday' -and ($d.Hour -lt 8 -or $d.Hour -gt 10)) { exit 1 }"
   if errorlevel 1 exit /b 0
 )
 set SECRET_FILE=%USERPROFILE%\.sdvico-cron-secret
