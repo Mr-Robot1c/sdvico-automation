@@ -62,6 +62,27 @@ function cleanNarration(text) {
     .trim();
 }
 
+// 5/9 (sep nghe feedback: "giong ngang ngang phe phe, khong thu hut" -> "lam giong nhanh ma vui
+// ve xiu"): hau xu ly giong doc bang ffmpeg. atempo (WSOLA) tang toc ma khong re nhu librosa
+// time_stretch hom 28/8; asetrate nang cao do nhe cho tuoi roi bu atempo de toc do cuoi dung y.
+// Ap cho giong LOCAL (My Duyen) va GEMINI; edge da co rate/pitch rieng. Mac dinh = mau 2 sep
+// nghe 5/9 (nhanh 12%, cao 1 nua cung). Env TTS_TEMPO / TTS_PITCH_SEMI doi duoc; TTS_TEMPO=1
+// TTS_PITCH_SEMI=0 la ve giong goc.
+function livelyArgs(sampleRate) {
+  const tempo = Number(process.env.TTS_TEMPO ?? 1.12) || 1;
+  const semi = Number(process.env.TTS_PITCH_SEMI ?? 1) || 0;
+  const sr = Number(sampleRate) || 48000;
+  const filters = [];
+  if (semi) {
+    const ratio = 2 ** (semi / 12);
+    filters.push(`asetrate=${Math.round(sr * ratio)}`, `aresample=${sr}`);
+    if (Math.abs(tempo / ratio - 1) > 0.005) filters.push(`atempo=${(tempo / ratio).toFixed(4)}`);
+  } else if (Math.abs(tempo - 1) > 0.005) {
+    filters.push(`atempo=${tempo.toFixed(4)}`);
+  }
+  return filters.length ? ['-af', filters.join(',')] : [];
+}
+
 // Tạo mp3 LẶNG dài `sec` giây (dự phòng khi TTS lỗi: cảnh vẫn dựng, có phụ đề, chỉ mất tiếng cảnh đó).
 async function silentAudio(outPath, sec) {
   const dur = Math.max(1, sec);
@@ -164,7 +185,7 @@ async function geminiTTS(cleanText, outPath, workDir, tag, model) {
   const ch = (mime.match(/channels=(\d+)/) || [])[1] || '1';
   const pcm = join(workDir, `${tag}_gem.pcm`);
   await writeFile(pcm, Buffer.from(part.inlineData.data, 'base64'));
-  await ffmpeg(['-y', '-f', 's16le', '-ar', rate, '-ac', ch, '-i', pcm, '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
+  await ffmpeg(['-y', '-f', 's16le', '-ar', rate, '-ac', ch, '-i', pcm, ...livelyArgs(rate), '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
   return probeDuration(outPath);
 }
 
@@ -229,7 +250,8 @@ async function localTTS(cleanText, outPath, workDir, tag) {
   if (buf.length < 1000) throw new Error('local-tts tra file qua nho (' + buf.length + ' bytes)');
   const wav = join(workDir, `${tag}_local.wav`);
   await writeFile(wav, buf);
-  await ffmpeg(['-y', '-i', wav, '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
+  // Server VieNeu tra WAV 48kHz (SAMPLE_RATE trong local-tts-server-vieneu.py).
+  await ffmpeg(['-y', '-i', wav, ...livelyArgs(48000), '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
   return probeDuration(outPath);
 }
 
