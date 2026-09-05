@@ -291,15 +291,21 @@ function localProsody(sentence, idx) {
   return idx % 2 === 0 ? { semiDelta: 0, tempoMul: 1.0 } : { semiDelta: 0.7, tempoMul: 1.03 };
 }
 
+// Outro: khong ap prosody theo cau (2 cau outro deu an muc nang cua cau cam -> do lai 257Hz, cao
+// hon loi doc 230-241Hz). Do thu: delta 0,35 -> 250Hz van cao; delta 0 -> ~245Hz nam giua dai
+// loi doc cac video (230-259Hz). Giu 0 (cau ngan tu nhien da cao hon cau dai 1 doan).
+const OUTRO_PROSODY = { semiDelta: 0, tempoMul: 1.0 };
+
 async function localTTS(cleanText, outPath, workDir, tag) {
   const sentences = splitSentences(cleanText);
+  const prosodyOf = (s, i) => (tag === 'outro' ? OUTRO_PROSODY : localProsody(s, i));
   if (sentences.length > 1 && process.env.TTS_LOCAL_PROSODY !== 'off') {
     try {
       const parts = [];
       for (let i = 0; i < sentences.length; i++) {
         const wav = await localTTSWav(sentences[i], workDir, `${tag}_s${i}`);
         const piece = `${tag}_s${i}_p.wav`;
-        const af = [livelyFilter(48000, localProsody(sentences[i], i)), TRIM_EDGES, sentenceGap(sentences[i])].filter(Boolean).join(',');
+        const af = [livelyFilter(48000, prosodyOf(sentences[i], i)), TRIM_EDGES, sentenceGap(sentences[i])].filter(Boolean).join(',');
         await ffmpeg(['-y', '-i', wav, '-af', af, '-c:a', 'pcm_s16le', join(workDir, piece)]);
         parts.push(piece);
       }
