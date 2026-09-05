@@ -370,6 +370,9 @@ export async function GET(req: Request) {
   // 29/8 (user "bỏ hẳn A/B"): mỗi hướng đi ra ĐÚNG 1 bài, dùng xong đánh used_at ngay.
   // Track suggestion đã dùng trong run này, cuối vòng update plan.data một lần.
   const suggestionsTouched: Array<{ idx: number; imgId: string }> = [];
+  // 5/9 chiều (user: "lâu lâu có thể thêm bài bán chỉ có hình ảnh sản phẩm"): khoảng 1/4 bài bán
+  // Facebook ra BÀI ẢNH: ảnh sản phẩm là chính, chữ 3 tới 5 câu, không dựng video.
+  const PHOTO_POST_RATE = 0.25;
 
   for (const [k, pf] of pickedFolders.entries()) {
     const group = pf.group;
@@ -405,6 +408,8 @@ export async function GET(req: Request) {
         else skipped.push({ group, reason: `o ${ps.time} la TikTok nhung folder khong co clip goc -> dang Facebook` });
       }
       const planSlot = ps ? { date: todayDate, index: ps.index, time: ps.time, channel: channels[0], group_id: ps.group_id || null, group_label: ps.group_label } : null;
+      const photoOnly = channels[0] === 'facebook' && Math.random() < PHOTO_POST_RATE;
+      const videoWanted = wantVideo && !photoOnly;
       const assets = { image: img.id, video: null };
 
       // A bám góc tri thức (sug.why + tiêu đề gợi ý). B dùng góc đối chứng, tự do tiêu đề.
@@ -434,6 +439,7 @@ export async function GET(req: Request) {
           emotionOverride,
           preferredHook,
           insight: chosenInsight,
+          photoOnly,
           client,
         });
       } catch (e) {
@@ -464,10 +470,11 @@ export async function GET(req: Request) {
             ...(chosenInsight ? { insight_id: chosenInsight.id, insight_situation: chosenInsight.situation, insight_line: chosenInsight.insight } : {}),
             // Chỉ yêu cầu dựng video AI khi folder có clip gốc (SEA-40, SF-50, Ắc quy...).
             // Folder chỉ ảnh (S-Tracking, Thuraya, XT-Pro...) -> bài ảnh, không dựng.
-            video_requested: wantVideo,
+            video_requested: videoWanted,
             // 29/8 (user "bỏ hẳn A/B"): không còn ab_pair_id/ab_variant. Video bài bán giữ
             // KIỂU SHORT 10-20 giây (trước đây gắn với cặp A/B) qua cờ video_short riêng.
-            ...(wantVideo ? { video_short: true } : {}),
+            ...(videoWanted ? { video_short: true } : {}),
+            ...(photoOnly ? { post_style: 'photo' } : {}),
             ...(sug ? {
               plan_id: appliedPlan?.id,
               suggestion_index: pf.suggestionIdx,
@@ -498,12 +505,13 @@ export async function GET(req: Request) {
         payload: {
           content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich',
           risk, assets, channels, authored: 'ai',
+          ...(photoOnly ? { post_style: 'photo' } : {}),
           ...(sug ? { from_plan_direction: true, suggestion_sources: sug.sources } : {}),
           ...(planSlot ? { plan_time: planTimeLocal(todayDate, planSlot.time), plan_channel: planSlot.channel, plan_group: planSlot.group_label, plan_slot_index: planSlot.index } : {}),
         },
         status: 'pending',
       });
-      results.push({ group, channels, contentId, risk, from_suggestion: !!sug, video_requested: wantVideo, slot_time: planSlot?.time || null });
+      results.push({ group, channels, contentId, risk, from_suggestion: !!sug, video_requested: videoWanted, photo_only: photoOnly, slot_time: planSlot?.time || null });
       if (sug && typeof pf.suggestionIdx === 'number') {
         suggestionsTouched.push({ idx: pf.suggestionIdx, imgId: img.id });
       }

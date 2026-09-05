@@ -77,6 +77,7 @@ export async function generateSocialPost({
   angleOverride = null, preferredHeadline = null,
   emotionOverride = null, preferredHook = null,
   insight = null,
+  photoOnly = false,
   client = null,
 }) {
   const { GoogleGenAI } = await import('@google/genai');
@@ -112,7 +113,9 @@ export async function generateSocialPost({
     'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn (3.000.000 đồng). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung, không nêu số.',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO; chỉ nói phân phối, lắp đặt, tương thích.',
-    isTikTok
+    photoOnly
+      ? 'ĐÂY LÀ BÀI ẢNH SẢN PHẨM (ảnh là chính, chữ là phụ): chỉ 3 tới 5 câu thật ngắn, tổng dưới 70 chữ, mỗi câu một dòng. Câu đầu là hook nghịch lý dưới 15 chữ. Giữa bài: sản phẩm gì, lo được chuyện gì cho bà con, có 1 con số thật nếu danh sách cho phép. Câu cuối: 1 câu hỏi ngắn kèm từ khóa mời nhắn Page. KHÔNG viết đủ 6 nhịp, KHÔNG gạch đầu dòng, KHÔNG kể chuyện dài.'
+      : isTikTok
       ? 'ĐÂY LÀ CHÚ THÍCH VIDEO TIKTOK: rút gọn khung 6 nhịp còn 2 tới 4 câu thật ngắn, giữ hook nghịch lý ở câu đầu + CTA hỏi ở câu cuối. KHÔNG viết cả 6 nhịp cho TikTok.'
       : 'ĐÂY LÀ BÀI FACEBOOK: khoảng 150 tới 220 chữ (6 tới 10 câu ngắn), viết ĐỦ 6 nhịp theo thứ tự, mỗi nhịp cách nhau bằng xuống dòng để đọc thoáng trên điện thoại. Có thể có 2 tới 3 dòng gạch đầu lợi ích ở nhịp 3 (dùng emoji làm đầu dòng, không dùng dấu chấm tròn).',
     'KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.',
@@ -134,7 +137,7 @@ export async function generateSocialPost({
   const user = [
     `Sản phẩm: "${productName}".`,
     features.length ? 'Đặc điểm sản phẩm (nêu đúng, chọn vài ý nổi bật, không thêm thông số ngoài danh sách này):\n- ' + features.join('\n- ') : '',
-    hasVideo ? 'Bài có kèm video minh họa.' : 'Bài dùng ảnh minh họa.',
+    hasVideo ? 'Bài có kèm video minh họa.' : photoOnly ? 'Bài đăng kèm ẢNH SẢN PHẨM thật, chữ chỉ là chú thích ngắn cho ảnh.' : 'Bài dùng ảnh minh họa.',
     insightText,
     insightText ? `Chữ cảm xúc lần này: ${angle}. Bài PHẢI chạm đúng chữ này (bộ lọc vàng playbook).` : `Chữ cảm xúc lần này: ${angle}. Bài PHẢI chạm đúng chữ này (bộ lọc vàng playbook).`,
     preferredHeadline ? `Nếu phù hợp, giữ hoặc bám gần tiêu đề gợi ý: "${preferredHeadline}" (đây là hướng đi tuần từ Kế hoạch AI). Không bắt buộc chép nguyên, nhưng nội dung phải khớp hướng đi này.` : '',
