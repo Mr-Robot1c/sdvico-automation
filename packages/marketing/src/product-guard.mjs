@@ -72,6 +72,27 @@ export const PRODUCT_GUARD = [
     forbidden: ['tiết kiệm dầu', 'tiết kiệm nhiên liệu', 'nhẹ tàu'],
     why: 'Sơn không liên quan nhiên liệu.',
   },
+  // 5/9: SDFish (app SDVICO tự làm). Sếp: Apple đang rà soát app, luồng nạp cước pending, giá
+  // chưa có -> CẤM kêu tải App Store, cấm nói giá/gói/thanh toán, cấm hứa tính năng đang làm.
+  // KHÔNG dùng cụm 'giá' đơn vì dính "giá cá" là tính năng thật.
+  {
+    key: 'sdfish',
+    match: /sd\s*fish|app\s*(cho\s*)?ng[uư]\s*d[aâ]n|b[aạ]n\s*[đd][oồ]ng\s*h[aà]nh\s*c[uủ]a\s*ng[uư]\s*d[aâ]n/i,
+    product: 'SDFish (app SDVICO cho ngư dân)',
+    allowed: [
+      'coi dự báo gió sóng, dự báo cá, dẫn đường và cảnh báo bão trước khi ra khơi',
+      'giữ giấy tờ tàu, sổ thuyền viên, hồ sơ, chứng chỉ, bảo hiểm một chỗ trên điện thoại',
+      'xem giá cá tham khảo theo vùng và tin mua bán, gọi thẳng đầu mối',
+      'chat, nhóm, gọi, họp online trong app; dùng thử trên web sdfish.sdvico.vn; nhắn Page hoặc gọi 0939 243 222 để được tạo tài khoản',
+    ],
+    forbidden: [
+      'app store', 'appstore', 'tải app', 'tải ứng dụng', 'cài app', 'ch play', 'google play',
+      'giá gói', 'bảng giá', 'phí gói', 'đồng/tháng', 'gói 12', 'gói 18', 'nạp cước', 'thanh toán', 'mua gói', 'miễn phí trọn đời',
+      'dự báo chính xác', 'chính xác 100', 'thay thế giám sát hành trình', 'thay cho thiết bị giám sát',
+      'chợ lao động', 'chợ cá', 'rạn đá ngầm', 'đá ngầm', 'luồng đi đa điểm',
+    ],
+    why: 'Sếp 5/9: Apple đang rà soát app, luồng nạp cước pending, giá chưa có -> không kêu tải App Store, không nói giá/thanh toán. Không hứa tính năng đang làm. SDFish không thay thế thiết bị giám sát hành trình (điều cấm 4).',
+  },
 ];
 
 // Luật CHUNG cho mọi bài/kịch bản.

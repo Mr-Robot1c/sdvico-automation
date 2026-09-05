@@ -1,4 +1,4 @@
-// Danh mục 8 folder sản phẩm SDVICO (theo kho tư liệu, đặt tên STT).
+// Danh mục 10 folder sản phẩm SDVICO (theo kho tư liệu, đặt tên STT).
 // product_group trong brand_assets nhận đúng nhãn 'group' dưới đây.
 // 'match' = từ khóa để tự gán tư liệu cũ theo tên. 'hashtag' = thẻ riêng của sản phẩm.
 
@@ -34,6 +34,11 @@ export const PRODUCTS = [
   { no: 9, group: '9. Máy Lọc Dầu Diesel SD12-300',
     match: ['sd12-300', 'sd12 300', 'sd12300', 'sd12', 'loc dau diesel', 'may loc dau diesel', 'loc dau sd12'],
     hashtags: ['#máy_lọc_dầu_Diesel', '#SD12_300', '#bảo_vệ_kim_phun', '#lọc_cặn_dầu'] },
+  // 5/9: SDFish — app do SDVICO TỰ LÀM cho ngư dân (web sdfish.sdvico.vn). Sếp Long lệnh
+  // truyền thông 5/9. Match ưu tiên tên riêng; "app ngu dan" / "ban dong hanh" là câu khẩu hiệu.
+  { no: 10, group: '10. SDFish',
+    match: ['sdfish', 'sd fish', 'app sdfish', 'ung dung sdfish', 'app ngu dan', 'ban dong hanh cua ngu dan', 'app cho ngu dan'],
+    hashtags: ['#SDFish', '#bạn_đồng_hành_của_ngư_dân', '#app_cho_ngư_dân', '#SDVICO'] },
 ];
 
 // Tính năng - thông số THẬT của từng sản phẩm (nguồn: file "tính năng N.txt" trong kho tư liệu).
@@ -94,6 +99,17 @@ export const FEATURES = {
     'Hỗ trợ động cơ vận hành ổn định',
     'Khung Inox 304, phù hợp môi trường tàu biển',
     'Thiết kế dễ lắp đặt, vệ sinh và bảo dưỡng',
+  ],
+  // 5/9: SDFish — CHỈ điều đã kiểm trên web sdfish.sdvico.vn (điều cấm 5). Không ghi giá, gói,
+  // App Store, tính năng đang làm.
+  '10. SDFish': [
+    'App SDVICO tự làm cho ngư dân Việt Nam, dùng được trên web sdfish.sdvico.vn',
+    'Ra khơi: dự báo cá, gió sóng, dẫn đường, có cảnh báo bão trên trang chủ',
+    'Tàu cá: giữ giấy tờ tàu, dịch vụ, đồ SDVICO một chỗ',
+    'Bạn thuyền: sổ thuyền viên, hồ sơ, chứng chỉ, bảo hiểm, tra cảnh báo trước khi nhận bạn mới',
+    'Giao dịch: giá cá tham khảo theo vùng, tin mua bán, đầu mối gọi thẳng',
+    'Có chat, nhóm, gọi điện, họp online ngay trong app',
+    'Đăng nhập bằng số điện thoại; tài khoản do SDVICO tạo giúp khi bà con nhắn Page hoặc gọi 0939 243 222',
   ],
 };
 
