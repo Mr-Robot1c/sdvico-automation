@@ -1,7 +1,8 @@
 # Marketing: workflow và app map
 
 > Đọc khi làm phần Marketing. Phụ trách Bạn B. Nền chung ở [README.md](README.md), điều cấm và giọng văn ở CLAUDE.md.
-covers: packages/marketing
+covers:
+<!-- re-verified: 2026-09-07 chieu - THEM packages/marketing/src/fb-inbox-import.mjs (nhap lead tu JSON do phien Chrome doc hop thu Business Suite page chinh; chi tiet README cung gio). Khong dung toi script khac cua packages/marketing. --> packages/marketing
 <!-- re-verified: 2026-09-05 trua - packages/marketing/src/products.mjs + product-guard.mjs them SDFish (muc 10, guard cam App Store/gia/thanh toan/tinh nang dang lam) y het ban app (chi tiet README cung gio). Day chuyen video khong doi. -->
 <!-- re-verified: 2026-09-05 trua - CHI BAN DOC + HET NGAT HOI + PHU DE (sep 5/9): (a) script.mjs chi sinh vertical (horizontal = vertical), build-video main() bo buildFormat horizontal, thumbs tu ban doc, pushToApprovalQueue upload 1 file doc -> video_h = video_v cung asset (FB Post/Reel + TikTok deu dung ban doc); (b) splitSentences chi tach khi dau cau + khoang trang (khong tach "3.000.000"), localTTS moi cau: livelyFilter + silenceremove 2 dau -45dB + apad 0,10s, xuat WAV pcm_s16le, concat WAV roi nen mp3 1 lan (het khoang nghi 0,3-0,4s giua cau); (c) assemble FORMATS.vertical subFont 15->13.5, subMargin 90->70; trend force_style FontSize 32->29, MarginV 140->110. -->
 <!-- re-verified: 2026-09-05 trua (2) - OUTRO CUNG GIONG + NGHI SAU DAU CAU (sep 5/9): do f0 (librosa pyin) outro 233Hz vs canh 246-259Hz -> OUTRO_TEXT tach 2 cau ("Nhắn tin cho Page SDVICO nha! Hoặc gọi số 0939 243 222 để được hỗ trợ.") de di duong localTTS tung cau + prosody nhu loi doc; sentenceGap(): sau !/? nghi 0,26s, sau . 0,16s (thay apad 0,10s deu); duong 1 cau/du phong cung TRIM_EDGES + gap. -->
