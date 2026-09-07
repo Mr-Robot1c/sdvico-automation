@@ -66,7 +66,7 @@ function SlotHead() {
       <tr>
         <th style={{ width: 84 }}>Ngày</th>
         <th style={{ width: 84 }}>Bật</th>
-        <th style={{ width: 110 }}>Giờ đăng</th>
+        <th style={{ width: 158 }}>Giờ đăng</th>
         <th style={{ width: 150 }}>Loại bài</th>
         <th style={{ width: 170 }}>Nền tảng</th>
         <th>Chia sẻ group (tay)</th>

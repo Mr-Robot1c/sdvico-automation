@@ -1527,7 +1527,7 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .pp-table td { vertical-align: middle; }
 .pp-table .pp-c-day { vertical-align: top; }
 .pp-table input[type='time'], .pp-table select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-family: inherit; font-size: .85rem; width: 100%; max-width: 100%; }
-.pp-table input[type='time'] { width: 104px; }
+.pp-table input[type='time'] { width: 142px; min-width: 142px; font-variant-numeric: tabular-nums; }
 .pp-table .pp-c-on label { display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; color: var(--ink-2); white-space: nowrap; }
 .pp-row:not(.on) td:not(.pp-c-day):not(.pp-c-on) { opacity: .45; }
 .pp-notes { margin: 0 0 10px; padding-left: 18px; font-size: .85rem; color: var(--ink-2); display: grid; gap: 2px; }

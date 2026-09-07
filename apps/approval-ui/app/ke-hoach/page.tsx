@@ -8,8 +8,6 @@ import ProposeButton from './propose-button';
 import GeneratePostsButton from './generate-posts-button';
 import SaveGenerateButton from './save-generate-button';
 import GenerateButton from './generate-button';
-import SevenAnglesButton from '../noi-dung/seven-angles-button';
-import TrendPostButton from './trend-post-button';
 import PostingPlanForm from './posting-plan-form';
 import { loadPostingPlan, summarizePlan, CHANNEL_LABEL } from '../../lib/posting-plan';
 
@@ -196,8 +194,6 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             </form>
           ) : null}
           <ProposeButton action={regenerateWeeklyProposalAction} label={weeklyProposal ? '📝 Soạn lại đề xuất tuần sau' : '📝 Soạn đề xuất tuần sau'} />
-          <TrendPostButton />
-          <SevenAnglesButton />
           <GenerateButton action={generatePlanNow} />
         </div>
       </header>
@@ -580,12 +576,8 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                   <td className="sub">Vừa đổi kế hoạch giữa ngày, muốn có bài mới liền không chờ khung 8h/14h.</td>
                 </tr>
                 <tr>
-                  <td><b>🎯 Bung 1 ý thành 7 bài</b></td>
-                  <td className="sub">Có 1 chủ đề nóng cần seeding hoặc ra mắt sản phẩm — máy sinh 7 bài khác góc.</td>
-                </tr>
-                <tr>
-                  <td><b>🔥 Sinh bài trend</b></td>
-                  <td className="sub">Có sự kiện nóng ngoài ngành (bão, bóng đá...) — máy móc sự kiện sang góc ngư dân + kịch bản video.</td>
+                  <td><b>📝 Soạn đề xuất tuần sau</b></td>
+                  <td className="sub">Muốn có bản kế hoạch tuần sau sớm hơn Chủ nhật, hoặc vừa đổi mục tiêu mà muốn bản đề xuất theo cài đặt mới. Bản chưa áp, Thứ 2 8h máy áp.</td>
                 </tr>
                 <tr>
                   <td><b>🧪 Áp dụng đề xuất mới</b></td>
