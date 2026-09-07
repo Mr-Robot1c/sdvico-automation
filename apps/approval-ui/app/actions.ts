@@ -658,7 +658,8 @@ export async function updateLeadStatus(formData: FormData) {
   const id = String(formData.get('lead_id') || '');
   const status = String(formData.get('status') || '');
   const note = String(formData.get('note') || '').slice(0, 1000);
-  if (!id || !['new', 'contacted', 'closed', 'spam'].includes(status)) return;
+  // 7/9: them 'won' (Da mua) - muc tieu tuan 10 khach MUA, xem migration 20260907160000.
+  if (!id || !['new', 'contacted', 'won', 'closed', 'spam'].includes(status)) return;
   const client = getServerClient();
   await client.from('mkt_leads').update({ status, note, updated_at: new Date().toISOString() }).eq('id', id);
   revalidatePath('/khach-hang');

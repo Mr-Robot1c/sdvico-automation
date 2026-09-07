@@ -18,6 +18,7 @@ export const dynamic = 'force-dynamic';
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
   new: { text: '🆕 Mới', cls: 'tone-accent' },
   contacted: { text: '📞 Đã liên hệ', cls: 'tone-ok' },
+  won: { text: '💰 Đã mua', cls: 'tone-ok' },
   closed: { text: '✅ Xong', cls: 'tone-default' },
   spam: { text: '🚫 Rác', cls: 'tone-no' },
 };
@@ -43,7 +44,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
   const filter = searchParams?.status || 'all';
 
   let q = client.from('mkt_leads').select('id, source, fb_user_name, fb_profile_url, message, status, note, created_at, content_id').order('created_at', { ascending: false }).limit(200);
-  if (filter !== 'all' && ['new', 'contacted', 'closed', 'spam'].includes(filter)) q = q.eq('status', filter);
+  if (filter !== 'all' && ['new', 'contacted', 'won', 'closed', 'spam'].includes(filter)) q = q.eq('status', filter);
   const { data: leadsRaw } = await q;
   const leads = (leadsRaw || []) as any[];
 
@@ -96,7 +97,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
       </details>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        {(['all', 'new', 'contacted', 'closed', 'spam'] as const).map((s) => (
+        {(['all', 'new', 'contacted', 'won', 'closed', 'spam'] as const).map((s) => (
           <a key={s} href={`/khach-hang${s === 'all' ? '' : `?status=${s}`}`}
             className={`btn sm ${filter === s ? 'ok' : 'ghost'}`} style={{ textDecoration: 'none' }}>
             {s === 'all' ? 'Tất cả' : STATUS_LABEL[s].text} ({counts[s] || 0})

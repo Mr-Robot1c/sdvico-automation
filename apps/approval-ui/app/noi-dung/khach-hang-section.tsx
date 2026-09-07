@@ -9,6 +9,7 @@ import DedupLeadsBar from './dedup-leads-bar';
 
 // User 27/8: "làm như cái bảng bài viết" - chuyển /khach-hang list dạng bảng thành KANBAN
 // 3 cột (Mới / Đã liên hệ / Xong) hiện thẳng trong /noi-dung?loai=khach-hang, không nhảy trang.
+// 7/9: tách cột "Đã mua" (status won) khỏi Xong để đếm khách MUA so với mục tiêu tuần (10 khách).
 // Cùng pattern với BangSection (bảng bài viết).
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -57,7 +58,7 @@ export default async function KhachHangSection() {
     for (const c of cs || []) titleOf.set((c as any).id, (c as any).title || '(không tên)');
   }
 
-  const byStatus = { new: [] as any[], contacted: [] as any[], closed: [] as any[] };
+  const byStatus = { new: [] as any[], contacted: [] as any[], won: [] as any[], closed: [] as any[] };
   for (const l of leads) {
     const s = l.status as keyof typeof byStatus;
     if (s in byStatus) byStatus[s].push(l);
@@ -66,7 +67,8 @@ export default async function KhachHangSection() {
   const columns = [
     { key: 'new', label: 'Mới', icon: '🆕', tone: 'pending', items: byStatus.new, empty: 'Chưa có lead mới.' },
     { key: 'contacted', label: 'Đã liên hệ', icon: '📞', tone: 'demo', items: byStatus.contacted, empty: 'Chưa có lead đang liên hệ.' },
-    { key: 'closed', label: 'Xong', icon: '✅', tone: 'published', items: byStatus.closed, empty: 'Chưa có lead đã xong.' },
+    { key: 'won', label: 'Đã mua', icon: '💰', tone: 'approved', items: byStatus.won, empty: 'Chưa có khách chốt mua. Chốt được thì đổi trạng thái sang Đã mua.' },
+    { key: 'closed', label: 'Xong', icon: '✅', tone: 'published', items: byStatus.closed, empty: 'Chưa có lead đã xong (không mua / hết việc).' },
   ];
 
   const renderCard = (l: any) => {
@@ -144,7 +146,8 @@ export default async function KhachHangSection() {
 
       {/* Board 3 cột dòng chảy lead. */}
       <div className="kanban-wrap">
-        <div className="kanban">
+        {/* 4 cột (globals.css .kanban mặc định 3 cột cho bảng bài viết) */}
+        <div className="kanban" style={{ gridTemplateColumns: 'repeat(4, minmax(250px, 1fr))', minWidth: 1040 }}>
           {columns.map((col) => (
             <div key={col.key} className="kanban-col">
               <div className={`kanban-head tone-${col.tone}`}>

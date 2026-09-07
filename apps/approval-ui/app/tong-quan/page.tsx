@@ -59,6 +59,12 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const now = Date.now();
   const since60 = new Date(now - 60 * 24 * 3600 * 1000).toISOString();
   const since7 = new Date(now - 7 * 24 * 3600 * 1000).toISOString();
+  // 7/9: khách "Đã mua" TUẦN NÀY (Thứ 2 00:00 VN -> giờ, theo updated_at lúc đổi trạng thái) so với
+  // mục tiêu tuần user giao nhóm IT 5/9 (10 khách MUA). Mục tiêu đọc từ mkt_weekly_goal "<n> khách hàng mua".
+  const vnNow = new Date(now + 7 * 3600 * 1000);
+  const mondayVN = new Date(vnNow);
+  mondayVN.setUTCDate(vnNow.getUTCDate() - ((vnNow.getUTCDay() + 6) % 7));
+  const weekStartIso = new Date(mondayVN.toISOString().slice(0, 10) + 'T00:00:00+07:00').toISOString();
 
   // 200 bai moi nhat, KHONG ilike o DB — q loc bang JS de tile "Da viet" khong lech khi search.
   const contentQuery = client
@@ -68,7 +74,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, todayView, leadsRes, yt] = await Promise.all([
+  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, todayView, leadsRes, yt, wonWeekRes, goalRes] = await Promise.all([
     client
       .from('approval_queue')
       .select('id, title, status, payload, created_at')
@@ -107,6 +113,8 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       .order('created_at', { ascending: false })
       .limit(100),
     getYouTubeChannelInfo(),
+    client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('status', 'won').gte('updated_at', weekStartIso),
+    client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
   ]);
 
   const queueRows = (queueRes.data || []) as QueueRow[];
@@ -164,6 +172,9 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const today = todayVN();
   const dayStartIso = new Date(today + 'T00:00:00+07:00').toISOString();
   const leadToday = leads.filter((l) => String(l.created_at || '') >= dayStartIso);
+  const wonWeek = Number(wonWeekRes.count || 0);
+  const goalText = String((goalRes.data as any)?.value?.text || '');
+  const wonTarget = Number(goalText.match(/(\d+)\s*khách\s*(?:hàng\s*)?mua/i)?.[1] || 10);
 
   // 29/8 (sếp: "đem đo lường và báo cáo tuần ra tổng quan"): số liệu TUẦN NÀY (kênh chính,
   // buildWeekReport offset 0) + đếm lượt đăng hôm nay + sức khoẻ Trang từ bộ quét Business Suite.
@@ -410,6 +421,9 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           <h2><span aria-hidden="true">🛒</span> Người hỏi mua <span className="sub">({fmt(leads.length)} trong 7 ngày · {fmt(leadToday.length)} hôm nay)</span></h2>
           {/* 7/9 (user): luôn có nút "Kiểm tra người mua" ở cuối khối, kể cả khi 7 ngày chưa ai hỏi,
               để vào thẳng trang khách hàng xem lead cũ và đổi trạng thái. */}
+          <p className="sub" style={{ margin: '0 0 8px', fontSize: '.85rem' }}>
+            💰 Đã mua tuần này: <b>{fmt(wonWeek)}</b> / {fmt(wonTarget)} khách (mục tiêu tuần). Chốt được thì đổi trạng thái khách sang "Đã mua".
+          </p>
           {leads.length === 0 ? (
             <div style={{ display: 'grid', gap: 10 }}>
               <p className="sub" style={{ margin: 0 }}>Chưa có ai hỏi mua trong 7 ngày. Bài đăng đều + chia sẻ group để tăng tiếp cận.</p>
@@ -420,7 +434,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
               {leads.slice(0, 4).map((l) => (
                 <div key={l.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: '.88rem', borderBottom: '1px dashed var(--line)', paddingBottom: 6 }}>
                   <span className={`badge ${String(l.status || 'new') === 'new' ? 'tone-no' : 'tone-ok'}`} style={{ flexShrink: 0 }}>
-                    {String(l.status || 'new') === 'new' ? 'Mới' : String(l.status) === 'done' ? 'Xong' : 'Đã liên hệ'}
+                    {String(l.status || 'new') === 'new' ? 'Mới' : String(l.status) === 'won' ? 'Đã mua' : String(l.status) === 'closed' ? 'Xong' : 'Đã liên hệ'}
                   </span>
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <b>{String(l.fb_user_name || 'Khách')}</b> · {String(l.message || '').slice(0, 60)}

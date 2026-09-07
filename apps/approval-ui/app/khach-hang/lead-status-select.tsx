@@ -28,6 +28,7 @@ export default function LeadStatusSelect({
       >
         <option value="new">🆕 Mới</option>
         <option value="contacted">📞 Đã liên hệ</option>
+        <option value="won">💰 Đã mua</option>
         <option value="closed">✅ Xong</option>
         <option value="spam">🚫 Rác</option>
       </select>
