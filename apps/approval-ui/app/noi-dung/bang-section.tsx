@@ -519,20 +519,30 @@ export default async function BangSection() {
                         const rowStyle = { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' as const };
                         const rowLabel = { fontSize: '.75rem', minWidth: 76, color: 'var(--ink-2)' };
                         const capText = cnt?.draft || cnt?.title || '';
+                        // 7/9 (user): thẻ CHỈ hiện hàng nút của nền tảng bài được xếp đăng hôm đó.
+                        // Bài ô Facebook không có hàng TikTok và ngược lại. Kênh đọc từ
+                        // payload.channels (rotate ghi đúng kênh ô lịch; plan_channel = channels[0]).
+                        // Bài cũ không ghi kênh -> giữ cách cũ (Facebook luôn, TikTok khi có video).
+                        // Ô YouTube: máy tự đăng qua API, không có hàng nút tay nào.
+                        const target: string[] = chans.length ? chans : (typeof p.plan_channel === 'string' && p.plan_channel ? [p.plan_channel] : []);
+                        const showFb = target.length === 0 || target.includes('facebook');
+                        const showTt = target.length === 0 ? hasVideo : target.includes('tiktok');
                         return (
                           <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <div style={rowStyle}>
-                              <span style={rowLabel}>📘 Facebook</span>
-                              {/* Đăng TAY lên Page chính (copy caption + tải ảnh + mở ô soạn bài), khỏi page token. */}
-                              <PostFbButton caption={capText} imageUrl={fbImg} composerUrl={fbComposerUrl} contentTitle={cnt?.title || 'sdvico'} />
-                              {fbPost ? <ShareGroups postUrl={fbPost.url} planGroupsToday={groupsOfDay(lastAt)} /> : null}
-                              {/* Dán link bài đăng tay trên Page chính SDVICOVN — chip FB ưu tiên link này. */}
-                              <LinkFbButton contentId={it.cid} linkedUrl={String((cnt?.brief as any)?.fb_real_url || '') || null} />
-                            </div>
-                            {hasVideo ? (
+                            {showFb ? (
+                              <div style={rowStyle}>
+                                <span style={rowLabel}>📘 Facebook</span>
+                                {/* Đăng TAY lên Page chính (copy caption + tải ảnh + mở ô soạn bài), khỏi page token. */}
+                                <PostFbButton caption={capText} imageUrl={fbImg} composerUrl={fbComposerUrl} contentTitle={cnt?.title || 'sdvico'} />
+                                {fbPost ? <ShareGroups postUrl={fbPost.url} planGroupsToday={groupsOfDay(lastAt)} /> : null}
+                                {/* Dán link bài đăng tay trên Page chính SDVICOVN — chip FB ưu tiên link này. */}
+                                <LinkFbButton contentId={it.cid} linkedUrl={String((cnt?.brief as any)?.fb_real_url || '') || null} />
+                              </div>
+                            ) : null}
+                            {showTt ? (
                               <div style={rowStyle}>
                                 <span style={rowLabel}>🎵 TikTok</span>
-                                <ExportTiktokButton videoUrl={videoVUrl!} caption={capText} contentTitle={cnt?.title || 'sdvico'} />
+                                {hasVideo ? <ExportTiktokButton videoUrl={videoVUrl!} caption={capText} contentTitle={cnt?.title || 'sdvico'} /> : null}
                                 <LinkTikTokButton contentId={it.cid} linkedVideoId={linkedVid || null} linkedShareUrl={linkedUrl || null} />
                               </div>
                             ) : null}
