@@ -99,16 +99,35 @@ function parseJson(t) {
 }
 
 // Goi Gemini co fallback: flash-latest hay 503 (qua tai) -> thu lai bang flash-lite-latest.
+// 7/9: them 429/RESOURCE_EXHAUSTED (het han muc free tier 20 request/ngay/model, hoac 5 request/phut)
+// cung doi sang model du phong — han muc tinh RIENG tung model, giong cach hoc-video.mjs dang lam.
+// Truoc chi bat 503 nen 13 anh Zalo 4/9 + 5/9 ket lien 2 toi (log 5/9 20:00 toan 429).
+// Model cuoi cung ma van 429 (han muc phut) thi cho 30s roi thu lai dung 1 lan.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const QUA_TAI = /503|UNAVAILABLE|overloaded|high demand/i;
+const HET_HAN_MUC = /429|RESOURCE_EXHAUSTED|quota/i;
 async function genWithFallback(parts) {
   const models = [MKT_MODEL, 'gemini-flash-lite-latest'].filter((v, i, a) => a.indexOf(v) === i);
   let lastErr;
-  for (const model of models) {
-    try {
-      const res = await ai.models.generateContent({ model, contents: [{ role: 'user', parts }], config: { temperature: 0.1 } });
-      return parseJson(res.text);
-    } catch (e) {
-      lastErr = e;
-      if (!/503|UNAVAILABLE|overloaded|high demand/i.test(String(e?.message || e))) throw e;
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+    for (let lan = 0; lan < 2; lan++) {
+      try {
+        const res = await ai.models.generateContent({ model, contents: [{ role: 'user', parts }], config: { temperature: 0.1 } });
+        return parseJson(res.text);
+      } catch (e) {
+        lastErr = e;
+        const msg = String(e?.message || e);
+        if (!QUA_TAI.test(msg) && !HET_HAN_MUC.test(msg)) throw e; // loi khac (sai khoa, model khong ho tro anh...) bao ngay
+        const laCuoi = i === models.length - 1;
+        if (HET_HAN_MUC.test(msg) && laCuoi && lan === 0) {
+          console.log(`    ... ${model} het han muc, cho 30s roi thu lai 1 lan`);
+          await sleep(30000);
+          continue;
+        }
+        if (!laCuoi) console.log(`    ... ${model} ${HET_HAN_MUC.test(msg) ? 'het han muc' : 'qua tai'}, doi sang ${models[i + 1]}`);
+        break; // sang model ke tiep (hoac het model -> nem loi cuoi)
+      }
     }
   }
   throw lastErr;
