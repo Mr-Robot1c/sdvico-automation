@@ -46,7 +46,8 @@ const TIER_LABEL: Record<Tier, { text: string; icon: string; cls: string }> = {
   winner: { text: 'Đẩy mạnh', icon: '🏆', cls: 'tone-ok' },
   watch: { text: 'Giữ nhịp', icon: '➖', cls: 'tone-default' },
   weak: { text: 'Đổi góc', icon: '⚠️', cls: 'tone-no' },
-  insufficient: { text: 'Gom số liệu', icon: '⏳', cls: 'tone-default' }
+  insufficient: { text: 'Gom số liệu', icon: '⏳', cls: 'tone-default' },
+  manual: { text: 'Ưu tiên tay', icon: '✋', cls: 'tone-accent' }
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -434,7 +435,8 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 <thead><tr><th>Sản phẩm</th><th className="num">Ưu tiên</th><th className="num">Tương tác/bài</th><th>Hướng xử lý</th></tr></thead>
                 <tbody>
                   {products.map((p) => {
-                    const t = TIER_LABEL[p.tier];
+                    // 7/9: bản có tier lạ (dữ liệu chỉnh tay) không được làm sập cả trang -> rơi về nhãn Gom số liệu.
+                    const t = TIER_LABEL[p.tier] || TIER_LABEL.insufficient;
                     return (
                       <tr key={p.product}>
                         <td>{p.product}</td>

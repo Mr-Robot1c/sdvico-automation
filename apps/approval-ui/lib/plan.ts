@@ -34,7 +34,9 @@ export type Measurement = {
   topPosts: { title: string; product: string; engagement: number }[];
 };
 
-export type Tier = 'winner' | 'watch' | 'weak' | 'insufficient';
+// 7/9: 'manual' = người đặt ưu tiên TAY (không do số liệu; script chỉnh trọng số / user chốt sản phẩm). Trang
+// /ke-hoach từng sập vì bản có tier 'manual' mà bảng nhãn thiếu key -> mọi Record<Tier,...> phải có 'manual'.
+export type Tier = 'winner' | 'watch' | 'weak' | 'insufficient' | 'manual';
 
 export type PlanProduct = ProductAgg & {
   tier: Tier;
@@ -638,7 +640,8 @@ const WEIGHT_BY_TIER: Record<Tier, number> = {
   winner: 3,
   watch: 2,
   weak: 1,
-  insufficient: 1 // sàn tối thiểu để gom thêm số liệu, chưa dồn sức vào cái chưa rõ
+  insufficient: 1, // sàn tối thiểu để gom thêm số liệu, chưa dồn sức vào cái chưa rõ
+  manual: 1 // không dùng: tier manual mang weight do người đặt sẵn trong products
 };
 
 // Sinh kế hoạch từ số liệu. threshold: số bài tối thiểu để xếp hạng. weeklyBudget: số bài/tuần để chia.

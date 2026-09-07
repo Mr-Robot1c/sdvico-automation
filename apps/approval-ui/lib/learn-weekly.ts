@@ -16,7 +16,7 @@ import { vnInt, weekWindowVN } from './plan';
 
 type Client = ReturnType<typeof getServerClient>;
 
-const WEIGHT_BY_TIER: Record<Tier, number> = { winner: 3, watch: 2, weak: 1, insufficient: 1 };
+const WEIGHT_BY_TIER: Record<Tier, number> = { winner: 3, watch: 2, weak: 1, insufficient: 1, manual: 1 };
 
 // Ngưỡng bài tối thiểu để xếp thắng/thua trong tuần. Tuần chỉ có 2 bài không đủ đại diện,
 // giữ nguyên trọng số mặc định 1 (không đẩy mạnh mà cũng không cắt).

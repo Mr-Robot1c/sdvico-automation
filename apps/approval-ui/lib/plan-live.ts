@@ -25,7 +25,7 @@ import { loadPostingPlan, slotsForDate, groupsForDate, type LoadedPostingPlan } 
 
 type Client = ReturnType<typeof getServerClient>;
 
-const WEIGHT_BY_TIER: Record<Tier, number> = { winner: 3, watch: 2, weak: 1, insufficient: 1 };
+const WEIGHT_BY_TIER: Record<Tier, number> = { winner: 3, watch: 2, weak: 1, insufficient: 1, manual: 1 };
 const MIN_POSTS = 2;              // ngưỡng bài để xếp thắng/thua
 const CONTENT_PER_DAY = 1;        // 1 bài content nuôi trang mỗi ngày
 
