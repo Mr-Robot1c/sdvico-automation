@@ -408,8 +408,13 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
         </section>
         <section className="blk">
           <h2><span aria-hidden="true">🛒</span> Người hỏi mua <span className="sub">({fmt(leads.length)} trong 7 ngày · {fmt(leadToday.length)} hôm nay)</span></h2>
+          {/* 7/9 (user): luôn có nút "Kiểm tra người mua" ở cuối khối, kể cả khi 7 ngày chưa ai hỏi,
+              để vào thẳng trang khách hàng xem lead cũ và đổi trạng thái. */}
           {leads.length === 0 ? (
-            <p className="sub" style={{ margin: 0 }}>Chưa có ai hỏi mua trong 7 ngày. Bài đăng đều + chia sẻ group để tăng tiếp cận.</p>
+            <div style={{ display: 'grid', gap: 10 }}>
+              <p className="sub" style={{ margin: 0 }}>Chưa có ai hỏi mua trong 7 ngày. Bài đăng đều + chia sẻ group để tăng tiếp cận.</p>
+              <Link href="/noi-dung?loai=khach-hang" className="btn ghost sm" style={{ justifySelf: 'start' }}>🛒 Kiểm tra người mua</Link>
+            </div>
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
               {leads.slice(0, 4).map((l) => (
@@ -428,7 +433,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
                   🔥 Bài hút khách nhất: {topLeadPosts.map(([cid, n]) => `${(leadPostTitles.get(cid) || '(không tên)').slice(0, 50)} (${n} người hỏi)`).join(' · ')}
                 </div>
               ) : null}
-              <Link href="/noi-dung?loai=khach-hang" className="src" style={{ fontSize: '.85rem' }}>Xem tất cả khách hàng →</Link>
+              <Link href="/noi-dung?loai=khach-hang" className="btn ghost sm" style={{ justifySelf: 'start' }}>🛒 Kiểm tra người mua</Link>
             </div>
           )}
         </section>
