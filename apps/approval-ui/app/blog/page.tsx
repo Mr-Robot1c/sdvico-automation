@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getServerClient } from '../../lib/supabase-server';
-import { loadPublicPosts, siteUrl } from '../../lib/seo';
+import { loadPublicPosts, publicBlogUrl, siteUrl } from '../../lib/seo';
 import { PRODUCT_CATALOG } from '../../lib/product-catalog';
 import PostCard from './post-card';
 
@@ -21,7 +21,8 @@ export const metadata: Metadata = {
     url: `${siteUrl()}/blog`,
     siteName: 'SDVICO'
   },
-  alternates: { canonical: `${siteUrl()}/blog` }
+  // 7/9: canonical -> sdvico.vn/blog (og:url giữ trang này, xem lib/seo.ts publicBlogBase).
+  alternates: { canonical: publicBlogUrl() }
 };
 
 // Danh sách bài công khai (design-spec-trang-cong-khai màn 1): tiêu đề + 1 dòng phụ ngắn,

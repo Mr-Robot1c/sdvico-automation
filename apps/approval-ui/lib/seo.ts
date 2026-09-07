@@ -56,6 +56,19 @@ export function siteUrl(): string {
   return 'https://sdvico-mktit.vercel.app';
 }
 
+// 7/9 (blog giai đoạn 2, plan tuần 7-13/9 mục 4E): sdvico.vn/blog đã chạy (SPA Vite đọc
+// /api/public/posts, anh Thành deploy 7/9). Google gom SEO về TÊN MIỀN CÔNG TY: canonical của
+// /blog và /blog/<slug> trỏ sdvico.vn. og:url GIỮ trang này vì SPA bên kia không có OG từng
+// bài (Facebook/Zalo xem trước sẽ ra tiêu đề chung của site). Sitemap cho sdvico.vn phục vụ ở
+// /api/public/sitemap.xml (robots.txt bên sdvico.vn khai báo).
+export function publicBlogBase(): string {
+  const explicit = (process.env.PUBLIC_BLOG_URL || '').trim();
+  return (explicit || 'https://sdvico.vn/blog').replace(/\/$/, '');
+}
+export function publicBlogUrl(slug?: string): string {
+  return slug ? `${publicBlogBase()}/${slug}` : publicBlogBase();
+}
+
 // Ngày đăng chuẩn ISO cho JSON-LD.
 function isoOrNull(v: string | null | undefined): string | null {
   if (!v) return null;

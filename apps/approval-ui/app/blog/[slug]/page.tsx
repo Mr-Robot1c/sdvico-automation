@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getServerClient } from '../../../lib/supabase-server';
-import { catalogItemOf, fmtDateVN, isProductOf, loadPublicPost, loadPublicPosts, optImg, optImgAbs, siteUrl } from '../../../lib/seo';
+import { catalogItemOf, fmtDateVN, isProductOf, loadPublicPost, loadPublicPosts, optImg, optImgAbs, publicBlogUrl, siteUrl } from '../../../lib/seo';
 import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
 import { safeJsonLd } from '../../../lib/jsonld';
 import ContactButtons from '../../contact-buttons';
@@ -14,6 +14,8 @@ export const revalidate = 300;
 type Props = { params: { slug: string } };
 
 // Meta OG + canonical để Facebook/Google/Zalo hiện đúng khi share link bài.
+// 7/9: canonical -> sdvico.vn/blog/<slug> (Google gom về tên miền công ty); og:url GIỮ trang này
+// (SPA sdvico.vn không có OG từng bài, xem lib/seo.ts publicBlogBase).
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const client = getServerClient();
   const post = await loadPublicPost(client, params.slug);
@@ -31,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: post.imageUrl ? [{ url: optImgAbs(post.imageUrl, 1200)! }] : [],
       publishedTime: post.publishedAt || undefined
     },
-    alternates: { canonical: url }
+    alternates: { canonical: publicBlogUrl(post.slug) }
   };
 }
 
@@ -62,7 +64,7 @@ export default async function BlogDetailPage({ params }: Props) {
     datePublished: post.publishedAt || undefined,
     author: { '@type': 'Organization', name: 'SDVICO', url: siteUrl() },
     publisher: { '@type': 'Organization', name: 'SDVICO', url: siteUrl() },
-    mainEntityOfPage: { '@type': 'WebPage', '@id': url }
+    mainEntityOfPage: { '@type': 'WebPage', '@id': publicBlogUrl(post.slug) } // khớp canonical (7/9)
   };
 
   return (

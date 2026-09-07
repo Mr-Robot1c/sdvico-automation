@@ -1,7 +1,8 @@
 > Load khi: task chạm UI trang công khai /blog, /blog/[slug], /blog/chu-de/[slug], /san-pham, /san-pham/[slug] (shell công khai trong root-shell.tsx)
 covers: apps/approval-ui/app/blog, apps/approval-ui/app/san-pham, apps/approval-ui/app/root-shell.tsx
-last_verified: 2026-08-30
+last_verified: 2026-09-07
 ttl_days: 90
+<!-- re-verified: 2026-09-07 toi - Man 1 (/blog) + man 2 (/blog/[slug]) CHI doi meta: canonical + JSON-LD @id tro sdvico.vn/blog(/<slug>) (publicBlogUrl trong lib/seo.ts), og:url giu nguyen URL app. Giao dien, bo cuc, CTA, the bai KHONG doi. Doi chieu lai: man 1 chip chu de + luoi 3/2/1, man 2 tieu de + anh tren fold + 1 CTA + 3 bai khac van dung code. -->
 <!-- re-verified: 2026-09-03 - Man danh sach blog: tieu de the dung cardTitle (cat tai cau dau, bo duoi keu goi "Lap ngay/Goi ngay..."), title day du van o aria-label/alt + trang bai le. Hang chip them "Chuyen nghe" dau hang -> /blog/chu-de/chuyen-nghe-bien (chu de ao gom bai content, khong link trang san pham). Cac man khac khong doi. -->
 <!-- re-verified: 2026-09-03 - Giam can egress (docs/plans/plan-giam-can-egress.md): post-card.tsx, blog/[slug]/page.tsx, san-pham/page.tsx, san-pham/[slug]/page.tsx doi src anh tu URL Supabase thang sang optImg()/optImgAbs() (di qua /_next/image cua Vercel). Alt text, bo cuc, hanh vi the/hero/gallery KHONG doi - chi doi nguon anh de giam Cached Egress Supabase. -->
 <!-- re-verified: 2026-08-30 - Audit UI muc L6: MOI the blog co chip danh muc — khong khop danh muc san pham thi chip chung "Bai viet" (truoc chi vai the co chip, nhin nhu loi). hideProduct giu nguyen hanh vi (trang chu de van an chip). -->
