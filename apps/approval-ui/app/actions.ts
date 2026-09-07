@@ -1839,6 +1839,26 @@ export async function deleteContent(formData: FormData) {
   revalidatePath('/do-luong');
 }
 
+// 7/9 (user: "xoá nhiều quá ở bảng bài viết thì web bị treo"): xoá NHIỀU bài trong 1 lượt. Trước
+// mỗi nút Xoá là 1 server action + revalidate cả /noi-dung (trang nặng: 200 bài, 600 dòng số liệu,
+// 300 dòng log) -> bấm 20 lần là 20 lượt render xếp hàng, UI đứng. Nút Xoá (delete-button.tsx)
+// gom các lần bấm trong ~0,8 giây rồi gọi hàm này 1 lần: 1 UPDATE ... IN, 1 dòng run_log, 1 revalidate.
+export async function deleteContents(formData: FormData) {
+  const ids = String(formData.get('content_ids') || '')
+    .split(',').map((x) => x.trim()).filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 200);
+  if (!ids.length) return;
+  const client = getServerClient();
+  const { error } = await client.from('mkt_content').update({ deleted_at: new Date().toISOString() }).in('id', ids);
+  if (error) throw new Error('Soft-delete lỗi: ' + error.message);
+  try {
+    await client.from('run_log').insert({
+      task: 'mkt.content_soft_deleted', actor: 'user', status: 'ok', detail: { contentIds: ids, count: ids.length, batch: true }
+    });
+  } catch { /* bỏ qua */ }
+  revalidatePath('/noi-dung');
+  revalidatePath('/do-luong');
+}
+
 // Khoi phuc bai da soft-delete: clear mkt_content.deleted_at. Goi tu trang thung rac.
 export async function restoreContent(formData: FormData) {
   const id = String(formData.get('content_id') || '');
