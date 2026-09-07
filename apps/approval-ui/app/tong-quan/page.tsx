@@ -264,7 +264,6 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Link href="/noi-dung" className="btn ok">📥 Duyệt bài ({fmt(pending.length)})</Link>
-          <Link href="/san-xuat" className="btn ghost">➕ Thêm bài ngoài lịch</Link>
           <Link href="/ke-hoach#lich-dang" className="btn ghost">🗓 Sửa lịch đăng</Link>
         </div>
       </header>

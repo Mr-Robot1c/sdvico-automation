@@ -458,7 +458,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           <form action={saveGoalFocusAndRegenerate}>
             <label>
               <b title="Câu ngắn bạn giao cho BOSS — được đưa vào prompt sinh hướng đi bài viết.">🎯 Mục tiêu tuần</b>
-              <textarea name="goal_text" defaultValue={goalText} rows={2} placeholder="Ví dụ: tuần này ưu tiên lọc dầu SF-50, cần 20 cuộc gọi." />
+              <textarea name="goal_text" defaultValue={goalText} rows={12} placeholder="Ví dụ: tuần này ưu tiên lọc dầu SF-50, cần 20 cuộc gọi." />
             </label>
             <label>
               <b title="Máy chỉ đăng các sản phẩm liệt kê ở đây, sản phẩm khác bị chặn hoàn toàn.">🎯 Chỉ đăng sản phẩm này</b>

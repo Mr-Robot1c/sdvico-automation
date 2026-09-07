@@ -1469,7 +1469,7 @@ button.topbar-back { font: inherit; cursor: pointer; }
   border: 1px solid var(--line); background: var(--surface); color: var(--ink);
   font-family: inherit; font-size: 0.92rem; line-height: 1.5;
 }
-.kh-settings textarea { resize: none; min-height: 66px; }
+.kh-settings textarea { resize: vertical; min-height: 280px; line-height: 1.55; font-size: .92rem; }
 .kh-settings .kh-inline { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .kh-settings .kh-inline input[type='date'] { width: auto; }
 
