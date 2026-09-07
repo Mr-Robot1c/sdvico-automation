@@ -15,7 +15,7 @@
 // Nen 2 nac van qua tran (video rat dai) thi bao ro, de lai nhu cu.
 // Idempotent: da co file tom tat cung ten trong Zalo/AI (bat ky ngay nao) thi bo qua (truoc ca buoc nen).
 import { createClient } from '@supabase/supabase-js';
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, rmSync, copyFileSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadRealEnv } from './video/env.mjs';
@@ -203,7 +203,20 @@ for (const v of videos) {
     errors += 1;
     console.log(`  X ${v.name}: ${e?.message || e}`);
   } finally {
-    if (nen) rmSync(nen.path, { force: true });
+    if (nen) {
+      // 4/9: sau khi Gemini xem xong, GHI DE file goc trong media/ bang ban nen — file goc qua lon
+      // se bi upload-zalo-to-bucket reject (Supabase bucket cap ~50MB free tier). Trade-off: mat
+      // chat luong goc (854p/15fps thay vi HD), doi lay upload thanh cong de AI hoc va la tu lieu
+      // marketing. Muon xem chat luong cao thi mo tren Zalo Web tim lai. User chot 4/9 vi da bo lo
+      // nhieu video tu 1/9 do bucket cap.
+      try {
+        copyFileSync(nen.path, v.full);
+        console.log(`  ~ ${v.name}: da ghi de file goc trong media/ bang ban nen ${mb(nen.size)}MB de upload bucket duoc`);
+      } catch (e) {
+        console.log(`  ! ${v.name}: khong ghi de duoc file goc (${e?.message || e}), file media giu nguyen ${mb(v.size)}MB - bucket se reject`);
+      }
+      rmSync(nen.path, { force: true });
+    }
   }
   await new Promise((r) => setTimeout(r, 1500)); // gian cach nhe, tranh dap quota
 }
