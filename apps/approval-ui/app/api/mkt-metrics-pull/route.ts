@@ -281,13 +281,22 @@ export async function GET(req: Request) {
       try {
         const win = nextWeekWindowVN(new Date());
         const existing = await findWeeklyProposal(client, win.start);
-        if (existing) {
+        // 7/9: chỉ GIỮ bản đề xuất có sẵn khi NGƯỜI bấm Soạn (generated_by manual) hoặc bản đã soạn
+        // từ hôm nay. Bản máy soạn sớm hơn (?plan=propose giữa tuần, số liệu chưa đủ) thì soạn lại
+        // thay thế, không để bản thiếu số nằm tới sáng Thứ 2.
+        const keepExisting = !!existing && (existing.generated_by === 'manual' || new Date(existing.created_at).getTime() >= new Date(vnDayStartIso(new Date())).getTime());
+        if (existing && keepExisting) {
           plan = { skipped: 'da co ban de xuat tuan sau ' + existing.id.slice(0, 8) };
         } else {
           const { id, plan: p } = await generateAndStorePlan(client, 'cron', {
             cadence: 'weekly', weekOffset: 0, periodFrom: new Date(Date.now() + 7 * 24 * 3600 * 1000),
             proposal: { week_start: win.start, week_end: win.end, auto_apply_at: vnLocalIso(win.start, '08:00') },
           });
+          if (id) {
+            const { data: olds } = await client.from('mkt_plans').select('id, data').eq('applied', false).eq('period_start', win.start).neq('id', id);
+            const ids = ((olds || []) as any[]).filter((r) => r.data?.proposal?.week_start === win.start).map((r) => r.id);
+            if (ids.length) await client.from('mkt_plans').delete().in('id', ids);
+          }
           plan = { id, ranked: p.summary.ranked, cadence: 'weekly', directions: p.content_suggestions?.length || 0 };
           try { await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'ok', detail: { cadence: 'weekly', planId: id, applied: false, proposal: true, weekStart: win.start, directions: p.content_suggestions?.length || 0, measurement_source: p.measurement_source || null } }); } catch { /* bỏ qua */ }
         }
