@@ -520,13 +520,18 @@ export default async function BangSection() {
                         const rowLabel = { fontSize: '.75rem', minWidth: 76, color: 'var(--ink-2)' };
                         const capText = cnt?.draft || cnt?.title || '';
                         // 7/9 (user): thẻ CHỈ hiện hàng nút của nền tảng bài được xếp đăng hôm đó.
-                        // Bài ô Facebook không có hàng TikTok và ngược lại. Kênh đọc từ
-                        // payload.channels (rotate ghi đúng kênh ô lịch; plan_channel = channels[0]).
-                        // Bài cũ không ghi kênh -> giữ cách cũ (Facebook luôn, TikTok khi có video).
-                        // Ô YouTube: máy tự đăng qua API, không có hàng nút tay nào.
-                        const target: string[] = chans.length ? chans : (typeof p.plan_channel === 'string' && p.plan_channel ? [p.plan_channel] : []);
-                        const showFb = target.length === 0 || target.includes('facebook');
-                        const showTt = target.length === 0 ? hasVideo : target.includes('tiktok');
+                        // Bài ô Facebook không có hàng TikTok và ngược lại. Kênh của Ô LỊCH là
+                        // payload.plan_channel (rotate ghi từ Lịch đăng cố định). KHÔNG dùng
+                        // payload.channels làm chuẩn: dây chuyền dựng video tự thêm 'tiktok' vào đó
+                        // (bài ô Facebook có video vẫn mang channels [facebook, tiktok]).
+                        // Bài cũ không có plan_channel -> rơi về channels; không có gì -> giữ cách cũ
+                        // (Facebook luôn, TikTok khi có video). Ô YouTube: máy tự đăng qua API, không
+                        // có hàng nút tay nào. Ngoại lệ: nền tảng ĐÃ ghép link vẫn hiện để còn đổi/bỏ.
+                        const planCh = typeof p.plan_channel === 'string' ? p.plan_channel : '';
+                        const target: string[] = planCh ? [planCh] : chans;
+                        const fbLinked = !!String((cnt?.brief as any)?.fb_real_url || '');
+                        const showFb = target.length === 0 || target.includes('facebook') || fbLinked;
+                        const showTt = (target.length === 0 ? hasVideo : target.includes('tiktok')) || !!linkedUrl;
                         return (
                           <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
                             {showFb ? (
