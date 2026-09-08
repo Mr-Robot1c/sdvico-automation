@@ -9,7 +9,8 @@ import { buildBumpers } from './bumpers.mjs';
 
 export const FORMATS = {
   // 5/9 (sếp): phụ đề nhỏ đi 10% (15 -> 13.5) và hạ thấp hơn một chút (MarginV 90 -> 70).
-  vertical: { w: 1080, h: 1920, subFont: 13.5, subMargin: 70 },
+  // 8/9 tối (Thanh xem video thử): phụ đề hạ thấp thêm chút nữa (MarginV 70 -> 48).
+  vertical: { w: 1080, h: 1920, subFont: 13.5, subMargin: 48 },
   horizontal: { w: 1920, h: 1080, subFont: 13, subMargin: 55 },
 };
 
@@ -54,7 +55,11 @@ async function buildSceneSegment(scene, fmt, workDir, index) {
 
 // Ghép toàn bộ. scenes: [{videoPath, audioPath, durationSec, text, kind}].
 // brandLine: dòng nhận diện phủ trên đầu video (vd "SDVICO • Hotline 1900 23 23 49").
-export async function assembleVideo({ scenes, format, workDir, brandLine, outPath, outroAudioPath = null }) {
+// priceBadge (8/9, Thanh: giá vào video dạng úp mở): chữ tem giá (có thể 2 dòng), null = không tem.
+// badgeFromScene: tem hiện từ cảnh nội dung thứ N (0-based); badgeOffsetSec: lệch thêm bao nhiêu giây
+// trong cảnh đó (8/9 tối, Thanh: "gần tới lúc đọc phần giảm giá thì mới hiện tem", kẻo bà con thấy
+// giá sớm rồi bỏ đi). Tem giữ tới hết phần nội dung, không đè intro/outro.
+export async function assembleVideo({ scenes, format, workDir, brandLine, outPath, outroAudioPath = null, priceBadge = null, badgeFromScene = 0, badgeOffsetSec = 0 }) {
   const fmt = FORMATS[format];
   if (!fmt) throw new Error(`format khong hop le: ${format}`);
   await ensureFonts(workDir);
@@ -104,9 +109,29 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
     `box=1:boxcolor=black@0.45:boxborderw=16:` +
     `x=(w-tw)/2:y=${pad}${enableExpr}`;
 
+  // 8/9 (Thanh: giá vào video, dạng úp mở): tem giá vàng kiểu reel, hiện từ cảnh giải pháp
+  // (badgeFromScene) tới hết phần nội dung, KHÔNG đè intro/outro. Chữ qua textfile (có dấu).
+  let badgeFilter = '';
+  if (priceBadge) {
+    await writeFile(join(workDir, 'badge.txt'), priceBadge, 'utf8');
+    let start = introDur;
+    for (let i = 0; i < Math.min(badgeFromScene, scenes.length); i++) start += scenes[i].durationSec;
+    start += Math.max(0, Number(badgeOffsetSec) || 0);
+    const end = totalDur > 0 ? totalDur - outroDur : 0;
+    const badgeFont = fmt.w >= 1920 ? 34 : 46;
+    const en = end > start ? `:enable='between(t,${start.toFixed(2)},${end.toFixed(2)})'` : '';
+    badgeFilter =
+      `,drawtext=fontfile=BeVietnamPro-Black.ttf:textfile=badge.txt:` +
+      `fontcolor=white:fontsize=${badgeFont}:line_spacing=10:` +
+      `box=1:boxcolor=0x113B64@0.92:boxborderw=24:` +
+      `x=(w-tw)/2:y=h*0.57${en}`;
+    // Vị trí và màu (Thanh xem 2 bản thử 8/9 tối): y=h*0.68 đè phụ đề, y=h*0.50 cao quá -> h*0.57;
+    // nền xanh dương logo 0x113B64 chữ trắng thay cho vàng.
+  }
+
   await ffmpeg([
     '-y', '-i', baseName,
-    '-vf', drawtext,
+    '-vf', drawtext + badgeFilter,
     '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
     '-c:a', 'copy', '-movflags', '+faststart',
     outPath,

@@ -16,6 +16,7 @@ import { assembleVideo } from './assemble.mjs';
 import { generateVideoScript, stripGreeting } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
+import { getPriceTeaser, redactExactPrices } from '../products.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { pythonCmd } from '../platform.mjs';
 
@@ -417,7 +418,8 @@ async function whisperArtifact(sceneAudios, workDir, tag) {
 // -> di cung duong localTTS tung cau nhu loi doc, len giong nhu cau cam trong cac canh.
 const OUTRO_TEXT = 'Nhắn tin cho Page SDVICO nha! Hoặc gọi số 0939 243 222 để được hỗ trợ.';
 
-async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, contentId) {
+// opts.priceBadge / opts.badgeFromScene (8/9): tem giá úp mở trên hình, xem assemble.mjs.
+async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, contentId, opts = {}) {
   const fdir = join(workDir, format);
   await mkdir(fdir, { recursive: true });
   // GIỌNG NGUYÊN KHỐI: thử Gemini TTS cho TOÀN BỘ cảnh + outro của bản này; bất kỳ cảnh nào
@@ -490,7 +492,21 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
   console.log(`  Giọng bản ${format}: ${engineLabel}`);
   const wa = await whisperArtifact(sceneAudios, fdir, format);
   const out = join(outDir, `sdvico_${contentId.slice(0, 8)}_${format}.mp4`);
-  await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio });
+  // 8/9 tối (Thanh): tem giá chỉ hiện khi giọng đọc SẮP tới câu giá ở cảnh cuối, không hiện sớm.
+  // Ước lượng thời điểm câu giá bắt đầu theo vị trí ký tự trong lời thoại cảnh cuối (cùng cách
+  // phụ đề chia thời gian theo độ dài chữ), trừ 0,4s để tem lên trước giọng một nhịp.
+  let badgeFromScene = built.length - 1;
+  let badgeOffsetSec = 0;
+  if (opts.priceBadge && built.length) {
+    const last = built[built.length - 1];
+    const text = String(last.text || '');
+    const keys = [opts.badgeSpoken, opts.badgeSpokenKey].filter(Boolean);
+    let pos = -1;
+    for (const k of keys) { pos = text.indexOf(k); if (pos >= 0) break; }
+    if (pos > 0 && text.length) badgeOffsetSec = Math.max(0, last.durationSec * (pos / text.length) - 0.4);
+    if (pos < 0) console.warn('  (tem giá: không thấy câu giá trong cảnh cuối, hiện tem từ đầu cảnh cuối)');
+  }
+  await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio, priceBadge: opts.priceBadge || null, badgeFromScene, badgeOffsetSec });
   const totalDur = await probeDuration(out);
   return { out, totalDur, scenes: built.length, whisper: wa?.info || null };
 }
@@ -498,8 +514,8 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
 // Đẩy video (CẢ 2 bản ngang 16:9 + dọc 9:16) vào Hàng đợi duyệt: upload Storage + brand_assets +
 // mkt_content + approval_queue (pending, kênh Facebook + TikTok). Người bấm Duyệt (điều cấm 1).
 // Lúc đăng: FB dùng video_h (ngang), TikTok dùng video_v (dọc).
-async function pushToApprovalQueue(client, { content, script, horizontalPath, verticalPath }) {
-  const title = (script.titles && script.titles[0]) || content.title || 'Video SDVICO';
+async function pushToApprovalQueue(client, { content, script, horizontalPath, verticalPath, teaser = null }) {
+  const title = redactExactPrices((script.titles && script.titles[0]) || content.title || 'Video SDVICO');
 
   // Helper upload 1 file mp4 -> brand_assets, trả về id.
   const uploadVideo = async (path, tag) => {
@@ -521,7 +537,10 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   const { guessGroup, productHashtags, DEFAULT_HASHTAGS } = await import('../products.mjs');
   const grp = guessGroup(`${content.title || ''} ${title}`);
   const tags = [...DEFAULT_HASHTAGS, ...(grp ? productHashtags(grp) : [])].join(' ');
-  const caption = `${title}\n\nGọi 0939 243 222 để được tư vấn tận nơi.\n\n${tags}`;
+  // 8/9: bài video riêng (content/thủ công) cũng mang mốc giá úp mở khi sản phẩm có giá.
+  const caption = teaser
+    ? `${title}\n\n${teaser.text}. Nhắn hoặc để số, bên em gửi giá chính xác và xếp kỹ thuật lắp tận tàu.\n\nGọi 0939 243 222 để được tư vấn tận nơi.\n\n${tags}`
+    : `${title}\n\nGọi 0939 243 222 để được tư vấn tận nơi.\n\n${tags}`;
   const risk = script.assessment?.risk === 'red' ? 'red' : script.assessment?.risk === 'amber' ? 'amber' : 'none';
 
   // Chọn 1 ẢNH SẢN PHẨM để thả vào bình luận đầu của bài video (bà con thấy sản phẩm rõ,
@@ -663,12 +682,16 @@ async function main() {
   // Kịch bản. 29/8 (bỏ A/B): chế độ SHORTS 10-20 giây giờ theo cờ brief.video_short (rotate
   // đặt cho mọi bài bán có video); brief.ab_pair_id giữ cho bài cũ trước 29/8.
   const isShort = brief.video_short === true || !!brief.ab_pair_id;
+  // 8/9 (luật giá úp mở): chỉ video BÁN HÀNG mới có giá (content, trend, bài quy định thì không).
+  const salesVideo = brief.post_kind !== 'content' && productGroup !== CONTENT_GROUP && !content.needs_gov_review;
+  const teaser = salesVideo ? getPriceTeaser(productGroup) : null;
+  if (teaser) console.log('Mốc giá úp mở:', teaser.text);
   console.log(`Sinh kịch bản (Gemini)${isShort ? ' - che do SHORTS 10-20s' : ''}...`);
   const script = await generateVideoScript(
     content,
     assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title })),
     PRODUCT_FACTS,
-    { short: isShort },
+    { short: isShort, productGroup, salesVideo },
     _tokenLogClient
   );
   console.log('Tiêu đề:', script.titles);
@@ -694,7 +717,8 @@ async function main() {
   // 5/9 (sep): CHI DUNG BAN DOC 9:16 cho moi kenh (FB Post/Reel + TikTok + YouTube Shorts) de dong
   // bo. Truoc day dung them ban ngang 16:9 cho FB Post — bo han, do nua thoi gian TTS + ghep.
   console.log('\n== Dựng bản vertical (9:16) dùng chung mọi kênh ==');
-  const vertical = await buildFormat('vertical', script.vertical, assetPaths, voice, workDir, outDir, contentId);
+  const vertical = await buildFormat('vertical', script.vertical, assetPaths, voice, workDir, outDir, contentId,
+    { priceBadge: teaser?.badge || null, badgeSpoken: teaser?.spoken || null, badgeSpokenKey: teaser?.spokenKey || null });
   console.log(`  -> ${vertical.out} (${vertical.totalDur.toFixed(1)}s, ${vertical.scenes} cảnh)`);
 
   // 3 ảnh đại diện từ bản dọc.
@@ -718,7 +742,7 @@ async function main() {
   // Đẩy vào Hàng đợi duyệt (một file dọc dùng cho cả FB lẫn TikTok).
   if (!process.argv.includes('--no-queue')) {
     try {
-      await pushToApprovalQueue(client, { content, script, horizontalPath: null, verticalPath: vertical.out });
+      await pushToApprovalQueue(client, { content, script, horizontalPath: null, verticalPath: vertical.out, teaser });
     } catch (e) {
       console.warn('Không đẩy được vào Hàng đợi duyệt:', e.message, '(video vẫn có ở out/video/).');
     }

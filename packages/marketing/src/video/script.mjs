@@ -4,6 +4,7 @@ import { assessDraft } from '../compliance.mjs';
 import { knownFactValues, testFactValues } from '../product-facts.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
 import { logTokenUsage } from '../token-log.mjs';
+import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser } from '../products.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 
@@ -55,6 +56,11 @@ function parseJson(text) {
 // lời thoại ngắn, câu đầu là móc câu. Mặc định false = bản dài 40-50 giây như cũ.
 export async function generateVideoScript(content, assets, facts = [], opts = {}, client = null) {
   const short = !!opts.short;
+  // 8/9 (luật giá úp mở, Thanh): video BÁN HÀNG đọc 1 câu mốc giá ở cảnh cuối; video content, trend,
+  // bài quy định KHÔNG có giá. Dữ liệu ở products.mjs (không có số chính xác trong code).
+  const teaser = opts.salesVideo && opts.productGroup ? getPriceTeaser(opts.productGroup) : null;
+  const shownName = (opts.productGroup && publicName(opts.productGroup)) || null;
+  const priceException = teaser ? ' Ngoại lệ duy nhất: câu mốc giá đã dặn ở phần GIÁ, đặt ở CUỐI cảnh này.' : '';
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -76,6 +82,10 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển tiếc nuối, tàu nằm bờ). Không lan man.',
     'CẢNH GIỮA: lối thoát bằng LỢI ÍCH cụ thể (không liệt kê thông số kỹ thuật khô) → phần thưởng cụ thể (đỡ tốn bao nhiêu, đi được bao xa, chở thêm được gì) → tin cậy 1 câu ngắn (lắp tận bến, bảo hành).',
     'CẢNH CUỐI: 1 câu chốt ngắn về LỢI ÍCH/thông điệp sản phẩm (đã có luật ở trên), có thể là câu hỏi mở nhẹ cho bà con nghĩ tiếp. KHÔNG nhắc "gọi", "liên hệ", "hotline" — outro cố định đầu ký đã lo phần đó.',
+    shownName ? `TÊN SẢN PHẨM: gọi đúng "${shownName}" trong lời thoại, KHÔNG gọi tên khác, KHÔNG đọc mã SD12-300.` : '',
+    teaser
+      ? `GIÁ (luật 8/9, BẮT BUỘC): CẢNH CUỐI phải có đúng 1 câu mốc giá, dùng NGUYÊN VĂN: "${teaser.spoken}". Đây là câu DUY NHẤT được nhắc "nhắn Page". TUYỆT ĐỐI KHÔNG đọc giá chính xác (không 9.900.000, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu), KHÔNG tự thêm con số tiền nào khác. Các cảnh trước KHÔNG nhắc giá.`
+      : '',
     ...guardLines(`${content.title || ''} ${content.draft || ''} ${content.brief?.rotation_group || ''}`),
     'Số theo chuẩn Việt Nam (dấu chấm ngăn hàng nghìn). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung.',
@@ -91,7 +101,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     '',
     'Tư liệu có sẵn (chỉ được dùng id trong đây):',
     assetList,
-  ].join('\n');
+  ].filter((line) => line !== '').join('\n');
 
   const user = [
     `Nội dung nguồn (đã đăng): "${content.title || ''}".`,
@@ -125,7 +135,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
           '  CẤM: câu ngắn cụt ("máy hỏng vặt lắm"), lặp lại hook, nhắc sản phẩm SDVICO (chưa tới lối thoát).',
           '',
           'CẢNH 3 role="solution" (10-15s, ~35-45 từ):',
-          '  LỐI THOÁT bằng sản phẩm + PHẦN THƯỞNG cụ thể + CHỐT lợi ích. Có chỗ nêu 2-3 lợi ích cụ thể (dầu sạch, máy khỏe, tiết kiệm bao nhiêu). KHÔNG nhắc gọi/liên hệ (outro cố định lo).',
+          '  LỐI THOÁT bằng sản phẩm + PHẦN THƯỞNG cụ thể + CHỐT lợi ích. Có chỗ nêu 2-3 lợi ích cụ thể (dầu sạch, máy khỏe, tiết kiệm bao nhiêu). KHÔNG nhắc gọi/liên hệ (outro cố định lo).' + priceException,
           '  Ví dụ về CẤU TRÚC (chủ đề khác, CẤM chép): "May mà có bộ sạc thông minh giữ bình luôn no điện, đèn sáng suốt đêm không lo! Bình bền gấp đôi, đỡ tiền thay, chuyến nào cũng trọn con nước. Yên tâm bám biển dài ngày nha anh em."',
         ]
       : [
@@ -137,7 +147,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
           'CẢNH 2 role="empathy" (BẮT BUỘC, không bỏ): tả HẬU QUẢ TIẾC + UẤT + LO cụ thể (số tiền mất, thời gian mất, tâm trạng). Không nhắc sản phẩm SDVICO.',
           'CẢNH 3 role="solution": sản phẩm xuất hiện như LỐI THOÁT, nói bằng LỢI ÍCH (không thông số kỹ thuật khô).',
           'CẢNH 4 role="reward": PHẦN THƯỞNG cụ thể (chở thêm bao nhiêu, đi xa bao nhiêu, tiết kiệm gì).',
-          'CẢNH 5 role="closing": câu chốt ngắn về lợi ích. Cấm nhắc gọi/liên hệ/hotline (outro cố định lo).',
+          'CẢNH 5 role="closing": câu chốt ngắn về lợi ích. Cấm nhắc gọi/liên hệ/hotline (outro cố định lo).' + priceException,
         ]),
   ].filter(Boolean).join('\n');
 
@@ -191,14 +201,23 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         if (cut !== narration) console.warn(`[script] ${kind}: da cat cau chao dau canh 1: "${narration.slice(0, 60)}"`);
         narration = cut;
       }
+      // 8/9: lưới giá — số tiền chính xác không được lọt vào lời thoại/phụ đề.
+      narration = redactExactPrices(narration);
       return { narration, assetId };
     })
     .filter((s) => s.narration && s.assetId);
 
   const vertical = fix(parsed.vertical?.scenes, 'vertical');
+  // 8/9: cảnh cuối video bán hàng phải có câu mốc giá đọc được (model quên thì nối vào).
+  if (teaser && vertical.length) {
+    const last = vertical[vertical.length - 1];
+    const before = last.narration;
+    last.narration = ensureSpokenTeaser(last.narration, teaser);
+    if (last.narration !== before) console.warn('[script] da noi cau gia up mo vao canh cuoi (model quen luat 8/9)');
+  }
   // 5/9 (sếp): chỉ dựng BẢN DỌC. Giữ key horizontal trỏ cùng mảng để code gọi không đổi.
   const horizontal = vertical;
-  const titles = Array.isArray(parsed.titles) ? parsed.titles.filter(Boolean).slice(0, 3) : [];
+  const titles = Array.isArray(parsed.titles) ? parsed.titles.filter(Boolean).slice(0, 3).map((t) => redactExactPrices(String(t))) : [];
 
   // Quét tuân thủ trên toàn bộ lời thoại (điều cấm 3, 4, 5).
   const allText = [...vertical].map((s) => s.narration).join('\n');
