@@ -8,7 +8,6 @@ import { channelsLabel, riskMeta, formatRelative, formatDateTimeVN } from '../la
 import PlatformLogo, { type PlatformKey } from './platform-logo';
 import TikTokPrivateChip from './tiktok-private-chip';
 import ExportTiktokButton from './export-tiktok-button';
-import AddLeadButton from './add-lead-button';
 import LinkFbButton from './link-fb-button';
 import PostFbButton from './post-fb-button';
 import CopyCaptionButton from './copy-caption-button';
@@ -497,8 +496,8 @@ export default async function BangSection() {
                           </div>
                         ) : null}
                       </ViewModal>
-                      {/* User 27/8 layout: chia 2 cột. TRÁI = Ghi Zalo/inbox + Chia sẻ group.
-                          PHẢI = Xuất TikTok + Copy caption (dòng 1) + Ghép TikTok (dòng 2). */}
+                      {/* Cụm nút hành động: HÀNG THEO NỀN TẢNG (📘 Facebook / 🎵 TikTok), xem
+                          ghi chú 30/8 + 7/9 + 8/9 bên dưới. */}
                       {it.cid ? (() => {
                         const cnt = contents.get(it.cid);
                         const linkedVid = (cnt?.brief as any)?.tiktok_video_id as string | undefined;
@@ -515,7 +514,10 @@ export default async function BangSection() {
                           || `https://business.facebook.com/latest/composer?asset_id=${process.env.FB_SUITE_ASSET_ID || '101052306114292'}`;
                         // 30/8 (user: "gộp các chức năng lại" — thẻ từng có 8 nút xổ 2 cột, trùng
                         // 2 nút Copy caption): sắp thành HÀNG THEO NỀN TẢNG, nhãn đầu hàng nói
-                        // platform nên nút trong hàng rút gọn chữ; 1 nút Copy caption chung.
+                        // platform nên nút trong hàng rút gọn chữ; 1 nút Copy caption.
+                        // 8/9 (user, thẻ bài YouTube tự nhiên có "Ghi Zalo" + "Copy caption"):
+                        // BỎ HẲN nút Ghi Zalo/inbox khỏi mọi thẻ; Copy caption CHỈ nằm trong hàng
+                        // TikTok (đăng TikTok tay mới cần) — hàng Facebook đã có "Đăng tay" tự copy.
                         const rowStyle = { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' as const };
                         const rowLabel = { fontSize: '.75rem', minWidth: 76, color: 'var(--ink-2)' };
                         const capText = cnt?.draft || cnt?.title || '';
@@ -549,12 +551,9 @@ export default async function BangSection() {
                                 <span style={rowLabel}>🎵 TikTok</span>
                                 {hasVideo ? <ExportTiktokButton videoUrl={videoVUrl!} caption={capText} contentTitle={cnt?.title || 'sdvico'} /> : null}
                                 <LinkTikTokButton contentId={it.cid} linkedVideoId={linkedVid || null} linkedShareUrl={linkedUrl || null} />
+                                <CopyCaptionButton caption={capText} />
                               </div>
                             ) : null}
-                            <div style={rowStyle}>
-                              <AddLeadButton contentId={it.cid} />
-                              <CopyCaptionButton caption={capText} />
-                            </div>
                           </div>
                         );
                       })() : null}
