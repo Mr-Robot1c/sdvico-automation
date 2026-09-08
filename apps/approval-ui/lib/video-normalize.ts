@@ -1,5 +1,4 @@
-// @ts-ignore: @ffmpeg-installer/ffmpeg không kèm type declaration
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { writeFile, readFile, unlink, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -7,8 +6,28 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-// Đường dẫn binary ffmpeg — đến từ @ffmpeg-installer (đóng gói sẵn trong npm, không tải runtime).
-const FFMPEG: string | undefined = (ffmpegInstaller as any)?.path;
+// Đường dẫn binary ffmpeg. 8/9: KHÔNG import tĩnh @ffmpeg-installer nữa — import tĩnh làm Next
+// trace binary linux (~68 MB) vào mọi function trên Vercel, đẩy Functions Storage vượt 10 GB
+// (mỗi bản deploy ~37 MB). Thứ tự tìm:
+//   1. env FFMPEG_PATH (nếu sau này muốn có ffmpeg trên Vercel: tải binary lúc chạy rồi đặt env).
+//   2. @ffmpeg-installer/ffmpeg qua createRequire với tên gói là BIẾN (webpack/nft không trace
+//      được, next.config còn outputFileTracingExcludes chặn thêm) — máy local (dev/test) vẫn có
+//      binary win32 từ node_modules gốc monorepo (packages/marketing phụ thuộc gói này).
+//   3. Không có -> normalizeVideo ném lỗi, caller (lib/tiktok.ts) dùng file gốc, KHÔNG chặn đăng.
+//      Đường đăng TikTok qua API đã bỏ từ 26/8 (xuất tay) nên trên Vercel chấp nhận không có ffmpeg.
+function resolveFfmpeg(): string | undefined {
+  const fromEnv = process.env.FFMPEG_PATH;
+  if (fromEnv) return fromEnv;
+  try {
+    const req = createRequire(process.cwd() + '/');
+    const installerModule = ['@ffmpeg-installer', 'ffmpeg'].join('/');
+    const installer = req(installerModule);
+    return (installer as any)?.path || (installer as any)?.default?.path;
+  } catch {
+    return undefined;
+  }
+}
+const FFMPEG: string | undefined = resolveFfmpeg();
 
 // Chuẩn hóa video cho TikTok: re-encode để NƯỚNG chiều xoay (ffmpeg autorotate mặc định bật) +
 // H.264 + AAC + faststart. Sửa lỗi video quay 90 độ khi TikTok bỏ qua cờ rotate. Chạy trong /tmp.

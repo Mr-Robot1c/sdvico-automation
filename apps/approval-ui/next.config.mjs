@@ -18,16 +18,23 @@ const nextConfig = {
     minimumCacheTTL: 2678400,
   },
 
-  // Native binary (.node / ffmpeg) — để Next require lúc chạy, không nhồi vào bundle webpack.
-  // Ghép logo dùng @napi-rs/canvas (external, tự trace như banner) + logo nhúng base64, không cần
-  // trace thêm sharp/asset nữa.
+  // Native binary (.node) — để Next require lúc chạy, không nhồi vào bundle webpack.
+  // Ghép logo dùng @napi-rs/canvas (external, tự trace như banner) + logo nhúng base64.
   experimental: {
-    serverComponentsExternalPackages: ['@napi-rs/canvas', '@ffmpeg-installer/ffmpeg'],
-    // Nhét binary ffmpeg (@ffmpeg-installer, có sẵn trong npm) vào function của Duyệt (/) và
-    // test-post để chuẩn hóa video TikTok. Glob ** để bắt đúng gói theo nền tảng (linux-x64 trên Vercel).
-    outputFileTracingIncludes: {
-      '/': ['./node_modules/@ffmpeg-installer/**'],
-      '/api/tiktok/test-post': ['./node_modules/@ffmpeg-installer/**']
+    serverComponentsExternalPackages: ['@napi-rs/canvas'],
+    // 8/9 GIẢM FUNCTIONS STORAGE (Vercel báo team a-644f hết 10 GB): trước đây
+    // outputFileTracingIncludes nhét binary ffmpeg linux (~68 MB, nén ~23 MB) vào MỌI function
+    // -> mỗi bản deploy ~37 MB, 320 bản trong 18 ngày ~ 12 GB. Đường đăng TikTok qua API đã
+    // BỎ từ 26/8 (xuất tay), normalizeVideo đã có fallback file gốc, nên KHÔNG đóng gói ffmpeg
+    // nữa. Loại hẳn @ffmpeg-installer khỏi trace ở mọi route (node_modules nằm ở gốc monorepo
+    // nên liệt kê cả 3 đường). Muốn có lại ffmpeg trên Vercel: đặt FFMPEG_PATH hoặc tải binary
+    // lúc chạy, KHÔNG bật lại outputFileTracingIncludes.
+    outputFileTracingExcludes: {
+      '*': [
+        './node_modules/@ffmpeg-installer/**',
+        '../../node_modules/@ffmpeg-installer/**',
+        '**/node_modules/@ffmpeg-installer/**'
+      ]
     }
   }
 };
