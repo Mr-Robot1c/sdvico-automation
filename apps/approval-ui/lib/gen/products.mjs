@@ -31,9 +31,10 @@ export const PRODUCTS = [
     hashtags: ['#sơn_RARE', '#sơn_chống_nóng', '#chống_nóng_tàu', '#làm_mát_tàu'] },
   // 26/8: SP mới do user cung cấp (folder "9. Máy Lọc Dầu Diesel SD12-300"). Match ưu tiên
   // "sd12" và "diesel" — tranh dụng chung "loc dau" (SF-50 no 6 sẽ match trước).
+  // 8/9: tên công khai là SF300B (Thanh chốt), SD12-300 chỉ là mã tem + tên folder → thêm match, đổi thẻ.
   { no: 9, group: '9. Máy Lọc Dầu Diesel SD12-300',
-    match: ['sd12-300', 'sd12 300', 'sd12300', 'sd12', 'loc dau diesel', 'may loc dau diesel', 'loc dau sd12'],
-    hashtags: ['#máy_lọc_dầu_Diesel', '#SD12_300', '#bảo_vệ_kim_phun', '#lọc_cặn_dầu'] },
+    match: ['sd12-300', 'sd12 300', 'sd12300', 'sd12', 'sf300b', 'sf 300b', 'sf-300b', 'may loc dau sf300b', 'loc dau sf300b', 'loc dau diesel', 'may loc dau diesel', 'loc dau sd12'],
+    hashtags: ['#máy_lọc_dầu_Diesel', '#SF300B', '#bảo_vệ_kim_phun', '#lọc_cặn_dầu'] },
   // 5/9: SDFish — app do SDVICO TỰ LÀM cho ngư dân (web sdfish.sdvico.vn). Sếp Long lệnh
   // truyền thông 5/9. Match ưu tiên tên riêng; "app ngu dan" / "ban dong hanh" là câu khẩu hiệu.
   { no: 10, group: '10. SDFish',
@@ -93,12 +94,14 @@ export const FEATURES = {
   ],
   // 26/8: nguồn từ file "Tính năng 9.txt" trong kho tư liệu user cung cấp.
   '9. Máy Lọc Dầu Diesel SD12-300': [
-    'Lọc nước và cặn bẩn trong dầu Diesel',
-    'Hỗ trợ bảo vệ kim phun, bơm cao áp',
-    'Giúp nhiên liệu sạch hơn trước khi vào máy',
-    'Hỗ trợ động cơ vận hành ổn định',
-    'Khung Inox 304, phù hợp môi trường tàu biển',
-    'Thiết kế dễ lắp đặt, vệ sinh và bảo dưỡng',
+    // 8/9 tối: tên công khai SF300B (chỉ còn 1 máy lọc dầu); thông số từ file "Tính năng.txt" folder
+    // "Lọc dầu SF300B" user cấp 8/9 (đã nạp product_facts verified).
+    'Máy lọc dầu SF300B, bơm điện công suất lớn SF300',
+    'Lọc nước và cặn bẩn trong dầu diesel, độ lọc 1 tới 10 micromet, tách nước 100%',
+    'Hỗ trợ bảo vệ kim phun, bơm cao áp; tiết kiệm nhiên liệu 5 tới 10% sau khi lọc',
+    'Kích thước 52 x 20 x 50 cm, nặng 15 kg, đặt vừa hầm máy, đầm máy chống rung',
+    'Vỏ inox 304 không rỉ sét, chịu muối biển',
+    'Dễ lắp đặt, vệ sinh và bảo dưỡng; bảo hành 12 tháng',
   ],
   // 5/9: SDFish — CHỈ điều đã kiểm trên web sdfish.sdvico.vn (điều cấm 5). Không ghi giá, gói,
   // App Store, tính năng đang làm.
@@ -115,6 +118,105 @@ export const FEATURES = {
 
 export function getFeatures(group) {
   return FEATURES[group] || [];
+}
+
+// 8/9/2026: GIÁ ÚP MỞ cho kênh công khai. Sếp đưa giá thật 14:04 ngày 8/9; Thanh chốt cùng chiều:
+// bài đăng Page, group, TikTok, YouTube, quảng cáo KHÔNG ghi số chính xác, chỉ ghi mốc "9,X triệu"
+// để bà con tò mò nhắn hỏi. Số chính xác chỉ nói trong inbox, điện thoại, sàn, và KHÔNG nằm trong
+// file này (để máy không lỡ in ra). Nhóm chưa có giá thì không có dòng, bài viết như cũ (điều cấm 5).
+// key = cụm phải có mặt trong bài để coi là "đã có câu giá". Bản sao y hệt ở packages/marketing.
+// 8/9 chiều (Thanh: "áp giá vào caption video"): thêm spoken (dạng ĐỌC ĐƯỢC cho lời thoại, TTS không
+// đọc được "3X"/"9,X"), spokenKey (cụm để biết cảnh cuối đã có câu giá), badge (tem giá vàng trên hình,
+// 2 dòng, qua drawtext textfile). Vẫn không có số chính xác.
+export const PRICE_TEASER = {
+  '2. Máy lọc nước biển SEA-40': {
+    text: 'Tháng 9 giảm 7 triệu, máy cơ chỉ còn 3X triệu, máy chạy điện 4X triệu',
+    key: '3X triệu',
+    spoken: 'Tháng 9 giảm 7 triệu, máy cơ còn hơn 30 triệu thôi. Nhắn Page nhận giá chính xác nha!',
+    spokenKey: 'hơn 30 triệu',
+    badge: 'Tháng 9 giảm 7 triệu\nMáy cơ chỉ còn 3X triệu',
+  },
+  '9. Máy Lọc Dầu Diesel SD12-300': {
+    text: 'Tháng 9 từ 12 triệu giảm còn 9,X triệu',
+    key: '9,X triệu',
+    spoken: 'Tháng 9 từ 12 triệu giảm còn chưa tới 10 triệu. Nhắn Page nhận giá chính xác nha!',
+    spokenKey: 'chưa tới 10 triệu',
+    badge: 'Tháng 9: từ 12 triệu\ncòn 9,X triệu',
+  },
+};
+export function getPriceTeaser(group) {
+  return PRICE_TEASER[group] || null;
+}
+
+// Tên gọi CÔNG KHAI khi khác nhãn folder kho. 8/9 Thanh chốt: máy lọc dầu gọi là SF300B; SD12-300
+// chỉ là mã trên tem máy và tên folder brand_assets, không ghi lên bài.
+export const PUBLIC_NAME = {
+  '9. Máy Lọc Dầu Diesel SD12-300': 'Máy lọc dầu SF300B',
+};
+export function publicName(group) {
+  return PUBLIC_NAME[group] || null;
+}
+
+// 8/9 tối (Thanh): "giờ chỉ còn 1 máy lọc dầu là SF300B, các sản phẩm kia cho bài bán ảnh".
+// VIDEO_GROUPS = nhóm được dựng video bán hàng (chiếm ô YouTube/TikTok); nhóm khác LUÔN ra bài ảnh
+// trên Facebook. DISCONTINUED_GROUPS = ngừng bán, rotate bỏ qua dù kế hoạch còn nhắc.
+// Bản sao y hệt ở packages/marketing.
+export const VIDEO_GROUPS = new Set([
+  '2. Máy lọc nước biển SEA-40',
+  '9. Máy Lọc Dầu Diesel SD12-300',
+]);
+export const DISCONTINUED_GROUPS = new Set([
+  '6. Thiết bị lọc dầu SF-50',
+]);
+export function isPhotoOnlyGroup(group) {
+  return !VIDEO_GROUPS.has(group);
+}
+export function isDiscontinuedGroup(group) {
+  return DISCONTINUED_GROUPS.has(group);
+}
+
+// Chặn số tiền chính xác lọt ra kênh công khai (lưới sau prompt, phòng model quên luật).
+// Số dạng N.NNN.NNN từ 1 triệu trở lên đổi thành mốc úp mở: dưới 10 triệu thành "9,X triệu",
+// từ 10 triệu thành "4X triệu". Các mốc "42 triệu", "9,9 triệu"... của giá đang áp cũng đổi.
+// "12 triệu" (giá cũ lọc dầu) và "7 triệu" (mức giảm) được phép vì nằm trong câu úp mở đã chốt.
+const EXACT_MILLIONS = [42, 31, 13, 49, 38, 14];
+export function redactExactPrices(text) {
+  let s = String(text || '');
+  s = s.replace(/(\d{1,3}(?:\.\d{3}){2,})\s*(?:đồng|đ|vnđ|vnd)?/gi, (m, num) => {
+    const n = Number(num.replace(/\./g, ''));
+    if (!n || n < 1000000) return m;
+    const tr = Math.floor(n / 1000000);
+    return tr < 10 ? `${tr},X triệu` : `${String(tr)[0]}X triệu`;
+  });
+  s = s.replace(/\b9[,.]9\s*(?:triệu|tr)\b/gi, '9,X triệu').replace(/\b9tr9\b/gi, '9,X triệu');
+  for (const tr of EXACT_MILLIONS) {
+    s = s.replace(new RegExp(`\\b${tr}\\s*(?:triệu|tr)\\b`, 'gi'), `${String(tr)[0]}X triệu`);
+  }
+  return s;
+}
+
+// Bảo đảm bài bán có đúng câu giá úp mở: chặn số chính xác, thiếu câu giá thì chèn trước dòng
+// CTA cuối (giữ câu hỏi mở kết bài). Nhóm không có giá thì trả nguyên văn, không đụng gì.
+export function ensurePriceTeaser(body, teaser) {
+  if (!teaser) return body;
+  const s = redactExactPrices(body);
+  if (s.includes(teaser.key)) return s;
+  const sentence = `${teaser.text}. Nhắn hoặc để số, bên em gửi giá chính xác và xếp kỹ thuật lắp tận tàu.`;
+  const lines = s.split('\n');
+  let last = lines.length - 1;
+  while (last > 0 && !lines[last].trim()) last--;
+  if (last <= 0) return `${s.trim()}\n\n${sentence}`;
+  lines.splice(last, 0, sentence, '');
+  return lines.join('\n');
+}
+
+// Bảo đảm CẢNH CUỐI video có câu giá đọc được (luật 8/9). Chặn số chính xác trước; thiếu câu thì
+// nối vào cuối lời thoại cảnh đó. Không teaser thì trả nguyên văn.
+export function ensureSpokenTeaser(narration, teaser) {
+  if (!teaser?.spoken) return narration;
+  const s = redactExactPrices(String(narration || '')).trim();
+  if (teaser.spokenKey && s.includes(teaser.spokenKey)) return s;
+  return s ? `${s} ${teaser.spoken}` : teaser.spoken;
 }
 
 // Folder tư liệu chung cho các BÀI CONTENT (không gắn sản phẩm cụ thể): ảnh biển, cảnh

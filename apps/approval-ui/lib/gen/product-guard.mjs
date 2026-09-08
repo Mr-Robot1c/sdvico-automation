@@ -25,22 +25,26 @@ export const PRODUCT_GUARD = [
       'bớt chở nước', 'đỡ chở nước', 'khỏi chở nước', 'không cần chở nước',
       'nhẹ tàu', 'giảm tải', 'tốn diện tích chở nước', 'đỡ tốn chỗ', 'tiết kiệm chỗ',
       'tiết kiệm dầu', 'tiết kiệm nhiên liệu', 'đỡ tốn dầu', 'giảm hao dầu',
+      // 8/9 (luật giá úp mở, Thanh): số chính xác không được lọt ra kênh công khai.
+      '42.000.000', '31.000.000', '49.000.000', '38.000.000', '42 triệu', '31 triệu',
     ],
-    why: 'Tàu cá CỐ Ý lấy nước để đằm tàu khi lấy đá; tàu nhẹ quá (đĩnh) chạy không được. Máy lọc nước KHÔNG liên quan tới nhiên liệu hay tải trọng tàu. (Phản hồi cấp trên, nhóm Zalo nội bộ 19/8/2026.)',
+    why: 'Tàu cá CỐ Ý lấy nước để đằm tàu khi lấy đá; tàu nhẹ quá (đĩnh) chạy không được. Máy lọc nước KHÔNG liên quan tới nhiên liệu hay tải trọng tàu. (Phản hồi cấp trên, nhóm Zalo nội bộ 19/8/2026.) 8/9/2026 Thanh chốt: bài công khai chỉ mốc giá úp mở ("giảm 7 triệu, máy cơ còn 3X triệu"), số chính xác chỉ nói trong inbox.',
   },
   {
     key: 'fuel',
-    match: /l[oọ]c\s*d[aầ]u|sf[\s-]?50|x[uử]\s*l[yý]\s*d[aầ]u|nano\s*graphene|pv\s*engine|pvoil|d[aầ]u\s*nh[oớ]t|rmi/i,
-    product: 'Thiết bị lọc dầu SF-50 / Dầu nhớt PVOIL Nano Graphene / PV Engine RMI',
+    match: /l[oọ]c\s*d[aầ]u|sf[\s-]?50|sf[\s-]?300\s?b|sd\s?12[\s-]?300|x[uử]\s*l[yý]\s*d[aầ]u|nano\s*graphene|pv\s*engine|pvoil|d[aầ]u\s*nh[oớ]t|rmi/i,
+    product: 'Máy lọc dầu SF300B (SF-50 ngừng bán 8/9) / Dầu nhớt PVOIL Nano Graphene / PV Engine RMI',
     allowed: [
       'giữ dầu sạch, bảo vệ máy, máy nổ êm và bền hơn',
-      'tiết kiệm dầu diesel cho tàu cá (chỉ nói khi tài liệu sản phẩm có ghi, không tự bịa con số phần trăm)',
+      'tiết kiệm dầu diesel cho tàu cá (chỉ nói khi tài liệu sản phẩm có ghi, không tự bịa con số phần trăm; SF300B tài liệu ghi 5 tới 10%)',
       'giảm hỏng vặt, đỡ nằm bờ sửa máy',
     ],
     forbidden: [
       'nhẹ tàu', 'giảm tải',
+      // 8/9 (luật giá úp mở, Thanh): số chính xác không được lọt ra kênh công khai.
+      '9.900.000', '9,9 triệu', '9tr9', '12.000.000',
     ],
-    why: 'Đây là NHÓM DUY NHẤT được nói tới tiết kiệm dầu/nhiên liệu. Tuyệt đối không tự bịa con số phần trăm tiết kiệm nếu tài liệu không ghi.',
+    why: 'Đây là NHÓM DUY NHẤT được nói tới tiết kiệm dầu/nhiên liệu. Tuyệt đối không tự bịa con số phần trăm tiết kiệm nếu tài liệu không ghi. 8/9/2026 Thanh chốt: bài công khai chỉ mốc giá úp mở ("từ 12 triệu giảm còn 9,X triệu"), số chính xác chỉ nói trong inbox.',
   },
   {
     key: 'comm',

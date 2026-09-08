@@ -3,7 +3,7 @@
 import { assessDraft, scanPlaybook, countWords, firstBodyLine } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
-import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices } from './products.mjs';
 import { insightBrief } from './insights.mjs';
 import { logTokenUsage } from './token-log.mjs';
 import { sampleHooks } from './hook-library.mjs';
@@ -88,13 +88,17 @@ export async function generateSocialPost({
 
   const features = getFeatures(productGroup);
   const isTikTok = channel === 'tiktok';
+  // 8/9: tên gọi công khai (máy lọc dầu = SF300B) + mốc giá ÚP MỞ (luật Thanh 8/9 chiều: bài công
+  // khai không ghi số chính xác, chỉ "9,X triệu" để bà con nhắn hỏi). Dữ liệu ở products.mjs.
+  const shownName = publicName(productGroup) || productName;
+  const teaser = getPriceTeaser(productGroup);
   // Ưu tiên emotionOverride (BOSS đã chốt chữ cho ngày đó theo playbook), rồi mới tới
   // angleOverride cũ, cuối cùng random 4 chữ. Cách này giữ tương thích với chỗ gọi cũ.
   const emotionAngle = emotionOverride ? pickAngleForEmotion(emotionOverride) : null;
   const angle = emotionAngle || angleOverride || ANGLES[Math.floor(Math.random() * ANGLES.length)];
   const system = [
     'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
-    `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${productName}". Bắt buộc: nêu rõ tên sản phẩm này, 1 tới 2 lợi ích thật của nó. Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
+    `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${shownName}". Bắt buộc: nêu rõ tên sản phẩm này (gọi đúng tên "${shownName}", không gọi tên khác), 1 tới 2 lợi ích thật của nó. Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
     'Giọng BẠN THUYỀN kể chuyện cho bạn nghe (không phải tờ rơi kỹ thuật, không sáo rỗng, không "công nghệ tiên tiến", không "thiết kế gọn gàng"). Câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM ĐANG VIẾT (xem SỰ THẬT NGHỀ bên dưới); KHÔNG gán lợi ích của sản phẩm khác.',
     '',
     'CÂU ĐẦU CỦA BODY = HOOK NGHỊCH LÝ MẤT MÁT, dưới 15 chữ, khúc mạnh nhất đặt đầu (tránh bị "See more" cắt). Nghịch lý = thành quả lớn bị phá bởi nguyên nhân nhỏ. Ví dụ chuẩn: "Trúng luồng cá mà phải quay vào bờ chỉ vì hết nước ngọt." — 13 chữ, tiếc đứt ruột, tự soi mình.',
@@ -108,11 +112,14 @@ export async function generateSocialPost({
     '5) TIN CẬY 1 CÂU DUY NHẤT: lắp tận bến, bảo hành, hướng dẫn tới khi quen tay. Đủ, không sa đà khoe.',
     '6) CTA MỞ CHUYỆN: một CÂU HỎI mở kéo comment (hỏi con số/kinh nghiệm ngư dân thường có, kiểu "anh thường đi mấy ngày một chuyến, tốn bao nhiêu khối nước?") + một TỪ KHÓA NGẮN mời nhắn Page nhẹ nhàng (ví dụ nhắn "NƯỚC" / "DẦU" / "VMS" cho page, mình gửi thông tin — không gọi làm phiền). KHÔNG đòi gọi tổng đài trong bài (tệp mới, đòi gọi là quá sức).',
     '',
-    ...guardLines(productName + ' ' + productGroup),
+    ...guardLines(shownName + ' ' + productName + ' ' + productGroup),
     'Chèn vài emoji hợp cảnh biển và thiết bị cho sinh động (ví dụ ⚓ 🚢 🌊 📡 💧 🛟 📞), đừng lạm dụng.',
     'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn (3.000.000 đồng). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung, không nêu số.',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO; chỉ nói phân phối, lắp đặt, tương thích.',
+    teaser
+      ? `GIÁ (luật 8/9, BẮT BUỘC): bài PHẢI có đúng 1 câu nêu mốc giá úp mở, dùng NGUYÊN VĂN cụm "${teaser.text}" (giữ nguyên chữ X, KHÔNG tự đoán hay thay X bằng số). TUYỆT ĐỐI KHÔNG ghi giá chính xác dưới bất kỳ dạng nào (không 9.900.000 đ, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu). Ngay sau câu giá: mời bà con nhắn hoặc để số để nhận giá chính xác, kỹ thuật lắp tận tàu. Câu giá đặt ở nhịp 4 hoặc 5 (với chú thích TikTok hay bài ảnh thì đặt ngay trước câu hỏi cuối), KHÔNG đặt làm câu đầu.`
+      : '',
     photoOnly
       ? 'ĐÂY LÀ BÀI ẢNH SẢN PHẨM (ảnh là chính, chữ là phụ): chỉ 3 tới 5 câu thật ngắn, tổng dưới 70 chữ, mỗi câu một dòng. Câu đầu là hook nghịch lý dưới 15 chữ. Giữa bài: sản phẩm gì, lo được chuyện gì cho bà con, có 1 con số thật nếu danh sách cho phép. Câu cuối: 1 câu hỏi ngắn kèm từ khóa mời nhắn Page. KHÔNG viết đủ 6 nhịp, KHÔNG gạch đầu dòng, KHÔNG kể chuyện dài.'
       : isTikTok
@@ -135,7 +142,7 @@ export async function generateSocialPost({
 
   const insightText = insight ? insightBrief(insight) : '';
   const user = [
-    `Sản phẩm: "${productName}".`,
+    `Sản phẩm: "${shownName}".`,
     features.length ? 'Đặc điểm sản phẩm (nêu đúng, chọn vài ý nổi bật, không thêm thông số ngoài danh sách này):\n- ' + features.join('\n- ') : '',
     hasVideo ? 'Bài có kèm video minh họa.' : photoOnly ? 'Bài đăng kèm ẢNH SẢN PHẨM thật, chữ chỉ là chú thích ngắn cho ảnh.' : 'Bài dùng ảnh minh họa.',
     insightText,
@@ -187,6 +194,13 @@ export async function generateSocialPost({
     violations = guardViolations(`${headline}\n${body}`, topic);
     playbookLast = scanPlaybook(body, { kind: 'sales' });
     if (!violations.length && !playbookLast.violations.length) break;
+  }
+
+  // 8/9: lưới giá — chặn số tiền chính xác lọt ra kênh công khai và bảo đảm có câu giá úp mở
+  // (kể cả khi model quên). Nhóm không có giá thì hai hàm này trả nguyên văn.
+  if (teaser) {
+    body = ensurePriceTeaser(body, teaser);
+    headline = redactExactPrices(headline);
   }
 
   const tags = hashtagBlock(productGroup);

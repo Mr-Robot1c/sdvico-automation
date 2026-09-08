@@ -3,7 +3,7 @@
 import { assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
-import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices } from './products.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -59,12 +59,19 @@ export async function generateSocialPost({ productGroup, productName, channel, h
 
   const features = getFeatures(productGroup);
   const isTikTok = channel === 'tiktok';
+  // 8/9: tên gọi công khai (máy lọc dầu = SF300B) + mốc giá ÚP MỞ (luật Thanh 8/9 chiều: bài công
+  // khai không ghi số chính xác, chỉ "9,X triệu" để bà con nhắn hỏi). Dữ liệu ở products.mjs.
+  const shownName = publicName(productGroup) || productName;
+  const teaser = getPriceTeaser(productGroup);
   const angle = ANGLES[Math.floor(Math.random() * ANGLES.length)];
   const system = [
     'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
-    `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${productName}". Bắt buộc: nêu rõ tên sản phẩm này, 1 tới 2 lợi ích thật của nó, và MỜI bà con liên hệ SDVICO để mua hoặc lắp đặt (SDVICO phân phối chính hãng, lắp đặt tận bến, bảo hành). Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
+    `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${shownName}". Bắt buộc: nêu rõ tên sản phẩm này (gọi đúng tên "${shownName}", không gọi tên khác), 1 tới 2 lợi ích thật của nó, và MỜI bà con liên hệ SDVICO để mua hoặc lắp đặt (SDVICO phân phối chính hãng, lắp đặt tận bến, bảo hành). Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
     'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM ĐANG VIẾT (xem SỰ THẬT NGHỀ bên dưới); KHÔNG gán lợi ích của sản phẩm khác.',
-    ...guardLines(productName + ' ' + productGroup),
+    ...guardLines(shownName + ' ' + productName + ' ' + productGroup),
+    teaser
+      ? `GIÁ (luật 8/9, BẮT BUỘC): bài PHẢI có đúng 1 câu nêu mốc giá úp mở, dùng NGUYÊN VĂN cụm "${teaser.text}" (giữ nguyên chữ X, KHÔNG tự đoán hay thay X bằng số). TUYỆT ĐỐI KHÔNG ghi giá chính xác dưới bất kỳ dạng nào (không 9.900.000 đ, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu). Ngay sau câu giá: mời bà con nhắn hoặc để số để nhận giá chính xác, kỹ thuật lắp tận tàu. Câu giá đặt gần cuối, ngay trước lời mời, KHÔNG đặt làm câu đầu.`
+      : '',
     'Chèn vài emoji hợp cảnh biển và thiết bị cho sinh động (ví dụ ⚓ 🚢 🌊 📡 💧 🛟 📞), đừng lạm dụng.',
     'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn (3.000.000 đồng). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung, không nêu số.',
@@ -79,7 +86,7 @@ export async function generateSocialPost({ productGroup, productName, channel, h
   ].join('\n');
 
   const user = [
-    `Sản phẩm: "${productName}".`,
+    `Sản phẩm: "${shownName}".`,
     features.length ? 'Đặc điểm sản phẩm (nêu đúng, chọn vài ý nổi bật, không thêm thông số ngoài danh sách này):\n- ' + features.join('\n- ') : '',
     hasVideo ? 'Bài có kèm video minh họa.' : 'Bài dùng ảnh minh họa.',
     `Góc tiếp cận lần này: ${angle}.`,
@@ -107,6 +114,13 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     if (!body) throw new Error('Gemini trả rỗng.');
     violations = guardViolations(`${headline}\n${body}`, topic);
     if (!violations.length) break;
+  }
+
+  // 8/9: lưới giá — chặn số tiền chính xác lọt ra kênh công khai và bảo đảm có câu giá úp mở
+  // (kể cả khi model quên). Nhóm không có giá thì hai hàm này trả nguyên văn.
+  if (teaser) {
+    body = ensurePriceTeaser(body, teaser);
+    headline = redactExactPrices(headline);
   }
 
   const tags = hashtagBlock(productGroup);

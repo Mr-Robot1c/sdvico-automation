@@ -29,6 +29,24 @@ export const PRODUCT_FACTS = [
   // ==== Số thật sẽ điền ở đây với verified:true, ví dụ (đang chú thích): ====
   // { category: 'giam_sat_hanh_trinh', brand: '...', model: '...', attribute: 'khang_nuoc',
   //   value: 'IP67', source: 'catalogue hãng 2026', confirmedBy: 'Phòng KD', confirmedAt: '2026-08-12', verified: true },
+  // 8/9/2026: máy lọc dầu SF300B (folder kho "9. Máy Lọc Dầu Diesel SD12-300", SD12-300 chỉ là mã bơm).
+  // Nguồn: file "Tính năng.txt" folder "Lọc dầu SF300B" Thanh cấp 8/9; cùng nội dung đã nạp bảng
+  // product_facts. Có dòng này để bộ quét không gắn cờ "SF300B chưa xác nhận" ở đường dùng mảng tĩnh.
+  { category: '9. Máy Lọc Dầu Diesel SD12-300', brand: null, model: 'SF300B',
+    attribute: 'tên gọi công khai', value: 'SF300B',
+    source: 'Tính năng.txt folder Lọc dầu SF300B (Thanh, 8/9/2026)', confirmedBy: 'Thanh Huynh', confirmedAt: '2026-09-08', verified: true },
+  { category: '9. Máy Lọc Dầu Diesel SD12-300', brand: null, model: 'SF300B',
+    attribute: 'độ lọc', value: '1 tới 10 micromet',
+    source: 'Tính năng.txt folder Lọc dầu SF300B (Thanh, 8/9/2026)', confirmedBy: 'Thanh Huynh', confirmedAt: '2026-09-08', verified: true },
+  { category: '9. Máy Lọc Dầu Diesel SD12-300', brand: null, model: 'SF300B',
+    attribute: 'kích thước', value: '52 x 20 x 50 cm',
+    source: 'Tính năng.txt folder Lọc dầu SF300B (Thanh, 8/9/2026)', confirmedBy: 'Thanh Huynh', confirmedAt: '2026-09-08', verified: true },
+  { category: '9. Máy Lọc Dầu Diesel SD12-300', brand: null, model: 'SF300B',
+    attribute: 'trọng lượng', value: '15 kg',
+    source: 'Tính năng.txt folder Lọc dầu SF300B (Thanh, 8/9/2026)', confirmedBy: 'Thanh Huynh', confirmedAt: '2026-09-08', verified: true },
+  { category: '9. Máy Lọc Dầu Diesel SD12-300', brand: null, model: 'SF300B',
+    attribute: 'bảo hành', value: '12 tháng',
+    source: 'Tính năng.txt folder Lọc dầu SF300B (Thanh, 8/9/2026)', confirmedBy: 'Thanh Huynh', confirmedAt: '2026-09-08', verified: true },
 ];
 
 function normalize(s) {
