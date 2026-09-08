@@ -35,7 +35,7 @@ ngày tới 32 bản.
 - `apps/approval-ui/package.json`: bỏ dependency `@ffmpeg-installer/ffmpeg` (dây chuyền video
   ở `packages/marketing` vẫn giữ, chạy trên GitHub Actions và máy local, không liên quan Vercel).
 
-Kỳ vọng: gói function mỗi bản deploy giảm từ 37,8 MB xuống dưới 10 MB.
+Đo trên bản preview 8/9 sau khi sửa: gói function mỗi bản deploy còn 15,4 MB (trước 37,8 MB). Phần còn lại là @napi-rs/canvas (vẽ banner), @google/genai, supabase-js; muốn gọn hơn nữa thì tách bước vẽ banner ra ngoài Vercel.
 
 ## 3. Việc người quản trị làm trên Vercel (không làm bằng code được)
 
