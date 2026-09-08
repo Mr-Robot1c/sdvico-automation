@@ -378,14 +378,24 @@ export async function GET(req: Request) {
   // 5/9 chiều (user: "lâu lâu có thể thêm bài bán chỉ có hình ảnh sản phẩm"): khoảng 1/4 bài bán
   // Facebook ra BÀI ẢNH: ảnh sản phẩm là chính, chữ 3 tới 5 câu, không dựng video.
   const PHOTO_POST_RATE = 0.25;
+  // 8/9 tối (Thanh): chỉ SEA-40 và SF300B (folder 9) được dựng video bán hàng; sản phẩm khác LUÔN
+  // ra bài ảnh, không chiếm ô YouTube/TikTok (rơi về Facebook như folder không có clip). SF-50 ngừng
+  // bán -> bỏ qua dù kế hoạch còn nhắc.
+  // @ts-ignore — module JS thuần
+  const { isPhotoOnlyGroup, isDiscontinuedGroup } = await import('../../../lib/gen/products.mjs');
 
   for (const [k, pf] of pickedFolders.entries()) {
     const group = pf.group;
     const f = folders.get(group)!;
     const name = productName(group);
     const sug = pf.suggestion;
+    if (isDiscontinuedGroup(group)) {
+      skipped.push({ group, reason: 'san pham NGUNG BAN (DISCONTINUED_GROUPS, 8/9: chi con SF300B) -> bo qua' });
+      continue;
+    }
+    const photoOnlyGroup: boolean = isPhotoOnlyGroup(group);
     // Folder có CLIP GỐC mới yêu cầu dựng video AI; chỉ ảnh thì đăng bài ảnh, không dựng.
-    const wantVideo = f.videos.length > 0;
+    const wantVideo = f.videos.length > 0 && !photoOnlyGroup;
 
     {
       const pool: A[] = f.images;
@@ -405,15 +415,16 @@ export async function GET(req: Request) {
       //   Không đủ điều kiện -> rơi về Facebook, ghi lý do vào skipped để đọc run_log là biết.
       const ps = saleSlots[k] || saleSlots[saleSlots.length - 1] || null;
       let channels: string[] = ['facebook'];
+      const noClipWhy = photoOnlyGroup ? 'san pham chi ra bai anh (PHOTO_ONLY_GROUPS)' : 'folder khong co clip goc';
       if (ps?.channel === 'youtube') {
         if (wantVideo && process.env.YOUTUBE_REFRESH_TOKEN) channels = ['youtube'];
-        else skipped.push({ group, reason: `o ${ps.time} la YouTube nhung ${wantVideo ? 'chua co YOUTUBE_REFRESH_TOKEN' : 'folder khong co clip goc'} -> dang Facebook` });
+        else skipped.push({ group, reason: `o ${ps.time} la YouTube nhung ${wantVideo ? 'chua co YOUTUBE_REFRESH_TOKEN' : noClipWhy} -> dang Facebook` });
       } else if (ps?.channel === 'tiktok') {
         if (wantVideo) channels = ['tiktok'];
-        else skipped.push({ group, reason: `o ${ps.time} la TikTok nhung folder khong co clip goc -> dang Facebook` });
+        else skipped.push({ group, reason: `o ${ps.time} la TikTok nhung ${noClipWhy} -> dang Facebook` });
       }
       const planSlot = ps ? { date: todayDate, index: ps.index, time: ps.time, channel: channels[0], group_id: ps.group_id || null, group_label: ps.group_label } : null;
-      const photoOnly = channels[0] === 'facebook' && Math.random() < PHOTO_POST_RATE;
+      const photoOnly = channels[0] === 'facebook' && (photoOnlyGroup || Math.random() < PHOTO_POST_RATE);
       const videoWanted = wantVideo && !photoOnly;
       const assets = { image: img.id, video: null };
 
