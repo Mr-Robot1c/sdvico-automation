@@ -26,6 +26,10 @@ ok('spoken nối cảnh cuối', ensureSpokenTeaser('Dầu sạch, máy khỏe!'
 ok('spoken không nối đôi', (ensureSpokenTeaser(PRICE_TEASER[G2].spoken, PRICE_TEASER[G2]).match(/hơn 30 triệu/g) || []).length === 1);
 ok('spoken chặn số', !/9\.900\.000/.test(ensureSpokenTeaser('Giá 9.900.000 đ nha.', PRICE_TEASER[G9])));
 eq('tên công khai', publicName(G9), 'Máy lọc dầu SF300B');
+// 9/9: lời đọc cảnh cuối kêu bình luận từ khóa (không "nhắn Page", không "cmt" vì TTS đọc từng chữ cái).
+for (const [g, t] of Object.entries(PRICE_TEASER)) {
+  ok(`spoken kêu bình luận ${g.slice(0, 2)}`, /Bình luận lọc dầu hay lọc nước/.test(t.spoken) && !/nhắn Page|cmt/i.test(t.spoken), t.spoken);
+}
 for (const [g, t] of Object.entries(PRICE_TEASER)) {
   for (const f of ['text', 'spoken', 'badge']) {
     ok(`style sạch ${g.slice(0, 2)} ${f}`, scanStyle(t[f]).length === 0, scanStyle(t[f]));

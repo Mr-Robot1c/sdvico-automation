@@ -84,7 +84,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'CẢNH CUỐI: 1 câu chốt ngắn về LỢI ÍCH/thông điệp sản phẩm (đã có luật ở trên), có thể là câu hỏi mở nhẹ cho bà con nghĩ tiếp. KHÔNG nhắc "gọi", "liên hệ", "hotline" — outro cố định đầu ký đã lo phần đó.',
     shownName ? `TÊN SẢN PHẨM: gọi đúng "${shownName}" trong lời thoại, KHÔNG gọi tên khác, KHÔNG đọc mã SD12-300.` : '',
     teaser
-      ? `GIÁ (luật 8/9, BẮT BUỘC): CẢNH CUỐI phải có đúng 1 câu mốc giá, dùng NGUYÊN VĂN: "${teaser.spoken}". Đây là câu DUY NHẤT được nhắc "nhắn Page". TUYỆT ĐỐI KHÔNG đọc giá chính xác (không 9.900.000, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu), KHÔNG tự thêm con số tiền nào khác. Các cảnh trước KHÔNG nhắc giá.`
+      ? `GIÁ (luật 8/9, BẮT BUỘC): CẢNH CUỐI phải có đúng 1 câu mốc giá, dùng NGUYÊN VĂN: "${teaser.spoken}". Đây là câu DUY NHẤT được kêu bà con bình luận (từ khóa lọc dầu / lọc nước), các cảnh khác không nhắc bình luận, nhắn Page hay gọi. TUYỆT ĐỐI KHÔNG đọc giá chính xác (không 9.900.000, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu), KHÔNG tự thêm con số tiền nào khác. Các cảnh trước KHÔNG nhắc giá.`
       : '',
     ...guardLines(`${content.title || ''} ${content.draft || ''} ${content.brief?.rotation_group || ''}`),
     'Số theo chuẩn Việt Nam (dấu chấm ngăn hàng nghìn). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',

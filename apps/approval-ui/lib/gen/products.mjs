@@ -132,14 +132,14 @@ export const PRICE_TEASER = {
   '2. Máy lọc nước biển SEA-40': {
     text: 'Tháng 9 giảm 7 triệu, máy cơ chỉ còn 3X triệu, máy chạy điện 4X triệu',
     key: '3X triệu',
-    spoken: 'Tháng 9 giảm 7 triệu, máy cơ còn hơn 30 triệu thôi. Nhắn Page nhận giá chính xác nha!',
+    spoken: 'Tháng 9 giảm 7 triệu, máy cơ còn hơn 30 triệu thôi. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
     spokenKey: 'hơn 30 triệu',
     badge: 'Tháng 9 giảm 7 triệu\nMáy cơ chỉ còn 3X triệu',
   },
   '9. Máy Lọc Dầu Diesel SD12-300': {
     text: 'Tháng 9 từ 12 triệu giảm còn 9,X triệu',
     key: '9,X triệu',
-    spoken: 'Tháng 9 từ 12 triệu giảm còn chưa tới 10 triệu. Nhắn Page nhận giá chính xác nha!',
+    spoken: 'Tháng 9 từ 12 triệu giảm còn chưa tới 10 triệu. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
     spokenKey: 'chưa tới 10 triệu',
     badge: 'Tháng 9: từ 12 triệu\ncòn 9,X triệu',
   },
