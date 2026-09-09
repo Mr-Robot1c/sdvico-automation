@@ -151,9 +151,9 @@ export async function GET(req: Request) {
   //    (user chốt 18/8: "folder sản phẩm có video thì ghép video AI, không thì thôi").
   const { data: assetsRaw } = await client
     .from('brand_assets')
-    .select('id, kind, title, product_group, source')
+    .select('id, kind, title, product_group, source, created_at')
     .not('product_group', 'is', null);
-  type A = { id: string; kind: string; title: string; product_group: string; source?: string | null };
+  type A = { id: string; kind: string; title: string; product_group: string; source?: string | null; created_at?: string | null };
   const folders = new Map<string, { images: A[]; videos: A[] }>();
   for (const a of (assetsRaw || []) as A[]) {
     if (!folders.has(a.product_group)) folders.set(a.product_group, { images: [], videos: [] });
@@ -555,6 +555,43 @@ export async function GET(req: Request) {
       for (const id of ids) if (!recentlyUsedImages.has(id)) recentlyUsedImages.set(id, String(r.created_at || ''));
     }
   } catch { /* thiếu thì không né, vẫn chọn như cũ */ }
+  // 9/9 (user: video "người thật tàu thật"): bài content được yêu cầu dựng video khi folder Content
+  // có CLIP ZALO MỚI (14 ngày) chưa dùng. Mỗi clip chỉ làm 1 video content (build-video ghi id cảnh
+  // vào brief.video_scene_assets; rotate ghi content_clip_id ngay khi chọn). Ngân sách GitHub
+  // Actions: tối đa 1 video content/ngày, đếm bằng cờ content_video (giữ nguyên sau khi dựng,
+  // khác video_requested bị hạ về false khi dựng xong).
+  // @ts-ignore — module JS thuần
+  const { pickFreshClips } = await import('../../../lib/gen/fresh-clip.mjs');
+  const usedClipIds = new Set<string>();
+  const collectUsed = (rows: any[]) => {
+    for (const r of rows) {
+      const arr = Array.isArray(r.brief?.video_scene_assets) ? r.brief.video_scene_assets : [];
+      for (const id of arr) usedClipIds.add(String(id));
+      if (r.brief?.content_clip_id) usedClipIds.add(String(r.brief.content_clip_id));
+    }
+  };
+  try {
+    const { data: usedRows, error: usedErr } = await client
+      .from('mkt_content').select('brief')
+      .or('brief->video_scene_assets.not.is.null,brief->content_clip_id.not.is.null')
+      .order('created_at', { ascending: false }).limit(200);
+    if (usedErr) throw usedErr;
+    collectUsed((usedRows || []) as any[]);
+  } catch {
+    // Lọc JSON lỗi (PostgREST cũ) -> quét 300 bài gần nhất, chậm hơn nhưng không bỏ sót.
+    const { data: fallbackRows } = await client
+      .from('mkt_content').select('brief').order('created_at', { ascending: false }).limit(300);
+    collectUsed((fallbackRows || []) as any[]);
+  }
+  let contentVideoToday = 1;
+  try {
+    const { count } = await client
+      .from('mkt_content').select('id', { count: 'exact', head: true })
+      .gte('created_at', dayStartIso).eq('brief->>content_video', 'true');
+    contentVideoToday = count || 0;
+  } catch { /* không đếm được thì coi như đã có, không dựng thêm */ }
+  // Loại bài hợp kể chuyện hiện trường; checklist/glossary/news/portrait vẫn bài ảnh.
+  const CONTENT_VIDEO_KINDS = new Set(['viral', 'seeding', 'engage', 'tip', 'qa']);
   for (let i = 0; i < contentCount; i++) {
     // Chọn CỤM CONTENT theo tỷ lệ đề xuất Phòng KD (tuần 5 bài content):
     //   qa=2, checklist=2, glossary=1, tip=1, engage=1, portrait=1, news=1 -> tổng 9 lượt/vòng.
@@ -594,9 +631,22 @@ export async function GET(req: Request) {
       viral: 'một khoảnh khắc hoặc tình huống có thật trên biển khiến bà con phải bàn tán, tự chọn theo chữ cảm xúc đã giao',
       seeding: 'một nỗi lo thật của bà con trước chuyến biển (nước ngọt, dầu máy, tín hiệu giám sát, chi phí...)',
     };
-    const chosenTopic = topicsOfKind.length
+    let chosenTopic = topicsOfKind.length
       ? pickRandom(topicsOfKind)
       : (KIND_FALLBACK_TOPIC[chosenKind] ? { type: chosenKind, topic: KIND_FALLBACK_TOPIC[chosenKind] } : undefined);
+
+    // 9/9: có clip thật mới + loại bài hợp + hôm nay chưa có video content -> chủ đề bám clip,
+    // yêu cầu dựng video (cảnh 1 bắt buộc dùng clip, xem packages/marketing/src/video/script.mjs).
+    const freshClips = CONTENT_VIDEO_KINDS.has(chosenKind) && contentVideoToday < 1
+      ? pickFreshClips(folders.get('Content')?.videos || [], usedClipIds)
+      : [];
+    const contentClip = freshClips[0] || null;
+    if (contentClip) {
+      chosenTopic = {
+        type: chosenKind,
+        topic: `Kể chuyện từ clip thật đội SDVICO vừa quay tại hiện trường: "${contentClip.title}". Mở bài bằng kết quả nhìn thấy trong clip, kể người thật việc thật, không bán hàng, kết bằng câu hỏi mở.`,
+      };
+    }
 
     let gen: any;
     try {
@@ -667,6 +717,7 @@ export async function GET(req: Request) {
           ...(picked.note ? { image_note: picked.note } : {}),
           ...(picked.reason ? { image_reason: picked.reason } : {}),
           ...(picked.warn ? { image_warn: picked.warn } : {}),
+          ...(contentClip ? { video_requested: true, video_short: true, content_video: true, content_clip_id: contentClip.id, content_clip_title: contentClip.title } : {}),
         },
         draft: gen.text,
         status: 'review',
@@ -675,13 +726,14 @@ export async function GET(req: Request) {
       .select('id')
       .single();
     if (ce || !ins) { skipped.push({ group: 'Bài content', reason: 'insert loi' }); break; }
+    if (contentClip) { usedClipIds.add(contentClip.id); contentVideoToday += 1; }
     await client.from('approval_queue').insert({
       kind: 'mkt_publish_content',
       title: `${kindTag} ${displayTitle}`,
       payload: { content_id: (ins as { id: string }).id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels, authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov, ...(planSlotC ? { plan_time: planTimeLocal(todayDate, planSlotC.time), plan_channel: 'facebook', plan_group: planSlotC.group_label, plan_slot_index: planSlotC.index } : {}) },
       status: 'pending',
     });
-    results.push({ group: 'Bài content', kind, channels, contentId: (ins as { id: string }).id, risk, needsGov, image_via: picked.via, image_note: picked.note });
+    results.push({ group: 'Bài content', kind, channels, contentId: (ins as { id: string }).id, risk, needsGov, image_via: picked.via, image_note: picked.note, video_requested: !!contentClip, content_clip: contentClip ? contentClip.title : null });
   }
 
   // 29/8 (bỏ A/B): mỗi hướng đi = 1 bài — sinh xong đánh used_at NGAY (kèm a_image_id để

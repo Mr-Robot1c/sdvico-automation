@@ -17,6 +17,7 @@ import { generateVideoScript, stripGreeting } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
 import { getPriceTeaser, redactExactPrices } from '../products.mjs';
+import { pickFreshClips, clipLabel } from './fresh-clip.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { pythonCmd } from '../platform.mjs';
 
@@ -514,7 +515,7 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
 // Đẩy video (CẢ 2 bản ngang 16:9 + dọc 9:16) vào Hàng đợi duyệt: upload Storage + brand_assets +
 // mkt_content + approval_queue (pending, kênh Facebook + TikTok). Người bấm Duyệt (điều cấm 1).
 // Lúc đăng: FB dùng video_h (ngang), TikTok dùng video_v (dọc).
-async function pushToApprovalQueue(client, { content, script, horizontalPath, verticalPath, teaser = null }) {
+async function pushToApprovalQueue(client, { content, script, horizontalPath, verticalPath, teaser = null, mustUseAssetId = null }) {
   const title = redactExactPrices((script.titles && script.titles[0]) || content.title || 'Video SDVICO');
 
   // Helper upload 1 file mp4 -> brand_assets, trả về id.
@@ -580,6 +581,8 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
       video_titles: script.titles || [],
       video_risk: risk,
       video_compliance: script.assessment?.flags || {},
+      video_scene_assets: script.sceneAssets || [],   // 9/9: id tư liệu từng cảnh, để đo clip nào đã lên video
+      video_must_use: mustUseAssetId,
     };
     const { error: ue } = await client.from('mkt_content').update({ brief: newBrief }).eq('id', content.id);
     if (ue) throw new Error('mkt_content update: ' + ue.message);
@@ -603,7 +606,7 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
 
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: 'social', title,
-    brief: { keyword: title, intent: 'giao_dich', assets, channels, generator: 'video-pipeline', post_kind: 'video', source_content: content.id, risk, compliance: script.assessment?.flags || {}, ...abMeta },
+    brief: { keyword: title, intent: 'giao_dich', assets, channels, generator: 'video-pipeline', post_kind: 'video', source_content: content.id, risk, compliance: script.assessment?.flags || {}, ...abMeta, video_scene_assets: script.sceneAssets || [], video_must_use: mustUseAssetId },
     draft: caption, status: 'review', needs_gov_review: risk === 'red',
   }).select('id').single();
   if (ce || !ins) throw new Error('mkt_content: ' + (ce?.message || ''));
@@ -675,11 +678,19 @@ async function main() {
   if (productGroup === 'Bài content' || brief.post_kind === 'content') productGroup = CONTENT_GROUP;
   if (!productGroup) throw new Error('Bài chưa gán sản phẩm (không đoán được từ tiêu đề/nội dung). Gán product_group ở /tu-lieu hoặc đặt tiêu đề rõ hơn.');
   const { data: assets } = await client.from('brand_assets')
-    .select('id, kind, title, storage_path')
+    .select('id, kind, title, storage_path, source, created_at')
     .eq('product_group', productGroup)
     .order('created_at', { ascending: false });
   if (!assets?.length) throw new Error(`Sản phẩm "${productGroup}" chưa có tư liệu trong brand_assets.`);
   console.log(`Sản phẩm: ${productGroup} (${assets.length} tư liệu)`);
+  // 9/9 (user: video "người thật tàu thật"): ÉP CLIP THẬT vào cảnh 1. Bài content: clip rotate
+  // đã chọn (brief.content_clip_id). Bài bán: clip Zalo mới nhất (14 ngày) của folder sản phẩm.
+  // Không có clip mới -> null, video dựng như cũ (ảnh + clip cũ do model chọn).
+  const contentVideo = productGroup === CONTENT_GROUP || brief.post_kind === 'content';
+  let mustUseAssetId = brief.content_clip_id && assets.some((a) => a.id === brief.content_clip_id) ? brief.content_clip_id : null;
+  if (!mustUseAssetId) mustUseAssetId = pickFreshClips(assets)[0]?.id || null;
+  if (mustUseAssetId) console.log('Clip thật bắt buộc (cảnh 1):', assets.find((a) => a.id === mustUseAssetId)?.title, `(${mustUseAssetId.slice(0, 8)})`);
+  else console.log('Không có clip Zalo mới trong 14 ngày, model tự chọn tư liệu như cũ.');
 
   // Kịch bản. 29/8 (bỏ A/B): chế độ SHORTS 10-20 giây giờ theo cờ brief.video_short (rotate
   // đặt cho mọi bài bán có video); brief.ab_pair_id giữ cho bài cũ trước 29/8.
@@ -691,11 +702,12 @@ async function main() {
   console.log(`Sinh kịch bản (Gemini)${isShort ? ' - che do SHORTS 10-20s' : ''}...`);
   const script = await generateVideoScript(
     content,
-    assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title })),
+    assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, label: clipLabel(a) })),
     PRODUCT_FACTS,
-    { short: isShort, productGroup, salesVideo },
+    { short: isShort, productGroup, salesVideo, mustUseAssetId, contentVideo },
     _tokenLogClient
   );
+  console.log('Tư liệu dùng trong cảnh:', (script.sceneAssets || []).map((id) => id.slice(0, 8)).join(', '));
   console.log('Tiêu đề:', script.titles);
   console.log('Rủi ro tuân thủ:', script.assessment.risk, JSON.stringify(script.assessment.flags));
   console.log('Cảnh: dọc', script.vertical.length);
@@ -744,7 +756,7 @@ async function main() {
   // Đẩy vào Hàng đợi duyệt (một file dọc dùng cho cả FB lẫn TikTok).
   if (!process.argv.includes('--no-queue')) {
     try {
-      await pushToApprovalQueue(client, { content, script, horizontalPath: null, verticalPath: vertical.out, teaser });
+      await pushToApprovalQueue(client, { content, script, horizontalPath: null, verticalPath: vertical.out, teaser, mustUseAssetId });
     } catch (e) {
       console.warn('Không đẩy được vào Hàng đợi duyệt:', e.message, '(video vẫn có ở out/video/).');
     }

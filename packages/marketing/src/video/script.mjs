@@ -69,19 +69,30 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     .map((f) => `${f.brand || ''} ${f.model || ''} ${f.attribute}: ${f.value}${f.verified ? '' : ' (CHƯA XÁC NHẬN)'}`.trim());
 
   const assetList = assets
-    .map((a) => `- id=${a.id} | ${a.kind} | ${a.title}`)
+    .map((a) => `- id=${a.id} | ${a.kind} | ${a.title}${a.label ? ` | ${a.label}` : ''}`)
     .join('\n');
+
+  // 9/9 (user: video "người thật tàu thật"): video CONTENT dựng từ clip thật, không bán hàng.
+  const CONTENT_STRUCTURE = [
+    'ĐÂY LÀ VIDEO CỘNG ĐỒNG "NGƯỜI THẬT TÀU THẬT": dựng từ clip THẬT đội SDVICO quay tại tàu, cảng, xưởng. KHÔNG bán hàng, KHÔNG nhắc giá, KHÔNG kêu nhắn Page hay gọi điện. Sản phẩm chỉ xuất hiện khi bài nguồn kể tới, và chỉ như một phần câu chuyện.',
+    'CẢNH ĐẦU: mở bằng KẾT QUẢ nhìn thấy trong clip, 1 câu khẳng định <=15 chữ (ví dụ về CẤU TRÚC, chủ đề khác, CẤM chép: "Bình ắc quy chết queo, 20 phút sau đèn sáng lại."), rồi 1 câu nói rõ đây là cảnh thật ở đâu (tên tàu, cảng, tỉnh nếu bài nguồn có; không có thì nói "trên tàu bà con").',
+    'CẢNH GIỮA: kể chuyện có người: ai đang làm gì, vất vả chỗ nào, bà con nói gì. Chạm 1 chữ cảm xúc NGHỀ / TIỀN / RỦI RO / TỰ HÀO như bài nguồn. Không bịa tên người, con số không có trong bài nguồn.',
+    'CẢNH CUỐI: 1 câu hỏi mở kéo bà con bình luận kể chuyện của họ (kinh nghiệm, con số, tàu của họ). Không lời kêu gọi bán hàng.',
+  ];
+  const SALES_STRUCTURE = [
+    'PLAYBOOK 24/8 (bộ lọc vàng): CẢNH ĐẦU phải MỞ NGAY bằng 1 CÂU HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (thành quả lớn bị phá bởi nguyên nhân nhỏ) — ví dụ câu đầu tiên của video: "Trúng luồng cá mà phải quay vào bờ vì hết nước." Cảnh đầu = hook + 1 câu tô đậm nỗi mất, KHÔNG có câu chào phía trước. Bám 1 trong 4 CHỮ CẢM XÚC: NGHỀ (khoe kinh nghiệm) / TIỀN (con số túi tiền) / RỦI RO (cảnh báo sai lầm, mất chuyến) / TỰ HÀO (lộc biển, danh dự nghề). Bài phải chạm đúng 1 chữ, không sáo rỗng.',
+    'HOOK NGHỊCH LÝ = CÂU KHẲNG ĐỊNH có 2 mảnh đối lập: THÀNH QUẢ LỚN + MẤT MÁT BẤT NGỜ. Ví dụ ĐÚNG: "Trúng luồng cá phải quay bờ vì cặn dầu.", "Đổ đầy dầu mà máy vẫn lịm giữa lộng.", "Dầu 38.000đ/lít đốt trôi vì kim phun bẩn." Ví dụ SAI (cấm): "Máy nổ có xót ruột không?", "Bà con có thấy vậy không?", "Anh em có gặp chưa?" — CÂU HỎI thăm/tu từ KHÔNG THAY THẾ được hook nghịch lý. Câu hỏi để dành cảnh cuối.',
+    'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển tiếc nuối, tàu nằm bờ). Không lan man.',
+    'CẢNH GIỮA: lối thoát bằng LỢI ÍCH cụ thể (không liệt kê thông số kỹ thuật khô) → phần thưởng cụ thể (đỡ tốn bao nhiêu, đi được bao xa, chở thêm được gì) → tin cậy 1 câu ngắn (lắp tận bến, bảo hành).',
+    'CẢNH CUỐI: 1 câu chốt ngắn về LỢI ÍCH/thông điệp sản phẩm (đã có luật ở trên), có thể là câu hỏi mở nhẹ cho bà con nghĩ tiếp. KHÔNG nhắc "gọi", "liên hệ", "hotline" — outro cố định đầu ký đã lo phần đó.',
+  ];
 
   const system = [
     'Bạn dựng kịch bản video ngắn cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     'Giọng gần gũi bà con ngư dân, câu ngắn gọn, dễ nghe khi lồng tiếng. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM trong bài nguồn (xem SỰ THẬT NGHỀ bên dưới); KHÔNG tự thêm lợi ích không có trong bài.',
     'LỜI THOẠI PHẢI CÓ CẢM XÚC như người kể chuyện cho bạn nghe (sếp góp ý 21/8: giọng đọc đều đều buồn ngủ): xen câu hỏi tu từ ("Bà con có thấy vậy không?"), câu cảm ngắn ("Đã lắm!", "Yên tâm hẳn!"), ngắt nhịp bằng dấu phẩy và câu ngắn 6 tới 12 chữ. Máy đọc lên xuống giọng THEO DẤU CÂU, nên dấu chấm hỏi, chấm than, dấu phẩy đặt đúng chỗ là giọng có hồn. BẮT BUỘC (sếp 5/9, các sếp chê giọng đều đều): MỖI CẢNH có ít nhất 1 câu cảm ngắn kết bằng dấu chấm than hoặc 1 câu hỏi ngắn kết bằng dấu chấm hỏi; câu dài quá 14 chữ phải tách thành 2 câu.',
     'KHÔNG MỞ ĐẦU BẰNG LỜI CHÀO (sếp bỏ 4/9): CẤM mọi câu chào kiểu "Alo alo bà con ơi!", "Hello anh em đi biển ơi!", "Hello các thuyền trưởng!", "Hello các con vợ ơi!", "Anh em ơi, nghe nè!", "Xin chào bà con", "Chào cả nhà"... Câu ĐẦU TIÊN của video phải là HOOK vào thẳng vấn đề, không chào, không xưng tên kênh. Cả video vẫn nói như người trẻ kể chuyện cho anh em đi biển nghe: năng lượng cao, tự nhiên, có thể chêm "nha", "nè", "luôn á"; NHƯNG vẫn tôn trọng bà con, không chửi bậy, không lố tới mức mất uy tín thiết bị.',
-    'PLAYBOOK 24/8 (bộ lọc vàng): CẢNH ĐẦU phải MỞ NGAY bằng 1 CÂU HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (thành quả lớn bị phá bởi nguyên nhân nhỏ) — ví dụ câu đầu tiên của video: "Trúng luồng cá mà phải quay vào bờ vì hết nước." Cảnh đầu = hook + 1 câu tô đậm nỗi mất, KHÔNG có câu chào phía trước. Bám 1 trong 4 CHỮ CẢM XÚC: NGHỀ (khoe kinh nghiệm) / TIỀN (con số túi tiền) / RỦI RO (cảnh báo sai lầm, mất chuyến) / TỰ HÀO (lộc biển, danh dự nghề). Bài phải chạm đúng 1 chữ, không sáo rỗng.',
-    'HOOK NGHỊCH LÝ = CÂU KHẲNG ĐỊNH có 2 mảnh đối lập: THÀNH QUẢ LỚN + MẤT MÁT BẤT NGỜ. Ví dụ ĐÚNG: "Trúng luồng cá phải quay bờ vì cặn dầu.", "Đổ đầy dầu mà máy vẫn lịm giữa lộng.", "Dầu 38.000đ/lít đốt trôi vì kim phun bẩn." Ví dụ SAI (cấm): "Máy nổ có xót ruột không?", "Bà con có thấy vậy không?", "Anh em có gặp chưa?" — CÂU HỎI thăm/tu từ KHÔNG THAY THẾ được hook nghịch lý. Câu hỏi để dành cảnh cuối.',
-    'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển tiếc nuối, tàu nằm bờ). Không lan man.',
-    'CẢNH GIỮA: lối thoát bằng LỢI ÍCH cụ thể (không liệt kê thông số kỹ thuật khô) → phần thưởng cụ thể (đỡ tốn bao nhiêu, đi được bao xa, chở thêm được gì) → tin cậy 1 câu ngắn (lắp tận bến, bảo hành).',
-    'CẢNH CUỐI: 1 câu chốt ngắn về LỢI ÍCH/thông điệp sản phẩm (đã có luật ở trên), có thể là câu hỏi mở nhẹ cho bà con nghĩ tiếp. KHÔNG nhắc "gọi", "liên hệ", "hotline" — outro cố định đầu ký đã lo phần đó.',
+    ...(opts.contentVideo ? CONTENT_STRUCTURE : SALES_STRUCTURE),
     shownName ? `TÊN SẢN PHẨM: gọi đúng "${shownName}" trong lời thoại, KHÔNG gọi tên khác, KHÔNG đọc mã SD12-300.` : '',
     teaser
       ? `GIÁ (luật 8/9, BẮT BUỘC): CẢNH CUỐI phải có đúng 1 câu mốc giá, dùng NGUYÊN VĂN: "${teaser.spoken}". Đây là câu DUY NHẤT được kêu bà con bình luận (từ khóa lọc dầu / lọc nước), các cảnh khác không nhắc bình luận, nhắn Page hay gọi. TUYỆT ĐỐI KHÔNG đọc giá chính xác (không 9.900.000, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu), KHÔNG tự thêm con số tiền nào khác. Các cảnh trước KHÔNG nhắc giá.`
@@ -91,6 +102,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung.',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO; chỉ nói phân phối, lắp đặt, tương thích.',
     'Mỗi cảnh chọn đúng một tư liệu bằng id trong danh sách, ưu tiên tư liệu khớp nội dung cảnh và ưu tiên video cho cảnh có chuyển động.',
+    opts.mustUseAssetId
+      ? `TƯ LIỆU BẮT BUỘC (9/9): cảnh ĐẦU TIÊN phải dùng id=${opts.mustUseAssetId} (clip thật mới quay, có nhãn CLIP THẬT MỚI trong danh sách). Các cảnh khác ưu tiên tư liệu có nhãn clip thật hơn ảnh.`
+      : '',
     'Lời thoại mỗi cảnh là câu nói trơn, không ghi chú, không tiêu đề, vì sẽ được máy đọc thành tiếng.',
     'CẤM CHÉP VÍ DỤ (5/9: video SF-50 đọc y nguyên câu mẫu trong hướng dẫn): mọi câu VÍ DỤ trong hướng dẫn này chỉ minh họa CẤU TRÚC và cố ý nói về chủ đề khác; không được chép nguyên văn hay gần nguyên văn, không lấy sản phẩm/tình huống trong ví dụ. Lời thoại phải viết MỚI từ chính BÀI NGUỒN bên dưới, dùng tình huống và con số có trong bài.',
     'CẤM cảnh cuối gọi điện / mời liên hệ SDVICO - phần OUTRO cuối video đã đọc "Gọi ngay cho SDVICO 0939 243 222" rồi, KHÔNG lặp lại ở nội dung chính (tránh trùng).',
@@ -114,8 +128,15 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'CHỈ CÓ BẢN DỌC (vertical). Không sinh "horizontal" (sếp 5/9: mọi video đăng lên chỉ 1 dạng dọc cho đồng bộ).',
     '}',
     'FIELD "role" BẮT BUỘC — không được thiếu, không được trùng. Model hay bỏ qua role và gộp/bỏ nhịp; đây là cách ép cấu trúc.',
-    ...(short
+    ...(opts.contentVideo
       ? [
+          'ĐÂY LÀ VIDEO CỘNG ĐỒNG 30-45 giây. CHÍNH XÁC 3 CẢNH, role LẦN LƯỢT: "hook", "story", "closing". KHÔNG thêm, KHÔNG bớt, KHÔNG lặp role.',
+          'CẢNH 1 role="hook" (8-12s, ~25-35 từ): kết quả nhìn thấy trong clip + 1 câu đây là cảnh thật ở đâu.',
+          'CẢNH 2 role="story" (15-20s, ~45-60 từ): chuyện người thật, việc thật, cảm xúc thật theo bài nguồn.',
+          'CẢNH 3 role="closing" (6-10s, ~20-30 từ): 1 câu hỏi mở cho bà con bình luận. Không giá, không gọi, không nhắn Page.',
+        ]
+      : short
+        ? [
           'ĐÂY LÀ VIDEO SHORTS GÂY CHÚ Ý (40-55 giây, tăng từ 18-25s để cảnh empathy có chỗ nêu HẬU QUẢ CHI TIẾT — user 26/8: "thời gian có thể tăng miễn dưới 1 phút").',
           'CHÍNH XÁC 3 CẢNH, role LẦN LƯỢT: "hook", "empathy", "solution". KHÔNG thêm cảnh, KHÔNG bớt cảnh, KHÔNG lặp role.',
           'Bản dọc (vertical): 3 cảnh, tổng lời thoại 40-55 giây (~120-160 từ tiếng Việt). Cả video DƯỚI 60 giây (kể cả outro cố định ~5s).',
@@ -169,7 +190,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     parsed = parseJson(res.text || '');
     // 26/8 siết lần 3: log warning nếu SHORTS thiếu scene role='empathy' (model hay lách gộp
     // vào hook hoặc solution). Không auto-regenerate (đắt token) nhưng log để soi khi debug.
-    if (short) {
+    if (short && !opts.contentVideo) {
       for (const k of ['vertical', 'horizontal']) {
         const roles = (parsed[k]?.scenes || []).map((s) => s?.role);
         if (!roles.includes('empathy')) {
@@ -208,6 +229,12 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     .filter((s) => s.narration && s.assetId);
 
   const vertical = fix(parsed.vertical?.scenes, 'vertical');
+  // 9/9: clip thật bắt buộc. Model quên thì ép vào cảnh 1 (id phải nằm trong danh sách được phép).
+  if (opts.mustUseAssetId && ids.has(opts.mustUseAssetId) && vertical.length && !vertical.some((s) => s.assetId === opts.mustUseAssetId)) {
+    console.warn('[script] model khong dung clip that bat buoc, ep vao canh 1');
+    vertical[0].assetId = opts.mustUseAssetId;
+  }
+  const sceneAssets = [...new Set(vertical.map((s) => s.assetId))];
   // 8/9: cảnh cuối video bán hàng phải có câu mốc giá đọc được (model quên thì nối vào).
   if (teaser && vertical.length) {
     const last = vertical[vertical.length - 1];
@@ -226,5 +253,5 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     testFactValues: testFactValues(facts),
   });
 
-  return { titles, vertical, horizontal, assessment };
+  return { titles, vertical, horizontal, assessment, sceneAssets };
 }

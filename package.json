@@ -15,6 +15,8 @@
     "test:skills": "node packages/marketing/src/test-skills.mjs",
     "test:price": "node packages/marketing/src/test-price-teaser.mjs",
     "test:inbox": "node packages/marketing/src/test-fb-inbox-time.mjs",
+    "test:clip": "node packages/marketing/src/test-fresh-clip.mjs",
+    "zalo:tai-bu": "node packages/marketing/src/tai-bu-media-zalo.mjs",
     "content:run": "node packages/marketing/src/run-content.mjs",
     "publish:fb": "node packages/marketing/src/publish-facebook.mjs",
     "seo:audit": "node packages/marketing/src/seo-audit.mjs",

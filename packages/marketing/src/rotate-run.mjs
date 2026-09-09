@@ -3,6 +3,7 @@
 // Chạy: node packages/marketing/src/rotate-run.mjs [soFolder=1]
 import { createClient } from '@supabase/supabase-js';
 import { loadRealEnv } from './video/env.mjs';
+import { pickFreshClips } from './video/fresh-clip.mjs';
 
 const N = Number(process.argv[2]) || 1;
 const env = loadRealEnv();
@@ -14,12 +15,12 @@ const rnd = (a) => a[Math.floor(Math.random() * a.length)];
 const shuffle = (a) => [...a].sort(() => Math.random() - 0.5);
 
 // 1. Gom folder.
-const { data: assetsRaw } = await client.from('brand_assets').select('id, kind, title, product_group').not('product_group', 'is', null);
+const { data: assetsRaw } = await client.from('brand_assets').select('id, kind, title, product_group, source, created_at').not('product_group', 'is', null);
 const folders = new Map();
 for (const a of assetsRaw || []) {
   if (!folders.has(a.product_group)) folders.set(a.product_group, { images: [], videos: [] });
   const f = folders.get(a.product_group);
-  if (a.kind === 'image') f.images.push(a); else if (a.kind === 'video' || a.kind === 'clip') f.videos.push(a);
+  if (a.kind === 'image') f.images.push(a); else if ((a.kind === 'video' || a.kind === 'clip') && a.source !== 'video-pipeline') f.videos.push(a);
 }
 // Folder 'Content' KHÔNG phải sản phẩm, loại khỏi vòng xoay sinh bài bán.
 const eligible = [...folders.keys()].filter((g) => g !== 'Content' && (folders.get(g).images.length || folders.get(g).videos.length));
@@ -35,6 +36,12 @@ for (const c of contents || []) {
     if (!usedByCycle.has(cy)) usedByCycle.set(cy, new Set());
     usedByCycle.get(cy).add(String(b.rotation_group));
   }
+}
+const usedClipIds = new Set();
+for (const c of contents || []) {
+  const b = c.brief || {};
+  for (const id of Array.isArray(b.video_scene_assets) ? b.video_scene_assets : []) usedClipIds.add(String(id));
+  if (b.content_clip_id) usedClipIds.add(String(b.content_clip_id));
 }
 let unused = eligible.filter((g) => !(usedByCycle.get(cycle) || new Set()).has(g));
 if (!unused.length) { cycle += 1; unused = [...eligible]; }
@@ -87,7 +94,10 @@ if (process.env.ROTATE_CONTENT !== '0') {
       let chosenKind = 'qa';
       for (const [k, w] of Object.entries(KIND_WEIGHT)) { r -= w; if (r <= 0) { chosenKind = k; break; } }
       const topicsOfKind = CONTENT_TOPICS.filter((t) => t.type === chosenKind);
-      const chosenTopic = topicsOfKind.length ? rnd(topicsOfKind) : undefined;
+      let chosenTopic = topicsOfKind.length ? rnd(topicsOfKind) : undefined;
+      const contentClip = ['viral', 'seeding', 'engage', 'tip', 'qa'].includes(chosenKind)
+        ? (pickFreshClips(folders.get('Content')?.videos || [], usedClipIds)[0] || null) : null;
+      if (contentClip) chosenTopic = { type: chosenKind, topic: `Kể chuyện từ clip thật đội SDVICO vừa quay tại hiện trường: "${contentClip.title}". Mở bài bằng kết quả nhìn thấy trong clip, kể người thật việc thật, không bán hàng, kết bằng câu hỏi mở.` };
 
       const gen = await generateContentPost({ topic: chosenTopic });
       const kind = gen.contentType || chosenKind;
@@ -99,7 +109,7 @@ if (process.env.ROTATE_CONTENT !== '0') {
       const assets = { image: media.id, video: null };
       const { data: ins } = await client.from('mkt_content').insert({
         kind: 'social', title: displayTitle,
-        brief: { keyword: 'Bài content', intent: 'thong_tin', assets, channels: ['facebook'], generator: 'rotation', rotation: true, rotation_group: 'Bài content', post_kind: 'content', topic: gen.topic, content_type: kind },
+        brief: { keyword: 'Bài content', intent: 'thong_tin', assets, channels: ['facebook'], generator: 'rotation', rotation: true, rotation_group: 'Bài content', post_kind: 'content', topic: gen.topic, content_type: kind, ...(contentClip ? { video_requested: true, video_short: true, content_video: true, content_clip_id: contentClip.id, content_clip_title: contentClip.title } : {}) },
         draft: gen.text, status: 'review', needs_gov_review: needsGov,
       }).select('id').single();
       if (ins) {
@@ -107,7 +117,7 @@ if (process.env.ROTATE_CONTENT !== '0') {
           kind: 'mkt_publish_content', title: `${kindTag} ${displayTitle}`,
           payload: { content_id: ins.id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels: ['facebook'], authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov }, status: 'pending',
         });
-        console.log(`Cycle ${cycle} | [Facebook] ${kindTag} ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk}${needsGov ? ' | NEEDS_GOV_REVIEW' : ''} | chu de: ${gen.topic}`);
+        console.log(`Cycle ${cycle} | [Facebook] ${kindTag} ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk}${needsGov ? ' | NEEDS_GOV_REVIEW' : ''} | chu de: ${gen.topic}${contentClip ? ' | VIDEO clip: ' + contentClip.title : ''}`);
       }
     } catch (e) { console.log('  Loi bai content:', e.message); }
   }

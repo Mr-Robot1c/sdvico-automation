@@ -2,6 +2,8 @@
 rem Day file Zalo len bucket roi NAP ngay vao Kho tri thuc cho AI hoc (khong cho server).
 rem Chay tay sau moi lan doc Zalo xong, hoac bat cu luc nao muon AI hoc lieu moi.
 cd /d "%~dp0.."
+echo == BUOC 0: Tai bu media Zalo con thieu file (tu href CDN) ==
+node packages\marketing\src\tai-bu-media-zalo.mjs
 echo == BUOC 1: Cho AI xem video moi trong Zalo\media ==
 node packages\marketing\src\hoc-video.mjs
 echo == BUOC 2: Day file len bucket kho-tri-thuc-noi-bo ==
