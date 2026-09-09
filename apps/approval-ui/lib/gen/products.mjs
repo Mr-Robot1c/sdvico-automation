@@ -201,13 +201,40 @@ export function ensurePriceTeaser(body, teaser) {
   if (!teaser) return body;
   const s = redactExactPrices(body);
   if (s.includes(teaser.key)) return s;
-  const sentence = `${teaser.text}. Nhắn hoặc để số, bên em gửi giá chính xác và xếp kỹ thuật lắp tận tàu.`;
+  const sentence = `${teaser.text}. Giá chính xác em gửi riêng, kỹ thuật lắp tận tàu.`;
   const lines = s.split('\n');
   let last = lines.length - 1;
   while (last > 0 && !lines[last].trim()) last--;
   if (last <= 0) return `${s.trim()}\n\n${sentence}`;
   lines.splice(last, 0, sentence, '');
   return lines.join('\n');
+}
+
+// 9/9 (Thanh): MỌI bài bán kết bằng câu kêu bà con BÌNH LUẬN từ khóa ("anh em cmt 'lọc dầu' hay 'lọc
+// nước' để em tư vấn"): kéo tương tác, lộ ra ai cần gì để Kinh doanh nhảy vào tư vấn (người trả lời,
+// máy không tự trả lời, điều cấm 1). Hai máy chủ lực dùng chung 1 câu; sản phẩm khác dùng từ khóa riêng.
+const CTA_FLAGSHIP = 'Anh em cmt "lọc dầu" hay "lọc nước" để em tư vấn cho anh em nhé!';
+const CTA_KEYWORD = {
+  '1. PV Engine RMI Nano Graphene': 'dầu nhớt',
+  '3. Thiết bị giám sát hành trình Viettel S-Tracking': 'giám sát hành trình',
+  '4. Thuraya Marine Star MNB-01': 'vệ tinh',
+  '5. Điện thoại vệ tinh XT-Pro': 'vệ tinh',
+  '7. Ắc quy Accu Nano SDViCo': 'ắc quy',
+  '8. Sơn RARE': 'sơn',
+  '10. SDFish': 'SDFish',
+};
+export function commentCta(group) {
+  if (group === '2. Máy lọc nước biển SEA-40' || group === '9. Máy Lọc Dầu Diesel SD12-300' || group === '6. Thiết bị lọc dầu SF-50') return CTA_FLAGSHIP;
+  const k = CTA_KEYWORD[group];
+  return k ? `Anh em cmt "${k}" để em tư vấn cho anh em nhé!` : 'Anh em cmt "tư vấn" để em tư vấn cho anh em nhé!';
+}
+// Bảo đảm câu CTA bình luận là câu CUỐI bài (model quên thì nối vào). Đã có câu kêu cmt/bình luận
+// từ khóa rồi thì giữ nguyên.
+export function ensureCommentCta(body, cta) {
+  if (!cta) return body;
+  const s = String(body || '').trimEnd();
+  if (/(?:cmt|bình luận|comment)\s*[:]?\s*["“']/i.test(s)) return s;
+  return s ? `${s}\n\n${cta}` : cta;
 }
 
 // Bảo đảm CẢNH CUỐI video có câu giá đọc được (luật 8/9). Chặn số chính xác trước; thiếu câu thì

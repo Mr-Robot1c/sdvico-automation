@@ -3,7 +3,7 @@
 import { assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
-import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta } from './products.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -63,6 +63,8 @@ export async function generateSocialPost({ productGroup, productName, channel, h
   // khai không ghi số chính xác, chỉ "9,X triệu" để bà con nhắn hỏi). Dữ liệu ở products.mjs.
   const shownName = publicName(productGroup) || productName;
   const teaser = getPriceTeaser(productGroup);
+  // 9/9 (Thanh): câu cuối MỌI bài bán = kêu bà con cmt từ khóa để Kinh doanh tư vấn.
+  const cta = commentCta(productGroup);
   const angle = ANGLES[Math.floor(Math.random() * ANGLES.length)];
   const system = [
     'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
@@ -70,16 +72,16 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM ĐANG VIẾT (xem SỰ THẬT NGHỀ bên dưới); KHÔNG gán lợi ích của sản phẩm khác.',
     ...guardLines(shownName + ' ' + productName + ' ' + productGroup),
     teaser
-      ? `GIÁ (luật 8/9, BẮT BUỘC): bài PHẢI có đúng 1 câu nêu mốc giá úp mở, dùng NGUYÊN VĂN cụm "${teaser.text}" (giữ nguyên chữ X, KHÔNG tự đoán hay thay X bằng số). TUYỆT ĐỐI KHÔNG ghi giá chính xác dưới bất kỳ dạng nào (không 9.900.000 đ, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu). Ngay sau câu giá: mời bà con nhắn hoặc để số để nhận giá chính xác, kỹ thuật lắp tận tàu. Câu giá đặt gần cuối, ngay trước lời mời, KHÔNG đặt làm câu đầu.`
+      ? `GIÁ (luật 8/9, BẮT BUỘC): bài PHẢI có đúng 1 câu nêu mốc giá úp mở, dùng NGUYÊN VĂN cụm "${teaser.text}" (giữ nguyên chữ X, KHÔNG tự đoán hay thay X bằng số). TUYỆT ĐỐI KHÔNG ghi giá chính xác dưới bất kỳ dạng nào (không 9.900.000 đ, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu). Ngay sau câu giá thêm ngắn: "giá chính xác em gửi riêng, kỹ thuật lắp tận tàu". Câu giá đặt gần cuối, TRƯỚC câu CTA cuối, KHÔNG đặt làm câu đầu.`
       : '',
     'Chèn vài emoji hợp cảnh biển và thiết bị cho sinh động (ví dụ ⚓ 🚢 🌊 📡 💧 🛟 📞), đừng lạm dụng.',
     'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn (3.000.000 đồng). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung, không nêu số.',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO; chỉ nói phân phối, lắp đặt, tương thích.',
     isTikTok
-      ? 'Đây là chú thích cho video TikTok: 2 tới 4 câu thật ngắn, cuốn, kết bằng mời gọi.'
+      ? 'Đây là chú thích cho video TikTok: 2 tới 4 câu thật ngắn, cuốn, kết bằng câu CTA cmt đã dặn.'
       : 'Đây là bài Facebook: 4 tới 6 câu, có thể có 2 tới 3 dòng gạch đầu lợi ích (dùng emoji làm đầu dòng, không dùng dấu chấm tròn).',
-    'Kết bằng lời mời rõ ràng, đúng kiểu bán hàng: NHẮN TIN cho Page SDVICO ở đây hoặc gọi tổng đài 1900 23 23 49 để được tư vấn, báo giá và lắp đặt tận bến. KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.',
+    `KẾT BÀI (luật Thanh 9/9, BẮT BUỘC, chép NGUYÊN VĂN, đứng riêng dòng cuối): "${cta}". KHÔNG kết bằng "nhắn tin cho Page" hay "gọi tổng đài". KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.`,
     'Mỗi bài phải KHÁC các bài trước: khác câu mở đầu, khác cách triển khai, khác tiêu đề.',
     '',
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số được duyệt: nói chung chung, không nêu số cụ thể.',
@@ -122,6 +124,8 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     body = ensurePriceTeaser(body, teaser);
     headline = redactExactPrices(headline);
   }
+  // 9/9: câu cuối bài bán luôn là CTA cmt từ khóa (model quên thì nối vào).
+  body = ensureCommentCta(body, cta);
 
   const tags = hashtagBlock(productGroup);
   const text = `${body}\n\n${tags}`;

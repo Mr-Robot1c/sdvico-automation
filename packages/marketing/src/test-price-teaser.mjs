@@ -1,7 +1,7 @@
 // test-price-teaser.mjs — kiểm luật giá úp mở (Thanh chốt 8/9/2026): bài công khai không được có số
 // tiền chính xác, chỉ mốc "9,X triệu"; cảnh cuối video có câu giá đọc được. Chạy: npm run test:price
 // Không cần mạng, không cần GEMINI_API_KEY.
-import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup } from './products.mjs';
+import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta } from './products.mjs';
 import { scanStyle } from './brand-voice-check.mjs';
 import { guardViolations } from './product-guard.mjs';
 import { assessDraft } from './compliance.mjs';
@@ -42,6 +42,19 @@ ok('SEA-40 có video', !isPhotoOnlyGroup(G2));
 ok('SF300B có video', !isPhotoOnlyGroup(G9));
 ok('Ắc quy bài ảnh', isPhotoOnlyGroup('7. Ắc quy Accu Nano SDViCo'));
 ok('SF-50 ngừng bán', isDiscontinuedGroup('6. Thiết bị lọc dầu SF-50'));
+// 9/9 (Thanh): câu cuối bài bán = kêu cmt từ khóa để Kinh doanh tư vấn.
+eq('CTA chủ lực', commentCta(G9), 'Anh em cmt "lọc dầu" hay "lọc nước" để em tư vấn cho anh em nhé!');
+eq('CTA SEA-40 dùng chung', commentCta(G2), commentCta(G9));
+eq('CTA ắc quy', commentCta('7. Ắc quy Accu Nano SDViCo'), 'Anh em cmt "ắc quy" để em tư vấn cho anh em nhé!');
+ok('CTA style sạch', scanStyle(commentCta(G9)).length === 0, scanStyle(commentCta(G9)));
+ok('ensureCommentCta nối cuối', ensureCommentCta('Hook.\n\nThân bài.', commentCta(G9)).endsWith(commentCta(G9)));
+ok('ensureCommentCta không nối đôi', (ensureCommentCta(`Hook.\n\n${commentCta(G9)}`, commentCta(G9)).match(/cmt "/g) || []).length === 1);
+{
+  const full = ensureCommentCta(ensurePriceTeaser('Hook.\n\nThân bài.\n\nAnh đi mấy ngày một chuyến?', PRICE_TEASER[G9]), commentCta(G9));
+  const lines = full.trim().split('\n');
+  eq('thứ tự: CTA là dòng cuối', lines[lines.length - 1], commentCta(G9));
+  ok('thứ tự: câu giá đứng trước CTA', full.indexOf('9,X triệu') < full.indexOf('Anh em cmt'));
+}
 
 let fail = 0;
 for (const c of cases) {
