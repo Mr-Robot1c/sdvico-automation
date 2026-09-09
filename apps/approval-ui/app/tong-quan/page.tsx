@@ -433,8 +433,8 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
             <div style={{ display: 'grid', gap: 8 }}>
               {leads.slice(0, 4).map((l) => (
                 <div key={l.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: '.88rem', borderBottom: '1px dashed var(--line)', paddingBottom: 6 }}>
-                  <span className={`badge ${String(l.status || 'new') === 'new' ? 'tone-no' : 'tone-ok'}`} style={{ flexShrink: 0 }}>
-                    {String(l.status || 'new') === 'new' ? 'Mới' : String(l.status) === 'won' ? 'Đã mua' : String(l.status) === 'closed' ? 'Xong' : 'Đã liên hệ'}
+                  <span className={`badge ${['new', 'lost'].includes(String(l.status || 'new')) ? 'tone-no' : 'tone-ok'}`} style={{ flexShrink: 0 }}>
+                    {String(l.status || 'new') === 'new' ? 'Mới' : String(l.status) === 'won' ? 'Đã mua' : String(l.status) === 'lost' ? 'Không chốt' : String(l.status) === 'closed' ? 'Xong' : 'Đã liên hệ'}
                   </span>
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <b>{String(l.fb_user_name || 'Khách')}</b> · {String(l.message || '').slice(0, 60)}

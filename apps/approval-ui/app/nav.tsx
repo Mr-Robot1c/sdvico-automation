@@ -17,7 +17,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   const main: Group = {
     title: '',
     items: [
-      { href: '/tong-quan', label: 'Tổng quan', icon: '📊', also: ['/noi-dung', '/ke-hoach', '/khach-hang', '/hang-doi'] },
+      { href: '/tong-quan', label: 'Tổng quan', icon: '📊', also: ['/noi-dung', '/ke-hoach', '/khach-hang', '/hang-doi', '/hoi-dap'] },
       { href: '/video', label: 'Video', icon: '🎬', also: ['/san-xuat', '/tu-lieu'] },
       { href: '/seo', label: 'SEO', icon: '🔍', also: ['/tu-khoa', '/quang-cao', '/du-kien'] },
       { href: '/kenh', label: 'Kênh', icon: '📡', also: ['/do-luong', '/ket-noi', '/facebook', '/youtube', '/tiktok'] },

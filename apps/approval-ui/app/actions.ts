@@ -659,11 +659,65 @@ export async function updateLeadStatus(formData: FormData) {
   const status = String(formData.get('status') || '');
   const note = String(formData.get('note') || '').slice(0, 1000);
   // 7/9: them 'won' (Da mua) - muc tieu tuan 10 khach MUA, xem migration 20260907160000.
-  if (!id || !['new', 'contacted', 'won', 'closed', 'spam'].includes(status)) return;
+  // 9/9: them 'lost' (Khong chot) + lost_reason — lenh sep Long: kenh online tu chot, khong pass
+  // lead cho KD, khong chot duoc thi ket qua la "khong chot" kem ly do (migration 20260909170000).
+  if (!id || !['new', 'contacted', 'won', 'lost', 'closed', 'spam'].includes(status)) return;
+  const patch: Record<string, unknown> = { status, note, updated_at: new Date().toISOString() };
+  if (formData.has('lost_reason')) patch.lost_reason = String(formData.get('lost_reason') || '').slice(0, 500) || null;
   const client = getServerClient();
-  await client.from('mkt_leads').update({ status, note, updated_at: new Date().toISOString() }).eq('id', id);
+  await client.from('mkt_leads').update(patch).eq('id', id);
   revalidatePath('/khach-hang');
   revalidatePath('/noi-dung');
+}
+
+// 9/9 (lenh sep Long 15:12): KHO HOI DAP theo san pham — moi cau khach hoi + cau tra loi da dung
+// luu lai, la dau vao cho Bot Live Stream phase 2 va bot noi bo /hoi-dap. Nguoi nhap, nguoi xac nhan;
+// may khong tu nhan khach (dieu cam 1). Bang mkt_product_qa (migration 20260909170000).
+export async function addProductQa(formData: FormData) {
+  const question = String(formData.get('question') || '').trim().slice(0, 500);
+  const answer = String(formData.get('answer') || '').trim().slice(0, 4000);
+  if (!question || !answer) return;
+  const product_group = String(formData.get('product_group') || 'Chung').trim().slice(0, 120) || 'Chung';
+  const source = String(formData.get('source') || '').trim().slice(0, 300) || null;
+  const confirmed_by = String(formData.get('confirmed_by') || '').trim().slice(0, 100) || null;
+  const verified = ['1', 'on', 'true'].includes(String(formData.get('verified') || ''));
+  const leadId = String(formData.get('lead_id') || '').trim() || null;
+  const client = getServerClient();
+  await client.from('mkt_product_qa').insert({ product_group, question, answer, source, confirmed_by, verified, lead_id: leadId });
+  revalidatePath('/hoi-dap');
+  revalidatePath('/khach-hang');
+}
+
+export async function updateProductQa(formData: FormData) {
+  const id = String(formData.get('id') || '').trim();
+  const question = String(formData.get('question') || '').trim().slice(0, 500);
+  const answer = String(formData.get('answer') || '').trim().slice(0, 4000);
+  if (!id || !question || !answer) return;
+  const client = getServerClient();
+  await client.from('mkt_product_qa').update({
+    question, answer,
+    source: String(formData.get('source') || '').trim().slice(0, 300) || null,
+    confirmed_by: String(formData.get('confirmed_by') || '').trim().slice(0, 100) || null,
+    updated_at: new Date().toISOString(),
+  }).eq('id', id);
+  revalidatePath('/hoi-dap');
+}
+
+export async function toggleProductQaVerified(formData: FormData) {
+  const id = String(formData.get('id') || '').trim();
+  if (!id) return;
+  const verified = String(formData.get('verified') || '') === '1';
+  const client = getServerClient();
+  await client.from('mkt_product_qa').update({ verified, updated_at: new Date().toISOString() }).eq('id', id);
+  revalidatePath('/hoi-dap');
+}
+
+export async function deleteProductQa(formData: FormData) {
+  const id = String(formData.get('id') || '').trim();
+  if (!id) return;
+  const client = getServerClient();
+  await client.from('mkt_product_qa').delete().eq('id', id);
+  revalidatePath('/hoi-dap');
 }
 
 // Cấu hình nhân viên kinh doanh nhận Zalo forward (user 25/8: "chuyển lead qua Zalo NV").

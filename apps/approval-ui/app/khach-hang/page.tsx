@@ -4,6 +4,11 @@ import LeadStatusSelect from './lead-status-select';
 import ForwardZaloButton from './forward-zalo-button';
 import SalesZaloEditor from './sales-zalo-editor';
 import DeleteLeadButton from './delete-lead-button';
+import SaveQaButton from './save-qa-button';
+import { addProductQa } from '../actions';
+import { QA_GROUPS } from '../../lib/hoi-dap-bot';
+// @ts-ignore — module JS thuần
+import { guessGroup } from '../../lib/gen/products.mjs';
 
 // Trang "Theo dõi người mua" (24/8, user: "thông tin khách hàng sẽ được gửi về cho nhân
 // viên kinh doanh"). Nhân viên vào đây xem danh sách người hỏi mua bắt được từ comment/tin
@@ -19,6 +24,8 @@ const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
   new: { text: '🆕 Mới', cls: 'tone-accent' },
   contacted: { text: '📞 Đã liên hệ', cls: 'tone-ok' },
   won: { text: '💰 Đã mua', cls: 'tone-ok' },
+  // 9/9 (lenh sep Long): khong chot duoc thi ket qua la "khong chot" + ly do, KHONG pass cho KD.
+  lost: { text: '❌ Không chốt', cls: 'tone-no' },
   closed: { text: '✅ Xong', cls: 'tone-default' },
   spam: { text: '🚫 Rác', cls: 'tone-no' },
 };
@@ -43,8 +50,8 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
   const client = getServerClient();
   const filter = searchParams?.status || 'all';
 
-  let q = client.from('mkt_leads').select('id, source, fb_user_name, fb_profile_url, message, status, note, created_at, content_id').order('created_at', { ascending: false }).limit(200);
-  if (filter !== 'all' && ['new', 'contacted', 'won', 'closed', 'spam'].includes(filter)) q = q.eq('status', filter);
+  let q = client.from('mkt_leads').select('id, source, fb_user_name, fb_profile_url, message, status, note, lost_reason, created_at, content_id').order('created_at', { ascending: false }).limit(200);
+  if (filter !== 'all' && ['new', 'contacted', 'won', 'lost', 'closed', 'spam'].includes(filter)) q = q.eq('status', filter);
   const { data: leadsRaw } = await q;
   const leads = (leadsRaw || []) as any[];
 
@@ -70,9 +77,10 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
         <div>
           <h1>Theo dõi người mua</h1>
           <p className="sub">
-            Người hỏi mua bắt được từ comment/tin nhắn Facebook dưới bài đăng. Máy chỉ ĐỌC và LƯU, không tự nhắn lại khách — bạn tự liên hệ và đánh dấu trạng thái ở đây.
+            Người hỏi mua bắt được từ comment/tin nhắn Facebook dưới bài đăng. Máy chỉ ĐỌC và LƯU, không tự nhắn lại khách. Kênh online tự trả lời, tự chốt, không chuyển cho Kinh doanh; không chốt được thì đánh dấu "Không chốt" kèm lý do. Câu hỏi hay thì bấm "Lưu hỏi đáp" để bot nhớ.
           </p>
         </div>
+        <a className="btn ghost sm" href="/hoi-dap" style={{ textDecoration: 'none' }}>📚 Kho hỏi đáp và bot</a>
       </header>
 
       <details className="plan-card" style={{ marginBottom: 14 }}>
@@ -97,7 +105,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
       </details>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        {(['all', 'new', 'contacted', 'won', 'closed', 'spam'] as const).map((s) => (
+        {(['all', 'new', 'contacted', 'won', 'lost', 'closed', 'spam'] as const).map((s) => (
           <a key={s} href={`/khach-hang${s === 'all' ? '' : `?status=${s}`}`}
             className={`btn sm ${filter === s ? 'ok' : 'ghost'}`} style={{ textDecoration: 'none' }}>
             {s === 'all' ? 'Tất cả' : STATUS_LABEL[s].text} ({counts[s] || 0})
@@ -144,8 +152,21 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                         <input type="hidden" name="lead_id" value={l.id} />
                         <input type="hidden" name="status" value={l.status} />
                         <input name="note" defaultValue={l.note || ''} placeholder="ghi chú..." className="note" style={{ width: 120, fontSize: '.85rem' }} />
+                        {l.status === 'lost' ? (
+                          <input name="lost_reason" defaultValue={l.lost_reason || ''} placeholder="lý do không chốt..." className="note" style={{ width: 140, fontSize: '.85rem' }} />
+                        ) : null}
                         <button className="btn ghost sm" type="submit">Lưu</button>
                       </form>
+                      {l.status === 'lost' && l.lost_reason ? <div className="sub" style={{ marginTop: 4 }}>❌ {l.lost_reason}</div> : null}
+                      <div style={{ marginTop: 6 }}>
+                        <SaveQaButton
+                          leadId={l.id}
+                          question={String(l.message || '').slice(0, 300)}
+                          groups={QA_GROUPS}
+                          defaultGroup={guessGroup(String(l.message || '')) || 'Chung'}
+                          action={addProductQa}
+                        />
+                      </div>
                     </td>
                     <td>
                       <ForwardZaloButton

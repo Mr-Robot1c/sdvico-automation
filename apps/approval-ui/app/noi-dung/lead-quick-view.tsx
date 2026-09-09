@@ -34,6 +34,7 @@ const STATUS_LABEL: Record<string, string> = {
   new: '🆕 Mới',
   contacted: '📞 Đã liên hệ',
   won: '💰 Đã mua',
+  lost: '❌ Không chốt',
   closed: '✅ Xong',
   spam: '⛔ Rác',
 };
@@ -44,7 +45,7 @@ function fmtDateTime(iso: string): string {
   return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hourCycle: 'h23' }).format(d);
 }
 
-type FilterKey = 'all' | 'new' | 'contacted' | 'won' | 'closed';
+type FilterKey = 'all' | 'new' | 'contacted' | 'won' | 'lost' | 'closed';
 
 export default function LeadQuickView({
   leads,
@@ -65,7 +66,7 @@ export default function LeadQuickView({
   const [showSales, setShowSales] = useState(false);
 
   const counts = useMemo(() => {
-    const c = { all: 0, new: 0, contacted: 0, won: 0, closed: 0 };
+    const c = { all: 0, new: 0, contacted: 0, won: 0, lost: 0, closed: 0 };
     for (const l of leads) {
       c.all++;
       const s = l.status as keyof typeof c;
@@ -176,7 +177,7 @@ export default function LeadQuickView({
 
         {/* Tabs status */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-          {(['all', 'new', 'contacted', 'won', 'closed'] as FilterKey[]).map((k) => (
+          {(['all', 'new', 'contacted', 'won', 'lost', 'closed'] as FilterKey[]).map((k) => (
             <button
               key={k}
               type="button"

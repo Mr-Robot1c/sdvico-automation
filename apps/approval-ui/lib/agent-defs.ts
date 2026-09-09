@@ -8,7 +8,8 @@ type Client = ReturnType<typeof getServerClient>;
 // 4/9: tách thành lib dùng chung để MỌI tab AI ở /kho-tri-thuc (không chỉ Tổng quan) cũng
 // hiện được thẻ đầu (AgentHeadCard) kèm giờ hoạt động — thêm AI thứ 10 "AI Đánh giá".
 
-export type AgentKey = 'boss' | 'creator' | 'video' | 'voice' | 'seo' | 'lich-kenh' | 'bao-cao' | 'data1' | 'data2' | 'danh-gia';
+// 9/9: thêm AI thứ 11 "hoi-dap" — bot hỏi đáp nội bộ từ kho mkt_product_qa (lệnh sếp Long 9/9).
+export type AgentKey = 'boss' | 'creator' | 'video' | 'voice' | 'seo' | 'lich-kenh' | 'bao-cao' | 'data1' | 'data2' | 'danh-gia' | 'hoi-dap';
 
 export type AgentDef = {
   key: AgentKey; icon: string; name: string; role: string; boss?: boolean;
@@ -57,6 +58,7 @@ export async function loadAgentDefs(client: Client): Promise<AgentDef[]> {
         'mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull',
         'mkt.learn_weekly',
         'mkt.knowledge_public_deep',
+        'mkt.hoi_dap_bot',
       ])
       .order('created_at', { ascending: false })
       .limit(300),
@@ -173,6 +175,16 @@ export async function loadAgentDefs(client: Client): Promise<AgentDef[]> {
       role: 'Chấm điểm từng bài (tương tác, lượt xem, giây xem, tiếp cận), xếp bậc sản phẩm Thắng / Theo dõi / Đuối theo tuần, đề xuất trọng số cho BOSS. Từ 29/8 mỗi hướng đi ra đúng 1 bài, không còn cặp A/B.',
       last: mkLast(lastOf(['mkt.learn_weekly', 'mkt.live_apply']), 'chấm điểm / chỉnh trọng số'),
       href: '/kho-tri-thuc?ai=danh-gia',
+    },
+    {
+      // 9/9: AI thứ 11 — bot hỏi đáp nội bộ (lệnh sếp Long 9/9 15:12: gom hỏi đáp thành kho kiến thức
+      // từng sản phẩm, đầu vào Bot Live Stream phase 2; Thanh: "nếu tôi quên thì hỏi nó").
+      key: 'hoi-dap', icon: '📚', name: 'AI hỏi đáp nội bộ',
+      model: 'Gemini 2.5 Flash (dự phòng 2.0 Flash, flash-latest, flash-lite), chỉ trả lời từ kho mkt_product_qa + product_facts',
+      runsAt: 'Chạy trên cloud khi có người hỏi ở trang /hoi-dap — không tự chạy theo lịch, không nhắn khách',
+      role: 'Trả lời nhân viên kênh online về giá, thông số, bảo hành, luật đăng bài, link sàn từ kho hỏi đáp đã nạp. Không có trong kho thì nói chưa có và gợi ý nạp. Kho này là đầu vào cho Bot Live Stream giai đoạn 2.',
+      last: mkLast(lastOf(['mkt.hoi_dap_bot']), 'trả lời câu hỏi nội bộ'),
+      href: '/hoi-dap',
     },
   ];
 
