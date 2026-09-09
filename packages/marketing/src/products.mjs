@@ -126,20 +126,23 @@ export function getFeatures(group) {
 // 8/9 chiều (Thanh: "áp giá vào caption video"): thêm spoken (dạng ĐỌC ĐƯỢC cho lời thoại, TTS không
 // đọc được "3X"/"9,X"), spokenKey (cụm để biết cảnh cuối đã có câu giá), badge (tem giá vàng trên hình,
 // 2 dòng, qua drawtext textfile). Vẫn không có số chính xác.
+// 9/9 chiều (Thanh, sau văn bản chính sách giá GĐ TTKD Tiến): BỎ HẲN "giá cũ 12 triệu" và "giảm 7 triệu"
+// (không có trong văn bản, chỉ là mốc kích thích). Câu giá mới do Thanh chốt nguyên văn: lọc nước
+// "máy cơ 3X triệu, máy điện 4X triệu, đã gồm công lắp, tặng 10 lõi lọc thô"; lọc dầu "từ 9,X triệu".
 export const PRICE_TEASER = {
   '2. Máy lọc nước biển SEA-40': {
-    text: 'Tháng 9 giảm 7 triệu, máy cơ chỉ còn 3X triệu, máy chạy điện 4X triệu',
+    text: 'Máy cơ 3X triệu, máy điện 4X triệu, đã gồm công lắp, tặng 10 lõi lọc thô',
     key: '3X triệu',
-    spoken: 'Tháng 9 giảm 7 triệu, máy cơ còn hơn 30 triệu thôi. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
+    spoken: 'Máy cơ hơn 30 triệu, máy điện hơn 40 triệu, đã gồm công lắp, còn tặng 10 lõi lọc thô. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
     spokenKey: 'hơn 30 triệu',
-    badge: 'Tháng 9 giảm 7 triệu\nMáy cơ chỉ còn 3X triệu',
+    badge: 'Máy cơ 3X triệu, máy điện 4X triệu\nĐã gồm công lắp, tặng 10 lõi lọc thô',
   },
   '9. Máy Lọc Dầu Diesel SD12-300': {
-    text: 'Tháng 9 từ 12 triệu giảm còn 9,X triệu',
+    text: 'Bộ lọc dầu từ 9,X triệu',
     key: '9,X triệu',
-    spoken: 'Tháng 9 từ 12 triệu giảm còn chưa tới 10 triệu. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
-    spokenKey: 'chưa tới 10 triệu',
-    badge: 'Tháng 9: từ 12 triệu\ncòn 9,X triệu',
+    spoken: 'Bộ lọc dầu từ hơn 9 triệu thôi. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
+    spokenKey: 'hơn 9 triệu',
+    badge: 'Bộ lọc dầu\ntừ 9,X triệu',
   },
 };
 export function getPriceTeaser(group) {

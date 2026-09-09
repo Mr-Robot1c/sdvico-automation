@@ -40,7 +40,7 @@ ok('guard bắt 9.900.000 công khai', guardViolations('Máy lọc dầu SF300B 
 ok('guard bắt 42 triệu', guardViolations('SEA-40 máy điện 42 triệu', 'lọc nước').length > 0);
 ok('guard tha 9,X triệu', guardViolations('Máy lọc dầu SF300B còn 9,X triệu', 'lọc dầu').length === 0);
 const facts = { knownFactValues: knownFactValues(PRODUCT_FACTS), testFactValues: testFactValues(PRODUCT_FACTS) };
-eq('compliance không cờ SF300B', assessDraft('Máy lọc dầu SF300B. Tháng 9 từ 12 triệu giảm còn 9,X triệu.', facts).flags.unverifiedSpecs.length, 0);
+eq('compliance không cờ SF300B', assessDraft('Máy lọc dầu SF300B. Bộ lọc dầu từ 9,X triệu.', facts).flags.unverifiedSpecs.length, 0);
 // 8/9 tối: chỉ SEA-40 và SF300B dựng video; SF-50 ngừng bán.
 ok('SEA-40 có video', !isPhotoOnlyGroup(G2));
 ok('SF300B có video', !isPhotoOnlyGroup(G9));
@@ -78,6 +78,13 @@ for (const l of Object.values(SHOPEE_LINK)) ok('shopee style sạch ' + l.slice(
   const withCta = ensureShopeeLink(`Hook.\n\n${commentCta(G9)}`, SHOPEE_LINK[G9]).trim().split('\n');
   eq('shopee chèn trước CTA sẵn có', withCta[withCta.length - 1], commentCta(G9));
 }
+
+// 9/9 chiều (Thanh): bỏ hẳn mốc giả "giá cũ 12 triệu" / "giảm 7 triệu"; câu giá theo văn bản chính sách.
+for (const [g, tz] of Object.entries(PRICE_TEASER)) {
+  for (const f of ['text', 'spoken', 'badge']) ok(`không mốc giả ${g.slice(0, 2)} ${f}`, !/12 triệu|giảm 7|giảm còn|giá cũ/i.test(tz[f]), tz[f]);
+}
+ok('teaser lọc nước có công lắp + lõi lọc', /đã gồm công lắp/.test(PRICE_TEASER[G2].text) && /10 lõi lọc thô/.test(PRICE_TEASER[G2].text));
+ok('teaser lọc dầu từ 9,X', PRICE_TEASER[G9].text === 'Bộ lọc dầu từ 9,X triệu');
 
 let fail = 0;
 for (const c of cases) {
