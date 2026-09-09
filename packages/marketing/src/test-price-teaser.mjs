@@ -79,12 +79,17 @@ for (const l of Object.values(SHOPEE_LINK)) ok('shopee style sạch ' + l.slice(
   eq('shopee chèn trước CTA sẵn có', withCta[withCta.length - 1], commentCta(G9));
 }
 
-// 9/9 chiều (Thanh): bỏ hẳn mốc giả "giá cũ 12 triệu" / "giảm 7 triệu"; câu giá theo văn bản chính sách.
-for (const [g, tz] of Object.entries(PRICE_TEASER)) {
-  for (const f of ['text', 'spoken', 'badge']) ok(`không mốc giả ${g.slice(0, 2)} ${f}`, !/12 triệu|giảm 7|giảm còn|giá cũ/i.test(tz[f]), tz[f]);
-}
+// 9/9 chiều (2) (Thanh chốt lại): câu giật tít có mốc neo 45 / 56 / 12 triệu, vẫn KHÔNG số chính xác 38/49/9,9.
+ok('teaser lọc nước mốc neo', /giảm từ 45 triệu còn 3X triệu/.test(PRICE_TEASER[G2].text) && /giảm từ 56 triệu còn 4X triệu/.test(PRICE_TEASER[G2].text), PRICE_TEASER[G2].text);
 ok('teaser lọc nước có công lắp + lõi lọc', /đã gồm công lắp/.test(PRICE_TEASER[G2].text) && /10 lõi lọc thô/.test(PRICE_TEASER[G2].text));
-ok('teaser lọc dầu từ 9,X', PRICE_TEASER[G9].text === 'Bộ lọc dầu từ 9,X triệu');
+eq('teaser lọc dầu mốc neo', PRICE_TEASER[G9].text, 'Bộ lọc dầu giảm từ 12 triệu còn 9,X triệu');
+eq('redact giữ mốc neo 45/56', redactExactPrices(PRICE_TEASER[G2].text), PRICE_TEASER[G2].text);
+eq('redact giữ mốc neo 12', redactExactPrices(PRICE_TEASER[G9].text), PRICE_TEASER[G9].text);
+for (const [g, tz] of Object.entries(PRICE_TEASER)) {
+  for (const f of ['text', 'spoken', 'badge']) ok(`không số chính xác 38/49/9,9 ${g.slice(0, 2)} ${f}`, !/\b(38|49)\s*triệu|9[,.]9\s*triệu|\d{1,3}\.\d{3}\.\d{3}/i.test(tz[f]), tz[f]);
+}
+ok('spoken lọc nước đọc được mốc neo', /giảm từ 45 triệu còn hơn 30 triệu/.test(PRICE_TEASER[G2].spoken) && /giảm từ 56 triệu còn hơn 40 triệu/.test(PRICE_TEASER[G2].spoken));
+ok('spoken lọc dầu đọc được mốc neo', /giảm từ 12 triệu còn hơn 9 triệu/.test(PRICE_TEASER[G9].spoken));
 
 let fail = 0;
 for (const c of cases) {

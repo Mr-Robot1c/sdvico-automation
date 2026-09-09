@@ -37,7 +37,7 @@ Luật Tiến: **"Đăng lên website đều là giá bán lẻ"** (giá đại 
 | Starlink Mini | 13.000.000 đ | | Như trên |
 | Viettel S-Tracking MTR-V02-VNM | 23.601.000 đ | | Gồm VAT và lắp đặt, BH 12 tháng máy, 6 tháng phụ kiện. KHÔNG đưa lên Shopee (điều cấm 4, cần ủy quyền hãng) |
 
-Lệch so với lời nói 8/9 (cần sếp chốt trước khi giữ trên bài): văn bản KHÔNG có "giá cũ 12 triệu" cho lọc dầu, KHÔNG có "giảm 7 triệu" cho lọc nước; khuyến mãi chính thức là tặng 10 lõi lọc thô. Văn bản có thêm bộ lọc dầu CƠ 7.900.000 đ mà 8/9 nói "chỉ còn 1 máy lọc dầu".
+Câu giật tít trên bài công khai (Thanh chốt 9/9 chiều, KHÔNG dùng trên Shopee): "máy cơ giảm từ 45 triệu còn 3X triệu, máy điện giảm từ 56 triệu còn 4X triệu, đã gồm công lắp, tặng 10 lõi lọc thô" và "bộ lọc dầu giảm từ 12 triệu còn 9,X triệu". Mốc 45 / 56 / 12 triệu là mốc neo kích thích, không có trong văn bản chính sách, nên bài vẫn qua duyệt và gửi nhóm xem trước. Trên Shopee chỉ ghi giá bán lẻ 38 / 49 / 7,9 / 9,9 triệu, không gạch giá cũ (Shopee phạt giá gốc ảo).
 
 ## 1. Máy lọc nước biển SEA-40
 

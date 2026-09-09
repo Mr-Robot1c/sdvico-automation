@@ -128,23 +128,25 @@ export function getFeatures(group) {
 // 8/9 chiều (Thanh: "áp giá vào caption video"): thêm spoken (dạng ĐỌC ĐƯỢC cho lời thoại, TTS không
 // đọc được "3X"/"9,X"), spokenKey (cụm để biết cảnh cuối đã có câu giá), badge (tem giá vàng trên hình,
 // 2 dòng, qua drawtext textfile). Vẫn không có số chính xác.
-// 9/9 chiều (Thanh, sau văn bản chính sách giá GĐ TTKD Tiến): BỎ HẲN "giá cũ 12 triệu" và "giảm 7 triệu"
-// (không có trong văn bản, chỉ là mốc kích thích). Câu giá mới do Thanh chốt nguyên văn: lọc nước
-// "máy cơ 3X triệu, máy điện 4X triệu, đã gồm công lắp, tặng 10 lõi lọc thô"; lọc dầu "từ 9,X triệu".
+// 9/9 chiều (2) (Thanh chốt lại, nguyên văn): DÙNG câu giật tít có mốc giá neo để bà con thấy rẻ:
+// "máy cơ giảm từ 45tr xuống còn 3X triệu, máy điện giảm từ 56tr còn 4X triệu, máy lọc dầu giảm từ 12tr
+// còn 9,Xtr". Các mốc 45 / 56 / 12 triệu là mốc neo Thanh cấp, KHÔNG có trong văn bản chính sách giá
+// GĐ TTKD Tiến 9/9 (chỉ có giá bán lẻ 38 / 49 / 9,9 triệu). Vì vậy bài vẫn đi qua hàng đợi duyệt và gửi
+// nhóm xem trước khi đăng (luật Tiến 9/9). Số chính xác 38/49/9,9 vẫn KHÔNG nằm trong file này.
 export const PRICE_TEASER = {
   '2. Máy lọc nước biển SEA-40': {
-    text: 'Máy cơ 3X triệu, máy điện 4X triệu, đã gồm công lắp, tặng 10 lõi lọc thô',
+    text: 'Máy cơ giảm từ 45 triệu còn 3X triệu, máy điện giảm từ 56 triệu còn 4X triệu, đã gồm công lắp, tặng 10 lõi lọc thô',
     key: '3X triệu',
-    spoken: 'Máy cơ hơn 30 triệu, máy điện hơn 40 triệu, đã gồm công lắp, còn tặng 10 lõi lọc thô. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
+    spoken: 'Máy cơ giảm từ 45 triệu còn hơn 30 triệu, máy điện giảm từ 56 triệu còn hơn 40 triệu, đã gồm công lắp, còn tặng 10 lõi lọc thô. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
     spokenKey: 'hơn 30 triệu',
-    badge: 'Máy cơ 3X triệu, máy điện 4X triệu\nĐã gồm công lắp, tặng 10 lõi lọc thô',
+    badge: 'Máy cơ 45 triệu còn 3X triệu\nMáy điện 56 triệu còn 4X triệu',
   },
   '9. Máy Lọc Dầu Diesel SD12-300': {
-    text: 'Bộ lọc dầu từ 9,X triệu',
+    text: 'Bộ lọc dầu giảm từ 12 triệu còn 9,X triệu',
     key: '9,X triệu',
-    spoken: 'Bộ lọc dầu từ hơn 9 triệu thôi. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
+    spoken: 'Bộ lọc dầu giảm từ 12 triệu còn hơn 9 triệu thôi. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
     spokenKey: 'hơn 9 triệu',
-    badge: 'Bộ lọc dầu\ntừ 9,X triệu',
+    badge: 'Bộ lọc dầu: từ 12 triệu\ncòn 9,X triệu',
   },
 };
 export function getPriceTeaser(group) {
