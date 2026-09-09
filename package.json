@@ -14,6 +14,7 @@
     "voice:server": "node scripts/voice-server.mjs",
     "test:skills": "node packages/marketing/src/test-skills.mjs",
     "test:price": "node packages/marketing/src/test-price-teaser.mjs",
+    "test:inbox": "node packages/marketing/src/test-fb-inbox-time.mjs",
     "content:run": "node packages/marketing/src/run-content.mjs",
     "publish:fb": "node packages/marketing/src/publish-facebook.mjs",
     "seo:audit": "node packages/marketing/src/seo-audit.mjs",

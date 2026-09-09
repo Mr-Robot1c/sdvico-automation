@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../../../../lib/supabase-server';
-import { pullFacebookInbox } from '../../../../lib/fb-inbox';
+import { pullFacebookInbox, FB_INBOX_SINCE_LABEL } from '../../../../lib/fb-inbox';
 
 // Route pull tin nhắn Messenger từ Facebook Graph API (không scrape UI).
 // Dùng token có scope pages_messaging (confirmed OK qua probe 27/8). Không phụ thuộc webhook
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
       task: 'mkt.fb_inbox_pull',
       actor: 'user',
       status: r.errors.length ? 'error' : 'ok',
-      detail: { pulled: r.pulled, skipped: r.skipped, errors: r.errors.slice(0, 5) },
+      detail: { pulled: r.pulled, skipped: r.skipped, old: r.old, since: FB_INBOX_SINCE_LABEL, errors: r.errors.slice(0, 5) },
     });
   } catch { /* bo qua */ }
 
@@ -34,11 +34,13 @@ export async function GET(req: Request) {
     revalidatePath('/noi-dung');
   }
 
+  const oldNote = r.old ? `, ${r.old} tin trước ${FB_INBOX_SINCE_LABEL} không lấy` : '';
   return NextResponse.json({
     ok: r.errors.length === 0,
     pulled: r.pulled,
     skipped: r.skipped,
+    old: r.old,
     errors: r.errors,
-    msg: r.pulled ? `Đã pull ${r.pulled} tin nhắn mới (${r.skipped} tin đã có, bỏ qua). Vào /khach-hang F5 để xem.` : (r.errors.length ? `Lỗi: ${r.errors[0]}` : `Không có tin mới (${r.skipped} tin đã có từ trước).`),
+    msg: r.pulled ? `Đã pull ${r.pulled} tin nhắn mới (${r.skipped} tin đã có, bỏ qua${oldNote}). Vào /khach-hang F5 để xem.` : (r.errors.length ? `Lỗi: ${r.errors[0]}` : `Không có tin mới (${r.skipped} tin đã có từ trước${oldNote}).`),
   });
 }
