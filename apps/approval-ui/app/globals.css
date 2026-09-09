@@ -1564,3 +1564,10 @@ button.topbar-back { font: inherit; cursor: pointer; }
   .askbot-fab-text { display: none; }
   .askbot-fab { padding: 12px 14px; }
 }
+
+/* 9/9 (2): keo tha nut + khung chat bot (Thanh: "loi no dem di xung quanh"). */
+.askbot-fab { touch-action: none; user-select: none; }
+.askbot-fab-drag { cursor: grabbing; transform: scale(1.04); box-shadow: 0 8px 22px rgba(0,0,0,.3); }
+.askbot-drag { cursor: grab; touch-action: none; user-select: none; }
+.askbot-drag:active { cursor: grabbing; }
+.askbot-grip { color: var(--ink-2); font-weight: 400; margin-left: 6px; letter-spacing: -2px; }
