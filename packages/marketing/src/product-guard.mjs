@@ -26,7 +26,7 @@ export const PRODUCT_GUARD = [
       'nhẹ tàu', 'giảm tải', 'tốn diện tích chở nước', 'đỡ tốn chỗ', 'tiết kiệm chỗ',
       'tiết kiệm dầu', 'tiết kiệm nhiên liệu', 'đỡ tốn dầu', 'giảm hao dầu',
       // 8/9 (luật giá úp mở, Thanh): số chính xác không được lọt ra kênh công khai.
-      '42.000.000', '31.000.000', '49.000.000', '38.000.000', '42 triệu', '31 triệu',
+      '42.000.000', '31.000.000', '49.000.000', '38.000.000', '42 triệu', '31 triệu', '49 triệu', '38 triệu', // 9/9 Thanh: 49/38 LÀ giá đã giảm (42/31 là số cũ ghi sai, vẫn chặn)
     ],
     why: 'Tàu cá CỐ Ý lấy nước để đằm tàu khi lấy đá; tàu nhẹ quá (đĩnh) chạy không được. Máy lọc nước KHÔNG liên quan tới nhiên liệu hay tải trọng tàu. (Phản hồi cấp trên, nhóm Zalo nội bộ 19/8/2026.) 8/9/2026 Thanh chốt: bài công khai chỉ mốc giá úp mở ("giảm 7 triệu, máy cơ còn 3X triệu"), số chính xác chỉ nói trong inbox.',
   },
