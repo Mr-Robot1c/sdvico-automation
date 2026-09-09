@@ -17,11 +17,27 @@
 | Thương hiệu | SDVICO nếu danh sách có; không có thì chọn "Không có thương hiệu", tên SDVICO đã nằm trong tiêu đề. |
 | Xuất xứ | [KD] Việt Nam hay nước khác. |
 | Bảo hành | SF300B: 12 tháng (đã xác nhận). SEA-40: [KD] tháng. |
-| Giá hiển thị gạch ngang | Lọc dầu: giá gốc 12.000.000, tạo Khuyến Mãi Của Shop giảm về 9.900.000 để Shopee gạch giá cũ. Lọc nước: 49.000.000 và 38.000.000 LÀ giá đã giảm (Thanh 9/9), giữ nguyên trên gian, chỉ tạo khuyến mãi khi sếp cho giá gốc. Hạn khuyến mãi: [SẾP] chốt, đề xuất tới 30/9. |
+| Giá hiển thị gạch ngang | KHÔNG tạo Khuyến Mãi Của Shop cho tới khi sếp xác nhận giá cũ; văn bản chính sách 9/9 chỉ có giá bán lẻ, không có giá gốc. Lọc dầu trên gian đang nhập 12.000.000 phải SỬA về 9.900.000. |
 | Vận chuyển | Đơn vị vận chuyển thường của Shopee giới hạn khoảng 20 tới 30 kg mỗi kiện, nặng hơn phải bật "Hàng cồng kềnh" (tới 200 kg, giá trị tới 100 triệu đồng). SF300B 15 kg, gói 52 x 20 x 50 cm, đi được đơn vị thường. Máy lọc nước khoảng 60 kg, gói 150 x 50 x 80 cm, PHẢI bật Hàng cồng kềnh hoặc chọn tự giao kèm lắp. |
 | Thuộc tính chi tiết | Xem bảng ở mục 5 dưới cùng. |
 | Thời gian chuẩn bị hàng | Bật "Hàng đặt trước" 7 ngày cho SEA-40 (cần hẹn kỹ thuật lắp). SF300B 2 ngày nếu có sẵn kho. |
 | Số lượng kho | [KD] SEA-40 máy điện, SEA-40 máy cơ, SF300B. |
+
+## 0b. CHÍNH SÁCH GIÁ CHÍNH THỨC (văn bản GĐ Trung tâm Kinh doanh Trịnh Minh Tiến, Thanh nhận 9/9 11:04)
+
+Luật Tiến: **"Đăng lên website đều là giá bán lẻ"** (giá đại lý KHÔNG đưa lên web, sàn, bài) và **"trước khi đăng lên, gửi lên nhóm để mọi người cùng xem qua ok thì đăng"**. Hai listing đã lên Shopee trước tin này, nên gửi bản chữ lên nhóm Zalo để mọi người xem lại rồi sửa theo góp ý.
+
+| Sản phẩm | Giá bán lẻ (gồm VAT) | Giá đại lý (KHÔNG công khai) | Ghi chú văn bản |
+|---|---|---|---|
+| Bộ lọc dầu CƠ | 7.900.000 đ | 6.000.000 đ | Chưa gồm vận chuyển và công lắp đặt |
+| Bộ lọc dầu BƠM ĐIỆN (SF300B) | 9.900.000 đ | 8.000.000 đ | Chưa gồm vận chuyển và công lắp đặt |
+| Máy lọc nước ĐIỆN | 49.000.000 đ | (không ghi) | ĐÃ gồm công lắp đặt. Tặng 10 lõi lọc thô khi mua và hoàn tất lắp đặt |
+| Máy lọc nước CƠ | 38.000.000 đ | (không ghi) | ĐÃ gồm công lắp đặt. Tặng 10 lõi lọc thô |
+| Starlink V4 | 15.000.000 đ | | Chưa gồm vận chuyển, lắp đặt. Cước 10 GB 5.500.000 đ/tháng, 25 GB 6.000.000 đ/tháng |
+| Starlink Mini | 13.000.000 đ | | Như trên |
+| Viettel S-Tracking MTR-V02-VNM | 23.601.000 đ | | Gồm VAT và lắp đặt, BH 12 tháng máy, 6 tháng phụ kiện. KHÔNG đưa lên Shopee (điều cấm 4, cần ủy quyền hãng) |
+
+Lệch so với lời nói 8/9 (cần sếp chốt trước khi giữ trên bài): văn bản KHÔNG có "giá cũ 12 triệu" cho lọc dầu, KHÔNG có "giảm 7 triệu" cho lọc nước; khuyến mãi chính thức là tặng 10 lõi lọc thô. Văn bản có thêm bộ lọc dầu CƠ 7.900.000 đ mà 8/9 nói "chỉ còn 1 máy lọc dầu".
 
 ## 1. Máy lọc nước biển SEA-40
 
@@ -31,12 +47,12 @@ Máy lọc nước biển thành nước ngọt SEA-40 SDVICO cho tàu cá, côn
 
 **Phân loại hàng (bật "Phân loại hàng", tên nhóm: Loại máy):**
 
-| Phân loại | Giá tháng 9 (ĐÃ giảm 7 triệu, Thanh chốt 9/9) | Kho |
+| Phân loại | Giá bán lẻ (văn bản chính thức 9/9, ĐÃ gồm công lắp đặt) | Kho |
 |---|---|---|
 | Máy chạy điện | 49.000.000 đ | [KD] |
 | Máy cơ | 38.000.000 đ | [KD] |
 
-Giá gốc trước giảm sếp chưa nói số, KHÔNG tự suy. Muốn Shopee gạch giá cũ thì phải hỏi sếp giá gốc rồi mới tạo Khuyến Mãi Của Shop; chưa có thì để giá 49.000.000 và 38.000.000 như đang nhập, không tạo khuyến mãi.
+Không tạo Khuyến Mãi Của Shop gạch giá (văn bản không có giá cũ). Khuyến mãi ghi trong mô tả: tặng 10 lõi lọc thô khi mua và hoàn tất lắp đặt.
 
 **Mô tả sản phẩm (dán vào ô Mô tả):**
 
@@ -63,7 +79,10 @@ Kích thước (dài x rộng x cao): 150 x 50 x 80 cm. Khối lượng khoảng
 Thiết kế và lắp ráp tại Việt Nam.
 
 Giao và lắp
-Kỹ thuật SDVICO tới tận tàu lắp đặt, chạy thử và hướng dẫn sử dụng. Khu vực lắp: [KD].
+Giá đã bao gồm công lắp đặt. Kỹ thuật SDVICO tới tận tàu lắp đặt, chạy thử và hướng dẫn sử dụng. Khu vực lắp: [KD].
+
+Quà tặng
+Tặng 10 lõi lọc thô khi mua máy và hoàn tất lắp đặt.
 
 Bảo hành
 Bảo hành kỹ thuật chung 12 tháng. Màng RO bảo hành 18 tháng, đổi mới. Đầu bơm cao áp bảo hành 2 năm.
@@ -75,7 +94,7 @@ Máy cơ khác máy chạy điện chỗ nào? [KD]
 Bao lâu súc lõi một lần? [KD]
 Có bán màng RO, lõi lọc lẻ không? [KD]
 
-Tháng 9 giảm 7 triệu, giá đã giảm: máy chạy điện 49.000.000 đ, máy cơ 38.000.000 đ. Chat với shop để được tư vấn đúng loại cho tàu.
+Giá bán lẻ đã gồm VAT và công lắp đặt: máy chạy điện 49.000.000 đ, máy cơ 38.000.000 đ. Tặng 10 lõi lọc thô khi hoàn tất lắp đặt. Chat với shop để được tư vấn đúng loại cho tàu.
 
 Công ty TNHH Hiệp Lực Phát Triển Việt (SDVICO), sdvico.vn. Xuất hóa đơn đầy đủ.
 
@@ -85,13 +104,20 @@ Công ty TNHH Hiệp Lực Phát Triển Việt (SDVICO), sdvico.vn. Xuất hóa
 
 Máy lọc dầu diesel SF300B SDVICO cho động cơ máy thủy, lọc cặn 1 tới 10 micron, tách nước, inox 304, bảo hành 12 tháng
 
-**Giá:** giá gốc 12.000.000 đ, giá tháng 9 9.900.000 đ. Không có phân loại (chỉ còn 1 loại).
+**Phân loại hàng (văn bản chính thức 9/9 có 2 bộ):** bật "Thêm nhóm phân loại", tên nhóm "Loại bơm".
+
+| Phân loại | Giá bán lẻ (gồm VAT, CHƯA gồm vận chuyển và công lắp) | Kho |
+|---|---|---|
+| Bơm điện SF300B | 9.900.000 đ | [KD] |
+| Lọc cơ | 7.900.000 đ | [KD] |
+
+Không tạo Khuyến Mãi Của Shop gạch "giá cũ 12.000.000" cho tới khi sếp xác nhận, vì văn bản chính sách không có giá này. Bộ lọc cơ: tên model, thông số, ảnh [KD] chưa có; chưa có thì tạm để 1 phân loại bơm điện.
 
 **Thông tin vận chuyển:** khối lượng 15 kg, kích thước gói hàng 52 x 20 x 50 cm (cộng thêm thùng đóng gói nếu có, [KD] xác nhận).
 
 **Mô tả sản phẩm (dán vào ô Mô tả):**
 
-KỸ THUẬT SDVICO LẮP TẬN TÀU. Máy dễ lắp, tự lắp cũng được, anh em cần thì kỹ thuật tới bến lắp và hướng dẫn.
+MÁY DỄ LẮP, TỰ LẮP ĐƯỢC. Anh em cần kỹ thuật SDVICO tới tận tàu lắp thì chat với shop, công lắp và đi lại tính theo thực tế tại bến.
 
 Dành cho ai
 Tàu vỏ gỗ, vỏ sắt hay bị nghẹt kim phun, máy khục kịch, nổ không êm vì dầu lẫn nước và cặn. Máy lọc dầu SF300B lọc dầu sạch trước khi vào máy, giữ máy nổ êm và bền hơn, đỡ hỏng vặt, đỡ nằm bờ sửa máy.
@@ -118,7 +144,7 @@ Kích thước: 52 x 20 x 50 cm.
 Khối lượng: 15 kg.
 
 Giao và lắp
-Giao toàn quốc qua đơn vị vận chuyển của Shopee. Anh em cần lắp thì chat với shop, kỹ thuật SDVICO tới tận tàu lắp và hướng dẫn.
+Giá máy chưa gồm phí vận chuyển và công lắp đặt. Giao toàn quốc qua đơn vị vận chuyển của Shopee, phí ship hiện khi đặt. Anh em cần lắp thì chat với shop, kỹ thuật SDVICO tới tận tàu, công lắp tính theo thực tế.
 
 Bảo hành
 Bảo hành 12 tháng.
@@ -128,7 +154,7 @@ Tự lắp được không? Được, máy thiết kế dễ lắp, chat với s
 Lắp ở đâu trên đường dầu? Kỹ thuật tư vấn theo từng loại máy tàu, chat với shop.
 Bao lâu vệ sinh lõi một lần? Tùy chất lượng dầu, chat với shop để được hướng dẫn.
 
-Tháng 9 từ 12.000.000 đ giảm còn 9.900.000 đ. Chat với shop để được tư vấn và xếp lịch lắp.
+Giá bán lẻ đã gồm VAT: bộ bơm điện SF300B 9.900.000 đ, bộ lọc cơ 7.900.000 đ. Chat với shop để được tư vấn và xếp lịch lắp.
 
 Công ty TNHH Hiệp Lực Phát Triển Việt (SDVICO), sdvico.vn. Xuất hóa đơn đầy đủ.
 
@@ -143,8 +169,8 @@ Bài bán tự sinh và caption video tự chèn link theo sản phẩm (product
 
 Shopee tính tỉ lệ phản hồi, cố gắng trả lời trong 1 giờ.
 
-- Hỏi giá lọc nước: "Dạ anh, máy lọc nước biển SEA-40 tháng 9 đã giảm 7 triệu, còn: máy chạy điện 49.000.000 đ, máy cơ 38.000.000 đ. Kỹ thuật lắp tận tàu. Anh đặt qua Shopee thì đây ạ: https://shopee.vn/product/212723941/45017630539/ Tàu anh xài máy phát hay máy cơ, đậu cảng nào để em tư vấn đúng loại ạ?"
-- Hỏi giá lọc dầu: "Dạ anh, máy lọc dầu SF300B tháng 9 từ 12.000.000 đ giảm còn 9.900.000 đ, bảo hành 12 tháng, vỏ inox 304. Anh đặt trên Shopee là bên em giao: https://shopee.vn/product/212723941/29945752663/ Cần lắp thì kỹ thuật tới tận tàu. Tàu anh máy gì, ở đâu ạ?"
+- Hỏi giá lọc nước: "Dạ anh, máy lọc nước biển SEA-40 giá bán lẻ đã gồm VAT và công lắp đặt: máy chạy điện 49.000.000 đ, máy cơ 38.000.000 đ, tặng 10 lõi lọc thô khi lắp xong. Kỹ thuật lắp tận tàu. Anh đặt qua Shopee thì đây ạ: https://shopee.vn/product/212723941/45017630539/ Tàu anh xài máy phát hay máy cơ, đậu cảng nào để em tư vấn đúng loại ạ?"
+- Hỏi giá lọc dầu: "Dạ anh, bộ lọc dầu bơm điện SF300B giá 9.900.000 đ, bộ lọc cơ 7.900.000 đ, đã gồm VAT, chưa gồm ship và công lắp, bảo hành 12 tháng, vỏ inox 304. Anh đặt trên Shopee là bên em giao: https://shopee.vn/product/212723941/29945752663/ Cần lắp thì kỹ thuật tới tận tàu. Tàu anh máy gì, ở đâu ạ?"
 - Hỏi giao tới đâu: "Dạ, máy lọc dầu giao toàn quốc qua Shopee. Máy lọc nước bên em giao và lắp tận tàu, anh cho em xin cảng đậu để em xếp lịch kỹ thuật ạ."
 - Hỏi lắp mất bao lâu: "[KD] Dạ lắp khoảng [KD] tiếng, kỹ thuật chạy thử và hướng dẫn xong mới về ạ."
 - Hỏi trả góp, xuất hóa đơn: "Dạ công ty xuất hóa đơn đầy đủ. Trả góp: [KD]."
