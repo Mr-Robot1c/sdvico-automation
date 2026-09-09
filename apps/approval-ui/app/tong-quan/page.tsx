@@ -307,7 +307,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
             {leadNew.length ? (
               <div className="need-item">
                 <span className="need-n">{fmt(leadNew.length)}</span>
-                <span style={{ flex: 1 }}>người hỏi mua <b>chưa được liên hệ</b> — chuyển cho nhân viên kinh doanh. <Link href="/noi-dung?loai=khach-hang">Mở Khách hàng →</Link></span>
+                <span style={{ flex: 1 }}>người hỏi mua <b>chưa được trả lời</b>. Kênh online tự trả lời và tự chốt, không chuyển Kinh doanh (lệnh sếp 9/9); thiếu thông tin thì hỏi bot. <Link href="/noi-dung?loai=khach-hang">Mở Khách hàng →</Link></span>
               </div>
             ) : null}
           </div>

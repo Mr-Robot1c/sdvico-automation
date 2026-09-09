@@ -17,7 +17,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   const main: Group = {
     title: '',
     items: [
-      { href: '/tong-quan', label: 'Tổng quan', icon: '📊', also: ['/noi-dung', '/ke-hoach', '/khach-hang', '/hang-doi', '/hoi-dap'] },
+      { href: '/tong-quan', label: 'Tổng quan', icon: '📊', also: ['/noi-dung', '/ke-hoach', '/khach-hang', '/hang-doi'] },
       { href: '/video', label: 'Video', icon: '🎬', also: ['/san-xuat', '/tu-lieu'] },
       { href: '/seo', label: 'SEO', icon: '🔍', also: ['/tu-khoa', '/quang-cao', '/du-kien'] },
       { href: '/kenh', label: 'Kênh', icon: '📡', also: ['/do-luong', '/ket-noi', '/facebook', '/youtube', '/tiktok'] },
@@ -27,6 +27,8 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   const heThong: Group = {
     title: 'Hệ thống',
     items: [
+      // 9/9 (Thanh: "không thấy con bot nào cả"): mục Hỏi bot ra menu, cùng nút nổi ask-bot-fab.tsx.
+      { href: '/hoi-dap', label: 'Hỏi bot', icon: '🤖' },
       { href: '/quy-tac', label: 'Quy tắc', icon: '📜' },
       // 29/8 (user): thay link sdvico.vn bang BLOG cua chinh he thong (trang cong khai /blog).
       { href: '/blog', label: 'Blog SDVICO', icon: '🌐', external: true }

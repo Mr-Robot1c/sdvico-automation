@@ -13,6 +13,8 @@ import { usePathname } from 'next/navigation';
 import Nav from './nav';
 import TopHeader from './top-header';
 import BotChip from './bot-chip';
+// 9/9: nút "Hỏi bot" nổi trên mọi trang nội bộ (bot hỏi đáp từ kho, cùng khung với /hoi-dap).
+import AskBotFab from './ask-bot-fab';
 import Tracking from './tracking';
 
 export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: { children: ReactNode; marketingOnly: boolean; pixelId?: string | null; ga4Id?: string | null }) {
@@ -103,6 +105,7 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
         </div>
       </div>
       <BotChip />
+      <AskBotFab />
     </>
   );
 }

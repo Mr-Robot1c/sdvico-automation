@@ -1531,3 +1531,36 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .pp-table .pp-c-on label { display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; color: var(--ink-2); white-space: nowrap; }
 .pp-row:not(.on) td:not(.pp-c-day):not(.pp-c-on) { opacity: .45; }
 .pp-notes { margin: 0 0 10px; padding-left: 18px; font-size: .85rem; color: var(--ink-2); display: grid; gap: 2px; }
+
+/* 9/9: nut HOI BOT noi (ask-bot-fab.tsx) - dung TREN chip "Bot da hoc" (bottom 20px) de khong de nhau. */
+.askbot-fab {
+  position: fixed; right: 20px; bottom: 74px; z-index: 9999;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-radius: 999px; border: 0;
+  background: linear-gradient(135deg, #e2442a 0%, #f06a4a 100%);
+  color: #fff; font-family: inherit; font-size: .92rem; font-weight: 700;
+  box-shadow: 0 4px 14px rgba(226,68,42,.35); cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.askbot-fab:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(226,68,42,.45); }
+.askbot-fab-on { background: var(--surface-2); color: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+.askbot-fab-text { line-height: 1.2; }
+.askbot-panel {
+  position: fixed; right: 20px; bottom: 126px; z-index: 9999;
+  width: min(440px, calc(100vw - 40px)); max-height: min(72vh, 640px); overflow: auto;
+  background: var(--surface, #fff); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: 0 12px 36px rgba(0,0,0,.22); padding: 12px 14px 8px;
+}
+.askbot-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.askbot-head-actions { display: inline-flex; align-items: center; gap: 6px; }
+.askbot-head-actions .btn { text-decoration: none; }
+.askbot-x {
+  width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink-2); cursor: pointer;
+  font-size: 18px; line-height: 1; display: grid; place-items: center;
+}
+.askbot-x:hover { color: var(--ink); }
+@media (max-width: 640px) {
+  .askbot-fab-text { display: none; }
+  .askbot-fab { padding: 12px 14px; }
+}
