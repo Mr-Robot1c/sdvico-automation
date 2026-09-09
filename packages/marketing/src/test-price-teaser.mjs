@@ -1,7 +1,7 @@
 // test-price-teaser.mjs — kiểm luật giá úp mở (Thanh chốt 8/9/2026): bài công khai không được có số
 // tiền chính xác, chỉ mốc "9,X triệu"; cảnh cuối video có câu giá đọc được. Chạy: npm run test:price
 // Không cần mạng, không cần GEMINI_API_KEY.
-import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta } from './products.mjs';
+import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta, SHOPEE_LINK, shopeeLink, ensureShopeeLink } from './products.mjs';
 import { scanStyle } from './brand-voice-check.mjs';
 import { guardViolations } from './product-guard.mjs';
 import { assessDraft } from './compliance.mjs';
@@ -57,7 +57,26 @@ ok('ensureCommentCta không nối đôi', (ensureCommentCta(`Hook.\n\n${commentC
   const full = ensureCommentCta(ensurePriceTeaser('Hook.\n\nThân bài.\n\nAnh đi mấy ngày một chuyến?', PRICE_TEASER[G9]), commentCta(G9));
   const lines = full.trim().split('\n');
   eq('thứ tự: CTA là dòng cuối', lines[lines.length - 1], commentCta(G9));
-  ok('thứ tự: câu giá đứng trước CTA', full.indexOf('9,X triệu') < full.indexOf('Anh em cmt'));
+  ok('thứ tự: câu giá đứng trước CTA', full.indexOf('9,X// 9/9 (Thanh): link Shopee trong bài bán, đứng trước CTA cmt, không chèn đôi, nhóm khác không có.
+eq('shopee link lọc nước', shopeeLink(G2), 'https://shopee.vn/product/212723941/45017630539/');
+eq('shopee link lọc dầu', shopeeLink(G9), 'https://shopee.vn/product/212723941/29945752663/');
+eq('shopee không link ắc quy', shopeeLink('7. Ắc quy Accu Nano SDViCo'), null);
+eq('shopee không link thì nguyên văn', ensureShopeeLink('Bài.', null), 'Bài.');
+ok('shopee nối cuối', ensureShopeeLink('Hook.\n\nThân bài.', SHOPEE_LINK[G9]).endsWith(SHOPEE_LINK[G9]));
+ok('shopee không nối đôi', (ensureShopeeLink(`Hook.\n\nĐặt trên Shopee: ${SHOPEE_LINK[G9]}`, SHOPEE_LINK[G9]).match(/shopee\.vn/g) || []).length === 1);
+ok('shopee redact không đụng link', redactExactPrices(`Đặt: ${SHOPEE_LINK[G2]}`).includes(SHOPEE_LINK[G2]));
+for (const l of Object.values(SHOPEE_LINK)) ok('shopee style sạch ' + l.slice(-12), scanStyle('Đặt trên Shopee, giao tận nơi: ' + l).length === 0, scanStyle('Đặt trên Shopee, giao tận nơi: ' + l));
+{
+  const full = ensureCommentCta(ensureShopeeLink(ensurePriceTeaser('Hook.\n\nThân bài.\n\nAnh đi mấy ngày một chuyến?', PRICE_TEASER[G9]), SHOPEE_LINK[G9]), commentCta(G9));
+  const lines = full.trim().split('\n');
+  eq('thứ tự: CTA vẫn là dòng cuối sau link', lines[lines.length - 1], commentCta(G9));
+  ok('thứ tự: giá trước link trước CTA', full.indexOf('9,X triệu') < full.indexOf('shopee.vn') && full.indexOf('shopee.vn') < full.indexOf('Anh em cmt'));
+  eq('shopee chạy lại không đổi', ensureShopeeLink(full, SHOPEE_LINK[G9]), full);
+  const withCta = ensureShopeeLink(`Hook.\n\n${commentCta(G9)}`, SHOPEE_LINK[G9]).trim().split('\n');
+  eq('shopee chèn trước CTA sẵn có', withCta[withCta.length - 1], commentCta(G9));
+}
+
+ triệu') < full.indexOf('Anh em cmt'));
 }
 
 let fail = 0;

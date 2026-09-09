@@ -237,6 +237,33 @@ export function ensureCommentCta(body, cta) {
   return s ? `${s}\n\n${cta}` : cta;
 }
 
+// 9/9 (Thanh): 2 máy đã lên gian Shopee SDVICO (shop 212723941). Bài bán chèn 1 dòng link sàn để bà con
+// đặt ship tận nơi hoặc trả góp qua sàn; sàn là nơi duy nhất ghi giá chính xác nên link không phá luật
+// giá úp mở. Chỉ 2 nhóm có link; nhóm khác không có dòng này. Bản sao y hệt ở packages/marketing/src/products.mjs.
+export const SHOPEE_LINK = {
+  '2. Máy lọc nước biển SEA-40': 'https://shopee.vn/product/212723941/45017630539/',
+  '9. Máy Lọc Dầu Diesel SD12-300': 'https://shopee.vn/product/212723941/29945752663/',
+};
+export function shopeeLink(group) {
+  return SHOPEE_LINK[group] || null;
+}
+// Bảo đảm bài có dòng link Shopee: đã có link shopee.vn thì giữ nguyên; có câu CTA cmt ở cuối thì
+// chèn TRƯỚC câu đó (CTA vẫn là dòng cuối); còn lại nối vào cuối. Không link thì trả nguyên văn.
+export function ensureShopeeLink(body, link) {
+  if (!link) return body;
+  const s = String(body || '').trimEnd();
+  if (/shopee\.vn\//i.test(s)) return s;
+  const line = `Đặt trên Shopee, giao tận nơi: ${link}`;
+  if (!s) return line;
+  const lines = s.split('\n');
+  const last = lines[lines.length - 1];
+  if (/(?:cmt|bình luận|comment)\s*[:]?\s*["“']/i.test(last)) {
+    lines.splice(lines.length - 1, 0, line, '');
+    return lines.join('\n');
+  }
+  return `${s}\n\n${line}`;
+}
+
 // Bảo đảm CẢNH CUỐI video có câu giá đọc được (luật 8/9). Chặn số chính xác trước; thiếu câu thì
 // nối vào cuối lời thoại cảnh đó. Không teaser thì trả nguyên văn.
 export function ensureSpokenTeaser(narration, teaser) {

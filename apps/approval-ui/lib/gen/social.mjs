@@ -3,7 +3,7 @@
 import { assessDraft, scanPlaybook, countWords, firstBodyLine } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
-import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, shopeeLink, ensureShopeeLink } from './products.mjs';
 import { insightBrief } from './insights.mjs';
 import { logTokenUsage } from './token-log.mjs';
 import { sampleHooks } from './hook-library.mjs';
@@ -205,6 +205,9 @@ export async function generateSocialPost({
     headline = redactExactPrices(headline);
   }
   // 9/9: câu cuối bài bán luôn là CTA cmt từ khóa (model quên thì nối vào).
+  // 9/9 (Thanh): bài bán FB/YT có dòng link Shopee (2 máy đã lên sàn) đứng trước CTA. TikTok bỏ qua vì
+  // caption không bấm được link, chỉ tốn chữ.
+  if (!isTikTok) body = ensureShopeeLink(body, shopeeLink(productGroup));
   body = ensureCommentCta(body, cta);
 
   const tags = hashtagBlock(productGroup);
