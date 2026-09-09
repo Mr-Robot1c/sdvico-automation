@@ -17,7 +17,7 @@
 | Thương hiệu | SDVICO nếu danh sách có; không có thì chọn "Không có thương hiệu", tên SDVICO đã nằm trong tiêu đề. |
 | Xuất xứ | [KD] Việt Nam hay nước khác. |
 | Bảo hành | SF300B: 12 tháng (đã xác nhận). SEA-40: [KD] tháng. |
-| Giá hiển thị gạch ngang | KHÔNG tạo Khuyến Mãi Của Shop cho tới khi sếp xác nhận giá cũ; văn bản chính sách 9/9 chỉ có giá bán lẻ, không có giá gốc. Lọc dầu trên gian đang nhập 12.000.000 phải SỬA về 9.900.000. |
+| Giá lọc dầu trên gian (Thanh chốt 9/9 chiều) | GIỮ giá niêm yết 12.000.000 đ, tạo Mã Giảm Giá Của Shop loại Voucher sản phẩm giảm 2.100.000 đ để khách trả 9.900.000 đ. Không dùng Khuyến Mãi Của Shop gạch giá (Shopee soát giá gốc ảo ở đó). Lọc nước giữ 49.000.000 và 38.000.000, không voucher. |
 | Vận chuyển | Đơn vị vận chuyển thường của Shopee giới hạn khoảng 20 tới 30 kg mỗi kiện, nặng hơn phải bật "Hàng cồng kềnh" (tới 200 kg, giá trị tới 100 triệu đồng). SF300B 15 kg, gói 52 x 20 x 50 cm, đi được đơn vị thường. Máy lọc nước khoảng 60 kg, gói 150 x 50 x 80 cm, PHẢI bật Hàng cồng kềnh hoặc chọn tự giao kèm lắp. |
 | Thuộc tính chi tiết | Xem bảng ở mục 5 dưới cùng. |
 | Thời gian chuẩn bị hàng | Bật "Hàng đặt trước" 7 ngày cho SEA-40 (cần hẹn kỹ thuật lắp). SF300B 2 ngày nếu có sẵn kho. |
@@ -111,7 +111,7 @@ Máy lọc dầu diesel SF300B SDVICO cho động cơ máy thủy, lọc cặn 1
 | Bơm điện SF300B | 9.900.000 đ | [KD] |
 | Lọc cơ | 7.900.000 đ | [KD] |
 
-Không tạo Khuyến Mãi Của Shop gạch "giá cũ 12.000.000" cho tới khi sếp xác nhận, vì văn bản chính sách không có giá này. Bộ lọc cơ: tên model, thông số, ảnh [KD] chưa có; chưa có thì tạm để 1 phân loại bơm điện.
+Giá trên gian giữ 12.000.000 đ (bơm điện), khách dùng voucher 2.100.000 đ còn 9.900.000 đ (Thanh chốt 9/9 chiều). Bộ lọc cơ nếu thêm phân loại thì ghi thẳng 7.900.000 đ, voucher chỉ gắn phân loại bơm điện. Bộ lọc cơ: tên model, thông số, ảnh [KD] chưa có; chưa có thì tạm để 1 phân loại bơm điện.
 
 **Thông tin vận chuyển:** khối lượng 15 kg, kích thước gói hàng 52 x 20 x 50 cm (cộng thêm thùng đóng gói nếu có, [KD] xác nhận).
 
