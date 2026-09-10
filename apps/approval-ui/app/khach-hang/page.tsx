@@ -90,9 +90,12 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
           <input name="name" placeholder="Tên khách" className="note" style={{ flex: '1 1 180px' }} />
           <input name="contact" placeholder="SĐT / Zalo / link" className="note" style={{ flex: '1 1 180px' }} />
           <input name="message" placeholder="Hỏi gì / sản phẩm quan tâm" className="note" style={{ flex: '2 1 260px' }} />
-          <select name="source" className="note" defaultValue="manual" style={{ flex: '1 1 160px' }} title="Tin trong hộp thư có thẻ 'Bắt đầu từ quảng cáo' thì chọn Quảng cáo Facebook">
-            <option value="manual">✍️ Nhập tay</option>
-            <option value="facebook_ads">📣 Quảng cáo Facebook</option>
+          <select name="channel" className="note" defaultValue="zalo" style={{ flex: '1 1 160px' }} title="Tin trong hộp thư có thẻ 'Bắt đầu từ quảng cáo' thì chọn Quảng cáo FB">
+            <option value="zalo">Zalo</option>
+            <option value="inbox">Inbox FB</option>
+            <option value="ads">📣 Quảng cáo FB</option>
+            <option value="call">Gọi</option>
+            <option value="meet">Gặp</option>
           </select>
           <button className="btn ok" type="submit">Thêm</button>
         </form>

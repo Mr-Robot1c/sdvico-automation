@@ -126,6 +126,7 @@ export default async function KhachHangSection() {
           <select name="channel" defaultValue="zalo" className="note">
             <option value="zalo">Zalo</option>
             <option value="inbox">Inbox FB</option>
+            <option value="ads">📣 Quảng cáo FB</option>
             <option value="call">Gọi</option>
             <option value="meet">Gặp</option>
           </select>

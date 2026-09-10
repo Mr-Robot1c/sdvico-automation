@@ -157,6 +157,7 @@ export default function LeadQuickView({
               <select name="channel" defaultValue="zalo" className="input" style={{ padding: '4px 8px' }}>
                 <option value="zalo">Zalo</option>
                 <option value="inbox">Inbox FB</option>
+                <option value="ads">📣 Quảng cáo FB</option>
                 <option value="call">Gọi</option>
                 <option value="meet">Gặp</option>
               </select>
