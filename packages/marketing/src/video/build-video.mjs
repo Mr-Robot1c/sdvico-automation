@@ -101,9 +101,12 @@ function livelyArgs(sampleRate, opts) {
 // giữ nguyên, thêm tiếng ồn nền -45..-40dB không bị cắt. Nay: ngưỡng -40dB + nén mọi khoảng lặng
 // BÊN TRONG khúc dài hơn 0,25s xuống 0,25s (đo thật: trống 1,6s còn ~0,75s). Đã thử start_duration
 // để bỏ tiếng bật: cắt luôn chữ thật (câu ngắn mất sạch) -> KHÔNG dùng.
-const TRIM_EDGES = 'silenceremove=start_periods=1:start_threshold=-40dB:start_silence=0.02,' +
-  'areverse,silenceremove=start_periods=1:start_threshold=-40dB:start_silence=0.02,areverse,' +
-  'silenceremove=stop_periods=-1:stop_duration=0.25:stop_threshold=-40dB:stop_silence=0.25';
+// 10/9 (3) (Thanh: "tạch tạch tạch"; đo video 1273b1bf: 73 bước sóng trong 38s, đi cụm đều 40ms):
+// silenceremove của ffmpeg đóng gói (2018) khi nén lặng giữa khúc bật tắt liên tục quanh ngưỡng
+// trên tiếng ồn nền, băm sóng thành mảnh -> chuỗi tiếng tạch. BỎ HẲN silenceremove + afade ở đây;
+// việc cắt đầu đuôi, nén lặng bên trong, mờ dần hai đầu và đo f0 chuyển sang tidy.py (numpy, có
+// độ trễ chuyển trạng thái 80ms, mỗi chỗ cắt mờ dần chéo 10ms). Thử trên 2 khúc cũ: chuỗi ffmpeg
+// thêm 5 tiếng tạch, tidy.py thêm 0.
 // ffmpeg dong goi (@ffmpeg-installer, ban 2018) chua co apad=pad_dur -> dung pad_len theo mau
 // (0,10s x 48kHz = 4800 mau). CI dung cung binary nay.
 // 5/9 (sep: "nghi hoi giua cac dau nhu ! lau them xiu"): sau cau cam/cau hoi nghi 0,26s, sau cau
@@ -112,10 +115,6 @@ function sentenceGap(sentence) {
   const sec = /[!?]$/.test(sentence) ? 0.26 : 0.16;
   return `apad=pad_len=${Math.round(sec * 48000)}`;
 }
-// 10/9 (2) (Thanh: "nghe tạch tạch tạch"): silenceremove cắt thẳng tại mức -40dB nên mỗi mối nối
-// câu có bậc sóng -> tiếng tạch. Mờ dần 15ms hai đầu mỗi khúc SAU khi cắt, TRƯỚC khi đệm.
-const FADE_EDGES = 'afade=t=in:st=0:d=0.015,areverse,afade=t=in:st=0:d=0.015,areverse';
-
 // Tạo mp3 LẶNG dài `sec` giây (dự phòng khi TTS lỗi: cảnh vẫn dựng, có phụ đề, chỉ mất tiếng cảnh đó).
 async function silentAudio(outPath, sec) {
   const dur = Math.max(1, sec);
@@ -313,22 +312,26 @@ function localProsody(_sentence, _idx) {
 const OUTRO_PROSODY = { semiDelta: 0, tempoMul: 1.0 };
 
 // 10/9 (Thanh: "mỗi clip một tone"): bỏ nâng cao độ theo câu vẫn lệch 219 tới 258 Hz vì VieNeu tự
-// lệch theo từng lần gọi. Nay ĐO f0 từng khúc (f0.py, numpy) rồi dịch về mốc chung TTS_F0_TARGET
-// (240 Hz, giữa dải Mỹ Duyên) bằng asetrate + atempo bù trong livelyFilter; kẹp ±2,5 nửa cung.
+// lệch theo từng lần gọi. Nay ĐO f0 từng khúc rồi dịch về mốc chung TTS_F0_TARGET (240 Hz, giữa
+// dải Mỹ Duyên) bằng asetrate + atempo bù trong livelyFilter; kẹp ±2,5 nửa cung.
 // Mô phỏng trên video 3826e7f9: 8 câu 219..258 Hz -> đều 239 Hz. Đo hỏng thì không dịch (0).
+// 10/9 (3): tidy.py làm luôn cắt đầu đuôi + nén lặng bên trong + mờ dần (xem ghi chú TRIM ở trên)
+// và trả f0 của khúc đã dọn. Trả { path (WAV đã dọn), semi }. tidy.py lỗi -> dùng WAV gốc, semi 0.
 const TTS_F0_TARGET = Number(process.env.TTS_F0_TARGET || 240) || 240;
-async function f0Semi(wav, workDir, tag) {
-  if (process.env.TTS_F0_NORMALIZE === 'off') return 0;
+async function tidyWav(wav, workDir, tag) {
+  const out = join(workDir, `${tag}_tidy.wav`);
   try {
-    const mono = join(workDir, `${tag}_f0.wav`);
-    await ffmpeg(['-y', '-i', wav, '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', mono]);
-    const out = await python('f0.py', [mono]);
-    const { f0 = 0, n = 0 } = JSON.parse(out.split('\n').pop() || '{}');
-    if (!f0 || n < 10) return 0;
-    return Math.max(-2.5, Math.min(2.5, 12 * Math.log2(TTS_F0_TARGET / f0)));
+    const res = await python('tidy.py', [wav, out]);
+    const { f0 = 0, n = 0, cuts = 0 } = JSON.parse(res.split('\n').pop() || '{}');
+    let semi = 0;
+    if (process.env.TTS_F0_NORMALIZE !== 'off' && f0 && n >= 10) {
+      semi = Math.max(-2.5, Math.min(2.5, 12 * Math.log2(TTS_F0_TARGET / f0)));
+    }
+    if (cuts) console.log(`  (${tag}: nén ${cuts} khoảng lặng bên trong khúc)`);
+    return { path: out, semi };
   } catch (e) {
-    console.warn(`  (${tag}: đo f0 lỗi "${String(e?.message || e).slice(0, 80)}", không chuẩn hoá cao độ)`);
-    return 0;
+    console.warn(`  (${tag}: tidy.py lỗi "${String(e?.message || e).slice(0, 80)}", dùng khúc gốc, không chuẩn hoá cao độ)`);
+    return { path: wav, semi: 0 };
   }
 }
 
@@ -342,9 +345,9 @@ async function localTTS(cleanText, outPath, workDir, tag) {
         const wav = await localTTSWav(sentences[i], workDir, `${tag}_s${i}`);
         const piece = `${tag}_s${i}_p.wav`;
         const pro = prosodyOf(sentences[i], i);
-        const semi = await f0Semi(wav, workDir, `${tag}_s${i}`);
-        const af = [livelyFilter(48000, { semiDelta: pro.semiDelta + semi, tempoMul: pro.tempoMul }), TRIM_EDGES, FADE_EDGES, sentenceGap(sentences[i])].filter(Boolean).join(',');
-        await ffmpeg(['-y', '-i', wav, '-af', af, '-c:a', 'pcm_s16le', join(workDir, piece)]);
+        const t = await tidyWav(wav, workDir, `${tag}_s${i}`);
+        const af = [livelyFilter(48000, { semiDelta: pro.semiDelta + t.semi, tempoMul: pro.tempoMul }), sentenceGap(sentences[i])].filter(Boolean).join(',');
+        await ffmpeg(['-y', '-i', t.path, '-af', af, '-c:a', 'pcm_s16le', join(workDir, piece)]);
         parts.push(piece);
       }
       const list = join(workDir, `${tag}_lcat.txt`);
@@ -357,9 +360,9 @@ async function localTTS(cleanText, outPath, workDir, tag) {
   }
   // Duong 1 cau / du phong: cung cat lang 2 dau + nghi cuoi cau nhu duong tung cau cho dong nhat.
   const wav = await localTTSWav(cleanText, workDir, tag);
-  const semi = await f0Semi(wav, workDir, tag);
-  const af = [livelyFilter(48000, { semiDelta: semi }), TRIM_EDGES, FADE_EDGES, sentenceGap(cleanText)].filter(Boolean).join(',');
-  await ffmpeg(['-y', '-i', wav, '-af', af, '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
+  const t = await tidyWav(wav, workDir, tag);
+  const af = [livelyFilter(48000, { semiDelta: t.semi }), sentenceGap(cleanText)].filter(Boolean).join(',');
+  await ffmpeg(['-y', '-i', t.path, '-af', af, '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
   return probeDuration(outPath);
 }
 
