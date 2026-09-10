@@ -172,6 +172,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const today = todayVN();
   const dayStartIso = new Date(today + 'T00:00:00+07:00').toISOString();
   const leadToday = leads.filter((l) => String(l.created_at || '') >= dayStartIso);
+  const leadAds = leads.filter((l) => String(l.source || '') === 'facebook_ads');
   const wonWeek = Number(wonWeekRes.count || 0);
   const goalText = String((goalRes.data as any)?.value?.text || '');
   const wonTarget = Number(goalText.match(/(\d+)\s*khách\s*(?:hàng\s*)?mua/i)?.[1] || 10);
@@ -418,7 +419,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           </div>
         </section>
         <section className="blk">
-          <h2><span aria-hidden="true">🛒</span> Người hỏi mua <span className="sub">({fmt(leads.length)} trong 7 ngày · {fmt(leadToday.length)} hôm nay)</span></h2>
+          <h2><span aria-hidden="true">🛒</span> Người hỏi mua <span className="sub">({fmt(leads.length)} trong 7 ngày · {fmt(leadToday.length)} hôm nay · {fmt(leadAds.length)} từ quảng cáo)</span></h2>
           {/* 7/9 (user): luôn có nút "Kiểm tra người mua" ở cuối khối, kể cả khi 7 ngày chưa ai hỏi,
               để vào thẳng trang khách hàng xem lead cũ và đổi trạng thái. */}
           <p className="sub" style={{ margin: '0 0 8px', fontSize: '.85rem' }}>

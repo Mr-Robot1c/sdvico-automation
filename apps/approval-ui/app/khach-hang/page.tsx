@@ -32,6 +32,7 @@ const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
 const SOURCE_LABEL: Record<string, string> = {
   facebook_comment: '💬 Comment Facebook',
   facebook_message: '📩 Tin nhắn Facebook',
+  facebook_ads: '📣 Quảng cáo Facebook',
   manual: '✍️ Nhập tay',
 };
 
@@ -89,6 +90,10 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
           <input name="name" placeholder="Tên khách" className="note" style={{ flex: '1 1 180px' }} />
           <input name="contact" placeholder="SĐT / Zalo / link" className="note" style={{ flex: '1 1 180px' }} />
           <input name="message" placeholder="Hỏi gì / sản phẩm quan tâm" className="note" style={{ flex: '2 1 260px' }} />
+          <select name="source" className="note" defaultValue="manual" style={{ flex: '1 1 160px' }} title="Tin trong hộp thư có thẻ 'Bắt đầu từ quảng cáo' thì chọn Quảng cáo Facebook">
+            <option value="manual">✍️ Nhập tay</option>
+            <option value="facebook_ads">📣 Quảng cáo Facebook</option>
+          </select>
           <button className="btn ok" type="submit">Thêm</button>
         </form>
       </details>

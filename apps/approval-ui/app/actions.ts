@@ -1105,13 +1105,14 @@ export async function addLeadManual(formData: FormData) {
   const contact = String(formData.get('contact') || '').trim().slice(0, 200);
   const contentId = String(formData.get('content_id') || '').trim();
   const channel = String(formData.get('channel') || '').trim().toLowerCase();
+  const source = String(formData.get('source') || '') === 'facebook_ads' ? 'facebook_ads' : 'manual';
   if (!name && !message) return;
   const CHANNEL_LABEL: Record<string, string> = { zalo: '[Zalo]', inbox: '[Inbox]', call: '[Gọi]', meet: '[Gặp]' };
   const prefix = CHANNEL_LABEL[channel] || '';
   const finalMessage = prefix ? `${prefix} ${message || contact}`.trim() : (message || contact);
   const client = getServerClient();
   await client.from('mkt_leads').insert({
-    source: 'manual',
+    source,
     fb_user_name: name || null,
     message: finalMessage,
     fb_profile_url: contact || null,

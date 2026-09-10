@@ -15,6 +15,7 @@ import DedupLeadsBar from './dedup-leads-bar';
 const SOURCE_LABEL: Record<string, string> = {
   facebook_comment: '💬 Cmt FB',
   facebook_message: '📩 Tin nhắn FB',
+  facebook_ads: '📣 Quảng cáo FB',
   manual: '✍️ Nhập tay',
 };
 
