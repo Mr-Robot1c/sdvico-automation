@@ -135,15 +135,16 @@ export const PRICE_TEASER = {
   '2. Máy lọc nước biển SEA-40': {
     text: 'Máy cơ giảm từ 45 triệu còn 3X triệu, máy điện giảm từ 56 triệu còn 4X triệu, đã gồm công lắp, tặng 10 lõi lọc thô',
     key: '3X triệu',
-    spoken: 'Máy cơ giảm từ 45 triệu còn hơn 30 triệu, máy điện giảm từ 56 triệu còn hơn 40 triệu, đã gồm công lắp, còn tặng 10 lõi lọc thô. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
-    spokenKey: 'hơn 30 triệu',
+    // 10/9 (Thanh: lời đọc phải là "giảm từ 56 triệu chỉ còn 4 X triệu", không đọc "hơn 40 triệu"; câu kêu bình luận DỜI XUỐNG OUTRO build-video.mjs).
+    spoken: 'Máy cơ giảm từ 45 triệu chỉ còn 3 X triệu, máy điện giảm từ 56 triệu chỉ còn 4 X triệu, đã gồm công lắp, còn tặng 10 lõi lọc thô!',
+    spokenKey: '3 X triệu',
     badge: 'Máy cơ 45 triệu còn 3X triệu\nMáy điện 56 triệu còn 4X triệu',
   },
   '9. Máy Lọc Dầu Diesel SD12-300': {
     text: 'Bộ lọc dầu giảm từ 12 triệu còn 9,X triệu',
     key: '9,X triệu',
-    spoken: 'Bộ lọc dầu giảm từ 12 triệu còn hơn 9 triệu thôi. Bình luận lọc dầu hay lọc nước, em tư vấn ngay nha!',
-    spokenKey: 'hơn 9 triệu',
+    spoken: 'Bộ lọc dầu giảm từ 12 triệu chỉ còn 9 phẩy X triệu thôi!',
+    spokenKey: '9 phẩy X triệu',
     badge: 'Bộ lọc dầu: từ 12 triệu\ncòn 9,X triệu',
   },
 };

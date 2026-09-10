@@ -417,7 +417,8 @@ async function whisperArtifact(sceneAudios, workDir, tag) {
 // 5/9 (sep: "outro khac giong voi giong doc"): do f0 outro 233Hz vs cac canh 246-259Hz, vi outro la
 // 1 cau dai doc ca doan (khong qua duong tung cau + prosody). Tach thanh 2 cau, cau dau cam than
 // -> di cung duong localTTS tung cau nhu loi doc, len giong nhu cau cam trong cac canh.
-const OUTRO_TEXT = 'Nhắn tin cho Page SDVICO nha! Hoặc gọi số 0939 243 222 để được hỗ trợ.';
+// 10/9 (Thanh): outro gộp 3 đường liên hệ, câu kêu bình luận từ khóa dời từ cảnh giá xuống đây.
+const OUTRO_TEXT = 'Nhắn tin cho Page SDVICO nha! Không thì bình luận lọc dầu hay lọc nước, hoặc gọi số 0939 243 222, để bên em tư vấn cho anh em nha!';
 
 // opts.priceBadge / opts.badgeFromScene (8/9): tem giá úp mở trên hình, xem assemble.mjs.
 async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, contentId, opts = {}) {

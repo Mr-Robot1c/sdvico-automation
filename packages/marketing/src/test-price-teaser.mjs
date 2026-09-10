@@ -23,12 +23,12 @@ ok('ensure chèn khi thiếu', ensurePriceTeaser('Hook.\n\nThân bài.\n\nAnh đ
 ok('ensure không chèn đôi', (ensurePriceTeaser(`Hook. ${PRICE_TEASER[G9].text}. Hỏi?`, PRICE_TEASER[G9]).match(/9,X triệu/g) || []).length === 1);
 eq('ensure không teaser', ensurePriceTeaser('Bài content.', null), 'Bài content.');
 ok('spoken nối cảnh cuối', ensureSpokenTeaser('Dầu sạch, máy khỏe!', PRICE_TEASER[G9]).endsWith(PRICE_TEASER[G9].spoken));
-ok('spoken không nối đôi', (ensureSpokenTeaser(PRICE_TEASER[G2].spoken, PRICE_TEASER[G2]).match(/hơn 30 triệu/g) || []).length === 1);
+ok('spoken không nối đôi', (ensureSpokenTeaser(PRICE_TEASER[G2].spoken, PRICE_TEASER[G2]).match(/3 X triệu/g) || []).length === 1);
 ok('spoken chặn số', !/9\.900\.000/.test(ensureSpokenTeaser('Giá 9.900.000 đ nha.', PRICE_TEASER[G9])));
 eq('tên công khai', publicName(G9), 'Máy lọc dầu SF300B');
-// 9/9: lời đọc cảnh cuối kêu bình luận từ khóa (không "nhắn Page", không "cmt" vì TTS đọc từng chữ cái).
+// 10/9 (Thanh): câu giá cảnh cuối CHỈ nói giá; kêu bình luận / nhắn Page / gọi số nằm ở OUTRO (build-video.mjs).
 for (const [g, t] of Object.entries(PRICE_TEASER)) {
-  ok(`spoken kêu bình luận ${g.slice(0, 2)}`, /Bình luận lọc dầu hay lọc nước/.test(t.spoken) && !/nhắn Page|cmt/i.test(t.spoken), t.spoken);
+  ok(`spoken chỉ nói giá ${g.slice(0, 2)}`, !/bình luận|nhắn Page|cmt|gọi số/i.test(t.spoken), t.spoken);
 }
 for (const [g, t] of Object.entries(PRICE_TEASER)) {
   for (const f of ['text', 'spoken', 'badge']) {
@@ -88,8 +88,8 @@ eq('redact giữ mốc neo 12', redactExactPrices(PRICE_TEASER[G9].text), PRICE_
 for (const [g, tz] of Object.entries(PRICE_TEASER)) {
   for (const f of ['text', 'spoken', 'badge']) ok(`không số chính xác 38/49/9,9 ${g.slice(0, 2)} ${f}`, !/\b(38|49)\s*triệu|9[,.]9\s*triệu|\d{1,3}\.\d{3}\.\d{3}/i.test(tz[f]), tz[f]);
 }
-ok('spoken lọc nước đọc được mốc neo', /giảm từ 45 triệu còn hơn 30 triệu/.test(PRICE_TEASER[G2].spoken) && /giảm từ 56 triệu còn hơn 40 triệu/.test(PRICE_TEASER[G2].spoken));
-ok('spoken lọc dầu đọc được mốc neo', /giảm từ 12 triệu còn hơn 9 triệu/.test(PRICE_TEASER[G9].spoken));
+ok('spoken lọc nước đọc mốc neo nguyên văn', /giảm từ 45 triệu chỉ còn 3 X triệu/.test(PRICE_TEASER[G2].spoken) && /giảm từ 56 triệu chỉ còn 4 X triệu/.test(PRICE_TEASER[G2].spoken) && !/hơn 40 triệu|hơn 30 triệu/.test(PRICE_TEASER[G2].spoken));
+ok('spoken lọc dầu đọc mốc neo nguyên văn', /giảm từ 12 triệu chỉ còn 9 phẩy X triệu/.test(PRICE_TEASER[G9].spoken));
 
 let fail = 0;
 for (const c of cases) {
