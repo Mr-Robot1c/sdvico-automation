@@ -35,7 +35,7 @@ Luật Tiến: **"Đăng lên website đều là giá bán lẻ"** (giá đại 
 | Máy lọc nước CƠ | 38.000.000 đ | (không ghi) | ĐÃ gồm công lắp đặt. Tặng 10 lõi lọc thô |
 | Starlink V4 | 15.000.000 đ | | Chưa gồm vận chuyển, lắp đặt. Cước 10 GB 5.500.000 đ/tháng, 25 GB 6.000.000 đ/tháng |
 | Starlink Mini | 13.000.000 đ | | Như trên |
-| Viettel S-Tracking MTR-V02-VNM | 23.601.000 đ | | Gồm VAT và lắp đặt, BH 12 tháng máy, 6 tháng phụ kiện. KHÔNG đưa lên Shopee (điều cấm 4, cần ủy quyền hãng) |
+| Viettel S-Tracking MTR-V02-VNM | 23.601.000 đ | | Gồm VAT và lắp đặt, BH 12 tháng máy, 6 tháng phụ kiện. 10/9 Thanh quyết đưa lên Shopee (mục 4), sếp duyệt bản chữ trước, sẵn bảng báo giá Viettel xác nhận nếu sàn hỏi ủy quyền |
 
 Câu giật tít trên bài công khai (Thanh chốt 9/9 chiều, KHÔNG dùng trên Shopee): "máy cơ giảm từ 45 triệu còn 3X triệu, máy điện giảm từ 56 triệu còn 4X triệu, đã gồm công lắp, tặng 10 lõi lọc thô" và "bộ lọc dầu giảm từ 12 triệu còn 9,X triệu". Mốc 45 / 56 / 12 triệu là mốc neo kích thích, không có trong văn bản chính sách, nên bài vẫn qua duyệt và gửi nhóm xem trước. Trên Shopee chỉ ghi giá bán lẻ 38 / 49 / 7,9 / 9,9 triệu, không gạch giá cũ (Shopee phạt giá gốc ảo).
 
@@ -184,6 +184,65 @@ Shopee tính tỉ lệ phản hồi, cố gắng trả lời trong 1 giờ.
 4. Số lượng kho từng loại, xuất xứ.
 5. Sếp chốt hạn khuyến mãi (đề xuất 30/9).
 6. Không viết trên sàn: "bớt chở nước", "nhẹ tàu", "tiết kiệm dầu" cho máy lọc nước (phản hồi cấp trên 19/8); không nói SEA-40 do SDVICO tự sản xuất cho tới khi có xác nhận (hồ sơ công ty ghi SDVICO phân phối, plan 7/9 ghi tự làm, đang lệch).
+
+
+## 4. Viettel S-Tracking (thêm 10/9, Thanh: "muốn S-Tracking lên Shopee giống 2 sản phẩm kia")
+
+Hai việc khác 2 máy kia, làm trước khi Đăng:
+- Điều cấm 3: bài chạm giám sát hành trình tàu cá, bản chữ dưới gửi sếp duyệt trước khi bấm Đăng. Mô tả chỉ nói "đúng quy định" chung, không nêu văn bản, mốc ngày, mức phạt.
+- Điều cấm 4 và luật sàn: thiết bị và app là của Viettel, SDVICO phân phối, lắp đặt, bảo hành. Shopee có thể yêu cầu giấy ủy quyền nhãn hiệu khi tên có chữ Viettel; sẵn bảng báo giá SDVICO_BG_GSHT_VTT ngày 5/9/2026 có dấu Viettel xác nhận để nộp nếu bị hỏi, không nộp thì có thể bị gỡ listing.
+
+**Tên sản phẩm (dưới 120 ký tự):**
+
+Thiết bị giám sát hành trình tàu cá Viettel S-Tracking MTR-V02-VNM, SDVICO phân phối và lắp đặt tận tàu
+
+**Ngành hàng:** gõ "định vị" hoặc "giám sát hành trình", chọn nhánh thiết bị định vị GPS. **Thương hiệu:** Viettel (có trong danh sách thì chọn, không có thì "Không có thương hiệu", tên Viettel đã ở tiêu đề).
+
+**Giá:** 23.601.000 đ, đã gồm VAT và công lắp đặt (bảng báo giá 5/9/2026, Viettel xác nhận). Không phân loại, không khuyến mãi gạch giá, không voucher. Chính sách áp dụng cho khách hàng cuối.
+
+**Thuộc tính:** Tình trạng Mới; Xuất xứ Việt Nam; Bảo hành 12 tháng; Loại bảo hành Bảo hành bởi nhà bán hàng; Nguồn điện: năng lượng mặt trời, điện tàu, pin nội (ô nào có thì điền); Chống nước: ngâm 30 phút sâu 1 m. Còn lại để trống.
+
+**Vận chuyển:** khối lượng và kích thước kiện [KD] cân đo (hộp thiết bị + hộp còi + cáp). Bật "Hàng đặt trước" 7 ngày vì phải hẹn kỹ thuật lắp. Chọn đơn vị thường nếu dưới 20 kg.
+
+**Hình ảnh:** ảnh 1 bộ đầy đủ nền trắng (SDViCo/3. .../2. .jpg), ảnh 2 thiết bị chính (1. ...jpg), ảnh 3 và 4 ảnh render lắp trên nóc ca bin (s-tracking-3d v2.png, cắt 1:1), ảnh 5 ảnh lắp thật trên tàu (lắp Viettel Tracking real.jpg). Không ảnh nào có số điện thoại.
+
+**Mô tả sản phẩm (dán vào ô Mô tả):**
+
+KỸ THUẬT SDVICO LẮP TẬN TÀU. Đặt trên sàn xong, bên em gọi xác nhận, hẹn ngày kỹ thuật xuống tàu lắp, kích hoạt tài khoản và hướng dẫn dùng app.
+
+Dành cho ai
+Tàu cá ra khơi xa cần thiết bị giám sát hành trình đúng quy định, gửi vị trí về bờ ổn định, có nút cứu hộ khi gặp sự cố.
+
+Thiết bị làm được gì
+Thiết bị giám sát hành trình tàu cá Viettel S-Tracking, model MTR-V02-VNM, sản xuất tại Việt Nam.
+Truyền dữ liệu vị trí về bờ 90 phút một lần.
+Nút cứu hộ SOS, gửi tin chu kỳ 15 phút một lần.
+Cảnh báo bằng đèn và còi khi tàu vượt ranh giới, 1 phút một lần cho tới khi quay lại ranh giới và ra khỏi vùng cấm.
+Cảnh báo pin nội dưới 30%.
+Tự lưu hành trình khi mất tín hiệu, tự gửi lại khi có sóng.
+Chống nước: ngâm 30 phút ở độ sâu 1 m.
+Nguồn: năng lượng mặt trời, điện tàu, pin nội.
+Miễn phí nhắn tin 2 chiều qua app Viettel S-Tracking. Mỗi tàu một tài khoản riêng, chủ tàu tự theo dõi tàu mình trên điện thoại.
+
+Bộ sản phẩm
+Thiết bị chính có tấm pin mặt trời, hộp còi cảnh báo có nút SOS, bộ cáp, giá gắn.
+
+Giao và lắp
+Giá đã gồm VAT và công lắp đặt. Kỹ thuật SDVICO tới tận tàu lắp, kích hoạt, hướng dẫn. Khu vực lắp: [KD].
+
+Bảo hành
+Bảo hành 12 tháng thiết bị chính, 6 tháng phụ kiện, với lỗi do nhà sản xuất.
+
+Hỏi đáp nhanh
+Có cần đăng ký gì thêm không? Kỹ thuật kích hoạt tài khoản cho tàu khi lắp, chủ tàu cài app Viettel S-Tracking là dùng.
+Mất sóng giữa biển thì sao? Máy tự lưu hành trình, có sóng gửi bù, không mất dữ liệu.
+Một chủ nhiều tàu xem chung được không? [KD hỏi Viettel]
+
+Giá 23.601.000 đ một bộ, đã gồm VAT và công lắp đặt. Chat với shop để xếp lịch lắp.
+
+SDVICO là nhà phân phối và lắp đặt thiết bị Viettel S-Tracking. Công ty TNHH Hiệp Lực Phát Triển Việt, sdvico.vn. Xuất hóa đơn đầy đủ.
+
+**Sau khi gian duyệt:** gửi link cho Claude để thêm vào SHOPEE_LINK nhóm 3 (bài bán S-Tracking tự chèn link) và vào bình luận đầu bài group. Mẫu chat khi khách hỏi: "Dạ anh, bộ giám sát hành trình Viettel S-Tracking trọn gói 23.601.000 đ đã gồm VAT và công lắp, bên em lắp tận tàu, mỗi tàu một tài khoản riêng. Tàu anh đậu cảng nào để em xếp lịch kỹ thuật ạ?"
 
 ## 5. Ô "Thông tin chi tiết" (thuộc tính) trên Shopee, theo bảng quy cách Kinh doanh gửi 9/9
 
