@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import AgentRoster from './agent-roster';
+import BotChat from '../hoi-dap/bot-chat';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang AGENT: theo doi qua trinh hoc va
 // chay cua cac AI trong he thong. 9 AI: BOSS (trung tam) + lam video + tao kich ban +
@@ -91,13 +92,22 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Agent</h1>
-          <p className="sub">9 AI của SDVICO đang chạy ở đâu, học được gì. Máy soạn, người bấm Duyệt — không AI nào tự đăng.</p>
+          <p className="sub">Các AI của SDVICO đang chạy ở đâu, học được gì. Máy soạn, người bấm Duyệt — không AI nào tự đăng.</p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {/* 28/8 (user): gop 2 nut thanh 1 — "Nguon hoc du lieu" (trang gop 2 tab). */}
           <Link href="/kho-tri-thuc" className="btn ghost">📚 Nguồn học dữ liệu</Link>
+          <Link href="/hoi-dap" className="btn ghost">🗂 Kho hỏi đáp</Link>
         </div>
       </header>
+
+      {/* ===== HOI BOT (10/9, Thanh: "cho vao chung voi trang agent cung voi may con kia") =====
+          Khung chat cua bot noi bo nam ngay dau trang Agent; bot tra loi ca cau hoi ngoai (co tim
+          Google) nhung so lieu SDVICO chi lay tu kho /hoi-dap. */}
+      <section className="blk">
+        <h2><span aria-hidden="true">💬</span> Hỏi bot <span className="sub">hỏi gì cũng được, số liệu SDVICO lấy từ kho hỏi đáp</span></h2>
+        <BotChat />
+      </section>
 
       {/* ===== VONG LAP ===== */}
       <section className="blk">

@@ -76,7 +76,8 @@ export default function AskBotFab() {
     if (toggleOnClick) setOpen((v) => !v);
   };
 
-  if (path.startsWith('/dang-nhap') || path.startsWith('/hoi-dap')) return null;
+  // 10/9: trang /agent đã có khung chat ngay đầu trang, không hiện nút nổi ở đó nữa.
+  if (path.startsWith('/dang-nhap') || path.startsWith('/hoi-dap') || path === '/agent') return null;
 
   const fabStyle: React.CSSProperties = { right: pos.right, bottom: pos.bottom };
   // Khung chat đứng ngay trên nút, cùng mép phải.
@@ -100,7 +101,7 @@ export default function AskBotFab() {
               <button type="button" className="askbot-x" aria-label="Đóng" onClick={() => setOpen(false)}>×</button>
             </span>
           </div>
-          <BotChat />
+          <BotChat compact />
         </div>
       ) : null}
       <button

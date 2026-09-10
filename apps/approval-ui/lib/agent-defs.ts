@@ -179,11 +179,13 @@ export async function loadAgentDefs(client: Client): Promise<AgentDef[]> {
     {
       // 9/9: AI thứ 11 — bot hỏi đáp nội bộ (lệnh sếp Long 9/9 15:12: gom hỏi đáp thành kho kiến thức
       // từng sản phẩm, đầu vào Bot Live Stream phase 2; Thanh: "nếu tôi quên thì hỏi nó").
-      key: 'hoi-dap', icon: '📚', name: 'AI hỏi đáp nội bộ',
-      model: 'Gemini 2.5 Flash (dự phòng 2.0 Flash, flash-latest, flash-lite), chỉ trả lời từ kho mkt_product_qa + product_facts',
-      runsAt: 'Chạy trên cloud khi có người hỏi ở trang /hoi-dap — không tự chạy theo lịch, không nhắn khách',
-      role: 'Trả lời nhân viên kênh online về giá, thông số, bảo hành, luật đăng bài, link sàn từ kho hỏi đáp đã nạp. Không có trong kho thì nói chưa có và gợi ý nạp. Kho này là đầu vào cho Bot Live Stream giai đoạn 2.',
-      last: mkLast(lastOf(['mkt.hoi_dap_bot']), 'trả lời câu hỏi nội bộ'),
+      // 10/9 (Thanh: "muốn chatbot như 1 con claude, hỏi bên ngoài mà nó vẫn biết"): trả lời mọi câu,
+      // có tìm Google; riêng số liệu SDVICO vẫn chỉ từ kho. Khung chat nằm ở /agent, kho ở /hoi-dap.
+      key: 'hoi-dap', icon: '💬', name: 'AI trợ lý hỏi đáp',
+      model: 'Gemini 3.6 Flash có Google Search khi còn hạn mức (dự phòng 3.6 / 3.5 Flash, 3.5 Flash Lite không tìm); số liệu SDVICO chỉ từ kho mkt_product_qa + product_facts',
+      runsAt: 'Chạy trên cloud khi có người hỏi ở trang Agent, nút Hỏi bot hoặc /hoi-dap — không tự chạy theo lịch, không nhắn khách',
+      role: 'Trợ lý đa năng cho nhân viên kênh online: hỏi gì cũng trả lời (kiến thức chung, kỹ thuật, tin mới, soạn chữ, dịch). Riêng giá, thông số, bảo hành, link sàn của SDVICO chỉ lấy từ kho hỏi đáp đã nạp, kho chưa có thì nói chưa có. Kho là đầu vào cho Bot Live Stream giai đoạn 2.',
+      last: mkLast(lastOf(['mkt.hoi_dap_bot']), 'trả lời câu hỏi'),
       href: '/hoi-dap',
     },
   ];

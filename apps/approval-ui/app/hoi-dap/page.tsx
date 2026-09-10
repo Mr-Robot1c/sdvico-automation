@@ -44,12 +44,13 @@ export default async function Page({ searchParams }: { searchParams?: { group?: 
         <div>
           <h1>Kho hỏi đáp và bot</h1>
           <p className="sub">
-            Mọi câu khách hỏi và câu trả lời đã dùng nạp vào đây theo từng sản phẩm. Bot chỉ trả lời từ kho này, không có thì nói chưa có. Đây là dữ liệu đầu vào cho Bot Live Stream giai đoạn 2.
+            Mọi câu khách hỏi và câu trả lời đã dùng nạp vào đây theo từng sản phẩm. Bot hỏi gì cũng trả lời, nhưng giá, thông số, bảo hành của SDVICO chỉ lấy từ kho này, không có thì nói chưa có. Đây là dữ liệu đầu vào cho Bot Live Stream giai đoạn 2.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <a className="btn ghost sm" href="/api/hoi-dap?export=1" style={{ textDecoration: 'none' }}>⬇ Xuất JSON cho bot live</a>
           <Link className="btn ghost sm" href="/khach-hang" style={{ textDecoration: 'none' }}>👥 Khách hàng</Link>
+          <Link className="btn ghost sm" href="/agent" style={{ textDecoration: 'none' }}>🤖 Agent</Link>
         </div>
       </header>
 

@@ -4,7 +4,8 @@ import { isAuthorizedApiRequest } from '../../../lib/session-auth';
 import { askBot, loadQa, type BotTurn } from '../../../lib/hoi-dap-bot';
 
 // /api/hoi-dap — bot hỏi đáp nội bộ (9/9/2026, lệnh sếp Long: kho kiến thức từng sản phẩm).
-//   POST { question, history? } -> { answer, found, sources, model }
+//   POST { question, history? } -> { answer, found, scope, sources, web_sources, model, searched }
+//   (10/9: bot trả lời cả câu hỏi ngoài, có tìm Google; số liệu SDVICO chỉ từ kho)
 //   GET  ?export=1              -> toàn bộ kho dạng JSON (đầu vào Bot Live Stream phase 2)
 // Cả hai đều cần đăng nhập (cookie sdvico_auth) hoặc Bearer CRON_SECRET; middleware không gác /api.
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
   const question = String(body?.question || '').trim();
   if (!question) return NextResponse.json({ error: 'Chưa có câu hỏi.' }, { status: 400 });
   const history: BotTurn[] = Array.isArray(body?.history)
-    ? body.history.filter((t: any) => t && (t.role === 'user' || t.role === 'bot') && typeof t.text === 'string').slice(-6)
+    ? body.history.filter((t: any) => t && (t.role === 'user' || t.role === 'bot') && typeof t.text === 'string').slice(-8)
     : [];
   try {
     const client = getServerClient();
