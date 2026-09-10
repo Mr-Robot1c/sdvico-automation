@@ -59,6 +59,12 @@ export default async function KhachHangSection() {
     for (const c of cs || []) titleOf.set((c as any).id, (c as any).title || '(không tên)');
   }
 
+  // 10/9: sếp cho chạy quảng cáo Facebook (boost reel lọc nước, hết 17/9). Đếm riêng khách
+  // nhập tay kênh Quảng cáo để tính chi phí mỗi tin nhắn.
+  const since7 = Date.now() - 7 * 24 * 3600 * 1000;
+  const adsAll = leads.filter((l) => String(l.source || '') === 'facebook_ads');
+  const ads7 = adsAll.filter((l) => new Date(l.created_at).getTime() >= since7);
+
   const byStatus = { new: [] as any[], contacted: [] as any[], won: [] as any[], closed: [] as any[] };
   for (const l of leads) {
     const s = l.status as keyof typeof byStatus;
@@ -145,6 +151,11 @@ export default async function KhachHangSection() {
       </details>
 
       <DedupLeadsBar racCount={cntRac || 0} />
+
+      <p className="sub" style={{ margin: '8px 0 12px' }}>
+        📣 Từ quảng cáo Facebook: <b>{ads7.length}</b> người trong 7 ngày · {adsAll.length} trong 30 ngày.
+        Tin trong hộp thư có thẻ &quot;Bắt đầu từ quảng cáo&quot; thì thêm ở khung trên, kênh chọn Quảng cáo FB.
+      </p>
 
       {/* Board 3 cột dòng chảy lead. */}
       <div className="kanban-wrap">

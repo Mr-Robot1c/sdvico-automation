@@ -140,7 +140,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
             <AutoRefresh seconds={30} />
           </div>
         </header>
-        {typeChips}
+        {/* 10/9 (Thanh): không hiện chip Bảng bài viết / Thùng rác ở trang Khách hàng, đã có nút Quay lại. */}
         <KhachHangSection />
       </main>
     );
