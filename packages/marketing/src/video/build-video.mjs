@@ -16,7 +16,7 @@ import { assembleVideo } from './assemble.mjs';
 import { generateVideoScript, stripGreeting } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
-import { getPriceTeaser, redactExactPrices } from '../products.mjs';
+import { getPriceTeaser, redactExactPrices, outroKeyword } from '../products.mjs';
 import { pickFreshClips, clipLabel } from './fresh-clip.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { pythonCmd } from '../platform.mjs';
@@ -418,7 +418,11 @@ async function whisperArtifact(sceneAudios, workDir, tag) {
 // 1 cau dai doc ca doan (khong qua duong tung cau + prosody). Tach thanh 2 cau, cau dau cam than
 // -> di cung duong localTTS tung cau nhu loi doc, len giong nhu cau cam trong cac canh.
 // 10/9 (Thanh): outro gộp 3 đường liên hệ, câu kêu bình luận từ khóa dời từ cảnh giá xuống đây.
-const OUTRO_TEXT = 'Nhắn tin cho Page SDVICO nha! Không thì bình luận lọc dầu hay lọc nước, hoặc gọi số 0939 243 222, để bên em tư vấn cho anh em nha!';
+// 10/9 (2): từ khóa bình luận theo ĐÚNG sản phẩm của video (outroKeyword): video lọc nước đọc
+// "bình luận lọc nước", video lọc dầu đọc "bình luận lọc dầu"; video content giữ câu gộp.
+function outroText(productGroup) {
+  return `Nhắn tin cho Page SDVICO nha! Không thì bình luận ${outroKeyword(productGroup)}, hoặc gọi số 0939 243 222, để bên em tư vấn cho anh em nha!`;
+}
 
 // opts.priceBadge / opts.badgeFromScene (8/9): tem giá úp mở trên hình, xem assemble.mjs.
 async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, contentId, opts = {}) {
@@ -438,6 +442,7 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
         'edge',
       ];
   const outroAudio = join(fdir, 'outro.mp3');
+  const OUTRO_TEXT = outroText(opts.productGroup);
   let built = [];
   let sceneAudios = [];
   let engineUsed = 'edge';
@@ -733,7 +738,7 @@ async function main() {
   // bo. Truoc day dung them ban ngang 16:9 cho FB Post — bo han, do nua thoi gian TTS + ghep.
   console.log('\n== Dựng bản vertical (9:16) dùng chung mọi kênh ==');
   const vertical = await buildFormat('vertical', script.vertical, assetPaths, voice, workDir, outDir, contentId,
-    { priceBadge: teaser?.badge || null, badgeSpoken: teaser?.spoken || null, badgeSpokenKey: teaser?.spokenKey || null });
+    { priceBadge: teaser?.badge || null, badgeSpoken: teaser?.spoken || null, badgeSpokenKey: teaser?.spokenKey || null, productGroup });
   console.log(`  -> ${vertical.out} (${vertical.totalDur.toFixed(1)}s, ${vertical.scenes} cảnh)`);
 
   // 3 ảnh đại diện từ bản dọc.

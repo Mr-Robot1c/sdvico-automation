@@ -232,6 +232,14 @@ export function commentCta(group) {
   const k = CTA_KEYWORD[group];
   return k ? `Anh em cmt "${k}" để em tư vấn cho anh em nhé!` : 'Anh em cmt "tư vấn" để em tư vấn cho anh em nhé!';
 }
+// 10/9 (Thanh: "bình luận lọc dầu hay lọc nước dựa trên video sản phẩm nào"): từ khóa bình luận đọc
+// trong OUTRO video theo ĐÚNG sản phẩm của video. Lọc nước -> "lọc nước", lọc dầu -> "lọc dầu", nhóm
+// khác theo CTA_KEYWORD; video content (không sản phẩm) giữ câu gộp "lọc dầu hay lọc nước".
+export function outroKeyword(group) {
+  if (group === '2. Máy lọc nước biển SEA-40') return 'lọc nước';
+  if (group === '9. Máy Lọc Dầu Diesel SD12-300' || group === '6. Thiết bị lọc dầu SF-50') return 'lọc dầu';
+  return CTA_KEYWORD[group] || 'lọc dầu hay lọc nước';
+}
 // Bảo đảm câu CTA bình luận là câu CUỐI bài (model quên thì nối vào). Đã có câu kêu cmt/bình luận
 // từ khóa rồi thì giữ nguyên.
 export function ensureCommentCta(body, cta) {

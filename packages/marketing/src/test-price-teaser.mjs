@@ -1,7 +1,7 @@
 // test-price-teaser.mjs — kiểm luật giá úp mở (Thanh chốt 8/9/2026): bài công khai không được có số
 // tiền chính xác, chỉ mốc "9,X triệu"; cảnh cuối video có câu giá đọc được. Chạy: npm run test:price
 // Không cần mạng, không cần GEMINI_API_KEY.
-import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta, SHOPEE_LINK, shopeeLink, ensureShopeeLink } from './products.mjs';
+import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta, SHOPEE_LINK, shopeeLink, ensureShopeeLink, outroKeyword } from './products.mjs';
 import { scanStyle } from './brand-voice-check.mjs';
 import { guardViolations } from './product-guard.mjs';
 import { assessDraft } from './compliance.mjs';
@@ -90,6 +90,12 @@ for (const [g, tz] of Object.entries(PRICE_TEASER)) {
 }
 ok('spoken lọc nước đọc mốc neo nguyên văn', /giảm từ 45 triệu chỉ còn 3 X triệu/.test(PRICE_TEASER[G2].spoken) && /giảm từ 56 triệu chỉ còn 4 X triệu/.test(PRICE_TEASER[G2].spoken) && !/hơn 40 triệu|hơn 30 triệu/.test(PRICE_TEASER[G2].spoken));
 ok('spoken lọc dầu đọc mốc neo nguyên văn', /giảm từ 12 triệu chỉ còn 9 phẩy X triệu/.test(PRICE_TEASER[G9].spoken));
+// 10/9 (Thanh): từ khóa bình luận trong outro theo đúng sản phẩm của video.
+eq('outro lọc nước', outroKeyword(G2), 'lọc nước');
+eq('outro lọc dầu', outroKeyword(G9), 'lọc dầu');
+eq('outro SF-50', outroKeyword('6. Thiết bị lọc dầu SF-50'), 'lọc dầu');
+eq('outro ắc quy', outroKeyword('7. Ắc quy Accu Nano SDViCo'), 'ắc quy');
+eq('outro content gộp', outroKeyword('Bài content'), 'lọc dầu hay lọc nước');
 
 let fail = 0;
 for (const c of cases) {
