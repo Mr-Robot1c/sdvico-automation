@@ -96,8 +96,14 @@ function livelyArgs(sampleRate, opts) {
 // 2 dau tu server + mp3 moi khuc them dem dau/cuoi frame -> noi lai thanh khoang nghi 0,3-0,4s
 // giua cac cau, nghe nhu hut hoi. Nay: cat lang 2 dau moi khuc (silenceremove, -45dB), dem
 // dung 0,10s, xuat WAV (khong dem frame), noi WAV roi moi nen mp3 MOT lan.
-const TRIM_EDGES = 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,' +
-  'areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,areverse';
+// 10/9 (Thanh, video 3826e7f9 "giây 27 ngất lâu"): sau câu hỏi trống 1,6s vì VieNeu nhả một tiếng
+// bật ngắn ở đầu khúc câu kế rồi mới đọc; cắt đầu dừng ngay tại tiếng bật nên đoạn lặng phía sau
+// giữ nguyên, thêm tiếng ồn nền -45..-40dB không bị cắt. Nay: ngưỡng -40dB + nén mọi khoảng lặng
+// BÊN TRONG khúc dài hơn 0,25s xuống 0,25s (đo thật: trống 1,6s còn ~0,75s). Đã thử start_duration
+// để bỏ tiếng bật: cắt luôn chữ thật (câu ngắn mất sạch) -> KHÔNG dùng.
+const TRIM_EDGES = 'silenceremove=start_periods=1:start_threshold=-40dB:start_silence=0.02,' +
+  'areverse,silenceremove=start_periods=1:start_threshold=-40dB:start_silence=0.02,areverse,' +
+  'silenceremove=stop_periods=-1:stop_duration=0.25:stop_threshold=-40dB:stop_silence=0.25';
 // ffmpeg dong goi (@ffmpeg-installer, ban 2018) chua co apad=pad_dur -> dung pad_len theo mau
 // (0,10s x 48kHz = 4800 mau). CI dung cung binary nay.
 // 5/9 (sep: "nghi hoi giua cac dau nhu ! lau them xiu"): sau cau cam/cau hoi nghi 0,26s, sau cau
@@ -256,10 +262,12 @@ function voiceStyleOf(brief = {}, needsGov = false) {
   const emo = String(brief.emotion || '').toUpperCase();
   if (needsGov) return { temperature: 0.8, label: 'nghiem tuc (bai quy dinh)' };
   if (emo.includes('RỦI RO')) return { temperature: 0.85, label: 'canh bao (RUI RO)' };
-  if (emo.includes('TỰ HÀO')) return { temperature: 1.0, label: 'hao hung (TU HAO)' };
+  // 10/9 (Thanh: tone lệch giữa các câu): hạ trần 1.0 -> 0.9 và content 0.9 -> 0.8, VieNeu bớt
+  // lệch màu giọng giữa các lần gọi (mỗi câu một lần gọi).
+  if (emo.includes('TỰ HÀO')) return { temperature: 0.9, label: 'hao hung (TU HAO)' };
   if (brief.generator === 'trend') return { temperature: 0.85, label: 'tin tuc ro rang' };
-  if (brief.post_kind === 'content') return { temperature: 0.9, label: 'am, ke chuyen' };
-  return { temperature: 1.0, label: 'soi noi (ban hang)' };
+  if (brief.post_kind === 'content') return { temperature: 0.8, label: 'am, ke chuyen' };
+  return { temperature: 0.9, label: 'soi noi (ban hang)' };
 }
 
 // Goi server VieNeu doc MOT khuc, tra ve duong dan WAV (48kHz, SAMPLE_RATE trong
@@ -287,10 +295,13 @@ async function localTTSWav(text, workDir, tag) {
 // (cung y tuong prosodyFor cua edge): cau hoi len giong va cham lai chut, cau cam cao + nhanh
 // hon, cau thuong xen ke cao/thap de khong mot duong thang. Seed server co dinh nen mau giong
 // giua cac cau van la mot.
+// 10/9 (Thanh: "mỗi clip một tone, chả đồng bộ"; đo video 3826e7f9: câu 237 → 267 → 254 → 260 → 246 Hz,
+// hơn 2 nửa cung): bỏ nâng cao độ theo câu (semiDelta 0 hết), chỉ giữ nhanh chậm theo loại câu.
+// Đảo lại ý sếp 5/9 "lên xuống giọng"; không ổn thì về giọng Leda (Gemini), Thanh chốt 10/9.
 function localProsody(sentence, idx) {
-  if (/\?$/.test(sentence)) return { semiDelta: 1.0, tempoMul: 0.97 };
-  if (/!$/.test(sentence)) return { semiDelta: 1.0, tempoMul: 1.05 };
-  return idx % 2 === 0 ? { semiDelta: 0, tempoMul: 1.0 } : { semiDelta: 0.7, tempoMul: 1.03 };
+  if (/\?$/.test(sentence)) return { semiDelta: 0, tempoMul: 0.97 };
+  if (/!$/.test(sentence)) return { semiDelta: 0, tempoMul: 1.05 };
+  return idx % 2 === 0 ? { semiDelta: 0, tempoMul: 1.0 } : { semiDelta: 0, tempoMul: 1.03 };
 }
 
 // Outro: khong ap prosody theo cau (2 cau outro deu an muc nang cua cau cam -> do lai 257Hz, cao
