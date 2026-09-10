@@ -112,6 +112,9 @@ function sentenceGap(sentence) {
   const sec = /[!?]$/.test(sentence) ? 0.26 : 0.16;
   return `apad=pad_len=${Math.round(sec * 48000)}`;
 }
+// 10/9 (2) (Thanh: "nghe tạch tạch tạch"): silenceremove cắt thẳng tại mức -40dB nên mỗi mối nối
+// câu có bậc sóng -> tiếng tạch. Mờ dần 15ms hai đầu mỗi khúc SAU khi cắt, TRƯỚC khi đệm.
+const FADE_EDGES = 'afade=t=in:st=0:d=0.015,areverse,afade=t=in:st=0:d=0.015,areverse';
 
 // Tạo mp3 LẶNG dài `sec` giây (dự phòng khi TTS lỗi: cảnh vẫn dựng, có phụ đề, chỉ mất tiếng cảnh đó).
 async function silentAudio(outPath, sec) {
@@ -298,10 +301,10 @@ async function localTTSWav(text, workDir, tag) {
 // 10/9 (Thanh: "mỗi clip một tone, chả đồng bộ"; đo video 3826e7f9: câu 237 → 267 → 254 → 260 → 246 Hz,
 // hơn 2 nửa cung): bỏ nâng cao độ theo câu (semiDelta 0 hết), chỉ giữ nhanh chậm theo loại câu.
 // Đảo lại ý sếp 5/9 "lên xuống giọng"; không ổn thì về giọng Leda (Gemini), Thanh chốt 10/9.
-function localProsody(sentence, idx) {
-  if (/\?$/.test(sentence)) return { semiDelta: 0, tempoMul: 0.97 };
-  if (/!$/.test(sentence)) return { semiDelta: 0, tempoMul: 1.05 };
-  return idx % 2 === 0 ? { semiDelta: 0, tempoMul: 1.0 } : { semiDelta: 0, tempoMul: 1.03 };
+// 10/9 (2) (Thanh nghe bản chuẩn hoá: "nhanh chậm nhanh chậm"): bỏ luôn đổi tốc độ theo loại câu,
+// mọi câu cùng một tempo (TTS_TEMPO 1.12). Hàm giữ lại để chỗ gọi không đổi.
+function localProsody(_sentence, _idx) {
+  return { semiDelta: 0, tempoMul: 1.0 };
 }
 
 // Outro: khong ap prosody theo cau (2 cau outro deu an muc nang cua cau cam -> do lai 257Hz, cao
@@ -340,7 +343,7 @@ async function localTTS(cleanText, outPath, workDir, tag) {
         const piece = `${tag}_s${i}_p.wav`;
         const pro = prosodyOf(sentences[i], i);
         const semi = await f0Semi(wav, workDir, `${tag}_s${i}`);
-        const af = [livelyFilter(48000, { semiDelta: pro.semiDelta + semi, tempoMul: pro.tempoMul }), TRIM_EDGES, sentenceGap(sentences[i])].filter(Boolean).join(',');
+        const af = [livelyFilter(48000, { semiDelta: pro.semiDelta + semi, tempoMul: pro.tempoMul }), TRIM_EDGES, FADE_EDGES, sentenceGap(sentences[i])].filter(Boolean).join(',');
         await ffmpeg(['-y', '-i', wav, '-af', af, '-c:a', 'pcm_s16le', join(workDir, piece)]);
         parts.push(piece);
       }
@@ -355,7 +358,7 @@ async function localTTS(cleanText, outPath, workDir, tag) {
   // Duong 1 cau / du phong: cung cat lang 2 dau + nghi cuoi cau nhu duong tung cau cho dong nhat.
   const wav = await localTTSWav(cleanText, workDir, tag);
   const semi = await f0Semi(wav, workDir, tag);
-  const af = [livelyFilter(48000, { semiDelta: semi }), TRIM_EDGES, sentenceGap(cleanText)].filter(Boolean).join(',');
+  const af = [livelyFilter(48000, { semiDelta: semi }), TRIM_EDGES, FADE_EDGES, sentenceGap(cleanText)].filter(Boolean).join(',');
   await ffmpeg(['-y', '-i', wav, '-af', af, '-c:a', 'libmp3lame', '-q:a', '4', outPath]);
   return probeDuration(outPath);
 }
