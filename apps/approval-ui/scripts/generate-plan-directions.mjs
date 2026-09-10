@@ -138,7 +138,8 @@ Tra JSON dung dang, khong them chu ngoai JSON:
 // KHONG dung google_search grounding vi grounding quota rat nho (500/ngay share bucket).
 // Chi feed knowledge da co trong DB.
 async function callGemini(prompt) {
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
+  // 10/9: gemini-2.5-flash và 2.0-flash đã bị Google gỡ (404), thay bằng 3.6-flash và 3.5-flash (đồng bộ lib/plan-directions.ts).
+  const models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
   let lastErr = '';
   for (const model of models) {
     try {

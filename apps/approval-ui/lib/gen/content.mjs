@@ -6,7 +6,7 @@
 //
 // Sinh nội dung bằng BẢN MẪU tất định để chạy được ngay khi chưa có khóa mô hình. Khi có
 // GEMINI_API_KEY (hoặc ANTHROPIC_API_KEY), có thể thay generateDraftText bằng lời gọi mô
-// hình như phần chấm CV của HR (packages/hr/src/screen/score.js dùng gemini-2.0-flash).
+// hình như phần chấm CV của HR (packages/hr/src/screen/score.js dùng gemini-3.6-flash).
 // Dù sinh bằng mô hình hay bản mẫu, bản nháp vẫn qua compliance và hàng đợi duyệt.
 
 import { DEFAULT_HASHTAGS, productHashtags, guessGroup } from './products.mjs';

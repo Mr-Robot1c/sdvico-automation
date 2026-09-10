@@ -13,7 +13,9 @@ import { logTokenUsage } from './gen/token-log.mjs';
 
 type AnyClient = { from: (t: string) => any };
 
-const MKT_MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
+// 10/9: gemini-2.5-flash và 2.0-flash đã bị Google gỡ (404 "no longer available"), thay bằng 3.6-flash
+// và 3.5-flash (kiểm thật 10/9, xem hoi-dap-bot.ts). flash-latest (=3.8) hay 503 nên đứng sau.
+const MKT_MODEL_CHAIN = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
 
 // Danh mục sản phẩm SDVICO — đồng bộ scripts/generate-plan-directions.mjs.
 // CÓ DẤU đầy đủ (user 21/8: hướng đi hiện không dấu khó đọc — prompt không dấu thì

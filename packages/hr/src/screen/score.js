@@ -10,7 +10,8 @@ import { GoogleGenAI } from '@google/genai';
 import { weightedScore } from './rubric.js';
 
 // Model mặc định miễn phí. Đổi bằng biến môi trường HR_SCREEN_MODEL nếu muốn model khác.
-const MODEL = process.env.HR_SCREEN_MODEL || 'gemini-2.0-flash';
+// 10/9: gemini-2.0-flash đã bị Google gỡ (404 "no longer available"), đổi sang gemini-3.6-flash (kiểm thật 10/9).
+const MODEL = process.env.HR_SCREEN_MODEL || 'gemini-3.6-flash';
 
 // Lược đồ JSON theo định dạng Gemini (kiểu viết hoa, không có additionalProperties).
 function buildSchema(rubric) {
