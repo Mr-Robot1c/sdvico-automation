@@ -63,6 +63,7 @@ ok('ensureCommentCta không nối đôi', (ensureCommentCta(`Hook.\n\n${commentC
 // 9/9 (Thanh): link Shopee trong bài bán, đứng trước CTA cmt, không chèn đôi, nhóm khác không có.
 eq('shopee link lọc nước', shopeeLink(G2), 'https://shopee.vn/product/212723941/45017630539/');
 eq('shopee link lọc dầu', shopeeLink(G9), 'https://shopee.vn/product/212723941/29945752663/');
+eq('shopee link S-Tracking', shopeeLink('3. Thiết bị giám sát hành trình Viettel S-Tracking'), 'https://shopee.vn/product/212723941/56017649187/');
 eq('shopee không link ắc quy', shopeeLink('7. Ắc quy Accu Nano SDViCo'), null);
 eq('shopee không link thì nguyên văn', ensureShopeeLink('Bài.', null), 'Bài.');
 ok('shopee nối cuối', ensureShopeeLink('Hook.\n\nThân bài.', SHOPEE_LINK[G9]).endsWith(SHOPEE_LINK[G9]));

@@ -242,7 +242,7 @@ Giá 23.601.000 đ một bộ, đã gồm VAT và công lắp đặt. Chat với
 
 SDVICO là nhà phân phối và lắp đặt thiết bị Viettel S-Tracking. Công ty TNHH Hiệp Lực Phát Triển Việt, sdvico.vn. Xuất hóa đơn đầy đủ.
 
-**Sau khi gian duyệt:** gửi link cho Claude để thêm vào SHOPEE_LINK nhóm 3 (bài bán S-Tracking tự chèn link) và vào bình luận đầu bài group. Mẫu chat khi khách hỏi: "Dạ anh, bộ giám sát hành trình Viettel S-Tracking trọn gói 23.601.000 đ đã gồm VAT và công lắp, bên em lắp tận tàu, mỗi tàu một tài khoản riêng. Tàu anh đậu cảng nào để em xếp lịch kỹ thuật ạ?"
+**Link gian (10/9):** https://shopee.vn/product/212723941/56017649187/ (đã thêm SHOPEE_LINK nhóm 3). Bình luận đầu bài group: "Anh em muốn đặt trên Shopee, bên em lắp tận tàu: https://shopee.vn/product/212723941/56017649187/". Trước đây: gửi link cho Claude để thêm vào SHOPEE_LINK nhóm 3 (bài bán S-Tracking tự chèn link) và vào bình luận đầu bài group. Mẫu chat khi khách hỏi: "Dạ anh, bộ giám sát hành trình Viettel S-Tracking trọn gói 23.601.000 đ đã gồm VAT và công lắp, bên em lắp tận tàu, mỗi tàu một tài khoản riêng. Tàu anh đậu cảng nào để em xếp lịch kỹ thuật ạ?"
 
 ## 5. Ô "Thông tin chi tiết" (thuộc tính) trên Shopee, theo bảng quy cách Kinh doanh gửi 9/9
 

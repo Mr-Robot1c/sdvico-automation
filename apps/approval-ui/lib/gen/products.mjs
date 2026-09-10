@@ -257,6 +257,8 @@ export function ensureCommentCta(body, cta) {
 export const SHOPEE_LINK = {
   '2. Máy lọc nước biển SEA-40': 'https://shopee.vn/product/212723941/45017630539/',
   '9. Máy Lọc Dầu Diesel SD12-300': 'https://shopee.vn/product/212723941/29945752663/',
+  // 10/9 (Thanh): S-Tracking cung len Shopee (dao quyet dinh 7/9). Hang Viettel, SDVICO phan phoi + lap.
+  '3. Thiết bị giám sát hành trình Viettel S-Tracking': 'https://shopee.vn/product/212723941/56017649187/',
 };
 export function shopeeLink(group) {
   return SHOPEE_LINK[group] || null;
