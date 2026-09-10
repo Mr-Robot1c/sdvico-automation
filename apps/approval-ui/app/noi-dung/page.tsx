@@ -50,7 +50,7 @@ function channelsShort(channels?: string[] | null, postReel?: boolean): string {
 
 type Flags = Record<string, string[] | undefined>;
 type Assets = { image?: string | null; image_url?: string | null; video?: string | null } | null;
-type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[]; video_requested?: boolean; post_reel?: boolean; ab_variant?: string; suggestion_title?: string; insight_line?: string; insight_situation?: string } | null;
+type Brief = { keyword?: string; intent?: string; risk?: string; compliance?: Flags; assets?: Assets; channels?: string[]; video_requested?: boolean; post_reel?: boolean; ab_variant?: string; suggestion_title?: string; insight_line?: string; insight_situation?: string; fb_real_url?: string } | null;
 type Content = { id: string; kind: string; title: string; brief: Brief; draft: string | null; status: string; created_at: string };
 
 export default async function Page({ searchParams }: { searchParams: { loai?: string; trangthai?: string } }) {
@@ -529,7 +529,8 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                               tiktokUsername={tiktokUsername}
                             />
                           ) : null}
-                          {p.url && p.channel === 'facebook' && !/\/reel\//.test(p.url) ? <ShareGroups postUrl={p.url} /> : null}
+                          {/* 10/9: chia sẻ group CHỈ bằng link Page chính đã ghép (fb_real_url), không dùng link page phụ máy đăng. */}
+                          {p.channel === 'facebook' && !/\/reel\//.test(p.url) && c.brief?.fb_real_url ? <ShareGroups postUrl={String(c.brief.fb_real_url)} /> : null}
                         </Fragment>
                       ))}
                       {/* Nút "Làm video" đã chuyển sang trang /san-xuat (nút "Xong + Làm video"). */}

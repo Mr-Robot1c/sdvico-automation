@@ -531,7 +531,11 @@ export default async function BangSection() {
                         // có hàng nút tay nào. Ngoại lệ: nền tảng ĐÃ ghép link vẫn hiện để còn đổi/bỏ.
                         const planCh = typeof p.plan_channel === 'string' ? p.plan_channel : '';
                         const target: string[] = planCh ? [planCh] : chans;
-                        const fbLinked = !!String((cnt?.brief as any)?.fb_real_url || '');
+                        // 10/9 (Thanh: "ghép link rồi mà chia sẻ group lấy link page phụ"): link chia sẻ group CHỈ lấy
+                        // fb_real_url (bài đăng tay trên Page chính đã ghép). mkt_posts.external_url là bài máy đăng
+                        // lên page phụ, không dùng để chia sẻ nữa. Thứ tự nút: Đăng tay -> Ghép link -> Chia sẻ group.
+                        const fbRealUrl = String((cnt?.brief as any)?.fb_real_url || '');
+                        const fbLinked = !!fbRealUrl;
                         const showFb = target.length === 0 || target.includes('facebook') || fbLinked;
                         const showTt = (target.length === 0 ? hasVideo : target.includes('tiktok')) || !!linkedUrl;
                         return (
@@ -541,9 +545,11 @@ export default async function BangSection() {
                                 <span style={rowLabel}>📘 Facebook</span>
                                 {/* Đăng TAY lên Page chính (copy caption + tải ảnh + mở ô soạn bài), khỏi page token. */}
                                 <PostFbButton caption={capText} imageUrl={fbImg} composerUrl={fbComposerUrl} contentTitle={cnt?.title || 'sdvico'} />
-                                {fbPost ? <ShareGroups postUrl={fbPost.url} planGroupsToday={groupsOfDay(lastAt)} /> : null}
-                                {/* Dán link bài đăng tay trên Page chính SDVICOVN — chip FB ưu tiên link này. */}
-                                <LinkFbButton contentId={it.cid} linkedUrl={String((cnt?.brief as any)?.fb_real_url || '') || null} />
+                                {/* Dán link bài đăng tay trên Page chính SDVICOVN — chip FB và Chia sẻ group dùng link này. */}
+                                <LinkFbButton contentId={it.cid} linkedUrl={fbRealUrl || null} />
+                                {fbRealUrl
+                                  ? <ShareGroups postUrl={fbRealUrl} planGroupsToday={groupsOfDay(lastAt)} />
+                                  : <span className="muted" style={{ fontSize: '.78rem' }} title="Chia sẻ group cần link bài trên Page chính SDVICO VN. Đăng tay xong, bấm Ghép link dán link bài rồi mới chia sẻ.">Ghép link rồi mới chia sẻ group</span>}
                               </div>
                             ) : null}
                             {showTt ? (
