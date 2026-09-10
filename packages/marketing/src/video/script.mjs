@@ -7,23 +7,40 @@ import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser } from '../products.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
+// 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
+// gọi thử 1 câu ngắn vẫn 200): 500 không nằm trong danh sách thử lại và không có model dự phòng nên
+// cả bài rớt, giữ chỗ 30 phút. Nay: 500/INTERNAL cũng thử lại, hết lượt thì đổi model kế trong chuỗi
+// (cùng thứ tự với lib/plan-directions.ts). MKT_MODEL_CHAIN (env, phẩy) ghi đè.
+const MODEL_CHAIN = (process.env.MKT_MODEL_CHAIN || '').split(',').map((s) => s.trim()).filter(Boolean);
+const SCRIPT_MODELS = [...new Set([MKT_MODEL, ...(MODEL_CHAIN.length ? MODEL_CHAIN : ['gemini-3.6-flash', 'gemini-3.5-flash'])])];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Gọi Gemini có thử lại khi quá tải (503/429/UNAVAILABLE) với giãn cách tăng dần.
-async function generateWithRetry(ai, params, tries = 4) {
+// Gọi Gemini có thử lại khi quá tải hoặc lỗi nội bộ (503/429/500) với giãn cách tăng dần; hết lượt
+// thì đổi sang model kế trong SCRIPT_MODELS (params.model là model đầu). Trả res, kèm res.modelUsed.
+async function generateWithRetry(ai, params, tries = 3) {
   let lastErr;
-  for (let i = 0; i < tries; i++) {
-    try {
-      return await ai.models.generateContent(params);
-    } catch (e) {
-      lastErr = e;
-      const msg = String(e?.message || e);
-      if (!/503|429|UNAVAILABLE|high demand|overloaded|RESOURCE_EXHAUSTED/i.test(msg) || i === tries - 1) throw e;
-      const wait = 1500 * 2 ** i;
-      console.warn(`Gemini quá tải, thử lại sau ${wait}ms...`);
-      await sleep(wait);
+  const models = [...new Set([params.model, ...SCRIPT_MODELS].filter(Boolean))];
+  for (const model of models) {
+    for (let i = 0; i < tries; i++) {
+      try {
+        const res = await ai.models.generateContent({ ...params, model });
+        if (res && typeof res === 'object') res.modelUsed = model;
+        return res;
+      } catch (e) {
+        lastErr = e;
+        const msg = String(e?.message || e);
+        const transient = /503|429|500|UNAVAILABLE|INTERNAL|high demand|overloaded|RESOURCE_EXHAUSTED/i.test(msg);
+        if (!transient) throw e;
+        if (i < tries - 1) {
+          const wait = 1500 * 2 ** i;
+          console.warn(`Gemini ${model} lỗi tạm (${msg.slice(0, 60)}), thử lại sau ${wait}ms...`);
+          await sleep(wait);
+        }
+      }
     }
+    const next = models[models.indexOf(model) + 1];
+    if (next) console.warn(`Gemini ${model} hỏng ${tries} lần, đổi sang ${next}`);
   }
   throw lastErr;
 }
@@ -186,7 +203,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       contents: user + extra,
       config: { systemInstruction: system, responseMimeType: 'application/json' },
     });
-    logTokenUsage(client, 'creator_video_script', MKT_MODEL, res?.usageMetadata);
+    logTokenUsage(client, 'creator_video_script', res?.modelUsed || MKT_MODEL, res?.usageMetadata);
     parsed = parseJson(res.text || '');
     // 26/8 siết lần 3: log warning nếu SHORTS thiếu scene role='empathy' (model hay lách gộp
     // vào hook hoặc solution). Không auto-regenerate (đắt token) nhưng log để soi khi debug.
