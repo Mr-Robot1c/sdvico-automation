@@ -95,6 +95,30 @@ export function channelsLabel(channels?: string[] | null, postReel?: boolean): s
   return arr.map((c) => map[c] || c).join(' + ');
 }
 
+// 10/9 (Thanh: "đăng lên kênh nào thì để kênh đó"): từ 4/9 mỗi bài chỉ đăng lên đúng 1 ô lịch
+// (payload.plan_channel do rotate ghi từ Lịch đăng cố định), nhưng brief.channels vẫn gom cả
+// [facebook, tiktok] vì dây chuyền video tự thêm tiktok -> nhãn cũ hiện "Facebook (Post + Reel) +
+// TikTok" dù bài chỉ lên Facebook. Có plan_channel thì chỉ ghi kênh đó; bài cũ không có thì rơi về
+// channelsLabel như trước.
+export function planChannelLabel(planChannel?: string | null, channels?: string[] | null, postReel?: boolean): string {
+  if (planChannel === 'facebook') return postReel ? 'Facebook (Post + Reel)' : 'Facebook';
+  if (planChannel === 'youtube') return 'YouTube';
+  if (planChannel === 'tiktok') return 'TikTok';
+  return channelsLabel(channels, postReel);
+}
+
+// Nhãn kênh ĐÃ ĐĂNG THẬT lấy từ mkt_posts (status published), khử trùng, giữ thứ tự FB, YT, TT.
+// Rỗng thì trả '' để nơi gọi rơi về nhãn kế hoạch.
+export function postedChannelsLabel(posted: string[] | null | undefined, short = false): string {
+  const order = ['facebook', 'youtube', 'tiktok', 'website'];
+  const map: Record<string, string> = short
+    ? { facebook: 'Facebook', tiktok: 'TikTok', website: 'Web', youtube: 'YouTube' }
+    : { facebook: 'Facebook', tiktok: 'TikTok', website: 'Website', youtube: 'YouTube' };
+  const uniq = [...new Set((posted || []).map((c) => String(c || '').toLowerCase()).filter(Boolean))];
+  uniq.sort((a, b) => (order.indexOf(a) < 0 ? 99 : order.indexOf(a)) - (order.indexOf(b) < 0 ? 99 : order.indexOf(b)));
+  return uniq.map((c) => map[c] || c).join(short ? ', ' : ' + ');
+}
+
 // Nhãn mục đích bài: bán hàng hay nội dung nuôi trang. Rõ hơn nhãn "ý định" SEO.
 export function purposeLabel(postKind?: string, format?: string): string {
   if (postKind === 'content') return 'Nội dung';

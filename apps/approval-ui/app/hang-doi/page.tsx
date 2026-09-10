@@ -3,7 +3,7 @@ import AutoRefresh from '../auto-refresh';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
-import { kindMeta, formatRelative, formatDateTimeVN, payloadRows, intentLabel, channelsLabel, purposeLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
+import { kindMeta, formatRelative, formatDateTimeVN, payloadRows, intentLabel, planChannelLabel, purposeLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 // (Hàng đợi duyệt hiện ảnh/video đã gắn từ payload.assets — build 2026-08-12.)
@@ -59,6 +59,8 @@ function mktInfo(payload: unknown) {
     keyword: p.keyword as string | undefined,
     landingUrl: p.landing_url as string | undefined,
     channels: Array.isArray(p.channels) ? (p.channels as string[]) : [],
+    // 10/9: ô lịch bài sẽ đăng (rotate ghi). Nhãn 📍 chỉ ghi kênh này, không gộp cả channels.
+    planChannel: typeof p.plan_channel === 'string' ? (p.plan_channel as string) : undefined,
     postKind: p.post_kind as string | undefined,
     // Cặp bài thử A/B theo hướng đi kế hoạch (rotate v3). Hiển thị badge kín đáo thay vì
     // prefix 🎯A/🎯B lộ trong tiêu đề (user: "để title A/B như vậy thì kì lắm").
@@ -282,7 +284,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   {info.authored === 'human'
                     ? <span className="badge tone-no" title="Bài do người tự soạn">🚩 Người viết</span>
                     : <span className="badge" title="Bài do máy tự sinh, chờ người duyệt">🤖 Máy viết</span>}
-                  <span className="badge badge-format" title={info.postReel ? 'Bài có video AI: Facebook đăng cả Post (video ngang + chữ + ảnh sản phẩm thả bình luận) lẫn Reel (video dọc). TikTok đăng bản dọc.' : 'Nơi bài sẽ được đăng'}>📍 {channelsLabel(info.channels, info.postReel)}</span>
+                  <span className="badge badge-format" title={info.postReel ? 'Bài có video AI: Facebook đăng cả Post (video ngang + chữ + ảnh sản phẩm thả bình luận) lẫn Reel (video dọc). TikTok đăng bản dọc.' : 'Nơi bài sẽ được đăng'}>📍 {planChannelLabel(info.planChannel, info.channels, info.postReel)}</span>
                   {purposeLabel(info.postKind, info.format)
                     ? <span className="badge" title="Bài bán sản phẩm hay bài nội dung nuôi trang">{purposeLabel(info.postKind, info.format)}</span>
                     : (info.intent ? <span className="badge">{intentLabel(info.intent)}</span> : null)}

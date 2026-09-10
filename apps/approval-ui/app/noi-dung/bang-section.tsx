@@ -4,7 +4,7 @@ import { editDraft, retryFacebookPublish, requestVideoForContent } from '../acti
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import ShareGroups from './share-groups';
-import { channelsLabel, riskMeta, formatRelative, formatDateTimeVN } from '../labels';
+import { channelsLabel, planChannelLabel, riskMeta, formatRelative, formatDateTimeVN } from '../labels';
 import PlatformLogo, { type PlatformKey } from './platform-logo';
 import TikTokPrivateChip from './tiktok-private-chip';
 import ExportTiktokButton from './export-tiktok-button';
@@ -253,7 +253,7 @@ export default async function BangSection() {
                       <b>{title}</b>
                       <div className="badges">
                         {p.authored === 'human' ? <span className="badge tone-no">🚩 Người viết</span> : <span className="badge">🤖 Máy viết</span>}
-                        <span className="badge badge-format">📍 {channelsLabel(chans, p.post_reel === true)}</span>
+                        <span className="badge badge-format" title="Kênh bài sẽ đăng (theo ô Lịch đăng cố định)">📍 {planChannelLabel(p.plan_channel, chans, p.post_reel === true)}</span>
                         {p.ab_variant ? <span className="badge badge-ab">🧪 Thử {p.ab_variant}</span> : null}
                         {brief.video_requested === true ? <span className="badge badge-video-pending">🎬 Đang làm video AI</span> : null}
                         <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
@@ -393,7 +393,7 @@ export default async function BangSection() {
                         ) : (
                           <span className="badge tone-demo" title="Đã duyệt, máy đang đăng lên kênh (1 tới 2 phút với video).">⏳ Đang đăng lên kênh</span>
                         )}
-                        <span className="badge badge-format">📍 {channelsLabel(chans, p.post_reel === true)}</span>
+                        <span className="badge badge-format" title="Kênh bài sẽ đăng (theo ô Lịch đăng cố định)">📍 {planChannelLabel(p.plan_channel, chans, p.post_reel === true)}</span>
                       </div>
                       {/* 29/8 (user: "bấm xem bài như bên chờ duyệt"): mở MODAL lớn ViewModal
                           thay vì xổ inline trong card. */}

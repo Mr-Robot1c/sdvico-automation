@@ -11,7 +11,7 @@ import ShareGroups from './share-groups';
 import BangSection from './bang-section';
 import KhachHangSection from './khach-hang-section';
 import TikTokPrivateChip from './tiktok-private-chip';
-import { lengthLabel, channelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
+import { lengthLabel, channelsLabel, postedChannelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -416,9 +416,13 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                       ) : null}
                     </td>
                     <td>{lengthLabel(c.kind)}</td>
-                    <td className="cell-chan" title={channelsLabel(c.brief?.channels, c.brief?.post_reel === true)}>
-                      {channelsShort(c.brief?.channels, c.brief?.post_reel === true)}
-                    </td>
+                    {/* 10/9 (Thanh: "đăng lên kênh nào thì để kênh đó"): đã đăng thật thì ghi kênh từ mkt_posts, chưa đăng mới ghi kế hoạch. */}
+                    {(() => {
+                      const postedCh = (publishedByContent.get(c.id) || []).filter((x) => !x.deletedAt).map((x) => x.channel);
+                      const full = postedCh.length ? postedChannelsLabel(postedCh) : channelsLabel(c.brief?.channels, c.brief?.post_reel === true);
+                      const short = postedCh.length ? postedChannelsLabel(postedCh, true) : channelsShort(c.brief?.channels, c.brief?.post_reel === true);
+                      return <td className="cell-chan" title={postedCh.length ? 'Kênh đã đăng thật: ' + full : 'Kênh dự kiến: ' + full}>{short}</td>;
+                    })()}
                     <td>
                       {(() => {
                         const m = metricsByContent.get(c.id);
