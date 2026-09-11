@@ -240,7 +240,7 @@ async function loadShareGroups(client: Client): Promise<string[]> {
   return arr
     .map((x: any) => typeof x === 'string' ? x.trim() : String(x?.label || x?.id || '').trim())
     .filter(Boolean)
-    .slice(0, 12);
+    .slice(0, 200); // 11/9: 51 group thật, trần 12 cũ cắt mất 39 nhóm
 }
 
 // Đọc focus (sản phẩm tập trung) còn hạn.

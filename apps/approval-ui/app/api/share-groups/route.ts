@@ -31,7 +31,9 @@ function normalize(raw: any): SavedGroup[] {
       });
     }
   }
-  return out.slice(0, 12);
+  // 11/9: danh sách thật 51 group nghề biển (đọc từ tài khoản Thanh) — trần 12 cũ cắt mất 39 nhóm
+  // và POST từ popover (đổi tên) ghi đè còn 12. Nới 200, đủ cho mọi tài khoản.
+  return out.slice(0, 200);
 }
 
 export async function GET() {

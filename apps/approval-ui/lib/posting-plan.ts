@@ -264,7 +264,7 @@ export async function loadShareGroups(client: Client): Promise<ShareGroup[]> {
       });
     }
   }
-  return out.slice(0, 12);
+  return out.slice(0, 200); // 11/9: 51 group thật, trần 12 cũ cắt mất 39 nhóm
 }
 
 export type LoadedPostingPlan = { plan: PostingPlan; saved: boolean; shareGroups: ShareGroup[] };
