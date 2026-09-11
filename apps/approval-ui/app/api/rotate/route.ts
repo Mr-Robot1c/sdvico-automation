@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { autoApplyWeeklyProposal } from '../../../lib/plan';
+import { autoApplyWeeklyProposal, weekWindowVN } from '../../../lib/plan';
 import { getServerClient } from '../../../lib/supabase-server';
 import { isEmergencyStopped, todayVN } from '../../../lib/safety';
 // @ts-ignore
-import { guessGroup } from '../../../lib/gen/products.mjs';
+import { guessGroup, isDiscontinuedGroup } from '../../../lib/gen/products.mjs';
 
 // Lịch hàng ngày: chọn NGẪU NHIÊN 1 folder sản phẩm (product_group) theo VÒNG XOAY
 // (mỗi folder dùng 1 lần mỗi vòng, hết cả folder mới sang vòng mới), rồi sinh bài chờ duyệt.
@@ -272,7 +272,40 @@ export async function GET(req: Request) {
     const g = (guessGroup as (t: string) => string | null)(s.product);
     return weights[productName(g || s.product)] ?? 1;
   };
-  const freshSorted = [...freshSugs].sort((a, b) => weightOfSug(b) - weightOfSug(a));
+  // 11/9 chiều (user "cái truyền thông SDFish đâu?"): sort THUẦN theo trọng số giảm dần làm sản phẩm
+  // trọng số 1 (SDFish, user 5/9: "thêm vô như bình thường, 1 tới 2 hướng/tuần") KHÔNG BAO GIỜ tới
+  // lượt: mỗi slot rút 1 hướng, hướng trọng số 2 và 3 luôn còn nên SDFish xếp cuối cả tuần (tuần 7-13/9
+  // ra 0 bài dù plan có 2 hướng). Luật mới: sản phẩm trong plan CHƯA có bài bán nào tuần này (từ 0h
+  // Thứ 2 giờ VN) được rút trước; giữa các sản phẩm cùng tình trạng vẫn theo trọng số giảm dần. Mỗi sản
+  // phẩm trong plan vì thế có mặt ít nhất 1 lần/tuần, phần còn lại của tuần vẫn nghiêng về sản phẩm
+  // trọng số cao. Hướng của sản phẩm NGỪNG BÁN bị loại khỏi hàng đợi ngay đây (kẻo được ưu tiên rồi
+  // bị skip ở dưới, mất trắng ô). lib/week-plan.ts mô phỏng cùng luật cho bảng dự kiến /ke-hoach.
+  const weekStartIso = new Date(weekWindowVN(new Date()).start + 'T00:00:00+07:00').toISOString();
+  const { data: weekRows } = await client
+    .from('mkt_content')
+    .select('brief')
+    .gte('created_at', weekStartIso)
+    .eq('brief->>rotation', 'true')
+    .is('deleted_at', null)
+    .limit(200);
+  const postedThisWeek = new Set<string>();
+  for (const r of (weekRows || []) as { brief?: any }[]) {
+    const g = r.brief?.rotation_group;
+    if (g && g !== 'Bài content' && !r.brief?.content_post && r.brief?.post_kind !== 'content') postedThisWeek.add(productName(String(g)).toLowerCase());
+  }
+  const groupOfSug = (s: Suggestion) => (guessGroup as (t: string) => string | null)(s.product);
+  const isFreshProduct = (s: Suggestion) => !postedThisWeek.has(productName(groupOfSug(s) || s.product).toLowerCase());
+  // Lượt có ô YouTube/TikTok: hướng của sản phẩm CÓ CLIP GỐC đi trước (ô video cần clip; sản phẩm
+  // chỉ ảnh như SDFish để dành cho ô Facebook, không bị đá ra ở khối thay folder bên dưới).
+  const runNeedsClip = saleSlots.some((s) => s.channel === 'youtube' || s.channel === 'tiktok');
+  const hasClipFolder = (g: string) => (folders.get(g)?.videos.length || 0) > 0;
+  const sugHasClip = (s: Suggestion) => { const g = groupOfSug(s); return !!g && hasClipFolder(g); };
+  const freshSorted = [...freshSugs]
+    .filter((s) => { const g = groupOfSug(s); return !(g && (isDiscontinuedGroup as (g: string) => boolean)(g)); })
+    .sort((a, b) =>
+      (runNeedsClip ? Number(sugHasClip(b)) - Number(sugHasClip(a)) : 0)
+      || (Number(isFreshProduct(b)) - Number(isFreshProduct(a)))
+      || (weightOfSug(b) - weightOfSug(a)));
   const candidateSuggestions = [...pendingBs, ...freshSorted];
 
   type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number };
@@ -337,8 +370,10 @@ export async function GET(req: Request) {
   // User 20/8: MOI DOT phai co it nhat 1 bai ban tu folder co CLIP NGUON (video AI dung duoc).
   // Neu pickedFolders khong co folder nao co clip, THAY 1 folder bang folder khac co clip (con trong
   // vong / trong eligible neu vong het). Giu ke hoach neu suggestion.product khop folder co clip.
-  const hasClipFolder = (g: string) => (folders.get(g)?.videos.length || 0) > 0;
-  if (pickedFolders.length && !pickedFolders.some((pf) => hasClipFolder(pf.group))) {
+  // 11/9 chiều: CHỈ thay khi lượt này có ô giờ cần video (YouTube/TikTok). Ô Facebook ra bài ảnh
+  // được, nên giữ folder đã rút — trước đây khối này chạy mọi ô, sản phẩm chỉ có ảnh (SDFish, 6 ảnh
+  // màn hình) bị đá ra bất cứ khi nào còn folder có clip chưa dùng trong vòng, tức gần như luôn luôn.
+  if (runNeedsClip && pickedFolders.length && !pickedFolders.some((pf) => hasClipFolder(pf.group))) {
     const pool = (unused.length ? unused : eligible).filter((g) => hasClipFolder(g) && !usedInThisRun.has(g));
     if (pool.length) {
       const replacement = pickRandom(pool);
@@ -382,7 +417,7 @@ export async function GET(req: Request) {
   // ra bài ảnh, không chiếm ô YouTube/TikTok (rơi về Facebook như folder không có clip). SF-50 ngừng
   // bán -> bỏ qua dù kế hoạch còn nhắc.
   // @ts-ignore — module JS thuần
-  const { isPhotoOnlyGroup, isDiscontinuedGroup } = await import('../../../lib/gen/products.mjs');
+  const { isPhotoOnlyGroup } = await import('../../../lib/gen/products.mjs');
 
   for (const [k, pf] of pickedFolders.entries()) {
     const group = pf.group;

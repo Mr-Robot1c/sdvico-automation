@@ -4,8 +4,9 @@
 // Nguồn dữ liệu từng ô:
 //   - Ngày ĐÃ QUA + slot đã chạy hôm nay: bài THẬT đã sinh (mkt_content generator=rotation).
 //   - Slot còn lại hôm nay + ngày TƯƠNG LAI: mô phỏng đúng thứ tự /api/rotate sẽ rút hướng
-//     (hướng chưa dùng sort theo trọng số sản phẩm, lọc theo focus còn hạn, mỗi lượt các bài
-//     phải khác sản phẩm — cùng luật usedInThisRun của rotate).
+//     (hướng chưa dùng: sản phẩm CHƯA có bài tuần này rút trước, rồi theo trọng số sản phẩm;
+//     bỏ sản phẩm ngừng bán; lọc theo focus còn hạn; mỗi lượt các bài phải khác sản phẩm — cùng
+//     luật của /api/rotate, sửa 11/9 chiều vì SDFish trọng số 1 không bao giờ tới lượt).
 //   - Bài content: theo playbook CONTENT_KIND_BY_DOW (lịch tuần 2-2-1-1-1).
 // KHÔNG phụ thuộc bản live (origin='live') — bản đó bị xoá là trang cũ mất sạch lịch tuần
 // (chính là lỗi user thấy 29/8: /ke-hoach trống trơn khối lịch).
@@ -13,7 +14,7 @@
 import type { getServerClient } from './supabase-server';
 import { weekWindowVN } from './plan';
 // @ts-ignore — module JS thuần
-import { guessGroup } from './gen/products.mjs';
+import { guessGroup, isDiscontinuedGroup } from './gen/products.mjs';
 import { CONTENT_KIND_BY_DOW, CONTENT_PURPOSE } from './plan-live';
 import { loadPostingPlan, slotsForDate, groupsForDate, type EffectiveSlot } from './posting-plan';
 
@@ -85,6 +86,8 @@ export async function buildWeekPlanView(
     .limit(120);
   type Actual = { morning: WeekCellItem[]; afternoon: WeekCellItem[]; content: WeekCellItem | null; ranMorning: boolean; ranAfternoon: boolean };
   const actualByDate = new Map<string, Actual>();
+  // Sản phẩm (tên không STT, chữ thường) đã có bài bán tuần này — bài thật + bài dự kiến đã rút.
+  const postedThisWeek = new Set<string>();
   for (const r of (rows || []) as any[]) {
     if (r.deleted_at) continue;
     const b = r.brief || {};
@@ -101,16 +104,22 @@ export async function buildWeekPlanView(
       continue;
     }
     item.product = productNameOf(String(b.rotation_group || b.keyword || ''));
+    if (item.product) postedThisWeek.add(item.product.toLowerCase());
     if (slot === 'sang') a.morning.push(item); else a.afternoon.push(item);
   }
 
   // Hàng đợi hướng đi cho phần DỰ KIẾN — cùng luật với /api/rotate: hướng chưa dùng
-  // (pending_variant thời A/B cũ coi như đã dùng), sort ổn định theo trọng số sản phẩm.
+  // (pending_variant thời A/B cũ coi như đã dùng), bỏ sản phẩm ngừng bán, sort ổn định theo trọng số;
+  // lúc rút (draw) sản phẩm chưa có bài tuần này đi trước (11/9 chiều).
   const suggestions: any[] = Array.isArray(appliedData?.content_suggestions) ? appliedData.content_suggestions : [];
   const weights: Record<string, number> = (appliedData?.weights || {}) as Record<string, number>;
   const wOf = (s: any) => weights[productNameOf(s.product)] ?? 1;
+  const isDiscontinued = (product: string) => {
+    const g = (guessGroup as (t: string) => string | null)(product);
+    return !!g && (isDiscontinuedGroup as (g: string) => boolean)(g);
+  };
   const queue = suggestions
-    .filter((s) => !s.used_at && !s.pending_variant)
+    .filter((s) => !s.used_at && !s.pending_variant && !isDiscontinued(String(s.product || '')))
     .sort((a, b) => wOf(b) - wOf(a))
     .map((s) => ({ title: String(s.title || ''), product: productNameOf(String(s.product || '')) }));
 
@@ -130,16 +139,27 @@ export async function buildWeekPlanView(
   // ảnh sẽ bị rotate bỏ qua, mô phỏng phải bỏ qua giống hệt kẻo lịch hứa bài không bao giờ ra.
   const { data: assetRows } = await client
     .from('brand_assets')
-    .select('product_group, kind')
-    .eq('kind', 'image')
+    .select('product_group, kind, source')
+    .in('kind', ['image', 'video', 'clip'])
     .not('product_group', 'is', null)
     .limit(1000);
+  const nameOfAsset = (a: any) => String(a.product_group || '').replace(/^\s*\d+\.\s*/, '').trim();
   const productsWithImages = [...new Set(
     ((assetRows || []) as any[])
-      .map((a) => String(a.product_group || '').replace(/^\s*\d+\.\s*/, '').trim())
+      .filter((a) => a.kind === 'image')
+      .map(nameOfAsset)
       .filter((g) => g && g !== 'Content')
   )];
   const hasImages = (product: string) => productsWithImages.some((p) => p.toLowerCase() === product.toLowerCase());
+  // Folder có CLIP GỐC (không tính video-pipeline đã dựng): ô YouTube/TikTok rotate thay folder không
+  // clip bằng folder có clip (11/9 chiều: chỉ ở ô video), nên dự kiến ô video ưu tiên sản phẩm có clip.
+  const productsWithClips = [...new Set(
+    ((assetRows || []) as any[])
+      .filter((a) => (a.kind === 'video' || a.kind === 'clip') && a.source !== 'video-pipeline')
+      .map(nameOfAsset)
+      .filter((g) => g && g !== 'Content')
+  )];
+  const hasClips = (product: string) => productsWithClips.some((p) => p.toLowerCase() === product.toLowerCase());
 
   // Số bài/ngày + nhóm chia sẻ đọc từ LỊCH ĐĂNG CỐ ĐỊNH (app_config mkt_posting_plan).
   const pp = await loadPostingPlan(client);
@@ -147,15 +167,25 @@ export async function buildWeekPlanView(
   // Rút n hướng dự kiến cho 1 lượt chạy: mỗi bài trong lượt phải KHÁC sản phẩm
   // (usedInThisRun của rotate); hết hướng hợp lệ thì ô đó rơi về "theo trọng số".
   let hasFallback = false;
-  const draw = (date: string, n: number): WeekCellItem[] => {
+  const draw = (date: string, slots: EffectiveSlot[]): WeekCellItem[] => {
     const out: WeekCellItem[] = [];
     const usedProducts = new Set<string>();
-    for (let k = 0; k < n; k++) {
+    for (let k = 0; k < slots.length; k++) {
       const focusOn = focusActiveOn(date);
-      const idx = queue.findIndex((q) => !usedProducts.has(q.product) && hasImages(q.product) && (!focusOn || matchFocus(q.product)));
+      const needsClip = slots[k]?.channel === 'youtube' || slots[k]?.channel === 'tiktok';
+      const okQ = (q: { product: string }) => !usedProducts.has(q.product) && hasImages(q.product) && (!focusOn || matchFocus(q.product));
+      // Sản phẩm chưa có bài tuần này đi trước (cùng luật rotate 11/9 chiều), hết mới tới theo trọng số.
+      // Ô video: ưu tiên sản phẩm có clip (rotate sẽ thay folder không clip ở ô này).
+      const isFresh = (q: { product: string }) => !postedThisWeek.has(q.product.toLowerCase());
+      let idx = -1;
+      if (needsClip) idx = queue.findIndex((q) => okQ(q) && hasClips(q.product) && isFresh(q));
+      if (idx < 0 && needsClip) idx = queue.findIndex((q) => okQ(q) && hasClips(q.product));
+      if (idx < 0) idx = queue.findIndex((q) => okQ(q) && isFresh(q));
+      if (idx < 0) idx = queue.findIndex(okQ);
       if (idx >= 0) {
         const [q] = queue.splice(idx, 1);
         usedProducts.add(q.product);
+        postedThisWeek.add(q.product.toLowerCase());
         out.push({ text: q.title, product: q.product, state: 'planned' });
       } else {
         hasFallback = true;
@@ -184,10 +214,10 @@ export async function buildWeekPlanView(
       // Slot đã chạy hôm nay thì giữ đúng bài thật (guard 1 lần/slot — thiếu bài cũng không
       // sinh thêm); slot chưa chạy (hôm nay hoặc ngày tới) mới điền dự kiến.
       if (!(isToday && actual?.ranMorning) && morning.length < mSale.length) {
-        morning = [...morning, ...draw(date, mSale.length - morning.length)];
+        morning = [...morning, ...draw(date, mSale.slice(morning.length))];
       }
       if (!(isToday && actual?.ranAfternoon)) {
-        if (afternoonSale.length < aSale.length) afternoonSale = [...afternoonSale, ...draw(date, aSale.length - afternoonSale.length)];
+        if (afternoonSale.length < aSale.length) afternoonSale = [...afternoonSale, ...draw(date, aSale.slice(afternoonSale.length))];
         if (!content && cSlot) content = { text: ck?.label || 'Content', state: 'planned', time: cSlot.time, channel: cSlot.channel, group: cSlot.group_label };
       }
       morning = decorate(morning, mSale);
