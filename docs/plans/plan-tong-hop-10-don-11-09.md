@@ -12,7 +12,7 @@
 | Việc | Tình trạng | Dùng ở đâu |
 |---|---|---|
 | 46 group nghề biển xếp hạng 1, 2, 3 (bỏ 3 nhóm tàu sông, 2 nhóm nội bộ) | Xong | Nút Chia sẻ group |
-| Lô hôm nay 8 nhóm, nút Đã chia, tiến độ trên Tổng quan, bảng ghi lượt đã chia | Xong, bảng đã tạo trên Supabase | Bảng bài viết, nút Chia sẻ group |
+| Lô hôm nay 4 nhóm (đổi từ 8 ngày 11/9 tối, cấu hình `mkt_share_lot_size`), nút Đã chia, tiến độ trên Tổng quan, bảng ghi lượt đã chia | Xong, bảng đã tạo trên Supabase | Bảng bài viết, nút Chia sẻ group |
 | Bài bán viết theo tệp: lọc dầu cho ghe nhỏ, lọc nước và giám sát cho tàu khơi xa | Xong, bài mới sinh từ 12/9 | Chờ duyệt |
 | Nguồn "Quảng cáo Facebook" trong trang Khách hàng, dòng đếm tin từ quảng cáo trên Tổng quan | Xong | Khách hàng, Tổng quan |
 | Video content 6 kiểu kể, giọng Mỹ Duyên một tone, outro một câu | Xong | Video |
@@ -45,12 +45,12 @@ không cạn nước, nước mới mỗi ngày, không phải cắt chuyến. L
 
 | Tuần | Lượt chia sẻ group | Người hỏi mới (Page, Zalo, ads, group) | Thợ máy, xưởng tàu đã nhắn | Đơn chốt |
 |---|---|---|---|---|
-| 1: 15 tới 21/9 | 56 | 15 | 10 | 2 lọc dầu |
-| 2: 22 tới 28/9 | 56 | 20 | 10 thêm, 2 người giới thiệu khách | 3 |
-| 3: 29/9 tới 5/10 | 56 | 25 | khách mua đầu tiên đồng ý cho quay | 3 |
-| 4: 6 tới 12/10 | 56 | 25 | bài lọc dầu đổi sang tàu thật đang dùng | 2 + 1 lọc nước hoặc giám sát |
+| 1: 15 tới 21/9 | 28 | 15 | 10 | 2 lọc dầu |
+| 2: 22 tới 28/9 | 28 | 20 | 10 thêm, 2 người giới thiệu khách | 3 |
+| 3: 29/9 tới 5/10 | 28 | 25 | khách mua đầu tiên đồng ý cho quay | 3 |
+| 4: 6 tới 12/10 | 28 | 25 | bài lọc dầu đổi sang tàu thật đang dùng | 2 + 1 lọc nước hoặc giám sát |
 
-Đo mỗi tối 21 giờ trên Tổng quan: dòng "Chia sẻ group hôm nay n/8", người hỏi mua theo nguồn, tin nhắn từ
+Đo mỗi tối 21 giờ trên Tổng quan: dòng "Chia sẻ group hôm nay n/4", người hỏi mua theo nguồn, tin nhắn từ
 quảng cáo. Ghi mọi người hỏi vào trang Khách hàng đúng nguồn (Facebook, Zalo, Quảng cáo Facebook, group).
 
 ## 4. Việc mỗi ngày của Thanh (khoảng 2 giờ)
@@ -58,32 +58,38 @@ quảng cáo. Ghi mọi người hỏi vào trang Khách hàng đúng nguồn (F
 | Giờ | Việc | Công cụ |
 |---|---|---|
 | 8:30 | Săn 20 phút: tìm trong 12 nhóm hạng 1 các chữ "kim phun", "hao dầu", "hết nước", "máy khục", "bấm dầu". Có bài thì bình luận 1 câu hỏi thăm rồi nhắn riêng, ghi vào Khách hàng nguồn group | Facebook trên Edge (tài khoản group) |
-| 9:00 | Lô sáng: mở Bảng bài viết, chọn bài bán hôm nay, bấm Chia sẻ group, dán vào 4 nhóm đầu lô, mỗi nhóm 1 câu dẫn khác nhau, cách nhau 3 tới 5 phút, bấm Đã chia | Nút Chia sẻ group, popover Lô hôm nay |
+| 9:00 | Lô sáng: mở Bảng bài viết, chọn bài bán hôm nay, bấm Chia sẻ group, vào 2 nhóm đầu lô. Đăng CHỮ VÀ ẢNH trực tiếp trong nhóm (chép thân bài, kèm ảnh tàu), link Page để ở bình luận, không dán link trần; mỗi nhóm 1 câu mở khác nhau, cách nhau 5 phút, bấm Đã chia | Nút Chia sẻ group, popover Lô hôm nay |
 | 9:30 tới 21:00 | Trực inbox Page và Zalo, trả lời trong 15 phút, hỏi 2 câu phân tệp (mục 7) | Messenger, Zalo, bot hỏi đáp |
 | 14:00 | Nhắn 2 tới 3 thợ máy hoặc xưởng tàu theo mục 8 | Messenger cá nhân |
-| 19:00 | Lô tối: 4 nhóm còn lại nhận bài content (video hoặc bài kể), bấm Đã chia | Nút Chia sẻ group |
+| 19:00 | Lô tối: 2 nhóm còn lại nhận bài content (video hoặc bài kể), cũng đăng trực tiếp, bấm Đã chia | Nút Chia sẻ group |
 | 21:00 | Đếm số trên Tổng quan, ghi người hỏi mới vào Khách hàng | Tổng quan, Khách hàng |
 
 Bài bán xoay nền tảng theo ngày: mỗi tuần 3 ngày lên Facebook, 2 ngày YouTube, 2 ngày TikTok (khi có clip
 gốc). Ngày YouTube hoặc TikTok không có bài bán Facebook mới, lô sáng dùng bài bán Facebook gần nhất của
 đúng sản phẩm (Bảng bài viết, lọc Đã đăng), hoặc đổi lô sáng thành content. Group vì thế chỉ thấy bài bán
-mới 3 lần một tuần, đỡ loãng. Lô hôm nay tự xoay: hạng 1 hai lượt một tuần, hạng 2 một lượt, hạng 3 luân
-phiên, nhóm đã chia hôm nay luôn nằm trong lô. Nhóm miền Bắc chỉ nhận bài lọc dầu. Hai nhóm "Cộng Đồng Ngư Dân Việt kiến thức" và
+mới 3 lần một tuần, đỡ loãng. Lô hôm nay tự xoay: ưu tiên nhóm chưa từng chia, rồi nhóm lâu nhất, nhóm
+chia trong 7 ngày xếp cuối; 46 nhóm chia 4 mỗi ngày nên mỗi nhóm thấy SDVICO khoảng 12 ngày một lần, hạng 1
+đi trước. Nhóm đã chia hôm nay luôn nằm trong lô. Thanh chốt 11/9: 4 nhóm thay vì 8 vì ngư dân vào nhiều
+nhóm cùng lúc, đăng 8 lượt một ngày cùng một bài thì thành rác. Nhóm miền Bắc chỉ nhận bài lọc dầu. Hai nhóm "Cộng Đồng Ngư Dân Việt kiến thức" và
 "Hội Ngư Dân Việt Nam" chỉ nhận content.
 
 ## 5. Tuần 1 chi tiết, 15 tới 21/9
 
-| Ngày | Sáng 9 giờ, bài bán, 4 nhóm | Tối 19 giờ, content, 4 nhóm | Việc khác trong ngày |
-|---|---|---|---|
-| Thứ 2 15/9 | Lọc dầu: DÂN BIỂN 137K, Máy Thủy 59K, Cam Ranh 36K, Kiên Giang 31K | DTT Miền Bắc 52K, DÂN BIỂN 41K, Người Đi Biển 38K, miền Trung 34K | Tắt reel lọc nước. Dựng quảng cáo lọc dầu theo mục 6. |
-| Thứ 3 16/9 | Lọc dầu: Dân Yêu Biển, máy Thủy 28K, Mua Bán Tàu Thuyền, thuyền ghe miền Trung | HỘI TÀU THUYỀN, Bến Tre, Hiệp hội cano, DTT MB2 | Nhắn 5 thợ máy hay đăng ở Máy Thủy Tàu Thuyền và Chợ Tàu (mục 8) |
-| Thứ 4 17/9 | Lọc nước: miền Trung 34K, Kiên Giang 31K, Cam Ranh, Người Đi Biển | CĐ MB, Cà Mau Sông Đốc, ghe biển tàu cá, NGHỀ BIỂN | Đọc số quảng cáo 48 giờ đầu: chi phí mỗi tin nhắn, số tin |
-| Thứ 5 18/9 | Lọc dầu: Trao Đổi, NGƯ DÂN VN, Nghệ An, DB Miền Trung | DTT MB3, Cà Mau, NA-TH, 3 Miền | Nhắn 5 thợ máy còn lại. Quay video test nước (mục 9) nếu máy có sẵn ở công ty |
-| Thứ 6 19/9 | Lọc dầu lượt 2: DÂN BIỂN 137K, Máy Thủy 59K, DÂN BIỂN 41K, Dân Yêu Biển | 4 nhóm hạng 3 đầu | Gửi sếp duyệt bài giám sát hành trình (điều cấm 3) |
-| Thứ 7 20/9 | Giám sát nếu đã duyệt, không thì lọc dầu: miền Trung, Kiên Giang, Mua Bán Tàu Thuyền, máy Thủy | 4 nhóm hạng 3 tiếp | |
-| Chủ nhật 21/9 | Lọc dầu: Cam Ranh, Người Đi Biển, thuyền ghe miền Trung, DTT MB 52K | 4 nhóm hạng 3 cuối | MỐC KIỂM: dưới 10 người hỏi thì đổi video ads và đổi câu dẫn group. BOSS xếp tuần sau |
+Nhóm nào thì nút Lô hôm nay chọn (4 nhóm, ưu tiên nhóm chưa từng chia rồi tới nhóm lâu nhất, danh sách xếp
+theo hạng nên hạng 1 đi trước). Thanh chỉ chọn bài: sáng bài bán vào 2 nhóm đầu lô, tối content vào 2 nhóm sau.
 
-Từ tuần 2 không cần bảng tay: nút Lô hôm nay tự chọn nhóm, Thanh chỉ chọn bài.
+| Ngày | Sáng 9 giờ, bài bán, 2 nhóm | Tối 19 giờ, content, 2 nhóm | Việc khác trong ngày |
+|---|---|---|---|
+| Thứ 2 15/9 | Lọc dầu | Content | Tắt reel lọc nước. Dựng quảng cáo lọc dầu theo mục 6. Kiểm popover Lô hôm nay hiện "0/4" |
+| Thứ 3 16/9 | Lọc dầu | Content | Nhắn 5 thợ máy hay đăng ở Máy Thủy Tàu Thuyền và Chợ Tàu (mục 8) |
+| Thứ 4 17/9 | Lọc nước, chỉ khi lô có nhóm miền Trung, Kiên Giang, Cà Mau; không thì lọc dầu | Content | Đọc số quảng cáo 48 giờ đầu: chi phí mỗi tin nhắn, số tin |
+| Thứ 5 18/9 | Lọc dầu | Content | Nhắn 5 thợ máy còn lại. Quay video test nước (mục 9) nếu máy có sẵn ở công ty |
+| Thứ 6 19/9 | Lọc dầu | Content | Gửi sếp duyệt bài giám sát hành trình (điều cấm 3) |
+| Thứ 7 20/9 | Giám sát nếu đã duyệt, không thì lọc dầu | Content | |
+| Chủ nhật 21/9 | Lọc dầu | Content | MỐC KIỂM: dưới 10 người hỏi thì đổi video ads và đổi câu dẫn group. BOSS xếp tuần sau |
+
+Nhóm miền Bắc trong lô chỉ nhận lọc dầu hoặc content. Hai nhóm kiến thức chỉ nhận content: gặp trong lô sáng
+thì đổi sang content, để bài bán cho nhóm kế.
 
 ## 6. Quảng cáo Facebook (Thanh dựng tay, sếp quyết tiền)
 
@@ -171,4 +177,5 @@ Lấy tàu thật bằng 2 đường không tốn máy:
 
 - Chủ nhật 21/9 dưới 10 người hỏi: đổi video ads sang video test nước hoặc video 9 nỗi sợ, đổi câu dẫn group.
 - Chủ nhật 28/9 chưa có đơn lọc dầu nào: dừng ads, dồn sức vào thợ máy và inbox.
-- Facebook chặn tài khoản chia sẻ: giảm còn 4 nhóm một ngày, cách 10 phút, không dán link trần, dán kèm câu dẫn.
+- Facebook chặn tài khoản chia sẻ: giảm còn 2 nhóm một ngày (cấu hình `mkt_share_lot_size` = 2), cách 10 phút.
+- Nhóm nào 2 lần đăng không ai bấm gì: chuyển xuống hạng 3 (sửa trường tier trong `mkt_share_groups`).
