@@ -90,11 +90,43 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     .join('\n');
 
   // 9/9 (user: video "người thật tàu thật"): video CONTENT dựng từ clip thật, không bán hàng.
+  // 11/9 (Thanh: "kịch bản nó cứ 1 màu miết"): trước đây cảnh đầu luôn "kết quả + đây là cảnh thật ở
+  // đâu", cảnh cuối luôn "1 câu hỏi mở", ví dụ trong prompt lại có "Bà con có thấy vậy không?" nên
+  // video nào cũng một khuôn. Nay 6 KIỂU KỂ xoay theo bài (băm id, cùng bài dựng lại vẫn cùng kiểu;
+  // opts.styleIdx / env VIDEO_CONTENT_STYLE ghi đè), mỗi kiểu mở khác, kết khác, nhịp khác, kèm
+  // danh sách cụm đã mòn bị cấm.
+  const CONTENT_STYLES = [
+    { key: 'chung-kien', label: 'Chứng kiến tại chỗ',
+      open: 'mở bằng MỘT CHI TIẾT NHỎ nhìn thấy trong clip (bàn tay, con ốc, vệt dầu, tiếng máy), 1 câu <=12 chữ, KHÔNG nói "đây là cảnh thật", địa điểm chỉ lướt qua trong cảnh giữa nếu bài nguồn có',
+      close: 'kết bằng 1 câu hỏi về KINH NGHIỆM riêng của bà con (họ làm khác chỗ nào), không hỏi "có thấy vậy không"' },
+    { key: 'loi-ke', label: 'Lời một người trên tàu',
+      open: 'mở bằng MỘT CÂU NÓI TRỰC TIẾP của người trong clip theo bài nguồn (đặt trong ngoặc kép, không bịa tên; không có tên thì gọi "chú", "anh thợ máy", "bác tài công"), rồi 1 câu ai vừa nói câu đó',
+      close: 'kết bằng LỜI NHẮN của chính người đó gửi anh em đi biển, câu cảm, KHÔNG câu hỏi' },
+    { key: 'con-so', label: 'Con số thật',
+      open: 'mở bằng MỘT CON SỐ có trong bài nguồn (ngày, chuyến, lít, năm nghề), 1 câu ngắn, rồi 1 câu con số đó đổi lấy cái gì; không có con số trong bài thì dùng mốc thời gian (bao nhiêu năm, mấy giờ sáng)',
+      close: 'kết bằng câu đố nhẹ: mời bà con bình luận con số của tàu mình (bao nhiêu ngày, bao nhiêu chuyến)' },
+    { key: 'truoc-sau', label: 'Trước và sau',
+      open: 'mở bằng HAI THỜI ĐIỂM đối lập trong cùng 1 câu (lúc ra khơi / lúc về bến, sáng / chiều, ngày xưa / bây giờ), rồi 1 câu cái gì đổi khác giữa hai lúc đó',
+      close: 'kết bằng 1 câu hỏi "tàu bà con đang ở đoạn nào", hoặc câu cảm ngắn về đoạn sau' },
+    { key: 'nhip-nhanh', label: 'Nhịp nhanh câu ngắn',
+      open: 'mở bằng ĐỘNG TỪ, câu 4 tới 7 chữ, 3 câu liên tiếp như đếm nhịp (siết. kiểm. nổ máy.), không câu nào quá 8 chữ trong cảnh đầu',
+      close: 'kết bằng 1 câu cảm ngắn có dấu chấm than về nghề, KHÔNG câu hỏi, KHÔNG lời chúc' },
+    { key: 'tam-su', label: 'Tâm sự chậm',
+      open: 'mở bằng THỜI ĐIỂM TRONG NGÀY và một hình ảnh tĩnh (chiều muộn ở cảng, sáng sớm sương chưa tan), giọng kể chậm, câu 8 tới 12 chữ',
+      close: 'kết bằng MỘT LỜI CHÚC ngắn cho chuyến biển tới, không câu hỏi, không kêu gọi' },
+  ];
+  const styleIdx = Number.isInteger(opts.styleIdx) ? opts.styleIdx
+    : process.env.VIDEO_CONTENT_STYLE !== undefined && process.env.VIDEO_CONTENT_STYLE !== '' ? Number(process.env.VIDEO_CONTENT_STYLE)
+      : [...String(content.id || '')].reduce((s, ch) => s + ch.charCodeAt(0), 0);
+  const STYLE = CONTENT_STYLES[Math.abs(styleIdx) % CONTENT_STYLES.length];
+  if (opts.contentVideo) console.log(`Kiểu kể video content: ${STYLE.label} (${STYLE.key})`);
   const CONTENT_STRUCTURE = [
     'ĐÂY LÀ VIDEO CỘNG ĐỒNG "NGƯỜI THẬT TÀU THẬT": dựng từ clip THẬT đội SDVICO quay tại tàu, cảng, xưởng. KHÔNG bán hàng, KHÔNG nhắc giá, KHÔNG kêu nhắn Page hay gọi điện. Sản phẩm chỉ xuất hiện khi bài nguồn kể tới, và chỉ như một phần câu chuyện.',
-    'CẢNH ĐẦU: mở bằng KẾT QUẢ nhìn thấy trong clip, 1 câu khẳng định <=15 chữ (ví dụ về CẤU TRÚC, chủ đề khác, CẤM chép: "Bình ắc quy chết queo, 20 phút sau đèn sáng lại."), rồi 1 câu nói rõ đây là cảnh thật ở đâu (tên tàu, cảng, tỉnh nếu bài nguồn có; không có thì nói "trên tàu bà con").',
-    'CẢNH GIỮA: kể chuyện có người: ai đang làm gì, vất vả chỗ nào, bà con nói gì. Chạm 1 chữ cảm xúc NGHỀ / TIỀN / RỦI RO / TỰ HÀO như bài nguồn. Không bịa tên người, con số không có trong bài nguồn.',
-    'CẢNH CUỐI: 1 câu hỏi mở kéo bà con bình luận kể chuyện của họ (kinh nghiệm, con số, tàu của họ). Không lời kêu gọi bán hàng.',
+    `KIỂU KỂ CỦA VIDEO NÀY: "${STYLE.label}". Bám đúng kiểu này, không trộn kiểu khác.`,
+    `CẢNH ĐẦU: ${STYLE.open}. Câu đầu tiên là câu người xem nghe đầu tiên, phải khác hẳn các video trước.`,
+    'CẢNH GIỮA: kể chuyện có người: ai đang làm gì, vất vả chỗ nào, bà con nói gì. Chạm 1 chữ cảm xúc NGHỀ / TIỀN / RỦI RO / TỰ HÀO như bài nguồn. Không bịa tên người, con số không có trong bài nguồn. Địa điểm (tên cảng, tỉnh) chỉ nói nếu bài nguồn có.',
+    `CẢNH CUỐI: ${STYLE.close}. Không lời kêu gọi bán hàng.`,
+    'CỤM ĐÃ MÒN, CẤM DÙNG (đã lặp ở nhiều video trước): "đây là cảnh thật", "cảnh quay thực tế", "bà con có thấy vậy không", "anh em có thấy vậy không", "đời người đi biển gắn liền với con tàu", "thương cái nghiệp biển khơi", "mấy hôm nay ghé cảng", "cặm cụi kiểm tra từng con ốc", "chuyến đi 30 ngày tới". Muốn nói ý đó thì tìm cách nói khác.',
   ];
   const SALES_STRUCTURE = [
     'PLAYBOOK 24/8 (bộ lọc vàng): CẢNH ĐẦU phải MỞ NGAY bằng 1 CÂU HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (thành quả lớn bị phá bởi nguyên nhân nhỏ) — ví dụ câu đầu tiên của video: "Trúng luồng cá mà phải quay vào bờ vì hết nước." Cảnh đầu = hook + 1 câu tô đậm nỗi mất, KHÔNG có câu chào phía trước. Bám 1 trong 4 CHỮ CẢM XÚC: NGHỀ (khoe kinh nghiệm) / TIỀN (con số túi tiền) / RỦI RO (cảnh báo sai lầm, mất chuyến) / TỰ HÀO (lộc biển, danh dự nghề). Bài phải chạm đúng 1 chữ, không sáo rỗng.',
@@ -107,7 +139,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   const system = [
     'Bạn dựng kịch bản video ngắn cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     'Giọng gần gũi bà con ngư dân, câu ngắn gọn, dễ nghe khi lồng tiếng. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM trong bài nguồn (xem SỰ THẬT NGHỀ bên dưới); KHÔNG tự thêm lợi ích không có trong bài.',
-    'LỜI THOẠI PHẢI CÓ CẢM XÚC như người kể chuyện cho bạn nghe (sếp góp ý 21/8: giọng đọc đều đều buồn ngủ): xen câu hỏi tu từ ("Bà con có thấy vậy không?"), câu cảm ngắn ("Đã lắm!", "Yên tâm hẳn!"), ngắt nhịp bằng dấu phẩy và câu ngắn 6 tới 12 chữ. Máy đọc lên xuống giọng THEO DẤU CÂU, nên dấu chấm hỏi, chấm than, dấu phẩy đặt đúng chỗ là giọng có hồn. BẮT BUỘC (sếp 5/9, các sếp chê giọng đều đều): MỖI CẢNH có ít nhất 1 câu cảm ngắn kết bằng dấu chấm than hoặc 1 câu hỏi ngắn kết bằng dấu chấm hỏi; câu dài quá 14 chữ phải tách thành 2 câu.',
+    'LỜI THOẠI PHẢI CÓ CẢM XÚC như người kể chuyện cho bạn nghe (sếp góp ý 21/8: giọng đọc đều đều buồn ngủ): xen câu hỏi tu từ đúng chỗ (tự nghĩ câu mới theo nội dung, KHÔNG dùng lại "Bà con có thấy vậy không?" vì đã mòn), câu cảm ngắn ("Đã lắm!", "Yên tâm hẳn!"), ngắt nhịp bằng dấu phẩy và câu ngắn 6 tới 12 chữ. Máy đọc lên xuống giọng THEO DẤU CÂU, nên dấu chấm hỏi, chấm than, dấu phẩy đặt đúng chỗ là giọng có hồn. BẮT BUỘC (sếp 5/9, các sếp chê giọng đều đều): MỖI CẢNH có ít nhất 1 câu cảm ngắn kết bằng dấu chấm than hoặc 1 câu hỏi ngắn kết bằng dấu chấm hỏi; câu dài quá 14 chữ phải tách thành 2 câu.',
     'KHÔNG MỞ ĐẦU BẰNG LỜI CHÀO (sếp bỏ 4/9): CẤM mọi câu chào kiểu "Alo alo bà con ơi!", "Hello anh em đi biển ơi!", "Hello các thuyền trưởng!", "Hello các con vợ ơi!", "Anh em ơi, nghe nè!", "Xin chào bà con", "Chào cả nhà"... Câu ĐẦU TIÊN của video phải là HOOK vào thẳng vấn đề, không chào, không xưng tên kênh. Cả video vẫn nói như người trẻ kể chuyện cho anh em đi biển nghe: năng lượng cao, tự nhiên, có thể chêm "nha", "nè", "luôn á"; NHƯNG vẫn tôn trọng bà con, không chửi bậy, không lố tới mức mất uy tín thiết bị.',
     ...(opts.contentVideo ? CONTENT_STRUCTURE : SALES_STRUCTURE),
     shownName ? `TÊN SẢN PHẨM: gọi đúng "${shownName}" trong lời thoại, KHÔNG gọi tên khác, KHÔNG đọc mã SD12-300.` : '',
@@ -148,9 +180,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     ...(opts.contentVideo
       ? [
           'ĐÂY LÀ VIDEO CỘNG ĐỒNG 30-45 giây. CHÍNH XÁC 3 CẢNH, role LẦN LƯỢT: "hook", "story", "closing". KHÔNG thêm, KHÔNG bớt, KHÔNG lặp role.',
-          'CẢNH 1 role="hook" (8-12s, ~25-35 từ): kết quả nhìn thấy trong clip + 1 câu đây là cảnh thật ở đâu.',
+          `CẢNH 1 role="hook" (8-12s, ~25-35 từ): theo KIỂU KỂ "${STYLE.label}" ở trên (${STYLE.open}).`,
           'CẢNH 2 role="story" (15-20s, ~45-60 từ): chuyện người thật, việc thật, cảm xúc thật theo bài nguồn.',
-          'CẢNH 3 role="closing" (6-10s, ~20-30 từ): 1 câu hỏi mở cho bà con bình luận. Không giá, không gọi, không nhắn Page.',
+          `CẢNH 3 role="closing" (6-10s, ~20-30 từ): ${STYLE.close}. Không giá, không gọi, không nhắn Page.`,
         ]
       : short
         ? [
