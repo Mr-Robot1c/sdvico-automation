@@ -345,7 +345,10 @@ async function localTTS(cleanText, outPath, workDir, tag) {
   // xuống giọng theo câu (5/9), nay đã bỏ lên xuống nên chỉ còn hại: mỗi câu một lần gọi VieNeu,
   // màu giọng lệch giữa các lần gọi. Mặc định đọc CẢ CẢNH một lần gọi (tidy.py vẫn nén lặng giữa
   // các câu); TTS_LOCAL_PROSODY=on mới quay lại từng câu.
-  if (sentences.length > 1 && process.env.TTS_LOCAL_PROSODY === 'on') {
+  // 11/9 (2) (Thanh nghe 2b7d303a: outro lặp "để bên em tư vấn cho anh em nha" 2 lần): outro 2 câu gộp
+  // một lần gọi thì VieNeu lặp đuôi (đo: 6 khúc tiếng cho 4 vế, 11,7s thay vì 8s). Outro LUÔN đọc
+  // từng câu (bản e56c4e63 đọc từng câu không lặp); cảnh vẫn đọc cả cảnh.
+  if (sentences.length > 1 && (tag === 'outro' || process.env.TTS_LOCAL_PROSODY === 'on')) {
     try {
       const parts = [];
       for (let i = 0; i < sentences.length; i++) {
