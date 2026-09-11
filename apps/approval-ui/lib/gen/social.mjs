@@ -213,6 +213,13 @@ export async function generateSocialPost({
   body = ensureCommentCta(body, cta);
 
   const tags = hashtagBlock(productGroup);
+  // 11/9: hashtag tĩnh trong products.mjs từng lọt cụm sai nghề ("khỏi_chở_nước") vì
+  // guardViolations() ở trên chỉ quét headline+body, quét TRƯỚC khi hashtag được ghép vào.
+  // Quét thêm hashtagBlock ở đây để bẫy lỗi tương tự nếu sau này ai thêm hashtag sai. Hashtag
+  // dùng gạch dưới nối chữ nên đổi thành khoảng trắng trước khi so khớp cụm cấm (cụm cấm viết
+  // có dấu cách). Bản sao y hệt ở packages/marketing/src/social.mjs.
+  const tagViolations = guardViolations(tags.replace(/_/g, ' '), topic);
+  if (tagViolations.length) violations = [...violations, ...tagViolations];
   const text = `${body}\n\n${tags}`;
 
   const assessment = assessDraft(text, {
