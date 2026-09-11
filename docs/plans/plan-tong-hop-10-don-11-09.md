@@ -64,8 +64,11 @@ quảng cáo. Ghi mọi người hỏi vào trang Khách hàng đúng nguồn (F
 | 19:00 | Lô tối: 4 nhóm còn lại nhận bài content (video hoặc bài kể), bấm Đã chia | Nút Chia sẻ group |
 | 21:00 | Đếm số trên Tổng quan, ghi người hỏi mới vào Khách hàng | Tổng quan, Khách hàng |
 
-Lô hôm nay tự xoay: hạng 1 hai lượt một tuần, hạng 2 một lượt, hạng 3 luân phiên, nhóm đã chia hôm nay
-luôn nằm trong lô. Nhóm miền Bắc chỉ nhận bài lọc dầu. Hai nhóm "Cộng Đồng Ngư Dân Việt kiến thức" và
+Bài bán xoay nền tảng theo ngày: mỗi tuần 3 ngày lên Facebook, 2 ngày YouTube, 2 ngày TikTok (khi có clip
+gốc). Ngày YouTube hoặc TikTok không có bài bán Facebook mới, lô sáng dùng bài bán Facebook gần nhất của
+đúng sản phẩm (Bảng bài viết, lọc Đã đăng), hoặc đổi lô sáng thành content. Group vì thế chỉ thấy bài bán
+mới 3 lần một tuần, đỡ loãng. Lô hôm nay tự xoay: hạng 1 hai lượt một tuần, hạng 2 một lượt, hạng 3 luân
+phiên, nhóm đã chia hôm nay luôn nằm trong lô. Nhóm miền Bắc chỉ nhận bài lọc dầu. Hai nhóm "Cộng Đồng Ngư Dân Việt kiến thức" và
 "Hội Ngư Dân Việt Nam" chỉ nhận content.
 
 ## 5. Tuần 1 chi tiết, 15 tới 21/9
@@ -157,7 +160,9 @@ Lấy tàu thật bằng 2 đường không tốn máy:
 
 ## 12. Việc máy còn lại
 
-1. Sonnet thi công `plan-bai-toan-loi-ich-11-09.md` (8 kịch bản, test 95). Sau deploy Thanh đặt trên Vercel
+1. Sonnet thi công `plan-bai-toan-loi-ich-11-09.md` (8 kịch bản, test 96), gồm 2 việc Thanh chốt 11/9 tối:
+   ngày TikTok lịch đăng viết chú thích ngắn 2 tới 4 câu (trước giờ luôn viết kiểu Facebook), và đoạn bài
+   toán chỉ chèn đủ vào bài Facebook và YouTube, TikTok chỉ 1 câu số. Sau deploy Thanh đặt trên Vercel
    2 biến: DIESEL_PRICE_VND=27740 và DIESEL_PRICE_DATE=3/9/2026. Kỳ giá dầu mới chỉ đổi 2 biến.
 2. Không thêm tính năng mới cho thợ máy trong tháng này; dùng trang Khách hàng nguồn group với ghi chú.
 3. Mốc kiểm 21/9 xong mới xét: trường "tệp A/B/C/D" trong Khách hàng, và video 9 nỗi sợ dựng tự động.

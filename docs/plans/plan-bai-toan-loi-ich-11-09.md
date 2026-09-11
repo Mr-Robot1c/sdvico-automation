@@ -56,6 +56,9 @@ nguyên văn: "Không bịa số liệu, giải thưởng, khách hàng, đối 
 - 2 bản `products.mjs` và 2 bản `social.mjs` phải sửa giống nhau (xem plan trước).
 - Số tiền viết kiểu Việt: dấu chấm hàng nghìn (55.480.000 đ), "triệu" viết "55,5 triệu đồng".
 - KHÔNG để model tự nhân chia: ví dụ đã tính sẵn thành câu, model chọn 1 ví dụ hợp cỡ tàu và chép số.
+- Bài bán xoay nền tảng theo ngày (Facebook, YouTube, TikTok, xem `lib/posting-plan.ts` SALE_CYCLE). Lịch đăng
+  hiện luôn gọi máy viết bài kiểu Facebook kể cả ngày TikTok (Bước 3b sửa). Đừng chèn cả bảng kịch bản vào
+  chú thích TikTok.
 
 ## 5. Các bước
 
@@ -174,10 +177,17 @@ export function waterBenefitLines() {
   out.push('CẤM suy ra lợi ích về trọng lượng tàu, chỗ chứa hay tiền nhiên liệu từ ví dụ này (sự thật nghề: tàu cố ý lấy nước để đằm khi lấy đá; máy lọc nước không liên quan nhiên liệu). Không nêu tiền nước ở cảng đất liền vì chưa có giá công khai.');
   return out;
 }
-export function benefitLines(group) {
+// channel: 'facebook' | 'youtube' | 'tiktok'. TikTok (Thanh 11/9): chú thích ngắn, chỉ 1 câu số, không
+// chèn cả bảng kịch bản; Facebook và YouTube (mô tả không giới hạn) nhận đủ 2 tới 3 câu bài toán.
+const TIKTOK_ONE_LINER = {
+  fuel: 'Chỉ 1 câu số, chép nguyên: "tàu 400 cv đi 20 ngày đốt khoảng 3.000 lít dầu, lọc dầu sạch bớt 5 tới 10% (tài liệu SF300B)". Không thêm tiền, không thêm kịch bản khác.',
+  water: 'Chỉ 1 câu số, chép nguyên: "10 người đi 20 ngày cần khoảng 3.000 lít nước ngọt, máy chạy hơn nửa giờ mỗi ngày là đủ". Không nói tiền nước, không nói bớt chở nước.',
+};
+export function benefitLines(group, channel = 'facebook') {
   const isFuel = group === '9. Máy Lọc Dầu Diesel SD12-300' || group === '6. Thiết bị lọc dầu SF-50';
   const isWater = group === '2. Máy lọc nước biển SEA-40';
   if (!isFuel && !isWater) return [];
+  if (channel === 'tiktok') return ['BÀI TOÁN LỢI ÍCH (TikTok, BẮT BUỘC):', TIKTOK_ONE_LINER[isFuel ? 'fuel' : 'water']];
   const ex = isFuel ? fuelBenefitLines() : waterBenefitLines();
   return [
     'BÀI TOÁN LỢI ÍCH (BẮT BUỘC có 2 tới 3 câu trong bài, đặt ở nhịp lối thoát hoặc phần thưởng): dưới đây là NHIỀU KỊCH BẢN theo cỡ tàu, số người, số ngày. Chọn ĐÚNG 1 kịch bản gần với tệp khách của bài nhất (tệp A lấy ghe 10 tới 14 m; tệp B lấy tàu 15 m trở lên), mỗi bài một kịch bản KHÁC bài trước, CHÉP NGUYÊN các con số của kịch bản đó, KHÔNG tự nhân chia, KHÔNG trộn số của hai kịch bản, KHÔNG làm tròn khác đi. Viết thành lời kể, không dán nguyên dòng ví dụ. Kèm 1 cụm nguồn ngắn trong ngoặc, ví dụ "(tính theo giá dầu Petrolimex kỳ 3/9/2026)". Kết bằng câu mời: tàu anh khác cỡ thì nhắn số người, số ngày, em tính riêng.',
@@ -195,8 +205,28 @@ export function benefitLines(group) {
 - Ngay sau dòng `    ...audienceLines(productGroup),` thêm:
 ```js
     // 11/9: phép tính lợi ích theo cỡ tàu, số có nguồn (BENEFIT_ASSUMPTIONS), model chỉ chép ví dụ.
-    ...benefitLines(productGroup),
+    // TikTok chỉ 1 câu số (chú thích ngắn), Facebook và YouTube đủ 2 tới 3 câu.
+    ...benefitLines(productGroup, channel),
 ```
+`channel` đã là tham số của `generateSocialPost` ở cả 2 bản (dòng `productGroup, productName, channel, hasVideo,`), không cần thêm.
+
+### Bước 3b: `apps/approval-ui/app/api/rotate/route.ts`, truyền đúng kênh cho máy viết bài
+
+Hiện lịch đăng LUÔN gọi `generateSocialPost({... channel: 'facebook' ...})` (khoảng dòng 448 tới 460, trong vòng
+sinh bài bán), kể cả ngày bài bán lên TikTok, nên nhánh "chú thích TikTok 2 tới 4 câu" trong `social.mjs`
+chưa bao giờ chạy; bài dài 5 tới 6 câu đang thành chú thích TikTok. Thanh 11/9 chốt: ngày TikTok viết ngắn.
+
+Biến `channels` (mảng, phần tử đầu là kênh thật của bài: 'facebook' | 'youtube' | 'tiktok') đã được tính
+ngay phía trên ở khối "Kênh theo LỊCH CỐ ĐỊNH". Sửa đúng 1 dòng:
+```ts
+// trước
+          channel: 'facebook',
+// sau: ngày TikTok viết chú thích ngắn; YouTube giữ dạng Facebook (mô tả video không giới hạn).
+          channel: channels[0] === 'tiktok' ? 'tiktok' : 'facebook',
+```
+Chỉ sửa lời gọi `generateSocialPost` của BÀI BÁN; lời gọi `generateContentPost` (bài content) giữ nguyên.
+Hệ quả có chủ ý: ngày TikTok chú thích chỉ 2 tới 4 câu, không có link Shopee (nhánh isTikTok sẵn có),
+vẫn có câu giá úp mở và CTA cmt.
 
 ### Bước 4: test `packages/marketing/src/test-price-teaser.mjs`
 
@@ -216,9 +246,10 @@ ok('benefit lọc dầu không dính SỰ THẬT NGHỀ', !guardViolations(fuelB
 eq('benefit nhóm khác rỗng', benefitLines('8. Sơn RARE').length, 0);
 ok('benefit không nêu tiền nước đất liền', !/đ\/m³|đồng một khối|120\.000/.test(waterBenefitLines().join(' ')));
 ok('estimateBenefit tính tay', estimateBenefit({ crew: 10, days: 20, engine: 'vua' }).waterLiters === 3000 && estimateBenefit({ crew: 10, days: 20, engine: 'vua' }).fuelLiters === 3000);
+ok('benefit TikTok chỉ 1 câu số', benefitLines(G9, 'tiktok').length === 2 && benefitLines(G9, 'tiktok').join(' ').includes('3.000 lít') && !benefitLines(G9, 'tiktok').join(' ').includes('VÍ DỤ') && benefitLines(G2, 'tiktok').length === 2 && !guardViolations(benefitLines(G2, 'tiktok').join(' '), G2).length);
 eq('trieu() né mốc giá bị guard cấm', [41610000, 49932000, 42000000, 83220000, 9900000, 4161000].map(trieu).join(' | '), '41,6 triệu đồng | 50 triệu đồng | 42,0 triệu đồng | 83 triệu đồng | 10 triệu đồng | 4,2 triệu đồng');
 ```
-Import thêm `BENEFIT_CASES, estimateBenefit, trieu` cùng các hàm trên. Tổng cộng +13 ca (82 sau plan trước → 95).
+Import thêm `BENEFIT_CASES, estimateBenefit, trieu` cùng các hàm trên. Tổng cộng +14 ca (82 sau plan trước → 96).
 Kiểm số: tàu 15 m 20 ngày: 150 lít × 20 = 3.000 lít × 27.740 = 83.220.000 đ → `trieu()` in "83 triệu đồng";
 5% = 4.161.000 đ → "4,2 triệu đồng", 10% = 8.322.000 đ → "8,3 triệu đồng"; một năm 6 chuyến 25 và 50 triệu đồng
 (49,9 phải làm tròn thành 50 vì guard cấm "9,9 triệu"); hoàn vốn 9.900.000 / 4.161.000 = 2,4 → "khoảng 3 chuyến".
@@ -229,7 +260,7 @@ Khối code Bước 1 đã được chạy thử ngày 11/9 với product-guard 
 ### Bước 5: doc + commit + deploy
 
 - `docs/app-map/marketing.md` chèn sau `covers:`:
-  `<!-- re-verified: 2026-09-11 toi - BAI TOAN LOI ICH trong bai ban (Thanh 11/9; so co nguon, Claude tim Google, xem docs/plans/plan-bai-toan-loi-ich-11-09.md): products.mjs (2 ban) BENEFIT_ASSUMPTIONS (gia dau DO 27.740 d/lit ky 3/9/2026, env DIESEL_PRICE_VND/DIESEL_PRICE_DATE; 15 lit nuoc/nguoi/ngay suy tu Tepbac 2018; tiet kiem 5-10% tai lieu SF300B; 6 chuyen/nam), ENGINE_CLASSES 3 lop may (nho/vua/lon, ghe nho khong tinh tien dau), BENEFIT_CASES 8 kich ban ghe 10 m toi hau can 25 m, estimateBenefit, trieu() ne moc gia guard cam, fuelBenefitLines/waterBenefitLines/benefitLines (moi bai chon 1 kich ban gan tep); social.mjs (2 ban) chen ...benefitLines(productGroup) sau ...audienceLines; test +13 ca. Loc nuoc KHONG neu tien nuoc dat lien (khong co nguon), khong noi bot cho nuoc/nhe tau. -->`
+  `<!-- re-verified: 2026-09-11 toi - BAI TOAN LOI ICH trong bai ban (Thanh 11/9; so co nguon, Claude tim Google, xem docs/plans/plan-bai-toan-loi-ich-11-09.md): products.mjs (2 ban) BENEFIT_ASSUMPTIONS (gia dau DO 27.740 d/lit ky 3/9/2026, env DIESEL_PRICE_VND/DIESEL_PRICE_DATE; 15 lit nuoc/nguoi/ngay suy tu Tepbac 2018; tiet kiem 5-10% tai lieu SF300B; 6 chuyen/nam), ENGINE_CLASSES 3 lop may (nho/vua/lon, ghe nho khong tinh tien dau), BENEFIT_CASES 8 kich ban ghe 10 m toi hau can 25 m, estimateBenefit, trieu() ne moc gia guard cam, fuelBenefitLines/waterBenefitLines/benefitLines (moi bai chon 1 kich ban gan tep); social.mjs (2 ban) chen ...benefitLines(productGroup, channel) sau ...audienceLines (TikTok chi 1 cau so); api/rotate/route.ts truyen channel tiktok cho bai ban ngay TikTok (truoc luon facebook); test +14 ca. Loc nuoc KHONG neu tien nuoc dat lien (khong co nguon), khong noi bot cho nuoc/nhe tau. -->`
 - `docs/app-map/README.md` chèn sau `covers:` một dòng tương tự ngắn cho bản apps.
 - Commit: `feat(social): bai toan loi ich 8 kich ban co tau trong bai ban (so co nguon, gia dau theo env) (Thanh 11/9); re-verify(docs/app-map/marketing.md, README.md)`.
 - Vercel env: thêm `DIESEL_PRICE_VND=27740` và `DIESEL_PRICE_DATE=3/9/2026` (Thanh đặt tay trên Vercel, và
@@ -237,10 +268,11 @@ Khối code Bước 1 đã được chạy thử ngày 11/9 với product-guard 
 
 ## 6. Verify
 
-1. `node --check` 4 file; `npm run test:price` ở gốc repo → 95/95 (82 sau plan trước + 13).
+1. `node --check` 4 file .mjs; `npx tsc --noEmit -p apps/approval-ui` sạch (rotate/route.ts); `npm run test:price` ở gốc repo → 96/96 (82 sau plan trước + 14).
 2. `node -e "import('./packages/marketing/src/products.mjs').then(m=>console.log(m.fuelBenefitLines().join('\n\n'), '\n\n', m.waterBenefitLines().join('\n\n')))"` → đọc bằng mắt: số tiền định dạng Việt, có nguồn, không có cụm cấm.
 3. Sinh thử 2 bài như plan trước (script scratch) → bài lọc dầu chứa ĐÚNG số của một kịch bản (ví dụ "3.000 lít... 83 triệu đồng... 4,2 tới 8,3 triệu đồng một chuyến"), không trộn số hai kịch bản; bài lọc nước chứa "3.000 lít... 150 can" hoặc số của kịch bản khác trong bảng. Sinh thử lần 2 phải ra kịch bản khác lần 1.
-4. Sau deploy: đọc bài bán kế tiếp ở Chờ duyệt.
+4. Sinh thử 1 bài với `channel: 'tiktok'` → 2 tới 4 câu, có đúng 1 câu "3.000 lít", không có link Shopee, vẫn có giá úp mở và CTA cmt.
+5. Sau deploy: đọc bài bán kế tiếp ở Chờ duyệt; ngày TikTok kế tiếp trong Kế hoạch (xem lịch tuần) kiểm chú thích ngắn.
 
 ## 7. Không làm
 
@@ -251,11 +283,12 @@ Khối code Bước 1 đã được chạy thử ngày 11/9 với product-guard 
 ## 8. Điều kiện dừng
 
 - Plan `plan-bai-ban-theo-tep-11-09.md` chưa thi công (không có `audienceLines`) → dừng, làm plan đó trước.
-- Test cũ SAI; hook đòi doc khác; tsc lỗi file ngoài 6 file.
+- Test cũ SAI; hook đòi doc khác; tsc lỗi file ngoài 7 file (4 .mjs, rotate/route.ts, 2 doc app-map).
+- Trong rotate/route.ts không tìm thấy biến `channels` ngay trên lời gọi `generateSocialPost` của bài bán → dừng, không tự đặt tên khác.
 
 ## 9. Definition of Done
 
-- [ ] BENEFIT_ASSUMPTIONS, ENGINE_CLASSES, BENEFIT_CASES (8) + các hàm ở cả 2 products.mjs; `...benefitLines(productGroup)` ở cả 2 social.mjs.
-- [ ] test:price 95/95; node --check sạch; gate OK; sinh thử 2 bài đúng số.
+- [ ] BENEFIT_ASSUMPTIONS, ENGINE_CLASSES, BENEFIT_CASES (8) + các hàm ở cả 2 products.mjs; `...benefitLines(productGroup, channel)` ở cả 2 social.mjs; rotate/route.ts truyền `channel` theo `channels[0]`.
+- [ ] test:price 96/96; node --check sạch; tsc sạch; gate OK; sinh thử 2 bài Facebook đúng số + 1 bài TikTok ngắn.
 - [ ] Deploy main; Thanh đã đặt 2 env giá dầu trên Vercel.
 - [ ] Ghi memory: nguồn số liệu + ngày, cách đổi giá dầu.
