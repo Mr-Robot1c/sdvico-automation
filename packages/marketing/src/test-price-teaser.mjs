@@ -60,7 +60,9 @@ ok('ensureCommentCta không nối đôi', (ensureCommentCta(`Hook.\n\n${commentC
   ok('thứ tự: câu giá đứng trước CTA', full.indexOf('9,X triệu') < full.indexOf('Anh em cmt'));
 }
 
-// 9/9 (Thanh): link Shopee trong bài bán, đứng trước CTA cmt, không chèn đôi, nhóm khác không có.
+// 9/9 (Thanh): hàm chèn link Shopee (đứng trước CTA cmt, không chèn đôi, nhóm khác không có).
+// 11/9 chiều: bài bán và caption video KHÔNG gọi hàm này nữa; giữ test vì hàm còn đó và SHOPEE_LINK
+// vẫn dùng ở bot hỏi đáp. Bên dưới có test bảo đảm social.mjs/build-video không gọi lại.
 eq('shopee link lọc nước', shopeeLink(G2), 'https://shopee.vn/product/212723941/45017630539/');
 eq('shopee link lọc dầu', shopeeLink(G9), 'https://shopee.vn/product/212723941/29945752663/');
 eq('shopee link S-Tracking', shopeeLink('3. Thiết bị giám sát hành trình Viettel S-Tracking'), 'https://shopee.vn/product/212723941/56017649187/');
@@ -103,7 +105,22 @@ eq('audience lọc dầu = A', audienceOf(G9)?.key, 'A');
 eq('audience lọc nước = B', audienceOf(G2)?.key, 'B');
 eq('audience nhóm khác = null', audienceOf('8. Sơn RARE'), null);
 eq('audienceLines nhóm khác rỗng', audienceLines('8. Sơn RARE').length, 0);
-ok('audienceLines lọc nước 5 dòng có câu hỏi', audienceLines(G2).length === 5 && audienceLines(G2)[4].includes('Tàu anh dài bao nhiêu mét'));
+// 11/9 chiều (Thanh): bỏ câu hỏi mở trước CTA (hỏi xong lại kêu cmt nghe lạc nhịp) -> 4 dòng, không dòng CÂU HỎI.
+ok('audienceLines lọc nước 4 dòng, không câu hỏi', audienceLines(G2).length === 4 && !audienceLines(G2).some((l) => /CÂU HỎI|Tàu anh dài bao nhiêu mét/.test(l)));
+ok('audienceLines lọc dầu không câu hỏi', !audienceLines(G9).some((l) => /Ghe anh chạy máy gì/.test(l)));
+{
+  // 11/9 chiều: bài bán + caption video không chèn link Shopee, prompt không cho câu hỏi mở trước CTA.
+  const { readFileSync } = await import('node:fs');
+  const here = new URL('.', import.meta.url);
+  for (const rel of ['./social.mjs', '../../../apps/approval-ui/lib/gen/social.mjs', './video/build-video.mjs']) {
+    const src = readFileSync(new URL(rel, here), 'utf8');
+    ok('không gọi ensureShopeeLink/shopeeLink: ' + rel, !/\b(?:ensureShopeeLink|shopeeLink)\(/.test(src));
+  }
+  for (const rel of ['./social.mjs', '../../../apps/approval-ui/lib/gen/social.mjs']) {
+    const src = readFileSync(new URL(rel, here), 'utf8');
+    ok('prompt cấm câu hỏi mở trước CTA: ' + rel, /KHÔNG chen(?: thêm)? câu hỏi mở/.test(src));
+  }
+}
 ok('AUDIENCE không chứa cụm SỰ THẬT NGHỀ cấm', Object.values(AUDIENCE).every((a) => !guardViolations(`${a.who} ${a.pain} ${a.compare} ${a.proof} ${a.question}`, a.key === 'A' ? G9 : G2).length));
 // 11/9: bài toán lợi ích có nguồn.
 eq('benefit 8 kịch bản', BENEFIT_CASES.length, 8);

@@ -3,7 +3,7 @@
 import { assessDraft, scanPlaybook, countWords, firstBodyLine } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
-import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, shopeeLink, ensureShopeeLink, audienceLines, benefitLines } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, audienceLines, benefitLines } from './products.mjs';
 import { insightBrief } from './insights.mjs';
 import { logTokenUsage } from './token-log.mjs';
 import { sampleHooks } from './hook-library.mjs';
@@ -112,7 +112,7 @@ export async function generateSocialPost({
     '3) LỐI THOÁT: sản phẩm xuất hiện như CÁCH GIẢI QUYẾT, nói bằng LỢI ÍCH (đỡ tốn dầu, đủ nước ngọt, bám biển dài hơn, ra khơi đúng quy định), KHÔNG liệt kê thông số kỹ thuật khô khan.',
     '4) PHẦN THƯỞNG cụ thể: cái được rõ ràng (chở thêm được đá/cá, tiết kiệm bao nhiêu, an tâm hơn).',
     '5) TIN CẬY 1 CÂU DUY NHẤT: lắp tận bến, bảo hành, hướng dẫn tới khi quen tay. Đủ, không sa đà khoe.',
-    `6) CÂU CUỐI BÀI (luật Thanh 9/9, BẮT BUỘC, chép NGUYÊN VĂN, đứng riêng dòng cuối): "${cta}". Ngay trước câu đó có thể thêm 1 câu hỏi mở ngắn kéo bình luận (hỏi con số/kinh nghiệm ngư dân, kiểu "anh thường đi mấy ngày một chuyến?"). KHÔNG mời nhắn Page bằng từ khóa kiểu cũ, KHÔNG đòi gọi tổng đài trong bài (tệp mới, đòi gọi là quá sức).`,
+    `6) CÂU CUỐI BÀI (luật Thanh 9/9, BẮT BUỘC, chép NGUYÊN VĂN, đứng riêng dòng cuối): "${cta}". Câu đứng NGAY TRƯỚC câu kết là câu giá; KHÔNG chen câu hỏi mở (kiểu "anh thường đi mấy ngày một chuyến?"), KHÔNG nhắc Shopee hay dán link mua (11/9 chiều: hỏi xong lại kêu cmt nghe lạc nhịp). KHÔNG mời nhắn Page bằng từ khóa kiểu cũ, KHÔNG đòi gọi tổng đài trong bài (tệp mới, đòi gọi là quá sức).`,
     '',
     ...guardLines(shownName + ' ' + productName + ' ' + productGroup),
     // 11/9: bài bán viết cho đúng tệp khách (A ghe nhỏ, B tàu khơi xa), xem AUDIENCE ở products.mjs.
@@ -142,7 +142,8 @@ export async function generateSocialPost({
     'Cái máy lọc nước biển SEA-40 lo đúng chuyện đó: biến nước biển thành nước ngọt ngay trên tàu, chạy bằng điện tàu sẵn có. Uống, nấu, tắm rửa thoải mái — khỏi chở theo mấy khối nước nặng trịch.',
     'Nghĩa là tàu nhẹ hơn, bám biển dài ngày hơn, và không phải cắt ngang chuyến chỉ vì hết nước. Chỗ nước đó để dành chở thêm đá, thêm cá.',
     'Bên mình lắp tận bến ở Vũng Tàu, bảo hành đầy đủ, hướng dẫn tới khi anh em quen tay.',
-    'Anh em thường đi mấy ngày một chuyến, tốn khoảng mấy khối nước ngọt? Comment con số bên dưới, mình tính thử cái máy cỡ nào hợp với tàu mình. Cần kỹ hơn thì nhắn "NƯỚC" cho page, mình gửi thông tin — không gọi làm phiền.',
+    'Máy cơ tầm 3X triệu, máy điện tầm 4X triệu đã gồm công lắp, giá chính xác em gửi riêng, kỹ thuật lắp tận tàu.',
+    'Anh em cmt "lọc dầu" hay "lọc nước" để em tư vấn cho anh em nhé!',
     '',
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số được duyệt: nói chung chung, không nêu số cụ thể.',
   ].join('\n');
@@ -210,9 +211,8 @@ export async function generateSocialPost({
     headline = redactExactPrices(headline);
   }
   // 9/9: câu cuối bài bán luôn là CTA cmt từ khóa (model quên thì nối vào).
-  // 9/9 (Thanh): bài bán FB/YT có dòng link Shopee (2 máy đã lên sàn) đứng trước CTA. TikTok bỏ qua vì
-  // caption không bấm được link, chỉ tốn chữ.
-  if (!isTikTok) body = ensureShopeeLink(body, shopeeLink(productGroup));
+  // 11/9 chiều (Thanh): BỎ dòng "Đặt trên Shopee..." từng chèn ở đây (9/9). Đứng giữa câu giá và câu
+  // kêu cmt nó lạc nhịp; link sàn chỉ còn ở bot hỏi đáp và bình luận đầu (caption-group.md).
   body = ensureCommentCta(body, cta);
 
   const tags = hashtagBlock(productGroup);

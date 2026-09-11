@@ -3,7 +3,7 @@
 import { assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
-import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, shopeeLink, ensureShopeeLink, audienceLines, benefitLines } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, audienceLines, benefitLines } from './products.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -86,7 +86,7 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     isTikTok
       ? 'Đây là chú thích cho video TikTok: 2 tới 4 câu thật ngắn, cuốn, kết bằng câu CTA cmt đã dặn.'
       : 'Đây là bài Facebook: 4 tới 6 câu, có thể có 2 tới 3 dòng gạch đầu lợi ích (dùng emoji làm đầu dòng, không dùng dấu chấm tròn).',
-    `KẾT BÀI (luật Thanh 9/9, BẮT BUỘC, chép NGUYÊN VĂN, đứng riêng dòng cuối): "${cta}". KHÔNG kết bằng "nhắn tin cho Page" hay "gọi tổng đài". KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.`,
+    `KẾT BÀI (luật Thanh 9/9, BẮT BUỘC, chép NGUYÊN VĂN, đứng riêng dòng cuối): "${cta}". Câu đứng NGAY TRƯỚC câu kết là câu giá; KHÔNG chen thêm câu hỏi mở (kiểu "ghe anh chạy máy gì, đi mấy ngày một chuyến?"), KHÔNG nhắc Shopee hay dán link mua (11/9 chiều: hỏi xong lại kêu cmt nghe lạc nhịp). KHÔNG kết bằng "nhắn tin cho Page" hay "gọi tổng đài". KHÔNG tự viết hashtag, hệ thống sẽ tự thêm.`,
     'Mỗi bài phải KHÁC các bài trước: khác câu mở đầu, khác cách triển khai, khác tiêu đề.',
     '',
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số được duyệt: nói chung chung, không nêu số cụ thể.',
@@ -130,9 +130,8 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     headline = redactExactPrices(headline);
   }
   // 9/9: câu cuối bài bán luôn là CTA cmt từ khóa (model quên thì nối vào).
-  // 9/9 (Thanh): bài bán FB/YT có dòng link Shopee (2 máy đã lên sàn) đứng trước CTA. TikTok bỏ qua vì
-  // caption không bấm được link, chỉ tốn chữ.
-  if (!isTikTok) body = ensureShopeeLink(body, shopeeLink(productGroup));
+  // 11/9 chiều (Thanh): BỎ dòng "Đặt trên Shopee..." từng chèn ở đây (9/9). Đứng giữa câu giá và câu
+  // kêu cmt nó lạc nhịp; link sàn chỉ còn ở bot hỏi đáp và bình luận đầu (caption-group.md).
   body = ensureCommentCta(body, cta);
 
   const tags = hashtagBlock(productGroup);

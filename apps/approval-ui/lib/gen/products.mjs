@@ -265,6 +265,8 @@ export function shopeeLink(group) {
 }
 // Bảo đảm bài có dòng link Shopee: đã có link shopee.vn thì giữ nguyên; có câu CTA cmt ở cuối thì
 // chèn TRƯỚC câu đó (CTA vẫn là dòng cuối); còn lại nối vào cuối. Không link thì trả nguyên văn.
+// 11/9 chiều (Thanh): social.mjs và caption build-video KHÔNG gọi hàm này nữa (bài bán bỏ dòng link).
+// Giữ hàm cho ai cần chèn tay; SHOPEE_LINK vẫn dùng ở bot hỏi đáp (hoi-dap-bot.ts).
 export function ensureShopeeLink(body, link) {
   if (!link) return body;
   const s = String(body || '').trimEnd();
@@ -330,7 +332,9 @@ export function audienceLines(group) {
     `NỖI ĐAU đưa vào bài (chọn 1 ý, không kể hết): ${a.pain}.`,
     `SO SÁNH NHẸ với thứ bà con đang dùng: ${a.compare}. Chỉ nói khác nhau chỗ nào, không chê, không bịa con số.`,
     `CÂU TIN CẬY (đúng 1 câu): ${a.proof}.`,
-    `CÂU HỎI ngay TRƯỚC câu CTA cuối, giữ ý này (được đổi vài chữ cho hợp giọng): "${a.question}".`,
+    // 11/9 chiều (Thanh): KHÔNG đưa a.question vào bài nữa. Hỏi "ghe anh chạy máy gì" rồi ngay dưới
+    // lại kêu cmt "lọc dầu" hay "lọc nước" nghe lạc nhịp. Câu hỏi giữ trong AUDIENCE cho Kinh doanh
+    // dùng khi chat với khách, không phải cho bài.
   ];
 }
 
