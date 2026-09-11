@@ -35,8 +35,8 @@ không cạn nước, nước mới mỗi ngày, không phải cắt chuyến. L
 
 1. Lọc dầu là mũi nhọn để tới 10 đơn. Lọc nước và giám sát đi chậm, chỉ nhắm tệp B ở 4 cụm cảng.
 2. Group là kênh hiện diện, chốt ở inbox Page và Zalo. Không cãi giá trong bình luận.
-3. Ý ChatGPT dùng được: bán qua thợ máy, đại lý, xưởng tàu; lắp thử một chuyến để có tàu thật làm mẫu;
-   video trả lời nỗi sợ thay vì video kể chuyện; phễu 100 đầu mối nhắn tay, đo từng bước.
+3. Ý ChatGPT dùng được: bán qua thợ máy, đại lý, xưởng tàu; có tàu thật làm mẫu (lấy từ khách mua đầu
+   tiên, không lắp thử); video trả lời nỗi sợ thay vì video kể chuyện; phễu 100 đầu mối nhắn tay, đo từng bước.
 4. Ý ChatGPT KHÔNG dùng: "bớt chở 1 tấn nước, nhẹ tàu" (cấp trên đã bắt lỗi 19/8, bộ lọc chặn); 5 lít nước
    một người một ngày (không có nguồn, dùng 15 lít); nêu giá 49 triệu ngay đầu bài (giá úp mở).
 5. Mọi số trong bài lấy từ bảng có nguồn. Không bịa số tiết kiệm, không bịa khách đã dùng.
@@ -47,8 +47,8 @@ không cạn nước, nước mới mỗi ngày, không phải cắt chuyến. L
 |---|---|---|---|---|
 | 1: 15 tới 21/9 | 56 | 15 | 10 | 2 lọc dầu |
 | 2: 22 tới 28/9 | 56 | 20 | 10 thêm, 2 nhận hàng mẫu | 3 |
-| 3: 29/9 tới 5/10 | 56 | 25 | 1 tàu lắp thử lọc nước | 3 |
-| 4: 6 tới 12/10 | 56 | 25 | quay case study tàu thật | 2 + 1 lọc nước hoặc giám sát |
+| 3: 29/9 tới 5/10 | 56 | 25 | khách mua đầu tiên đồng ý cho quay | 3 |
+| 4: 6 tới 12/10 | 56 | 25 | bài lọc dầu đổi sang tàu thật đang dùng | 2 + 1 lọc nước hoặc giám sát |
 
 Đo mỗi tối 21 giờ trên Tổng quan: dòng "Chia sẻ group hôm nay n/8", người hỏi mua theo nguồn, tin nhắn từ
 quảng cáo. Ghi mọi người hỏi vào trang Khách hàng đúng nguồn (Facebook, Zalo, Quảng cáo Facebook, group).
@@ -72,7 +72,7 @@ luôn nằm trong lô. Nhóm miền Bắc chỉ nhận bài lọc dầu. Hai nh�
 
 | Ngày | Sáng 9 giờ, bài bán, 4 nhóm | Tối 19 giờ, content, 4 nhóm | Việc khác trong ngày |
 |---|---|---|---|
-| Thứ 2 15/9 | Lọc dầu: DÂN BIỂN 137K, Máy Thủy 59K, Cam Ranh 36K, Kiên Giang 31K | DTT Miền Bắc 52K, DÂN BIỂN 41K, Người Đi Biển 38K, miền Trung 34K | Tắt reel lọc nước. Dựng quảng cáo lọc dầu theo mục 6. Xin sếp 2 câu: giá đại lý lọc dầu, có cho lắp thử lọc nước một chuyến không |
+| Thứ 2 15/9 | Lọc dầu: DÂN BIỂN 137K, Máy Thủy 59K, Cam Ranh 36K, Kiên Giang 31K | DTT Miền Bắc 52K, DÂN BIỂN 41K, Người Đi Biển 38K, miền Trung 34K | Tắt reel lọc nước. Dựng quảng cáo lọc dầu theo mục 6. Xin anh Tiến 1 con số giá đại lý lọc dầu (mục 8) |
 | Thứ 3 16/9 | Lọc dầu: Dân Yêu Biển, máy Thủy 28K, Mua Bán Tàu Thuyền, thuyền ghe miền Trung | HỘI TÀU THUYỀN, Bến Tre, Hiệp hội cano, DTT MB2 | Nhắn 5 thợ máy hay đăng ở Máy Thủy Tàu Thuyền và Chợ Tàu (mục 8) |
 | Thứ 4 17/9 | Lọc nước: miền Trung 34K, Kiên Giang 31K, Cam Ranh, Người Đi Biển | CĐ MB, Cà Mau Sông Đốc, ghe biển tàu cá, NGHỀ BIỂN | Đọc số quảng cáo 48 giờ đầu: chi phí mỗi tin nhắn, số tin |
 | Thứ 5 18/9 | Lọc dầu: Trao Đổi, NGƯ DÂN VN, Nghệ An, DB Miền Trung | DTT MB3, Cà Mau, NA-TH, 3 Miền | Nhắn 5 thợ máy còn lại. Quay video test nước (mục 9) nếu máy có sẵn ở công ty |
@@ -118,7 +118,11 @@ chép tay từ bảng đó, không tự nhân chia. Số đầy đủ giá máy 
   "Chào anh, em bên SDVICO ở Vũng Tàu, chuyên lọc dầu và lọc nước cho tàu cá. Thấy anh hay lắp máy cho bà
   con, bên em có chính sách cho anh em thợ máy lấy bộ lọc dầu về lắp kèm. Anh cho em xin Zalo, em gửi ảnh
   máy và bảng tính hao dầu để anh xem có hợp với ghe khách anh không."
-- Giá đại lý: sếp Tiến quyết, Thanh xin trước thứ 2 15/9. Chưa có thì chỉ nói "có chính sách cho thợ máy".
+- Giá đại lý: Google KHÔNG có số công khai (11/9 đã tra: các trang chính sách đại lý dầu nhớt, phụ tùng máy
+  thủy đều ghi "chiết khấu theo thỏa thuận", không nêu phần trăm). Chỉ anh Tiến trả lời được. Thanh xin anh
+  Tiến đúng 1 con số theo 1 trong 2 cách, để anh chọn cách nào dễ: (a) thợ máy lấy bộ lọc dầu về bán, giá
+  lấy hàng thấp hơn giá bán bao nhiêu; (b) thợ máy chỉ giới thiệu khách, SDVICO bán giá thường và trả hoa
+  hồng mỗi bộ bao nhiêu. Chưa có số thì khi nhắn chỉ nói "có chính sách cho thợ máy", không hứa con số.
 - Mục tiêu tháng: 2 thợ máy nhận hàng mẫu, mỗi người bán giúp 1 bộ.
 - Phễu để đo: 100 nhắn, 30 trả lời, 10 quan tâm, 5 xin bảng tính, 2 nhận mẫu. Ghi vào Khách hàng nguồn
   group, ghi chú "đại lý".
@@ -131,13 +135,18 @@ chép tay từ bảng đó, không tự nhân chia. Số đầy đủ giá máy 
 | Bảng tính hoàn vốn lọc dầu | Có 8 kịch bản trong plan bài toán lợi ích | Sonnet chèn vào bài bán; Thanh dùng bảng gửi Zalo ngay từ tuần 1 |
 | Video test nước: nước biển vào, nước ngọt ra, uống thử | CHƯA CÓ | Thanh quay tại công ty, 60 giây, tuần 1 hoặc 2; không hứa chỉ số chưa đo |
 | Video trả lời 9 nỗi sợ (uống được không, bao nhiêu lít, điện gì, hỏng ai sửa, lõi bao lâu thay, có phụ tùng không) | CHƯA CÓ, chỉ trả lời được câu có trong tài liệu | Thanh liệt kê câu, Kinh doanh trả lời, máy dựng video tuần 2 |
-| Case study tàu thật | CHƯA CÓ khách dùng | Sau khi có tàu lắp thử (mục 10) |
+| Case study tàu thật | CHƯA CÓ khách dùng | Xin quay ở khách mua đầu tiên, đổi quà (mục 10) |
 
-## 10. Lắp thử một chuyến và tàu mẫu (sếp quyết)
+## 10. Tàu thật làm mẫu (không lắp thử, Thanh chốt 11/9)
 
-- Đề xuất sếp: 1 máy lọc nước lắp thử trên 1 tàu tệp B đi 20 ngày ở Vũng Tàu hoặc Phước Tỉnh, tuần 3.
-  Chọn tàu từ người hỏi thật hoặc từ thợ máy giới thiệu. Điều kiện: chủ tàu cho quay video và nói cảm nhận.
-- Có tàu dùng rồi thì mọi bài lọc nước tuần 4 đổi sang "tàu anh X ở Phước Tỉnh đang dùng", thay cho bài lý lẽ.
+Công ty không cho lắp thử miễn phí. Lấy tàu thật bằng 2 đường không tốn máy:
+
+- **Khách mua đầu tiên đổi video lấy quà.** Khi giao bộ lọc dầu đầu tiên, Thanh xin quay 30 giây lúc lắp và
+  xin chủ tàu nhắn lại sau chuyến đầu. Đổi lại tặng lõi lọc thay thế hoặc can nhớt PVOIL (sếp duyệt quà,
+  giá trị nhỏ). Có 1 tàu là đủ để tuần 4 đổi mọi bài lọc dầu sang "tàu anh X ở Phước Tỉnh đang dùng".
+- **Chạy máy tại bến, không lắp lên tàu.** Nếu công ty có máy lọc nước trưng bày, Thanh mang ra cầu cảng
+  Phước Tỉnh hoặc Bến Đình 1 buổi sáng, bơm nước biển tại chỗ cho chủ tàu xem nước ra và uống thử, quay
+  video test nước luôn (mục 9). Không tốn máy, không cần chuyến biển.
 - Chưa có tàu thật thì KHÔNG viết "nhiều tàu đã dùng", điều cấm 5.
 
 ## 11. Nội dung (BOSS xếp lịch, máy soạn, người duyệt)
