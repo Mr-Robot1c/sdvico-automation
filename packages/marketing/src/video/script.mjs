@@ -95,6 +95,14 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   // video nào cũng một khuôn. Nay 6 KIỂU KỂ xoay theo bài (băm id, cùng bài dựng lại vẫn cùng kiểu;
   // opts.styleIdx / env VIDEO_CONTENT_STYLE ghi đè), mỗi kiểu mở khác, kết khác, nhịp khác, kèm
   // danh sách cụm đã mòn bị cấm.
+  // Cụm đã mòn (lặp ở nhiều video trước). Dùng 2 chỗ: cấm trong prompt + soát sau khi sinh, dính thì
+  // sinh lại 1 lần (bản 5392815a vẫn chép "mấy hôm nay ghé cảng", "đời người đi biển gắn liền với con
+  // tàu" từ bài nguồn dù prompt đã cấm).
+  const WORN_PHRASES = [
+    'đây là cảnh thật', 'cảnh quay thực tế', 'bà con có thấy vậy không', 'anh em có thấy vậy không',
+    'đời người đi biển gắn liền với con tàu', 'thương cái nghiệp biển khơi', 'thương các nghiệp biển khơi',
+    'mấy hôm nay ghé cảng', 'cặm cụi kiểm tra từng con ốc',
+  ];
   const CONTENT_STYLES = [
     { key: 'chung-kien', label: 'Chứng kiến tại chỗ',
       open: 'mở bằng MỘT CHI TIẾT NHỎ nhìn thấy trong clip (bàn tay, con ốc, vệt dầu, tiếng máy), 1 câu <=12 chữ, KHÔNG nói "đây là cảnh thật", địa điểm chỉ lướt qua trong cảnh giữa nếu bài nguồn có',
@@ -124,9 +132,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'ĐÂY LÀ VIDEO CỘNG ĐỒNG "NGƯỜI THẬT TÀU THẬT": dựng từ clip THẬT đội SDVICO quay tại tàu, cảng, xưởng. KHÔNG bán hàng, KHÔNG nhắc giá, KHÔNG kêu nhắn Page hay gọi điện. Sản phẩm chỉ xuất hiện khi bài nguồn kể tới, và chỉ như một phần câu chuyện.',
     `KIỂU KỂ CỦA VIDEO NÀY: "${STYLE.label}". Bám đúng kiểu này, không trộn kiểu khác.`,
     `CẢNH ĐẦU: ${STYLE.open}. Câu đầu tiên là câu người xem nghe đầu tiên, phải khác hẳn các video trước.`,
-    'CẢNH GIỮA: kể chuyện có người: ai đang làm gì, vất vả chỗ nào, bà con nói gì. Chạm 1 chữ cảm xúc NGHỀ / TIỀN / RỦI RO / TỰ HÀO như bài nguồn. Không bịa tên người, con số không có trong bài nguồn. Địa điểm (tên cảng, tỉnh) chỉ nói nếu bài nguồn có.',
+    'CẢNH GIỮA: kể chuyện có người: ai đang làm gì, vất vả chỗ nào, bà con nói gì. Chạm 1 chữ cảm xúc NGHỀ / TIỀN / RỦI RO / TỰ HÀO như bài nguồn. Không bịa tên người, con số không có trong bài nguồn. Địa điểm (tên cảng, tỉnh) chỉ nói nếu bài nguồn có. KỂ LẠI BẰNG LỜI CỦA MÌNH: giữ ý của bài nguồn nhưng KHÔNG chép nguyên câu, không lặp lại cụm từ của bài nguồn quá 5 chữ liền nhau.',
     `CẢNH CUỐI: ${STYLE.close}. Không lời kêu gọi bán hàng.`,
-    'CỤM ĐÃ MÒN, CẤM DÙNG (đã lặp ở nhiều video trước): "đây là cảnh thật", "cảnh quay thực tế", "bà con có thấy vậy không", "anh em có thấy vậy không", "đời người đi biển gắn liền với con tàu", "thương cái nghiệp biển khơi", "mấy hôm nay ghé cảng", "cặm cụi kiểm tra từng con ốc", "chuyến đi 30 ngày tới". Muốn nói ý đó thì tìm cách nói khác.',
+    `CỤM ĐÃ MÒN, CẤM DÙNG (đã lặp ở nhiều video trước, kể cả khi bài nguồn có): ${WORN_PHRASES.map((p) => `"${p}"`).join(', ')}. Muốn nói ý đó thì tìm cách nói khác.`,
   ];
   const SALES_STRUCTURE = [
     'PLAYBOOK 24/8 (bộ lọc vàng): CẢNH ĐẦU phải MỞ NGAY bằng 1 CÂU HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (thành quả lớn bị phá bởi nguyên nhân nhỏ) — ví dụ câu đầu tiên của video: "Trúng luồng cá mà phải quay vào bờ vì hết nước." Cảnh đầu = hook + 1 câu tô đậm nỗi mất, KHÔNG có câu chào phía trước. Bám 1 trong 4 CHỮ CẢM XÚC: NGHỀ (khoe kinh nghiệm) / TIỀN (con số túi tiền) / RỦI RO (cảnh báo sai lầm, mất chuyến) / TỰ HÀO (lộc biển, danh dự nghề). Bài phải chạm đúng 1 chữ, không sáo rỗng.',
@@ -227,9 +235,12 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   const topic = `${content.title || ''} ${content.draft || ''} ${content.brief?.rotation_group || ''}`;
   let parsed = {};
   let viol = [];
+  let worn = [];
   for (let attempt = 0; attempt < 2; attempt++) {
-    const extra = !viol.length ? '' :
-      `\n\nLẦN TRƯỚC LỜI THOẠI SAI NGHỀ, phải bỏ hẳn các ý: ${viol.map((v) => `"${v.phrase}"`).join(', ')}. ${viol[0].why}`;
+    const extra = (!viol.length ? '' :
+      `\n\nLẦN TRƯỚC LỜI THOẠI SAI NGHỀ, phải bỏ hẳn các ý: ${viol.map((v) => `"${v.phrase}"`).join(', ')}. ${viol[0].why}`)
+      + (!worn.length ? '' :
+      `\n\nLẦN TRƯỚC LỜI THOẠI VẪN DÙNG CỤM ĐÃ MÒN: ${worn.map((p) => `"${p}"`).join(', ')}. Viết lại toàn bộ, diễn đạt khác hẳn, tuyệt đối không dùng các cụm đó.`);
     const res = await generateWithRetry(ai, {
       model: MKT_MODEL,
       contents: user + extra,
@@ -249,7 +260,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     }
     const all = [...(parsed.vertical?.scenes || []), ...(parsed.horizontal?.scenes || [])].map((x) => x?.narration || '').join('\n');
     viol = guardViolations(all, topic);
-    if (!viol.length) break;
+    worn = opts.contentVideo ? WORN_PHRASES.filter((p) => all.toLowerCase().includes(p)) : [];
+    if (worn.length) console.warn(`[script] loi thoai dung cum da mon (lan ${attempt + 1}): ${worn.join(' | ')}`);
+    if (!viol.length && !worn.length) break;
   }
   if (viol.length) {
     // Dự phòng: cắt câu sai khỏi từng cảnh, cảnh rỗng sẽ bị fix() loại.
