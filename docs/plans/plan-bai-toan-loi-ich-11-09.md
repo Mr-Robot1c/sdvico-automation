@@ -181,7 +181,7 @@ export function waterBenefitLines() {
 // chèn cả bảng kịch bản; Facebook và YouTube (mô tả không giới hạn) nhận đủ 2 tới 3 câu bài toán.
 const TIKTOK_ONE_LINER = {
   fuel: 'Chỉ 1 câu số, chép nguyên: "tàu 400 cv đi 20 ngày đốt khoảng 3.000 lít dầu, lọc dầu sạch bớt 5 tới 10% (tài liệu SF300B)". Không thêm tiền, không thêm kịch bản khác.',
-  water: 'Chỉ 1 câu số, chép nguyên: "10 người đi 20 ngày cần khoảng 3.000 lít nước ngọt, máy chạy hơn nửa giờ mỗi ngày là đủ". Không nói tiền nước, không nói bớt chở nước.',
+  water: 'Chỉ 1 câu số, chép nguyên: "10 người đi 20 ngày cần khoảng 3.000 lít nước ngọt, máy chạy hơn nửa giờ mỗi ngày là đủ". Không nói tiền nước, không nhắc tới tải trọng hay dầu (lời dặn này cố ý không chứa cụm cấm, guard so khớp chuỗi con).',
 };
 export function benefitLines(group, channel = 'facebook') {
   const isFuel = group === '9. Máy Lọc Dầu Diesel SD12-300' || group === '6. Thiết bị lọc dầu SF-50';
