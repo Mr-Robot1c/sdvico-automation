@@ -332,6 +332,134 @@ export function audienceLines(group) {
   ];
 }
 
+// 11/9 (Thanh: bài bán phải có phép tính theo cỡ tàu). Mọi số có nguồn công khai, xem
+// docs/plans/plan-bai-toan-loi-ich-11-09.md mục 1. Model KHÔNG tự tính, chỉ chép câu ví dụ đã tính sẵn.
+// Giá dầu đổi theo kỳ điều hành: đặt env DIESEL_PRICE_VND (đ/lít) và DIESEL_PRICE_DATE (dd/mm/yyyy).
+export const BENEFIT_ASSUMPTIONS = {
+  dieselPrice: Number(process.env.DIESEL_PRICE_VND || 27740),
+  dieselPriceDate: process.env.DIESEL_PRICE_DATE || '3/9/2026',
+  dieselPriceSource: 'Petrolimex DO 0,05S-II vùng 1',
+  waterPerPersonPerDay: 15,          // lít, suy từ Tepbac 17/1/2018: tàu 10 người chở 3 tấn nước cho chuyến ~20 ngày
+  waterSourceNote: 'theo mức ngư dân Quỳnh Lập, Nghệ An chở khoảng 3 tấn nước cho tàu 10 người một chuyến',
+  fuelSavingPct: [5, 10],            // tài liệu SF300B
+  tripsPerYear: 6,                   // Tạp chí Thủy sản VN 20/12/2024, một chủ tàu Vũng Tàu
+  injectorLifeHours: [2000, 3000],   // thietbitpp.vn
+  waterMachineLph: 250,              // SEA-40 bản chạy điện, bảng quy cách Kinh doanh 9/9
+};
+// LỚP MÁY: lít dầu MỖI NGÀY suy từ nguồn công khai (ghi rõ cách suy trong fuelSource). Không có nguồn cho
+// máy dưới 300 cv nên lớp "nho" không tính tiền dầu (chỉ tính nước).
+export const ENGINE_CLASSES = {
+  nho:  { label: 'máy 90 tới 150 cv', fuelPerDay: null, fuelSource: 'chưa có nguồn công khai cho máy nhỏ, không tính tiền dầu' },
+  vua:  { label: 'máy 300 tới 400 cv', fuelPerDay: 150, fuelSource: 'Dân trí 27/2/2022, tàu 400 cv Thanh Hóa 1.500 tới 2.000 lít mỗi chuyến 10 tới 15 ngày, suy ra khoảng 150 lít mỗi ngày' },
+  // 340 chứ không 330: 330 × 30 = 9.900 lít bị product-guard nhóm 9 bắt nhầm là giá "9,9 triệu".
+  lon:  { label: 'máy 500 tới 600 cv', fuelPerDay: 340, fuelSource: 'VnExpress 4/7/2005, tàu 500 tới 600 cv khoảng 10.000 lít mỗi chuyến một tháng, suy ra khoảng 340 lít mỗi ngày' },
+};
+// 8 KỊCH BẢN (Thanh 11/9: đưa nhiều giả định để bài chọn đúng cỡ tàu của khách). crew = số người, days = số
+// ngày một chuyến, engine = lớp máy. Thứ tự từ nhỏ tới lớn.
+export const BENEFIT_CASES = [
+  { key: 'ghe-10m-4n-3d',  label: 'ghe 10 m, máy 90 cv, 4 người, chuyến 3 ngày',            crew: 4,  days: 3,  engine: 'nho' },
+  { key: 'ghe-12m-5n-7d',  label: 'ghe 12 m, máy 150 cv, 5 người, chuyến 7 ngày',           crew: 5,  days: 7,  engine: 'nho' },
+  { key: 'tau-14m-6n-10d', label: 'tàu 14 m, máy 300 cv, 6 người, chuyến 10 ngày',          crew: 6,  days: 10, engine: 'vua' },
+  { key: 'tau-15m-8n-15d', label: 'tàu 15 m, máy 400 cv, 8 người, chuyến 15 ngày',          crew: 8,  days: 15, engine: 'vua' },
+  { key: 'tau-15m-10n-20d',label: 'tàu 15 m, máy 400 cv, 10 người, chuyến 20 ngày',         crew: 10, days: 20, engine: 'vua' },
+  { key: 'tau-17m-10n-25d',label: 'tàu 17 m, máy 500 cv, 10 người, chuyến 25 ngày',         crew: 10, days: 25, engine: 'lon' },
+  { key: 'tau-20m-12n-30d',label: 'tàu 20 m, máy 600 cv, 12 người, chuyến 30 ngày',         crew: 12, days: 30, engine: 'lon' },
+  { key: 'hau-can-25m',    label: 'tàu hậu cần 25 m, máy 600 cv, 15 người, chuyến 30 ngày', crew: 15, days: 30, engine: 'lon' },
+];
+// Lít dầu cả chuyến của một kịch bản (null nếu lớp máy chưa có nguồn).
+export function fuelLitersOf(c) {
+  const e = ENGINE_CLASSES[c.engine];
+  return e && e.fuelPerDay ? e.fuelPerDay * c.days : null;
+}
+// Tính 1 kịch bản bất kỳ (dùng cho bot hỏi đáp hoặc Kinh doanh tính tay theo tàu khách).
+export function estimateBenefit({ crew, days, engine = 'vua' }) {
+  const a = BENEFIT_ASSUMPTIONS;
+  const e = ENGINE_CLASSES[engine] || ENGINE_CLASSES.vua;
+  const fuelLiters = e.fuelPerDay ? e.fuelPerDay * days : null;
+  const fuelCost = fuelLiters ? fuelLiters * a.dieselPrice : null;
+  const waterLiters = crew * days * a.waterPerPersonPerDay;
+  return {
+    fuelLiters, fuelCost,
+    fuelSaveLo: fuelCost ? fuelCost * a.fuelSavingPct[0] / 100 : null,
+    fuelSaveHi: fuelCost ? fuelCost * a.fuelSavingPct[1] / 100 : null,
+    waterLiters, waterCans: Math.round(waterLiters / 20), waterPerDay: crew * a.waterPerPersonPerDay,
+    machineHoursPerDay: Math.ceil(crew * a.waterPerPersonPerDay / a.waterMachineLph * 10) / 10,
+  };
+}
+export function vnd(n) {
+  return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' đ';
+}
+// product-guard so khớp CHUỖI CON, nên số tiền lợi ích không được tạo ra các chuỗi giá bị cấm:
+// nhóm 9 cấm "9,9 triệu" (49,9 triệu dính), nhóm 2 cấm "42 triệu", "31 triệu", "49 triệu", "38 triệu"
+// (1.500 lít × 27.740 = 41,6 triệu làm tròn thành "42 triệu" dính). Cách in: dưới 10 triệu ưu tiên 1 số lẻ
+// ("4,2 triệu đồng"), từ 10 triệu ưu tiên số chẵn ("83 triệu đồng"); cách nào dính thì đổi sang cách kia
+// ("41,6 triệu đồng", "50 triệu đồng"); cả hai cùng dính (đúng 42,0) thì in "42,0 triệu đồng".
+// KHÔNG import danh sách này từ product-guard vì guard là nội bộ; nếu guard thêm mốc giá thì cập nhật đây.
+const GUARD_MONEY = ['9,9 triệu', '42 triệu', '31 triệu', '49 triệu', '38 triệu'];
+export function trieu(n) {
+  const m = n / 1000000;
+  const one = (Math.round(m * 10) / 10).toFixed(1).replace('.', ',');
+  const whole = String(Math.round(m));
+  const order = m >= 10 ? [whole, one] : [one, whole];
+  for (const c of order) {
+    const s = c + ' triệu đồng';
+    if (!GUARD_MONEY.some((g) => s.includes(g))) return s;
+  }
+  return whole + ',0 triệu đồng';
+}
+// Câu ví dụ đã tính sẵn cho nhóm 9 (lọc dầu). Trả [] cho nhóm khác.
+export function fuelBenefitLines() {
+  const a = BENEFIT_ASSUMPTIONS;
+  const out = [];
+  for (const c of BENEFIT_CASES) {
+    const fuelLiters = fuelLitersOf(c);
+    if (!fuelLiters) continue;
+    const e = ENGINE_CLASSES[c.engine];
+    const cost = fuelLiters * a.dieselPrice;
+    const [lo, hi] = a.fuelSavingPct;
+    const saveLo = cost * lo / 100; const saveHi = cost * hi / 100;
+    // Hoàn vốn: máy 9,9 triệu (giá bán lẻ, KHÔNG ghi ra bài) chia cho tiết kiệm thấp nhất mỗi chuyến.
+    const payback = Math.ceil(9900000 / saveLo);
+    out.push(`VÍ DỤ ${c.label}: khoảng ${e.fuelPerDay} lít dầu mỗi ngày (${e.fuelSource}) × ${c.days} ngày = ${fuelLiters.toLocaleString('vi-VN')} lít một chuyến × ${vnd(a.dieselPrice)}/lít (${a.dieselPriceSource}, kỳ ${a.dieselPriceDate}) = ${trieu(cost)} tiền dầu; lọc dầu sạch giúp bớt ${lo} tới ${hi}% (tài liệu SF300B) = ${trieu(saveLo)} tới ${trieu(saveHi)} một chuyến, ${a.tripsPerYear} chuyến một năm là ${trieu(saveLo * a.tripsPerYear)} tới ${trieu(saveHi * a.tripsPerYear)}; máy 9,X triệu hoàn vốn sau khoảng ${payback} chuyến.`);
+  }
+  out.push('Ghe máy nhỏ (dưới 300 cv): chưa có nguồn số lít dầu, KHÔNG tính tiền; chỉ nói dầu sạch giữ kim phun và bơm cao áp bền, máy nổ êm, bớt nằm bờ.');
+  out.push(`VÒI PHUN: theo thợ máy, vòi phun máy tàu hỏng sau ${a.injectorLifeHours[0].toLocaleString('vi-VN')} tới ${a.injectorLifeHours[1].toLocaleString('vi-VN')} giờ chạy; dầu bẩn làm hỏng sớm hơn. Không nêu tiền sửa (chưa có số tàu cá).`);
+  return out;
+}
+// Câu ví dụ cho nhóm 2 (lọc nước). KHÔNG nói tiền nước cảng đất liền (chưa có nguồn), KHÔNG nói bớt chở, nhẹ tàu.
+export function waterBenefitLines() {
+  const a = BENEFIT_ASSUMPTIONS;
+  const out = [];
+  for (const c of BENEFIT_CASES) {
+    if (c.days < 10) continue; // ghe đi 3 tới 7 ngày mang can là đủ, máy lọc nước không hợp (tệp A)
+    const litersTrip = c.crew * c.days * a.waterPerPersonPerDay;
+    const cans = Math.round(litersTrip / 20);
+    const perDay = c.crew * a.waterPerPersonPerDay;
+    const hours = Math.ceil(perDay / a.waterMachineLph * 10) / 10;
+    out.push(`VÍ DỤ ${c.label}: ${c.crew} người × ${c.days} ngày × ${a.waterPerPersonPerDay} lít mỗi người mỗi ngày (${a.waterSourceNote}) = ${litersTrip.toLocaleString('vi-VN')} lít, tức khoảng ${(litersTrip / 1000).toString().replace('.', ',')} tấn nước, ${cans} can 20 lít phải mua, chở, xếp và giữ cho không hôi; máy lọc ${a.waterMachineLph} lít mỗi giờ chạy khoảng ${hours.toString().replace('.', ',')} giờ mỗi ngày là đủ ${perDay} lít cho cả tàu, nước làm mới mỗi ngày, hết can vẫn không cạn.`);
+  }
+  // Không viết thẳng các cụm bị cấm vào dòng này (guardViolations quét cả prompt trong test); nói bằng ý.
+  out.push('CẤM suy ra lợi ích về trọng lượng tàu, chỗ chứa hay tiền nhiên liệu từ ví dụ này (sự thật nghề: tàu cố ý lấy nước để đằm khi lấy đá; máy lọc nước không liên quan nhiên liệu). Không nêu tiền nước ở cảng đất liền vì chưa có giá công khai.');
+  return out;
+}
+// channel: 'facebook' | 'youtube' | 'tiktok'. TikTok (Thanh 11/9): chú thích ngắn, chỉ 1 câu số, không
+// chèn cả bảng kịch bản; Facebook và YouTube (mô tả không giới hạn) nhận đủ 2 tới 3 câu bài toán.
+const TIKTOK_ONE_LINER = {
+  fuel: 'Chỉ 1 câu số, chép nguyên: "tàu 400 cv đi 20 ngày đốt khoảng 3.000 lít dầu, lọc dầu sạch bớt 5 tới 10% (tài liệu SF300B)". Không thêm tiền, không thêm kịch bản khác.',
+  water: 'Chỉ 1 câu số, chép nguyên: "10 người đi 20 ngày cần khoảng 3.000 lít nước ngọt, máy chạy hơn nửa giờ mỗi ngày là đủ". Không nói tiền nước, không nhắc tới tải trọng hay dầu (lời dặn này cố ý không chứa cụm cấm, guard so khớp chuỗi con).',
+};
+export function benefitLines(group, channel = 'facebook') {
+  const isFuel = group === '9. Máy Lọc Dầu Diesel SD12-300' || group === '6. Thiết bị lọc dầu SF-50';
+  const isWater = group === '2. Máy lọc nước biển SEA-40';
+  if (!isFuel && !isWater) return [];
+  if (channel === 'tiktok') return ['BÀI TOÁN LỢI ÍCH (TikTok, BẮT BUỘC):', TIKTOK_ONE_LINER[isFuel ? 'fuel' : 'water']];
+  const ex = isFuel ? fuelBenefitLines() : waterBenefitLines();
+  return [
+    'BÀI TOÁN LỢI ÍCH (BẮT BUỘC có 2 tới 3 câu trong bài, đặt ở nhịp lối thoát hoặc phần thưởng): dưới đây là NHIỀU KỊCH BẢN theo cỡ tàu, số người, số ngày. Chọn ĐÚNG 1 kịch bản gần với tệp khách của bài nhất (tệp A lấy ghe 10 tới 14 m; tệp B lấy tàu 15 m trở lên), mỗi bài một kịch bản KHÁC bài trước, CHÉP NGUYÊN các con số của kịch bản đó, KHÔNG tự nhân chia, KHÔNG trộn số của hai kịch bản, KHÔNG làm tròn khác đi. Viết thành lời kể, không dán nguyên dòng ví dụ. Kèm 1 cụm nguồn ngắn trong ngoặc, ví dụ "(tính theo giá dầu Petrolimex kỳ 3/9/2026)". Kết bằng câu mời: tàu anh khác cỡ thì nhắn số người, số ngày, em tính riêng.',
+    ...ex,
+  ];
+}
+
 // Bảo đảm CẢNH CUỐI video có câu giá đọc được (luật 8/9). Chặn số chính xác trước; thiếu câu thì
 // nối vào cuối lời thoại cảnh đó. Không teaser thì trả nguyên văn.
 export function ensureSpokenTeaser(narration, teaser) {

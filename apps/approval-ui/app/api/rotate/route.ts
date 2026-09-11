@@ -448,7 +448,8 @@ export async function GET(req: Request) {
         gen = await (generateSocialPost as any)({
           productGroup: group,
           productName: name,
-          channel: 'facebook',
+          // ngày TikTok viết chú thích ngắn; YouTube giữ dạng Facebook (mô tả video không giới hạn).
+          channel: channels[0] === 'tiktok' ? 'tiktok' : 'facebook',
           hasVideo: false,
           angleOverride,
           preferredHeadline,

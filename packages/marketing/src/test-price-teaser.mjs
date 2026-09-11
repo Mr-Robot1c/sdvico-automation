@@ -1,7 +1,7 @@
 // test-price-teaser.mjs — kiểm luật giá úp mở (Thanh chốt 8/9/2026): bài công khai không được có số
 // tiền chính xác, chỉ mốc "9,X triệu"; cảnh cuối video có câu giá đọc được. Chạy: npm run test:price
 // Không cần mạng, không cần GEMINI_API_KEY.
-import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta, SHOPEE_LINK, shopeeLink, ensureShopeeLink, outroKeyword, AUDIENCE, audienceOf, audienceLines } from './products.mjs';
+import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta, SHOPEE_LINK, shopeeLink, ensureShopeeLink, outroKeyword, AUDIENCE, audienceOf, audienceLines, benefitLines, fuelBenefitLines, waterBenefitLines, BENEFIT_ASSUMPTIONS, BENEFIT_CASES, estimateBenefit, trieu } from './products.mjs';
 import { scanStyle } from './brand-voice-check.mjs';
 import { guardViolations } from './product-guard.mjs';
 import { assessDraft } from './compliance.mjs';
@@ -105,6 +105,21 @@ eq('audience nhóm khác = null', audienceOf('8. Sơn RARE'), null);
 eq('audienceLines nhóm khác rỗng', audienceLines('8. Sơn RARE').length, 0);
 ok('audienceLines lọc nước 5 dòng có câu hỏi', audienceLines(G2).length === 5 && audienceLines(G2)[4].includes('Tàu anh dài bao nhiêu mét'));
 ok('AUDIENCE không chứa cụm SỰ THẬT NGHỀ cấm', Object.values(AUDIENCE).every((a) => !guardViolations(`${a.who} ${a.pain} ${a.compare} ${a.proof} ${a.question}`, a.key === 'A' ? G9 : G2).length));
+// 11/9: bài toán lợi ích có nguồn.
+eq('benefit 8 kịch bản', BENEFIT_CASES.length, 8);
+ok('benefit lọc dầu 6 ví dụ máy vừa và lớn', fuelBenefitLines().filter((l) => l.startsWith('VÍ DỤ')).length === 6);
+ok('benefit lọc dầu tàu 15 m 20 ngày = 3.000 lít, 83 triệu', fuelBenefitLines().some((l) => l.includes('tàu 15 m, máy 400 cv, 10 người, chuyến 20 ngày') && l.includes('3.000 lít') && l.includes('83 triệu đồng') && l.includes('27.740 đ')));
+ok('benefit lọc dầu tàu 20 m 30 ngày = 10.200 lít', fuelBenefitLines().some((l) => l.includes('chuyến 30 ngày') && l.includes('10.200 lít')));
+ok('benefit lọc dầu có hoàn vốn', fuelBenefitLines().every((l) => !l.startsWith('VÍ DỤ') || /hoàn vốn sau khoảng \d+ chuyến/.test(l)));
+ok('benefit lọc nước 6 ví dụ (bỏ 2 ghe đi dưới 10 ngày)', waterBenefitLines().filter((l) => l.startsWith('VÍ DỤ')).length === 6);
+ok('benefit lọc nước tàu 15 m 10 người 20 ngày = 3.000 lít, 150 can', waterBenefitLines().some((l) => l.includes('chuyến 20 ngày') && l.includes('3.000 lít') && l.includes('150 can')));
+ok('benefit lọc nước không dính SỰ THẬT NGHỀ', !guardViolations(waterBenefitLines().join(' '), G2).length);
+ok('benefit lọc dầu không dính SỰ THẬT NGHỀ', !guardViolations(fuelBenefitLines().join(' '), G9).length);
+eq('benefit nhóm khác rỗng', benefitLines('8. Sơn RARE').length, 0);
+ok('benefit không nêu tiền nước đất liền', !/đ\/m³|đồng một khối|120\.000/.test(waterBenefitLines().join(' ')));
+ok('estimateBenefit tính tay', estimateBenefit({ crew: 10, days: 20, engine: 'vua' }).waterLiters === 3000 && estimateBenefit({ crew: 10, days: 20, engine: 'vua' }).fuelLiters === 3000);
+ok('benefit TikTok chỉ 1 câu số', benefitLines(G9, 'tiktok').length === 2 && benefitLines(G9, 'tiktok').join(' ').includes('3.000 lít') && !benefitLines(G9, 'tiktok').join(' ').includes('VÍ DỤ') && benefitLines(G2, 'tiktok').length === 2 && !guardViolations(benefitLines(G2, 'tiktok').join(' '), G2).length);
+eq('trieu() né mốc giá bị guard cấm', [41610000, 49932000, 42000000, 83220000, 9900000, 4161000].map(trieu).join(' | '), '41,6 triệu đồng | 50 triệu đồng | 42,0 triệu đồng | 83 triệu đồng | 10 triệu đồng | 4,2 triệu đồng');
 let fail = 0;
 for (const c of cases) {
   if (!c.ok) fail++;
