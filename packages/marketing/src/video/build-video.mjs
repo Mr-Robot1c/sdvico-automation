@@ -324,8 +324,11 @@ async function tidyWav(wav, workDir, tag) {
     const res = await python('tidy.py', [wav, out]);
     const { f0 = 0, n = 0, cuts = 0 } = JSON.parse(res.split('\n').pop() || '{}');
     let semi = 0;
+    // 11/9: dịch bằng asetrate đổi luôn màu giọng (formant), kéo 1,5 nửa cung là nghe như người khác
+    // (Thanh: "2 giọng"). Kẹp ±1,0 nửa cung (≈6%, formant lệch ít) thay vì ±2,5; ffmpeg đóng gói
+    // không có rubberband để giữ formant.
     if (process.env.TTS_F0_NORMALIZE !== 'off' && f0 && n >= 10) {
-      semi = Math.max(-2.5, Math.min(2.5, 12 * Math.log2(TTS_F0_TARGET / f0)));
+      semi = Math.max(-1.0, Math.min(1.0, 12 * Math.log2(TTS_F0_TARGET / f0)));
     }
     if (cuts) console.log(`  (${tag}: nén ${cuts} khoảng lặng bên trong khúc)`);
     return { path: out, semi };
@@ -338,7 +341,11 @@ async function tidyWav(wav, workDir, tag) {
 async function localTTS(cleanText, outPath, workDir, tag) {
   const sentences = splitSentences(cleanText);
   const prosodyOf = (s, i) => (tag === 'outro' ? OUTRO_PROSODY : localProsody(s, i));
-  if (sentences.length > 1 && process.env.TTS_LOCAL_PROSODY !== 'off') {
+  // 11/9 (Thanh nghe bản e56c4e63: "trong video tới 2 giọng khác nhau"): đọc TỪNG CÂU sinh ra để lên
+  // xuống giọng theo câu (5/9), nay đã bỏ lên xuống nên chỉ còn hại: mỗi câu một lần gọi VieNeu,
+  // màu giọng lệch giữa các lần gọi. Mặc định đọc CẢ CẢNH một lần gọi (tidy.py vẫn nén lặng giữa
+  // các câu); TTS_LOCAL_PROSODY=on mới quay lại từng câu.
+  if (sentences.length > 1 && process.env.TTS_LOCAL_PROSODY === 'on') {
     try {
       const parts = [];
       for (let i = 0; i < sentences.length; i++) {
