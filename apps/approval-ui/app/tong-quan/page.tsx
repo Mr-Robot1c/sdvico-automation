@@ -5,6 +5,7 @@ import PlatformLogo, { type PlatformKey } from '../noi-dung/platform-logo';
 import PageSuiteBlock from '../do-luong/page-suite-block';
 import { buildTodayView, TODAY_STAGE_LABEL } from '../../lib/today-plan';
 import { CHANNEL_LABEL, DOW_LONG } from '../../lib/posting-plan';
+import { computeShareLot } from '../../lib/share-lot';
 
 // 27/8 REDESIGN theo file "redesign web.docx" cua sep — trang TONG QUAN kieu ForLife Ops.
 // v2 (feedback sep cung ngay): (1) icon kenh trong bang bam duoc -> mo bai tren nen tang do;
@@ -74,7 +75,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, todayView, leadsRes, yt, wonWeekRes, goalRes] = await Promise.all([
+  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, todayView, leadsRes, yt, wonWeekRes, goalRes, shareLot] = await Promise.all([
     client
       .from('approval_queue')
       .select('id, title, status, payload, created_at')
@@ -115,6 +116,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     getYouTubeChannelInfo(),
     client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('status', 'won').gte('updated_at', weekStartIso),
     client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
+    computeShareLot(client),
   ]);
 
   const queueRows = (queueRes.data || []) as QueueRow[];
@@ -321,6 +323,12 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           <span aria-hidden="true">📅</span> Kế hoạch hôm nay{' '}
           <span className="sub">· {todayLabel} · {fmt(todayView.counts.total)} bài theo lịch{todayView.overridden ? ' · ✏️ lịch riêng hôm nay' : ''}{!todayView.saved ? ' · lịch mặc định (chưa lưu)' : ''}</span>
         </h2>
+        <p className="sub" style={{ margin: '4px 0 8px', fontSize: '.85rem' }}>
+          📣 Chia sẻ group hôm nay: <b>{fmt(shareLot.doneToday)}/{fmt(shareLot.lotSize)}</b> nhóm
+          {shareLot.doneToday >= shareLot.lotSize
+            ? ', đủ lô.'
+            : <> · còn: {shareLot.lot.filter((g) => !g.sharedToday).slice(0, 5).map((g) => g.label).join(', ')}{shareLot.lot.filter((g) => !g.sharedToday).length > 5 ? '…' : ''}. Bấm 📣 Chia sẻ group trên thẻ bài đã đăng.</>}
+        </p>
         {todayView.rows.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Hôm nay lịch không có bài nào. <Link href="/ke-hoach#lich-dang" className="src">Sửa lịch đăng →</Link></p>
         ) : (

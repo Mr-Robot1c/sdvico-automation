@@ -13,7 +13,7 @@ import PostFbButton from './post-fb-button';
 import CopyCaptionButton from './copy-caption-button';
 import LinkTikTokButton from './link-tiktok-button';
 import PexelsScenesButton from './pexels-scenes-button';
-import { loadPostingPlan, groupsForDate, isFutureVNLocal, CHANNEL_LABEL } from '../../lib/posting-plan';
+import { isFutureVNLocal, CHANNEL_LABEL } from '../../lib/posting-plan';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -47,7 +47,7 @@ const fmtVN = (n: number) => (n || 0).toLocaleString('vi-VN');
 export default async function BangSection() {
   const client = getServerClient();
 
-  const [queueRes, alertRes, pp] = await Promise.all([
+  const [queueRes, alertRes] = await Promise.all([
     client
       .from('approval_queue')
       .select('id, title, payload, status, created_at, decided_at')
@@ -59,19 +59,7 @@ export default async function BangSection() {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending')
       .neq('kind', 'mkt_publish_content'),
-    // Lịch đăng cố định (user 26/8: "chia sẻ vào group này có thể nhìn vào bảng kế hoạch ngày
-    // đó để hiển thị chỉ đăng vào group đó không?"). Chưa lưu lịch → dùng lịch mặc định.
-    loadPostingPlan(client),
   ]);
-
-  // Group chia sẻ theo LỊCH ĐĂNG CỐ ĐỊNH của ngày bài được đăng (trước đọc bản live xoay vòng).
-  const groupsOfDay = (isoDatetime: string): string[] => {
-    if (!isoDatetime) return [];
-    const t = new Date(isoDatetime).getTime();
-    if (!Number.isFinite(t)) return [];
-    const vnDate = new Date(t + 7 * 3600 * 1000).toISOString().slice(0, 10);
-    return groupsForDate(pp.plan, vnDate, pp.shareGroups);
-  };
 
   const queue = (queueRes.data || []) as any[];
   const otherPending = alertRes.count || 0;
@@ -548,7 +536,7 @@ export default async function BangSection() {
                                 {/* Dán link bài đăng tay trên Page chính SDVICOVN — chip FB và Chia sẻ group dùng link này. */}
                                 <LinkFbButton contentId={it.cid} linkedUrl={fbRealUrl || null} />
                                 {fbRealUrl
-                                  ? <ShareGroups postUrl={fbRealUrl} planGroupsToday={groupsOfDay(lastAt)} />
+                                  ? <ShareGroups postUrl={fbRealUrl} contentId={it.cid} />
                                   : <span className="muted" style={{ fontSize: '.78rem' }} title="Chia sẻ group cần link bài trên Page chính SDVICO VN. Đăng tay xong, bấm Ghép link dán link bài rồi mới chia sẻ.">Ghép link rồi mới chia sẻ group</span>}
                               </div>
                             ) : null}

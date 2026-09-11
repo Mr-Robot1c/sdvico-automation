@@ -44,27 +44,12 @@ function normalizeGroupUrl(input: string): { id: string; url: string } | null {
   return { id, url: `https://www.facebook.com/groups/${id}` };
 }
 
-// Chuẩn hoá tên group để so khớp fuzzy với plan groups (user gõ tên trong /ke-hoach có thể
-// khác cách viết trong ShareGroups: hoa/thường, dấu, punctuation). Lowercase + bỏ dấu câu.
-function norm(s: string): string {
-  return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
-}
-function matchesPlan(groupLabel: string, planNames: string[]): boolean {
-  if (!planNames.length) return true; // không có plan -> hiện tất cả
-  const gl = norm(groupLabel);
-  if (!gl) return false;
-  return planNames.some((pn) => {
-    const pnn = norm(pn);
-    return pnn && (gl.includes(pnn) || pnn.includes(gl));
-  });
-}
-
 export default function ShareGroups({
   postUrl,
-  planGroupsToday = [],
+  contentId = null,
 }: {
   postUrl: string;
-  planGroupsToday?: string[];
+  contentId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<SavedGroup[]>([]);
@@ -73,6 +58,36 @@ export default function ShareGroups({
   // User 26/8: bài đăng ngày nào -> chỉ hiện groups đã lên plan ngày đó. Toggle "Xem tất cả"
   // để override khi user muốn chia sẻ vào group ngoài plan (case ngoại lệ).
   const [showAll, setShowAll] = useState(false);
+  type LotItem = SavedGroup & { sharedToday: { id: string; content_id: string | null; shared_at: string } | null; sharedThisPost: boolean; lastSharedAt: string | null; daysSince: number | null };
+  const [lot, setLot] = useState<{ lotSize: number; doneToday: number; lot: LotItem[]; allGroups: LotItem[] } | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const loadLot = async () => {
+    try {
+      const r = await fetch(`/api/share-groups/shares?content_id=${encodeURIComponent(contentId || '')}`, { cache: 'no-store' });
+      if (r.ok) setLot(await r.json());
+    } catch { /* giữ lô cũ */ }
+  };
+  useEffect(() => { if (open) loadLot(); }, [open]);
+  const markShared = async (g: LotItem) => {
+    setBusyId(g.id);
+    try {
+      const r = await fetch('/api/share-groups/shares', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_id: contentId, group_id: g.id, group_label: g.label, post_url: postUrl }),
+      });
+      if (!r.ok) alert('Không ghi được lượt chia (' + r.status + '). Thử lại.');
+      await loadLot();
+    } finally { setBusyId(null); }
+  };
+  const undoShared = async (g: LotItem) => {
+    if (!g.sharedToday) return;
+    setBusyId(g.id);
+    try {
+      await fetch('/api/share-groups/shares', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: g.sharedToday.id }) });
+      await loadLot();
+    } finally { setBusyId(null); }
+  };
+  const fmtHHmm = (iso: string) => new Date(new Date(iso).getTime() + 7 * 3600 * 1000).toISOString().slice(11, 16);
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const popRef = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
@@ -156,11 +171,11 @@ export default function ShareGroups({
       if (r.ok) { const j = await r.json(); if (j?.name) label = String(j.name).slice(0, 60); }
     } catch { /* giu ID */ }
     const next = [...groups, { id: norm.id, label, url: norm.url }];
-    setGroups(next); saveGroupsServer(next); setNewG('');
+    setGroups(next); saveGroupsServer(next); setNewG(''); loadLot();
   };
   const removeGroup = (id: string) => {
     const next = groups.filter((g) => g.id !== id);
-    setGroups(next); saveGroupsServer(next);
+    setGroups(next); saveGroupsServer(next); loadLot();
   };
   // Go ten: doi state ngay, LUU SERVER sau 800ms ngung go (debounce — tranh moi phim 1 POST,
   // route con lam moi de xuat song). Blur hoac dong popover thi luu lien khong cho.
@@ -209,67 +224,65 @@ export default function ShareGroups({
             </button>
           </div>
           {(() => {
-            // Filter theo plan groups của ngày bài đăng: chỉ hiện groups có label khớp plan
-            // (fuzzy match); không có plan hoặc user bật "Xem tất cả" -> hiện hết.
-            const hasPlan = planGroupsToday.length > 0;
-            const filtered = hasPlan && !showAll
-              ? groups.filter((g) => matchesPlan(g.label, planGroupsToday))
-              : groups;
-            const hidden = groups.length - filtered.length;
-            return (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
-                  <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>
-                    {hasPlan && !showAll
-                      ? <>📋 <b>Groups theo kế hoạch hôm nay:</b></>
-                      : <>Group của bạn:</>}
-                  </div>
-                  {hasPlan ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowAll(!showAll)}
-                      className="btn ghost sm"
-                      style={{ padding: '2px 8px', fontSize: 11 }}
-                      title={showAll ? 'Chỉ hiện groups đã lên plan hôm nay' : 'Hiện tất cả groups (kể cả ngoài plan)'}
-                    >
-                      {showAll ? `📋 Theo plan (${groups.length - hidden})` : `👁 Xem tất cả (${groups.length})`}
-                    </button>
-                  ) : null}
-                </div>
-                {hasPlan && !showAll && hidden > 0 ? (
-                  <p className="sub" style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--ink-2)' }}>
-                    Ẩn {hidden} group ngoài plan hôm nay. Plan có: <i>{planGroupsToday.join(', ')}</i>
-                  </p>
-                ) : null}
-                {filtered.length === 0 ? (
-                  hasPlan && groups.length > 0 ? (
-                    <p className="sub" style={{ margin: '0 0 8px' }}>
-                      Không có group nào trong plan hôm nay khớp với danh sách bên dưới. Bấm "Xem tất cả" để hiện tất cả groups.
-                    </p>
-                  ) : (
-                    <p className="sub" style={{ margin: '0 0 8px' }}>Chưa có group nào. Thêm bên dưới.</p>
-                  )
-                ) : (
-                  <>
-                    <p className="sub" style={{ margin: '0 0 6px', fontSize: 11 }}>💡 Bấm vào ô tên để đặt lại (Meta chặn API lấy tên group tự động).</p>
-                    <ul style={{ listStyle: 'none', margin: '0 0 8px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {filtered.map((g) => (
-                <li key={g.id} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            const items: LotItem[] = showAll
+              ? (lot?.allGroups || groups.map((g) => ({ ...g, sharedToday: null, sharedThisPost: false, lastSharedAt: null, daysSince: null })))
+              : (lot?.lot || []);
+            const size = lot?.lotSize ?? 8;
+            const done = lot?.doneToday ?? 0;
+            const renderRow = (g: LotItem) => {
+              const otherPostToday = !!g.sharedToday && !g.sharedThisPost;
+              return (
+                <li key={g.id} style={{ display: 'flex', gap: 4, alignItems: 'center', opacity: otherPostToday ? 0.55 : 1 }}>
                   <input
                     value={g.label}
                     onChange={(e) => renameGroup(g.id, e.target.value)}
                     onBlur={commitRename}
                     placeholder="Đặt tên gợi nhớ..."
-                    style={{ flex: 1, minWidth: 0, padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 4, fontSize: 12, background: 'var(--surface)', color: 'var(--ink)', fontStyle: g.label === g.id ? 'italic' : 'normal', opacity: g.label === g.id ? 0.8 : 1 }}
-                    title={`ID: ${g.id} — ${g.url}
-Bấm để đặt tên gợi nhớ`}
+                    style={{ flex: 1, minWidth: 0, padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 4, fontSize: 12, background: 'var(--surface)', color: 'var(--ink)' }}
+                    title={`ID: ${g.id}${g.lastSharedAt ? ` · chia lần cuối ${g.daysSince === 0 ? 'hôm nay' : `${g.daysSince} ngày trước`}` : ' · chưa chia lần nào'}`}
                   />
+                  {showAll ? (
+                    <span className="sub" style={{ fontSize: 10, whiteSpace: 'nowrap' }}>
+                      {g.lastSharedAt ? (g.daysSince === 0 ? 'hôm nay' : `${g.daysSince} ngày`) : 'chưa chia'}
+                    </span>
+                  ) : null}
                   <a className="btn ok sm" href={g.url} target="_blank" rel="noreferrer" title="Mở group (đã copy link ở trên, dán vào ô Tạo bài viết)">Mở</a>
+                  {otherPostToday ? (
+                    <span className="sub" style={{ fontSize: 10, whiteSpace: 'nowrap' }} title="Mỗi group mỗi ngày 1 bài">đã nhận bài khác hôm nay</span>
+                  ) : g.sharedThisPost && g.sharedToday ? (
+                    <>
+                      <span className="badge tone-ok" style={{ fontSize: 10 }}>✓ {fmtHHmm(g.sharedToday.shared_at)}</span>
+                      <button type="button" className="btn ghost sm" disabled={busyId === g.id} onClick={() => undoShared(g)} title="Bấm nhầm thì hoàn tác">Hoàn tác</button>
+                    </>
+                  ) : (
+                    <button type="button" className="btn sm" disabled={busyId === g.id} onClick={() => markShared(g)} title="Đã dán link và bấm Post trong group này">✓ Đã chia</button>
+                  )}
                   <button type="button" className="btn no sm" onClick={() => removeGroup(g.id)} aria-label="Xoá" title="Xoá khỏi danh sách">✕</button>
                 </li>
-              ))}
-                    </ul>
-                  </>
+              );
+            };
+            return (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                    {showAll ? <>Tất cả group ({groups.length}):</> : <>📣 <b>Lô hôm nay: đã chia {done}/{size} nhóm</b></>}
+                  </div>
+                  <button type="button" onClick={() => setShowAll(!showAll)} className="btn ghost sm" style={{ padding: '2px 8px', fontSize: 11 }}
+                    title={showAll ? 'Về lô hôm nay' : 'Hiện tất cả group kèm ngày chia gần nhất'}>
+                    {showAll ? `📣 Lô hôm nay (${size})` : `👁 Xem tất cả (${groups.length})`}
+                  </button>
+                </div>
+                {!showAll ? (
+                  <p className="sub" style={{ margin: '0 0 6px', fontSize: 11 }}>
+                    Mỗi ngày {size} nhóm, mỗi nhóm 1 bài, xoay đều để 7 ngày phủ hết. Dán link, bấm Post trong group rồi bấm ✓ Đã chia.
+                  </p>
+                ) : null}
+                {items.length === 0 ? (
+                  <p className="sub" style={{ margin: '0 0 8px' }}>{groups.length ? 'Đang tải lô hôm nay...' : 'Chưa có group nào. Thêm bên dưới.'}</p>
+                ) : (
+                  <ul style={{ listStyle: 'none', margin: '0 0 8px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {items.map(renderRow)}
+                  </ul>
                 )}
               </>
             );
