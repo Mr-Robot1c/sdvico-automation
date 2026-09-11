@@ -3,7 +3,7 @@
 import { assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
-import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, shopeeLink, ensureShopeeLink } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, shopeeLink, ensureShopeeLink, audienceLines } from './products.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -71,6 +71,8 @@ export async function generateSocialPost({ productGroup, productName, channel, h
     `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${shownName}". Bắt buộc: nêu rõ tên sản phẩm này (gọi đúng tên "${shownName}", không gọi tên khác), 1 tới 2 lợi ích thật của nó, và MỜI bà con liên hệ SDVICO để mua hoặc lắp đặt (SDVICO phân phối chính hãng, lắp đặt tận bến, bảo hành). Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
     'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM ĐANG VIẾT (xem SỰ THẬT NGHỀ bên dưới); KHÔNG gán lợi ích của sản phẩm khác.',
     ...guardLines(shownName + ' ' + productName + ' ' + productGroup),
+    // 11/9: bài bán viết cho đúng tệp khách (A ghe nhỏ, B tàu khơi xa), xem AUDIENCE ở products.mjs.
+    ...audienceLines(productGroup),
     teaser
       ? `GIÁ (luật 8/9, BẮT BUỘC): bài PHẢI có đúng 1 câu nêu mốc giá úp mở, dùng NGUYÊN VĂN cụm "${teaser.text}" (giữ nguyên chữ X, KHÔNG tự đoán hay thay X bằng số). TUYỆT ĐỐI KHÔNG ghi giá chính xác dưới bất kỳ dạng nào (không 9.900.000 đ, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu). Ngay sau câu giá thêm ngắn: "giá chính xác em gửi riêng, kỹ thuật lắp tận tàu". Câu giá đặt gần cuối, TRƯỚC câu CTA cuối, KHÔNG đặt làm câu đầu.`
       : '',

@@ -280,6 +280,60 @@ export function ensureShopeeLink(body, link) {
   return `${s}\n\n${line}`;
 }
 
+// 11/9 (đọc trọn 51 group Facebook nghề biển, docs/plans/phan-tich-group-ngu-dan-11-09.md): bài bán phải
+// biết nói với ai. Tệp A = chủ ghe nhỏ ven bờ (khách lọc dầu); tệp B = chủ tàu khơi xa 15 m trở lên (khách
+// lọc nước, giám sát). Chữ ở đây đã tránh mọi cụm SỰ THẬT NGHỀ cấm (product-guard.mjs): KHÔNG "bớt chở
+// nước", "nhẹ tàu", "giảm tải", "tiết kiệm dầu" cho lọc nước. Bản sao y hệt ở apps/approval-ui/lib/gen.
+export const AUDIENCE = {
+  '9. Máy Lọc Dầu Diesel SD12-300': {
+    key: 'A',
+    who: 'chủ ghe 8 tới 12 m chạy máy Kia 33, Yanmar 2T, D30, đi gần bờ, một chuyến vài ngày, tiền eo hẹp, quen mua đồ cũ',
+    pain: 'giá dầu lên, dầu lẫn cặn và nước làm nghẹt kim phun, máy khục kịch nổ không êm, nằm bờ sửa tốn tiền và mất chuyến',
+    compare: 'đồ cũ "còn 90%" mua trôi nổi không ai bảo hành',
+    proof: 'tự lắp được, giao tận nơi toàn quốc, bảo hành 12 tháng, vỏ inox 304 chịu muối biển',
+    question: 'Ghe anh chạy máy gì, một chuyến mấy ngày?',
+  },
+  '6. Thiết bị lọc dầu SF-50': {
+    key: 'A',
+    who: 'chủ ghe 8 tới 12 m chạy máy Kia 33, Yanmar 2T, D30, đi gần bờ, một chuyến vài ngày, tiền eo hẹp, quen mua đồ cũ',
+    pain: 'giá dầu lên, dầu lẫn cặn và nước làm nghẹt kim phun, máy khục kịch nổ không êm, nằm bờ sửa tốn tiền và mất chuyến',
+    compare: 'đồ cũ "còn 90%" mua trôi nổi không ai bảo hành',
+    proof: 'tự lắp được, giao tận nơi toàn quốc, bảo hành 12 tháng',
+    question: 'Ghe anh chạy máy gì, một chuyến mấy ngày?',
+  },
+  '2. Máy lọc nước biển SEA-40': {
+    key: 'B',
+    who: 'chủ tàu 15 tới 20 m, máy 280 tới 550 cv, đi 20 tới 30 ngày một chuyến, tàu thu mua hoặc tàu hậu cần, cả tàu 8 tới 12 người ăn uống tắm rửa',
+    pain: 'nước ngọt cạn giữa chuyến, nước để lâu trong thùng thì hôi và đau bụng, phải cắt chuyến quay bờ sớm khi cá đang vào',
+    compare: 'thùng nước inox trên boong: chứa được bao nhiêu thì xài bấy nhiêu, hết là hết',
+    proof: 'giá đã gồm công lắp, kỹ thuật SDVICO tới tận tàu lắp và hướng dẫn, tặng 10 lõi lọc thô, làm ra khoảng 250 lít nước ngọt mỗi giờ',
+    question: 'Tàu anh dài bao nhiêu mét, đi mấy ngày một chuyến?',
+  },
+  '3. Thiết bị giám sát hành trình Viettel S-Tracking': {
+    key: 'B',
+    who: 'chủ tàu 15 m trở lên đi khơi xa, đang chạy máy giám sát cũ hoặc sắp phải thay',
+    pain: 'máy cũ chập chờn mất tín hiệu, lắp chậm, hỏng không biết kêu ai, mỗi lần đi làm giấy lại lo',
+    compare: 'máy cũ mua trôi nổi trên mạng không ai lắp, không ai bảo hành',
+    proof: 'SDVICO lắp tận tàu, kích hoạt tài khoản ngay khi lắp, bảo hành 12 tháng máy và 6 tháng phụ kiện, mỗi tàu một tài khoản riêng trên app Viettel S-Tracking',
+    question: 'Tàu anh đang chạy máy giám sát nào, lắp năm nào rồi?',
+  },
+};
+export function audienceOf(group) {
+  return AUDIENCE[group] || null;
+}
+// Khối prompt "khách của bài này" cho generateSocialPost (2 bản social.mjs). Nhóm không có hồ sơ -> [].
+export function audienceLines(group) {
+  const a = audienceOf(group);
+  if (!a) return [];
+  return [
+    `KHÁCH CỦA BÀI NÀY (tệp ${a.key}, đọc từ 51 group nghề biển 11/9): ${a.who}. Viết như đang nói với đúng người này, xưng "anh em" hoặc "bà con" như thường, KHÔNG gọi "khách hàng", KHÔNG viết cho người ngoài nghề.`,
+    `NỖI ĐAU đưa vào bài (chọn 1 ý, không kể hết): ${a.pain}.`,
+    `SO SÁNH NHẸ với thứ bà con đang dùng: ${a.compare}. Chỉ nói khác nhau chỗ nào, không chê, không bịa con số.`,
+    `CÂU TIN CẬY (đúng 1 câu): ${a.proof}.`,
+    `CÂU HỎI ngay TRƯỚC câu CTA cuối, giữ ý này (được đổi vài chữ cho hợp giọng): "${a.question}".`,
+  ];
+}
+
 // Bảo đảm CẢNH CUỐI video có câu giá đọc được (luật 8/9). Chặn số chính xác trước; thiếu câu thì
 // nối vào cuối lời thoại cảnh đó. Không teaser thì trả nguyên văn.
 export function ensureSpokenTeaser(narration, teaser) {

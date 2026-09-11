@@ -1,7 +1,7 @@
 // test-price-teaser.mjs — kiểm luật giá úp mở (Thanh chốt 8/9/2026): bài công khai không được có số
 // tiền chính xác, chỉ mốc "9,X triệu"; cảnh cuối video có câu giá đọc được. Chạy: npm run test:price
 // Không cần mạng, không cần GEMINI_API_KEY.
-import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta, SHOPEE_LINK, shopeeLink, ensureShopeeLink, outroKeyword } from './products.mjs';
+import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta, SHOPEE_LINK, shopeeLink, ensureShopeeLink, outroKeyword, AUDIENCE, audienceOf, audienceLines } from './products.mjs';
 import { scanStyle } from './brand-voice-check.mjs';
 import { guardViolations } from './product-guard.mjs';
 import { assessDraft } from './compliance.mjs';
@@ -98,6 +98,13 @@ eq('outro SF-50', outroKeyword('6. Thiết bị lọc dầu SF-50'), 'lọc dầ
 eq('outro ắc quy', outroKeyword('7. Ắc quy Accu Nano SDViCo'), 'ắc quy');
 eq('outro content gộp', outroKeyword('Bài content'), 'lọc dầu hay lọc nước');
 
+// 11/9: bài bán theo tệp khách (A ghe nhỏ cho lọc dầu, B tàu khơi xa cho lọc nước, giám sát).
+eq('audience lọc dầu = A', audienceOf(G9)?.key, 'A');
+eq('audience lọc nước = B', audienceOf(G2)?.key, 'B');
+eq('audience nhóm khác = null', audienceOf('8. Sơn RARE'), null);
+eq('audienceLines nhóm khác rỗng', audienceLines('8. Sơn RARE').length, 0);
+ok('audienceLines lọc nước 5 dòng có câu hỏi', audienceLines(G2).length === 5 && audienceLines(G2)[4].includes('Tàu anh dài bao nhiêu mét'));
+ok('AUDIENCE không chứa cụm SỰ THẬT NGHỀ cấm', Object.values(AUDIENCE).every((a) => !guardViolations(`${a.who} ${a.pain} ${a.compare} ${a.proof} ${a.question}`, a.key === 'A' ? G9 : G2).length));
 let fail = 0;
 for (const c of cases) {
   if (!c.ok) fail++;
