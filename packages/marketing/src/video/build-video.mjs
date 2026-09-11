@@ -348,7 +348,8 @@ async function localTTS(cleanText, outPath, workDir, tag) {
   // 11/9 (2) (Thanh nghe 2b7d303a: outro lặp "để bên em tư vấn cho anh em nha" 2 lần): outro 2 câu gộp
   // một lần gọi thì VieNeu lặp đuôi (đo: 6 khúc tiếng cho 4 vế, 11,7s thay vì 8s). Outro LUÔN đọc
   // từng câu (bản e56c4e63 đọc từng câu không lặp); cảnh vẫn đọc cả cảnh.
-  if (sentences.length > 1 && (tag === 'outro' || process.env.TTS_LOCAL_PROSODY === 'on')) {
+  // 11/9 (3): outro đã gộp 1 câu (outroText) nên đi đường 1 lần gọi như cảnh; bỏ ưu tiên từng câu.
+  if (sentences.length > 1 && process.env.TTS_LOCAL_PROSODY === 'on') {
     try {
       const parts = [];
       for (let i = 0; i < sentences.length; i++) {
@@ -471,7 +472,10 @@ async function whisperArtifact(sceneAudios, workDir, tag) {
 // 10/9 (2): từ khóa bình luận theo ĐÚNG sản phẩm của video (outroKeyword): video lọc nước đọc
 // "bình luận lọc nước", video lọc dầu đọc "bình luận lọc dầu"; video content giữ câu gộp.
 function outroText(productGroup) {
-  return `Nhắn tin cho Page SDVICO nha! Không thì bình luận ${outroKeyword(productGroup)}, hoặc gọi số 0939 243 222, để bên em tư vấn cho anh em nha!`;
+  // 11/9 (3) (Thanh: 2 câu outro = 2 lần gọi VieNeu = 2 màu giọng; gộp 1 lần gọi thì lặp đuôi vì cả
+  // 2 câu đều kết "nha!"): outro thành MỘT câu, một "nha" ở cuối, đọc một lần gọi (cách cũ trước 5/9,
+  // chưa từng lặp) -> một giọng, không lặp.
+  return `Nhắn tin cho Page SDVICO, không thì bình luận ${outroKeyword(productGroup)}, hoặc gọi số 0939 243 222, để bên em tư vấn cho anh em nha!`;
 }
 
 // opts.priceBadge / opts.badgeFromScene (8/9): tem giá úp mở trên hình, xem assemble.mjs.
