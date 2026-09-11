@@ -620,6 +620,59 @@ export async function generateAndStorePlan(
     console.error('[plan] carry-over huong di loi (bo qua):', e?.message || e);
   }
 
+  // 11/9 chiều (user "đã nói có truyền thông SDFish mà rốt cuộc mất tiêu"): buildPlan chỉ xếp sản phẩm
+  // CÓ BÀI ĐO ĐƯỢC tuần trước. Sản phẩm mới đưa vào truyền thông (SDFish 5/9, weight 1) tuần đầu chưa
+  // có bài nên không vào products/weights; rotate lọc "chỉ folder trong weights" và bảng dự kiến bỏ
+  // qua luôn; hướng SDFish do Gemini sinh có cũng không tới lượt. Vòng luẩn quẩn: không có bài vì
+  // không trong plan, không trong plan vì không có bài. Luật: mọi sản phẩm trong danh sách TẬP TRUNG
+  // (mkt_focus còn hạn) khớp được folder sản phẩm PHẢI có mặt trong plan: weight tối thiểu 1, ít nhất
+  // 1 bài/tuần, và ít nhất 1 hướng đi (thiếu thì kéo hướng chưa dùng của bản đang áp, kể cả khi người
+  // bấm tay). Vẫn KHÔNG ưu tiên (user 5/9: "SDFish thêm vô như bình thường"), chỉ bảo đảm có mặt.
+  try {
+    if (fGroups.length && (!fv.until || new Date(fv.until).getTime() > Date.now())) {
+      const stripNo = (g: string) => String(g || '').replace(/^s*d+.s*/, '').trim();
+      const focusProducts = [...new Set(
+        fGroups.map((g) => (guessGroup as (t: string) => string | null)(String(g))).filter((g): g is string => !!g).map(stripNo)
+      )];
+      const norm = (p: string) => p.toLowerCase().trim();
+      const missingSug: string[] = [];
+      for (const product of focusProducts) {
+        if (!plan.products.some((p) => norm(p.product) === norm(product))) {
+          plan.products.push({
+            product, count: 0, engagement: 0, conversions: 0, avgEng: 0, avgConv: 0,
+            tier: 'manual', weight: 1, postsPerWeek: 1,
+            note: 'Trong danh sách tập trung tuần, chưa có số liệu; giữ ít nhất 1 bài/tuần để truyền thông.',
+          });
+        }
+        if (plan.weights[product] == null) plan.weights[product] = 1;
+        const has = (plan.content_suggestions || []).some((sg) => norm(sg.product) === norm(product) || norm(stripNo((guessGroup as (t: string) => string | null)(sg.product) || '')) === norm(product));
+        if (!has) missingSug.push(product);
+      }
+      if (missingSug.length) {
+        const { data: prevApplied2 } = await client
+          .from('mkt_plans').select('data').eq('applied', true)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        const prevSugs2: ContentDirection[] = Array.isArray((prevApplied2 as any)?.data?.content_suggestions)
+          ? (prevApplied2 as any).data.content_suggestions : [];
+        const titles = new Set((plan.content_suggestions || []).map((sg) => sg.title.toLowerCase().trim()));
+        for (const product of missingSug) {
+          const pick = prevSugs2
+            .filter((sg) => !sg.used_at && (sg as any).pending_variant !== 'B' && norm(stripNo((guessGroup as (t: string) => string | null)(sg.product) || sg.product)) === norm(product))
+            .filter((sg) => !titles.has(sg.title.toLowerCase().trim()))
+            .slice(0, 2);
+          if (pick.length) {
+            plan.content_suggestions = [...(plan.content_suggestions || []), ...pick.map((sg) => ({ ...sg, carried: true }))];
+            for (const sg of pick) titles.add(sg.title.toLowerCase().trim());
+          } else {
+            plan.narrative.push(`Sản phẩm tập trung "${product}" chưa có hướng đi nào trong bản này và bản đang áp cũng hết hướng chưa dùng. Cần soạn thêm hướng cho sản phẩm này, nếu không tuần tới sẽ không có bài.`);
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    console.error('[plan] bao dam san pham tap trung co mat loi (bo qua):', e?.message || e);
+  }
+
   const win = weekWindowVN(opts.periodFrom || now);
   const { data, error } = await client
     .from('mkt_plans')
