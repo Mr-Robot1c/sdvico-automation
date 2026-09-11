@@ -121,6 +121,20 @@ ok('audienceLines lọc dầu không câu hỏi', !audienceLines(G9).some((l) =>
     ok('prompt cấm câu hỏi mở trước CTA: ' + rel, /KHÔNG chen(?: thêm)? câu hỏi mở/.test(src));
   }
 }
+{
+  // 11/9 tối: bài mẫu chuẩn (playbook PHẦN 12) trong prompt bài bán không được dạy model cụm sai nghề SEA-40
+  // (guard sea40: tàu cá cố ý chở nước dằn tàu). Quét cả biến thể mà guard so chuỗi con không bắt được.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../../apps/approval-ui/lib/gen/social.mjs', import.meta.url), 'utf8');
+  const start = src.indexOf('BÀI MẪU CHUẨN');
+  const end = src.indexOf('allowed.length ?', start);
+  const block = start >= 0 && end > start ? src.slice(start, end) : '';
+  ok('bài mẫu chuẩn có trong prompt app', block.length > 0);
+  ok('bài mẫu chuẩn không dính SỰ THẬT NGHỀ SEA-40', !guardViolations(block, G2).length, guardViolations(block, G2).map((v) => v.phrase));
+  ok('bài mẫu chuẩn không có biến thể bớt nước/nhẹ tàu', !/khỏi chở|đỡ chở|bớt chở|chở theo|nặng trịch|tàu nhẹ|nhẹ hơn|giảm tải|tiết kiệm dầu/i.test(block));
+  ok('bài mẫu chuẩn sạch văn phong', scanStyle(block).length === 0, scanStyle(block));
+  ok('bài mẫu chuẩn kết bằng câu giá úp mở + CTA cmt', /4X triệu[\s\S]{0,200}cmt "lọc dầu" hay "lọc nước"/.test(block));
+}
 ok('AUDIENCE không chứa cụm SỰ THẬT NGHỀ cấm', Object.values(AUDIENCE).every((a) => !guardViolations(`${a.who} ${a.pain} ${a.compare} ${a.proof} ${a.question}`, a.key === 'A' ? G9 : G2).length));
 // 11/9: bài toán lợi ích có nguồn.
 eq('benefit 8 kịch bản', BENEFIT_CASES.length, 8);
