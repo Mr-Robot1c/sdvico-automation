@@ -1,6 +1,6 @@
 # PLAN TỔNG HỢP 10 ĐƠN: 15/9 tới 12/10/2026 (bản chốt 11/9 tối)
 
-> Người dùng: Thanh (vận hành marketing) làm hằng ngày; sếp Long và anh Tiến quyết tiền, giá, máy demo.
+> Người dùng: Thanh (vận hành marketing) làm hằng ngày; sếp Long và anh Tiến quyết tiền và giá.
 > Gộp từ: báo cáo đọc trọn 51 group (`phan-tich-group-ngu-dan-11-09.md`), 3 plan cho Sonnet, ý kiến ChatGPT
 > Thanh gửi 11/9 (chỉ giữ phần không phạm luật công ty), và số liệu có nguồn trong `plan-bai-toan-loi-ich-11-09.md`.
 > Máy soạn, người bấm. Không tự đăng, không tự nhắn. Giá công khai chỉ úp mở 9,X / 3X / 4X triệu.
@@ -23,7 +23,7 @@ Theo báo cáo 51 group: sai món (lọc nước là món chậm, giá cao) và 
 
 **Kết luận từ 51 group:** 8 trên 10 bài là người bán, người mua chỉ đọc và nhắn riêng. Tệp A chủ ghe 8 tới
 12 m đông nhất, hợp lọc dầu 9,X triệu. Tệp B tàu 15 m trở lên khơi xa ở miền Trung, Kiên Giang, Cà Mau,
-hợp lọc nước và giám sát. Tệp C thợ máy và người bán máy là kênh đại lý. Tệp D miền Bắc chỉ lọc dầu ship.
+hợp lọc nước và giám sát. Tệp C thợ máy và người bán máy là kênh giới thiệu. Tệp D miền Bắc chỉ lọc dầu ship.
 
 **Số liệu có nguồn để nói chuyện với khách** (chi tiết và link ở plan bài toán lợi ích):
 tàu 400 cv khoảng 150 lít dầu một ngày, tàu 500 tới 600 cv khoảng 340 lít; dầu DO 27.740 đ một lít kỳ
@@ -35,18 +35,18 @@ không cạn nước, nước mới mỗi ngày, không phải cắt chuyến. L
 
 1. Lọc dầu là mũi nhọn để tới 10 đơn. Lọc nước và giám sát đi chậm, chỉ nhắm tệp B ở 4 cụm cảng.
 2. Group là kênh hiện diện, chốt ở inbox Page và Zalo. Không cãi giá trong bình luận.
-3. Ý ChatGPT dùng được: bán qua thợ máy, đại lý, xưởng tàu; có tàu thật làm mẫu (lấy từ khách mua đầu
-   tiên, không lắp thử); video trả lời nỗi sợ thay vì video kể chuyện; phễu 100 đầu mối nhắn tay, đo từng bước.
+3. Ý ChatGPT dùng được: giới thiệu qua thợ máy, xưởng tàu; có tàu thật làm mẫu lấy từ khách mua đầu
+   tiên; video trả lời nỗi sợ thay vì video kể chuyện; phễu 100 đầu mối nhắn tay, đo từng bước.
 4. Ý ChatGPT KHÔNG dùng: "bớt chở 1 tấn nước, nhẹ tàu" (cấp trên đã bắt lỗi 19/8, bộ lọc chặn); 5 lít nước
    một người một ngày (không có nguồn, dùng 15 lít); nêu giá 49 triệu ngay đầu bài (giá úp mở).
 5. Mọi số trong bài lấy từ bảng có nguồn. Không bịa số tiết kiệm, không bịa khách đã dùng.
 
 ## 3. Mục tiêu và số đo 4 tuần
 
-| Tuần | Lượt chia sẻ group | Người hỏi mới (Page, Zalo, ads, group) | Đầu mối đại lý đã nhắn | Đơn chốt |
+| Tuần | Lượt chia sẻ group | Người hỏi mới (Page, Zalo, ads, group) | Thợ máy, xưởng tàu đã nhắn | Đơn chốt |
 |---|---|---|---|---|
 | 1: 15 tới 21/9 | 56 | 15 | 10 | 2 lọc dầu |
-| 2: 22 tới 28/9 | 56 | 20 | 10 thêm, 2 nhận hàng mẫu | 3 |
+| 2: 22 tới 28/9 | 56 | 20 | 10 thêm, 2 người giới thiệu khách | 3 |
 | 3: 29/9 tới 5/10 | 56 | 25 | khách mua đầu tiên đồng ý cho quay | 3 |
 | 4: 6 tới 12/10 | 56 | 25 | bài lọc dầu đổi sang tàu thật đang dùng | 2 + 1 lọc nước hoặc giám sát |
 
@@ -60,7 +60,7 @@ quảng cáo. Ghi mọi người hỏi vào trang Khách hàng đúng nguồn (F
 | 8:30 | Săn 20 phút: tìm trong 12 nhóm hạng 1 các chữ "kim phun", "hao dầu", "hết nước", "máy khục", "bấm dầu". Có bài thì bình luận 1 câu hỏi thăm rồi nhắn riêng, ghi vào Khách hàng nguồn group | Facebook trên Edge (tài khoản group) |
 | 9:00 | Lô sáng: mở Bảng bài viết, chọn bài bán hôm nay, bấm Chia sẻ group, dán vào 4 nhóm đầu lô, mỗi nhóm 1 câu dẫn khác nhau, cách nhau 3 tới 5 phút, bấm Đã chia | Nút Chia sẻ group, popover Lô hôm nay |
 | 9:30 tới 21:00 | Trực inbox Page và Zalo, trả lời trong 15 phút, hỏi 2 câu phân tệp (mục 7) | Messenger, Zalo, bot hỏi đáp |
-| 14:00 | Nhắn 2 tới 3 đầu mối đại lý hoặc xưởng tàu theo mục 8 | Messenger cá nhân |
+| 14:00 | Nhắn 2 tới 3 thợ máy hoặc xưởng tàu theo mục 8 | Messenger cá nhân |
 | 19:00 | Lô tối: 4 nhóm còn lại nhận bài content (video hoặc bài kể), bấm Đã chia | Nút Chia sẻ group |
 | 21:00 | Đếm số trên Tổng quan, ghi người hỏi mới vào Khách hàng | Tổng quan, Khách hàng |
 
@@ -72,7 +72,7 @@ luôn nằm trong lô. Nhóm miền Bắc chỉ nhận bài lọc dầu. Hai nh�
 
 | Ngày | Sáng 9 giờ, bài bán, 4 nhóm | Tối 19 giờ, content, 4 nhóm | Việc khác trong ngày |
 |---|---|---|---|
-| Thứ 2 15/9 | Lọc dầu: DÂN BIỂN 137K, Máy Thủy 59K, Cam Ranh 36K, Kiên Giang 31K | DTT Miền Bắc 52K, DÂN BIỂN 41K, Người Đi Biển 38K, miền Trung 34K | Tắt reel lọc nước. Dựng quảng cáo lọc dầu theo mục 6. Xin anh Tiến 1 con số giá đại lý lọc dầu (mục 8) |
+| Thứ 2 15/9 | Lọc dầu: DÂN BIỂN 137K, Máy Thủy 59K, Cam Ranh 36K, Kiên Giang 31K | DTT Miền Bắc 52K, DÂN BIỂN 41K, Người Đi Biển 38K, miền Trung 34K | Tắt reel lọc nước. Dựng quảng cáo lọc dầu theo mục 6. |
 | Thứ 3 16/9 | Lọc dầu: Dân Yêu Biển, máy Thủy 28K, Mua Bán Tàu Thuyền, thuyền ghe miền Trung | HỘI TÀU THUYỀN, Bến Tre, Hiệp hội cano, DTT MB2 | Nhắn 5 thợ máy hay đăng ở Máy Thủy Tàu Thuyền và Chợ Tàu (mục 8) |
 | Thứ 4 17/9 | Lọc nước: miền Trung 34K, Kiên Giang 31K, Cam Ranh, Người Đi Biển | CĐ MB, Cà Mau Sông Đốc, ghe biển tàu cá, NGHỀ BIỂN | Đọc số quảng cáo 48 giờ đầu: chi phí mỗi tin nhắn, số tin |
 | Thứ 5 18/9 | Lọc dầu: Trao Đổi, NGƯ DÂN VN, Nghệ An, DB Miền Trung | DTT MB3, Cà Mau, NA-TH, 3 Miền | Nhắn 5 thợ máy còn lại. Quay video test nước (mục 9) nếu máy có sẵn ở công ty |
@@ -104,28 +104,25 @@ Câu 1: "Tàu anh dài bao nhiêu mét, chạy máy gì?" Câu 2: "Tàu đi mấ
 | Ghe dưới 12 m, máy nhỏ, đi 3 tới 7 ngày | Lọc dầu, tự lắp, giao tận nơi, bảo hành 12 tháng | Không nói tiền dầu (chưa có nguồn cho máy nhỏ). Nói giá dầu 27.740 đ một lít, lọc sạch bớt 5 tới 10% hao |
 | Tàu 14 tới 15 m, máy 300 tới 400 cv, 6 tới 10 người, 10 tới 20 ngày | Lọc dầu trước, lọc nước nếu đi từ 20 ngày | 150 lít một ngày, chuyến 20 ngày 3.000 lít khoảng 83 triệu tiền dầu, bớt 4,2 tới 8,3 triệu một chuyến, máy 9,X triệu hoàn vốn khoảng 3 chuyến. Nước 10 người 20 ngày là 3.000 lít, 150 can 20 lít |
 | Tàu 17 m trở lên, máy 500 tới 600 cv, 25 tới 30 ngày | Cả lọc dầu và lọc nước, giám sát nếu đang thay máy cũ | 340 lít một ngày, chuyến 30 ngày 10.200 lít khoảng 283 triệu tiền dầu |
-| Thợ máy, người bán máy | Chuyển sang kịch bản đại lý mục 8 | |
+| Thợ máy, người bán máy | Chuyển sang kịch bản thợ máy mục 8 | |
 
 Số cụ thể của 8 kịch bản nằm trong plan bài toán lợi ích; khi Sonnet xong, bài bán tự chèn. Trước đó Thanh
 chép tay từ bảng đó, không tự nhân chia. Số đầy đủ giá máy chỉ nói trong inbox.
 
-## 8. Kênh đại lý, thợ máy, xưởng tàu (ý ChatGPT, lọc theo luật công ty)
+## 8. Kênh thợ máy, xưởng tàu (ý ChatGPT, lọc theo luật công ty; không chiết khấu, không hàng mẫu)
 
 - Danh sách 100 đầu mối lấy từ 51 group: 5 tới 10 thợ máy đăng đều ở Máy Thủy Tàu Thuyền 59K, Chợ Tàu và
   Máy Thủy, mua bán máy Thủy; người bán tàu ở Mua Bán Tàu Thuyền; xưởng và tiệm máy ở Phước Tỉnh, Đề Gi,
   Sông Đốc, Rạch Giá. Thanh lập bảng tay 4 cột: tên, nhóm, số Zalo, đã nhắn ngày.
 - Nhắn 2 tới 3 người mỗi ngày, không dồn một lúc để khỏi bị Facebook chặn. Mẫu:
   "Chào anh, em bên SDVICO ở Vũng Tàu, chuyên lọc dầu và lọc nước cho tàu cá. Thấy anh hay lắp máy cho bà
-  con, bên em có chính sách cho anh em thợ máy lấy bộ lọc dầu về lắp kèm. Anh cho em xin Zalo, em gửi ảnh
-  máy và bảng tính hao dầu để anh xem có hợp với ghe khách anh không."
-- Giá đại lý: Google KHÔNG có số công khai (11/9 đã tra: các trang chính sách đại lý dầu nhớt, phụ tùng máy
-  thủy đều ghi "chiết khấu theo thỏa thuận", không nêu phần trăm). Chỉ anh Tiến trả lời được. Thanh xin anh
-  Tiến đúng 1 con số theo 1 trong 2 cách, để anh chọn cách nào dễ: (a) thợ máy lấy bộ lọc dầu về bán, giá
-  lấy hàng thấp hơn giá bán bao nhiêu; (b) thợ máy chỉ giới thiệu khách, SDVICO bán giá thường và trả hoa
-  hồng mỗi bộ bao nhiêu. Chưa có số thì khi nhắn chỉ nói "có chính sách cho thợ máy", không hứa con số.
-- Mục tiêu tháng: 2 thợ máy nhận hàng mẫu, mỗi người bán giúp 1 bộ.
-- Phễu để đo: 100 nhắn, 30 trả lời, 10 quan tâm, 5 xin bảng tính, 2 nhận mẫu. Ghi vào Khách hàng nguồn
-  group, ghi chú "đại lý".
+  con, anh cho em xin Zalo, em gửi ảnh bộ lọc dầu và bảng tính hao dầu. Ghe nào khách anh hay than hao dầu,
+  kim phun nghẹt thì anh chỉ giúp em, hoặc anh lắp kèm luôn nếu khách cần."
+- Không nói chiết khấu, không nói hoa hồng, không gửi hàng mẫu (Thanh chốt 11/9: công ty chưa có chính
+  sách này). Thợ máy là người biết nhiều ghe, mình gửi tài liệu để họ nhớ tới máy khi khách than hao dầu.
+- Mục tiêu tháng: 2 thợ máy giới thiệu được khách hỏi tới Page hoặc Zalo.
+- Phễu để đo: 100 nhắn, 30 trả lời, 10 quan tâm, 5 xin bảng tính, 2 giới thiệu khách. Ghi vào Khách hàng
+  nguồn group, ghi chú "thợ máy".
 
 ## 9. Bộ tài liệu bán hàng 5 món (đã có gì, thiếu gì)
 
@@ -137,9 +134,9 @@ chép tay từ bảng đó, không tự nhân chia. Số đầy đủ giá máy 
 | Video trả lời 9 nỗi sợ (uống được không, bao nhiêu lít, điện gì, hỏng ai sửa, lõi bao lâu thay, có phụ tùng không) | CHƯA CÓ, chỉ trả lời được câu có trong tài liệu | Thanh liệt kê câu, Kinh doanh trả lời, máy dựng video tuần 2 |
 | Case study tàu thật | CHƯA CÓ khách dùng | Xin quay ở khách mua đầu tiên, đổi quà (mục 10) |
 
-## 10. Tàu thật làm mẫu (không lắp thử, Thanh chốt 11/9)
+## 10. Tàu thật làm mẫu
 
-Công ty không cho lắp thử miễn phí. Lấy tàu thật bằng 2 đường không tốn máy:
+Lấy tàu thật bằng 2 đường không tốn máy:
 
 - **Khách mua đầu tiên đổi video lấy quà.** Khi giao bộ lọc dầu đầu tiên, Thanh xin quay 30 giây lúc lắp và
   xin chủ tàu nhắn lại sau chuyến đầu. Đổi lại tặng lõi lọc thay thế hoặc can nhớt PVOIL (sếp duyệt quà,
@@ -162,12 +159,11 @@ Công ty không cho lắp thử miễn phí. Lấy tàu thật bằng 2 đườn
 
 1. Sonnet thi công `plan-bai-toan-loi-ich-11-09.md` (8 kịch bản, test 95). Sau deploy Thanh đặt trên Vercel
    2 biến: DIESEL_PRICE_VND=27740 và DIESEL_PRICE_DATE=3/9/2026. Kỳ giá dầu mới chỉ đổi 2 biến.
-2. Không thêm tính năng mới cho đại lý trong tháng này; dùng trang Khách hàng nguồn group với ghi chú.
+2. Không thêm tính năng mới cho thợ máy trong tháng này; dùng trang Khách hàng nguồn group với ghi chú.
 3. Mốc kiểm 21/9 xong mới xét: trường "tệp A/B/C/D" trong Khách hàng, và video 9 nỗi sợ dựng tự động.
 
 ## 13. Điều kiện đổi hướng
 
 - Chủ nhật 21/9 dưới 10 người hỏi: đổi video ads sang video test nước hoặc video 9 nỗi sợ, đổi câu dẫn group.
-- Chủ nhật 28/9 chưa có đơn lọc dầu nào: dừng ads, dồn sức vào thợ máy và inbox; xin sếp giá kích cầu cho
-  10 bộ đầu.
+- Chủ nhật 28/9 chưa có đơn lọc dầu nào: dừng ads, dồn sức vào thợ máy và inbox.
 - Facebook chặn tài khoản chia sẻ: giảm còn 4 nhóm một ngày, cách 10 phút, không dán link trần, dán kèm câu dẫn.
