@@ -68,24 +68,67 @@ export default function ShareGroups({
     } catch { /* giữ lô cũ */ }
   };
   useEffect(() => { if (open) loadLot(); }, [open]);
+  // 12/9 (Thanh: "nút Đã chia không hoạt động"): trước đây bấm xong nút bị khóa cho tới khi POST + tải lại
+  // lô trả về; máy chủ chậm hoặc treo là nút đứng im, không báo gì. Giờ: (1) đổi giao diện NGAY (lạc quan),
+  // (2) gọi máy chủ có hạn 15 giây, (3) lỗi hay hết giờ thì trả lại như cũ và báo rõ, (4) không khóa nút
+  // trong lúc tải lại lô, chỉ chặn bấm đúp cùng một nhóm.
+  const fetchWithTimeout = async (input: RequestInfo, init: RequestInit, ms = 15000) => {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms);
+    try { return await fetch(input, { ...init, signal: ctl.signal }); } finally { clearTimeout(t); }
+  };
+  const patchLot = (groupId: string, fn: (g: LotItem) => LotItem) => {
+    setLot((prev) => {
+      if (!prev) return prev;
+      const map = (arr: LotItem[]) => arr.map((x) => (x.id === groupId ? fn(x) : x));
+      const lotNext = map(prev.lot); const allNext = map(prev.allGroups);
+      return { ...prev, lot: lotNext, allGroups: allNext, doneToday: lotNext.filter((x) => x.sharedToday).length };
+    });
+  };
+  const inFlight = useRef<Set<string>>(new Set());
+  const errText = (e: any) => (e?.name === 'AbortError' ? 'máy chủ không trả lời sau 15 giây' : (e?.message || 'lỗi mạng'));
   const markShared = async (g: LotItem) => {
+    if (inFlight.current.has(g.id)) return;
+    inFlight.current.add(g.id);
     setBusyId(g.id);
+    const nowIso = new Date().toISOString();
+    patchLot(g.id, (x) => ({ ...x, sharedToday: { id: 'tam', content_id: contentId, shared_at: nowIso }, sharedThisPost: true, lastSharedAt: nowIso, daysSince: 0 }));
     try {
-      const r = await fetch('/api/share-groups/shares', {
+      const r = await fetchWithTimeout('/api/share-groups/shares', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content_id: contentId, group_id: g.id, group_label: g.label, post_url: postUrl }),
       });
-      if (!r.ok) alert('Không ghi được lượt chia (' + r.status + '). Thử lại.');
-      await loadLot();
-    } finally { setBusyId(null); }
+      if (!r.ok) {
+        let msg = ''; try { msg = String((await r.json())?.error || ''); } catch { /* bỏ qua */ }
+        throw new Error(r.status === 401 ? 'phiên đăng nhập hết hạn, tải lại trang rồi đăng nhập lại' : 'máy chủ trả ' + r.status + (msg ? ': ' + msg : ''));
+      }
+      const j = await r.json();
+      if (j?.row?.id) patchLot(g.id, (x) => ({ ...x, sharedToday: { id: String(j.row.id), content_id: j.row.content_id ?? contentId, shared_at: String(j.row.shared_at || nowIso) } }));
+      setBusyId(null);
+      loadLot(); // đồng bộ nền, không khóa nút
+    } catch (e: any) {
+      patchLot(g.id, (x) => ({ ...x, sharedToday: g.sharedToday, sharedThisPost: g.sharedThisPost, lastSharedAt: g.lastSharedAt, daysSince: g.daysSince }));
+      setBusyId(null);
+      alert('Chưa ghi được lượt chia cho "' + g.label + '": ' + errText(e) + '. Bấm lại giúp em.');
+    } finally { inFlight.current.delete(g.id); }
   };
   const undoShared = async (g: LotItem) => {
-    if (!g.sharedToday) return;
+    if (!g.sharedToday || inFlight.current.has(g.id)) return;
+    if (g.sharedToday.id === 'tam') { alert('Đang ghi lượt chia, chờ một chút rồi hoàn tác.'); return; }
+    inFlight.current.add(g.id);
     setBusyId(g.id);
+    const prevShared = g.sharedToday;
+    patchLot(g.id, (x) => ({ ...x, sharedToday: null, sharedThisPost: false }));
     try {
-      await fetch('/api/share-groups/shares', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: g.sharedToday.id }) });
-      await loadLot();
-    } finally { setBusyId(null); }
+      const r = await fetchWithTimeout('/api/share-groups/shares', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: prevShared.id }) });
+      if (!r.ok) throw new Error('máy chủ trả ' + r.status);
+      setBusyId(null);
+      loadLot();
+    } catch (e: any) {
+      patchLot(g.id, (x) => ({ ...x, sharedToday: prevShared, sharedThisPost: g.sharedThisPost }));
+      setBusyId(null);
+      alert('Chưa hoàn tác được cho "' + g.label + '": ' + errText(e) + '. Bấm lại giúp em.');
+    } finally { inFlight.current.delete(g.id); }
   };
   const fmtHHmm = (iso: string) => new Date(new Date(iso).getTime() + 7 * 3600 * 1000).toISOString().slice(11, 16);
   const btnRef = useRef<HTMLButtonElement | null>(null);
