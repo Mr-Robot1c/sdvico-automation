@@ -75,7 +75,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, todayView, leadsRes, yt, wonWeekRes, goalRes, shareLot] = await Promise.all([
+  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, todayView, leadsRes, yt, wonWeekRes, goalRes, shareLot, qaVerifiedRes, qaPendingRes] = await Promise.all([
     client
       .from('approval_queue')
       .select('id, title, status, payload, created_at')
@@ -117,7 +117,12 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('status', 'won').gte('updated_at', weekStartIso),
     client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
     computeShareLot(client),
+    // 12/9 (Thanh gật): dòng đếm kho hỏi đáp cho mục tiêu tuần 14–20/9 (kho tri thức bot live, đích 40 dòng đã xác nhận)
+    client.from('mkt_product_qa').select('id', { count: 'exact', head: true }).eq('verified', true),
+    client.from('mkt_product_qa').select('id', { count: 'exact', head: true }).eq('verified', false),
   ]);
+  const qaVerified = qaVerifiedRes.count ?? 0;
+  const qaPending = qaPendingRes.count ?? 0;
 
   const queueRows = (queueRes.data || []) as QueueRow[];
   const posts = (postsRes.data || []) as PostRow[];
@@ -432,6 +437,10 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
               để vào thẳng trang khách hàng xem lead cũ và đổi trạng thái. */}
           <p className="sub" style={{ margin: '0 0 8px', fontSize: '.85rem' }}>
             💰 Đã mua tuần này: <b>{fmt(wonWeek)}</b> / {fmt(wonTarget)} khách (mục tiêu tuần). Chốt được thì đổi trạng thái khách sang "Đã mua".
+          </p>
+          <p className="sub" style={{ margin: '0 0 8px', fontSize: '.85rem' }}>
+            📚 Kho hỏi đáp: <b>{fmt(qaVerified)}</b> dòng đã xác nhận · <b>{fmt(qaPending)}</b> dòng chờ Kinh doanh xác nhận.
+            {qaPending > 0 ? ' Hỏi anh Tiến, Hòa hoặc Linh rồi bấm Xác nhận.' : ''} <Link href="/hoi-dap" className="src">Mở Kho hỏi đáp →</Link>
           </p>
           {leads.length === 0 ? (
             <div style={{ display: 'grid', gap: 10 }}>
