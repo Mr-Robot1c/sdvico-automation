@@ -60,3 +60,4 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 - Backend và tác vụ theo lịch dùng khóa **service role**, tự bỏ qua RLS. Giao diện duyệt server-side cũng dùng service role (xem `apps/approval-ui/lib/supabase-server.ts`).
 - `mkt_oauth_tokens` cố tình **không có policy** nào: kể cả vai trò authenticated cũng không đọc được, chỉ service role. Token là bí mật (điều cấm 7).
 - Trọng tâm RLS bảo vệ dữ liệu cá nhân: `hr_candidates`, `hr_applications` (điều cấm 6).
+<!-- re-verified: 2026-09-13 toi - Migration 20260913200000_run_log_task_created_idx: index run_log(task, created_at desc). Ly do: /agent (lib/agent-defs.ts) doc lan chay cuoi cua 11 AI bang 1 truy van in(17 task)+limit 300 keo ca detail, run_log ~8.000 dong khong index -> luc lanh 5-6 giay, Supabase cat, loi bi nuot thanh mang rong -> 7 AI bao "chua thay lan chay nao" oan (Thanh thay 13/9 18:39). DA AP len lluuoygdlaadtjsbnxbk qua db-apply.mjs 13/9. -->

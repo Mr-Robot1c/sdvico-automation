@@ -47,21 +47,29 @@ export function ago(iso: string | null): string {
 type LogRow = { task: string; status: string; detail: any; created_at: string };
 
 export async function loadAgentDefs(client: Client): Promise<AgentDef[]> {
-  const [logRes, dataInternalCount, dataInternalLast, dataPublicCount, dataPublicLast, videoAssetRes] = await Promise.all([
-    client
-      .from('run_log')
-      .select('task, status, detail, created_at')
-      .in('task', [
-        'mkt.plan', 'mkt.plan_manual', 'mkt.live_apply', 'mkt.apply_learn',
-        'mkt.rotate', 'mkt.suggestions_refill',
-        'mkt.seo_audit', 'mkt.seed_keywords', 'mkt.keyword_suggest',
-        'mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull',
-        'mkt.learn_weekly',
-        'mkt.knowledge_public_deep',
-        'mkt.hoi_dap_bot',
-      ])
-      .order('created_at', { ascending: false })
-      .limit(300),
+  // 13/9 (Thanh thấy 7 AI báo "chưa thấy lần chạy nào" dù run_log có đủ): bản cũ 1 truy vấn
+  // in(17 task) + limit 300 kéo cả cột detail, run_log ~8.000 dòng không có index nên lúc lạnh
+  // mất 5-6 giây, Supabase cắt -> logRes.error bị nuốt thành mảng rỗng -> UI in "chưa chạy" oan.
+  // Giờ: mỗi nhóm AI 1 truy vấn limit 1 (chạy song song, ~0,4 giây), kèm index
+  // run_log(task, created_at desc) (migration 20260913200000), và lỗi đọc log thì NÓI là lỗi đọc log.
+  const LOG_GROUPS: string[][] = [
+    ['mkt.plan', 'mkt.plan_manual', 'mkt.live_apply', 'mkt.apply_learn'],
+    ['mkt.rotate', 'mkt.suggestions_refill'],
+    ['mkt.seo_audit', 'mkt.seed_keywords', 'mkt.keyword_suggest'],
+    ['mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull'],
+    ['mkt.learn_weekly'],
+    ['mkt.knowledge_public_deep'],
+    ['mkt.hoi_dap_bot'],
+  ];
+  const [logResList, dataInternalCount, dataInternalLast, dataPublicCount, dataPublicLast, videoAssetRes] = await Promise.all([
+    Promise.all(LOG_GROUPS.map((tasks) =>
+      client
+        .from('run_log')
+        .select('task, status, detail, created_at')
+        .in('task', tasks)
+        .order('created_at', { ascending: false })
+        .limit(1)
+    )),
     client.from('mkt_knowledge_internal').select('*', { count: 'exact', head: true }),
     client.from('mkt_knowledge_internal').select('created_at').order('created_at', { ascending: false }).limit(1),
     client.from('mkt_knowledge_public').select('*', { count: 'exact', head: true }),
@@ -69,7 +77,8 @@ export async function loadAgentDefs(client: Client): Promise<AgentDef[]> {
     client.from('brand_assets').select('title, created_at').in('kind', ['video', 'clip']).order('created_at', { ascending: false }).limit(1),
   ]);
 
-  const logs = (logRes.data || []) as LogRow[];
+  const logs = logResList.flatMap((r) => (r.data || []) as LogRow[]).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  const logReadError = logResList.some((r) => r.error);
   const lastOf = (tasks: string[]): LogRow | null => logs.find((l) => tasks.includes(l.task)) || null;
   const lastVideoAsset = ((videoAssetRes.data || [])[0] as any) || null;
   const lastInternal = ((dataInternalLast.data || [])[0] as any) || null;
@@ -79,6 +88,7 @@ export async function loadAgentDefs(client: Client): Promise<AgentDef[]> {
   // skipped là "bỏ qua có mục đích" (rotate đã sinh xong slot hôm nay, guard chặn dư),
   // KHÔNG phải lỗi. Trước gộp !== 'ok' thành ok:false -> UI in "Lỗi" oan.
   const mkLast = (row: LogRow | null, okNote: string): AgentDef['last'] => {
+    if (!row && logReadError) return { at: null, state: 'warn', note: 'không đọc được nhật ký lúc này, tải lại trang sau ít phút' };
     if (!row) return { at: null, state: null, note: 'chưa thấy lần chạy nào trong log' };
     if (row.status === 'ok') return { at: row.created_at, state: 'ok', note: okNote };
     if (row.status === 'skipped') {
