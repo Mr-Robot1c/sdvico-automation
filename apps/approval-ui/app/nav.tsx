@@ -31,7 +31,8 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
     items: [
       { href: '/quy-tac', label: 'Quy tắc', icon: '📜' },
       // 29/8 (user): thay link sdvico.vn bang BLOG cua chinh he thong (trang cong khai /blog).
-      { href: '/blog', label: 'Blog SDVICO', icon: '🌐', external: true }
+      // 13/9 (Thanh): sdvico.vn/blog da song (anh Thanh len IIS) -> menu tro thang sang do; /blog cua he thong van con.
+      { href: 'https://sdvico.vn/blog', label: 'Blog SDVICO', icon: '🌐', external: true }
     ]
   };
   const groups: Group[] = marketingOnly
