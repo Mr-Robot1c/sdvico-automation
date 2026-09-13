@@ -15,11 +15,13 @@ function fmtVN(iso: string) {
   } catch { return iso; }
 }
 
-export async function metricsAlert(client: Client): Promise<{ alert: MetricsAlert; hoursSinceMetric: number | null }> {
-  const [{ data: lastMetric }, { data: lastPull }] = await Promise.all([
+export async function metricsAlert(client: Client): Promise<{ alert: MetricsAlert; hoursSinceMetric: number | null; readError?: boolean }> {
+  const [{ data: lastMetric, error: errMetric }, { data: lastPull, error: errPull }] = await Promise.all([
     client.from('mkt_metrics').select('created_at').order('created_at', { ascending: false }).limit(1),
     client.from('run_log').select('status, detail, created_at').eq('task', 'mkt.metrics_pull').order('created_at', { ascending: false }).limit(1),
   ]);
+  // 13/9: truy vấn lỗi tạm (kết nối) thì KHÔNG suy ra "chưa có lượt kéo nào" — bỏ qua lượt này.
+  if (errMetric || errPull) return { alert: null, hoursSinceMetric: null, readError: true };
   const mIso = (lastMetric || [])[0]?.created_at as string | undefined;
   const hM = mIso ? (Date.now() - new Date(mIso).getTime()) / 3600000 : null;
   const pull = (lastPull || [])[0] as { status: string; detail: any; created_at: string } | undefined;

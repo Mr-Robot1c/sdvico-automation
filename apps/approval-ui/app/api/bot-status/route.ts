@@ -17,8 +17,8 @@ export async function GET() {
     { count: internal },
     { count: publicSrc },
     { data: planRows },
-    { data: lastInternal },
-    { data: lastPublic },
+    { data: lastInternal, error: errInternal },
+    { data: lastPublic, error: errPublic },
     metric,
   ] = await Promise.all([
     client.from('mkt_knowledge_internal').select('id', { count: 'exact', head: true }).gte('created_at', since),
@@ -38,8 +38,14 @@ export async function GET() {
   const hPublic = hoursSince((lastPublic || [])[0]?.created_at as string | undefined);
   const hMetric = metric.hoursSinceMetric == null ? Infinity : metric.hoursSinceMetric;
   const alerts: Array<{ who: string; msg: string }> = [];
-  if (hInternal > 30) alerts.push({ who: 'Data 1', msg: hInternal === Infinity ? 'Chưa học nội bộ bao giờ. Kiểm tra phiên đọc Zalo và task đẩy bucket (SDVICO-DayKhoZalo).' : `Đã ${Math.floor(hInternal)} giờ không có bản ghi nội bộ mới. Có thể phiên đọc Zalo hôm nay không chạy hoặc file chưa được đẩy lên bucket.` });
-  if (hPublic > 30) alerts.push({ who: 'Data 2', msg: hPublic === Infinity ? 'Chưa học public bao giờ.' : `Đã ${Math.floor(hPublic)} giờ không có nguồn public mới. Cron mkt-metrics-pull (chạy học public) có thể đang không chạy.` });
+  // 13/9 (Thanh: "báo động fake"): chip từng in "Chưa học nội bộ/public bao giờ" ngay cạnh dòng
+  // "Đã học 43 bản ghi nội bộ và 49 nguồn" — vì truy vấn lấy dòng mới nhất lỗi tạm (kết nối
+  // Supabase) trả data=null, code coi như "chưa bao giờ". Giờ: truy vấn lỗi, hoặc 7 ngày qua
+  // vẫn có bản ghi, thì KHÔNG kết luận "chưa bao giờ"; lỗi đọc thì bỏ qua lượt này (client poll lại sau 60 giây).
+  const internalReadable = !errInternal && !(hInternal === Infinity && (internal || 0) > 0);
+  const publicReadable = !errPublic && !(hPublic === Infinity && (publicSrc || 0) > 0);
+  if (internalReadable && hInternal > 30) alerts.push({ who: 'Data 1', msg: hInternal === Infinity ? 'Chưa học nội bộ bao giờ. Kiểm tra phiên đọc Zalo và task đẩy bucket (SDVICO-DayKhoZalo).' : `Đã ${Math.floor(hInternal)} giờ không có bản ghi nội bộ mới. Có thể phiên đọc Zalo hôm nay không chạy hoặc file chưa được đẩy lên bucket.` });
+  if (publicReadable && hPublic > 30) alerts.push({ who: 'Data 2', msg: hPublic === Infinity ? 'Chưa học public bao giờ.' : `Đã ${Math.floor(hPublic)} giờ không có nguồn public mới. Cron mkt-metrics-pull (chạy học public) có thể đang không chạy.` });
   if (metric.alert) alerts.push({ who: 'Đo lường', msg: metric.alert.message });
 
   const applied = (planRows || [])[0] as any;
@@ -57,6 +63,7 @@ export async function GET() {
     lastInternalHours: hInternal === Infinity ? null : Math.round(hInternal),
     lastPublicHours: hPublic === Infinity ? null : Math.round(hPublic),
     lastMetricHours: hMetric === Infinity ? null : Math.round(hMetric),
+    readErrors: [errInternal ? 'Data 1' : null, errPublic ? 'Data 2' : null, metric.readError ? 'Đo lường' : null].filter(Boolean),
     alerts,
   });
 }
