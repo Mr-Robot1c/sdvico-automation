@@ -24,8 +24,11 @@ export async function GET() {
     client.from('mkt_knowledge_internal').select('id', { count: 'exact', head: true }).gte('created_at', since),
     client.from('mkt_knowledge_public').select('id', { count: 'exact', head: true }).gte('created_at', since),
     client.from('mkt_plans').select('id, data, applied, applied_at, created_at').eq('applied', true).order('created_at', { ascending: false }).limit(1),
-    client.from('mkt_knowledge_internal').select('created_at').not('source_path', 'like', 'evaluator/%').order('created_at', { ascending: false }).limit(1),
-    client.from('mkt_knowledge_public').select('created_at').order('created_at', { ascending: false }).limit(1),
+    // 13/9 (kiểm 13/9 tối: 3 bảng KHÔNG có created_at NULL, nguyên nhân thật là truy vấn lỗi tạm; giữ guard cho chắc): Postgres xếp NULL LÊN ĐẦU khi ORDER BY ... DESC -> một bản ghi created_at rỗng là đủ làm
+    // lastInternal[0].created_at = null -> chip báo "Chưa học nội bộ bao giờ" dù 7 ngày vẫn có 43 bản ghi.
+    // Loại NULL ra khỏi truy vấn + nullsFirst:false, và giữ error để không suy diễn khi lỗi truy vấn.
+    client.from('mkt_knowledge_internal').select('created_at').not('source_path', 'like', 'evaluator/%').not('created_at', 'is', null).order('created_at', { ascending: false, nullsFirst: false }).limit(1),
+    client.from('mkt_knowledge_public').select('created_at').not('created_at', 'is', null).order('created_at', { ascending: false, nullsFirst: false }).limit(1),
     metricsAlert(client),
   ]);
 
@@ -38,14 +41,15 @@ export async function GET() {
   const hPublic = hoursSince((lastPublic || [])[0]?.created_at as string | undefined);
   const hMetric = metric.hoursSinceMetric == null ? Infinity : metric.hoursSinceMetric;
   const alerts: Array<{ who: string; msg: string }> = [];
-  // 13/9 (Thanh: "báo động fake"): chip từng in "Chưa học nội bộ/public bao giờ" ngay cạnh dòng
-  // "Đã học 43 bản ghi nội bộ và 49 nguồn" — vì truy vấn lấy dòng mới nhất lỗi tạm (kết nối
-  // Supabase) trả data=null, code coi như "chưa bao giờ". Giờ: truy vấn lỗi, hoặc 7 ngày qua
-  // vẫn có bản ghi, thì KHÔNG kết luận "chưa bao giờ"; lỗi đọc thì bỏ qua lượt này (client poll lại sau 60 giây).
-  const internalReadable = !errInternal && !(hInternal === Infinity && (internal || 0) > 0);
-  const publicReadable = !errPublic && !(hPublic === Infinity && (publicSrc || 0) > 0);
-  if (internalReadable && hInternal > 30) alerts.push({ who: 'Data 1', msg: hInternal === Infinity ? 'Chưa học nội bộ bao giờ. Kiểm tra phiên đọc Zalo và task đẩy bucket (SDVICO-DayKhoZalo).' : `Đã ${Math.floor(hInternal)} giờ không có bản ghi nội bộ mới. Có thể phiên đọc Zalo hôm nay không chạy hoặc file chưa được đẩy lên bucket.` });
-  if (publicReadable && hPublic > 30) alerts.push({ who: 'Data 2', msg: hPublic === Infinity ? 'Chưa học public bao giờ.' : `Đã ${Math.floor(hPublic)} giờ không có nguồn public mới. Cron mkt-metrics-pull (chạy học public) có thể đang không chạy.` });
+  // 13/9: lỗi truy vấn -> nói đúng là "không kiểm tra được", không kết luận "chưa học bao giờ".
+  // "Chưa học bao giờ" chỉ khi KHÔNG có bản ghi nào cả (đếm 7 ngày cũng 0); còn đếm 7 ngày > 0 mà
+  // không tìm được ngày hợp lệ thì là dữ liệu thiếu created_at, báo đúng bệnh để người sửa cột.
+  if (errInternal) alerts.push({ who: 'Data 1', msg: `Không kiểm tra được lần học nội bộ gần nhất (lỗi truy vấn: ${errInternal.message}).` });
+  else if (hInternal === Infinity && (internal || 0) > 0) alerts.push({ who: 'Data 1', msg: `Có ${internal} bản ghi nội bộ 7 ngày qua nhưng không bản ghi nào có ngày tạo hợp lệ (created_at rỗng). Kiểm tra cột created_at trong mkt_knowledge_internal.` });
+  else if (hInternal > 30) alerts.push({ who: 'Data 1', msg: hInternal === Infinity ? 'Chưa học nội bộ bao giờ. Kiểm tra phiên đọc Zalo và task đẩy bucket (SDVICO-DayKhoZalo).' : `Đã ${Math.floor(hInternal)} giờ không có bản ghi nội bộ mới. Có thể phiên đọc Zalo hôm nay không chạy hoặc file chưa được đẩy lên bucket.` });
+  if (errPublic) alerts.push({ who: 'Data 2', msg: `Không kiểm tra được lần học public gần nhất (lỗi truy vấn: ${errPublic.message}).` });
+  else if (hPublic === Infinity && (publicSrc || 0) > 0) alerts.push({ who: 'Data 2', msg: `Có ${publicSrc} nguồn public 7 ngày qua nhưng không nguồn nào có ngày tạo hợp lệ (created_at rỗng).` });
+  else if (hPublic > 30) alerts.push({ who: 'Data 2', msg: hPublic === Infinity ? 'Chưa học public bao giờ.' : `Đã ${Math.floor(hPublic)} giờ không có nguồn public mới. Cron mkt-metrics-pull (chạy học public) có thể đang không chạy.` });
   if (metric.alert) alerts.push({ who: 'Đo lường', msg: metric.alert.message });
 
   const applied = (planRows || [])[0] as any;
