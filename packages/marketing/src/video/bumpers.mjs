@@ -4,13 +4,18 @@
 // Cùng codec cảnh chính (H.264 yuv420p 30fps AAC 44100 stereo) để concat -c copy.
 import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
 import { writeFile, mkdir } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { ffmpeg, probeDuration } from './ffmpeg.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FPS = 30;
+// 14/9 (sep): 4s dau video doc dung CLIP INTRO THUONG HIEU dung san (assets/intro-doc.mp4, cat tu
+// intro-2026-Q3.mp4: bot nuoc gom thanh logo, chu SDVICO truot vao, slogan). Clip da cat dung
+// 4,0s (diem doi canh) + fade tieng 0,4s cuoi. Thieu file hoac ban ngang thi ve intro bang canvas
+// nhu cu. INTRO_CLIP=duong-dan-khac de thu clip khac.
+const INTRO_CLIP = process.env.INTRO_CLIP || join(HERE, 'assets', 'intro-doc.mp4');
 
 let fontsReady = false;
 function registerFontsFromWorkdir(workDir) {
@@ -303,6 +308,20 @@ async function renderBumperMp4(drawFrame, framesDir, W, H, dur, audioPath, outSe
   return outSeg;
 }
 
+// Ma hoa lai clip intro ve DUNG tham so cua cac canh (H.264 yuv420p 30fps, timescale 30000, AAC
+// 44100 stereo) de concat -c copy khong loi. Clip 1080x1920 nen scale la no-op, van giu de an toan.
+async function renderIntroFromClip(clipPath, W, H, outSeg, workDir) {
+  await ffmpeg([
+    '-y', '-i', clipPath,
+    '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},format=yuv420p`,
+    '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
+    '-r', String(FPS), '-video_track_timescale', String(FPS * 1000),
+    '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+    outSeg,
+  ], { cwd: workDir });
+  return outSeg;
+}
+
 // Tạo intro và outro cho một FORMAT. Trả về {introSeg, outroSeg} là tên file mp4 trong workDir để
 // concat cùng cảnh chính. outroAudioPath: mp3 TTS đọc tổng đài (đã sinh sẵn), có thể null.
 // Xem trước 1 frame (dùng cho scripts/preview-bumpers.mjs) — không ảnh hưởng pipeline.
@@ -322,7 +341,11 @@ export async function buildBumpers({ workDir, fmt, outroAudioPath = null, introD
   }
   const introFramesDir = join(workDir, '_intro_frames');
   const outroFramesDir = join(workDir, '_outro_frames');
-  await renderBumperMp4(drawIntroFrame, introFramesDir, fmt.w, fmt.h, introDurSec, null, 'intro.mp4', workDir);
+  if (fmt.h > fmt.w && existsSync(INTRO_CLIP)) {
+    await renderIntroFromClip(INTRO_CLIP, fmt.w, fmt.h, 'intro.mp4', workDir);
+  } else {
+    await renderBumperMp4(drawIntroFrame, introFramesDir, fmt.w, fmt.h, introDurSec, null, 'intro.mp4', workDir);
+  }
   await renderBumperMp4(drawOutroFrame, outroFramesDir, fmt.w, fmt.h, outroActualDur, outroAudioPath, 'outro.mp4', workDir);
   return { introSeg: 'intro.mp4', outroSeg: 'outro.mp4' };
 }

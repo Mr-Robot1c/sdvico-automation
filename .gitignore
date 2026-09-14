@@ -56,3 +56,6 @@ seo-report.md
 # Python cache
 __pycache__/
 *.pyc
+
+# 14/9: clip intro thuong hieu (4s dau video doc) — ngoai le cho luat *.mp4 o tren
+!packages/marketing/src/video/assets/*.mp4
