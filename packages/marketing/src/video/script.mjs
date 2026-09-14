@@ -103,6 +103,38 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'đời người đi biển gắn liền với con tàu', 'thương cái nghiệp biển khơi', 'thương các nghiệp biển khơi',
     'mấy hôm nay ghé cảng', 'cặm cụi kiểm tra từng con ốc',
   ];
+  // 14/9 (sếp: "kịch bản video lọc dầu / lọc nước đừng cứ mãi mất luồng cá lớn, đổi cho đừng giống
+  // nhau quá"): video BÁN HÀNG trước đây ép đúng 1 kiểu hook nghịch lý + ví dụ toàn "trúng luồng cá
+  // phải quay bờ", cảnh 2 lại gợi ý "vợ con đợi tiền / xót đứt ruột / nằm bờ cả tuần" nên bài nào
+  // cũng một khuôn. Nay: 6 KIỂU MỞ xoay theo bài (băm id như video content, env VIDEO_SALES_STYLE
+  // ghi đè), mỗi kiểu kèm 1 TÌNH HUỐNG MẤT MÁT khác nhau, và danh sách cụm đã mòn bị cấm + soát sau
+  // khi sinh (dính thì sinh lại 1 lần).
+  const SALES_WORN = [
+    'trúng luồng cá', 'luồng cá lớn', 'mất luồng cá', 'quay vào bờ', 'quay đầu về bờ', 'phải quay bờ',
+    'chuyến đi đứt', 'chuyến biển đi đứt', 'chuyến biển đứt', 'đứt gánh', 'trong nháy mắt',
+    'xót đứt ruột', 'tiếc đứt ruột', 'uất nghẹn', 'uất không nói nên lời', 'vợ con ở nhà',
+    'nằm bờ cả tuần', 'giữa khơi xa', 'tàu bạc tỷ', 'chén nước lã',
+  ];
+  const SALES_STYLES = [
+    { key: 'nghich-ly', label: 'Nghịch lý mất mát',
+      open: 'mở bằng 1 CÂU KHẲNG ĐỊNH <=15 chữ có 2 mảnh đối lập: việc đã làm đúng / đầu tư lớn NHƯNG hỏng vì 1 thứ nhỏ trong dầu hoặc trong nước. KHÔNG dùng tình huống trúng cá phải về bờ',
+      situation: 'máy đang chạy ngon bỗng khục khặc rồi tắt giữa chừng, thợ tháo ra thấy toàn cặn' },
+    { key: 'con-so', label: 'Con số túi tiền',
+      open: 'mở bằng MỘT CON SỐ tiền hoặc lít dầu hoặc ngày công (có trong bài nguồn, không có thì nói "mấy triệu", "cả chục triệu", "cả tuần") đặt ngay đầu câu, rồi 1 câu số đó bay đi đâu',
+      situation: 'tiền thay kim phun, bơm cao áp, tiền dầu đốt hao, tiền nước ngọt mua từ bờ cộng dồn mỗi chuyến' },
+    { key: 'loi-tho-may', label: 'Lời thợ máy',
+      open: 'mở bằng MỘT CÂU NÓI TRỰC TIẾP của thợ máy hoặc chủ tàu (trong ngoặc kép, không bịa tên, gọi "anh thợ máy", "bác chủ tàu"), rồi 1 câu ai vừa nói và nói lúc nào',
+      situation: 'thợ máy sửa tới lần thứ ba trong tháng, lắc đầu vì nguyên nhân vẫn là dầu bẩn / nước lợ' },
+    { key: 'thoi-quen-sai', label: 'Thói quen hay mắc',
+      open: 'mở bằng 1 THÓI QUEN nhiều tàu vẫn làm mà tưởng đúng (đổ dầu là chạy, mua nước bờ chở theo, xả cặn qua loa), 1 câu <=14 chữ, rồi 1 câu cái giá phải trả. KHÔNG bịa tỷ lệ phần trăm hay "9 trên 10 tàu"',
+      situation: 'tưởng tiết kiệm được chút ban đầu, cuối chuyến tính lại tốn gấp mấy lần' },
+    { key: 'giac-quan', label: 'Giác quan tại chỗ',
+      open: 'mở bằng ÂM THANH, MÙI hoặc HÌNH ẢNH cụ thể trên tàu (tiếng máy lịm dần, mùi khét, nước lợ mặn chát, vệt cặn đen trong cốc dầu), 1 câu ngắn, rồi 1 câu điều đó báo hiệu gì',
+      situation: 'cả tàu im lặng nghe máy, hoặc anh em nhăn mặt vì ca nước lợ' },
+    { key: 'truoc-sau', label: 'Trước và sau',
+      open: 'mở bằng HAI TÀU hoặc HAI CHUYẾN đặt cạnh nhau trong cùng 1 câu (tàu lắp / tàu chưa lắp, chuyến trước / chuyến này), rồi 1 câu khác nhau ở đâu. Không bịa tên tàu, tên người',
+      situation: 'tàu bên cạnh về bến đúng hẹn còn tàu mình còn loay hoay sửa máy hoặc chia từng ca nước' },
+  ];
   const CONTENT_STYLES = [
     { key: 'chung-kien', label: 'Chứng kiến tại chỗ',
       open: 'mở bằng MỘT CHI TIẾT NHỎ nhìn thấy trong clip (bàn tay, con ốc, vệt dầu, tiếng máy), 1 câu <=12 chữ, KHÔNG nói "đây là cảnh thật", địa điểm chỉ lướt qua trong cảnh giữa nếu bài nguồn có',
@@ -128,6 +160,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       : [...String(content.id || '')].reduce((s, ch) => s + ch.charCodeAt(0), 0);
   const STYLE = CONTENT_STYLES[Math.abs(styleIdx) % CONTENT_STYLES.length];
   if (opts.contentVideo) console.log(`Kiểu kể video content: ${STYLE.label} (${STYLE.key})`);
+  const salesIdx = process.env.VIDEO_SALES_STYLE !== undefined && process.env.VIDEO_SALES_STYLE !== '' ? Number(process.env.VIDEO_SALES_STYLE) : styleIdx;
+  const SALES_STYLE = SALES_STYLES[Math.abs(salesIdx) % SALES_STYLES.length];
+  if (!opts.contentVideo) console.log(`Kiểu mở video bán hàng: ${SALES_STYLE.label} (${SALES_STYLE.key})`);
   const CONTENT_STRUCTURE = [
     'ĐÂY LÀ VIDEO CỘNG ĐỒNG "NGƯỜI THẬT TÀU THẬT": dựng từ clip THẬT đội SDVICO quay tại tàu, cảng, xưởng. KHÔNG bán hàng, KHÔNG nhắc giá, KHÔNG kêu nhắn Page hay gọi điện. Sản phẩm chỉ xuất hiện khi bài nguồn kể tới, và chỉ như một phần câu chuyện.',
     `KIỂU KỂ CỦA VIDEO NÀY: "${STYLE.label}". Bám đúng kiểu này, không trộn kiểu khác.`,
@@ -137,8 +172,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     `CỤM ĐÃ MÒN, CẤM DÙNG (đã lặp ở nhiều video trước, kể cả khi bài nguồn có): ${WORN_PHRASES.map((p) => `"${p}"`).join(', ')}. Muốn nói ý đó thì tìm cách nói khác.`,
   ];
   const SALES_STRUCTURE = [
-    'PLAYBOOK 24/8 (bộ lọc vàng): CẢNH ĐẦU phải MỞ NGAY bằng 1 CÂU HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (thành quả lớn bị phá bởi nguyên nhân nhỏ) — ví dụ câu đầu tiên của video: "Trúng luồng cá mà phải quay vào bờ vì hết nước." Cảnh đầu = hook + 1 câu tô đậm nỗi mất, KHÔNG có câu chào phía trước. Bám 1 trong 4 CHỮ CẢM XÚC: NGHỀ (khoe kinh nghiệm) / TIỀN (con số túi tiền) / RỦI RO (cảnh báo sai lầm, mất chuyến) / TỰ HÀO (lộc biển, danh dự nghề). Bài phải chạm đúng 1 chữ, không sáo rỗng.',
-    'HOOK NGHỊCH LÝ = CÂU KHẲNG ĐỊNH có 2 mảnh đối lập: THÀNH QUẢ LỚN + MẤT MÁT BẤT NGỜ. Ví dụ ĐÚNG: "Trúng luồng cá phải quay bờ vì cặn dầu.", "Đổ đầy dầu mà máy vẫn lịm giữa lộng.", "Dầu 38.000đ/lít đốt trôi vì kim phun bẩn." Ví dụ SAI (cấm): "Máy nổ có xót ruột không?", "Bà con có thấy vậy không?", "Anh em có gặp chưa?" — CÂU HỎI thăm/tu từ KHÔNG THAY THẾ được hook nghịch lý. Câu hỏi để dành cảnh cuối.',
+    `KIỂU MỞ CỦA VIDEO NÀY (sếp 14/9: mỗi video một kiểu, không được giống nhau): "${SALES_STYLE.label}". CẢNH ĐẦU: ${SALES_STYLE.open}. Cảnh đầu = câu mở + 1 câu tô đậm nỗi mất, KHÔNG có câu chào phía trước, KHÔNG câu hỏi thăm chung chung ("có thấy vậy không?", "có gặp chưa?"). Bám 1 trong 4 CHỮ CẢM XÚC: NGHỀ (khoe kinh nghiệm) / TIỀN (con số túi tiền) / RỦI RO (cảnh báo sai lầm, mất chuyến) / TỰ HÀO (lộc biển, danh dự nghề). Bài phải chạm đúng 1 chữ, không sáo rỗng.`,
+    `TÌNH HUỐNG MẤT MÁT của video này (dùng cho cảnh đầu và cảnh đồng cảm, kể bằng lời mình theo bài nguồn): ${SALES_STYLE.situation}. CẤM dùng lại tình huống "đang trúng cá / trúng luồng cá phải quay về bờ" trừ khi bài nguồn kể đúng chuyện đó, và kể cả khi đó cũng phải nói bằng cách khác.`,
+    `CỤM ĐÃ MÒN, CẤM DÙNG (đã lặp ở nhiều video bán hàng trước): ${SALES_WORN.map((p) => `"${p}"`).join(', ')}. Muốn nói ý đó thì tìm cách nói khác.`,
     'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển tiếc nuối, tàu nằm bờ). Không lan man.',
     'CẢNH GIỮA: lối thoát bằng LỢI ÍCH cụ thể (không liệt kê thông số kỹ thuật khô) → phần thưởng cụ thể (đỡ tốn bao nhiêu, đi được bao xa, chở thêm được gì) → tin cậy 1 câu ngắn (lắp tận bến, bảo hành).',
     'CẢNH CUỐI: 1 câu chốt ngắn về LỢI ÍCH/thông điệp sản phẩm (đã có luật ở trên), có thể là câu hỏi mở nhẹ cho bà con nghĩ tiếp. KHÔNG nhắc "gọi", "liên hệ", "hotline" — outro cố định đầu ký đã lo phần đó.',
@@ -199,17 +235,16 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
           'Bản dọc (vertical): 3 cảnh, tổng lời thoại 40-55 giây (~120-160 từ tiếng Việt). Cả video DƯỚI 60 giây (kể cả outro cố định ~5s).',
           '',
           'CẢNH 1 role="hook" (8-12s, ~25-35 từ):',
-          '  "[HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ, câu KHẲNG ĐỊNH 2 mảnh đối lập — là câu ĐẦU TIÊN, không chào]. [1 câu tô đậm nỗi mất]."',
-          '  Ví dụ về CẤU TRÚC (chủ đề khác, CẤM chép): "Đèn sáng rực cả đêm câu mực, sáng ra bình ắc quy chết queo. Thế là cả mẻ mực nằm lại ngoài khơi!"',
-          '  CẤM: câu chào mở đầu ("Alo alo", "Hello anh em", "Xin chào bà con"...), câu hỏi thay hook ("xót ruột không?", "có thấy vậy không?"), câu chung chung, thiếu 2 mảnh đối lập.',
+          `  Theo KIỂU MỞ "${SALES_STYLE.label}" ở trên: ${SALES_STYLE.open}. Rồi 1 câu tô đậm nỗi mất theo TÌNH HUỐNG đã cho.`,
+          '  CẤM: câu chào mở đầu ("Alo alo", "Hello anh em", "Xin chào bà con"...), câu hỏi thăm chung chung ("xót ruột không?", "có thấy vậy không?"), câu chung chung không có hình ảnh cụ thể, và mọi cụm đã mòn ở trên.',
           '',
           'CẢNH 2 role="empathy" (15-20s, ~45-60 từ) — CẢNH DÀI NHẤT, nhịp cảm xúc mạnh nhất playbook. BẮT BUỘC, KHÔNG được gộp/bỏ:',
-          '  Tả 3-4 HẬU QUẢ CỤ THỂ để bà con thấy TIẾC + UẤT + LO đầy đủ. PHẢI nêu đủ:',
-          '  1. Con số tiền mất (VD "mất mấy triệu tiền phụ tùng", "sửa hết chục triệu")',
-          '  2. Thời gian mất (VD "nằm bờ cả tuần", "cả chuyến biển đi đứt")',
-          '  3. Cơ hội mất (VD "đang trúng luồng cá phải bỏ", "vợ con ở nhà mong tiền")',
-          '  4. Tâm trạng (VD "xót đứt ruột", "uất nghẹn không nói nên lời")',
-          '  Ví dụ về CẤU TRÚC (chủ đề khác, CẤM chép): "Bình chết là đèn tắt, máy dò tắt, cả tàu mù giữa đêm. Thay bình mới mất mấy triệu, còn phải chạy về bờ bỏ luôn con nước đang trúng. Xót không anh em? Vợ con ở nhà đợi tiền, mình đứng nhìn bình hỏng mà uất!"',
+          '  Tả 3-4 HẬU QUẢ CỤ THỂ để bà con thấy TIẾC + UẤT + LO đầy đủ, bám TÌNH HUỐNG MẤT MÁT đã cho ở trên. PHẢI nêu đủ 4 ý, mỗi ý tự nghĩ cách nói riêng cho video này:',
+          '  1. Tiền mất (phụ tùng, tiền dầu, tiền nước, tiền công thợ)',
+          '  2. Thời gian mất (chờ sửa, chờ phụ tùng, chuyến bị ngắn lại)',
+          '  3. Cơ hội mất (chuyến biển, con nước, mối hàng, uy tín với bạn ghe)',
+          '  4. Tâm trạng (chọn 1 cảm xúc cụ thể của người trong cuộc, KHÔNG dùng "xót đứt ruột", "uất nghẹn", "vợ con ở nhà")',
+          '  Ví dụ về CẤU TRÚC (chủ đề khác, CẤM chép): "Bình chết là đèn tắt, máy dò tắt, cả tàu mù giữa đêm. Thay bình mới mất mấy triệu, thêm hai ngày nằm chờ hàng về. Tức nhất là bạn ghe bên cạnh vẫn sáng đèn kéo mực đều đều!"',
           '  CẤM: câu ngắn cụt ("máy hỏng vặt lắm"), lặp lại hook, nhắc sản phẩm SDVICO (chưa tới lối thoát).',
           '',
           'CẢNH 3 role="solution" (10-15s, ~35-45 từ):',
@@ -221,8 +256,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
           'Bản dọc (vertical): 5 cảnh, tổng lời thoại 55-60 giây.',
           'Lời thoại mỗi cảnh 8-12 giây (~20-30 từ). Súc tích, không lặp ý.',
           '',
-          'CẢNH 1 role="hook": vào thẳng HOOK NGHỊCH LÝ MẤT MÁT <=15 chữ (câu khẳng định 2 mảnh đối lập) rồi 1 câu tô đậm nỗi mất. KHÔNG câu chào mở đầu. Cấm câu hỏi.',
-          'CẢNH 2 role="empathy" (BẮT BUỘC, không bỏ): tả HẬU QUẢ TIẾC + UẤT + LO cụ thể (số tiền mất, thời gian mất, tâm trạng). Không nhắc sản phẩm SDVICO.',
+          `CẢNH 1 role="hook": theo KIỂU MỞ "${SALES_STYLE.label}" (${SALES_STYLE.open}), rồi 1 câu tô đậm nỗi mất theo TÌNH HUỐNG đã cho. KHÔNG câu chào mở đầu, KHÔNG câu hỏi thăm chung chung.`,
+          'CẢNH 2 role="empathy" (BẮT BUỘC, không bỏ): tả HẬU QUẢ TIẾC + UẤT + LO cụ thể (tiền mất, thời gian mất, cơ hội mất, tâm trạng) bám TÌNH HUỐNG đã cho, không dùng cụm đã mòn. Không nhắc sản phẩm SDVICO.',
           'CẢNH 3 role="solution": sản phẩm xuất hiện như LỐI THOÁT, nói bằng LỢI ÍCH (không thông số kỹ thuật khô).',
           'CẢNH 4 role="reward": PHẦN THƯỞNG cụ thể (chở thêm bao nhiêu, đi xa bao nhiêu, tiết kiệm gì).',
           'CẢNH 5 role="closing": câu chốt ngắn về lợi ích. Cấm nhắc gọi/liên hệ/hotline (outro cố định lo).' + priceException,
@@ -251,7 +286,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     // 26/8 siết lần 3: log warning nếu SHORTS thiếu scene role='empathy' (model hay lách gộp
     // vào hook hoặc solution). Không auto-regenerate (đắt token) nhưng log để soi khi debug.
     if (short && !opts.contentVideo) {
-      for (const k of ['vertical', 'horizontal']) {
+      for (const k of ['vertical']) { // 14/9: chỉ còn bản dọc, bỏ cảnh báo thừa cho horizontal
         const roles = (parsed[k]?.scenes || []).map((s) => s?.role);
         if (!roles.includes('empathy')) {
           console.warn(`[script] SHORTS ${k} thieu scene role='empathy' (roles=${JSON.stringify(roles)}) - can canh 2 dong cam TIEC+UAT theo playbook.`);
@@ -260,7 +295,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     }
     const all = [...(parsed.vertical?.scenes || []), ...(parsed.horizontal?.scenes || [])].map((x) => x?.narration || '').join('\n');
     viol = guardViolations(all, topic);
-    worn = opts.contentVideo ? WORN_PHRASES.filter((p) => all.toLowerCase().includes(p)) : [];
+    worn = (opts.contentVideo ? WORN_PHRASES : SALES_WORN).filter((p) => all.toLowerCase().includes(p));
     if (worn.length) console.warn(`[script] loi thoai dung cum da mon (lan ${attempt + 1}): ${worn.join(' | ')}`);
     if (!viol.length && !worn.length) break;
   }

@@ -471,7 +471,11 @@ export function benefitLines(group, channel = 'facebook') {
 export function ensureSpokenTeaser(narration, teaser) {
   if (!teaser?.spoken) return narration;
   const s = redactExactPrices(String(narration || '')).trim();
-  if (teaser.spokenKey && s.includes(teaser.spokenKey)) return s;
+  // 14/9: model hay viết "3X triệu" / "9,X triệu" (liền, dấu phẩy) thay vì "3 X triệu" / "9 phẩy X
+  // triệu" nên spokenKey không khớp -> câu giá bị nối thêm lần 2, video đọc giá 2 lần. So khớp sau
+  // khi chuẩn hóa: bỏ khoảng trắng, thường hóa, ",X" coi như "phẩy X".
+  const norm = (t) => String(t || '').toLowerCase().replace(/,\s*x/g, 'phẩyx').replace(/\s+/g, '');
+  if (teaser.spokenKey && norm(s).includes(norm(teaser.spokenKey))) return s;
   return s ? `${s} ${teaser.spoken}` : teaser.spoken;
 }
 
