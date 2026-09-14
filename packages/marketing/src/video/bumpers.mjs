@@ -12,8 +12,9 @@ import { ffmpeg, probeDuration } from './ffmpeg.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FPS = 30;
 // 14/9 (sep): 4s dau video doc dung CLIP INTRO THUONG HIEU dung san (assets/intro-doc.mp4, cat tu
-// intro-2026-Q3.mp4: bot nuoc gom thanh logo, chu SDVICO truot vao, slogan). Clip da cat dung
-// 4,0s (diem doi canh) + fade tieng 0,4s cuoi. Thieu file hoac ban ngang thi ve intro bang canvas
+// intro-2026-Q3.mp4: bot nuoc gom thanh logo, chu SDVICO truot vao, slogan). Sep 14/9 (2): "on qua,
+// toi 3s hien chu Nghe ca thinh vuong la duoc" -> clip cat 3,3s (slogan hien xong ~3,0s), tieng
+// -14 dB + fade 0,5s cuoi. Thieu file hoac ban ngang thi ve intro bang canvas
 // nhu cu. INTRO_CLIP=duong-dan-khac de thu clip khac.
 const INTRO_CLIP = process.env.INTRO_CLIP || join(HERE, 'assets', 'intro-doc.mp4');
 
