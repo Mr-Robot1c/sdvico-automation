@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { rootTabFor } from '../lib/routes';
 
 type Tab = { href: string; label: string; icon: string; external?: boolean; also?: string[] };
 type Group = { title: string; items: Tab[] };
@@ -17,7 +18,10 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   const main: Group = {
     title: '',
     items: [
-      { href: '/tong-quan', label: 'Tổng quan', icon: '📊', also: ['/noi-dung', '/ke-hoach', '/khach-hang', '/hang-doi'] },
+      { href: '/tong-quan', label: 'Tổng quan', icon: '📊', also: ['/noi-dung', '/ke-hoach', '/hang-doi'] },
+      // 15/9 (Thanh, kế hoạch sửa web): Khách hàng "đem ra ngoài luôn" — mục riêng trên menu,
+      // không còn nằm trong Tổng quan / Bảng bài viết.
+      { href: '/khach-hang', label: 'Khách hàng', icon: '🛒', also: ['/hoi-dap'] },
       { href: '/video', label: 'Video', icon: '🎬', also: ['/san-xuat', '/tu-lieu'] },
       { href: '/seo', label: 'SEO', icon: '🔍', also: ['/tu-khoa', '/quang-cao', '/du-kien'] },
       { href: '/kenh', label: 'Kênh', icon: '📡', also: ['/do-luong', '/ket-noi', '/facebook', '/youtube', '/tiktok'] },
@@ -49,7 +53,10 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
         heThong
       ];
 
+  // Mục sáng theo cây trang (lib/routes.ts); `also` giữ làm dự phòng cho route chưa khai trong cây.
+  const root = rootTabFor(path || '/');
   const isOn = (t: Tab) =>
+    (root ? root === t.href : false) ||
     path === t.href || (t.also || []).some((a) => path === a || (path || '').startsWith(a + '/')) || (path || '').startsWith(t.href + '/');
 
   return (

@@ -19,9 +19,14 @@ import { createPortal } from 'react-dom';
 export default function ForwardZaloButton({
   leadSummary,
   salesPeople,
+  onForwarded,
+  forwardedTo,
 }: {
   leadSummary: string;
   salesPeople: Array<{ name: string; phone: string }>;
+  // 15/9: server action ghi lại "đã chuyển cho ai, lúc nào" (mkt_leads.forwarded_to/at).
+  onForwarded?: (personName: string) => Promise<void>;
+  forwardedTo?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<string>('');
@@ -80,6 +85,7 @@ export default function ForwardZaloButton({
       setStatus('⛔ Copy fail, bấm phải copy tay');
     }
     window.open(`https://zalo.me/${person.phone}`, '_blank', 'noopener,noreferrer');
+    if (onForwarded) { try { await onForwarded(nameOf(person)); } catch { /* không chặn luồng */ } }
     setTimeout(() => { setOpen(false); setStatus(''); }, 3500);
   }
 
@@ -132,7 +138,7 @@ export default function ForwardZaloButton({
         aria-expanded={open}
         style={{ whiteSpace: 'nowrap' }}
       >
-        📱 Chuyển NV ▾
+        {forwardedTo ? '📱 Chuyển lại ▾' : '📱 Chuyển NV ▾'}
       </button>
       {mounted && menu ? createPortal(menu, document.body) : null}
     </>

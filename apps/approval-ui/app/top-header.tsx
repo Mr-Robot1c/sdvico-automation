@@ -1,34 +1,35 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import ThemeToggle from './theme-toggle';
+import { crumbFor, parentFor, routeNodeFor, ROUTES } from '../lib/routes';
 
-// 5 trang chinh cua redesign 27/8 — cac trang KHAC (trang chi tiet cu) hien nut
-// "← Quay lai" = router.back() ve TRANG TRUOC DO (user 27/8 v2: "quay ve trang truoc
-// chu khong phai ve Tong quan luon"). Vao thang bang URL (khong co history) thi
-// fallback ve /tong-quan.
-const MAIN_TABS = ['/tong-quan', '/video', '/seo', '/kenh', '/agent', '/'];
+// 15/9 (Thanh, kế hoạch "SDVICO sửa web"): nút "← Quay lại" đưa về TRANG CHA theo cây trang
+// (lib/routes.ts), KHÔNG dùng history.back() nữa — đi Tổng quan/Khách hàng -> Agent -> Quay lại
+// mà về lại Khách hàng là sai. Trang gốc của mỗi mục menu không có nút này.
 
-// Thanh trên cùng: nhãn vai trò + tên trang gọn + hành động phải (theme, user).
-// Cố tình mỏng: title chi tiết của trang vẫn nằm trong <h1> của từng page.
+// Thanh trên cùng: nhãn vai trò + đường dẫn cha › con + hành động phải (theme, user).
 export default function TopHeader({ marketingOnly = false }: { marketingOnly?: boolean }) {
   const path = usePathname() || '/';
-  const router = useRouter();
   const role = marketingOnly ? 'Marketing SDVICO' : 'Duyệt và Hồ sơ SDVICO';
   const crumb = crumbFor(path);
-  const showBack = !MAIN_TABS.includes(path);
-  const goBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) router.back();
-    else router.push('/tong-quan');
-  };
+  const parent = parentFor(path);
+  const parentLabel = parent ? (ROUTES[parent]?.label || routeNodeFor(parent)?.node.label || '') : '';
 
   return (
     <header className="topbar" role="banner">
       <div className="topbar-left">
-        {showBack ? (
-          <button type="button" onClick={goBack} className="topbar-back" title="Quay lại trang trước đó">← Quay lại</button>
+        {parent ? (
+          <Link href={parent} className="topbar-back" title={`Quay lại ${parentLabel}`}>← Quay lại</Link>
         ) : null}
         <span className="topbar-role">{role}</span>
+        {parent && parentLabel && parentLabel !== crumb ? (
+          <>
+            <span className="topbar-sep" aria-hidden="true">›</span>
+            <Link href={parent} className="topbar-crumb" style={{ textDecoration: 'none', color: 'inherit' }}>{parentLabel}</Link>
+          </>
+        ) : null}
         {crumb ? (
           <>
             <span className="topbar-sep" aria-hidden="true">›</span>
@@ -49,37 +50,4 @@ export default function TopHeader({ marketingOnly = false }: { marketingOnly?: b
       </div>
     </header>
   );
-}
-
-function crumbFor(path: string): string {
-  const map: Record<string, string> = {
-    '/': 'Tổng quan',
-    '/hang-doi': 'Hàng đợi duyệt',
-    '/tong-quan': 'Tổng quan',
-    '/video': 'Video',
-    '/seo': 'SEO',
-    '/kenh': 'Kênh',
-    '/agent': 'Agent',
-    '/noi-dung': 'Tất cả nội dung',
-    '/san-xuat': 'Xưởng sản xuất',
-    '/do-luong': 'Đo lường',
-    '/do-luong/tuan': 'Báo cáo tuần',
-    '/tu-khoa': 'Kho từ khóa',
-    '/du-kien': 'Nguồn dữ kiện',
-    '/tu-lieu': 'Kho tư liệu',
-    '/ke-hoach': 'Kế hoạch',
-    '/kho-tri-thuc': 'Nguồn học dữ liệu',
-    '/du-lieu-ai': 'Nguồn học dữ liệu',
-    '/ket-noi': 'Kết nối',
-    '/quy-tac': 'Quy tắc',
-    '/quang-cao': 'Quảng cáo',
-    '/facebook': 'Kết nối Facebook',
-    '/tiktok': 'Kết nối TikTok',
-    '/youtube': 'Kết nối YouTube',
-    '/privacy': 'Chính sách quyền riêng tư',
-    '/terms': 'Điều khoản',
-    '/ho-so': 'Hồ sơ ứng viên',
-    '/vi-tri': 'Vị trí tuyển dụng'
-  };
-  return map[path] || '';
 }

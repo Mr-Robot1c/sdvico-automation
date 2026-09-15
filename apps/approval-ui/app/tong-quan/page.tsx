@@ -6,6 +6,7 @@ import PageSuiteBlock from '../do-luong/page-suite-block';
 import { buildTodayView, TODAY_STAGE_LABEL } from '../../lib/today-plan';
 import { CHANNEL_LABEL, DOW_LONG } from '../../lib/posting-plan';
 import { computeShareLot } from '../../lib/share-lot';
+import ShareLotToday from './share-lot-today';
 
 // 27/8 REDESIGN theo file "redesign web.docx" cua sep — trang TONG QUAN kieu ForLife Ops.
 // v2 (feedback sep cung ngay): (1) icon kenh trong bang bam duoc -> mo bai tren nen tang do;
@@ -269,6 +270,10 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const shown = filtered.slice(0, 30);
   const hasFilter = !!(q || fGd || fKenh || fKh);
 
+  // Bài Facebook đã đăng hôm nay (theo lịch) để gắn lượt chia group.
+  const todayFbRow = todayView.rows.find((r) => r.slot.channel === 'facebook' && r.stage === 'published' && r.contentId);
+  const todayFbPost = todayFbRow ? { contentId: String(todayFbRow.contentId), url: todayFbRow.publishedUrl } : null;
+
   const needCount = (pendingStale.length ? 1 : 0) + (failedStuckCids.length ? 1 : 0) + (yt.configured && yt.error ? 1 : 0) + (leadNew.length ? 1 : 0);
 
   const stageCls = (s: string) => ({ waiting: 'stage-waiting', missed: 'stage-missed', draft: 'stage-draft', pending: 'stage-pending', scheduled: 'stage-scheduled', manual: 'stage-manual', published: 'stage-published', rejected: 'stage-rejected' } as Record<string, string>)[s] || 'stage-draft';
@@ -315,7 +320,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
             {leadNew.length ? (
               <div className="need-item">
                 <span className="need-n">{fmt(leadNew.length)}</span>
-                <span style={{ flex: 1 }}>người hỏi mua <b>chưa được trả lời</b>. Kênh online tự trả lời và tự chốt, không chuyển Kinh doanh (lệnh sếp 9/9); thiếu thông tin thì hỏi bot. <Link href="/noi-dung?loai=khach-hang">Mở Khách hàng →</Link></span>
+                <span style={{ flex: 1 }}>người hỏi mua <b>chưa được trả lời</b>. Kênh online tự trả lời và tự chốt, không chuyển Kinh doanh (lệnh sếp 9/9); thiếu thông tin thì hỏi bot. <Link href="/khach-hang">Mở Khách hàng →</Link></span>
               </div>
             ) : null}
           </div>
@@ -328,12 +333,14 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           <span aria-hidden="true">📅</span> Kế hoạch hôm nay{' '}
           <span className="sub">· {todayLabel} · {fmt(todayView.counts.total)} bài theo lịch{todayView.overridden ? ' · ✏️ lịch riêng hôm nay' : ''}{!todayView.saved ? ' · lịch mặc định (chưa lưu)' : ''}</span>
         </h2>
-        <p className="sub" style={{ margin: '4px 0 8px', fontSize: '.85rem' }}>
-          📣 Chia sẻ group hôm nay: <b>{fmt(shareLot.doneToday)}/{fmt(shareLot.lotSize)}</b> nhóm
-          {shareLot.doneToday >= shareLot.lotSize
-            ? ', đủ lô.'
-            : <> · còn: {shareLot.lot.filter((g) => !g.sharedToday).slice(0, 5).map((g) => g.label).join(', ')}{shareLot.lot.filter((g) => !g.sharedToday).length > 5 ? '…' : ''}. Bấm 📣 Chia sẻ group trên thẻ bài đã đăng.</>}
-        </p>
+        {/* 15/9 (Thanh): lô 4 nhóm hôm nay + nút "Đã chia" 1 chạm ngay tại đây — máy không thấy được
+            việc chia trên Facebook, chỉ đếm khi người bấm. */}
+        <ShareLotToday
+          lot={shareLot.lot.map((g) => ({ id: g.id, label: g.label, url: g.url, sharedToday: g.sharedToday }))}
+          lotSize={shareLot.lotSize}
+          doneToday={shareLot.doneToday}
+          post={todayFbPost}
+        />
         {todayView.rows.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Hôm nay lịch không có bài nào. <Link href="/ke-hoach#lich-dang" className="src">Sửa lịch đăng →</Link></p>
         ) : (
@@ -410,23 +417,23 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
         <section className="blk">
           <h2><span aria-hidden="true">📶</span> Tiến độ theo giai đoạn <span className="sub">ô đỏ = cần người động tay</span></h2>
           <div className="stage-flow">
-            <Link href="/ke-hoach" className="stage-node" title="Hướng đi bài viết BOSS đề xuất trong bản kế hoạch đang áp">
+            <Link href="/ke-hoach#huong-di" className="stage-node" title="Hướng đi bài viết BOSS đề xuất trong bản kế hoạch đang áp — bấm để xem">
               <b>{fmt(ideaCount)}</b><span>Ý tưởng</span>
             </Link>
             <span className="stage-sep" aria-hidden="true">→</span>
-            <Link href="/tong-quan?gd=draft" className="stage-node" title="Bài đã viết xong còn ở bước nháp / đang sinh (trong 200 bài mới nhất)">
+            <Link href="/tong-quan?gd=draft#tat-ca-noi-dung" className="stage-node" title="Bài đã viết xong còn ở bước nháp / đang sinh (trong 200 bài mới nhất)">
               <b>{fmt(writtenCount)}</b><span>Đã viết</span>
             </Link>
             <span className="stage-sep" aria-hidden="true">→</span>
-            <Link href="/noi-dung" className={`stage-node ${pending.length ? 'act' : ''}`} title="Bài chờ người bấm Duyệt">
+            <Link href="/tong-quan?gd=pending#tat-ca-noi-dung" className={`stage-node ${pending.length ? 'act' : ''}`} title="Bài chờ người bấm Duyệt — bấm để xem danh sách">
               <b>{fmt(pending.length)}</b><span>Chờ duyệt</span>
             </Link>
             <span className="stage-sep" aria-hidden="true">→</span>
-            <Link href="/noi-dung" className="stage-node" title="Bài đã duyệt kèm giờ hẹn, tới giờ máy tự đăng">
+            <Link href="/tong-quan?gd=scheduled#tat-ca-noi-dung" className="stage-node" title="Bài đã duyệt kèm giờ hẹn, tới giờ máy tự đăng — bấm để xem danh sách">
               <b>{fmt(scheduled.length)}</b><span>Đã lên lịch</span>
             </Link>
             <span className="stage-sep" aria-hidden="true">→</span>
-            <Link href="/kenh" className="stage-node done" title="Bài đã đăng thật lên các kênh">
+            <Link href="/tong-quan?gd=published#tat-ca-noi-dung" className="stage-node done" title="Bài đã đăng thật lên các kênh — bấm để xem danh sách">
               <b>{fmt(publishedCids.size)}</b><span>Đã đăng</span>
             </Link>
           </div>
@@ -445,7 +452,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           {leads.length === 0 ? (
             <div style={{ display: 'grid', gap: 10 }}>
               <p className="sub" style={{ margin: 0 }}>Chưa có ai hỏi mua trong 7 ngày. Bài đăng đều + chia sẻ group để tăng tiếp cận.</p>
-              <Link href="/noi-dung?loai=khach-hang" className="btn ghost sm" style={{ justifySelf: 'start' }}>🛒 Kiểm tra người mua</Link>
+              <Link href="/khach-hang" className="btn ghost sm" style={{ justifySelf: 'start' }}>🛒 Kiểm tra người mua</Link>
             </div>
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
@@ -465,7 +472,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
                   🔥 Bài hút khách nhất: {topLeadPosts.map(([cid, n]) => `${(leadPostTitles.get(cid) || '(không tên)').slice(0, 50)} (${n} người hỏi)`).join(' · ')}
                 </div>
               ) : null}
-              <Link href="/noi-dung?loai=khach-hang" className="btn ghost sm" style={{ justifySelf: 'start' }}>🛒 Kiểm tra người mua</Link>
+              <Link href="/khach-hang" className="btn ghost sm" style={{ justifySelf: 'start' }}>🛒 Kiểm tra người mua</Link>
             </div>
           )}
         </section>
@@ -522,7 +529,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       </section>
 
       {/* ===== 5. TẤT CẢ NỘI DUNG — gấp mặc định, mở khi đang lọc ===== */}
-      <details className="blk tq-details" open={hasFilter}>
+      <details className="blk tq-details" id="tat-ca-noi-dung" open={hasFilter}>
         <summary><span aria-hidden="true">📄</span> Tất cả nội dung <span className="sub">{fmt(filtered.length)} bài trong 200 bài mới nhất · bấm để mở bảng và bộ lọc</span></summary>
         <form method="get" style={{ margin: '0 0 10px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* 30/8 (audit L1): ô tìm + bộ lọc có aria-label, không chỉ dựa placeholder. */}

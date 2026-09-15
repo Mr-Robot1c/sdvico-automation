@@ -10,7 +10,6 @@ import DeleteButton from './delete-button';
 import TrashActions from './trash-actions';
 import ShareGroups from './share-groups';
 import BangSection from './bang-section';
-import KhachHangSection from './khach-hang-section';
 import TikTokPrivateChip from './tiktok-private-chip';
 import { lengthLabel, channelsLabel, postedChannelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 
@@ -127,25 +126,8 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     );
   }
 
-  // Tab Khách hàng: kanban 3 cột (Mới / Đã liên hệ / Xong) — cùng layout với Bảng bài viết.
-  // User 27/8: "làm như bảng bài viết" để quay lại được qua tabs, không phải bấm back browser.
-  if (tab === 'khach-hang') {
-    return (
-      <main>
-        <header className="head-row">
-          <div>
-            <h1>Khách hỏi mua</h1>
-            <p className="sub">Lead từ comment/tin nhắn Facebook + nhập tay. Máy chỉ ĐỌC và LƯU, không tự nhắn khách.</p>
-          </div>
-          <div className="head-actions">
-            <AutoRefresh seconds={30} />
-          </div>
-        </header>
-        {/* 10/9 (Thanh): không hiện chip Bảng bài viết / Thùng rác ở trang Khách hàng, đã có nút Quay lại. */}
-        <KhachHangSection />
-      </main>
-    );
-  }
+  // 15/9 (Thanh): Khách hàng là trang riêng /khach-hang (mục menu riêng). Link cũ ?loai=khach-hang chuyển tiếp.
+  if (tab === 'khach-hang') redirect('/khach-hang');
 
   // Tab Thung rac: hien danh sach bai soft-deleted (deleted_at NOT NULL) voi 2 nut Khoi phuc / Xoa han.
   // Cac tab khac loc deleted_at null de bai an sau soft-delete khong hien.

@@ -1,42 +1,39 @@
+import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { updateLeadStatus, addLeadManual } from '../actions';
-import LeadStatusSelect from './lead-status-select';
+import { updateLeadStatus, addLeadManual, addProductQa, recordLeadForward } from '../actions';
+import LeadStepper, { STEP_LABEL } from './lead-stepper';
 import ForwardZaloButton from './forward-zalo-button';
 import SalesZaloEditor from './sales-zalo-editor';
 import DeleteLeadButton from './delete-lead-button';
 import SaveQaButton from './save-qa-button';
-import { addProductQa } from '../actions';
+import DedupLeadsBar from './dedup-leads-bar';
+import AutoRefresh from '../auto-refresh';
 import { QA_GROUPS } from '../../lib/hoi-dap-bot';
 // @ts-ignore — module JS thuần
 import { guessGroup } from '../../lib/gen/products.mjs';
 
-// Trang "Theo dõi người mua" (24/8, user: "thông tin khách hàng sẽ được gửi về cho nhân
-// viên kinh doanh"). Nhân viên vào đây xem danh sách người hỏi mua bắt được từ comment/tin
-// nhắn Facebook, tự đánh dấu đã liên hệ chưa. Gửi Zalo tự động CHƯA làm (OA chưa xác thực,
-// xem docs/runbook-zalo-oa-setup.md) — trang này là bước 1: hiện trong web trước.
+// 15/9 (Thanh, kế hoạch "SDVICO sửa web"): trang Khách hàng ĐEM RA NGOÀI thành mục menu riêng,
+// bỏ kanban 4 cột (sếp: "nhìn quá rối, không cần mấy khối Đã liên hệ / Đã xong, phải là 1 flow
+// chặt chẽ"). Một bảng, mỗi khách 1 dòng, cột "Bước" chỉ hiện bước hiện tại + nút bước kế tiếp:
+//   Mới -> Đã liên hệ -> Đã mua / Không chốt (kèm lý do).
+// "Chuyển NV" giờ để lại dấu: dòng khách ghi "đã chuyển → Tên NV lúc hh:mm" (cột forwarded_*).
+// Các việc phụ (thêm tay, NV nhận Zalo, dọn trùng, rác) gom vào thanh công cụ nhỏ góc phải.
 //
-// NGUỒN LEAD (24/8): webhook /api/facebook/webhook bắt comment (đang hoạt động, không cần
-// quyền đặc biệt) + tin nhắn Messenger (cần pages_messaging, đang chờ Facebook duyệt). Chưa
-// duyệt xong thì chỉ có lead từ comment + lead nhập tay.
+// Máy chỉ ĐỌC và LƯU lead, không tự nhắn khách (điều cấm 1). Kênh online tự trả lời, tự chốt
+// (lệnh sếp Long 9/9); không chốt được ghi "Không chốt" + lý do.
 export const dynamic = 'force-dynamic';
 
-const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
-  new: { text: '🆕 Mới', cls: 'tone-accent' },
-  contacted: { text: '📞 Đã liên hệ', cls: 'tone-ok' },
-  won: { text: '💰 Đã mua', cls: 'tone-ok' },
-  // 9/9 (lenh sep Long): khong chot duoc thi ket qua la "khong chot" + ly do, KHONG pass cho KD.
-  lost: { text: '❌ Không chốt', cls: 'tone-no' },
-  closed: { text: '✅ Xong', cls: 'tone-default' },
-  spam: { text: '🚫 Rác', cls: 'tone-no' },
-};
 const SOURCE_LABEL: Record<string, string> = {
   facebook_comment: '💬 Comment Facebook',
   facebook_message: '📩 Tin nhắn Facebook',
   facebook_ads: '📣 Quảng cáo Facebook',
   manual: '✍️ Nhập tay',
 };
+const FILTERS = ['all', 'new', 'contacted', 'won', 'lost', 'spam'] as const;
+const FILTER_LABEL: Record<string, string> = { all: 'Tất cả', ...STEP_LABEL };
 
-function fmtDateTime(iso: string): string {
+function fmtDateTime(iso: string | null): string {
+  if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const p = new Intl.DateTimeFormat('vi-VN', {
@@ -46,127 +43,182 @@ function fmtDateTime(iso: string): string {
   const g = (t: string) => p.find((x) => x.type === t)?.value || '';
   return `${g('hour')}:${g('minute')} ${g('day')}/${g('month')}`;
 }
+const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 
-export default async function Page({ searchParams }: { searchParams?: { status?: string } }) {
+type Lead = {
+  id: string; source: string; fb_user_name: string | null; fb_profile_url: string | null; message: string;
+  status: string; note: string | null; lost_reason: string | null; created_at: string; updated_at: string | null;
+  content_id: string | null; forwarded_to?: string | null; forwarded_at?: string | null;
+};
+
+const BASE_COLS = 'id, source, fb_user_name, fb_profile_url, message, status, note, lost_reason, created_at, updated_at, content_id';
+
+export default async function Page({ searchParams }: { searchParams?: { status?: string; q?: string } }) {
   const client = getServerClient();
-  const filter = searchParams?.status || 'all';
+  const filter = FILTERS.includes((searchParams?.status || 'all') as any) ? (searchParams?.status || 'all') : 'all';
+  const q = String(searchParams?.q || '').trim().slice(0, 80);
 
-  let q = client.from('mkt_leads').select('id, source, fb_user_name, fb_profile_url, message, status, note, lost_reason, created_at, content_id').order('created_at', { ascending: false }).limit(200);
-  if (filter !== 'all' && ['new', 'contacted', 'won', 'lost', 'closed', 'spam'].includes(filter)) q = q.eq('status', filter);
-  const { data: leadsRaw } = await q;
-  const leads = (leadsRaw || []) as any[];
+  // Cột forwarded_* có từ migration 20260915120000; chưa áp thì rơi về bộ cột cũ, trang không vỡ.
+  const build = (cols: string) => {
+    let qq = client.from('mkt_leads').select(cols).order('created_at', { ascending: false }).limit(300);
+    if (filter !== 'all') qq = qq.eq('status', filter);
+    else qq = qq.neq('status', 'spam');
+    if (q) qq = qq.or(`fb_user_name.ilike.%${q.replace(/[%,()]/g, ' ')}%,message.ilike.%${q.replace(/[%,()]/g, ' ')}%`);
+    return qq;
+  };
+  const weekStart = (() => {
+    const vn = new Date(Date.now() + 7 * 3600 * 1000);
+    const dow = (vn.getUTCDay() + 6) % 7; // T2 = 0
+    const mon = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate() - dow));
+    return new Date(mon.getTime() - 7 * 3600 * 1000).toISOString();
+  })();
+  const since7 = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+
+  let leadsRes = await build(`${BASE_COLS}, forwarded_to, forwarded_at`);
+  let hasForwardCols = true;
+  if (leadsRes.error) { hasForwardCols = false; leadsRes = await build(BASE_COLS); }
+  const leads = ((leadsRes.data || []) as unknown) as Lead[];
+
+  const [countsRes, salesRow, wonWeekRes, newWeekRes, ads7Res, goalRow] = await Promise.all([
+    // Đếm theo trạng thái bằng 1 truy vấn nhỏ (trước đây kéo cả bảng về chỉ để đếm).
+    client.from('mkt_leads').select('status').limit(5000),
+    client.from('app_config').select('value').eq('key', 'mkt_sales_zalo').maybeSingle(),
+    client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('status', 'won').gte('updated_at', weekStart),
+    client.from('mkt_leads').select('id', { count: 'exact', head: true }).neq('status', 'spam').gte('created_at', weekStart),
+    client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('source', 'facebook_ads').gte('created_at', since7),
+    client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
+  ]);
+  const counts: Record<string, number> = { all: 0 };
+  for (const r of (countsRes.data || []) as any[]) {
+    counts[r.status] = (counts[r.status] || 0) + 1;
+    if (r.status !== 'spam') counts.all += 1;
+  }
+  const salesPeople: Array<{ name: string; phone: string }> = Array.isArray((salesRow.data as any)?.value?.people) ? (salesRow.data as any).value.people : [];
+  // Mục tiêu tuần: cùng cách đọc với /tong-quan ("... 10 khách mua ..." trong mkt_weekly_goal).
+  const goalText = String((goalRow.data as any)?.value?.text || '');
+  const wonTarget = Number(goalText.match(/(\d+)\s*khách\s*(?:hàng\s*)?mua/i)?.[1] || 10);
 
   const contentIds = [...new Set(leads.map((l) => l.content_id).filter(Boolean))] as string[];
   const titleOf = new Map<string, string>();
   if (contentIds.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, title').in('id', contentIds);
+    const { data: cs } = await client.from('mkt_content').select('id, title').in('id', contentIds.slice(0, 200));
     for (const c of cs || []) titleOf.set((c as any).id, (c as any).title || '(không tên)');
   }
 
-  // Đếm theo trạng thái (không lọc) để hiện tab.
-  const { data: allForCount } = await client.from('mkt_leads').select('status');
-  const counts: Record<string, number> = { all: (allForCount || []).length };
-  for (const r of (allForCount || []) as any[]) counts[r.status] = (counts[r.status] || 0) + 1;
-
-  // Danh sách NV kinh doanh nhận forward Zalo (user 25/8).
-  const { data: salesRow } = await client.from('app_config').select('value').eq('key', 'mkt_sales_zalo').maybeSingle();
-  const salesPeople: Array<{ name: string; phone: string }> = Array.isArray((salesRow as any)?.value?.people) ? (salesRow as any).value.people : [];
+  const hrefFor = (s: string) => `/khach-hang${s === 'all' ? '' : `?status=${s}`}${q ? `${s === 'all' ? '?' : '&'}q=${encodeURIComponent(q)}` : ''}`;
 
   return (
     <main>
       <header className="head-row">
         <div>
-          <h1>Theo dõi người mua</h1>
-          <p className="sub">
-            Người hỏi mua bắt được từ comment/tin nhắn Facebook dưới bài đăng. Máy chỉ ĐỌC và LƯU, không tự nhắn lại khách. Kênh online tự trả lời, tự chốt, không chuyển cho Kinh doanh; không chốt được thì đánh dấu "Không chốt" kèm lý do. Câu hỏi hay thì bấm "Lưu hỏi đáp" để bot nhớ.
+          <h1>Khách hàng</h1>
+          <p className="sub" style={{ margin: '4px 0 0' }}>
+            Người hỏi mua từ comment, tin nhắn Facebook, quảng cáo và nhập tay. Mỗi khách đi một đường: <b>Mới → Đã liên hệ → Đã mua</b> hoặc <b>Không chốt</b> (ghi lý do). Máy chỉ đọc và lưu, người trả lời khách.
           </p>
         </div>
-        <a className="btn ghost sm" href="/hoi-dap" style={{ textDecoration: 'none' }}>📚 Kho hỏi đáp và bot</a>
+        <div className="head-actions lead-toolbar">
+          <AutoRefresh seconds={60} />
+          <details>
+            <summary><span className="btn ghost sm">➕ Thêm khách</span></summary>
+            <div className="lead-pop">
+              <form action={addLeadManual} style={{ display: 'grid', gap: 8 }}>
+                <input name="name" placeholder="Tên khách" className="note" required />
+                <input name="contact" placeholder="SĐT / Zalo / link" className="note" />
+                <input name="message" placeholder="Hỏi gì / sản phẩm quan tâm" className="note" />
+                <select name="channel" className="note" defaultValue="zalo" title="Tin trong hộp thư có thẻ 'Bắt đầu từ quảng cáo' thì chọn Quảng cáo FB">
+                  <option value="zalo">Zalo</option>
+                  <option value="inbox">Inbox FB</option>
+                  <option value="ads">📣 Quảng cáo FB</option>
+                  <option value="call">Gọi</option>
+                  <option value="meet">Gặp</option>
+                </select>
+                <button className="btn ok sm" type="submit">Thêm khách</button>
+              </form>
+            </div>
+          </details>
+          <details>
+            <summary><span className="btn ghost sm" title="Nhân viên kinh doanh nhận Zalo khi bấm Chuyển NV">📱 NV nhận Zalo ({salesPeople.length})</span></summary>
+            <div className="lead-pop">
+              <p className="sub" style={{ margin: '0 0 8px' }}>Bấm "Chuyển NV" ở một khách sẽ copy nội dung + mở Zalo tới người bạn chọn, và ghi lại đã chuyển cho ai. Zalo OA chưa xác thực nên chưa gửi tự động.</p>
+              <SalesZaloEditor initial={salesPeople} />
+            </div>
+          </details>
+          <DedupLeadsBar racCount={counts.spam || 0} />
+          <Link className="btn ghost sm" href="/hoi-dap">📚 Kho hỏi đáp</Link>
+        </div>
       </header>
 
-      <details className="plan-card" style={{ marginBottom: 14 }}>
-        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>➕ Thêm khách hỏi mua (nhập tay)</summary>
-        <form action={addLeadManual} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-          <input name="name" placeholder="Tên khách" className="note" style={{ flex: '1 1 180px' }} />
-          <input name="contact" placeholder="SĐT / Zalo / link" className="note" style={{ flex: '1 1 180px' }} />
-          <input name="message" placeholder="Hỏi gì / sản phẩm quan tâm" className="note" style={{ flex: '2 1 260px' }} />
-          <select name="channel" className="note" defaultValue="zalo" style={{ flex: '1 1 160px' }} title="Tin trong hộp thư có thẻ 'Bắt đầu từ quảng cáo' thì chọn Quảng cáo FB">
-            <option value="zalo">Zalo</option>
-            <option value="inbox">Inbox FB</option>
-            <option value="ads">📣 Quảng cáo FB</option>
-            <option value="call">Gọi</option>
-            <option value="meet">Gặp</option>
-          </select>
-          <button className="btn ok" type="submit">Thêm</button>
+      <div className="lead-week">
+        <span>Tuần này: <b>{fmt(newWeekRes.count ?? 0)}</b> khách hỏi</span>
+        <span>💰 Đã mua: <b>{fmt(wonWeekRes.count ?? 0)}</b> / {fmt(wonTarget)} (mục tiêu tuần)</span>
+        <span>📣 Từ quảng cáo 7 ngày: <b>{fmt(ads7Res.count ?? 0)}</b></span>
+        {!hasForwardCols ? <span className="err-note">Chưa áp migration 20260915120000 (cột Chuyển NV) — nhờ IT chạy SQL.</span> : null}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 12px' }}>
+        <nav className="filters" style={{ margin: 0 }} aria-label="Lọc theo bước">
+          {FILTERS.map((s) => (
+            <Link key={s} href={hrefFor(s)} className={`chip ${filter === s ? 'on' : ''}`}>
+              {FILTER_LABEL[s]} <span className="n">{fmt(counts[s] || 0)}</span>
+            </Link>
+          ))}
+        </nav>
+        <form method="get" style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+          {filter !== 'all' ? <input type="hidden" name="status" value={filter} /> : null}
+          <input className="search" type="search" name="q" defaultValue={q} placeholder="Tìm tên / nội dung..." aria-label="Tìm khách" style={{ maxWidth: 220 }} />
+          <button className="btn ghost sm" type="submit">Tìm</button>
         </form>
-      </details>
-
-      <details className="plan-card" style={{ marginBottom: 14 }} open={salesPeople.length === 0}>
-        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-          📱 NV kinh doanh nhận Zalo forward
-          <span className="sub" style={{ fontWeight: 400, marginLeft: 8 }}>{salesPeople.length} người</span>
-        </summary>
-        <p className="sub" style={{ margin: '8px 0' }}>
-          Thêm nhân viên nhận Zalo forward, mỗi NV 1 dòng. Bấm "📱 Chuyển NV" ở mỗi lead sẽ copy nội dung vào clipboard + mở tab zalo.me tới NV bạn chọn — NV paste vào chat Zalo cá nhân. (Zalo OA chưa xác thực nên chưa gửi tự động được.)
-        </p>
-        <SalesZaloEditor initial={salesPeople} />
-      </details>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        {(['all', 'new', 'contacted', 'won', 'lost', 'closed', 'spam'] as const).map((s) => (
-          <a key={s} href={`/khach-hang${s === 'all' ? '' : `?status=${s}`}`}
-            className={`btn sm ${filter === s ? 'ok' : 'ghost'}`} style={{ textDecoration: 'none' }}>
-            {s === 'all' ? 'Tất cả' : STATUS_LABEL[s].text} ({counts[s] || 0})
-          </a>
-        ))}
       </div>
 
       {leads.length === 0 ? (
         <div className="empty">
           <div className="empty-icon" aria-hidden="true">👥</div>
-          <p>Chưa có người hỏi mua nào.</p>
-          <p className="sub">Webhook Facebook bắt comment hỏi mua tự động dưới bài đăng, hoặc thêm tay ở khung trên.</p>
+          <p>{q ? 'Không tìm thấy khách nào khớp.' : filter === 'all' ? 'Chưa có người hỏi mua nào.' : `Chưa có khách ở bước ${FILTER_LABEL[filter]}.`}</p>
+          <p className="sub">Máy bắt comment và tin nhắn hỏi mua dưới bài đăng; khách gọi / Zalo thì bấm ➕ Thêm khách.</p>
         </div>
       ) : (
         <div className="tablewrap">
-          <table className="datatable">
+          <table className="datatable lead-table">
             <thead>
-              <tr><th>Lúc</th><th>Nguồn</th><th>Người</th><th>Nội dung hỏi</th><th>Bài liên quan</th><th style={{ width: 150 }}>Trạng thái</th><th>Ghi chú</th><th>Chuyển NV</th><th style={{ width: 80 }}></th></tr>
+              <tr>
+                <th style={{ width: 92 }}>Lúc</th>
+                <th style={{ width: 200 }}>Khách</th>
+                <th>Hỏi gì</th>
+                <th style={{ width: 250 }}>Bước</th>
+                <th style={{ width: 150 }}>Chuyển NV</th>
+                <th style={{ width: 200 }}>Ghi chú</th>
+                <th style={{ width: 60 }}></th>
+              </tr>
             </thead>
             <tbody>
               {leads.map((l) => {
-                const st = STATUS_LABEL[l.status] || STATUS_LABEL.new;
+                const relatedTitle = l.content_id ? titleOf.get(l.content_id) : null;
+                const leadSummary = [
+                  `🔔 Khách hỏi mua SDVICO (${fmtDateTime(l.created_at)})`,
+                  `Nguồn: ${SOURCE_LABEL[l.source] || l.source}`,
+                  `Người: ${l.fb_user_name || '(chưa lấy được tên)'}`,
+                  `Hỏi: ${l.message}`,
+                  relatedTitle ? `Bài liên quan: ${relatedTitle}` : '',
+                  l.fb_profile_url ? `Link: ${l.fb_profile_url}` : '',
+                  `Mở dashboard: https://sdvico-mktit.vercel.app/khach-hang`,
+                ].filter(Boolean).join('\n');
+                const forward = recordLeadForward.bind(null, l.id);
                 return (
                   <tr key={l.id}>
                     <td className="sub" style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(l.created_at)}</td>
-                    <td className="sub" style={{ whiteSpace: 'nowrap' }}>{SOURCE_LABEL[l.source] || l.source}</td>
                     <td>
-                      {l.fb_user_name || <span className="muted">(chưa lấy được tên)</span>}
+                      <b>{l.fb_user_name || <span className="muted">(chưa lấy được tên)</span>}</b>
+                      <div className="sub" style={{ fontSize: '.78rem' }}>{SOURCE_LABEL[l.source] || l.source}</div>
                       {l.fb_profile_url ? (
-                        <div style={{ marginTop: 2 }}>
-                          <a className="src" href={l.fb_profile_url} target="_blank" rel="noreferrer" style={{ fontSize: '.8rem' }}>
-                            {l.source === 'facebook_message' ? '📩 Mở hộp thư Page ↗' : '↗ Xem profile'}
-                          </a>
-                        </div>
+                        <a className="src" href={l.fb_profile_url} target="_blank" rel="noreferrer" style={{ fontSize: '.78rem' }}>
+                          {l.source === 'facebook_message' ? '📩 Mở hộp thư Page ↗' : l.source === 'facebook_comment' ? '↗ Xem profile' : '↗ Liên hệ'}
+                        </a>
                       ) : null}
                     </td>
-                    <td style={{ maxWidth: 280 }}>{l.message}</td>
-                    <td className="sub">{l.content_id ? (titleOf.get(l.content_id) || '—') : '—'}</td>
                     <td>
-                      <LeadStatusSelect leadId={l.id} status={l.status} note={l.note || ''} action={updateLeadStatus} />
-                    </td>
-                    <td>
-                      <form action={updateLeadStatus} style={{ display: 'flex', gap: 4 }}>
-                        <input type="hidden" name="lead_id" value={l.id} />
-                        <input type="hidden" name="status" value={l.status} />
-                        <input name="note" defaultValue={l.note || ''} placeholder="ghi chú..." className="note" style={{ width: 120, fontSize: '.85rem' }} />
-                        {l.status === 'lost' ? (
-                          <input name="lost_reason" defaultValue={l.lost_reason || ''} placeholder="lý do không chốt..." className="note" style={{ width: 140, fontSize: '.85rem' }} />
-                        ) : null}
-                        <button className="btn ghost sm" type="submit">Lưu</button>
-                      </form>
-                      {l.status === 'lost' && l.lost_reason ? <div className="sub" style={{ marginTop: 4 }}>❌ {l.lost_reason}</div> : null}
-                      <div style={{ marginTop: 6 }}>
+                      <div className="lead-msg">{l.message}</div>
+                      {relatedTitle ? <div className="sub" style={{ fontSize: '.78rem', marginTop: 2 }}>📎 {relatedTitle}</div> : null}
+                      <div style={{ marginTop: 4 }}>
                         <SaveQaButton
                           leadId={l.id}
                           question={String(l.message || '').slice(0, 300)}
@@ -177,18 +229,19 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                       </div>
                     </td>
                     <td>
-                      <ForwardZaloButton
-                        salesPeople={salesPeople}
-                        leadSummary={[
-                          `🔔 Lead mới từ SDVICO (${fmtDateTime(l.created_at)})`,
-                          `Nguồn: ${SOURCE_LABEL[l.source] || l.source}`,
-                          `Người: ${l.fb_user_name || '(chưa lấy được tên)'}`,
-                          `Hỏi: ${l.message}`,
-                          l.content_id && titleOf.get(l.content_id) ? `Bài liên quan: ${titleOf.get(l.content_id)}` : '',
-                          l.fb_profile_url ? `Link: ${l.fb_profile_url}` : '',
-                          `Mở dashboard: https://sdvico-mktit.vercel.app/khach-hang`,
-                        ].filter(Boolean).join('\n')}
-                      />
+                      <LeadStepper leadId={l.id} status={l.status} note={l.note || ''} lostReason={l.lost_reason || ''} />
+                    </td>
+                    <td>
+                      <ForwardZaloButton salesPeople={salesPeople} leadSummary={leadSummary} onForwarded={forward} forwardedTo={l.forwarded_to || null} />
+                      {l.forwarded_to ? <div className="lead-fwd">→ {l.forwarded_to}{l.forwarded_at ? ` · ${fmtDateTime(l.forwarded_at)}` : ''}</div> : null}
+                    </td>
+                    <td>
+                      <form action={updateLeadStatus} style={{ display: 'flex', gap: 4 }}>
+                        <input type="hidden" name="lead_id" value={l.id} />
+                        <input type="hidden" name="status" value={l.status} />
+                        <input name="note" defaultValue={l.note || ''} placeholder="ghi chú..." className="note" style={{ width: 130, fontSize: '.82rem' }} />
+                        <button className="btn ghost sm" type="submit">Lưu</button>
+                      </form>
                     </td>
                     <td>
                       <DeleteLeadButton

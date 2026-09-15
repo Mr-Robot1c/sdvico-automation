@@ -2276,3 +2276,20 @@ export async function pullMetricsNow(): Promise<{ ok: boolean; fb: number; yt: n
   return { ok: true, fb, yt, tt, inbox, msg, details: { tt_errors: ttErrors, yt_errors: ytErrors, fb_errors: fbErrors, inbox_errors: inboxErrors, tt_matched: ttMatched } };
 }
 
+
+// 15/9 (Thanh, kế hoạch sửa web): "Chuyển NV" phải để lại dấu vết — ghi ai nhận, lúc nào, để trang
+// Khách hàng hiện "đã chuyển → Tên NV". Máy vẫn không tự nhắn (điều cấm 1); người bấm copy + mở Zalo.
+export async function recordLeadForward(leadId: string, personName: string): Promise<void> {
+  const id = String(leadId || '').trim();
+  const name = String(personName || '').trim().slice(0, 120);
+  if (!id || !name) return;
+  const client = getServerClient();
+  const nowIso = new Date().toISOString();
+  const { error } = await client.from('mkt_leads').update({ forwarded_to: name, forwarded_at: nowIso, updated_at: nowIso }).eq('id', id);
+  if (error) {
+    // Cột chưa có (migration 20260915120000 chưa áp) -> ghi vào run_log để không mất dấu.
+    console.error('[lead-forward] khong ghi duoc cot forwarded_*:', error.message);
+  }
+  try { await client.from('run_log').insert({ task: 'mkt.lead_forward', actor: 'nguoi-bam', status: error ? 'warn' : 'ok', detail: { lead_id: id, to: name, error: error?.message || null } }); } catch { /* bỏ qua */ }
+  revalidatePath('/khach-hang');
+}
