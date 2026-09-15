@@ -534,6 +534,8 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
           durationSec: dur,
           text: s.narration,
           kind: asset.kind === 'image' ? 'image' : 'video',
+          assetId: s.assetId,
+          role: s.role || null,
         });
       }
       // Outro đọc số 0939 243 222 (spellPhones đọc từng chữ số). Đường edge tự chống chịu
@@ -572,13 +574,19 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
   }
   await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio, priceBadge: opts.priceBadge || null, badgeFromScene, badgeOffsetSec });
   const totalDur = await probeDuration(out);
-  return { out, totalDur, scenes: built.length, whisper: wa?.info || null };
+  // 15/9 (Thanh: trang Video phải hiện "lấy tư liệu nào, dùng ở giây nào"): dòng thời gian từng cảnh.
+  let t = 0;
+  const timeline = built.map((b) => {
+    const start = t; t += Number(b.durationSec) || 0;
+    return { assetId: b.assetId || null, role: b.role || null, kind: b.kind, start: Number(start.toFixed(1)), end: Number(t.toFixed(1)), text: String(b.text || '').slice(0, 90) };
+  });
+  return { out, totalDur, scenes: built.length, whisper: wa?.info || null, timeline };
 }
 
 // Đẩy video (CẢ 2 bản ngang 16:9 + dọc 9:16) vào Hàng đợi duyệt: upload Storage + brand_assets +
 // mkt_content + approval_queue (pending, kênh Facebook + TikTok). Người bấm Duyệt (điều cấm 1).
 // Lúc đăng: FB dùng video_h (ngang), TikTok dùng video_v (dọc).
-async function pushToApprovalQueue(client, { content, script, horizontalPath, verticalPath, teaser = null, mustUseAssetId = null }) {
+async function pushToApprovalQueue(client, { content, script, horizontalPath, verticalPath, teaser = null, mustUseAssetId = null, timeline = null }) {
   const title = redactExactPrices((script.titles && script.titles[0]) || content.title || 'Video SDVICO');
 
   // Helper upload 1 file mp4 -> brand_assets, trả về id.
@@ -646,6 +654,9 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
       video_compliance: script.assessment?.flags || {},
       video_scene_assets: script.sceneAssets || [],   // 9/9: id tư liệu từng cảnh, để đo clip nào đã lên video
       video_must_use: mustUseAssetId,
+      video_timeline: timeline || [],                 // 15/9: cảnh nào dùng tư liệu nào, từ giây mấy tới giây mấy
+      video_scene_match: script.sceneMatch || [],     // 15/9: vai cảnh, hình cần, điểm khớp, ai chọn (model/luật)
+      video_built_at: new Date().toISOString(),
     };
     const { error: ue } = await client.from('mkt_content').update({ brief: newBrief }).eq('id', content.id);
     if (ue) throw new Error('mkt_content update: ' + ue.message);
@@ -669,7 +680,7 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
 
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: 'social', title,
-    brief: { keyword: title, intent: 'giao_dich', assets, channels, generator: 'video-pipeline', post_kind: 'video', source_content: content.id, risk, compliance: script.assessment?.flags || {}, ...abMeta, video_scene_assets: script.sceneAssets || [], video_must_use: mustUseAssetId },
+    brief: { keyword: title, intent: 'giao_dich', assets, channels, generator: 'video-pipeline', post_kind: 'video', source_content: content.id, risk, compliance: script.assessment?.flags || {}, ...abMeta, video_scene_assets: script.sceneAssets || [], video_must_use: mustUseAssetId, video_timeline: timeline || [], video_scene_match: script.sceneMatch || [], video_built_at: new Date().toISOString() },
     draft: caption, status: 'review', needs_gov_review: risk === 'red',
   }).select('id').single();
   if (ce || !ins) throw new Error('mkt_content: ' + (ce?.message || ''));
@@ -740,18 +751,39 @@ async function main() {
   // content được) — đổi sang folder thật để lấy được ảnh/clip.
   if (productGroup === 'Bài content' || brief.post_kind === 'content') productGroup = CONTENT_GROUP;
   if (!productGroup) throw new Error('Bài chưa gán sản phẩm (không đoán được từ tiêu đề/nội dung). Gán product_group ở /tu-lieu hoặc đặt tiêu đề rõ hơn.');
-  const { data: assets } = await client.from('brand_assets')
-    .select('id, kind, title, storage_path, source, created_at')
-    .eq('product_group', productGroup)
-    .order('created_at', { ascending: false });
-  if (!assets?.length) throw new Error(`Sản phẩm "${productGroup}" chưa có tư liệu trong brand_assets.`);
-  console.log(`Sản phẩm: ${productGroup} (${assets.length} tư liệu)`);
+  // Cột description có từ migration 20260915130000; chưa áp thì rơi về cột cũ (không có mô tả, khớp theo luật vai cảnh).
+  let ASSET_COLS = 'id, kind, title, storage_path, source, created_at, product_group, description';
+  let productRes = await client.from('brand_assets').select(ASSET_COLS).eq('product_group', productGroup).order('created_at', { ascending: false });
+  if (productRes.error && /description/i.test(productRes.error.message || '')) {
+    console.warn('brand_assets chưa có cột description (migration 20260915130000 chưa áp) — chọn cảnh theo tiêu đề + luật vai cảnh.');
+    ASSET_COLS = 'id, kind, title, storage_path, source, created_at, product_group';
+    productRes = await client.from('brand_assets').select(ASSET_COLS).eq('product_group', productGroup).order('created_at', { ascending: false });
+  }
+  if (productRes.error) throw new Error('brand_assets: ' + productRes.error.message);
+  const productAssets = productRes.data;
+  if (!productAssets?.length) throw new Error(`Sản phẩm "${productGroup}" chưa có tư liệu trong brand_assets.`);
+  // 15/9 (sếp: "kịch bản nói máy hư, nước đục mà chiếu máy mới bóng"): cảnh VẤN ĐỀ cần cảnh tàu thật,
+  // khoang máy, thợ sửa... nằm ở folder Content, không có trong folder sản phẩm. Video bán hàng lấy
+  // thêm 40 tư liệu Content mới nhất vào pool; scene-match.mjs quyết cảnh nào dùng gì theo mô tả.
+  let assets = [...productAssets];
+  if (productGroup !== CONTENT_GROUP) {
+    const { data: lifeAssets } = await client.from('brand_assets')
+      .select(ASSET_COLS)
+      .eq('product_group', CONTENT_GROUP)
+      .neq('source', 'video-pipeline')
+      .order('created_at', { ascending: false })
+      .limit(40);
+    const seen = new Set(assets.map((a) => a.id));
+    for (const a of lifeAssets || []) if (!seen.has(a.id)) assets.push(a);
+  }
+  const describedCount = assets.filter((a) => a.description).length;
+  console.log(`Sản phẩm: ${productGroup} (${productAssets.length} tư liệu sản phẩm + ${assets.length - productAssets.length} tư liệu đời sống; ${describedCount}/${assets.length} có mô tả${describedCount < assets.length / 2 ? ' — chạy mo-ta-tu-lieu.mjs để khớp cảnh tốt hơn' : ''})`);
   // 9/9 (user: video "người thật tàu thật"): ÉP CLIP THẬT vào cảnh 1. Bài content: clip rotate
   // đã chọn (brief.content_clip_id). Bài bán: clip Zalo mới nhất (14 ngày) của folder sản phẩm.
   // Không có clip mới -> null, video dựng như cũ (ảnh + clip cũ do model chọn).
   const contentVideo = productGroup === CONTENT_GROUP || brief.post_kind === 'content';
   let mustUseAssetId = brief.content_clip_id && assets.some((a) => a.id === brief.content_clip_id) ? brief.content_clip_id : null;
-  if (!mustUseAssetId) mustUseAssetId = pickFreshClips(assets)[0]?.id || null;
+  if (!mustUseAssetId) mustUseAssetId = pickFreshClips(productAssets)[0]?.id || null;
   if (mustUseAssetId) console.log('Clip thật bắt buộc (cảnh 1):', assets.find((a) => a.id === mustUseAssetId)?.title, `(${mustUseAssetId.slice(0, 8)})`);
   else console.log('Không có clip Zalo mới trong 14 ngày, model tự chọn tư liệu như cũ.');
 
@@ -765,7 +797,7 @@ async function main() {
   console.log(`Sinh kịch bản (Gemini)${isShort ? ' - che do SHORTS 10-20s' : ''}...`);
   const script = await generateVideoScript(
     content,
-    assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, label: clipLabel(a) })),
+    assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, label: clipLabel(a), description: a.description || '', folder: a.product_group || '', fresh: /MỚI/.test(clipLabel(a)) })),
     PRODUCT_FACTS,
     { short: isShort, productGroup, salesVideo, mustUseAssetId, contentVideo },
     _tokenLogClient
@@ -819,7 +851,7 @@ async function main() {
   // Đẩy vào Hàng đợi duyệt (một file dọc dùng cho cả FB lẫn TikTok).
   if (!process.argv.includes('--no-queue')) {
     try {
-      await pushToApprovalQueue(client, { content, script, horizontalPath: null, verticalPath: vertical.out, teaser, mustUseAssetId });
+      await pushToApprovalQueue(client, { timeline: vertical.timeline, content, script, horizontalPath: null, verticalPath: vertical.out, teaser, mustUseAssetId });
     } catch (e) {
       console.warn('Không đẩy được vào Hàng đợi duyệt:', e.message, '(video vẫn có ở out/video/).');
     }

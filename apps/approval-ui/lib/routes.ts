@@ -31,6 +31,7 @@ export const ROUTES: Record<string, RouteNode> = {
   // Con của Video
   '/san-xuat': { label: 'Xưởng sản xuất', parent: '/video' },
   '/tu-lieu': { label: 'Kho tư liệu', parent: '/video' },
+  '/video/da-dang': { label: 'Video đã đăng', parent: '/video' },
 
   // Con của SEO
   '/tu-khoa': { label: 'Kho từ khóa', parent: '/seo' },

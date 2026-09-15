@@ -1633,3 +1633,12 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .save-report { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--ok); background: color-mix(in srgb, var(--ok) 8%, transparent); font-size: .86rem; }
 .save-report.err { border-color: var(--no); background: color-mix(in srgb, var(--no) 8%, transparent); }
 .save-report ul { margin: 4px 0 0; padding-left: 18px; }
+
+/* ===== 15/9: bảng video trong kho — dòng thời gian cảnh ===== */
+.tl-list { display: grid; gap: 2px; font-size: .78rem; }
+.tl-item { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.tl-time { font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; min-width: 62px; }
+.tl-role { color: var(--accent); white-space: nowrap; min-width: 64px; font-size: .72rem; }
+.tl-asset { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-kho td { vertical-align: top; }
+.pl-sub:hover b { color: var(--accent); }

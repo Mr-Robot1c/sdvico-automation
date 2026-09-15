@@ -16,6 +16,9 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { loadRealEnv } from './video/env.mjs';
+import { spawnSync } from 'node:child_process';
+import { writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 const env = loadRealEnv();
 const MKT_MODEL = env.MKT_MODEL || 'gemini-flash-latest';
@@ -78,7 +81,9 @@ const FOLDER_LIST = FOLDERS.map((f) => `- ${f}`).join('\n');
 const RULES = [
   'Ban phan loai TU LIEU marketing cho SDVICO (thiet bi tau ca).',
   'Chi tra JSON dung dang, khong them chu nao ngoai JSON:',
-  '{"loai":"tu_lieu"|"giay_to_ca_nhan"|"man_hinh_app"|"khong_dung_duoc","folder":"<mot dong trong danh sach>","tieu_de":"<8-12 chu tieng Viet mo ta noi dung>"}',
+  '{"loai":"tu_lieu"|"giay_to_ca_nhan"|"man_hinh_app"|"khong_dung_duoc","folder":"<mot dong trong danh sach>","tieu_de":"<8-12 chu tieng Viet mo ta noi dung>","mo_ta":"<1-2 cau co dau: thay gi, o dau, tinh trang moi/cu/hu/ban/can/duc/dang sua/dang chay, co nguoi khong>","hop_canh":["van_de"|"giai_phap"|"doi_song"|"san_pham_moi"|"lap_dat"|"huong_dan"],"tu_khoa":["3-8 tu khoa"]}',
+  // 15/9 (sep: kich ban phai di doi voi hinh): mo_ta + hop_canh luu vao brand_assets.description de day chuyen video khop canh.
+  'mo_ta: ghi RO tinh trang (may moi bong / may cu ri set / can dau den / nuoc duc / tho dang thao sua...) vi day chuyen video se chon hinh theo mo ta nay; khong bia chi tiet khong thay.',
   'loai "giay_to_ca_nhan": can cuoc, ho chieu, bang lai, giay to co ten/so ca nhan (KE CA chup mot phan).',
   'loai "man_hinh_app": screenshot man hinh dien thoai/app/phan mem. KE CA anh chup THAT nhung co OVERLAY cua app (logo TikTok/YouTube/Facebook/Instagram, nut like/tim, so hotline, ten kenh, sub-title, chu keu goi ghim tren anh) => day la screenshot tu nen tang khac, KHONG dung lam tu lieu san pham cua SDVICO — TUYET DOI khong dat vao folder san pham.',
   'loai "khong_dung_duoc": mo nhoe, khong lien quan san pham hay doi song nghe ca.',
@@ -144,6 +149,9 @@ async function classifyVideoBySummary(summary) {
   return genWithFallback([{ text: `${RULES}\n\nDay la BAN TOM TAT video tu lieu:\n${summary.slice(0, 3000)}` }]);
 }
 
+const FFMPEG_OK = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
+const TMP_DIR = join(tmpdir(), 'sdvico-up-media'); mkdirSync(TMP_DIR, { recursive: true });
+if (!FFMPEG_OK) console.warn('Khong thay ffmpeg: video up nguyen ban (khong faststart), web mo se cham hon.');
 const media = listMedia(mediaDir);
 let up = 0, skip = 0, chan = 0, loi = 0;
 for (const m of media) {
@@ -177,15 +185,28 @@ for (const m of media) {
   const ext = m.name.split('.').pop().toLowerCase();
   const mime = isVideo ? 'video/mp4' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
   const sp = `zalo-auto/${Date.now()}-${m.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-  const buf = readFileSync(m.full);
+  let buf = readFileSync(m.full);
+  // 15/9 (Thanh: bam xem video trong kho treo may): video dien thoai de moov o cuoi file, trinh duyet
+  // phai tai het moi phat. Co ffmpeg thi remux -movflags +faststart (khong nen lai, giu nguyen chat luong).
+  if (isVideo && FFMPEG_OK) {
+    try {
+      const outp = join(TMP_DIR, `${Date.now()}-fast.mp4`);
+      const r = spawnSync('ffmpeg', ['-y', '-i', m.full, '-c', 'copy', '-movflags', '+faststart', outp], { stdio: 'ignore' });
+      if (r.status === 0 && existsSync(outp)) { buf = readFileSync(outp); unlinkSync(outp); }
+    } catch { /* giu file goc */ }
+  }
+  const description = cls.mo_ta
+    ? `${String(cls.mo_ta).trim()}${Array.isArray(cls.hop_canh) && cls.hop_canh.length ? ` | Hợp cảnh: ${cls.hop_canh.map(String).join(', ')}` : ''}${Array.isArray(cls.tu_khoa) && cls.tu_khoa.length ? ` | Từ khoá: ${cls.tu_khoa.map(String).join(', ')}` : ''}`.slice(0, 1000)
+    : null;
 
   const upRes = await client.storage.from('brand-assets').upload(sp, buf, { contentType: mime, upsert: false, cacheControl: '31536000' });
   if (upRes.error) { loi += 1; console.error(`  X ${m.name}: upload ${upRes.error.message}`); continue; }
-  const ins = await client.from('brand_assets').insert({
-    kind: isVideo ? 'video' : 'image',
-    title, storage_path: sp, license: 'owned', license_note: key,
-    source: 'zalo-auto', product_group: folder, mime, size_bytes: m.size,
-  });
+  const baseRow = { kind: isVideo ? 'video' : 'image', title, storage_path: sp, license: 'owned', license_note: key, source: 'zalo-auto', product_group: folder, mime, size_bytes: buf.length };
+  let ins = await client.from('brand_assets').insert(description ? { ...baseRow, description, described_at: new Date().toISOString() } : baseRow);
+  if (ins.error && description && /description|described_at/i.test(ins.error.message || '')) {
+    console.warn('  (brand_assets chưa có cột description — migration 20260915130000 chưa áp; ghi không kèm mô tả)');
+    ins = await client.from('brand_assets').insert(baseRow);
+  }
   if (ins.error) { loi += 1; console.error(`  X ${m.name}: insert ${ins.error.message}`); continue; }
   up += 1;
   console.log(`  ✓ ${m.folder}/${m.name} -> ${folder} | ${title}`);

@@ -4,6 +4,7 @@
 covers: supabase/migrations
 last_verified: 2026-09-15
 ttl_days: 180
+<!-- re-verified: 2026-09-15 (2) - Migration 20260915130000_brand_assets_description: them brand_assets.description text (mo ta noi dung: canh gi, tinh trang moi/cu/hu/ban/can/duc, boi canh, hop canh) + described_at timestamptz. Ghi boi up-media-kho-tu-lieu.mjs (luc up) va mo-ta-tu-lieu.mjs (bo sung tu lieu cu); doc boi day chuyen video (scene-match.mjs) de hinh di doi voi loi. Code roi ve cot cu neu CHUA AP. CHUA AP DB -> Thanh chay SQL Editor cung 20260915120000. -->
 <!-- re-verified: 2026-09-15 - Migration 20260915120000_mkt_leads_forwarded: them 2 cot mkt_leads.forwarded_to text + forwarded_at timestamptz (ke hoach "SDVICO sua web" cua Thanh 15/9: nut Chuyen NV phai de lai dau ai nhan, luc nao). Ghi boi server action recordLeadForward (app/actions.ts); trang /khach-hang tu roi ve bo cot cu neu migration CHUA AP (hien canh bao do). CHUA AP DB (db-apply IPv6) -> Thanh chay SQL Editor. -->
 <!-- re-verified: 2026-09-11 - Migration 20260911120000_mkt_group_shares: bang mkt_group_shares (content_id FK mkt_content set null, group_id, group_label, post_url, shared_at, shared_by, source) + 2 index + RLS staff_all. Ghi nhan nguoi da chia bai vao group (lo 8 nhom/ngay, Thanh 11/9). CHUA AP DB tu may (db-apply IPv6), Thanh chay SQL Editor. -->
 <!-- re-verified: 2026-09-10 chieu - Migration 20260910150000_mkt_leads_source_facebook_ads: CHECK mkt_leads.source them 'facebook_ads' -> facebook_comment/facebook_message/facebook_ads/manual. Ly do: sep duyet quang cao Facebook 20.000 d/ngay (san thuc te 26.205 d + VAT), boost reel loc nuoc muc tieu Tin nhan; webhook Messenger chua live nen Thanh nhap tay o /khach-hang (form them o chon nguon Quang cao Facebook) khi tin trong hop thu co the "Bat dau tu quang cao"; /tong-quan dem rieng "tu quang cao" 7 ngay. CHUA AP len DB (db-apply IPv6 loi tu 9/9) -> user chay SQL Editor. -->
@@ -36,7 +37,7 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 |---|---|---|---|
 | approval_queue | Chung | Hàng đợi duyệt, cổng điều cấm 1 (pending → approved mới đăng) | Bật, staff |
 | run_log | Chung | Nhật ký thao tác tự động, kèm ảnh chụp khi lỗi | Bật, staff |
-| brand_assets | Marketing | Kho tư liệu ảnh/clip thật (owned/licensed), cột `product_group` = folder sản phẩm (STT) cho vòng xoay | Bật, staff |
+| brand_assets | Marketing | Kho tư liệu ảnh/clip thật (owned/licensed), cột `product_group` = folder sản phẩm (STT) cho vòng xoay, `description`/`described_at` (15/9: mô tả nội dung cho dây chuyền video khớp cảnh) | Bật, staff |
 | mkt_keywords | Marketing | Kho từ khóa, phân loại theo ý định | Bật, staff |
 | mkt_content | Marketing | Nội dung + trạng thái, cờ needs_gov_review, brief.assets, `deleted_at` = soft-delete (giữ lịch sử Like/View ở mkt_metrics) | Bật, staff |
 | mkt_posts | Marketing | Bài đã đăng + kênh (facebook/website/youtube/tiktok), external_url, `made_public_at` = user đánh dấu đã đổi công khai tay (TikTok chưa audit), `deleted_at` = soft-delete user tự đánh dấu bài đã bị xoá tay (VD: xoá video TikTok trên app) | Bật, staff |

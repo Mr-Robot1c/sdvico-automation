@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import PlatformLogo from '../noi-dung/platform-logo';
+import VideoViewer from './video-viewer';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang VIDEO: luong lam video bang AI cua
 // SDVICO (thay vidpod/OpenMontage cua ForLife bang Gemini + ffmpeg cua minh):
@@ -37,7 +38,7 @@ export default async function Page() {
       .limit(200),
     client
       .from('brand_assets')
-      .select('id, kind, title, storage_path, product_group, created_at')
+      .select('id, kind, title, storage_path, product_group, created_at, source')
       .in('kind', ['video', 'clip'])
       .order('created_at', { ascending: false })
       .limit(12),
@@ -71,6 +72,31 @@ export default async function Page() {
 
   const urlOf = (p: string) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
 
+  // 15/9 (Thanh: bảng video trong kho phải có cột "lấy tư liệu nào, dùng ở giây nào"). Video do dây
+  // chuyền dựng có storage_path video/sdvico_<8 ký tự id bài>_...; nối về bài gốc (brief.video_timeline
+  // từ 15/9, bài cũ chỉ có video_scene_assets) rồi tra tên tư liệu từng cảnh.
+  type Tl = { assetId: string | null; role: string | null; kind: string; start: number; end: number; text: string };
+  const contentByPrefix = new Map<string, any>();
+  for (const c of contents) contentByPrefix.set(String(c.id).slice(0, 8), c);
+  const sourceOf = (a: any): any | null => {
+    const m = String(a.storage_path || '').match(/^video\/sdvico_([0-9a-f]{8})_/i);
+    return m ? contentByPrefix.get(m[1]) || null : null;
+  };
+  const sceneIds = new Set<string>();
+  for (const a of assets) {
+    const c = sourceOf(a);
+    const tl: Tl[] = Array.isArray(c?.brief?.video_timeline) ? c.brief.video_timeline : [];
+    for (const t of tl) if (t.assetId) sceneIds.add(String(t.assetId));
+    for (const id of (Array.isArray(c?.brief?.video_scene_assets) ? c.brief.video_scene_assets : [])) sceneIds.add(String(id));
+  }
+  const sceneTitle = new Map<string, { title: string; kind: string }>();
+  if (sceneIds.size) {
+    const { data: sc } = await client.from('brand_assets').select('id, title, kind').in('id', [...sceneIds].slice(0, 200));
+    for (const r of sc || []) sceneTitle.set(String((r as any).id), { title: String((r as any).title || ''), kind: String((r as any).kind || '') });
+  }
+  const secs = (n: number) => `${Math.round(n)}s`;
+  const ROLE_VI: Record<string, string> = { hook: 'mở', empathy: 'đồng cảm', story: 'chuyện', solution: 'lối ra', reward: 'phần thưởng', closing: 'chốt' };
+
   // 1/9 (user feedback): văn phong cho NGƯỜI DÙNG, không phô jargon (ffmpeg, 1080x1920,
   // burn phụ đề, cân âm lượng, brand-assets, Supabase). Diễn đạt việc bằng ngôn ngữ nghiệp vụ.
   const steps = [
@@ -99,21 +125,22 @@ export default async function Page() {
         <div className={`pl-tile ${generating.length ? 'hot' : ''}`}><b>{fmt(generating.length)}</b><span>Đang sinh kịch bản</span></div>
         <div className={`pl-tile ${waiting.length ? 'hot' : ''}`}><b>{fmt(waiting.length)}</b><span>Chờ Watcher dựng</span></div>
         <div className="pl-tile"><b>{fmt(builtRecently.length)}</b><span>Video dựng xong (30 ngày)</span></div>
+        {/* 15/9 (Thanh): 3 ô Đã đăng bấm vào từng nền tảng để kiểm tra danh sách video. */}
         <div className="pl-tile" style={{ gridColumn: 'span 2', minWidth: 260 }}>
-          <span style={{ marginTop: 0, fontWeight: 600 }}>Đã đăng</span>
+          <span style={{ marginTop: 0, fontWeight: 600 }}>Đã đăng <span className="sub" style={{ display: 'inline', fontWeight: 400 }}>· bấm để xem từng video</span></span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
-            <div style={{ textAlign: 'center', borderRight: '1px solid var(--line)' }}>
+            <Link href="/video/da-dang?kenh=facebook" className="pl-sub" style={{ textAlign: 'center', borderRight: '1px solid var(--line)', textDecoration: 'none', color: 'inherit' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><PlatformLogo platform="facebook" size={15} /><b style={{ fontSize: '1.25rem' }}>{fmt(fbVideoCount)}</b></span>
-              <span style={{ display: 'block', fontSize: '.75rem', color: 'var(--ink-2)' }}>Video Facebook</span>
-            </div>
-            <div style={{ textAlign: 'center', borderRight: '1px solid var(--line)' }}>
+              <span style={{ display: 'block', fontSize: '.75rem', color: 'var(--ink-2)' }}>Video Facebook →</span>
+            </Link>
+            <Link href="/video/da-dang?kenh=youtube" className="pl-sub" style={{ textAlign: 'center', borderRight: '1px solid var(--line)', textDecoration: 'none', color: 'inherit' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><PlatformLogo platform="youtube" size={15} /><b style={{ fontSize: '1.25rem' }}>{fmt(ytCount)}</b></span>
-              <span style={{ display: 'block', fontSize: '.75rem', color: 'var(--ink-2)' }}>Video YouTube</span>
-            </div>
-            <div style={{ textAlign: 'center' }}>
+              <span style={{ display: 'block', fontSize: '.75rem', color: 'var(--ink-2)' }}>Video YouTube →</span>
+            </Link>
+            <Link href="/video/da-dang?kenh=tiktok" className="pl-sub" style={{ textAlign: 'center', textDecoration: 'none', color: 'inherit' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><PlatformLogo platform="tiktok" size={15} /><b style={{ fontSize: '1.25rem' }}>{fmt(ttCount)}</b></span>
-              <span style={{ display: 'block', fontSize: '.75rem', color: 'var(--ink-2)' }}>Video TikTok</span>
-            </div>
+              <span style={{ display: 'block', fontSize: '.75rem', color: 'var(--ink-2)' }}>Video TikTok →</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -158,29 +185,59 @@ export default async function Page() {
 
       {/* ===== ARTIFACT DANG NAM O DAU ===== */}
       <section className="blk">
-        <h2><span aria-hidden="true">📦</span> Video mới nhất trong kho <span className="sub">brand-assets trên Supabase Storage — bấm để mở xem</span></h2>
+        <h2><span aria-hidden="true">📦</span> Video mới nhất trong kho <span className="sub">bấm ▶ Xem để mở ngay trong trang · cột "Ghép từ" cho biết video lấy tư liệu nào, ở giây nào</span></h2>
         {assets.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Kho chưa có video nào.</p>
         ) : (
           <div className="tablewrap">
-            <table className="datatable">
+            <table className="datatable video-kho">
               <thead>
                 <tr>
                   <th>Video</th>
-                  <th style={{ width: 140 }}>Folder</th>
-                  <th style={{ width: 120 }}>Tạo lúc</th>
-                  <th style={{ width: 80 }}>Mở</th>
+                  <th style={{ width: 200 }}>Bài gốc</th>
+                  <th style={{ minWidth: 280 }}>Ghép từ tư liệu · giây</th>
+                  <th style={{ width: 130 }}>Folder</th>
+                  <th style={{ width: 110 }}>Tạo lúc</th>
+                  <th style={{ width: 90 }}>Xem</th>
                 </tr>
               </thead>
               <tbody>
-                {assets.map((a) => (
-                  <tr key={a.id}>
-                    <td className="cell-title"><b>{String(a.title || a.storage_path).slice(0, 80)}</b></td>
-                    <td className="sub" style={{ fontSize: '.82rem' }}>{String(a.product_group || '—')}</td>
-                    <td className="sub" style={{ fontSize: '.82rem' }}>{fmtDT(a.created_at)}</td>
-                    <td><a className="src" href={urlOf(String(a.storage_path))} target="_blank" rel="noreferrer">↗ Xem</a></td>
-                  </tr>
-                ))}
+                {assets.map((a) => {
+                  const c = sourceOf(a);
+                  const tl: Tl[] = Array.isArray(c?.brief?.video_timeline) ? c.brief.video_timeline : [];
+                  const legacy: string[] = !tl.length && Array.isArray(c?.brief?.video_scene_assets) ? c.brief.video_scene_assets.map(String) : [];
+                  const isPipeline = a.source === 'video-pipeline' || /^video\//.test(String(a.storage_path || ''));
+                  return (
+                    <tr key={a.id}>
+                      <td className="cell-title"><b>{String(a.title || a.storage_path).slice(0, 80)}</b>{!isPipeline ? <div className="sub" style={{ fontSize: '.76rem' }}>clip gốc (không phải video máy dựng)</div> : null}</td>
+                      <td className="sub" style={{ fontSize: '.82rem' }}>{c ? String(c.title || '(không tên)').slice(0, 70) : isPipeline ? '— (bài cũ hơn 30 ngày)' : '—'}</td>
+                      <td>
+                        {tl.length ? (
+                          <div className="tl-list">
+                            {tl.map((t, i) => {
+                              const st = t.assetId ? sceneTitle.get(String(t.assetId)) : null;
+                              return (
+                                <div key={i} className="tl-item">
+                                  <span className="tl-time">{secs(t.start)}–{secs(t.end)}</span>
+                                  <span className="tl-role">{ROLE_VI[String(t.role || '')] || t.role || ''}</span>
+                                  <span className="tl-asset" title={t.text || ''}>{st ? `${st.kind === 'image' ? '🖼' : '🎞'} ${st.title.slice(0, 60)}` : (t.assetId ? '(tư liệu đã xoá)' : '—')}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : legacy.length ? (
+                          <div className="tl-list">
+                            {legacy.map((id, i) => { const st = sceneTitle.get(id); return <div key={i} className="tl-item"><span className="tl-asset">{st ? `${st.kind === 'image' ? '🖼' : '🎞'} ${st.title.slice(0, 60)}` : '(tư liệu đã xoá)'}</span></div>; })}
+                            <div className="sub" style={{ fontSize: '.72rem' }}>bản dựng trước 15/9: chưa ghi giây</div>
+                          </div>
+                        ) : <span className="sub">—</span>}
+                      </td>
+                      <td className="sub" style={{ fontSize: '.82rem' }}>{String(a.product_group || '—')}</td>
+                      <td className="sub" style={{ fontSize: '.82rem' }}>{fmtDT(a.created_at)}</td>
+                      <td><VideoViewer url={urlOf(String(a.storage_path))} title={String(a.title || a.storage_path)} /></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

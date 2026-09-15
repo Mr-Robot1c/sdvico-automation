@@ -20,7 +20,9 @@
     "content:run": "node packages/marketing/src/run-content.mjs",
     "publish:fb": "node packages/marketing/src/publish-facebook.mjs",
     "seo:audit": "node packages/marketing/src/seo-audit.mjs",
-    "seo:suggest": "node packages/marketing/src/suggest-keywords.mjs"
+    "seo:suggest": "node packages/marketing/src/suggest-keywords.mjs",
+    "test:scene": "node packages/marketing/src/test-scene-match.mjs",
+    "kho:mo-ta": "node packages/marketing/src/mo-ta-tu-lieu.mjs"
   },
   "workspaces": [
     "packages/*",

@@ -5,6 +5,7 @@ import { knownFactValues, testFactValues } from '../product-facts.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser } from '../products.mjs';
+import { matchScenesToAssets, assetListForPrompt } from './scene-match.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -85,9 +86,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     .filter((f) => f.value)
     .map((f) => `${f.brand || ''} ${f.model || ''} ${f.attribute}: ${f.value}${f.verified ? '' : ' (CHƯA XÁC NHẬN)'}`.trim());
 
-  const assetList = assets
-    .map((a) => `- id=${a.id} | ${a.kind} | ${a.title}${a.label ? ` | ${a.label}` : ''}`)
-    .join('\n');
+  // 15/9 (sếp: kịch bản phải đi đôi với hình): danh sách tư liệu KÈM MÔ TẢ + folder (brand_assets.description).
+  const assetList = assetListForPrompt(assets);
 
   // 9/9 (user: video "người thật tàu thật"): video CONTENT dựng từ clip thật, không bán hàng.
   // 11/9 (Thanh: "kịch bản nó cứ 1 màu miết"): trước đây cảnh đầu luôn "kết quả + đây là cảnh thật ở
@@ -194,7 +194,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'Số theo chuẩn Việt Nam (dấu chấm ngăn hàng nghìn). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung.',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO; chỉ nói phân phối, lắp đặt, tương thích.',
-    'Mỗi cảnh chọn đúng một tư liệu bằng id trong danh sách, ưu tiên tư liệu khớp nội dung cảnh và ưu tiên video cho cảnh có chuyển động.',
+    'MỖI CẢNH ghi field "visual" = HÌNH CẦN THẤY cho cảnh đó (1 câu cụ thể). Cảnh vấn đề (hook/empathy/story) hình phải là cảnh cũ/hư/cặn/nước đục/thợ đang sửa/tàu thật/khoang máy, KHÔNG phải sản phẩm mới bóng; cảnh giải pháp (solution/reward/closing) mới tới hình sản phẩm, lắp đặt, máy chạy. Field "asset_id" chỉ là GỢI Ý (tuỳ chọn) chọn từ danh sách theo MÔ TẢ tư liệu; máy sẽ khớp lại hình theo "visual" sau khi bạn viết xong.',
     opts.mustUseAssetId
       ? `TƯ LIỆU BẮT BUỘC (9/9): cảnh ĐẦU TIÊN phải dùng id=${opts.mustUseAssetId} (clip thật mới quay, có nhãn CLIP THẬT MỚI trong danh sách). Các cảnh khác ưu tiên tư liệu có nhãn clip thật hơn ảnh.`
       : '',
@@ -217,7 +217,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'Trả về JSON đúng cấu trúc sau, không thêm chữ ngoài JSON:',
     '{',
     '  "titles": ["ba tiêu đề khác nhau, ngắn, hấp dẫn"],',
-    '  "vertical": {"scenes": [{"role": "hook|empathy|solution|reward|closing", "narration": "câu thoại", "asset_id": "id"}]}',
+    '  "vertical": {"scenes": [{"role": "hook|empathy|solution|reward|closing", "narration": "câu thoại", "visual": "hình cần thấy cho cảnh này", "asset_id": "id gợi ý (tuỳ chọn)"}]}',
     'CHỈ CÓ BẢN DỌC (vertical). Không sinh "horizontal" (sếp 5/9: mọi video đăng lên chỉ 1 dạng dọc cho đồng bộ).',
     '}',
     'FIELD "role" BẮT BUỘC — không được thiếu, không được trùng. Model hay bỏ qua role và gộp/bỏ nhịp; đây là cách ép cấu trúc.',
@@ -308,28 +308,37 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   }
 
   const ids = new Set(assets.map((a) => a.id));
-  const fix = (scenes, kind) => (scenes || [])
+  // 15/9: tách 2 bước — lời thoại + "visual" ở trên; HÌNH khớp ở đây bằng scene-match.mjs (mô tả tư liệu +
+  // luật vai cảnh). Bỏ hẳn fallback assets[i % n] (xoay vòng mù nội dung — gốc lỗi "nói máy hư mà chiếu máy mới").
+  const rawScenes = (parsed.vertical?.scenes || [])
     .map((s, i) => {
-      let assetId = s.asset_id;
-      if (!ids.has(assetId)) assetId = assets[i % assets.length]?.id; // fallback vòng xoay
-      let narration = String(s.narration || '').trim();
+      let narration = String(s?.narration || '').trim();
       // 4/9: cảnh 1 không được mở bằng câu chào (xem stripGreeting).
       if (i === 0) {
         const cut = stripGreeting(narration);
-        if (cut !== narration) console.warn(`[script] ${kind}: da cat cau chao dau canh 1: "${narration.slice(0, 60)}"`);
+        if (cut !== narration) console.warn(`[script] vertical: da cat cau chao dau canh 1: "${narration.slice(0, 60)}"`);
         narration = cut;
       }
       // 8/9: lưới giá — số tiền chính xác không được lọt vào lời thoại/phụ đề.
       narration = redactExactPrices(narration);
-      return { narration, assetId };
+      const role = String(s?.role || '').trim().toLowerCase() || (i === 0 ? 'hook' : 'solution');
+      const visual = String(s?.visual || '').trim().slice(0, 300);
+      const hint = ids.has(s?.asset_id) ? String(s.asset_id) : null;
+      return { role, narration, visual, hint };
     })
-    .filter((s) => s.narration && s.assetId);
-
-  const vertical = fix(parsed.vertical?.scenes, 'vertical');
-  // 9/9: clip thật bắt buộc. Model quên thì ép vào cảnh 1 (id phải nằm trong danh sách được phép).
-  if (opts.mustUseAssetId && ids.has(opts.mustUseAssetId) && vertical.length && !vertical.some((s) => s.assetId === opts.mustUseAssetId)) {
-    console.warn('[script] model khong dung clip that bat buoc, ep vao canh 1');
-    vertical[0].assetId = opts.mustUseAssetId;
+    .filter((s) => s.narration);
+  const picks = assets.length
+    ? await matchScenesToAssets({ ai, generate: generateWithRetry, model: MKT_MODEL, scenes: rawScenes, assets, mustUseAssetId: opts.mustUseAssetId || null, log: console })
+    : rawScenes.map(() => null);
+  const vertical = rawScenes
+    .map((s, i) => {
+      const assetId = picks[i]?.assetId || s.hint || null;
+      return { narration: s.narration, assetId, role: s.role, visual: s.visual, fit: picks[i]?.fit ?? null, matchBy: picks[i]?.by || (s.hint ? 'hint' : 'none'), why: picks[i]?.why || '' };
+    })
+    .filter((s) => s.assetId);
+  for (const [i, s] of vertical.entries()) {
+    const a = assets.find((x) => x.id === s.assetId);
+    console.log(`  cảnh ${i + 1} [${s.role}] ${s.matchBy} fit=${s.fit ?? '?'} -> ${a?.kind || '?'} "${String(a?.title || s.assetId).slice(0, 60)}"${s.visual ? ` | cần: ${s.visual.slice(0, 70)}` : ''}`);
   }
   const sceneAssets = [...new Set(vertical.map((s) => s.assetId))];
   // 8/9: cảnh cuối video bán hàng phải có câu mốc giá đọc được (model quên thì nối vào).
@@ -350,5 +359,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     testFactValues: testFactValues(facts),
   });
 
-  return { titles, vertical, horizontal, assessment, sceneAssets };
+  // 15/9: khớp cảnh ↔ tư liệu (id, vai, hình cần, điểm khớp) để ghi vào brief.video_scene_match + trang Video.
+  const sceneMatch = vertical.map((s, i) => ({ scene: i + 1, role: s.role, assetId: s.assetId, visual: s.visual, fit: s.fit, by: s.matchBy, why: s.why }));
+  return { titles, vertical, horizontal, assessment, sceneAssets, sceneMatch };
 }
