@@ -1,4 +1,6 @@
-import { savePostingPlanAction, savePostingOverrideAction, clearPostingOverrideAction, proposePostingPlanAction } from './goal-actions';
+import { savePostingPlanWithReport, savePostingOverrideAction, clearPostingOverrideAction, proposePostingPlanAction } from './goal-actions';
+import PostingPlanFormClient from './posting-plan-form-client';
+import type { DayLot } from '../../lib/share-lot';
 import {
   DOW_ORDER, DOW_LONG, DOW_SHORT, MAX_SLOTS_PER_DAY, CHANNEL_LABEL, todayVNDate,
   type LoadedPostingPlan, type PostingSlot,
@@ -51,8 +53,8 @@ function SlotTr({ prefix, i, slot, groups, dowIdx, dayCell }: {
         </select>
       </td>
       <td className="pp-c-group">
-        <select name={`${prefix}_${i}_group`} defaultValue={slot?.group_id || ''} aria-label="Group chia sẻ tay">
-          <option value="">Không chia sẻ group</option>
+        <select name={`${prefix}_${i}_group`} defaultValue={slot?.group_id || ''} aria-label="Ghim nhóm chia sẻ">
+          <option value="">Theo lô tự rút</option>
           {groups.map((g) => <option key={g.id} value={g.id}>👥 {g.label}</option>)}
         </select>
       </td>
@@ -69,13 +71,18 @@ function SlotHead() {
         <th style={{ width: 158 }}>Giờ đăng</th>
         <th style={{ width: 150 }}>Loại bài</th>
         <th style={{ width: 170 }}>Nền tảng</th>
-        <th>Chia sẻ group (tay)</th>
+        <th>Ghim nhóm (tuỳ chọn)</th>
       </tr>
     </thead>
   );
 }
 
-export default function PostingPlanForm({ pp }: { pp: LoadedPostingPlan }) {
+// 15/9: `lots` = lô 4 nhóm/ngày của tuần này (theo ngày YYYY-MM-DD) để hiện cạnh từng thứ;
+// `changeLog` = nhật ký máy/người đổi lịch (run_log mkt.posting_plan_save / _boss) hiện dưới form.
+export type PlanChangeLog = { at: string; actor: string; summary: string; changes: string[]; kind: string };
+export default function PostingPlanForm({ pp, lots = {}, changeLog = [] }: { pp: LoadedPostingPlan; lots?: Record<string, DayLot>; changeLog?: PlanChangeLog[] }) {
+  const lotByDow = new Map<number, DayLot>();
+  for (const l of Object.values(lots)) lotByDow.set(new Date(l.date + 'T00:00:00Z').getUTCDay(), l);
   const today = todayVNDate();
   const ovDates = Object.keys(pp.plan.overrides || {}).sort();
   const ovToday = pp.plan.overrides?.[today] || null;
@@ -108,7 +115,10 @@ export default function PostingPlanForm({ pp }: { pp: LoadedPostingPlan }) {
         </ul>
       ) : null}
 
-      <form action={savePostingPlanAction}>
+      <PostingPlanFormClient
+        action={savePostingPlanWithReport}
+        hint={<>Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h; giờ ở đây được điền sẵn vào ô hẹn giờ khi Duyệt. Nhóm chia sẻ: máy tự rút lô {lotByDow.values().next().value?.lotSize || 4} nhóm/ngày (cột "Lô hôm đó"); ô "Ghim nhóm" chỉ khi muốn ép 1 nhóm cụ thể. YouTube chỉ ra bài khi folder sản phẩm có clip. TikTok: máy dựng video, bạn Duyệt rồi Xuất TikTok tay.</>}
+      >
         <div className="tablewrap">
           <table className="datatable pp-table">
             <SlotHead />
@@ -118,18 +128,38 @@ export default function PostingPlanForm({ pp }: { pp: LoadedPostingPlan }) {
                 return Array.from({ length: MAX_SLOTS_PER_DAY }, (_, i) => (
                   <SlotTr
                     key={`${d}-${i}`} prefix={`s_${d}`} i={i} slot={slots[i] || null} groups={pp.shareGroups} dowIdx={d}
-                    dayCell={i === 0 ? <td rowSpan={MAX_SLOTS_PER_DAY} className="pp-c-day"><b>{DOW_SHORT[d]}</b><div className="sub">{DOW_LONG[d]}</div></td> : undefined}
+                    dayCell={i === 0 ? (
+                      <td rowSpan={MAX_SLOTS_PER_DAY} className="pp-c-day">
+                        <b>{DOW_SHORT[d]}</b><div className="sub">{DOW_LONG[d]}</div>
+                        {lotByDow.get(d) ? (
+                          <div className="wk-lot-list" style={{ marginTop: 6 }} title="Lô nhóm máy rút cho ngày này (ngày đã qua = nhóm đã chia thật)">
+                            <span className="sub" style={{ fontSize: '.72rem' }}>Lô hôm đó ({lotByDow.get(d)!.done}/{lotByDow.get(d)!.lotSize}):</span>
+                            {lotByDow.get(d)!.items.map((g) => <span key={g.id} className={`wk-lot-item ${g.done ? 'done' : ''} ${g.pinned ? 'pinned' : ''}`}><span className="lbl">{g.done ? '✓' : '·'} {g.label}</span></span>)}
+                          </div>
+                        ) : null}
+                      </td>
+                    ) : undefined}
                   />
                 ));
               })}
             </tbody>
           </table>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
-          <button className="btn ok" type="submit">💾 Lưu lịch đăng</button>
-          <span className="sub">Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h; giờ ở đây được điền sẵn vào ô hẹn giờ khi Duyệt. Group lấy từ popover 📣 Chia sẻ group. YouTube chỉ ra bài khi folder sản phẩm có clip. TikTok: máy dựng video, bạn Duyệt rồi Xuất TikTok tay.</span>
-        </div>
-      </form>
+      </PostingPlanFormClient>
+
+      {changeLog.length ? (
+        <details className="pp-override" style={{ marginTop: 12 }}>
+          <summary className="kh-summary">📝 Nhật ký thay đổi lịch <span className="sub">{changeLog.length} lần gần nhất · máy tự xếp lại và người sửa đều ghi ở đây</span></summary>
+          <div className="plan-log">
+            {changeLog.map((c, i) => (
+              <div key={i} className={`plan-log-item ${c.actor === 'cron' ? 'boss' : ''}`}>
+                <b>{fmtVN(c.at)}</b> · {c.actor === 'cron' ? '🧠 BOSS tự xếp (cron)' : c.kind === 'boss' ? '🧠 BOSS xếp lại (người bấm)' : c.kind === 'override' ? '✏️ Sửa riêng một ngày' : c.kind === 'override-clear' ? '✏️ Bỏ lịch riêng' : '✍️ Người sửa lịch'} — {c.summary || 'không ghi chi tiết'}
+                {c.changes.length ? <ul>{c.changes.slice(0, 8).map((t, j) => <li key={j}>{t}</li>)}{c.changes.length > 8 ? <li>… {c.changes.length - 8} thay đổi nữa</li> : null}</ul> : null}
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
 
       <details className="pp-override" style={{ marginTop: 14 }} open={!!ovToday}>
         <summary className="kh-summary">✏️ Sửa riêng một ngày <span className="sub">{ovDates.length ? `đang có lịch riêng: ${ovDates.join(', ')}` : 'chưa ngày nào có lịch riêng'}</span></summary>

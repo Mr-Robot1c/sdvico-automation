@@ -9,7 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../../lib/supabase-server';
 import { generateAndStorePlan, weekWindowVN, proposalTargetWeekVN, vnLocalIso } from '../../lib/plan';
 import { refreshLiveProposal } from '../../lib/plan-live';
-import { loadPostingPlan, savePostingPlan, buildBossPostingPlan, pruneOverrides, normalizeSlot, MAX_SLOTS_PER_DAY, type PostingDay, type PostingSlot } from '../../lib/posting-plan';
+import { loadPostingPlan, savePostingPlan, buildBossPostingPlan, pruneOverrides, normalizeSlot, MAX_SLOTS_PER_DAY, type PostingDay, type PostingSlot, type PostingPlan, diffPostingPlans, summarizeChanges } from '../../lib/posting-plan';
 
 // NGƯỜI GIAO VIỆC vừa đổi mục tiêu / sản phẩm tập trung -> BOSS sinh lại kế hoạch NGAY và ÁP DỤNG
 // luôn (user 19/8: "đã note mục tiêu mới mà BOSS vẫn giữ kế hoạch cũ không cập nhật"). Đây là
@@ -173,14 +173,26 @@ async function afterPlanSaved(client: ReturnType<typeof getServerClient>, detail
   try { await client.from('run_log').insert({ task: 'mkt.posting_plan_save', actor: 'user', status: 'ok', detail }); } catch { /* bo qua */ }
   revalidatePath('/ke-hoach'); revalidatePath('/tong-quan'); revalidatePath('/noi-dung');
 }
-export async function savePostingPlanAction(formData: FormData) {
+export type SaveReport = { ok: boolean; summary: string; changes: string[]; at: string } | null;
+export async function savePostingPlanAction(formData: FormData) { await savePostingPlanWithReport(null, formData); }
+// 15/9 (Thanh): nút Lưu trả về "đã thêm X / bỏ Y bài" để hiện ngay dưới nút (useFormState ở
+// posting-plan-form-client.tsx) và ghi run_log.detail.changes cho Nhật ký thay đổi lịch.
+export async function savePostingPlanWithReport(_prev: SaveReport, formData: FormData): Promise<SaveReport> {
   const client = getServerClient();
   const current = await loadPostingPlan(client);
   const days: Record<string, PostingDay> = {};
   for (let d = 0; d < 7; d++) days[String(d)] = { slots: readSlots(formData, `s_${d}`) };
   // Người sửa = lịch của TUẦN NÀY (week_start hôm nay); BOSS Thứ 2 tuần sau vẫn ra bản mới.
-  await savePostingPlan(client, { version: 1, days, overrides: current.plan.overrides || {}, source: 'user', week_start: weekWindowVN(new Date()).start, notes: current.plan.notes || [], proposed_at: current.plan.proposed_at });
-  await afterPlanSaved(client, { kind: 'week', slotsPerDay: Object.fromEntries(Object.entries(days).map(([k, v]) => [k, v.slots.length])) });
+  const next: PostingPlan = { version: 1, days, overrides: current.plan.overrides || {}, source: 'user', week_start: weekWindowVN(new Date()).start, notes: current.plan.notes || [], proposed_at: current.plan.proposed_at };
+  const changes = diffPostingPlans(current.saved ? current.plan : null, next, current.shareGroups);
+  const summary = summarizeChanges(changes);
+  try {
+    await savePostingPlan(client, next);
+  } catch (e: any) {
+    return { ok: false, summary: 'Không lưu được: ' + String(e?.message || e).slice(0, 200), changes: [], at: new Date().toISOString() };
+  }
+  await afterPlanSaved(client, { kind: 'week', slotsPerDay: Object.fromEntries(Object.entries(days).map(([k, v]) => [k, v.slots.length])), summary, changes: changes.map((c) => c.text).slice(0, 40) });
+  return { ok: true, summary, changes: changes.map((c) => c.text), at: new Date().toISOString() };
 }
 export async function savePostingOverrideAction(formData: FormData) {
   const date = String(formData.get('ov_date') || '').trim();
@@ -207,8 +219,9 @@ export async function proposePostingPlanAction() {
   const current = await loadPostingPlan(client);
   const { plan, input } = await buildBossPostingPlan(client);
   await savePostingPlan(client, { ...plan, overrides: pruneOverrides(current.plan.overrides, plan.week_start || '') });
+  const changes = diffPostingPlans(current.saved ? current.plan : null, plan, input.shareGroups);
   try {
-    await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'user', status: 'ok', detail: { groups: input.shareGroups.length, youtubeReady: input.youtubeReady, clipFolders: input.clipFolders, replaced: current.saved } });
+    await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'user', status: 'ok', detail: { groups: input.shareGroups.length, youtubeReady: input.youtubeReady, clipFolders: input.clipFolders, replaced: current.saved, summary: summarizeChanges(changes), changes: changes.map((c) => c.text).slice(0, 40) } });
   } catch { /* bo qua */ }
   await afterPlanSaved(client, { kind: 'boss', groups: input.shareGroups.length, youtubeReady: input.youtubeReady });
 }

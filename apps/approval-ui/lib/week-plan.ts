@@ -17,6 +17,7 @@ import { weekWindowVN } from './plan';
 import { guessGroup, isDiscontinuedGroup } from './gen/products.mjs';
 import { CONTENT_KIND_BY_DOW, CONTENT_PURPOSE } from './plan-live';
 import { loadPostingPlan, slotsForDate, groupsForDate, type EffectiveSlot } from './posting-plan';
+import { planShareLots, type DayLot } from './share-lot';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -40,10 +41,21 @@ export type WeekDayView = {
   content: WeekCellItem | null;  // ô content trong ngày (giờ tuỳ lịch)
   contentLabel: string;          // nhãn playbook ("Viral · Tự hào")
   contentPurpose?: string;
-  groups: string[];              // nhóm FB cần chia sẻ hôm đó (theo Lịch đăng cố định)
+  groups: string[];              // nhóm FB ghim ở Lịch đăng cố định (cũ, 1 nhóm/ô)
+  lot: DayLot | null;            // 15/9: LÔ đủ 4 nhóm phải chia hôm đó (thật cho ngày qua/hôm nay, dự kiến cho ngày tới)
   contentWindow: 'sang' | 'chieu';
   overridden: boolean;           // ngày này đang dùng lịch riêng
 };
+
+// 15/9 (Thanh): bảng tuần đổi sang MỖI BÀI 1 DÒNG nhiều cột — làm phẳng 3 ô sáng/chiều/content.
+export type WeekRow = WeekCellItem & { window: 'sang' | 'chieu'; kind: 'sale' | 'content'; label: string };
+export function weekRowsOf(d: WeekDayView): WeekRow[] {
+  const rows: WeekRow[] = [];
+  for (const it of d.morning) rows.push({ ...it, window: 'sang', kind: 'sale', label: it.text });
+  for (const it of d.afternoonSale) rows.push({ ...it, window: 'chieu', kind: 'sale', label: it.text });
+  if (d.content) rows.push({ ...d.content, window: d.contentWindow, kind: 'content', label: d.content.state === 'done' ? d.content.text : `Content ${d.contentLabel}` });
+  return rows.sort((a, b) => String(a.time || (a.window === 'sang' ? '00:00' : '12:00')).localeCompare(String(b.time || (b.window === 'sang' ? '00:00' : '12:00'))));
+}
 
 export type WeekPlanView = {
   window: { start: string; end: string };
@@ -163,6 +175,10 @@ export async function buildWeekPlanView(
 
   // Số bài/ngày + nhóm chia sẻ đọc từ LỊCH ĐĂNG CỐ ĐỊNH (app_config mkt_posting_plan).
   const pp = await loadPostingPlan(client);
+  // 15/9: lô 4 nhóm/ngày cho cả tuần (nhóm ghim ở lịch luôn nằm trong lô ngày đó).
+  const pinnedByDate: Record<string, string[]> = {};
+  for (const date of dayDates) pinnedByDate[date] = slotsForDate(pp.plan, date, pp.shareGroups).map((s) => s.group_id || '').filter(Boolean);
+  const lots = await planShareLots(client, dayDates, pinnedByDate, now);
 
   // Rút n hướng dự kiến cho 1 lượt chạy: mỗi bài trong lượt phải KHÁC sản phẩm
   // (usedInThisRun của rotate); hết hướng hợp lệ thì ô đó rơi về "theo trọng số".
@@ -238,6 +254,7 @@ export async function buildWeekPlanView(
       contentLabel: ck?.label || 'Content',
       contentPurpose: ck ? CONTENT_PURPOSE[ck.kind] : undefined,
       groups,
+      lot: lots[date] || null,
       contentWindow: cSlot ? cSlot.window : 'chieu',
       overridden: daySlots[0]?.overridden ?? false,
     };

@@ -1,7 +1,9 @@
 import { getServerClient } from '../../lib/supabase-server';
 import type { Plan, Tier } from '../../lib/plan';
 import { vnInt, proposalTargetWeekVN } from '../../lib/plan';
-import { buildWeekPlanView, productNameOf } from '../../lib/week-plan';
+import { buildWeekPlanView, productNameOf, weekRowsOf } from '../../lib/week-plan';
+import ShareLotToday from '../tong-quan/share-lot-today';
+import type { PlanChangeLog } from './posting-plan-form';
 import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
 import { saveGoalFocusAndRegenerate, generatePostsNow, regenerateWeeklyProposalAction } from './goal-actions';
 import ProposeButton from './propose-button';
@@ -124,6 +126,18 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
 
   // BẢNG TUẦN: luôn dựng theo bản ĐANG ÁP (thực tế máy chạy), kể cả khi đang xem bản cũ.
   const week = await buildWeekPlanView(client, appliedRow?.data || null);
+  // 15/9: nhật ký máy/người đổi lịch đăng (run_log) — hiện dưới khối Lịch đăng cố định.
+  const { data: logRows } = await client
+    .from('run_log')
+    .select('created_at, actor, detail')
+    .in('task', ['mkt.posting_plan_save', 'mkt.posting_plan_boss'])
+    .order('created_at', { ascending: false })
+    .limit(8);
+  const changeLog: PlanChangeLog[] = ((logRows || []) as any[]).map((r) => ({
+    at: String(r.created_at), actor: String(r.actor || ''), kind: String(r.detail?.kind || (r.detail?.reason ? 'boss' : '')),
+    summary: String(r.detail?.summary || (r.detail?.slotsPerDay ? 'lưu lịch (bản cũ chưa ghi chi tiết)' : r.detail?.reason ? `BOSS xếp: ${r.detail.reason}` : '')),
+    changes: Array.isArray(r.detail?.changes) ? r.detail.changes.map((x: any) => String(x)) : [],
+  }));
 
   const suggestions = (displayData?.content_suggestions || []) as any[];
   const usedCount = suggestions.filter((s) => s.used_at || s.pending_variant).length;
@@ -283,91 +297,108 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         )}
       </section>
 
-      {/* ===== 2. KẾ HOẠCH TUẦN (T2..CN) ===== */}
+      {/* ===== 2. KẾ HOẠCH TUẦN (T2..CN) — 15/9 (Thanh): bảng NHIỀU CỘT, mỗi bài 1 dòng; cột Lô nhóm đủ 4 nhóm/ngày ===== */}
       <section className="blk">
         <h2>
           📆 Kế hoạch tuần
-          <span className="sub">{fmtDate(week.window.start)} – {fmtDate(week.window.end)} · bài đã sinh có ✓, còn lại là dự kiến máy sẽ rút theo thứ tự ưu tiên</span>
+          <span className="sub">{fmtDate(week.window.start)} – {fmtDate(week.window.end)} · mỗi bài một dòng · ✅ đã sinh, ▫️ dự kiến máy rút theo thứ tự ưu tiên</span>
         </h2>
         <div className="tablewrap" style={{ marginTop: 8 }}>
           <table className="datatable week-table">
             <thead>
               <tr>
-                <th style={{ width: 92 }}>Ngày</th>
-                <th>🕗 Sáng (ô giờ trước 12h)</th>
-                <th>🕐 Chiều (ô giờ từ 12h)</th>
-                <th style={{ width: 190 }}>📣 Chia sẻ nhóm (tay)</th>
+                <th style={{ width: 84 }}>Ngày</th>
+                <th style={{ width: 60 }}>Giờ</th>
+                <th style={{ width: 96 }}>Loại</th>
+                <th style={{ width: 130 }}>Nền tảng</th>
+                <th>Bài / hướng đi</th>
+                <th style={{ width: 170 }}>Sản phẩm</th>
+                <th style={{ width: 96 }}>Trạng thái</th>
+                <th className="wk-lot">📣 Lô nhóm chia sẻ hôm đó</th>
               </tr>
             </thead>
             <tbody>
               {week.days.map((d) => {
-                const contentNode = d.content ? (
-                  <div className="wk-item">
-                    <span aria-hidden="true">{d.content.state === 'done' ? '✅' : '📰'}</span>
-                    <span title={d.contentPurpose || ''}>
-                      {d.content.state === 'done'
-                        ? <><span className="wk-t">{d.content.text}</span><span className="wk-sub"> · content {d.contentLabel}</span></>
-                        : <><span className="wk-t">Content {d.contentLabel}</span><span className="wk-sub"> · máy viết theo playbook</span></>}
-                      {d.content.time ? <span className="wk-sub"> · {d.content.time} · {d.content.channel ? CHANNEL_LABEL[d.content.channel] : 'Facebook Page'}{d.content.group ? ` · 👥 ${d.content.group}` : ''}</span> : null}
-                    </span>
-                  </div>
-                ) : null;
-                return (
-                <tr key={d.date} className={d.isToday ? 'row-today' : undefined}>
-                  <td style={{ whiteSpace: 'nowrap' }}>
+                const rows = weekRowsOf(d);
+                const span = Math.max(rows.length, 1);
+                const dayCell = (
+                  <td rowSpan={span} className="wk-day">
                     <b>{d.dowLabel.replace('Chủ nhật', 'CN').replace('Thứ ', 'T')}</b> <span className="sub">{fmtDate(d.date).slice(0, 5)}</span>
                     {d.isToday ? <div className="sub">👉 hôm nay</div> : null}
                     {d.overridden ? <div className="sub">✏️ lịch riêng</div> : null}
                   </td>
-                  <td>
-                    {d.morning.length ? d.morning.map((it, k) => (
-                      <div key={k} className={`wk-item ${it.state === 'fallback' ? 'is-fallback' : ''}`}>
-                        <span aria-hidden="true">{it.state === 'done' ? '✅' : '▫️'}</span>
-                        <span>
-                          <span className="wk-t">{it.text}</span>
-                          {it.product ? <span className="wk-sub"> · {it.product}</span> : null}
-                          {it.time ? <span className="wk-sub"> · {it.time} · {it.channel ? CHANNEL_LABEL[it.channel] : 'Facebook Page'}{it.group ? ` · 👥 ${it.group}` : ''}</span> : null}
-                        </span>
-                      </div>
-                    )) : null}
-                    {d.contentWindow === 'sang' ? contentNode : null}
-                    {!d.morning.length && !(d.contentWindow === 'sang' && d.content) ? <span className="sub">— máy nghỉ</span> : null}
-                  </td>
-                  <td>
-                    {d.afternoonSale.map((it, k) => (
-                      <div key={`s${k}`} className={`wk-item ${it.state === 'fallback' ? 'is-fallback' : ''}`}>
-                        <span aria-hidden="true">{it.state === 'done' ? '✅' : '▫️'}</span>
-                        <span>
-                          <span className="wk-t">{it.text}</span>
-                          {it.product ? <span className="wk-sub"> · {it.product}</span> : null}
-                          {it.time ? <span className="wk-sub"> · {it.time} · {it.channel ? CHANNEL_LABEL[it.channel] : 'Facebook Page'}{it.group ? ` · 👥 ${it.group}` : ''}</span> : null}
-                        </span>
-                      </div>
-                    ))}
-                    {d.contentWindow === 'chieu' ? contentNode : null}
-                    {!d.afternoonSale.length && !(d.contentWindow === 'chieu' && d.content) ? <span className="sub">— máy nghỉ</span> : null}
-                  </td>
-                  <td className="sub">{d.groups.length ? d.groups.join(', ') : '—'}</td>
-                </tr>
                 );
+                const lotCell = (
+                  <td rowSpan={span} className="wk-lot">
+                    {d.lot && d.lot.items.length ? (
+                      d.isToday ? (
+                        <ShareLotToday
+                          compact
+                          lot={d.lot.items.map((g) => ({ id: g.id, label: g.label, url: g.url, sharedToday: g.done ? { id: 'da-ghi', content_id: null, shared_at: '' } : null }))}
+                          lotSize={d.lot.lotSize}
+                          doneToday={d.lot.done}
+                          post={null}
+                        />
+                      ) : (
+                        <div className="wk-lot-list">
+                          <span className="sub" style={{ fontSize: '.74rem' }}>{d.isPast ? `đã chia ${d.lot.done}/${d.lot.lotSize}` : `dự kiến ${d.lot.lotSize} nhóm`}</span>
+                          {d.lot.items.map((g) => (
+                            <span key={g.id} className={`wk-lot-item ${g.done ? 'done' : ''} ${g.pinned ? 'pinned' : ''}`}>
+                              <span className="lbl" title={g.label}>{g.done ? '✓' : '·'} {g.label}{g.pinned ? ' 📌' : ''}</span>
+                              {!d.isPast ? <a href={g.url} target="_blank" rel="noreferrer">mở ↗</a> : null}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                    ) : <span className="sub">—</span>}
+                  </td>
+                );
+                if (!rows.length) {
+                  return (
+                    <tr key={d.date} className={d.isToday ? 'row-today' : undefined}>
+                      {dayCell}
+                      <td colSpan={6} className="sub">— máy nghỉ</td>
+                      {lotCell}
+                    </tr>
+                  );
+                }
+                return rows.map((r, k) => (
+                  <tr key={`${d.date}-${k}`} className={d.isToday ? 'row-today' : undefined}>
+                    {k === 0 ? dayCell : null}
+                    <td style={{ whiteSpace: 'nowrap' }}>{r.time || (r.window === 'sang' ? 'sáng' : 'chiều')}</td>
+                    <td>{r.kind === 'sale' ? 'Bài bán' : <span title={d.contentPurpose || ''}>Content</span>}</td>
+                    <td>
+                      <span className={`ch-chip ${r.channel || 'facebook'}`}>{r.channel ? CHANNEL_LABEL[r.channel] : 'Facebook Page'}</span>
+                      {r.group ? <div className="sub" style={{ fontSize: '.74rem', marginTop: 2 }}>📌 {r.group}</div> : null}
+                    </td>
+                    <td>
+                      <span className="wk-t">{r.state === 'fallback' ? 'Bài theo trọng số sản phẩm' : r.label}</span>
+                      {r.kind === 'content' && r.state !== 'done' ? <span className="wk-sub"> · máy viết theo playbook {d.contentLabel}</span> : null}
+                      {r.kind === 'content' && r.state === 'done' ? <span className="wk-sub"> · {d.contentLabel}</span> : null}
+                    </td>
+                    <td className="sub">{r.product || (r.kind === 'content' ? 'Bài content' : '—')}</td>
+                    <td><span className={`wk-state ${r.state}`}>{r.state === 'done' ? '✅ đã sinh' : r.state === 'fallback' ? 'hướng cạn' : '▫️ dự kiến'}</span></td>
+                    {k === 0 ? lotCell : null}
+                  </tr>
+                ));
               })}
             </tbody>
           </table>
         </div>
         <p className="sub" style={{ margin: '10px 0 0' }}>
           Tối 20h BOSS tự chỉnh trọng số theo số liệu ngày (tối đa 0,5 điểm). Chủ nhật 20h học số cả tuần trên Facebook, YouTube và TikTok. Thứ 2 8h ra kế hoạch tuần mới theo luật 70/30.
-          {week.hasFallback ? ' Ô "theo trọng số" nghĩa là hướng đi đã cạn — máy tự nạp thêm hướng mới trong ngày.' : ''}
-          {' '}Đổi giờ/kênh/group ở khối Lịch đăng cố định ngay bên dưới.
+          {week.hasFallback ? ' Ô "hướng cạn" nghĩa là hướng đi đã hết — máy tự nạp thêm hướng mới trong ngày.' : ''}
+          {' '}Lô nhóm: ngày đã qua là nhóm đã bấm "Đã chia", hôm nay bấm được ngay trong bảng, ngày tới là dự kiến máy xoay (nhóm lâu chưa chia lên trước). Đổi giờ/kênh/ghim nhóm ở khối Lịch đăng cố định ngay bên dưới.
         </p>
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
           <GeneratePostsButton action={generatePostsNow} />
         </div>
       </section>
 
-      <PostingPlanForm pp={pp} />
+      <PostingPlanForm pp={pp} lots={Object.fromEntries(week.days.filter((d) => d.lot).map((d) => [d.date, d.lot!]))} changeLog={changeLog} />
 
       {/* ===== 3. HƯỚNG ĐI BÀI VIẾT ===== */}
-      <section className="blk">
+      <section className="blk" id="huong-di">
         <h2>
           🧭 Hướng đi bài viết
           <span className="sub">BOSS sinh từ tri thức + số liệu · sản phẩm ưu tiên cao được rút trước · mỗi hướng ra đúng 1 bài</span>

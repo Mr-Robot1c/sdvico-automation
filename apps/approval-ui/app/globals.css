@@ -1610,3 +1610,26 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .lead-table { min-width: 1080px; }
 .lead-table .lead-msg { min-width: 260px; }
 .lead-table td:nth-child(3) { min-width: 280px; }
+
+/* ===== 15/9: bảng Kế hoạch tuần mỗi bài 1 dòng + cột lô nhóm ===== */
+.week-table td { vertical-align: top; }
+.week-table .wk-day { white-space: nowrap; background: var(--surface-2); }
+.week-table tr.row-today td { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.week-table .wk-lot { min-width: 210px; }
+.wk-lot-list { display: grid; gap: 3px; font-size: .8rem; }
+.wk-lot-item { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.wk-lot-item .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-lot-item.done { color: var(--ok); }
+.wk-lot-item.pinned .lbl { font-weight: 600; }
+.wk-lot-item a { color: var(--accent); text-decoration: none; font-size: .74rem; white-space: nowrap; }
+.wk-state { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: .74rem; font-weight: 600; white-space: nowrap; }
+.wk-state.done { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.wk-state.planned { background: var(--chip); color: var(--ink-2); }
+.wk-state.fallback { background: color-mix(in srgb, var(--brand-red) 12%, transparent); color: var(--brand-red); }
+.plan-log { display: grid; gap: 6px; margin-top: 8px; font-size: .84rem; }
+.plan-log-item { border-left: 3px solid var(--line); padding: 4px 10px; }
+.plan-log-item.boss { border-color: var(--accent); }
+.plan-log-item ul { margin: 4px 0 0; padding-left: 18px; }
+.save-report { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--ok); background: color-mix(in srgb, var(--ok) 8%, transparent); font-size: .86rem; }
+.save-report.err { border-color: var(--no); background: color-mix(in srgb, var(--no) 8%, transparent); }
+.save-report ul { margin: 4px 0 0; padding-left: 18px; }

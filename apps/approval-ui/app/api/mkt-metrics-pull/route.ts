@@ -8,7 +8,7 @@ import { pullTikTokMetrics } from '../../../lib/tiktok-metrics';
 import { pullFacebookInbox } from '../../../lib/fb-inbox';
 import { learnWeekly, shouldRunLearnWeekly } from '../../../lib/learn-weekly';
 import { refreshLiveProposal, applyLiveEvening } from '../../../lib/plan-live';
-import { loadPostingPlan, buildBossPostingPlan, savePostingPlan, pruneOverrides, isPlanForCurrentWeek } from '../../../lib/posting-plan';
+import { loadPostingPlan, buildBossPostingPlan, savePostingPlan, pruneOverrides, isPlanForCurrentWeek, diffPostingPlans, summarizeChanges } from '../../../lib/posting-plan';
 
 // Kéo số liệu tương tác Facebook về mkt_metrics. Gọi bởi Vercel Cron (Authorization: Bearer
 // CRON_SECRET) hoặc thủ công (?secret=CRON_SECRET).
@@ -38,7 +38,9 @@ async function bossProposePostingPlan(client: ReturnType<typeof getServerClient>
   const cur = await loadPostingPlan(client);
   const { plan, input } = await buildBossPostingPlan(client, now);
   await savePostingPlan(client, { ...plan, overrides: pruneOverrides(cur.plan.overrides, plan.week_start || '') });
-  const detail = { reason, weekStart: plan.week_start, groups: input.shareGroups.length, youtubeReady: input.youtubeReady, clipFolders: input.clipFolders, replacedSource: cur.saved ? cur.plan.source || 'default' : 'none' };
+  // 15/9 (Thanh): ghi rõ máy đã thêm/bỏ ô nào để trang Kế hoạch hiện "Nhật ký thay đổi lịch".
+  const changes = diffPostingPlans(cur.saved ? cur.plan : null, plan, input.shareGroups);
+  const detail = { reason, weekStart: plan.week_start, groups: input.shareGroups.length, youtubeReady: input.youtubeReady, clipFolders: input.clipFolders, replacedSource: cur.saved ? cur.plan.source || 'default' : 'none', summary: summarizeChanges(changes), changes: changes.map((c) => c.text).slice(0, 40) };
   try { await client.from('run_log').insert({ task: 'mkt.posting_plan_boss', actor: 'cron', status: 'ok', detail }); } catch { /* bo qua */ }
   return detail;
 }

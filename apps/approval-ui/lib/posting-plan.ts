@@ -335,3 +335,48 @@ export function summarizePlan(plan: PostingPlan): string {
   }
   return DOW_ORDER.map((d, i) => `${DOW_SHORT[d]} ${parts[i].replace('/', ' bán + ')} content`).join(' · ');
 }
+
+// ===== 15/9 (Thanh, kế hoạch sửa web): "chỗ lưu lịch đăng phải có thông báo mỗi khi tự động thêm
+// hoặc xoá 1 bài". So 2 lịch (theo thứ trong tuần) -> danh sách câu chữ người đọc được; dùng cho
+// nút Lưu (hiện ngay dưới nút), BOSS xếp lại (tay + cron Thứ 2) và ghi vào run_log.detail.changes.
+export type PlanChange = { dow: number; kind: 'add' | 'remove' | 'group' | 'channel'; text: string };
+
+function slotKey(s: PostingSlot): string { return `${s.time}|${s.kind}`; }
+function slotText(s: PostingSlot, groups: ShareGroup[] = []): string {
+  const g = s.group_id ? (groups.find((x) => x.id === s.group_id)?.label || s.group_id) : '';
+  return `${s.time} ${KIND_LABEL[s.kind]} · ${CHANNEL_LABEL[s.channel]}${g ? ` · 👥 ${g}` : ''}`;
+}
+
+export function diffPostingPlans(before: PostingPlan | null, after: PostingPlan, groups: ShareGroup[] = []): PlanChange[] {
+  const out: PlanChange[] = [];
+  for (const d of DOW_ORDER) {
+    const a = before?.days?.[String(d)]?.slots || [];
+    const b = after.days?.[String(d)]?.slots || [];
+    const label = DOW_LONG[d];
+    const aBy = new Map(a.map((s) => [slotKey(s), s]));
+    const bBy = new Map(b.map((s) => [slotKey(s), s]));
+    for (const [k, s] of bBy) {
+      const old = aBy.get(k);
+      if (!old) { out.push({ dow: d, kind: 'add', text: `${label}: thêm bài ${slotText(s, groups)}` }); continue; }
+      if (old.channel !== s.channel) out.push({ dow: d, kind: 'channel', text: `${label} ${s.time}: đổi nền tảng ${CHANNEL_LABEL[old.channel]} → ${CHANNEL_LABEL[s.channel]}` });
+      if ((old.group_id || '') !== (s.group_id || '')) {
+        const lo = old.group_id ? (groups.find((x) => x.id === old.group_id)?.label || old.group_id) : 'không ghim';
+        const ln = s.group_id ? (groups.find((x) => x.id === s.group_id)?.label || s.group_id) : 'không ghim';
+        out.push({ dow: d, kind: 'group', text: `${label} ${s.time}: nhóm ghim ${lo} → ${ln}` });
+      }
+    }
+    for (const [k, s] of aBy) if (!bBy.has(k)) out.push({ dow: d, kind: 'remove', text: `${label}: bỏ bài ${slotText(s, groups)}` });
+  }
+  return out;
+}
+
+export function summarizeChanges(changes: PlanChange[]): string {
+  const add = changes.filter((c) => c.kind === 'add').length;
+  const rem = changes.filter((c) => c.kind === 'remove').length;
+  const oth = changes.length - add - rem;
+  const parts: string[] = [];
+  if (add) parts.push(`thêm ${add} bài`);
+  if (rem) parts.push(`bỏ ${rem} bài`);
+  if (oth) parts.push(`đổi ${oth} ô`);
+  return parts.length ? parts.join(', ') : 'không đổi ô nào';
+}
