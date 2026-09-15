@@ -187,20 +187,18 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
 
   // 29/8 (sếp: "đem đo lường và báo cáo tuần ra tổng quan"): số liệu TUẦN NÀY (kênh chính,
   // buildWeekReport offset 0) + đếm lượt đăng hôm nay + sức khoẻ Trang từ bộ quét Business Suite.
-  let week: any = null;
-  try {
-    const { buildWeekReport } = await import('../../lib/week-report');
-    week = await buildWeekReport(client, 0);
-  } catch { /* thiếu số liệu thì block tự ẩn */ }
-  const { count: postsTodayCount } = await client
-    .from('mkt_posts').select('id', { count: 'exact', head: true })
-    .eq('status', 'published').gte('published_at', dayStartIso).lte('published_at', new Date().toISOString());
-  const { data: pageScans } = await client
-    .from('mkt_metrics').select('metrics, created_at')
-    .eq('source', 'facebook').eq('entity_ref', '__page_real__')
-    .not('metrics->suite28', 'is', null)
-    .order('created_at', { ascending: false }).limit(30);
-  const scanList = (pageScans || []) as any[];
+  // 15/9 (web chậm): 3 việc dưới độc lập nhau — trước chạy TUẦN TỰ (3 vòng chờ), giờ chạy song song.
+  const leadByCidEarly = new Map<string, number>();
+  for (const l of leads) { const cid = String(l.content_id || ''); if (cid) leadByCidEarly.set(cid, (leadByCidEarly.get(cid) || 0) + 1); }
+  const topLeadCidsEarly = [...leadByCidEarly.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([cid]) => cid);
+  const [week, postsTodayRes, pageScansRes, leadTitlesRes] = await Promise.all([
+    (async () => { try { const { buildWeekReport } = await import('../../lib/week-report'); return await buildWeekReport(client, 0); } catch { return null as any; } })(),
+    client.from('mkt_posts').select('id', { count: 'exact', head: true }).eq('status', 'published').gte('published_at', dayStartIso).lte('published_at', new Date().toISOString()),
+    client.from('mkt_metrics').select('metrics, created_at').eq('source', 'facebook').eq('entity_ref', '__page_real__').not('metrics->suite28', 'is', null).order('created_at', { ascending: false }).limit(30),
+    topLeadCidsEarly.length ? client.from('mkt_content').select('id, title').in('id', topLeadCidsEarly) : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const postsTodayCount = postsTodayRes.count;
+  const scanList = ((pageScansRes as any).data || []) as any[];
   const scanCur = scanList[0]?.metrics || null;
   const scanPrev = (scanList.find((r: any) => String(r.created_at) < dayStartIso) as any)?.metrics || null;
   const vnI = (n: number | null | undefined) => Number(n || 0).toLocaleString('vi-VN');
@@ -217,10 +215,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   }
   const topLeadPosts = [...leadByCid.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
   const leadPostTitles = new Map<string, string>();
-  if (topLeadPosts.length) {
-    const { data: lp } = await client.from('mkt_content').select('id, title').in('id', topLeadPosts.map(([cid]) => cid));
-    for (const c of lp || []) leadPostTitles.set(String((c as any).id), String((c as any).title || '(không tên)'));
-  }
+  for (const c of ((leadTitlesRes as any).data || []) as any[]) leadPostTitles.set(String(c.id), String(c.title || '(không tên)'));
 
   // Giai doan cua tung bai trong bang Tat ca noi dung.
   function stageOf(c: ContentRow): { key: string; cls: string; label: string } {

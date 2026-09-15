@@ -80,8 +80,8 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
   const leads = ((leadsRes.data || []) as unknown) as Lead[];
 
   const [countsRes, salesRow, wonWeekRes, newWeekRes, ads7Res, goalRow] = await Promise.all([
-    // Đếm theo trạng thái bằng 1 truy vấn nhỏ (trước đây kéo cả bảng về chỉ để đếm).
-    client.from('mkt_leads').select('status').limit(5000),
+    // Đếm theo trạng thái: 6 lượt đếm head (không kéo dòng nào về), chạy song song.
+    Promise.all(['new', 'contacted', 'won', 'lost', 'closed', 'spam'].map((st) => client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('status', st).then((r) => [st, r.count || 0] as [string, number]))),
     client.from('app_config').select('value').eq('key', 'mkt_sales_zalo').maybeSingle(),
     client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('status', 'won').gte('updated_at', weekStart),
     client.from('mkt_leads').select('id', { count: 'exact', head: true }).neq('status', 'spam').gte('created_at', weekStart),
@@ -89,10 +89,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
     client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
   ]);
   const counts: Record<string, number> = { all: 0 };
-  for (const r of (countsRes.data || []) as any[]) {
-    counts[r.status] = (counts[r.status] || 0) + 1;
-    if (r.status !== 'spam') counts.all += 1;
-  }
+  for (const [st, n] of countsRes) { counts[st] = n; if (st !== 'spam') counts.all += n; }
   const salesPeople: Array<{ name: string; phone: string }> = Array.isArray((salesRow.data as any)?.value?.people) ? (salesRow.data as any).value.people : [];
   // Mục tiêu tuần: cùng cách đọc với /tong-quan ("... 10 khách mua ..." trong mkt_weekly_goal).
   const goalText = String((goalRow.data as any)?.value?.text || '');

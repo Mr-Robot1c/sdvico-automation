@@ -14,7 +14,9 @@ import Nav from './nav';
 import TopHeader from './top-header';
 import BotChip from './bot-chip';
 // 9/9: nút "Hỏi bot" nổi trên mọi trang nội bộ (bot hỏi đáp từ kho, cùng khung với /hoi-dap).
-import AskBotFab from './ask-bot-fab';
+import dynamic from 'next/dynamic';
+// 15/9 (web chậm): khung chat bot (bot-chat + fab) chỉ tải khi trang đã vẽ xong, không nằm trong gói đầu của mọi trang.
+const AskBotFab = dynamic(() => import('./ask-bot-fab'), { ssr: false });
 import Tracking from './tracking';
 
 export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: { children: ReactNode; marketingOnly: boolean; pixelId?: string | null; ga4Id?: string | null }) {

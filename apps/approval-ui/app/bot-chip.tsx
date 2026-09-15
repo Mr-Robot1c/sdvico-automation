@@ -39,7 +39,7 @@ export default function BotChip() {
     } catch {}
   }, []);
 
-  // Fetch bot status ngay + moi 60s.
+  // Fetch bot status ngay + moi 5 phut.
   useEffect(() => {
     let alive = true;
     const load = () => {
@@ -49,7 +49,8 @@ export default function BotChip() {
         .catch(() => {});
     };
     load();
-    const id = setInterval(load, 60000);
+    // 15/9 (web chậm): /api/bot-status chạy ~6 truy vấn; trước hỏi mỗi 60 giây trên MỌI trang. Giờ 5 phút.
+    const id = setInterval(load, 5 * 60000);
     return () => { alive = false; clearInterval(id); };
   }, []);
 

@@ -118,7 +118,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
             <h1>Bảng bài viết</h1>
           </div>
           <div className="head-actions">
-            <AutoRefresh seconds={30} />
+            <AutoRefresh seconds={60} />
           </div>
         </header>
         {typeChips}
@@ -304,7 +304,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
           </p>
         </div>
         <div className="head-actions">
-          <AutoRefresh seconds={30} />
+          <AutoRefresh seconds={60} />
         </div>
       </header>
 

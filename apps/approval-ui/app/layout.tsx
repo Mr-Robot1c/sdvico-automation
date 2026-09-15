@@ -1,7 +1,12 @@
 import './globals.css';
 import type { ReactNode } from 'react';
 import RootShell from './root-shell';
+import { unstable_cache } from 'next/cache';
 import { loadAdsConfig } from '../lib/ads-config';
+
+// 15/9 (web chậm): cấu hình Pixel/GA4 chỉ trang công khai dùng nhưng layout đọc app_config MỖI request
+// (supabase-server ép no-store). Cache 5 phút ở tầng dữ liệu Next — đổi ở /quang-cao thì tối đa 5 phút sau áp.
+const loadAdsConfigCached = unstable_cache(async () => loadAdsConfig(), ['ads-config'], { revalidate: 300 });
 
 export const metadata = {
   title: 'SDVICO · Duyệt nội dung',
@@ -18,7 +23,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const marketingOnly = process.env.MARKETING_ONLY === 'true' || process.env.MARKETING_ONLY === '1';
   // Cấu hình đo lường quảng cáo (Pixel/GA4) cho trang công khai — item 4. Đọc 1 lần ở layout,
   // truyền xuống RootShell; chỉ chèn script ở nhánh public.
-  const ads = await loadAdsConfig();
+  const ads = await loadAdsConfigCached();
   return (
     <html lang="vi">
       <head>
