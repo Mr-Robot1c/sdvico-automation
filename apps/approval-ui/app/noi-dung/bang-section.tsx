@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
+import { TIKTOK_USERNAME } from '../../lib/tiktok-username';
 import { editDraft, retryFacebookPublish, requestVideoForContent } from '../actions';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
@@ -182,9 +183,8 @@ export default async function BangSection() {
   const CH_LABEL: Record<string, string> = { facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok', zalo: 'Zalo', website: 'Website' };
   const isPlat = (c: string): c is PlatformKey => c === 'facebook' || c === 'youtube' || c === 'tiktok' || c === 'zalo';
   // Username TikTok công ty để nút "Mở TikTok" trên chip riêng tư mở đúng profile
-  // (https://www.tiktok.com/@sdvico_tbtc — user confirm 26/8). Hardcode fallback vì fact
-  // tĩnh của SDVICO; env NEXT_PUBLIC_TIKTOK_USERNAME override nếu sau này đổi.
-  const tiktokUsername = (process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim() || null;
+  // (15/9: kênh hiện tại @sdvico_tbtauca, lấy từ lib/tiktok-username.ts, một chỗ duy nhất).
+  const tiktokUsername = TIKTOK_USERNAME || null;
   // Bang bai viet la kanban tong quan - chi hien 1 vai bai gan nhat, xem het qua tab Bai viet
   // (user 26/8: "bang bai viet hien 1 so bai gan day thoi, qua trang bai viet no moi hien het").
   // Cot moi co nut "Xem tat ca" moreHref dan qua /noi-dung?loai=bai-viet.

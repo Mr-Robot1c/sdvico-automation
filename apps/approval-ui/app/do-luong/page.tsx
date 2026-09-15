@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
+import { TIKTOK_USERNAME } from '../../lib/tiktok-username';
 import { refreshFacebookMetrics, importManualFacebookPost } from '../actions';
 import MetricsAuto from './metrics-auto';
 import RefreshButton from './refresh-button';
@@ -255,7 +256,7 @@ export default async function Page() {
             rows={ttRows}
             renderMetrics={(m) => [fmt(m.views), fmt(m.reactions), fmt(m.comments), fmt(m.shares)]}
             customUrl={(r) => r.m.shareUrl || r.url}
-            channelLabel="@sdvico_tbtc"
+            channelLabel={`@${TIKTOK_USERNAME}`}
           />
 
           <BangSoLieu

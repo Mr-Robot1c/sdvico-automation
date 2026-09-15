@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
+import { TIKTOK_USERNAME } from '../../lib/tiktok-username';
 import { fbStatus, tiktokStatus } from '../../lib/platform-status';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
 import { getTikTokVideoCount } from '../../lib/tiktok';
@@ -118,7 +119,7 @@ export default async function Page() {
   const ytPosts = byChannel.get('youtube') || { count: 0, lastAt: '' };
   const ttPostCount = typeof ttVideoCount === 'number' ? ttVideoCount : (byChannel.get('tiktok') || { count: 0 }).count;
 
-  const tiktokUser = (process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim();
+  const tiktokUser = TIKTOK_USERNAME;
   const ytOk = !!(yt.configured && yt.channelTitle);
 
   // ===== BAI NOI BAT: gop diem tat ca nen tang theo content =====

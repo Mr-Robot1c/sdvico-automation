@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
+import { TIKTOK_USERNAME } from '../../lib/tiktok-username';
 import { fbStatus, tiktokStatus } from '../../lib/platform-status';
 import { getTikTokVideoCount } from '../../lib/tiktok';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
@@ -389,8 +390,8 @@ export default async function TongQuanSection() {
             <span className="pf-stat"><b>—</b><span>Like</span></span>
           </div>
           <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <a href={`https://www.tiktok.com/@${(process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim()}`} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.82rem', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} title="Mở tài khoản TikTok SDVICO">
-              <PlatformLogo platform="tiktok" size={14} /> Mở TikTok @{(process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim()} ↗
+            <a href={`https://www.tiktok.com/@${TIKTOK_USERNAME}`} target="_blank" rel="noreferrer" className="src" style={{ fontSize: '.82rem', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} title="Mở tài khoản TikTok SDVICO">
+              <PlatformLogo platform="tiktok" size={14} /> Mở TikTok @{TIKTOK_USERNAME} ↗
             </a>
             <Link href="/tiktok" className="src" style={{ fontSize: '.82rem', whiteSpace: 'nowrap' }}>⚙️ Kết nối/audit →</Link>
           </div>

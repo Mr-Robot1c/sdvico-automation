@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getServerClient } from '../../lib/supabase-server';
+import { TIKTOK_USERNAME } from '../../lib/tiktok-username';
 import AutoRefresh from '../auto-refresh';
 import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
@@ -265,7 +266,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       });
     }
   }
-  const tiktokUsername = (process.env.NEXT_PUBLIC_TIKTOK_USERNAME || 'sdvico_tbtc').trim() || null;
+  const tiktokUsername = TIKTOK_USERNAME || null;
 
   // Số liệu mới nhất (like, comment, share, lượt xem) của bài ĐÃ ĐĂNG — hiện gọn ngay trong
   // bảng (user 21/8: gộp đo lường vào đây cho dễ kiểm soát). mkt_metrics là chuỗi snapshot
