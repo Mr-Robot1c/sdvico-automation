@@ -1,5 +1,6 @@
 > Load khi: task chạm UI trang công khai /blog, /blog/[slug], /blog/chu-de/[slug], /san-pham, /san-pham/[slug] (shell công khai trong root-shell.tsx)
 covers: apps/approval-ui/app/blog, apps/approval-ui/app/san-pham, apps/approval-ui/app/root-shell.tsx
+<!-- re-verified: 2026-09-15 - DOT 4 (kho tu lieu Google Drive): app/san-pham/page.tsx + app/san-pham/[slug]/page.tsx + lib/seo.ts + lib/cover-image.ts doi getPublicUrl -> assetPublicUrl (lib/asset-url.ts) de anh tren Drive ("gdrive:<id>/<ten>") hien duoc; giao dien trang cong khai KHONG doi. -->
 last_verified: 2026-09-07
 ttl_days: 90
 <!-- re-verified: 2026-09-09 chieu - root-shell.tsx CHI them <AskBotFab /> canh <BotChip /> o nhanh SHELL NOI BO (sau isPublic); shell cong khai /blog, /san-pham, /privacy, /terms KHONG doi, khong co nut bot o trang cong khai. -->

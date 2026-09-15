@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { PRODUCT_CATALOG } from '../../lib/product-catalog';
 import { isProductOf, optImg, siteUrl } from '../../lib/seo';
 import { getServerClient } from '../../lib/supabase-server';
+import { assetPublicUrl } from '../../lib/asset-url';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 600; // 10 phut
@@ -38,7 +39,7 @@ async function loadCardData(): Promise<{ counts: Record<string, number>; images:
     }
     counts[p.slug] = seen.size;
     const img = ((assetRows || []) as any[]).find((a) => a.storage_path && isProductOf(p, String(a.product_group || '')));
-    if (img) images[p.slug] = client.storage.from('brand-assets').getPublicUrl(img.storage_path).data.publicUrl;
+    if (img) images[p.slug] = assetPublicUrl(client, img.storage_path);
   }
   return { counts, images };
 }

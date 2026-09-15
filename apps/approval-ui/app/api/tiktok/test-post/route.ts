@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../../lib/supabase-server';
 import { postVideoToTikTok } from '../../../../lib/tiktok';
+import { assetPublicUrl } from '../../../../lib/asset-url';
 
 // Đăng THỬ 1 video lên TikTok để kiểm tra luồng Direct Post. Chưa audit nên video ra chế độ
 // riêng tư (SELF_ONLY). Bảo vệ bằng CRON_SECRET. Dùng:
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
   }
   if (!asset) return NextResponse.json({ error: 'không tìm thấy video trong kho' }, { status: 404 });
 
-  const videoUrl = client.storage.from('brand-assets').getPublicUrl(asset.storage_path).data.publicUrl;
+  const videoUrl = assetPublicUrl(client, asset.storage_path);
   const caption = url.searchParams.get('caption') || `${asset.title || 'Video SDVICO'} — SDVICO nghề cá thịnh vượng`;
 
   const result = await postVideoToTikTok(client, { videoUrl, caption });

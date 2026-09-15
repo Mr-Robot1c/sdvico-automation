@@ -2,6 +2,7 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach
+<!-- re-verified: 2026-09-15 (4) - DOT 4+5 (Drive kho tu lieu, Search Console) — chi tiet README/marketing.md cung gio; Ke hoach/BOSS khong doi. -->
 <!-- re-verified: 2026-09-15 (3) - DOT 3 VIDEO (sep qua ke hoach "SDVICO sua web" 15/9: "kich ban noi may hu, nuoc duc ma chieu may moi bong; kich ban phai di doi voi dung video"): xem chi tiet o marketing.md cung gio (scene-match.mjs, brand_assets.description, video_timeline). Flow BOSS / Ke hoach KHONG doi. -->
 <!-- re-verified: 2026-09-15 (2) - DOT 2 KE HOACH (Thanh 15/9): /ke-hoach bang tuan MOI BAI 1 DONG nhieu cot (weekRowsOf trong lib/week-plan.ts), cot Lo nhom 4 nhom/ngay (planShareLots trong lib/share-lot.ts; hom nay bam Da chia ngay trong bang), nut Luu lich dang tra bao cao them/bo bai (savePostingPlanWithReport + posting-plan-form-client.tsx), Nhat ky thay doi lich doc run_log; dropdown group -> "Ghim nhom (tuy chon)". Flow BOSS de xuat / NGUOI quyet KHONG doi. -->
 <!-- re-verified: 2026-09-15 - (a) intro-doc.mp4 tieng -16 dB (sep: "nho lai 15%" so voi -14 dB); (b) build-video cleanNarration SDVICO -> "S D Vi Cô" (sep nghe video doc "S D Vi CO", muon "cô"; 3 mau da gui). -->

@@ -12,6 +12,7 @@ import ShareGroups from './share-groups';
 import BangSection from './bang-section';
 import TikTokPrivateChip from './tiktok-private-chip';
 import { lengthLabel, channelsLabel, postedChannelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
+import { assetPublicUrl } from '../../lib/asset-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -212,7 +213,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       .select('id, storage_path, kind, title')
       .in('id', [...assetIds]);
     for (const a of as || []) {
-      const url = client.storage.from('brand-assets').getPublicUrl(a.storage_path as string).data.publicUrl;
+      const url = assetPublicUrl(client, a.storage_path as string);
       assetUrl.set(a.id as string, { url, kind: (a.kind as string) || '', title: (a.title as string) || '' });
     }
   }

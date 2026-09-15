@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import PlatformLogo from '../noi-dung/platform-logo';
 import VideoViewer from './video-viewer';
+import { assetPublicUrl } from '../../lib/asset-url';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang VIDEO: luong lam video bang AI cua
 // SDVICO (thay vidpod/OpenMontage cua ForLife bang Gemini + ffmpeg cua minh):
@@ -70,7 +71,7 @@ export default async function Page() {
     fbVideoCount = (fbContents || []).filter((c: any) => c.kind === 'video' || c.brief?.assets?.video || c.brief?.assets?.video_v).length;
   }
 
-  const urlOf = (p: string) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
+  const urlOf = (p: string) => assetPublicUrl(client, p);
 
   // 15/9 (Thanh: bảng video trong kho phải có cột "lấy tư liệu nào, dùng ở giây nào"). Video do dây
   // chuyền dựng có storage_path video/sdvico_<8 ký tự id bài>_...; nối về bài gốc (brief.video_timeline

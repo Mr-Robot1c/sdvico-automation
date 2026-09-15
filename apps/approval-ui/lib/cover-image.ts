@@ -15,6 +15,7 @@
 import { guessGroup } from './gen/products.mjs';
 // @ts-ignore
 import { pickImageForContent } from './gen/pick-image.mjs';
+import { assetPublicUrl } from './asset-url';
 
 type Client = any;
 
@@ -79,7 +80,7 @@ export async function ensureCoverForContent(
       if (assets.image && !taken.has(String(assets.image))) {
         const { data: row } = await client.from('brand_assets').select('storage_path').eq('id', assets.image).maybeSingle();
         if (row?.storage_path) {
-          const url = client.storage.from('brand-assets').getPublicUrl(row.storage_path).data.publicUrl;
+          const url = assetPublicUrl(client, row.storage_path);
           const res = await fetch(url, { method: 'HEAD' }).catch(() => null);
           if (res?.ok) {
             taken.add(String(assets.image));

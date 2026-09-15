@@ -8,6 +8,7 @@ import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
 import { safeJsonLd } from '../../../lib/jsonld';
 import ContactButtons from '../../contact-buttons';
 import PostCard from '../../blog/post-card';
+import { assetPublicUrl } from '../../../lib/asset-url';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 600;
@@ -43,7 +44,7 @@ async function loadImages(p: ProductKey): Promise<string[]> {
   return ((data || []) as any[])
     .filter((a) => a.storage_path && isProductOf(p, String(a.product_group || '')))
     .slice(0, 6)
-    .map((a) => client.storage.from('brand-assets').getPublicUrl(a.storage_path).data.publicUrl);
+    .map((a) => assetPublicUrl(client, a.storage_path));
 }
 
 async function loadRelatedPosts(p: ProductKey): Promise<PublicPost[]> {

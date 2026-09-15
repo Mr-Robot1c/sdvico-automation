@@ -14,6 +14,7 @@
 //  - Không đăng lại bài đã đăng (kiểm mkt_posts theo content_id + channel facebook).
 
 import { getServiceClient, logRun, isStopped, incrementDailyCounter } from '@sdvico/core';
+import { assetPublicUrl } from './asset-url.mjs';
 
 const LIVE = process.argv.includes('--live');
 const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
@@ -93,7 +94,7 @@ if (assetIds.length) {
     .select('id, storage_path')
     .in('id', assetIds);
   for (const a of assets || []) {
-    imageUrlById.set(a.id, client.storage.from('brand-assets').getPublicUrl(a.storage_path).data.publicUrl);
+    imageUrlById.set(a.id, assetPublicUrl(client, a.storage_path));
   }
 }
 

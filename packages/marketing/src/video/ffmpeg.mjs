@@ -97,6 +97,12 @@ export async function probeSize(path) {
 
 // Tải một asset từ Supabase Storage (bucket brand-assets) xuống file.
 export async function downloadAsset(client, storagePath, destPath, bucket = 'brand-assets') {
+  // 15/9: tư liệu trên Google Drive (storage_path "gdrive:<id>/<tên>") tải qua gdrive.mjs.
+  if (/^gdrive:/.test(String(storagePath || ''))) {
+    const { downloadFromDrive } = await import('../gdrive.mjs');
+    await writeFile(destPath, await downloadFromDrive(storagePath));
+    return destPath;
+  }
   const { data, error } = await client.storage.from(bucket).download(storagePath);
   if (error) throw new Error(`tai asset ${storagePath}: ${error.message}`);
   const buf = Buffer.from(await data.arrayBuffer());

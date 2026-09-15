@@ -2,6 +2,7 @@
 // Dung tay khi Cowork xuat xong xa file vao ./Zalo.
 // Bo qua file da co tren bucket (theo ten). Bao 1 dong ket qua moi file.
 import { createClient } from '@supabase/supabase-js';
+import { driveEnabled, uploadToDrive } from './gdrive.mjs';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { loadRealEnv } from './video/env.mjs';
@@ -69,9 +70,15 @@ for (const name of items) {
     const { data: dup } = await client.from('brand_assets').select('id').eq('title', title).limit(1);
     if (dup && dup.length) { skipped += 1; console.log(`  - da co trong kho tu lieu: ${name}`); continue; }
     const safeName = name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const mediaPath = `zalo/${Date.now()}-${safeName}`;
-    const upM = await client.storage.from('brand-assets').upload(mediaPath, buf, { contentType: ctype(name), cacheControl: '31536000' });
-    if (upM.error) { console.error(`  X media ${name}: ${upM.error.message}`); errors += 1; continue; }
+    let mediaPath = `zalo/${Date.now()}-${safeName}`;
+    // 15/9: có Google Drive thì media lên Drive (Supabase chỉ giữ link).
+    if (driveEnabled()) {
+      try { mediaPath = (await uploadToDrive({ name: `${Date.now()}-${safeName}`, buf, mime: ctype(name) })).storagePath; }
+      catch (e) { console.error(`  X media ${name}: Drive ${e?.message || e}`); errors += 1; continue; }
+    } else {
+      const upM = await client.storage.from('brand-assets').upload(mediaPath, buf, { contentType: ctype(name), cacheControl: '31536000' });
+      if (upM.error) { console.error(`  X media ${name}: ${upM.error.message}`); errors += 1; continue; }
+    }
     const { guessGroup } = await import('./products.mjs');
     const grp = guessGroup(name) || 'Content';
     const ins = await client.from('brand_assets').insert({

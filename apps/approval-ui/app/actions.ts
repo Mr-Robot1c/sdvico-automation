@@ -10,6 +10,7 @@ import { isEmergencyStopped } from '../lib/safety';
 import { fetchWithRetry } from '../lib/retry';
 import { pullFacebookMetrics, fbPageTokens } from '../lib/fb-metrics';
 import { generateAndStorePlan } from '../lib/plan';
+import { assetPublicUrl, isDrivePath, deleteDriveFile } from '../lib/asset-url';
 
 // Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment ngay lúc video còn
 // đang xử lý sẽ lỗi → ảnh bị bỏ). Hỏi trạng thái qua /{videoId}?fields=status. Trả true khi sẵn sàng.
@@ -156,7 +157,7 @@ async function publishContentToFacebook(
     if (!assetId) return null;
     const { data: a } = await client.from('brand_assets').select('storage_path').eq('id', assetId).single();
     const sp = (a as { storage_path?: string } | null)?.storage_path;
-    return sp ? client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl : null;
+    return sp ? assetPublicUrl(client, sp) : null;
   };
   const assets = (c as any).brief?.assets || {};
   // 28/8 tối: bài content có thể mang ẢNH LINK NGOÀI (image_url — Google/Unsplash, không lưu
@@ -400,7 +401,7 @@ async function publishContentToTikTok(
     await client.from('mkt_posts').insert({ content_id: contentId, channel: 'tiktok', status: 'failed' });
     return { ok: false, error: 'không thấy file video trong kho' };
   }
-  const videoUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  const videoUrl = assetPublicUrl(client, sp);
   // Rút gọn cho TikTok để bài dài không bị cắt cụt (giữ hashtag).
   const caption = shortCaptionForTikTok(String((c as any).draft || (c as any).title || ''));
 
@@ -472,7 +473,7 @@ async function publishContentToYoutube(
     await client.from('mkt_posts').insert({ content_id: contentId, channel: 'youtube', status: 'failed' });
     return { ok: false, error: 'khong thay file video trong kho' };
   }
-  const videoUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  const videoUrl = assetPublicUrl(client, sp);
   const title = String((c as any).title || 'Video SDVICO');
   const caption = String((c as any).draft || (c as any).title || '');
   const productGroup = ((c as any).brief?.rotation_group || '').replace(/^\s*\d+\.\s*/, '').trim();
@@ -1604,7 +1605,7 @@ async function uploadImageBuffer(
     .select('id')
     .single();
   if (error) throw new Error(error.message);
-  const url = client.storage.from('brand-assets').getPublicUrl(path).data.publicUrl;
+  const url = assetPublicUrl(client, path);
   return { id: (data as { id: string }).id, url };
 }
 
@@ -1700,7 +1701,7 @@ export async function createCompositeFromBackground(input: {
     .replace(/\s+/g, ' ')
     .trim();
   const bannerTitle = String(input.title || '').trim() || prodName;
-  const productUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  const productUrl = assetPublicUrl(client, sp);
   const cutoutBuffer = await removeBgCutout(productUrl);
   let backgroundBuffer: Buffer | null = null;
   if (input.background) {
@@ -1817,7 +1818,11 @@ export async function deleteAsset(formData: FormData) {
   const storagePath = String(formData.get('storage_path') || '');
   if (!id) return;
   const client = getServerClient();
-  if (storagePath) await client.storage.from('brand-assets').remove([storagePath]);
+  if (storagePath) {
+    // 15/9: tư liệu trên Google Drive xoá qua API Drive (cần GOOGLE_SA_JSON), còn lại xoá Storage.
+    if (isDrivePath(storagePath)) { try { await deleteDriveFile(storagePath); } catch (e: any) { console.error('[deleteAsset] Drive:', e?.message || e); } }
+    else await client.storage.from('brand-assets').remove([storagePath]);
+  }
   await client.from('brand_assets').delete().eq('id', id);
   revalidatePath('/tu-lieu');
 }
@@ -2093,7 +2098,7 @@ export async function checkVideoDone(sourceContentId: string): Promise<{
     if (videoId) {
       const { data: a } = await client.from('brand_assets').select('storage_path').eq('id', videoId).single();
       const sp = (a as { storage_path?: string } | null)?.storage_path;
-      if (sp) videoUrl = client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+      if (sp) videoUrl = assetPublicUrl(client, sp);
     }
     return { done: true, videoContentId: v.id, url: '/noi-dung?loai=video', title: v.title, videoUrl };
   }

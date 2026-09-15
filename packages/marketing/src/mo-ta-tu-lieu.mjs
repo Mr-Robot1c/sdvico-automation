@@ -15,6 +15,7 @@ import { join, resolve, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { loadRealEnv } from './video/env.mjs';
+import { assetPublicUrl } from './asset-url.mjs';
 
 const env = loadRealEnv();
 const MKT_MODEL = env.MKT_MODEL || 'gemini-flash-lite-latest';
@@ -87,7 +88,7 @@ function findVideoSummary(name) {
 }
 function hasFfmpeg() { return spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0; }
 
-const publicUrl = (p) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
+const publicUrl = (p) => assetPublicUrl(client, p);
 
 let q = client.from('brand_assets')
   .select('id, kind, title, storage_path, source, product_group, license_note, mime, size_bytes, description')
@@ -134,7 +135,7 @@ for (const a of rows) {
           skip += 1; console.log(`  - ${a.title}: video ${Math.round(size / 1e6)}MB khong co ban tom tat, bo qua (chay hoc-video truoc)`);
         }
       }
-      if (ff && local) {
+      if (ff && local && !/^gdrive:/.test(String(a.storage_path))) {
         const outp = local.replace(/(\.[^.]+)?$/, '.fast.mp4');
         const r = spawnSync('ffmpeg', ['-y', '-i', local, '-c', 'copy', '-movflags', '+faststart', outp], { stdio: 'ignore' });
         if (r.status === 0 && existsSync(outp)) {

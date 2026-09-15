@@ -13,6 +13,7 @@
 
 import type { getServerClient } from './supabase-server';
 import { PRODUCT_CATALOG, type ProductItem } from './product-catalog';
+import { assetPublicUrl } from './asset-url';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -122,7 +123,7 @@ async function imageUrlOf(client: Client, assetId: string | null | undefined): P
   const { data } = await client.from('brand_assets').select('storage_path').eq('id', assetId).maybeSingle();
   const sp = (data as any)?.storage_path as string | undefined;
   if (!sp) return null;
-  return client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  return assetPublicUrl(client, sp);
 }
 
 // Liệt kê bài PUBLIC (mkt_posts đã publish + có draft hợp lệ). Sắp theo published_at giảm dần.
@@ -179,7 +180,7 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
   // đặt thật); tuyệt đối không vào pool dự phòng CHUNG. Pool chung cạn thì thà placeholder logo.
   // So TIỀN TỐ: source thật trong kho là 'zalo-auto' / 'zalo-backlog-tkkd' (không phải 'zalo' trần).
   const noZalo = (arr: PoolImg[]) => arr.filter((a) => !String(a.source || '').startsWith('zalo'));
-  const publicUrlOf = (sp: string) => client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
+  const publicUrlOf = (sp: string) => assetPublicUrl(client, sp);
   // Chống TRÙNG ảnh giữa các thẻ trong cùng một trang danh sách (user 28/8 chụp 2 card y hệt):
   // ảnh nào đã cấp cho 1 bài thì bài sau dò tiếp vị trí kế trong pool; pool cạn mới cho lặp.
   const usedCovers = new Set<string>();

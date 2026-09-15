@@ -1,5 +1,6 @@
 import { getServerClient } from '../../lib/supabase-server';
 import SanXuatForm from './form';
+import { assetPublicUrl } from '../../lib/asset-url';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -28,7 +29,7 @@ export default async function Page() {
   const assets = (assetRows || []) as Asset[];
   const images = assets.filter((a) => a.kind === 'image' || a.kind === 'logo');
   const videos = assets.filter((a) => a.kind === 'video' || a.kind === 'clip');
-  const urlOf = (p: string) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
+  const urlOf = (p: string) => assetPublicUrl(client, p);
   const withUrl = <T extends { storage_path: string }>(a: T) => ({ ...a, url: urlOf(a.storage_path) });
 
   return (

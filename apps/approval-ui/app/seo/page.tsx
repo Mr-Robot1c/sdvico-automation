@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { loadPublicPosts, siteUrl } from '../../lib/seo';
+import { loadPublicPosts, siteUrl, publicBlogUrl } from '../../lib/seo';
+import { loadGscLatest, gscConfigured } from '../../lib/gsc';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang SEO: bai da dang len web cong khai
 // (/blog), kho tu khoa, va suc khoe SEO (sitemap, audit gan nhat). Y chang layout SEO cua
@@ -23,8 +24,10 @@ const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 export default async function Page() {
   const client = getServerClient();
 
-  const [posts, kwRes, auditRes] = await Promise.all([
+  const [posts, gsc, kwRes, auditRes] = await Promise.all([
     loadPublicPosts(client, 200),
+    // 15/9: số Google Search Console (click / hiển thị / CTR / vị trí 28 ngày) cho từng bài.
+    loadGscLatest(client),
     client
       .from('mkt_keywords')
       .select('id, keyword, intent, source, created_at')
@@ -37,6 +40,8 @@ export default async function Page() {
       .order('created_at', { ascending: false })
       .limit(12),
   ]);
+  const pct = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
+  const gscOn = gscConfigured();
 
   const keywords = (kwRes.data || []) as any[];
   const auditRows = (auditRes.data || []) as any[];
@@ -69,19 +74,29 @@ export default async function Page() {
       </header>
 
       {/* ===== TILE ===== */}
+      {/* 15/9 (Thanh): mọi ô bấm được -> danh sách đầy đủ. */}
       <div className="pl-tiles">
-        <div className="pl-tile"><b>{fmt(posts.length)}</b><span>Bài SEO đã đăng</span></div>
-        <div className="pl-tile"><b>{fmt(keywords.length)}</b><span>Từ khóa trong kho</span></div>
-        <div className="pl-tile"><b>{lastPostAt ? fmtDT(lastPostAt) : '—'}</b><span>Bài mới nhất</span></div>
-        <div className="pl-tile">
+        <Link href="/seo/bai-viet" className="pl-tile" title="Xem tất cả bài công khai kèm số Google"><b>{fmt(posts.length)}</b><span>Bài SEO đã đăng →</span></Link>
+        <Link href="/tu-khoa" className="pl-tile" title="Mở kho từ khóa"><b>{fmt(keywords.length)}</b><span>Từ khóa trong kho →</span></Link>
+        <a href={sorted[0] ? publicBlogUrl(sorted[0].slug) : `${base}/blog`} target="_blank" rel="noreferrer" className="pl-tile" title="Mở bài mới nhất"><b>{lastPostAt ? fmtDT(lastPostAt) : '—'}</b><span>Bài mới nhất ↗</span></a>
+        <a href="#suc-khoe" className="pl-tile" title="Xem chi tiết audit">
           <b>{audit ? (audit.status === 'ok' ? '✅' : '⚠️') : '—'}</b>
-          <span>Audit SEO {audit ? fmtDT(audit.created_at) : '(chưa chạy)'}</span>
-        </div>
+          <span>Audit SEO {audit ? fmtDT(audit.created_at) : '(chưa chạy)'} ↓</span>
+        </a>
+        <Link href="/seo/bai-viet?sap=click" className="pl-tile" title="Số Google Search Console 28 ngày">
+          <b>{gsc.site ? fmt(Number(gsc.site.clicks) || 0) : '—'}</b>
+          <span>{gsc.site ? `Click Google · ${fmt(Number(gsc.site.impressions) || 0)} hiển thị` : gscOn ? 'Click Google (chờ kéo)' : 'Click Google (chưa nối)'}</span>
+        </Link>
       </div>
+      {!gscOn ? (
+        <p className="sub" style={{ margin: '-6px 0 12px', fontSize: '.85rem' }}>
+          🔗 Chưa nối Google Search Console: đặt <code>GOOGLE_SA_JSON</code> + <code>GSC_SITE_URL</code> trên Vercel theo <code>docs/runbook-search-console-setup.md</code>, số click/hiển thị sẽ tự về mỗi ngày.
+        </p>
+      ) : null}
 
       {/* ===== BAI SEO DA DANG ===== */}
       <section className="blk">
-        <h2><span aria-hidden="true">📰</span> Bài SEO đã đăng <span className="sub">10 bài mới nhất trên {base}/blog — bấm để mở bài công khai</span></h2>
+        <h2><span aria-hidden="true">📰</span> Bài SEO đã đăng <span className="sub">10 bài mới nhất · số Google 28 ngày{gsc.at ? ` (cập nhật ${fmtDT(gsc.at)})` : ''} · <Link href="/seo/bai-viet" className="src">xem cả {fmt(posts.length)} bài →</Link></span></h2>
         {latest.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Chưa có bài công khai nào.</p>
         ) : (
@@ -91,8 +106,12 @@ export default async function Page() {
                 <tr>
                   <th>Tiêu đề</th>
                   <th style={{ width: 150 }}>Sản phẩm</th>
-                  <th style={{ width: 120 }}>Ngày đăng</th>
-                  <th style={{ width: 80 }}>Mở</th>
+                  <th style={{ width: 110 }}>Ngày đăng</th>
+                  <th className="num" style={{ width: 70 }}>Click</th>
+                  <th className="num" style={{ width: 80 }}>Hiển thị</th>
+                  <th className="num" style={{ width: 64 }}>CTR</th>
+                  <th className="num" style={{ width: 64 }}>Vị trí</th>
+                  <th style={{ width: 70 }}>Mở</th>
                 </tr>
               </thead>
               <tbody>
@@ -103,8 +122,14 @@ export default async function Page() {
                     <td className="sub" style={{ fontSize: '.82rem', maxWidth: 150, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={String(p.product || '')}>
                       {String(p.product || '—')}
                     </td>
-                    <td className="sub" style={{ fontSize: '.82rem' }}>{fmtDT(p.publishedAt || null)}</td>
-                    <td><a className="src" href={`${base}/blog/${p.slug}`} target="_blank" rel="noreferrer">↗ Mở</a></td>
+                    <td className="sub" style={{ fontSize: '.82rem', whiteSpace: 'nowrap' }}>{fmtDT(p.publishedAt || null)}</td>
+                    {(() => { const g = gsc.byCid.get(p.contentId); return (<>
+                      <td className="num">{g ? fmt(g.clicks) : <span className="sub">—</span>}</td>
+                      <td className="num">{g ? fmt(g.impressions) : <span className="sub">—</span>}</td>
+                      <td className="num">{g ? pct(g.ctr) : <span className="sub">—</span>}</td>
+                      <td className="num">{g ? g.position.toFixed(1).replace('.', ',') : <span className="sub">—</span>}</td>
+                    </>); })()}
+                    <td><a className="src" href={publicBlogUrl(p.slug)} target="_blank" rel="noreferrer">↗ Mở</a></td>
                   </tr>
                 ))}
               </tbody>
@@ -132,7 +157,7 @@ export default async function Page() {
           )}
         </section>
 
-        <section className="blk">
+        <section className="blk" id="suc-khoe">
           <h2><span aria-hidden="true">🩺</span> Sức khỏe SEO</h2>
           <div style={{ display: 'grid', gap: 8, fontSize: '.9rem' }}>
             <div className="need-item">

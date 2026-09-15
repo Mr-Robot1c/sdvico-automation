@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { loadRealEnv } from './video/env.mjs';
+import { driveEnabled, uploadToDrive } from './gdrive.mjs';
 import { spawnSync } from 'node:child_process';
 import { writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -150,6 +151,8 @@ async function classifyVideoBySummary(summary) {
 }
 
 const FFMPEG_OK = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
+const DRIVE_ON = driveEnabled(env);
+console.log(DRIVE_ON ? 'Kho tu lieu: Google Drive (Supabase chi giu link).' : 'Kho tu lieu: Supabase Storage (chua cau hinh Google Drive).');
 const TMP_DIR = join(tmpdir(), 'sdvico-up-media'); mkdirSync(TMP_DIR, { recursive: true });
 if (!FFMPEG_OK) console.warn('Khong thay ffmpeg: video up nguyen ban (khong faststart), web mo se cham hon.');
 const media = listMedia(mediaDir);
@@ -199,9 +202,19 @@ for (const m of media) {
     ? `${String(cls.mo_ta).trim()}${Array.isArray(cls.hop_canh) && cls.hop_canh.length ? ` | Hợp cảnh: ${cls.hop_canh.map(String).join(', ')}` : ''}${Array.isArray(cls.tu_khoa) && cls.tu_khoa.length ? ` | Từ khoá: ${cls.tu_khoa.map(String).join(', ')}` : ''}`.slice(0, 1000)
     : null;
 
-  const upRes = await client.storage.from('brand-assets').upload(sp, buf, { contentType: mime, upsert: false, cacheControl: '31536000' });
-  if (upRes.error) { loi += 1; console.error(`  X ${m.name}: upload ${upRes.error.message}`); continue; }
-  const baseRow = { kind: isVideo ? 'video' : 'image', title, storage_path: sp, license: 'owned', license_note: key, source: 'zalo-auto', product_group: folder, mime, size_bytes: buf.length };
+  // 15/9 (sếp: media Zalo lên Google Drive cho khỏi đầy Supabase): có GOOGLE_SA_JSON + GDRIVE_FOLDER_ID
+  // thì up Drive, storage_path = "gdrive:<id>/<tên>"; không có thì Supabase như cũ.
+  let storagePath = sp;
+  if (DRIVE_ON) {
+    try {
+      const d = await uploadToDrive({ name: `${Date.now()}-${m.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`, buf, mime });
+      storagePath = d.storagePath;
+    } catch (e) { loi += 1; console.error(`  X ${m.name}: Drive ${e?.message || e}`); continue; }
+  } else {
+    const upRes = await client.storage.from('brand-assets').upload(sp, buf, { contentType: mime, upsert: false, cacheControl: '31536000' });
+    if (upRes.error) { loi += 1; console.error(`  X ${m.name}: upload ${upRes.error.message}`); continue; }
+  }
+  const baseRow = { kind: isVideo ? 'video' : 'image', title, storage_path: storagePath, license: 'owned', license_note: key, source: 'zalo-auto', product_group: folder, mime, size_bytes: buf.length };
   let ins = await client.from('brand_assets').insert(description ? { ...baseRow, description, described_at: new Date().toISOString() } : baseRow);
   if (ins.error && description && /description|described_at/i.test(ins.error.message || '')) {
     console.warn('  (brand_assets chưa có cột description — migration 20260915130000 chưa áp; ghi không kèm mô tả)');
@@ -209,7 +222,7 @@ for (const m of media) {
   }
   if (ins.error) { loi += 1; console.error(`  X ${m.name}: insert ${ins.error.message}`); continue; }
   up += 1;
-  console.log(`  ✓ ${m.folder}/${m.name} -> ${folder} | ${title}`);
+  console.log(`  ✓ ${m.folder}/${m.name} -> ${folder} | ${title}${DRIVE_ON ? ' [Drive]' : ''}`);
 }
 
 console.log(`\nKho tu lieu: ${up} up moi, ${skip} bo qua, ${chan} bi chan (giay to/man hinh), ${loi} loi.`);

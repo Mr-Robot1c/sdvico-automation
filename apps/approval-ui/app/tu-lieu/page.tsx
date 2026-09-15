@@ -6,6 +6,7 @@ import LibUploader from './lib-uploader';
 import ProductGroupSelect from './product-group-select';
 // @ts-ignore — module JS thuần
 import { PRODUCTS, CONTENT_GROUP } from '../../lib/gen/products.mjs';
+import { assetPublicUrl } from '../../lib/asset-url';
 
 // KHO TƯ LIỆU kiểu trình quản lý file (user 21/8 gửi mẫu): cây folder bên TRÁI (bấm chọn),
 // lưới thumbnail bên PHẢI với tên + loại + ngày. Thao tác đổi tên / chuyển folder / xóa nằm
@@ -69,7 +70,7 @@ export default async function Page({ searchParams }: { searchParams: { folder?: 
   const customGroups: string[] = Array.isArray((customCfg as any)?.value?.groups) ? (customCfg as any).value.groups : [];
 
   const rows = (data || []) as Asset[];
-  const urlOf = (p: string) => client.storage.from('brand-assets').getPublicUrl(p).data.publicUrl;
+  const urlOf = (p: string) => assetPublicUrl(client, p);
   const isVideo = (k: string) => k === 'video' || k === 'clip';
 
   // Gộp folder cứng + custom folder từ app_config để chọn/hiển thị.

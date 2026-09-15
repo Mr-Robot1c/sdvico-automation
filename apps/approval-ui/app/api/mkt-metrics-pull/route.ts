@@ -88,6 +88,22 @@ export async function GET(req: Request) {
     inbox = { pulled: 0, skipped: 0, errors: [String(e?.message || e).slice(0, 160)] };
   }
 
+  // 15/9 (sếp: số click/hiển thị Google ở bài SEO): Search Console 1 lượt/ngày sau 6h VN (số trễ 2 ngày),
+  // chống trùng bằng run_log mkt.gsc_pull hôm nay. Chưa cấu hình -> bỏ qua im lặng.
+  let gsc: { pulled: number; matched: number; errors: string[]; skipped?: string } = { pulled: 0, matched: 0, errors: [] };
+  try {
+    const { gscConfigured, pullSearchConsole } = await import('../../../lib/gsc');
+    if (gscConfigured()) {
+      const vn = new Date(Date.now() + 7 * 3600 * 1000);
+      const dayStart = new Date(vn.toISOString().slice(0, 10) + 'T00:00:00+07:00').toISOString();
+      const { count } = await client.from('run_log').select('id', { count: 'exact', head: true }).eq('task', 'mkt.gsc_pull').eq('status', 'ok').gte('created_at', dayStart);
+      if (vn.getUTCHours() >= 6 && !(count && count > 0)) {
+        gsc = await pullSearchConsole(client);
+        await client.from('run_log').insert({ task: 'mkt.gsc_pull', actor: 'cron', status: gsc.errors.length ? 'error' : 'ok', detail: gsc });
+      }
+    }
+  } catch (e: any) { gsc = { pulled: 0, matched: 0, errors: [String(e?.message || e).slice(0, 160)] }; }
+
   // DON THUNG RAC (27/8 v3, user: "thung rac giu bai soft-delete, sau 7 ngay tu xoa luon").
   // Bai deleted_at qua 7 ngay -> hard delete 4 bang nhu hardDeleteContent. Toi da 30 bai/luot
   // cron de khong keo dai function; con sot thi luot sau don tiep.

@@ -15,6 +15,7 @@ import CopyCaptionButton from './copy-caption-button';
 import LinkTikTokButton from './link-tiktok-button';
 import PexelsScenesButton from './pexels-scenes-button';
 import { isFutureVNLocal, CHANNEL_LABEL } from '../../lib/posting-plan';
+import { assetPublicUrl } from '../../lib/asset-url';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -155,7 +156,7 @@ export default async function BangSection() {
   const assetUrl = new Map<string, string>();
   if (assetIds.size) {
     const { data: as } = await client.from('brand_assets').select('id, storage_path').in('id', [...assetIds]);
-    for (const a of as || []) assetUrl.set((a as any).id, client.storage.from('brand-assets').getPublicUrl((a as any).storage_path).data.publicUrl);
+    for (const a of as || []) assetUrl.set((a as any).id, assetPublicUrl(client, (a as any).storage_path, (a as any).kind));
   }
 
   // Chia cột. Đã duyệt = approved nhưng chưa có bài đăng thật (đang đăng / chờ hẹn giờ / bị chặn).

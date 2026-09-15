@@ -4,6 +4,7 @@ import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
 import { kindMeta, formatRelative, formatDateTimeVN, payloadRows, intentLabel, planChannelLabel, purposeLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
+import { assetPublicUrl } from '../../lib/asset-url';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 // (Hàng đợi duyệt hiện ảnh/video đã gắn từ payload.assets — build 2026-08-12.)
@@ -173,7 +174,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
       .select('id, storage_path, kind, title')
       .in('id', [...assetIds]);
     for (const a of as || []) {
-      const url = client.storage.from('brand-assets').getPublicUrl(a.storage_path as string).data.publicUrl;
+      const url = assetPublicUrl(client, a.storage_path as string);
       assetUrl.set(a.id as string, { url, kind: (a.kind as string) || '', title: (a.title as string) || '' });
     }
   }
