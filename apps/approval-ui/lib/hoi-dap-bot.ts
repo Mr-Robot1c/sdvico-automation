@@ -10,6 +10,7 @@
 // Chuỗi thử: Gemini có Google Search trước, lỗi/quota thì rơi về không tìm; tổng thời gian dưới 60s
 // (Vercel Hobby), bài học plan-directions.ts 24/8.
 
+import { webSearch, webSearchProvider, formatHitsForPrompt } from './web-search';
 // @ts-ignore — module JS thuần
 import { logTokenUsage } from './gen/token-log.mjs';
 // @ts-ignore — module JS thuần
@@ -36,14 +37,35 @@ export type BotResult = {
 // 3.5-flash-lite (1s), flash-lite-latest. Tìm Google (googleSearch) trên key free hiện 429 ngay
 // (hết hạn mức grounding, bài học knowledge-public.ts) nên để 2 lượt có tìm lên đầu (rớt nhanh 0,3s,
 // khi Google mở lại hạn mức thì tự dùng), rồi 4 lượt không tìm. Tổng timeout 12+8+12+10+8+8 = 58s < 60s Vercel.
-const ATTEMPTS: Array<{ model: string; search: boolean; ms: number }> = [
-  { model: 'gemini-3.6-flash', search: true, ms: 12_000 },
-  { model: 'gemini-flash-latest', search: true, ms: 8_000 },
-  { model: 'gemini-3.6-flash', search: false, ms: 12_000 },
-  { model: 'gemini-3.5-flash', search: false, ms: 10_000 },
-  { model: 'gemini-3.5-flash-lite', search: false, ms: 8_000 },
-  { model: 'gemini-flash-lite-latest', search: false, ms: 8_000 },
+// 15/9 (sếp: "bot chưa phát huy vì chưa cung cấp được thông tin như Google; tìm model khác, Trung Quốc chẳng
+// hạn?"; Thanh chốt: làm CẢ HAI): (1) tìm web bằng API trả phí (lib/web-search.ts, Tavily/Serper) rồi nhét kết
+// quả vào prompt — không còn phụ thuộc grounding Google bị 429; (2) lớp provider: đặt OPENAI_BASE_URL +
+// OPENAI_API_KEY + OPENAI_MODEL (DeepSeek, Qwen, Kimi... đều theo chuẩn OpenAI) thì model đó chạy ĐẦU TIÊN,
+// Gemini thành dự phòng; BOT_PROVIDER=gemini ép về Gemini. Không đặt gì -> y như cũ.
+type Attempt = { provider: 'gemini' | 'openai'; model: string; search: boolean; ms: number };
+const GEMINI_ATTEMPTS: Attempt[] = [
+  { provider: 'gemini', model: 'gemini-3.6-flash', search: true, ms: 12_000 },
+  { provider: 'gemini', model: 'gemini-flash-latest', search: true, ms: 8_000 },
+  { provider: 'gemini', model: 'gemini-3.6-flash', search: false, ms: 12_000 },
+  { provider: 'gemini', model: 'gemini-3.5-flash', search: false, ms: 10_000 },
+  { provider: 'gemini', model: 'gemini-3.5-flash-lite', search: false, ms: 8_000 },
+  { provider: 'gemini', model: 'gemini-flash-lite-latest', search: false, ms: 8_000 },
 ];
+export function openAiCompatConfigured(): { baseUrl: string; model: string; label: string } | null {
+  const base = (process.env.OPENAI_BASE_URL || '').trim().replace(/\/$/, '');
+  const key = (process.env.OPENAI_API_KEY || '').trim();
+  const model = (process.env.OPENAI_MODEL || '').trim();
+  if (!base || !key || !model) return null;
+  return { baseUrl: base, model, label: (process.env.OPENAI_LABEL || model).trim() };
+}
+function buildAttempts(hasWebHits: boolean): Attempt[] {
+  const oa = openAiCompatConfigured();
+  const forceGemini = (process.env.BOT_PROVIDER || '').trim().toLowerCase() === 'gemini';
+  // Đã có kết quả tìm web trong prompt thì bỏ 2 lượt grounding (chậm, hay 429) — lượt JSON thẳng nhanh hơn.
+  const gem = hasWebHits ? GEMINI_ATTEMPTS.filter((a) => !a.search) : GEMINI_ATTEMPTS;
+  if (oa && !forceGemini) return [{ provider: 'openai', model: oa.model, search: false, ms: 25_000 }, ...gem];
+  return gem;
+}
 const MAX_QUESTION = 2000;
 
 // Nhóm sản phẩm cho ô chọn (10 nhóm products.mjs + 2 nhóm ngoài danh mục).
@@ -166,11 +188,36 @@ function extractWebSources(res: any): WebSource[] {
   return out;
 }
 
-async function callGemini(mkPrompt: (canSearch: boolean) => string, client: AnyClient | null): Promise<GeminiOut> {
+// Gọi model theo chuẩn OpenAI chat/completions (DeepSeek, Qwen, Kimi, OpenAI...). JSON mode nếu máy chủ hỗ trợ.
+async function callOpenAiCompat(prompt: string, a: Attempt): Promise<string> {
+  const oa = openAiCompatConfigured();
+  if (!oa) throw new Error('OPENAI_* chưa cấu hình');
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), a.ms);
+  try {
+    const r = await fetch(`${oa.baseUrl}/chat/completions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({ model: a.model, temperature: 0.3, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } }),
+      signal: ctrl.signal, cache: 'no-store',
+    });
+    const j: any = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`${oa.label} ${r.status}: ${String(j.error?.message || j.message || '').slice(0, 140)}`);
+    const text = String(j.choices?.[0]?.message?.content || '');
+    if (!text.trim()) throw new Error('trả lời rỗng');
+    return text;
+  } finally { clearTimeout(timer); }
+}
+
+async function callModel(mkPrompt: (canSearch: boolean) => string, client: AnyClient | null, hasWebHits: boolean): Promise<GeminiOut> {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   let lastErr = '';
-  for (const a of ATTEMPTS) {
+  for (const a of buildAttempts(hasWebHits)) {
+    if (a.provider === 'openai') {
+      try {
+        const text = await callOpenAiCompat(mkPrompt(false), a);
+        return { text, model: openAiCompatConfigured()?.label || a.model, searched: false, web: [] };
+      } catch (e: any) { lastErr = `${a.model}: ${String(e?.message || e).slice(0, 150)}`; continue; }
+    }
     try {
       // Grounding (googleSearch) không đi cùng responseMimeType JSON, nên lượt có tìm thì tự bóc JSON từ chữ.
       const config: any = { temperature: 0.3 };
@@ -193,7 +240,7 @@ async function callGemini(mkPrompt: (canSearch: boolean) => string, client: AnyC
       lastErr = `${a.model}${a.search ? '+search' : ''}: ${String(e?.message || e).slice(0, 150)}`;
     }
   }
-  throw new Error('Mọi model Gemini đều lỗi hoặc quá giờ. Lỗi cuối: ' + lastErr);
+  throw new Error('Mọi model đều lỗi hoặc quá giờ. Lỗi cuối: ' + lastErr);
 }
 
 function parseJson(text: string): { answer?: string; found?: boolean; scope?: string; used_ids?: unknown } {
@@ -209,7 +256,14 @@ export async function askBot(client: AnyClient, question: string, history: BotTu
   const q = String(question || '').trim().slice(0, MAX_QUESTION);
   if (!q) throw new Error('Câu hỏi trống.');
   const { qa, text } = await buildKnowledgeText(client);
-  const { text: raw, model, searched, web } = await callGemini((canSearch) => buildPrompt(text, history, q, canSearch), client);
+  // 15/9: tìm web trước (API trả phí) khi có key; kết quả nhét vào prompt, nguồn trả về cho UI.
+  const hits = webSearchProvider() ? await webSearch(q, 5) : [];
+  const webBlock = formatHitsForPrompt(hits);
+  const res = await callModel((canSearch) => buildPrompt(text, history, q, canSearch || hits.length > 0) + (webBlock ? `\n\n${webBlock}` : ''), client, hits.length > 0);
+  const raw = res.text;
+  const model = hits.length ? `${res.model} + ${webSearchProvider() === 'tavily' ? 'Tavily' : 'Google (Serper)'}` : res.model;
+  const searched = res.searched || hits.length > 0;
+  const web: WebSource[] = res.web.length ? res.web : hits.map((h) => ({ url: h.url, title: h.title }));
   const parsed = parseJson(raw);
   const byId = new Map(qa.map((r) => [r.id, r]));
   const usedIds = (Array.isArray(parsed.used_ids) ? parsed.used_ids : [])

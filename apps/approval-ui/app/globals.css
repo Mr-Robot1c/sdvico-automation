@@ -1656,3 +1656,15 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .cmt-item .when { color: var(--ink-2); font-size: .76rem; white-space: nowrap; text-align: right; }
 .pf-stat.link { text-decoration: none; color: inherit; cursor: pointer; }
 .pf-stat.link:hover b { color: var(--accent); }
+
+/* ===== 15/9: thẻ AI có lịch chạy + dải 7 ngày ===== */
+.agent-card .ag-sched { font-size: .76rem; color: var(--ink-2); }
+.agent-card .ag-sched ul { margin: 2px 0 0; padding-left: 16px; }
+.agent-card .ag-sched li { margin: 0; }
+.ag-strip { display: flex; align-items: flex-end; gap: 8px; font-size: .74rem; color: var(--ink-2); }
+.ag-strip-lbl { white-space: nowrap; }
+.ag-bars { display: inline-flex; align-items: flex-end; gap: 3px; height: 20px; }
+.ag-bar { width: 9px; border-radius: 2px 2px 0 0; background: var(--ok); display: inline-block; }
+.ag-bar.err { background: var(--no); }
+.ag-bar.none { background: var(--line); }
+.ag-strip-days { white-space: nowrap; font-size: .68rem; }
