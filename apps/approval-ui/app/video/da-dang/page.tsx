@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { getServerClient } from '../../../lib/supabase-server';
 import PlatformLogo, { type PlatformKey } from '../../noi-dung/platform-logo';
 import { TIKTOK_PROFILE_URL } from '../../../lib/tiktok-username';
+import { loadChannelPosts, sumChannel, qualityOf, qualityLabel, type Channel } from '../../../lib/channel-posts';
+import { getTikTokVideoIds } from '../../../lib/tiktok';
 
 // 15/9 (Thanh, kế hoạch sửa web): ô "Đã đăng: 12 Facebook · 16 YouTube · 4 TikTok" ở /video phải bấm
 // vào được từng nền tảng để kiểm tra các video. Trang này liệt kê video đã đăng của 1 kênh: bài gì,
@@ -26,41 +28,18 @@ const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 export default async function Page({ searchParams }: { searchParams?: { kenh?: string } }) {
   const kenh = KENH[String(searchParams?.kenh || 'facebook')] ? String(searchParams?.kenh || 'facebook') : 'facebook';
   const client = getServerClient();
-  const { data: postRows } = await client
-    .from('mkt_posts')
-    .select('content_id, channel, external_url, published_at')
-    .eq('status', 'published')
-    .is('deleted_at', null)
-    .eq('channel', kenh)
-    .order('published_at', { ascending: false })
-    .limit(300);
-  const posts = (postRows || []) as any[];
-  const cids = [...new Set(posts.map((p) => String(p.content_id || '')).filter(Boolean))].slice(0, 300);
-  const [{ data: contents }, { data: metricRows }] = await Promise.all([
-    cids.length ? client.from('mkt_content').select('id, title, kind, brief').in('id', cids) : Promise.resolve({ data: [] as any[] }),
-    cids.length
-      ? client.from('mkt_metrics').select('entity_ref, metrics, created_at').eq('source', kenh).in('entity_ref', cids).order('created_at', { ascending: false }).limit(900)
-      : Promise.resolve({ data: [] as any[] }),
-  ]);
-  const contentOf = new Map<string, any>((contents || []).map((c: any) => [String(c.id), c]));
-  const latest = new Map<string, any>();
-  for (const r of (metricRows || []) as any[]) { const k = String(r.entity_ref); if (!latest.has(k)) latest.set(k, r.metrics || {}); }
-
-  // Facebook trộn bài chữ + video: chỉ giữ bài có video thật. YouTube/TikTok vốn chỉ video.
-  const rows = posts
-    .map((p) => ({ p, c: contentOf.get(String(p.content_id || '')) }))
-    .filter(({ c }) => kenh !== 'facebook' || !c || c.kind === 'video' || c.brief?.assets?.video || c.brief?.assets?.video_v)
-    .filter((x, i, arr) => arr.findIndex((y) => y.p.content_id === x.p.content_id) === i);
-
-  const tot = { views: 0, cmts: 0, eng: 0 };
-  for (const { p } of rows) { const m = latest.get(String(p.content_id || '')) || {}; tot.views += Number(m.views) || 0; tot.cmts += Number(m.comments) || 0; tot.eng += Number(m.engagement ?? m.reactions) || 0; }
+  const ttIds = kenh === 'tiktok' ? await getTikTokVideoIds(client) : null;
+  const all = await loadChannelPosts(client, kenh as Channel, { limit: 400, tiktokIds: ttIds });
+  const rows = all.filter((r) => r.isVideo);
+  const tot = sumChannel(rows);
+  const scores = rows.map(qualityOf);
 
   return (
     <main>
       <header className="head-row">
         <div>
           <h1><PlatformLogo platform={KENH[kenh].key} size={22} /> Video đã đăng · {KENH[kenh].label}</h1>
-          <p className="sub" style={{ margin: '4px 0 0' }}>{fmt(rows.length)} video · {fmt(tot.views)} lượt xem · {fmt(tot.eng)} tương tác · {fmt(tot.cmts)} bình luận (số mới nhất máy kéo về). Bấm tiêu đề để mở bài thật.</p>
+          <p className="sub" style={{ margin: '4px 0 0' }}>{fmt(rows.length)} video · {fmt(tot.views)} lượt xem · {fmt(tot.engagement)} tương tác · {fmt(tot.comments)} bình luận (số mới nhất máy kéo về). Bấm tiêu đề để mở bài thật.</p>
         </div>
         <nav className="filters" style={{ margin: 0 }} aria-label="Chọn nền tảng">
           {Object.entries(KENH).map(([k, v]) => (
@@ -87,23 +66,21 @@ export default async function Page({ searchParams }: { searchParams?: { kenh?: s
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ p, c }, i) => {
-                const m = latest.get(String(p.content_id || '')) || {};
-                const url = String(p.external_url || '');
-                const real = c?.brief?.fb_real_url ? String(c.brief.fb_real_url) : (url && !url.startsWith('tiktok:') ? url : (c?.brief?.tiktok_share_url ? String(c.brief.tiktok_share_url) : ''));
+              {rows.map((r, i) => {
+                const sc = qualityOf(r); const ql = qualityLabel(sc, scores);
                 return (
-                  <tr key={`${p.content_id}-${i}`}>
+                  <tr key={`${r.cid}-${i}`}>
                     <td className="sub">{i + 1}</td>
                     <td className="cell-title">
-                      {real ? <a href={real} target="_blank" rel="noreferrer" className="src"><b>{String(c?.title || '(không tên)').slice(0, 90)}</b></a> : <b>{String(c?.title || '(không tên)').slice(0, 90)}</b>}
-                      {c?.brief?.rotation_group ? <div className="sub" style={{ fontSize: '.78rem' }}>{String(c.brief.rotation_group).replace(/^\s*\d+\.\s*/, '')}</div> : null}
+                      {r.url ? <a href={r.url} target="_blank" rel="noreferrer" className="src"><b>{r.title.slice(0, 90)}</b></a> : <b>{r.title.slice(0, 90)}</b>}
+                      <div className="sub" style={{ fontSize: '.78rem' }}>{r.product || '—'} · <span className={`badge ${ql.cls}`} title={`điểm ${sc}`}>{ql.text}</span></div>
                     </td>
-                    <td className="sub" style={{ whiteSpace: 'nowrap' }}>{fmtDT(p.published_at)}</td>
-                    <td className="num">{fmt(Number(m.views) || 0)}</td>
-                    <td className="num">{fmt(Number(m.engagement ?? m.reactions) || 0)}</td>
-                    <td className="num">{fmt(Number(m.comments) || 0)}</td>
-                    <td className="num">{fmt(Number(m.shares) || 0)}</td>
-                    <td>{real ? <a href={real} target="_blank" rel="noreferrer" className="src">↗ Mở</a> : <span className="sub">—</span>}</td>
+                    <td className="sub" style={{ whiteSpace: 'nowrap' }}>{fmtDT(r.publishedAt)}</td>
+                    <td className="num">{fmt(r.views)}</td>
+                    <td className="num">{fmt(r.engagement)}</td>
+                    <td className="num">{fmt(r.comments)}</td>
+                    <td className="num">{fmt(r.shares)}</td>
+                    <td>{r.url ? <a href={r.url} target="_blank" rel="noreferrer" className="src">↗ Mở</a> : <span className="sub">—</span>}</td>
                   </tr>
                 );
               })}

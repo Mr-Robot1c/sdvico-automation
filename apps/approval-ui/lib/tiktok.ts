@@ -237,3 +237,28 @@ export async function getTikTokVideoCount(client: Client): Promise<number | null
     return null;
   }
 }
+
+// 15/9 (lọc số liệu kênh hiện tại): danh sách id video còn trên profile. Null = API lỗi (caller rơi về mốc
+// ngày nối kênh). Tối đa 10 trang x 20 video.
+export async function getTikTokVideoIds(client: Client): Promise<Set<string> | null> {
+  try {
+    const { accessToken } = await getValidTikTokToken(client);
+    const authJson = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+    const ids = new Set<string>();
+    let cursor: number | undefined = undefined;
+    let hasMore = true;
+    let guard = 10;
+    while (hasMore && guard-- > 0) {
+      const body: any = { max_count: 20 };
+      if (cursor) body.cursor = cursor;
+      const r = await fetch(`${TT}/v2/video/list/?fields=id`, { method: 'POST', headers: authJson, body: JSON.stringify(body) });
+      const j: any = await r.json();
+      if (!r.ok || ttErr(j)) return null;
+      for (const v of j?.data?.videos || []) if (v?.id) ids.add(String(v.id));
+      hasMore = !!j?.data?.has_more;
+      cursor = j?.data?.cursor;
+      if (!cursor) break;
+    }
+    return ids;
+  } catch { return null; }
+}

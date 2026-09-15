@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { TIKTOK_USERNAME } from '../../lib/tiktok-username';
+import { TIKTOK_USERNAME, isCurrentTikTokMetric } from '../../lib/tiktok-username';
+import { getTikTokVideoIds } from '../../lib/tiktok';
 import { fbStatus, tiktokStatus } from '../../lib/platform-status';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
 import { getTikTokVideoCount } from '../../lib/tiktok';
@@ -33,12 +34,13 @@ const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 export default async function Page() {
   const client = getServerClient();
 
-  const [fb, tt, yt, za, ttVideoCount, postsRes, metricsRes] = await Promise.all([
+  const [fb, tt, yt, za, ttVideoIds, postsRes, metricsRes] = await Promise.all([
     fbStatus(),
     tiktokStatus(),
     getYouTubeChannelInfo(),
     zaloOaStatus(client),
-    getTikTokVideoCount(client),
+    // 15/9 (Thanh: view TikTok sai): lấy DANH SÁCH id video còn trên kênh hiện tại — vừa đếm bài, vừa lọc snapshot cũ của kênh đã mất.
+    getTikTokVideoIds(client),
     client
       .from('mkt_posts')
       .select('content_id, channel, external_url, published_at')
@@ -84,6 +86,8 @@ export default async function Page() {
     if (!cid) continue;
     if (cid.startsWith('__')) { if (!pageLevel.has(cid)) pageLevel.set(cid, r.metrics || {}); continue; }
     const bag = r.source === 'youtube' ? latestYT : r.source === 'tiktok' ? latestTT : latestFB;
+    // TikTok: bỏ snapshot của video không còn trên kênh hiện tại (kênh cũ @sdvico_tbtc đã mất).
+    if (r.source === 'tiktok' && !isCurrentTikTokMetric(r.metrics || {}, ttVideoIds)) continue;
     if (!bag.has(cid)) bag.set(cid, (r.metrics || {}) as M);
   }
   const followers = Number((pageLevel.get('__page_real__') || pageLevel.get('__page__') || {})?.followers) || 0;
@@ -117,7 +121,7 @@ export default async function Page() {
   }
   const fbPosts = { count: fbRealCount, lastAt: fbPostsAll.lastAt };
   const ytPosts = byChannel.get('youtube') || { count: 0, lastAt: '' };
-  const ttPostCount = typeof ttVideoCount === 'number' ? ttVideoCount : (byChannel.get('tiktok') || { count: 0 }).count;
+  const ttPostCount = ttVideoIds ? ttVideoIds.size : (byChannel.get('tiktok') || { count: 0 }).count;
 
   const tiktokUser = TIKTOK_USERNAME;
   const ytOk = !!(yt.configured && yt.channelTitle);
@@ -190,7 +194,7 @@ export default async function Page() {
       cmts: fbCmts,
       warn: fb.ok ? null : String(fb.text || 'Token Facebook lỗi — kiểm tra ở Kết nối.').slice(0, 120),
       link: fb.realPageUrl ? { url: fb.realPageUrl, label: 'Mở Page SDVICO ↗' } : null,
-      detail: { href: '/do-luong', label: 'Số liệu từng bài' },
+      detail: { href: '/kenh/facebook', label: 'Từng bài + bình luận' },
     },
     {
       key: 'youtube' as PlatformKey,
@@ -204,7 +208,7 @@ export default async function Page() {
       cmts: ytCmts,
       warn: ytOk ? null : yt.configured ? `Token lỗi: ${String(yt.error || 'không rõ').slice(0, 90)} — lấy token mới theo runbook.` : 'Chưa cấu hình 3 biến YOUTUBE_* trên Vercel.',
       link: yt.channelUrl ? { url: yt.channelUrl, label: `Mở kênh ${yt.channelTitle || 'SDVICO'} ↗` } : null,
-      detail: { href: '/do-luong', label: 'Số liệu từng video' },
+      detail: { href: '/kenh/youtube', label: 'Từng video' },
     },
     {
       key: 'tiktok' as PlatformKey,
@@ -218,7 +222,7 @@ export default async function Page() {
       cmts: ttCmts,
       warn: tt.ok ? 'App chưa qua audit TikTok — video đăng tay qua nút Xuất TikTok, ghép lại để kéo số.' : String((tt as any).text || 'Chưa kết nối TikTok.').slice(0, 120),
       link: { url: `https://www.tiktok.com/@${tiktokUser}`, label: `Mở @${tiktokUser} ↗` },
-      detail: { href: '/tiktok', label: 'Kết nối và audit' },
+      detail: { href: '/kenh/tiktok', label: 'Từng video' },
     },
     {
       key: 'zalo' as PlatformKey,
@@ -245,7 +249,7 @@ export default async function Page() {
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link href="/do-luong" className="btn ghost">📈 Đo lường ngày</Link>
-          <Link href="/do-luong/tuan" className="btn ghost">📅 Báo cáo tuần</Link>
+          <Link href="/do-luong/tuan" className="btn ghost">📅 Báo cáo tuần từng kênh</Link>
           <Link href="/ket-noi" className="btn ghost">🔌 Kết nối</Link>
         </div>
       </header>
@@ -262,10 +266,21 @@ export default async function Page() {
               </span>
               <span className={`badge ${c.badgeCls}`}>{c.badge}</span>
             </div>
+            {/* 15/9 (Thanh): 3 ô số bấm được -> trang từng nền tảng, sắp theo ô vừa bấm. */}
             <div className="pf-stats three" style={{ marginTop: 10 }}>
-              <span className="pf-stat"><b>{fmt(c.posts)}</b><span>Bài đã đăng</span></span>
-              <span className="pf-stat"><b>{c.views || c.posts ? fmt(c.views) : '—'}</b><span>Tổng lượt xem</span></span>
-              <span className="pf-stat"><b>{c.cmts || c.posts ? fmt(c.cmts) : '—'}</b><span>Tổng comment</span></span>
+              {c.key === 'zalo' ? (
+                <>
+                  <span className="pf-stat"><b>{fmt(c.posts)}</b><span>Bài đã đăng</span></span>
+                  <span className="pf-stat"><b>—</b><span>Tổng lượt xem</span></span>
+                  <span className="pf-stat"><b>—</b><span>Tổng comment</span></span>
+                </>
+              ) : (
+                <>
+                  <Link href={`/kenh/${c.key}`} className="pf-stat link" title="Xem từng bài"><b>{fmt(c.posts)}</b><span>Bài đã đăng →</span></Link>
+                  <Link href={`/kenh/${c.key}?sap=xem`} className="pf-stat link" title="Xem bài nào nhiều lượt xem"><b>{c.views || c.posts ? fmt(c.views) : '—'}</b><span>Tổng lượt xem →</span></Link>
+                  <Link href={`/kenh/${c.key}?sap=cmt`} className="pf-stat link" title="Xem bài nào nhiều bình luận"><b>{c.cmts || c.posts ? fmt(c.cmts) : '—'}</b><span>Tổng comment →</span></Link>
+                </>
+              )}
             </div>
             {c.warn ? <p className="pf-note" style={{ marginTop: 8, color: 'var(--no)' }}>⚠️ {c.warn}</p> : null}
             {/* 29/8 (sếp: "lệch chỗ mở page/số liệu từng bài"): thanh chân card CHUẨN 1 HÀNG cho cả

@@ -1642,3 +1642,17 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .tl-asset { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .video-kho td { vertical-align: top; }
 .pl-sub:hover b { color: var(--accent); }
+
+/* ===== 15/9: trang từng nền tảng /kenh/<nền tảng> + bình luận ===== */
+.ch-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 12px 0 16px; }
+.ch-kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 12px 14px; text-decoration: none; color: inherit; }
+.ch-kpi b { display: block; font-size: 1.4rem; line-height: 1.2; }
+.ch-kpi span { display: block; color: var(--ink-2); font-size: .8rem; margin-top: 2px; }
+.ch-kpi.on { border-color: var(--accent); }
+.cmt-panel { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; background: var(--surface-2); }
+.cmt-item { display: grid; grid-template-columns: 150px 1fr 90px; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: .88rem; }
+.cmt-item:last-child { border-bottom: none; }
+.cmt-item .who { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmt-item .when { color: var(--ink-2); font-size: .76rem; white-space: nowrap; text-align: right; }
+.pf-stat.link { text-decoration: none; color: inherit; cursor: pointer; }
+.pf-stat.link:hover b { color: var(--accent); }

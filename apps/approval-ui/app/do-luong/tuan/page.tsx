@@ -10,16 +10,23 @@ import PullMetricsButton from '../../noi-dung/pull-metrics-button';
 // @ts-ignore — module .mjs dùng chung với fb-metrics (nhận diện bài thuộc page nào)
 import { isOtherPage } from '../../../lib/page-origin.mjs';
 import PageSuiteBlock from '../page-suite-block';
+import ChannelWeek from './channel-week';
+import { getTikTokVideoIds } from '../../../lib/tiktok';
+import { isCurrentTikTokMetric } from '../../../lib/tiktok-username';
 
 export const dynamic = 'force-dynamic';
 
 // Báo cáo theo TUẦN — item 1a. Aggregate mkt_metrics theo tuần ISO VN (Thứ 2 - Chủ Nhật).
 // Query ?tuan=0 = tuần này, ?tuan=1 = tuần trước, ?tuan=2 = 2 tuần trước... (cap 12).
 // So sánh delta với tuần liền trước để bà con thấy xu hướng.
-export default async function Page({ searchParams }: { searchParams?: { tuan?: string } }) {
+export default async function Page({ searchParams }: { searchParams?: { tuan?: string; kenh?: string } }) {
   const client = getServerClient();
   const rawOffset = Number(searchParams?.tuan || 0);
   const offset = Number.isFinite(rawOffset) ? Math.max(0, Math.min(12, Math.floor(rawOffset))) : 0;
+  // 15/9 (sếp): báo cáo tuần không còn là báo cáo chung — dashboard RIÊNG từng kênh (?kenh=facebook|youtube|tiktok),
+  // "Tất cả" giữ bản gộp cũ.
+  const kenhTab = ['facebook', 'youtube', 'tiktok'].includes(String(searchParams?.kenh || '')) ? String(searchParams?.kenh) as 'facebook' | 'youtube' | 'tiktok' : null;
+  const ttIds = await getTikTokVideoIds(client);
 
   const report = await buildWeekReport(client, offset);
   const { window: win, totals, totalsPrev, delta, posts, topPosts, byProduct, byKind, narrative } = report;
@@ -51,6 +58,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
     const cid = String(r.entity_ref || '');
     const ct = Number((r.metrics || {}).createTime || 0);
     if (!cid || !ct || ttSeen.has(cid)) continue;
+    if (!isCurrentTikTokMetric(r.metrics || {}, ttIds)) continue; // 15/9: bỏ video kênh cũ
     const iso = new Date(ct * 1000).toISOString();
     if (iso < win.startIso || iso >= win.endIso) continue;
     ttSeen.add(cid);
@@ -78,9 +86,11 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
     .limit(1500);
   // Snapshot mới nhất mỗi (cid, source).
   const latest = new Map<string, any>();
+  const latestAt = new Map<string, string>();
   for (const r of (weekMetrics || []) as any[]) {
     const k = `${r.entity_ref}|${r.source}`;
-    if (!latest.has(k)) latest.set(k, r.metrics || {});
+    if (r.source === 'tiktok' && !isCurrentTikTokMetric(r.metrics || {}, ttIds)) continue;
+    if (!latest.has(k)) { latest.set(k, r.metrics || {}); latestAt.set(k, String(r.created_at || '')); }
   }
   const rowsAllChannels = weekPosts.filter((p) => {
     if (weekDeleted.has(p.cid)) return false;
@@ -91,11 +101,14 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
     const m = latest.get(`${p.cid}|${p.channel}`) || {};
     const eng = (m.reactions || 0) + (m.comments || 0) + (m.shares || 0);
     const realUrl = p.channel === 'facebook' ? String((weekBriefs.get(p.cid) || {}).fb_real_url || '') : '';
+    const b = weekBriefs.get(p.cid) || {};
+    const product = b.post_kind === 'content' || b.rotation_group === 'Bài content' ? 'Bài content' : String(b.rotation_group || '').replace(/^\s*\d+\.\s*/, '').trim();
     return {
       cid: p.cid, channel: p.channel, publishedAt: p.publishedAt, url: realUrl || p.url,
-      title: weekTitles.get(p.cid) || '(không tên)',
+      title: weekTitles.get(p.cid) || '(không tên)', product,
       reactions: m.reactions || 0, comments: m.comments || 0, shares: m.shares || 0,
       views: m.views || 0, engagement: eng, shareUrl: m.shareUrl, videoId: m.videoId,
+      reach: m.reach ?? null, watchSec: m.watchSec ?? null, metricAt: latestAt.get(`${p.cid}|${p.channel}`) || null,
     };
   }).sort((a, b) => (b.views + b.engagement) - (a.views + a.engagement));
 
@@ -169,7 +182,19 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
         </span>
       </section>
 
-      {posts.length === 0 ? (
+      {/* 15/9 (sếp): dashboard RIÊNG từng kênh. */}
+      <nav className="filters" style={{ margin: '0 0 16px' }} aria-label="Chọn kênh">
+        <Link href={`/do-luong/tuan?tuan=${offset}`} className={`chip ${!kenhTab ? 'on' : ''}`}>Tất cả kênh (gộp)</Link>
+        {([['facebook', 'Facebook'], ['youtube', 'YouTube Shorts'], ['tiktok', 'TikTok']] as const).map(([k, l]) => (
+          <Link key={k} href={`/do-luong/tuan?tuan=${offset}&kenh=${k}`} className={`chip ${kenhTab === k ? 'on' : ''}`}><PlatformLogo platform={k} size={13} /> {l}</Link>
+        ))}
+      </nav>
+
+      {kenhTab ? (
+        <ChannelWeek channel={kenhTab} rows={rowsAllChannels.filter((r) => r.channel === kenhTab)} weekLabel={win.label} offset={offset} />
+      ) : null}
+
+      {kenhTab ? null : posts.length === 0 ? (
         await (async () => {
           // Tuan nay rong - do dem TAT CA bai (moi kenh, khong chi FB) trong tuan gan nhat co bai
           // de gio y user bam sang tuan do. User 26/8: "so lieu mat het roi" - thuc te data cu
