@@ -54,7 +54,10 @@ function cleanNarration(text) {
     // 28/8 (user): TTS doc ten cong ty la "SD Vi Co" (et-de vi-co) chu khong danh van
     // "S D V I C O" hay "SD Vi C O". Chi ap cho GIONG DOC — phu de/caption giu "SDVICO"
     // vi cleanNarration chi chay trong duong tts().
-    .replace(/SDVICO/gi, 'SD Vi Co')
+    // 15/9 (sep): "Co" bi doc khong dau -> "Cô" (ét-đê vi-cô).
+    // 15/9 (sep nghe video: doc "S D Vi CO" -> muon "S D Vi cô"): tach S va D roi de VieNeu doc
+    // tung chu cai, "Cô" co dau. Mau 2/3 sep nghe 15/9.
+    .replace(/SDVICO/gi, 'S D Vi Cô')
     // 4/9 (sep): giong doc doc SAI chu "Page" trong outro ("Nhan tin cho Page SDVICO"). Doc theo
     // "pây" (sep nghe thu 4/9 chieu: "pết" khong ung, muon nghe kieu "pay"). Fanpage -> "phen pây".
     // Chi ap cho GIONG DOC, chu tren man hinh / caption giu nguyen "Page".
