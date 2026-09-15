@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
+import { isCurrentTikTokMetric } from '../../lib/tiktok-username';
 import { refreshFacebookMetrics, setConversions, deleteContent, importManualFacebookPost } from '../actions';
 import BarChart from './bar-chart';
 import PostTitle from './post-title';
@@ -81,6 +82,7 @@ export default async function DoLuongSection() {
     const cid = (r as any).entity_ref as string | null;
     if (!cid || cid.startsWith('__') || ttLatest.has(cid)) continue;
     const m = ((r as any).metrics || {}) as any;
+    if (!isCurrentTikTokMetric(m)) continue; // 15/9: bỏ video kênh TikTok cũ
     ttLatest.set(cid, { views: m.views || 0, reactions: m.reactions || 0, comments: m.comments || 0, shares: m.shares || 0, videoId: m.videoId, shareUrl: m.shareUrl || undefined });
   }
 

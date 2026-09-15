@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { TIKTOK_USERNAME } from '../../lib/tiktok-username';
+import { TIKTOK_USERNAME, isCurrentTikTokMetric } from '../../lib/tiktok-username';
 import { fbStatus, tiktokStatus } from '../../lib/platform-status';
 import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
 import { getTikTokVideoCount } from '../../lib/tiktok';
@@ -83,6 +83,8 @@ export default async function Page() {
     const cid = String(r.entity_ref || '');
     if (!cid) continue;
     if (cid.startsWith('__')) { if (!pageLevel.has(cid)) pageLevel.set(cid, r.metrics || {}); continue; }
+    // 15/9: bỏ snapshot video kênh TikTok cũ (@sdvico_tbtc) — trước đây cộng lẫn nên thẻ hiện 900 thay vì 84.
+    if (r.source === 'tiktok' && !isCurrentTikTokMetric(r.metrics)) continue;
     const bag = r.source === 'youtube' ? latestYT : r.source === 'tiktok' ? latestTT : latestFB;
     if (!bag.has(cid)) bag.set(cid, (r.metrics || {}) as M);
   }
