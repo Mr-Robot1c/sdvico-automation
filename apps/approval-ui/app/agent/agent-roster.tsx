@@ -1,8 +1,7 @@
 import Link from 'next/link';
-import { getServerClient } from '../../lib/supabase-server';
-import { loadAgentDefs, ago, fmtDT } from '../../lib/agent-defs';
+import { ago, fmtDT } from '../../lib/agent-defs';
 import { AGENT_SCHEDULE } from '../../lib/agent-schedule';
-import { cachedAgentActivity } from '../../lib/cached';
+import { cachedAgentActivity, cachedAgentDefs } from '../../lib/cached';
 
 // 28/8 (user: "chi dung 1 dashboard the hien tat ca cac Agent"): bo 9 AI card tach ra
 // component dung chung — trang /agent va trang Nguon hoc du lieu (/kho-tri-thuc tab Tong
@@ -13,8 +12,8 @@ import { cachedAgentActivity } from '../../lib/cached';
 // thật (lib/agent-schedule.ts, chép từ file cron) + dải 7 NGÀY (số lần chạy / lỗi mỗi ngày từ run_log).
 
 export default async function AgentRoster() {
-  const client = getServerClient();
-  const [agents, activity] = await Promise.all([loadAgentDefs(client), cachedAgentActivity()]);
+  // 16/9 (Thanh: "web chậm và lag... ưu tiên nhất"): 12 truy vấn định nghĩa AI đi qua cache 2 phút.
+  const [agents, activity] = await Promise.all([cachedAgentDefs(), cachedAgentActivity()]);
 
   return (
     <div className="agent-grid">
@@ -45,17 +44,27 @@ export default async function AgentRoster() {
                 <ul>{sch.when.map((w, i) => <li key={i}>{w}</li>)}</ul>
               </div>
             ) : null}
-            <div className="ag-strip" title="Số lần chạy mỗi ngày trong 7 ngày gần nhất (đỏ = có lỗi)">
-              <span className="ag-strip-lbl">7 ngày: <b>{act.total}</b> lần{act.errors ? <span className="err-note" style={{ marginLeft: 4 }}>· {act.errors} lỗi</span> : ''}</span>
-              <span className="ag-bars">
-                {act.days.map((d) => {
-                  const n = d.ok + d.err + d.warn;
-                  const h = n ? Math.max(3, Math.round((n / max) * 18)) : 2;
-                  return <span key={d.date} className={`ag-bar ${d.err ? 'err' : n ? 'ok' : 'none'}`} style={{ height: h }} title={`${d.label}: ${n} lần${d.err ? `, ${d.err} lỗi` : ''}${d.warn ? `, ${d.warn} cảnh báo` : ''}`} />;
-                })}
-              </span>
-              <span className="ag-strip-days">{act.days[0]?.label} → {act.days[6]?.label}</span>
-            </div>
+            {/* 16/9 (Thanh: "bấm vô ô đỏ cũng không được"): cả dải 7 ngày là link sang trang Chi
+                tiết của AI đó — nơi liệt kê lần chạy + lỗi. */}
+            {(() => {
+              const strip = (
+                <>
+                  <span className="ag-strip-lbl">7 ngày: <b>{act.total}</b> lần{act.errors ? <span className="err-note" style={{ marginLeft: 4 }}>· {act.errors} lỗi</span> : ''}</span>
+                  <span className="ag-bars">
+                    {act.days.map((d) => {
+                      const n = d.ok + d.err + d.warn;
+                      const h = n ? Math.max(3, Math.round((n / max) * 18)) : 2;
+                      return <span key={d.date} className={`ag-bar ${d.err ? 'err' : n ? 'ok' : 'none'}`} style={{ height: h }} title={`${d.label}: ${n} lần${d.err ? `, ${d.err} lỗi` : ''}${d.warn ? `, ${d.warn} cảnh báo` : ''}`} />;
+                    })}
+                  </span>
+                  <span className="ag-strip-days">{act.days[0]?.label} → {act.days[6]?.label}</span>
+                </>
+              );
+              const title = `Số lần chạy mỗi ngày trong 7 ngày gần nhất (đỏ = có lỗi)${a.href ? ' — bấm để xem chi tiết' : ''}`;
+              return a.href
+                ? <Link href={a.href} className="ag-strip" style={{ textDecoration: 'none', color: 'inherit' }} title={title}>{strip}</Link>
+                : <div className="ag-strip" title={title}>{strip}</div>;
+            })()}
             <div className="ag-last">
               {/* 1/9: đổi "Học lần cuối" -> "Chạy lần cuối" cho đúng — AI làm việc chứ đâu chỉ học. */}
               {a.last.at ? `Chạy lần cuối ${ago(a.last.at)} (${fmtDT(a.last.at)}) — ${a.last.note}` : a.last.note}

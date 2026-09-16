@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { loadAgentDefs, type AgentDef } from '../../lib/agent-defs';
+import { type AgentDef } from '../../lib/agent-defs';
+import { cachedAgentDefs } from '../../lib/cached';
 import { loadQa, QA_GROUPS } from '../../lib/hoi-dap-bot';
 import AgentHeadCard from '../agent/agent-head-card';
 import { addProductQa } from '../actions';
@@ -29,7 +30,7 @@ export default async function Page({ searchParams }: { searchParams?: { group?: 
   const [rows, allRows, defs, botLog] = await Promise.all([
     loadQa(client, group || undefined),
     loadQa(client),
-    loadAgentDefs(client),
+    cachedAgentDefs(),
     client.from('run_log').select('detail, created_at').eq('task', 'mkt.hoi_dap_bot').eq('status', 'warn').order('created_at', { ascending: false }).limit(8),
   ]);
   const agent = (defs as AgentDef[]).find((a) => a.key === 'hoi-dap');

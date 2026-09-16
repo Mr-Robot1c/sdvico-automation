@@ -64,6 +64,28 @@ export const cachedAgentActivity = unstable_cache(
   { revalidate: 120, tags: [TAG.runlog] }
 );
 
+// Định nghĩa + trạng thái lần chạy cuối của 11 AI (12 truy vấn nhỏ song song): giữ 2 phút.
+// 16/9 (Thanh: "trang Nguồn học dữ liệu vẫn chậm và lag"): trước chạy lại trên MỌI tab + mọi request.
+export const cachedAgentDefs = unstable_cache(
+  async () => {
+    const { loadAgentDefs } = await import('./agent-defs');
+    return loadAgentDefs(getServerClient());
+  },
+  ['agent-defs-v1'],
+  { revalidate: 120, tags: [TAG.runlog] }
+);
+
+// Tổng hợp token Gemini + Claude Code (2 bảng nặng 3.000 + 10.000 dòng, cộng dồn xong chỉ còn
+// vài chục số): giữ 5 phút. Chỉ tab Quản trị token đọc.
+export const cachedTokenStats = unstable_cache(
+  async () => {
+    const { loadTokenStats } = await import('./token-stats');
+    return loadTokenStats(getServerClient());
+  },
+  ['token-stats-v1'],
+  { revalidate: 300, tags: [TAG.runlog] }
+);
+
 // Gọi ở server action / route sau khi ghi dữ liệu để trang thấy ngay.
 export function bustCache(...tags: string[]) {
   for (const t of tags) { try { revalidateTag(t); } catch { /* ngoài request context thì bỏ qua */ } }
