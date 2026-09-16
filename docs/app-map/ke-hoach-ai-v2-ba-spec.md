@@ -2,6 +2,7 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach
+<!-- re-verified: 2026-09-16 (3) - bo Chuyen NV o /khach-hang + script doi kho sang Drive; Ke hoach/BOSS khong doi. -->
 <!-- re-verified: 2026-09-16 (2) - Drive noi xong qua OAuth (packages/marketing/src/gdrive.mjs, google-oauth-drive.mjs); Ke hoach/BOSS khong doi. -->
 <!-- re-verified: 2026-09-16 - DOT 9 (Thanh sua web ban 2): /ke-hoach lo nhom theo TUNG O DANG Facebook (4 nhom/buoi, share-lot.ts planShareLots v2), bang tuan cot lo theo dong, form Lich co dinh moi o hien bai se ra + lo buoi de dong bo voi bang tren. Flow BOSS de xuat / NGUOI quyet KHONG doi. -->
 <!-- re-verified: 2026-09-15 (4) - DOT 4+5 (Drive kho tu lieu, Search Console) — chi tiet README/marketing.md cung gio; Ke hoach/BOSS khong doi. -->

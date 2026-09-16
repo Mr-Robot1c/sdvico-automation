@@ -2,8 +2,9 @@
 
 > Load khi / Load when: cần biết lược đồ bảng, cột chính và chính sách RLS. Nguồn sự thật là `supabase/migrations` (doc này tóm tắt, migration mới thì cập nhật ở đây cùng commit).
 covers: supabase/migrations
-last_verified: 2026-09-15
+last_verified: 2026-09-16
 ttl_days: 180
+<!-- re-verified: 2026-09-16 - 2 migration 20260915120000 (mkt_leads.forwarded_*) + 20260915130000 (brand_assets.description) DA AP DB boi Thanh 16/9 (kiem tra select OK). forwarded_* khong con hien tren UI (Thanh bo Chuyen NV). brand_assets.storage_path tu 16/9 co dang "gdrive:<id>/<ten>" cho tu lieu tren Google Drive (doi-kho-sang-drive.mjs doi ca tu lieu cu). -->
 <!-- re-verified: 2026-09-15 (2) - Migration 20260915130000_brand_assets_description: them brand_assets.description text (mo ta noi dung: canh gi, tinh trang moi/cu/hu/ban/can/duc, boi canh, hop canh) + described_at timestamptz. Ghi boi up-media-kho-tu-lieu.mjs (luc up) va mo-ta-tu-lieu.mjs (bo sung tu lieu cu); doc boi day chuyen video (scene-match.mjs) de hinh di doi voi loi. Code roi ve cot cu neu CHUA AP. CHUA AP DB -> Thanh chay SQL Editor cung 20260915120000. -->
 <!-- re-verified: 2026-09-15 - Migration 20260915120000_mkt_leads_forwarded: them 2 cot mkt_leads.forwarded_to text + forwarded_at timestamptz (ke hoach "SDVICO sua web" cua Thanh 15/9: nut Chuyen NV phai de lai dau ai nhan, luc nao). Ghi boi server action recordLeadForward (app/actions.ts); trang /khach-hang tu roi ve bo cot cu neu migration CHUA AP (hien canh bao do). CHUA AP DB (db-apply IPv6) -> Thanh chay SQL Editor. -->
 <!-- re-verified: 2026-09-11 - Migration 20260911120000_mkt_group_shares: bang mkt_group_shares (content_id FK mkt_content set null, group_id, group_label, post_url, shared_at, shared_by, source) + 2 index + RLS staff_all. Ghi nhan nguoi da chia bai vao group (lo 8 nhom/ngay, Thanh 11/9). CHUA AP DB tu may (db-apply IPv6), Thanh chay SQL Editor. -->

@@ -1,9 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { updateLeadStatus, addLeadManual, addProductQa, recordLeadForward } from '../actions';
+import { updateLeadStatus, addLeadManual, addProductQa } from '../actions';
 import LeadStepper, { STEP_LABEL } from './lead-stepper';
-import ForwardZaloButton from './forward-zalo-button';
-import SalesZaloEditor from './sales-zalo-editor';
 import DeleteLeadButton from './delete-lead-button';
 import SaveQaButton from './save-qa-button';
 import DedupLeadsBar from './dedup-leads-bar';
@@ -16,8 +14,8 @@ import { guessGroup } from '../../lib/gen/products.mjs';
 // bỏ kanban 4 cột (sếp: "nhìn quá rối, không cần mấy khối Đã liên hệ / Đã xong, phải là 1 flow
 // chặt chẽ"). Một bảng, mỗi khách 1 dòng, cột "Bước" chỉ hiện bước hiện tại + nút bước kế tiếp:
 //   Mới -> Đã liên hệ -> Đã mua / Không chốt (kèm lý do).
-// "Chuyển NV" giờ để lại dấu: dòng khách ghi "đã chuyển → Tên NV lúc hh:mm" (cột forwarded_*).
-// Các việc phụ (thêm tay, NV nhận Zalo, dọn trùng, rác) gom vào thanh công cụ nhỏ góc phải.
+// 16/9 (Thanh: "bỏ Chuyển NV, từ nay t phụ trách trả lời luôn — chính vì vậy mới cần con bot"): bỏ nút Chuyển NV,
+// khối NV nhận Zalo; cột forwarded_* trong DB giữ nhưng không hiện. Việc phụ (thêm tay, dọn trùng, rác) ở thanh góc phải.
 //
 // Máy chỉ ĐỌC và LƯU lead, không tự nhắn khách (điều cấm 1). Kênh online tự trả lời, tự chốt
 // (lệnh sếp Long 9/9); không chốt được ghi "Không chốt" + lý do.
@@ -75,14 +73,12 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
   const since7 = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
 
   let leadsRes = await build(`${BASE_COLS}, forwarded_to, forwarded_at`);
-  let hasForwardCols = true;
-  if (leadsRes.error) { hasForwardCols = false; leadsRes = await build(BASE_COLS); }
+  if (leadsRes.error) leadsRes = await build(BASE_COLS);
   const leads = ((leadsRes.data || []) as unknown) as Lead[];
 
-  const [countsRes, salesRow, wonWeekRes, newWeekRes, ads7Res, goalRow] = await Promise.all([
+  const [countsRes, wonWeekRes, newWeekRes, ads7Res, goalRow] = await Promise.all([
     // Đếm theo trạng thái: 6 lượt đếm head (không kéo dòng nào về), chạy song song.
     Promise.all(['new', 'contacted', 'won', 'lost', 'closed', 'spam'].map((st) => client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('status', st).then((r) => [st, r.count || 0] as [string, number]))),
-    client.from('app_config').select('value').eq('key', 'mkt_sales_zalo').maybeSingle(),
     client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('status', 'won').gte('updated_at', weekStart),
     client.from('mkt_leads').select('id', { count: 'exact', head: true }).neq('status', 'spam').gte('created_at', weekStart),
     client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('source', 'facebook_ads').gte('created_at', since7),
@@ -90,7 +86,6 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
   ]);
   const counts: Record<string, number> = { all: 0 };
   for (const [st, n] of countsRes) { counts[st] = n; if (st !== 'spam') counts.all += n; }
-  const salesPeople: Array<{ name: string; phone: string }> = Array.isArray((salesRow.data as any)?.value?.people) ? (salesRow.data as any).value.people : [];
   // Mục tiêu tuần: cùng cách đọc với /tong-quan ("... 10 khách mua ..." trong mkt_weekly_goal).
   const goalText = String((goalRow.data as any)?.value?.text || '');
   const wonTarget = Number(goalText.match(/(\d+)\s*khách\s*(?:hàng\s*)?mua/i)?.[1] || 10);
@@ -110,7 +105,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
         <div>
           <h1>Khách hàng</h1>
           <p className="sub" style={{ margin: '4px 0 0' }}>
-            Người hỏi mua từ comment, tin nhắn Facebook, quảng cáo và nhập tay. Mỗi khách đi một đường: <b>Mới → Đã liên hệ → Đã mua</b> hoặc <b>Không chốt</b> (ghi lý do). Máy chỉ đọc và lưu, người trả lời khách.
+            Người hỏi mua từ comment, tin nhắn Facebook, quảng cáo và nhập tay. Mỗi khách đi một đường: <b>Mới → Đã liên hệ → Đã mua</b> hoặc <b>Không chốt</b> (ghi lý do). Máy chỉ đọc và lưu; kênh online tự trả lời khách, thiếu thông tin thì hỏi bot.
           </p>
         </div>
         <div className="head-actions lead-toolbar">
@@ -133,13 +128,6 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
               </form>
             </div>
           </details>
-          <details>
-            <summary><span className="btn ghost sm" title="Nhân viên kinh doanh nhận Zalo khi bấm Chuyển NV">📱 NV nhận Zalo ({salesPeople.length})</span></summary>
-            <div className="lead-pop">
-              <p className="sub" style={{ margin: '0 0 8px' }}>Bấm "Chuyển NV" ở một khách sẽ copy nội dung + mở Zalo tới người bạn chọn, và ghi lại đã chuyển cho ai. Zalo OA chưa xác thực nên chưa gửi tự động.</p>
-              <SalesZaloEditor initial={salesPeople} />
-            </div>
-          </details>
           <DedupLeadsBar racCount={counts.spam || 0} />
           <Link className="btn ghost sm" href="/hoi-dap">📚 Kho hỏi đáp</Link>
         </div>
@@ -149,7 +137,6 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
         <span>Tuần này: <b>{fmt(newWeekRes.count ?? 0)}</b> khách hỏi</span>
         <span>💰 Đã mua: <b>{fmt(wonWeekRes.count ?? 0)}</b> / {fmt(wonTarget)} (mục tiêu tuần)</span>
         <span>📣 Từ quảng cáo 7 ngày: <b>{fmt(ads7Res.count ?? 0)}</b></span>
-        {!hasForwardCols ? <span className="err-note">Chưa áp migration 20260915120000 (cột Chuyển NV) — nhờ IT chạy SQL.</span> : null}
       </div>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 12px' }}>
@@ -182,7 +169,6 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                 <th style={{ width: 200 }}>Khách</th>
                 <th>Hỏi gì</th>
                 <th style={{ width: 330 }}>Bước</th>
-                <th style={{ width: 150 }}>Chuyển NV</th>
                 <th style={{ width: 200 }}>Ghi chú</th>
                 <th style={{ width: 60 }}></th>
               </tr>
@@ -199,7 +185,6 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                   l.fb_profile_url ? `Link: ${l.fb_profile_url}` : '',
                   `Mở dashboard: https://sdvico-mktit.vercel.app/khach-hang`,
                 ].filter(Boolean).join('\n');
-                const forward = recordLeadForward.bind(null, l.id);
                 return (
                   <tr key={l.id}>
                     <td className="sub" style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(l.created_at)}</td>
@@ -227,10 +212,6 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                     </td>
                     <td>
                       <LeadStepper leadId={l.id} status={l.status} note={l.note || ''} lostReason={l.lost_reason || ''} />
-                    </td>
-                    <td>
-                      <ForwardZaloButton salesPeople={salesPeople} leadSummary={leadSummary} onForwarded={forward} forwardedTo={l.forwarded_to || null} />
-                      {l.forwarded_to ? <div className="lead-fwd">→ {l.forwarded_to}{l.forwarded_at ? ` · ${fmtDateTime(l.forwarded_at)}` : ''}</div> : null}
                     </td>
                     <td>
                       <form action={updateLeadStatus} style={{ display: 'flex', gap: 4 }}>
