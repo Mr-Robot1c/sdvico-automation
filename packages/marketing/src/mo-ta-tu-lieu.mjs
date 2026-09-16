@@ -44,11 +44,9 @@ const PROMPT = [
   'KHONG bia chi tiet khong thay. Co so dien thoai / ten nguoi thi KHONG ghi.',
 ].join('\n');
 
-function parseJson(t) {
-  const m = String(t || '').match(/\{[\s\S]*\}/);
-  if (!m) return null;
-  try { return JSON.parse(m[0]); } catch { return null; }
-}
+// 16/9: model dự phòng hay trả JSON kèm chữ thừa / 2 object -> lấy object ĐẦU TIÊN cân bằng ngoặc (như scene-match.mjs).
+import { extractFirstJson } from './video/scene-match.mjs';
+function parseJson(t) { return extractFirstJson(String(t || '')); }
 async function gen(parts) {
   const models = [...new Set([MKT_MODEL, 'gemini-3.6-flash', 'gemini-3.5-flash'])];
   let last;
@@ -56,7 +54,10 @@ async function gen(parts) {
     for (let i = 0; i < 3; i++) {
       try {
         const res = await ai.models.generateContent({ model, contents: [{ role: 'user', parts }], config: { responseMimeType: 'application/json' } });
-        return parseJson(res.text);
+        const j = parseJson(res.text);
+        if (j && j.mo_ta) return j;
+        // trả lời không đúng khuôn -> thử lại / đổi model như lỗi tạm
+        throw new Error('429 khong-dung-khuon: ' + String(res.text || '').replace(/\s+/g, ' ').slice(0, 80));
       } catch (e) {
         last = e;
         const msg = String(e?.message || e);
