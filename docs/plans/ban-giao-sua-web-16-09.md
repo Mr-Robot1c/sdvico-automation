@@ -30,7 +30,7 @@
 | # | Việc | Ai | Trạng thái |
 |---|---|---|---|
 | B1 | Mô tả tư liệu cũ để video chọn hình đúng | Claude | XONG 16/9 chiều: 190/190. Tư liệu mới up tự có mô tả |
-| B2 | Search Console sdvico.vn: anh Thành thêm email `sdvico-kho-tu-lieu@sdvico-youtube.iam.gserviceaccount.com` (quyền Đầy đủ) | anh Thành + Thanh | Thanh đã nhắn, chờ rep. 16/9 chiều Claude gọi thử phát hiện thêm: dự án Google CHƯA BẬT Search Console API — Thanh mở link bên dưới bằng Edge, bấm Enable (1 phút). Cả hai xong thì chạy `npm run gsc:kiem`, lệnh tự báo đặt `GSC_SITE_URL` giá trị nào |
+| B2 | Search Console sdvico.vn: anh Thành thêm email `sdvico-kho-tu-lieu@sdvico-youtube.iam.gserviceaccount.com` (quyền Đầy đủ) | anh Thành | API đã bật (Thanh Enable 16/9 chiều, `gsc:kiem` xác nhận). Chỉ còn chờ anh Thành thêm email vào property. Anh Thành xong thì chạy `npm run gsc:kiem`, lệnh tự báo đặt `GSC_SITE_URL` giá trị nào |
 | B3 | Bot tìm web: đăng ký Tavily (https://tavily.com, free 1.000 lượt/tháng), gửi key `tvly-...` | Thanh | Chờ key → Claude đặt `TAVILY_API_KEY` trên Vercel, thử bot |
 | B4 | (tuỳ chọn) Model Trung Quốc free: Groq (https://console.groq.com) key `gsk_...` chạy Qwen 3 | Thanh | Có key → Claude đặt OPENAI_BASE_URL/KEY/MODEL, chạy trước Gemini |
 | B5 | Dựng thử 1 video (bài lọc dầu SD12-300, không đưa vào hàng đợi) để Thanh xem cảnh nào ghép hình nào | Claude | XONG 16/9 chiều: 54,7 s, cảnh 1 clip thật thợ xử lý sự cố máy lọc dầu, cảnh 2 ảnh thợ sửa động cơ tàu, cảnh 3 ảnh sản phẩm SF300B (điểm khớp 10/10/10). File out/video/sdvico_492313ac_vertical.mp4 (worktree), đã gửi Thanh. Chờ Thanh nhận xét |
@@ -38,9 +38,6 @@
 | B7 | Ứng dụng Google vẫn hiện cảnh báo "requires verification" vì scope YouTube | không cần làm | chỉ 1 tài khoản dùng, bỏ qua |
 
 ## C. Lệnh hay dùng
-
-Link bật Search Console API (B2, Thanh mở bằng Edge rồi bấm Enable):
-https://console.cloud.google.com/apis/library/searchconsole.googleapis.com?project=sdvico-youtube
 
 ```
 npm run gsc:kiem                         # kiểm Search Console: API bật chưa, anh Thành thêm quyền chưa, GSC_SITE_URL đặt gì (B2)
