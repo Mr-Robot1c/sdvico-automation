@@ -96,8 +96,8 @@ export default function BotChat({ compact = false }: { compact?: boolean }) {
       >
         <textarea
           className="note"
-          style={{ flex: 1, resize: 'vertical', minHeight: 40, maxHeight: 160 }}
-          rows={compact ? 1 : 2}
+          style={{ flex: 1, resize: 'vertical', minHeight: compact ? 56 : 64, maxHeight: 200, fontSize: 15, lineHeight: 1.45 }}
+          rows={compact ? 2 : 3}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(); } }}
