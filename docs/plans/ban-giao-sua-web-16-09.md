@@ -29,11 +29,11 @@
 
 | # | Việc | Ai | Trạng thái |
 |---|---|---|---|
-| B1 | Mô tả tư liệu cũ để video chọn hình đúng | Claude | 182/190 (16/9 trưa), 8 file cuối đang chạy. Kiểm bằng `npm run kho:mo-ta -- --limit 60`, báo 0 là xong |
+| B1 | Mô tả tư liệu cũ để video chọn hình đúng | Claude | XONG 16/9 chiều: 190/190. Tư liệu mới up tự có mô tả |
 | B2 | Search Console sdvico.vn: anh Thành thêm email `sdvico-kho-tu-lieu@sdvico-youtube.iam.gserviceaccount.com` (quyền Đầy đủ) | anh Thành | Thanh đã nhắn, chờ rep. Xong → Claude đặt `GSC_SITE_URL` trên Vercel, gọi thử, số click về trang SEO |
 | B3 | Bot tìm web: đăng ký Tavily (https://tavily.com, free 1.000 lượt/tháng), gửi key `tvly-...` | Thanh | Chờ key → Claude đặt `TAVILY_API_KEY` trên Vercel, thử bot |
 | B4 | (tuỳ chọn) Model Trung Quốc free: Groq (https://console.groq.com) key `gsk_...` chạy Qwen 3 | Thanh | Có key → Claude đặt OPENAI_BASE_URL/KEY/MODEL, chạy trước Gemini |
-| B5 | Dựng thử 1 video sau khi B1 xong, gửi Thanh xem cảnh nào ghép hình nào | Claude | chưa |
+| B5 | Dựng thử 1 video (bài lọc dầu SD12-300, không đưa vào hàng đợi) để Thanh xem cảnh nào ghép hình nào | Claude | đang dựng 16/9 chiều, xem out/video/ |
 | B6 | Web còn chậm ở trang nào | Thanh theo dõi 2 hôm rồi báo | chờ |
 | B7 | Ứng dụng Google vẫn hiện cảnh báo "requires verification" vì scope YouTube | không cần làm | chỉ 1 tài khoản dùng, bỏ qua |
 
