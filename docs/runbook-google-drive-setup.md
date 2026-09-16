@@ -2,7 +2,7 @@
 
 > 15/9/2026, sếp: "video/ảnh của Zalo sau này up lên Google Drive, sợ up lên Supabase mau đầy".
 > Thanh chốt: Drive lưu file, Supabase chỉ giữ link. Tư liệu cũ trên Supabase giữ nguyên.
-> Người thực hiện: Thanh hoặc IT. Làm 1 lần, khoảng 20 phút.
+> ĐÃ NỐI XONG 16/9 (xem mục ĐÃ LÀM XONG). Phần dưới là cách làm lại khi cần.
 
 ## Cách hệ thống chạy sau khi nối
 
@@ -14,53 +14,43 @@
 - Xoá tư liệu ở trang Kho tư liệu xoá luôn file trên Drive (cần khoá trên Vercel).
 - Chưa có khoá thì mọi thứ chạy y như cũ trên Supabase.
 
-## Bước 1. Tạo tài khoản dịch vụ (service account)
+## ĐÃ LÀM XONG 16/9 (Thanh + Claude) — ghi lại để sau này đổi máy / đổi tài khoản
 
-1. Vào https://console.cloud.google.com, chọn project đang dùng cho YouTube (hoặc tạo project mới "SDVICO Marketing").
-2. Menu **APIs & Services → Library**, tìm **Google Drive API** → **Enable**.
-3. Menu **IAM & Admin → Service Accounts → Create service account**.
-   Tên: `sdvico-kho-tu-lieu`. Không cần cấp vai trò. Bấm Done.
-4. Bấm vào tài khoản vừa tạo → tab **Keys → Add key → Create new key → JSON** → tải file JSON về máy.
-   File này là **mật khẩu**, không gửi qua Zalo nhóm, không commit vào Git (điều cấm 7).
-5. Ghi lại email của tài khoản dịch vụ (dạng `sdvico-kho-tu-lieu@<project>.iam.gserviceaccount.com`).
+Kết quả: file Zalo up lên thư mục Drive **SDVICO Kho tư liệu** (id `1MNDua5Ai8iEffBlS7SVHosSQiL2QI4Yy`) bằng tài khoản
+Google của Thanh qua OAuth. Đã thử up, mở link công khai, xoá: OK. 5 biến đã đặt trên Vercel production và trong `.env`
+gốc trên máy: `GDRIVE_FOLDER_ID`, `GDRIVE_REFRESH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_SA_JSON`.
 
-## Bước 2. Tạo thư mục Drive và chia sẻ
+**Bài học:** Google (từ 2025) KHÔNG cho tài khoản dịch vụ chứa file trên My Drive ("Service Accounts do not have
+storage quota", chỉ Shared Drive của Workspace). Nên tài khoản dịch vụ `sdvico-kho-tu-lieu@sdvico-youtube.iam...`
+chỉ còn dùng cho Search Console; Drive đi bằng OAuth như YouTube.
 
-1. Trên Google Drive của tài khoản công ty, tạo thư mục **SDVICO Kho tư liệu**.
-2. Chuột phải → **Chia sẻ** → dán email tài khoản dịch vụ ở bước 1 → quyền **Người chỉnh sửa** → Gửi.
-3. Mở thư mục, chép ID trên thanh địa chỉ: `https://drive.google.com/drive/folders/<ID Ở ĐÂY>`.
+## Cách làm lại (khi đổi tài khoản Google hoặc token hết hạn)
 
-Lưu ý dung lượng: file up bằng tài khoản dịch vụ tính vào hạn mức của **thư mục được chia sẻ** (tài khoản
-công ty) khi thư mục nằm trong Shared Drive; nếu là My Drive cá nhân, file thuộc tài khoản dịch vụ (hạn mức
-15 GB riêng). Nên dùng **Shared Drive** (Google Workspace) nếu công ty có.
-
-## Bước 3. Đặt biến môi trường
-
-Máy nội bộ (file `.env` ở gốc repo, dòng mới):
+1. Google Cloud (project `sdvico-youtube`, tài khoản phải bật xác minh 2 bước): APIs & Services → Credentials →
+   **+ Create credentials → OAuth client ID → Desktop app** → Download JSON (`client_secret_*.json`).
+2. Ghi vào `.env` gốc: `GOOGLE_CLIENT_ID=` và `GOOGLE_CLIENT_SECRET=` (2 giá trị trong file JSON, mục `installed`).
+3. Chạy trong repo:
 
 ```
-GOOGLE_SA_JSON=<dán nguyên nội dung file JSON trên 1 dòng, hoặc chuỗi base64 của file>
-GDRIVE_FOLDER_ID=<ID thư mục ở bước 2>
+node packages/marketing/src/google-oauth-drive.mjs
 ```
 
-Tạo chuỗi base64 (khỏi lo dấu ngoặc, xuống dòng) bằng PowerShell:
+   rồi mở **Edge** vào `http://localhost:8765/start`, chọn tài khoản công ty, Nâng cao → Chuyển đến SDVICO Marketing →
+   Cho phép. Script tự ghi `GDRIVE_REFRESH_TOKEN` vào `.env`. Scope chỉ `drive.file` (chỉ đụng file do app tạo).
+4. Thư mục Drive: tạo (hoặc dùng) thư mục, chép id trên thanh địa chỉ vào `GDRIVE_FOLDER_ID`.
+5. Đưa lên Vercel (Settings → Environment Variables, Production) cùng 4 tên biến trên rồi Redeploy — Vercel chỉ cần
+   để xoá file Drive khi bấm Xoá ở Kho tư liệu.
+6. Ứng dụng OAuth đang ở chế độ Testing thì refresh token hết hạn sau 7 ngày: vào Google Auth Platform → Audience →
+   **Publish app** để dùng lâu dài (scope drive.file không thuộc loại nhạy cảm, không cần Google xét).
 
-```
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\duong\dan\khoa.json"))
-```
-
-Vercel (Settings → Environment Variables, Production): thêm 2 biến trên rồi **Redeploy**. Vercel chỉ cần
-để xoá file Drive khi bấm Xoá ở Kho tư liệu; không có cũng không sao.
-
-## Bước 4. Kiểm tra
+## Kiểm tra
 
 ```
 node packages/marketing/src/up-media-kho-tu-lieu.mjs
 ```
 
 Dòng đầu phải in `Kho tu lieu: Google Drive (Supabase chi giu link).` và mỗi file up có đuôi `[Drive]`.
-Mở trang Kho tư liệu, ảnh/video mới hiện bình thường. Nếu thấy lỗi `Drive upload lỗi 403`: thư mục chưa
-chia sẻ cho đúng email tài khoản dịch vụ, hoặc chưa bật Google Drive API.
+Lỗi `Drive OAuth lỗi 400: invalid_grant` = token hết hạn (app Testing 7 ngày) → chạy lại bước 3.
 
 ## Bổ sung mô tả tư liệu (đợt video 15/9)
 

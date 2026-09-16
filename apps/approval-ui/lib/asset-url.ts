@@ -24,14 +24,32 @@ export function assetPublicUrl(client: Client, storagePath: string, kind = ''): 
   return client.storage.from('brand-assets').getPublicUrl(sp).data.publicUrl;
 }
 export function driveConfigured(): boolean {
-  return !!((process.env.GOOGLE_SA_JSON || '').trim() && (process.env.GDRIVE_FOLDER_ID || '').trim());
+  const oauth = !!((process.env.GDRIVE_REFRESH_TOKEN || '').trim() && (process.env.GOOGLE_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID || '').trim());
+  return !!(process.env.GDRIVE_FOLDER_ID || '').trim() && (oauth || !!(process.env.GOOGLE_SA_JSON || '').trim());
+}
+// 16/9: Google không cho tài khoản dịch vụ giữ file My Drive -> file do OAuth tài khoản công ty tạo (GDRIVE_REFRESH_TOKEN,
+// cùng client YouTube). Xoá cũng phải bằng token đó; tài khoản dịch vụ chỉ là dự phòng (Shared Drive).
+async function driveToken(): Promise<string | null> {
+  const rt = (process.env.GDRIVE_REFRESH_TOKEN || '').trim();
+  const id = (process.env.GOOGLE_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID || '').trim();
+  const secret = (process.env.GOOGLE_CLIENT_SECRET || process.env.YOUTUBE_CLIENT_SECRET || '').trim();
+  if (rt && id && secret) {
+    const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: id, client_secret: secret, refresh_token: rt, grant_type: 'refresh_token' }), cache: 'no-store' });
+    const j: any = await r.json().catch(() => ({}));
+    return r.ok && j.access_token ? String(j.access_token) : null;
+  }
+  if ((process.env.GOOGLE_SA_JSON || '').trim()) {
+    const { googleAccessToken } = await import('./google-sa');
+    return googleAccessToken(['https://www.googleapis.com/auth/drive']);
+  }
+  return null;
 }
 // Xoá file trên Drive (khi người xoá tư liệu ở /tu-lieu). Không có khoá -> bỏ qua, trả false.
 export async function deleteDriveFile(storagePath: string): Promise<boolean> {
   const p = parseDrivePath(storagePath);
-  if (!p || !(process.env.GOOGLE_SA_JSON || '').trim()) return false;
-  const { googleAccessToken } = await import('./google-sa');
-  const token = await googleAccessToken(['https://www.googleapis.com/auth/drive']);
+  if (!p) return false;
+  const token = await driveToken();
+  if (!token) return false;
   const r = await fetch(`https://www.googleapis.com/drive/v3/files/${p.id}?supportsAllDrives=true`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
   return r.ok || r.status === 404;
 }

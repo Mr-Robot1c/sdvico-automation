@@ -12,8 +12,36 @@ import { googleAccessToken } from './google-sa.mjs';
 
 const SCOPE = ['https://www.googleapis.com/auth/drive'];
 
+// 16/9: Google KHÔNG cho tài khoản dịch vụ giữ file trên My Drive ("Service Accounts do not have storage
+// quota"; chỉ Shared Drive của Workspace). Nên đường CHÍNH là OAuth tài khoản công ty (GDRIVE_REFRESH_TOKEN
+// lấy bằng google-oauth-drive.mjs, cùng GOOGLE_CLIENT_ID/SECRET của YouTube); tài khoản dịch vụ chỉ còn là
+// dự phòng khi thư mục là Shared Drive.
+let oauthCache = { token: null, exp: 0 };
+// OAuth client dùng chung với YouTube (trên Vercel đặt tên YOUTUBE_CLIENT_ID/SECRET; GOOGLE_CLIENT_* là tên cũ).
+export function oauthClient(env = process.env) {
+  const id = String(env.GOOGLE_CLIENT_ID || env.YOUTUBE_CLIENT_ID || '').trim();
+  const secret = String(env.GOOGLE_CLIENT_SECRET || env.YOUTUBE_CLIENT_SECRET || '').trim();
+  return id && secret ? { id, secret } : null;
+}
+export function driveOAuthConfigured(env = process.env) {
+  return !!(String(env.GDRIVE_REFRESH_TOKEN || '').trim() && oauthClient(env));
+}
 export function driveEnabled(env = process.env) {
-  return !!(String(env.GOOGLE_SA_JSON || '').trim() && String(env.GDRIVE_FOLDER_ID || '').trim());
+  return !!String(env.GDRIVE_FOLDER_ID || '').trim() && (driveOAuthConfigured(env) || !!String(env.GOOGLE_SA_JSON || '').trim());
+}
+async function driveToken(env = process.env) {
+  if (driveOAuthConfigured(env)) {
+    if (oauthCache.token && Date.now() < oauthCache.exp - 60_000) return oauthCache.token;
+    const r = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: oauthClient(env).id, client_secret: oauthClient(env).secret, refresh_token: env.GDRIVE_REFRESH_TOKEN, grant_type: 'refresh_token' }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.access_token) throw new Error(`Drive OAuth lỗi ${r.status}: ${String(j.error_description || j.error || '').slice(0, 160)}`);
+    oauthCache = { token: j.access_token, exp: Date.now() + (Number(j.expires_in) || 3600) * 1000 };
+    return oauthCache.token;
+  }
+  return googleAccessToken(SCOPE, env);
 }
 export function isDrivePath(storagePath) {
   return /^gdrive:/.test(String(storagePath || ''));
@@ -35,8 +63,8 @@ export function driveUrl(storagePath, kind = '') {
 
 // Up 1 file (Buffer) vào thư mục kho; đặt quyền "ai có link xem được"; trả storage_path chuẩn.
 export async function uploadToDrive({ name, buf, mime, folderId = process.env.GDRIVE_FOLDER_ID, env = process.env }) {
-  if (!driveEnabled(env)) throw new Error('Google Drive chưa cấu hình (GOOGLE_SA_JSON + GDRIVE_FOLDER_ID)');
-  const token = await googleAccessToken(SCOPE, env);
+  if (!driveEnabled(env)) throw new Error('Google Drive chưa cấu hình (GDRIVE_FOLDER_ID + GDRIVE_REFRESH_TOKEN hoặc GOOGLE_SA_JSON)');
+  const token = await driveToken(env);
   const meta = JSON.stringify({ name, parents: [folderId] });
   const boundary = 'sdvico' + Date.now();
   const head = Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`);
@@ -61,7 +89,7 @@ export async function uploadToDrive({ name, buf, mime, folderId = process.env.GD
 export async function deleteFromDrive(storagePath, env = process.env) {
   const p = parseDrivePath(storagePath);
   if (!p) return false;
-  const token = await googleAccessToken(SCOPE, env);
+  const token = await driveToken(env);
   const r = await fetch(`https://www.googleapis.com/drive/v3/files/${p.id}?supportsAllDrives=true`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
   return r.ok || r.status === 404;
 }
@@ -71,7 +99,7 @@ export async function downloadFromDrive(storagePath, env = process.env) {
   const p = parseDrivePath(storagePath);
   if (!p) throw new Error('không phải đường dẫn gdrive:');
   if (driveEnabled(env)) {
-    const token = await googleAccessToken(SCOPE, env);
+    const token = await driveToken(env);
     const r = await fetch(`https://www.googleapis.com/drive/v3/files/${p.id}?alt=media&supportsAllDrives=true`, { headers: { Authorization: `Bearer ${token}` } });
     if (!r.ok) throw new Error(`Drive tải ${p.id}: ${r.status}`);
     return Buffer.from(await r.arrayBuffer());
@@ -83,7 +111,7 @@ export async function downloadFromDrive(storagePath, env = process.env) {
 
 // Dung lượng thư mục kho trên Drive (để trang Kho tư liệu hiện "đã dùng X MB").
 export async function driveFolderUsage(folderId = process.env.GDRIVE_FOLDER_ID, env = process.env) {
-  const token = await googleAccessToken(SCOPE, env);
+  const token = await driveToken(env);
   let pageToken = '';
   let bytes = 0, files = 0;
   do {

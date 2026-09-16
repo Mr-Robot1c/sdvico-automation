@@ -2,6 +2,7 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach
+<!-- re-verified: 2026-09-16 (2) - Drive noi xong qua OAuth (packages/marketing/src/gdrive.mjs, google-oauth-drive.mjs); Ke hoach/BOSS khong doi. -->
 <!-- re-verified: 2026-09-16 - DOT 9 (Thanh sua web ban 2): /ke-hoach lo nhom theo TUNG O DANG Facebook (4 nhom/buoi, share-lot.ts planShareLots v2), bang tuan cot lo theo dong, form Lich co dinh moi o hien bai se ra + lo buoi de dong bo voi bang tren. Flow BOSS de xuat / NGUOI quyet KHONG doi. -->
 <!-- re-verified: 2026-09-15 (4) - DOT 4+5 (Drive kho tu lieu, Search Console) — chi tiet README/marketing.md cung gio; Ke hoach/BOSS khong doi. -->
 <!-- re-verified: 2026-09-15 (3) - DOT 3 VIDEO (sep qua ke hoach "SDVICO sua web" 15/9: "kich ban noi may hu, nuoc duc ma chieu may moi bong; kich ban phai di doi voi dung video"): xem chi tiet o marketing.md cung gio (scene-match.mjs, brand_assets.description, video_timeline). Flow BOSS / Ke hoach KHONG doi. -->
@@ -30,7 +31,6 @@ covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approv
 <!-- re-verified: 2026-09-04 sang (2) - up-media siet phan loai anh screenshot co overlay (chi tiet marketing.md cung gio). Flow KHONG doi. -->
 last_verified: 2026-09-15
 ttl_days: 90
-<!-- DOC-STATUS: SUSPECT (2026-09-15) — code 'apps/approval-ui/app/ke-hoach' doi sau last_verified. DOI CHIEU VOI CODE truoc khi tin. May quan ly dong nay, dung sua tay. -->
 <!-- re-verified: 2026-09-03 toi - REFILL HUONG DI (NV3 nhanh nap lai khi can): co che mkt.suggestions_refill trong api/mkt-metrics-pull tu 20/8 CHUA TUNG chay (run_log 0 dong) vi dieu kien `fresh === 0` dem ca huong needs_gov_review + huong ket khong map folder (rotate bo qua, khong danh used_at) -> khong bao gio ve 0; su co 3/9 plan con 2 huong deu gov lam rotate roi fallback bam focus tu che (fromPlan=0). Hanh vi MOI: moi luot cron, neu huong SACH (chua dung + khong gov) cua ban dang ap < 3 thi BOSS sinh bo sung ngay — van cung duong generateContentDirections (goal + mkt_focus noi nhu generateAndStorePlan, avoidTitles 14 ngay, winners 70/30), ghi run_log mkt.suggestions_refill (ok/skipped/error), tran 4 luot/ngay. Flow NV3 sinh ke hoach T2/T6 + carry-over KHONG doi; huong gov van nam trong plan cho duyet (dieu cam 3 giu), chi khong duoc tinh la "con hang". -->
 <!-- re-verified: 2026-09-03 - Giam can egress cham packages/marketing/src (chi tiet marketing.md cung gio): chi them cacheControl khi upload. Flow ke hoach/NV/AC KHONG doi. -->
 <!-- re-verified: 2026-09-02 - hoc-video.mjs nen tam video lon (>14,5MB) bang ffmpeg de Gemini xem duoc (chi tiet o marketing.md cung gio): NV1 nap tri thuc noi bo het bo sot video lon trong Zalo/media, kho tu lieu (up-media) theo do het hoan. Flow ke hoach/NV/AC khong doi. -->
