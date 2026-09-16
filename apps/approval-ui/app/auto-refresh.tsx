@@ -28,6 +28,19 @@ export default function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
     }
   }, [left, seconds, router]);
 
+  // 16/9 (Thanh: "refresh 30s chả có tác dụng"): tab nằm nền bị trình duyệt bóp đồng hồ nên
+  // quay lại tab là số cũ, phải chờ thêm 1 vòng. Giờ hễ tab hiện lại là làm mới NGAY.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        router.refresh();
+        setLeft(seconds);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [seconds, router]);
+
   return (
     <span className="refresh">Tự làm mới sau {Math.max(left, 0)} giây</span>
   );
