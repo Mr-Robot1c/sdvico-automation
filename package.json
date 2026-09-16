@@ -24,7 +24,8 @@
     "test:scene": "node packages/marketing/src/test-scene-match.mjs",
     "kho:mo-ta": "node packages/marketing/src/mo-ta-tu-lieu.mjs",
     "kho:doi-drive": "node packages/marketing/src/doi-kho-sang-drive.mjs",
-    "drive:oauth": "node packages/marketing/src/google-oauth-drive.mjs"
+    "drive:oauth": "node packages/marketing/src/google-oauth-drive.mjs",
+    "gsc:kiem": "node packages/marketing/src/kiem-search-console.mjs"
   },
   "workspaces": [
     "packages/*",

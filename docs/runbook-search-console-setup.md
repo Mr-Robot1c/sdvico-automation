@@ -17,6 +17,12 @@
 Dùng chung tài khoản dịch vụ của runbook Google Drive (`docs/runbook-google-drive-setup.md`, bước 1).
 Nếu chưa có thì làm bước 1 ở đó. Thêm: **APIs & Services → Library → Google Search Console API → Enable**.
 
+> 16/9: kiểm thật thấy bước Enable này CHƯA làm (mọi lệnh gọi trả 403 "API has not been used").
+> Link thẳng, mở bằng Edge tài khoản công ty rồi bấm Enable:
+> https://console.cloud.google.com/apis/library/searchconsole.googleapis.com?project=sdvico-youtube
+>
+> Kiểm nhanh toàn bộ (API + quyền property + giá trị `GSC_SITE_URL`): `npm run gsc:kiem`.
+
 ## Bước 2. Cho tài khoản dịch vụ đọc property
 
 1. Vào https://search.google.com/search-console, chọn property **sdvico.vn** (dạng Domain `sc-domain:sdvico.vn`
