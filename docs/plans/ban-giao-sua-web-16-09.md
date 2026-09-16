@@ -33,7 +33,7 @@
 | B2 | Search Console sdvico.vn: anh Thành thêm email `sdvico-kho-tu-lieu@sdvico-youtube.iam.gserviceaccount.com` (quyền Đầy đủ) | anh Thành | Thanh đã nhắn, chờ rep. Xong → Claude đặt `GSC_SITE_URL` trên Vercel, gọi thử, số click về trang SEO |
 | B3 | Bot tìm web: đăng ký Tavily (https://tavily.com, free 1.000 lượt/tháng), gửi key `tvly-...` | Thanh | Chờ key → Claude đặt `TAVILY_API_KEY` trên Vercel, thử bot |
 | B4 | (tuỳ chọn) Model Trung Quốc free: Groq (https://console.groq.com) key `gsk_...` chạy Qwen 3 | Thanh | Có key → Claude đặt OPENAI_BASE_URL/KEY/MODEL, chạy trước Gemini |
-| B5 | Dựng thử 1 video (bài lọc dầu SD12-300, không đưa vào hàng đợi) để Thanh xem cảnh nào ghép hình nào | Claude | đang dựng 16/9 chiều, xem out/video/ |
+| B5 | Dựng thử 1 video (bài lọc dầu SD12-300, không đưa vào hàng đợi) để Thanh xem cảnh nào ghép hình nào | Claude | XONG 16/9 chiều: 54,7 s, cảnh 1 clip thật thợ xử lý sự cố máy lọc dầu, cảnh 2 ảnh thợ sửa động cơ tàu, cảnh 3 ảnh sản phẩm SF300B (điểm khớp 10/10/10). File out/video/sdvico_492313ac_vertical.mp4 (worktree), đã gửi Thanh. Chờ Thanh nhận xét |
 | B6 | Web còn chậm ở trang nào | Thanh theo dõi 2 hôm rồi báo | chờ |
 | B7 | Ứng dụng Google vẫn hiện cảnh báo "requires verification" vì scope YouTube | không cần làm | chỉ 1 tài khoản dùng, bỏ qua |
 
