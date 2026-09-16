@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getServerClient } from '../../../lib/supabase-server';
-import { buildWeekReport } from '../../../lib/week-report';
+import { cachedWeekReport } from '../../../lib/cached';
 import { vnInt } from '../../../lib/plan';
 import BarChart from '../bar-chart';
 import PostTitle from '../post-title';
@@ -28,7 +28,8 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
   const kenhTab = ['facebook', 'youtube', 'tiktok'].includes(String(searchParams?.kenh || '')) ? String(searchParams?.kenh) as 'facebook' | 'youtube' | 'tiktok' : null;
   const ttIds = await tiktokIdsCached();
 
-  const report = await buildWeekReport(client, offset);
+  // 16/9 (Thanh: web chậm là ưu tiên nhất): báo cáo tuần qua cache 2 phút (lib/cached.ts).
+  const report = await cachedWeekReport(offset);
   const { window: win, totals, totalsPrev, delta, posts, topPosts, byProduct, byKind, narrative } = report;
 
   // 26/8 (user tach 2 trang Do luong): trang tuan them bang "Tung bai — moi kenh" gom

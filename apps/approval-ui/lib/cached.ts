@@ -86,6 +86,28 @@ export const cachedTokenStats = unstable_cache(
   { revalidate: 300, tags: [TAG.runlog] }
 );
 
+// Bài đã đăng công khai cho trang SEO (mkt_posts + mkt_content ghép): giữ 5 phút.
+export const cachedPublicPosts = unstable_cache(
+  async (limit: number) => {
+    const { loadPublicPosts } = await import('./seo');
+    return loadPublicPosts(getServerClient(), limit);
+  },
+  ['public-posts-v1'],
+  { revalidate: 300, tags: [TAG.content, TAG.metrics] }
+);
+
+// Snapshot Search Console mới nhất (mkt_metrics source=gsc, 1.500 dòng): giữ 10 phút.
+// Map không qua được cache JSON nên trả entries; nơi gọi dựng lại Map.
+export const cachedGscLatest = unstable_cache(
+  async () => {
+    const { loadGscLatest } = await import('./gsc');
+    const { byCid, site, at } = await loadGscLatest(getServerClient());
+    return { entries: [...byCid.entries()], site, at };
+  },
+  ['gsc-latest-v1'],
+  { revalidate: 600, tags: [TAG.metrics] }
+);
+
 // Gọi ở server action / route sau khi ghi dữ liệu để trang thấy ngay.
 export function bustCache(...tags: string[]) {
   for (const t of tags) { try { revalidateTag(t); } catch { /* ngoài request context thì bỏ qua */ } }

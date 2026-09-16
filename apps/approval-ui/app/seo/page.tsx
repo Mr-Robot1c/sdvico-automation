@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { loadPublicPosts, siteUrl, publicBlogUrl } from '../../lib/seo';
-import { loadGscLatest, gscConfigured } from '../../lib/gsc';
+import { siteUrl, publicBlogUrl } from '../../lib/seo';
+import { gscConfigured, type GscPage } from '../../lib/gsc';
+import { cachedPublicPosts, cachedGscLatest } from '../../lib/cached';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang SEO: bai da dang len web cong khai
 // (/blog), kho tu khoa, va suc khoe SEO (sitemap, audit gan nhat). Y chang layout SEO cua
@@ -24,10 +25,12 @@ const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 export default async function Page() {
   const client = getServerClient();
 
-  const [posts, gsc, kwRes, auditRes] = await Promise.all([
-    loadPublicPosts(client, 200),
+  // 16/9 (Thanh: web chậm là ưu tiên nhất): 2 nguồn nặng (bài công khai + snapshot Search
+  // Console 1.500 dòng) đi qua cache 5/10 phút — lib/cached.ts.
+  const [posts, gscRaw, kwRes, auditRes] = await Promise.all([
+    cachedPublicPosts(200),
     // 15/9: số Google Search Console (click / hiển thị / CTR / vị trí 28 ngày) cho từng bài.
-    loadGscLatest(client),
+    cachedGscLatest(),
     client
       .from('mkt_keywords')
       .select('id, keyword, intent, source, created_at')
@@ -42,6 +45,7 @@ export default async function Page() {
   ]);
   const pct = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
   const gscOn = gscConfigured();
+  const gsc = { byCid: new Map<string, GscPage>(gscRaw.entries as Array<[string, GscPage]>), site: gscRaw.site, at: gscRaw.at };
 
   const keywords = (kwRes.data || []) as any[];
   const auditRows = (auditRes.data || []) as any[];

@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { getServerClient } from '../../../lib/supabase-server';
-import { loadPublicPosts, publicBlogUrl } from '../../../lib/seo';
-import { loadGscLatest, gscConfigured } from '../../../lib/gsc';
+import { publicBlogUrl } from '../../../lib/seo';
+import { gscConfigured, type GscPage } from '../../../lib/gsc';
+import { cachedPublicPosts, cachedGscLatest } from '../../../lib/cached';
 
 // 15/9 (Thanh: "bấm vào 48 bài SEO đã đăng thì thể hiện hết tất cả các bài"): trang liệt kê ĐỦ bài
 // công khai kèm số Google Search Console (click, hiển thị, CTR, vị trí 28 ngày) nếu đã nối.
@@ -22,7 +23,9 @@ export default async function Page({ searchParams }: { searchParams?: { sap?: st
   const client = getServerClient();
   const q = String(searchParams?.q || '').trim().toLowerCase();
   const sap = String(searchParams?.sap || 'moi');
-  const [posts, gsc] = await Promise.all([loadPublicPosts(client, 500), loadGscLatest(client)]);
+  // 16/9 (Thanh: web chậm là ưu tiên nhất): 2 nguồn nặng đi qua cache 5/10 phút (lib/cached.ts).
+  const [posts, gscRaw] = await Promise.all([cachedPublicPosts(500), cachedGscLatest()]);
+  const gsc = { byCid: new Map<string, GscPage>(gscRaw.entries as Array<[string, GscPage]>), site: gscRaw.site, at: gscRaw.at };
   let rows = posts.map((p) => ({ p, g: gsc.byCid.get(p.contentId) || null }));
   if (q) rows = rows.filter(({ p }) => String(p.title || '').toLowerCase().includes(q) || String(p.product || '').toLowerCase().includes(q));
   const key = (r: any) => r.g ? r.g : { clicks: 0, impressions: 0, position: 999 };
