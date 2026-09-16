@@ -56,7 +56,12 @@ export async function loadAgentActivity(client: Client, now: Date = new Date()):
   };
   for (const r of (logRes.data || []) as any[]) {
     for (const [key, s] of Object.entries(AGENT_SCHEDULE) as [AgentKey, AgentSchedule][]) {
-      if (s.tasks.includes(String(r.task))) bump(key, String(r.created_at), String(r.status), String(r.detail?.error || r.detail?.msg || '').slice(0, 100));
+      // 16/9 (Thanh: "3 lỗi mà bấm vô xem không được"): lỗi dựng video ghi detail {title, exit_code}
+      // không có error/msg nên dòng "Lỗi gần nhất" không bao giờ hiện — thêm đường lùi về tên bài.
+      if (s.tasks.includes(String(r.task))) {
+        const err = String(r.detail?.error || r.detail?.msg || (r.detail?.title ? `bài "${r.detail.title}" dựng lỗi${r.detail?.exit_code != null ? ` (mã ${r.detail.exit_code})` : ''}` : '')).slice(0, 140);
+        bump(key, String(r.created_at), String(r.status), err);
+      }
     }
   }
   for (const r of (videoRes.data || []) as any[]) { bump('video', String(r.created_at), 'ok'); bump('voice', String(r.created_at), 'ok'); }

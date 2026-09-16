@@ -1412,7 +1412,8 @@ button.board-stat:hover { border-color: var(--accent, #1f5fbf); }
 
 /* Agent grid: cac card AI. */
 .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-.agent-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; }
+/* 16/9 (Thanh): align-content start — card ngắn (Lưu vào kho) không bị giãn hàng làm badge trôi lệch so với card bên cạnh. */
+.agent-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; }
 .agent-card .ag-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .agent-card .ag-name { font-weight: 700; font-size: .92rem; }
 .agent-card .ag-role { color: var(--ink-2); font-size: .8rem; line-height: 1.4; }
@@ -1663,7 +1664,8 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .agent-card .ag-sched { font-size: .76rem; color: var(--ink-2); }
 .agent-card .ag-sched ul { margin: 2px 0 0; padding-left: 16px; }
 .agent-card .ag-sched li { margin: 0; }
-.ag-strip { display: flex; align-items: flex-end; gap: 8px; font-size: .74rem; color: var(--ink-2); }
+/* 16/9 (Thanh): wrap — nhãn ngày "10/09 → 16/09" xuống dòng thay vì văng ra ngoài card hẹp. */
+.ag-strip { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 8px; font-size: .74rem; color: var(--ink-2); min-width: 0; }
 .ag-strip-lbl { white-space: nowrap; }
 .ag-bars { display: inline-flex; align-items: flex-end; gap: 3px; height: 20px; }
 .ag-bar { width: 9px; border-radius: 2px 2px 0 0; background: var(--ok); display: inline-block; }
