@@ -3,7 +3,7 @@ import { getServerClient } from '../../../lib/supabase-server';
 import PlatformLogo, { type PlatformKey } from '../../noi-dung/platform-logo';
 import { TIKTOK_PROFILE_URL } from '../../../lib/tiktok-username';
 import { loadChannelPosts, sumChannel, qualityOf, qualityLabel, type Channel } from '../../../lib/channel-posts';
-import { getTikTokVideoIds } from '../../../lib/tiktok';
+import { tiktokIdsCached } from '../../../lib/cached';
 
 // 15/9 (Thanh, kế hoạch sửa web): ô "Đã đăng: 12 Facebook · 16 YouTube · 4 TikTok" ở /video phải bấm
 // vào được từng nền tảng để kiểm tra các video. Trang này liệt kê video đã đăng của 1 kênh: bài gì,
@@ -28,7 +28,7 @@ const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 export default async function Page({ searchParams }: { searchParams?: { kenh?: string } }) {
   const kenh = KENH[String(searchParams?.kenh || 'facebook')] ? String(searchParams?.kenh || 'facebook') : 'facebook';
   const client = getServerClient();
-  const ttIds = kenh === 'tiktok' ? await getTikTokVideoIds(client) : null;
+  const ttIds = kenh === 'tiktok' ? await tiktokIdsCached() : null;
   const all = await loadChannelPosts(client, kenh as Channel, { limit: 400, tiktokIds: ttIds });
   const rows = all.filter((r) => r.isVideo);
   const tot = sumChannel(rows);

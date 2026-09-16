@@ -181,7 +181,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                 <th style={{ width: 92 }}>Lúc</th>
                 <th style={{ width: 200 }}>Khách</th>
                 <th>Hỏi gì</th>
-                <th style={{ width: 250 }}>Bước</th>
+                <th style={{ width: 330 }}>Bước</th>
                 <th style={{ width: 150 }}>Chuyển NV</th>
                 <th style={{ width: 200 }}>Ghi chú</th>
                 <th style={{ width: 60 }}></th>

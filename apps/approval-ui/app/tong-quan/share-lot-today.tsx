@@ -76,8 +76,8 @@ export default function ShareLotToday({
   return (
     <div className="lot-box">
       <div className="lot-head">
-        <span>📣 Chia sẻ group hôm nay: <b>{done}/{lotSize}</b> nhóm</span>
-        {done >= lotSize ? <span className="lot-ok">✓ đủ lô</span> : <span className="sub">bấm <b>Mở nhóm</b>, đăng xong bấm <b>Đã chia</b></span>}
+        <span>📣 {compact ? 'Buổi này' : 'Chia sẻ group hôm nay'}: <b>{done}/{lotSize}</b> nhóm</span>
+        {done >= lotSize ? <span className="lot-ok">✓ đủ lô</span> : compact ? null : <span className="sub">bấm <b>Mở nhóm</b>, đăng xong bấm <b>Đã chia</b></span>}
       </div>
       <div className={`lot-chips ${compact ? 'compact' : ''}`}>
         {items.map((g) => (

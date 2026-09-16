@@ -314,7 +314,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 <th>Bài / hướng đi</th>
                 <th style={{ width: 170 }}>Sản phẩm</th>
                 <th style={{ width: 96 }}>Trạng thái</th>
-                <th className="wk-lot">📣 Lô nhóm chia sẻ hôm đó</th>
+                <th className="wk-lot">📣 Lô nhóm chia sẻ của BUỔI đó</th>
               </tr>
             </thead>
             <tbody>
@@ -328,37 +328,42 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                     {d.overridden ? <div className="sub">✏️ lịch riêng</div> : null}
                   </td>
                 );
-                const lotCell = (
-                  <td rowSpan={span} className="wk-lot">
-                    {d.lot && d.lot.items.length ? (
-                      d.isToday ? (
+                const lotCellFor = (r: ReturnType<typeof weekRowsOf>[number]) => {
+                  const sl = r.lot;
+                  if (!sl || sl.channel !== 'facebook') return <td className="wk-lot"><span className="sub">— (không chia group: {r.channel && r.channel !== 'facebook' ? CHANNEL_LABEL[r.channel] : 'không phải Facebook'})</span></td>;
+                  if (!sl.items.length) return <td className="wk-lot"><span className="sub">—</span></td>;
+                  if (d.isToday) {
+                    return (
+                      <td className="wk-lot">
                         <ShareLotToday
                           compact
-                          lot={d.lot.items.map((g) => ({ id: g.id, label: g.label, url: g.url, sharedToday: g.done ? { id: 'da-ghi', content_id: null, shared_at: '' } : null }))}
-                          lotSize={d.lot.lotSize}
-                          doneToday={d.lot.done}
-                          post={null}
+                          lot={sl.items.map((g) => ({ id: g.id, label: g.label, url: g.url, sharedToday: g.done ? { id: 'da-ghi', content_id: r.contentId || null, shared_at: '' } : null }))}
+                          lotSize={sl.lotSize}
+                          doneToday={sl.done}
+                          post={r.contentId ? { contentId: r.contentId, url: null } : null}
                         />
-                      ) : (
-                        <div className="wk-lot-list">
-                          <span className="sub" style={{ fontSize: '.74rem' }}>{d.isPast ? `đã chia ${d.lot.done}/${d.lot.lotSize}` : `dự kiến ${d.lot.lotSize} nhóm`}</span>
-                          {d.lot.items.map((g) => (
-                            <span key={g.id} className={`wk-lot-item ${g.done ? 'done' : ''} ${g.pinned ? 'pinned' : ''}`}>
-                              <span className="lbl" title={g.label}>{g.done ? '✓' : '·'} {g.label}{g.pinned ? ' 📌' : ''}</span>
-                              {!d.isPast ? <a href={g.url} target="_blank" rel="noreferrer">mở ↗</a> : null}
-                            </span>
-                          ))}
-                        </div>
-                      )
-                    ) : <span className="sub">—</span>}
-                  </td>
-                );
+                      </td>
+                    );
+                  }
+                  return (
+                    <td className="wk-lot">
+                      <div className="wk-lot-list">
+                        <span className="sub" style={{ fontSize: '.74rem' }}>{d.isPast ? `đã chia ${sl.done}/${sl.lotSize}` : `dự kiến ${sl.lotSize} nhóm cho buổi này`}</span>
+                        {sl.items.map((g) => (
+                          <span key={g.id} className={`wk-lot-item ${g.done ? 'done' : ''} ${g.pinned ? 'pinned' : ''}`}>
+                            <span className="lbl" title={g.label}>{g.done ? '✓' : '·'} {g.label}{g.pinned ? ' 📌' : ''}</span>
+                            {!d.isPast ? <a href={g.url} target="_blank" rel="noreferrer">mở ↗</a> : null}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  );
+                };
                 if (!rows.length) {
                   return (
                     <tr key={d.date} className={d.isToday ? 'row-today' : undefined}>
                       {dayCell}
-                      <td colSpan={6} className="sub">— máy nghỉ</td>
-                      {lotCell}
+                      <td colSpan={7} className="sub">— máy nghỉ</td>
                     </tr>
                   );
                 }
@@ -378,7 +383,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                     </td>
                     <td className="sub">{r.product || (r.kind === 'content' ? 'Bài content' : '—')}</td>
                     <td><span className={`wk-state ${r.state}`}>{r.state === 'done' ? '✅ đã sinh' : r.state === 'fallback' ? 'hướng cạn' : '▫️ dự kiến'}</span></td>
-                    {k === 0 ? lotCell : null}
+                    {lotCellFor(r)}
                   </tr>
                 ));
               })}
@@ -388,14 +393,14 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <p className="sub" style={{ margin: '10px 0 0' }}>
           Tối 20h BOSS tự chỉnh trọng số theo số liệu ngày (tối đa 0,5 điểm). Chủ nhật 20h học số cả tuần trên Facebook, YouTube và TikTok. Thứ 2 8h ra kế hoạch tuần mới theo luật 70/30.
           {week.hasFallback ? ' Ô "hướng cạn" nghĩa là hướng đi đã hết — máy tự nạp thêm hướng mới trong ngày.' : ''}
-          {' '}Lô nhóm: ngày đã qua là nhóm đã bấm "Đã chia", hôm nay bấm được ngay trong bảng, ngày tới là dự kiến máy xoay (nhóm lâu chưa chia lên trước). Đổi giờ/kênh/ghim nhóm ở khối Lịch đăng cố định ngay bên dưới.
+          {' '}Lô nhóm: MỖI BUỔI đăng Facebook chia 4 nhóm khác nhau (ngày 2 bài Facebook = 8 nhóm). Buổi đã qua hiện nhóm đã bấm "Đã chia", hôm nay bấm được ngay trong bảng, buổi tới là dự kiến máy xoay (nhóm lâu chưa chia lên trước). Đổi giờ/kênh/ghim nhóm ở khối Lịch đăng cố định ngay bên dưới.
         </p>
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
           <GeneratePostsButton action={generatePostsNow} />
         </div>
       </section>
 
-      <PostingPlanForm pp={pp} lots={Object.fromEntries(week.days.filter((d) => d.lot).map((d) => [d.date, d.lot!]))} changeLog={changeLog} />
+      <PostingPlanForm pp={pp} lots={Object.fromEntries(week.days.filter((d) => d.lot).map((d) => [d.date, d.lot!]))} rowsByDate={Object.fromEntries(week.days.map((d) => [d.date, weekRowsOf(d)]))} changeLog={changeLog} />
 
       {/* ===== 3. HƯỚNG ĐI BÀI VIẾT ===== */}
       <section className="blk" id="huong-di">

@@ -1,6 +1,7 @@
 import { savePostingPlanWithReport, savePostingOverrideAction, clearPostingOverrideAction, proposePostingPlanAction } from './goal-actions';
 import PostingPlanFormClient from './posting-plan-form-client';
 import type { DayLot } from '../../lib/share-lot';
+import type { WeekRow } from '../../lib/week-plan';
 import {
   DOW_ORDER, DOW_LONG, DOW_SHORT, MAX_SLOTS_PER_DAY, CHANNEL_LABEL, todayVNDate,
   type LoadedPostingPlan, type PostingSlot,
@@ -24,11 +25,13 @@ function fmtVN(iso?: string): string {
 }
 
 // Một HÀNG = một bài. `dayCell` chỉ truyền ở hàng đầu của ngày (rowSpan).
-function SlotTr({ prefix, i, slot, groups, dowIdx, dayCell }: {
-  prefix: string; i: number; slot: PostingSlot | null; groups: LoadedPostingPlan['shareGroups']; dowIdx: number | null; dayCell?: React.ReactNode;
+function SlotTr({ prefix, i, slot, groups, dowIdx, dayCell, planRow }: {
+  prefix: string; i: number; slot: PostingSlot | null; groups: LoadedPostingPlan['shareGroups']; dowIdx: number | null; dayCell?: React.ReactNode; planRow?: WeekRow | null;
 }) {
   const ck = dowIdx !== null ? CONTENT_KIND_BY_DOW[dowIdx] : null;
+  const lot = planRow?.lot || null;
   return (
+    <>
     <tr className={slot ? 'pp-row on' : 'pp-row'}>
       {dayCell !== undefined ? dayCell : null}
       <td className="pp-c-on">
@@ -54,11 +57,24 @@ function SlotTr({ prefix, i, slot, groups, dowIdx, dayCell }: {
       </td>
       <td className="pp-c-group">
         <select name={`${prefix}_${i}_group`} defaultValue={slot?.group_id || ''} aria-label="Ghim nhóm chia sẻ">
-          <option value="">Theo lô tự rút</option>
+          <option value="">Theo lô tự rút (4 nhóm/buổi)</option>
           {groups.map((g) => <option key={g.id} value={g.id}>👥 {g.label}</option>)}
         </select>
       </td>
     </tr>
+    {slot && planRow ? (
+      <tr className="pp-row pp-plan-line">
+        <td colSpan={5} className="sub" style={{ fontSize: '.78rem', paddingTop: 0 }}>
+          <span className={`wk-state ${planRow.state}`}>{planRow.state === 'done' ? '✅ đã sinh' : planRow.state === 'fallback' ? 'hướng cạn' : '▫️ dự kiến'}</span>
+          {' '}<b>{planRow.state === 'fallback' ? 'Bài theo trọng số sản phẩm' : planRow.label}</b>
+          {planRow.product ? ` · ${planRow.product}` : planRow.kind === 'content' ? ' · Bài content' : ''}
+          {lot && lot.channel === 'facebook' && lot.items.length ? (
+            <> · 📣 Lô buổi này ({lot.done}/{lot.lotSize}): {lot.items.map((g) => `${g.done ? '✓ ' : ''}${g.label}${g.pinned ? ' 📌' : ''}`).join(', ')}</>
+          ) : lot && lot.channel !== 'facebook' ? ' · không chia group (không phải Facebook)' : null}
+        </td>
+      </tr>
+    ) : null}
+    </>
   );
 }
 
@@ -80,9 +96,16 @@ function SlotHead() {
 // 15/9: `lots` = lô 4 nhóm/ngày của tuần này (theo ngày YYYY-MM-DD) để hiện cạnh từng thứ;
 // `changeLog` = nhật ký máy/người đổi lịch (run_log mkt.posting_plan_save / _boss) hiện dưới form.
 export type PlanChangeLog = { at: string; actor: string; summary: string; changes: string[]; kind: string };
-export default function PostingPlanForm({ pp, lots = {}, changeLog = [] }: { pp: LoadedPostingPlan; lots?: Record<string, DayLot>; changeLog?: PlanChangeLog[] }) {
+export default function PostingPlanForm({ pp, lots = {}, rowsByDate = {}, changeLog = [] }: { pp: LoadedPostingPlan; lots?: Record<string, DayLot>; rowsByDate?: Record<string, WeekRow[]>; changeLog?: PlanChangeLog[] }) {
   const lotByDow = new Map<number, DayLot>();
   for (const l of Object.values(lots)) lotByDow.set(new Date(l.date + 'T00:00:00Z').getUTCDay(), l);
+  // 16/9 (Thanh: "ở trên phân rõ rồi mà lịch ở dưới không thấy đầy đủ, phải đồng bộ về nội dung"):
+  // mỗi ô lịch hiện đúng bài của tuần này (bài đã sinh / hướng dự kiến, sản phẩm) + lô 4 nhóm của buổi đó.
+  const rowByDowIdx = new Map<string, WeekRow>();
+  for (const [date, rows] of Object.entries(rowsByDate)) {
+    const dow = new Date(date + 'T00:00:00Z').getUTCDay();
+    for (const r of rows) if (r.slotIndex !== undefined) rowByDowIdx.set(`${dow}:${r.slotIndex}`, r);
+  }
   const today = todayVNDate();
   const ovDates = Object.keys(pp.plan.overrides || {}).sort();
   const ovToday = pp.plan.overrides?.[today] || null;
@@ -128,15 +151,11 @@ export default function PostingPlanForm({ pp, lots = {}, changeLog = [] }: { pp:
                 return Array.from({ length: MAX_SLOTS_PER_DAY }, (_, i) => (
                   <SlotTr
                     key={`${d}-${i}`} prefix={`s_${d}`} i={i} slot={slots[i] || null} groups={pp.shareGroups} dowIdx={d}
+                    planRow={rowByDowIdx.get(`${d}:${i}`) || null}
                     dayCell={i === 0 ? (
                       <td rowSpan={MAX_SLOTS_PER_DAY} className="pp-c-day">
                         <b>{DOW_SHORT[d]}</b><div className="sub">{DOW_LONG[d]}</div>
-                        {lotByDow.get(d) ? (
-                          <div className="wk-lot-list" style={{ marginTop: 6 }} title="Lô nhóm máy rút cho ngày này (ngày đã qua = nhóm đã chia thật)">
-                            <span className="sub" style={{ fontSize: '.72rem' }}>Lô hôm đó ({lotByDow.get(d)!.done}/{lotByDow.get(d)!.lotSize}):</span>
-                            {lotByDow.get(d)!.items.map((g) => <span key={g.id} className={`wk-lot-item ${g.done ? 'done' : ''} ${g.pinned ? 'pinned' : ''}`}><span className="lbl">{g.done ? '✓' : '·'} {g.label}</span></span>)}
-                          </div>
-                        ) : null}
+                        {lotByDow.get(d) ? <div className="sub" style={{ fontSize: '.72rem', marginTop: 6 }}>Lô: {lotByDow.get(d)!.done}/{lotByDow.get(d)!.lotSize} nhóm cả ngày</div> : null}
                       </td>
                     ) : undefined}
                   />

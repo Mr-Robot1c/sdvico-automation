@@ -1,9 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { TIKTOK_USERNAME, isCurrentTikTokMetric } from '../../lib/tiktok-username';
-import { getTikTokVideoIds } from '../../lib/tiktok';
-import { fbStatus, tiktokStatus } from '../../lib/platform-status';
-import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
+import { cachedPlatformStatus, tiktokIdsCached } from '../../lib/cached';
 import { getTikTokVideoCount } from '../../lib/tiktok';
 import { zaloOaStatus } from '../../lib/zalo-oa';
 import PlatformLogo, { type PlatformKey } from '../noi-dung/platform-logo';
@@ -34,13 +32,12 @@ const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 export default async function Page() {
   const client = getServerClient();
 
-  const [fb, tt, yt, za, ttVideoIds, postsRes, metricsRes] = await Promise.all([
-    fbStatus(),
-    tiktokStatus(),
-    getYouTubeChannelInfo(),
+  // 16/9 (web chậm): trạng thái 3 nền tảng + danh sách video TikTok là API NGOÀI (0,5-3 giây mỗi cái) -> cache 5-10 phút.
+  const [status, za, ttVideoIds, postsRes, metricsRes] = await Promise.all([
+    cachedPlatformStatus(),
     zaloOaStatus(client),
     // 15/9 (Thanh: view TikTok sai): lấy DANH SÁCH id video còn trên kênh hiện tại — vừa đếm bài, vừa lọc snapshot cũ của kênh đã mất.
-    getTikTokVideoIds(client),
+    tiktokIdsCached(),
     client
       .from('mkt_posts')
       .select('content_id, channel, external_url, published_at')
@@ -56,6 +53,7 @@ export default async function Page() {
       .limit(900),
   ]);
 
+  const { fb, tt, yt } = status;
   const posts = (postsRes.data || []) as any[];
 
   // Dem bai + lan dang gan nhat theo kenh.
@@ -249,7 +247,7 @@ export default async function Page() {
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link href="/do-luong" className="btn ghost">📈 Đo lường ngày</Link>
-          <Link href="/do-luong/tuan" className="btn ghost">📅 Báo cáo tuần từng kênh</Link>
+          <Link href="/do-luong/tuan" className="btn ghost">📅 Báo cáo tuần</Link>
           <Link href="/ket-noi" className="btn ghost">🔌 Kết nối</Link>
         </div>
       </header>

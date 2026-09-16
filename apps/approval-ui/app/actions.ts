@@ -1189,6 +1189,8 @@ export async function generateSevenAngles(formData: FormData): Promise<{ ok: boo
 
 // Cập nhật số liệu thủ công (nút trên trang Đo lường): Facebook + YouTube Shorts.
 export async function refreshFacebookMetrics() {
+  // 16/9: kéo số xong thì làm mới cache báo cáo tuần / trạng thái kênh (lib/cached.ts).
+  try { const { bustCache, TAG } = await import('../lib/cached'); bustCache(TAG.metrics, TAG.status, TAG.runlog); } catch { /* bỏ qua */ }
   const client = getServerClient();
   await pullFacebookMetrics(client);
   try {

@@ -131,6 +131,8 @@ export async function GET(req: Request) {
       });
     }
   } catch { /* don rac loi khong lam vo cron */ }
+  // 16/9: số liệu mới -> làm mới cache báo cáo tuần / hoạt động AI (lib/cached.ts).
+  try { const { bustCache, TAG } = await import('../../../lib/cached'); bustCache(TAG.metrics, TAG.runlog, TAG.status); } catch { /* bỏ qua */ }
   // GHI run_log mỗi lần chạy (18/8: mkt_metrics trống suốt mà không ai biết cron có chạy không
   // vì route này im lặng). Trang Dữ liệu AI + /api/fb-diag đọc được để chẩn đoán.
   try {

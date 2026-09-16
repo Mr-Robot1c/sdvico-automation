@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { loadAgentDefs, ago, fmtDT } from '../../lib/agent-defs';
-import { AGENT_SCHEDULE, loadAgentActivity } from '../../lib/agent-schedule';
+import { AGENT_SCHEDULE } from '../../lib/agent-schedule';
+import { cachedAgentActivity } from '../../lib/cached';
 
 // 28/8 (user: "chi dung 1 dashboard the hien tat ca cac Agent"): bo 9 AI card tach ra
 // component dung chung — trang /agent va trang Nguon hoc du lieu (/kho-tri-thuc tab Tong
@@ -13,7 +14,7 @@ import { AGENT_SCHEDULE, loadAgentActivity } from '../../lib/agent-schedule';
 
 export default async function AgentRoster() {
   const client = getServerClient();
-  const [agents, activity] = await Promise.all([loadAgentDefs(client), loadAgentActivity(client)]);
+  const [agents, activity] = await Promise.all([loadAgentDefs(client), cachedAgentActivity()]);
 
   return (
     <div className="agent-grid">

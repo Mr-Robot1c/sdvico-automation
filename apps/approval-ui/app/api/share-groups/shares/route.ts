@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../../lib/supabase-server';
 import { isAuthorizedApiRequest } from '../../../../lib/session-auth';
-import { computeShareLot, todayVNDate } from '../../../../lib/share-lot';
+import { computeShareLot, lotForContent, todayVNDate } from '../../../../lib/share-lot';
 
 // Lượt người chia bài vào group (Thanh 11/9). Máy KHÔNG đăng gì lên Facebook (điều cấm 1, Groups API
 // đã đóng); route này chỉ ghi/đọc sổ mkt_group_shares và tính "lô hôm nay".
@@ -11,7 +11,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const contentId = (url.searchParams.get('content_id') || '').trim() || null;
   const client = getServerClient();
-  const lot = await computeShareLot(client, { contentId });
+  // 16/9: có bài -> lô của ĐÚNG Ô đăng bài đó (mỗi buổi 4 nhóm); không có -> lô theo ngày như cũ.
+  const lot = contentId ? await lotForContent(client, contentId) : await computeShareLot(client, { contentId });
   return NextResponse.json(lot);
 }
 

@@ -41,7 +41,7 @@ export const ROUTES: Record<string, RouteNode> = {
 
   // Con của Kênh
   '/do-luong': { label: 'Đo lường ngày', parent: '/kenh' },
-  '/do-luong/tuan': { label: 'Báo cáo tuần', parent: '/do-luong' },
+  '/do-luong/tuan': { label: 'Báo cáo tuần', parent: '/kenh' },
   '/ket-noi': { label: 'Kết nối', parent: '/kenh' },
   '/facebook': { label: 'Kết nối Facebook', parent: '/kenh' },
   '/youtube': { label: 'Kết nối YouTube', parent: '/kenh' },

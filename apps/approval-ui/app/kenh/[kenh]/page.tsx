@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { getServerClient } from '../../../lib/supabase-server';
 import PlatformLogo, { type PlatformKey } from '../../noi-dung/platform-logo';
 import { loadChannelPosts, sumChannel, qualityOf, qualityLabel, type Channel } from '../../../lib/channel-posts';
-import { getTikTokVideoIds } from '../../../lib/tiktok';
+import { tiktokIdsCached } from '../../../lib/cached';
 import { fetchFacebookComments } from '../../../lib/fb-comments';
 import { TIKTOK_PROFILE_URL } from '../../../lib/tiktok-username';
 
@@ -35,7 +35,7 @@ export default async function Page({ params, searchParams }: { params: { kenh: s
   const sap = String(searchParams?.sap || 'moi');
   const q = String(searchParams?.q || '').trim().toLowerCase();
   const cmtCid = String(searchParams?.cmt || '').trim();
-  const ttIds = kenh === 'tiktok' ? await getTikTokVideoIds(client) : null;
+  const ttIds = kenh === 'tiktok' ? await tiktokIdsCached() : null;
   let rows = await loadChannelPosts(client, kenh, { limit: 400, tiktokIds: ttIds });
   const tot = sumChannel(rows);
   if (q) rows = rows.filter((r) => r.title.toLowerCase().includes(q) || r.product.toLowerCase().includes(q));

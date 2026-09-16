@@ -11,7 +11,7 @@ import PullMetricsButton from '../../noi-dung/pull-metrics-button';
 import { isOtherPage } from '../../../lib/page-origin.mjs';
 import PageSuiteBlock from '../page-suite-block';
 import ChannelWeek from './channel-week';
-import { getTikTokVideoIds } from '../../../lib/tiktok';
+import { tiktokIdsCached } from '../../../lib/cached';
 import { isCurrentTikTokMetric } from '../../../lib/tiktok-username';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
   // 15/9 (sếp): báo cáo tuần không còn là báo cáo chung — dashboard RIÊNG từng kênh (?kenh=facebook|youtube|tiktok),
   // "Tất cả" giữ bản gộp cũ.
   const kenhTab = ['facebook', 'youtube', 'tiktok'].includes(String(searchParams?.kenh || '')) ? String(searchParams?.kenh) as 'facebook' | 'youtube' | 'tiktok' : null;
-  const ttIds = await getTikTokVideoIds(client);
+  const ttIds = await tiktokIdsCached();
 
   const report = await buildWeekReport(client, offset);
   const { window: win, totals, totalsPrev, delta, posts, topPosts, byProduct, byKind, narrative } = report;
@@ -153,7 +153,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
     <main>
       <header className="head-row">
         <div>
-          <h1>Đo lường tuần</h1>
+          <h1>Báo cáo tuần</h1>
           <p className="sub">
             Gom số liệu cả tuần (Thứ 2 đến Chủ Nhật, giờ Việt Nam) mọi kênh: Facebook, TikTok, YouTube Shorts. So sánh với tuần liền trước để biết đang lên hay xuống. Xem số liệu HÔM NAY ở <Link className="src" href="/do-luong">Đo lường ngày</Link>.
           </p>

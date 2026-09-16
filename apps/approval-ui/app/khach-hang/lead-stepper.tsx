@@ -51,7 +51,7 @@ export default function LeadStepper({ leadId, status, note, lostReason }: { lead
           <button className="btn ghost sm" type="submit">Lưu</button>
         </form>
       ) : null}
-      {cur === 'lost' && lostReason ? <span className="sub" style={{ fontSize: '.78rem', flexBasis: '100%' }}>❌ {lostReason}</span> : null}
+      {cur === 'lost' && lostReason ? <span className="sub" style={{ fontSize: '.78rem', flexBasis: '100%' }}>Lý do: {lostReason}</span> : null}
       {!pending && cur !== 'spam' ? (
         <button type="button" className="btn ghost sm" style={{ color: 'var(--ink-2)' }} onClick={() => setMore((v) => !v)} title="Trạng thái khác">⋯</button>
       ) : null}

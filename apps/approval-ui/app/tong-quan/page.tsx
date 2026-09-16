@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { getYouTubeChannelInfo } from '../../lib/youtube-publish';
+import { cachedPlatformStatus, cachedWeekReport } from '../../lib/cached';
 import PlatformLogo, { type PlatformKey } from '../noi-dung/platform-logo';
 import PageSuiteBlock from '../do-luong/page-suite-block';
 import { buildTodayView, TODAY_STAGE_LABEL } from '../../lib/today-plan';
 import { CHANNEL_LABEL, DOW_LONG } from '../../lib/posting-plan';
-import { computeShareLot } from '../../lib/share-lot';
+import { computeShareLot, planShareLots } from '../../lib/share-lot';
 import ShareLotToday from './share-lot-today';
 
 // 27/8 REDESIGN theo file "redesign web.docx" cua sep — trang TONG QUAN kieu ForLife Ops.
@@ -114,7 +114,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       .gte('created_at', since7)
       .order('created_at', { ascending: false })
       .limit(100),
-    getYouTubeChannelInfo(),
+    cachedPlatformStatus().then((st) => st.yt),
     client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('status', 'won').gte('updated_at', weekStartIso),
     client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
     computeShareLot(client),
@@ -192,7 +192,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   for (const l of leads) { const cid = String(l.content_id || ''); if (cid) leadByCidEarly.set(cid, (leadByCidEarly.get(cid) || 0) + 1); }
   const topLeadCidsEarly = [...leadByCidEarly.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([cid]) => cid);
   const [week, postsTodayRes, pageScansRes, leadTitlesRes] = await Promise.all([
-    (async () => { try { const { buildWeekReport } = await import('../../lib/week-report'); return await buildWeekReport(client, 0); } catch { return null as any; } })(),
+    (async () => { try { return await cachedWeekReport(0); } catch { return null as any; } })(),
     client.from('mkt_posts').select('id', { count: 'exact', head: true }).eq('status', 'published').gte('published_at', dayStartIso).lte('published_at', new Date().toISOString()),
     client.from('mkt_metrics').select('metrics, created_at').eq('source', 'facebook').eq('entity_ref', '__page_real__').not('metrics->suite28', 'is', null).order('created_at', { ascending: false }).limit(30),
     topLeadCidsEarly.length ? client.from('mkt_content').select('id, title').in('id', topLeadCidsEarly) : Promise.resolve({ data: [] as any[] }),
@@ -265,9 +265,10 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const shown = filtered.slice(0, 30);
   const hasFilter = !!(q || fGd || fKenh || fKh);
 
-  // Bài Facebook đã đăng hôm nay (theo lịch) để gắn lượt chia group.
-  const todayFbRow = todayView.rows.find((r) => r.slot.channel === 'facebook' && r.stage === 'published' && r.contentId);
-  const todayFbPost = todayFbRow ? { contentId: String(todayFbRow.contentId), url: todayFbRow.publishedUrl } : null;
+  // 16/9 (Thanh: mỗi BUỔI 4 nhóm): lô nhóm theo từng ô đăng hôm nay, hiện ngay trong bảng Kế hoạch hôm nay.
+  const todayLots = await planShareLots(client, { [today]: todayView.rows.map((r) => ({ index: r.slot.index, time: r.slot.time, kind: r.slot.kind, channel: r.slot.channel, group_id: r.slot.group_id, contentId: r.contentId })) });
+  const todayLot = todayLots[today] || null;
+  const lotOfRow = (idx: number) => todayLot?.slots.find((s) => s.index === idx) || null;
 
   const needCount = (pendingStale.length ? 1 : 0) + (failedStuckCids.length ? 1 : 0) + (yt.configured && yt.error ? 1 : 0) + (leadNew.length ? 1 : 0);
 
@@ -328,14 +329,9 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           <span aria-hidden="true">📅</span> Kế hoạch hôm nay{' '}
           <span className="sub">· {todayLabel} · {fmt(todayView.counts.total)} bài theo lịch{todayView.overridden ? ' · ✏️ lịch riêng hôm nay' : ''}{!todayView.saved ? ' · lịch mặc định (chưa lưu)' : ''}</span>
         </h2>
-        {/* 15/9 (Thanh): lô 4 nhóm hôm nay + nút "Đã chia" 1 chạm ngay tại đây — máy không thấy được
-            việc chia trên Facebook, chỉ đếm khi người bấm. */}
-        <ShareLotToday
-          lot={shareLot.lot.map((g) => ({ id: g.id, label: g.label, url: g.url, sharedToday: g.sharedToday }))}
-          lotSize={shareLot.lotSize}
-          doneToday={shareLot.doneToday}
-          post={todayFbPost}
-        />
+        <p className="sub" style={{ margin: '4px 0 8px', fontSize: '.85rem' }}>
+          📣 Chia sẻ group hôm nay: <b>{fmt(todayLot?.done || 0)}/{fmt(todayLot?.lotSize || 0)}</b> nhóm · mỗi buổi Facebook 4 nhóm, bấm <b>Mở nhóm</b> rồi <b>Đã chia</b> ngay trong cột Chia sẻ group bên dưới (máy không tự thấy việc chia trên Facebook).
+        </p>
         {todayView.rows.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Hôm nay lịch không có bài nào. <Link href="/ke-hoach#lich-dang" className="src">Sửa lịch đăng →</Link></p>
         ) : (
@@ -345,7 +341,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
                 <tr>
                   <th style={{ width: 70 }}>Giờ</th>
                   <th style={{ width: 150 }}>Kênh</th>
-                  <th style={{ width: 170 }}>Chia sẻ group</th>
+                  <th style={{ width: 300 }}>Chia sẻ group (4 nhóm/buổi)</th>
                   <th>Bài</th>
                   <th style={{ width: 170 }}>Trạng thái</th>
                 </tr>
@@ -360,7 +356,22 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
                       </span>
                       <div className="sub" style={{ fontSize: '.78rem', marginTop: 2 }}>{r.slot.kind === 'sale' ? 'Bài bán' : 'Bài content'}</div>
                     </td>
-                    <td>{r.slot.group_label ? <span className="ch-chip group">👥 {r.slot.group_label}</span> : <span className="muted">—</span>}</td>
+                    <td>
+                      {(() => {
+                        const sl = lotOfRow(r.slot.index);
+                        if (!sl || sl.channel !== 'facebook') return <span className="muted">— (không phải Facebook)</span>;
+                        if (!sl.items.length) return <span className="muted">—</span>;
+                        return (
+                          <ShareLotToday
+                            compact
+                            lot={sl.items.map((g) => ({ id: g.id, label: g.label, url: g.url, sharedToday: g.done ? { id: 'da-ghi', content_id: r.contentId, shared_at: '' } : null }))}
+                            lotSize={sl.lotSize}
+                            doneToday={sl.done}
+                            post={r.contentId ? { contentId: r.contentId, url: r.publishedUrl } : null}
+                          />
+                        );
+                      })()}
+                    </td>
                     <td className="cell-title">
                       {r.title ? (
                         r.publishedUrl

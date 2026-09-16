@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import PlatformLogo from '../noi-dung/platform-logo';
 import VideoViewer from './video-viewer';
+import { loadChannelPosts } from '../../lib/channel-posts';
+import { tiktokIdsCached } from '../../lib/cached';
 import { assetPublicUrl } from '../../lib/asset-url';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang VIDEO: luong lam video bang AI cua
@@ -59,17 +61,18 @@ export default async function Page() {
   const waiting = contents.filter((c) => c.brief?.video_requested === true || String(c.brief?.video_requested) === 'true');
   const generating = contents.filter((c) => c.brief?.trend_generating === true || String(c.brief?.trend_generating) === 'true');
   const builtRecently = contents.filter((c) => c.brief?.trend_video_built_at || c.brief?.assets?.video_v || c.brief?.assets?.video);
-  const ytCount = postRows.filter((p) => p.channel === 'youtube').length;
-  const ttCount = postRows.filter((p) => p.channel === 'tiktok').length;
-
-  // So VIDEO da dang len Facebook: FB tron lan bai text/anh/video nen chi dem bai co video
-  // that (kind='video' hoac brief.assets.video/video_v). YT/TikTok von chi co video -> dem het.
-  const fbCids = [...new Set(postRows.filter((p) => p.channel === 'facebook').map((p) => String(p.content_id || '')).filter(Boolean))].slice(0, 500);
-  let fbVideoCount = 0;
-  if (fbCids.length) {
-    const { data: fbContents } = await client.from('mkt_content').select('id, kind, brief').in('id', fbCids);
-    fbVideoCount = (fbContents || []).filter((c: any) => c.kind === 'video' || c.brief?.assets?.video || c.brief?.assets?.video_v).length;
-  }
+  // 16/9 (Thanh: ô hiện 12 mà bấm vào chỉ 9): 3 ô đếm bằng ĐÚNG hàm của trang danh sách (/video/da-dang):
+  // Facebook chỉ kênh chính, TikTok chỉ video còn trên kênh hiện tại, khử trùng theo bài.
+  const ttIds = await tiktokIdsCached();
+  const [fbList, ytList, ttList] = await Promise.all([
+    loadChannelPosts(client, 'facebook', { limit: 400 }),
+    loadChannelPosts(client, 'youtube', { limit: 400 }),
+    loadChannelPosts(client, 'tiktok', { limit: 400, tiktokIds: ttIds }),
+  ]);
+  const fbVideoCount = fbList.filter((r) => r.isVideo).length;
+  const ytCount = ytList.filter((r) => r.isVideo).length;
+  const ttCount = ttList.filter((r) => r.isVideo).length;
+  void postRows;
 
   const urlOf = (p: string) => assetPublicUrl(client, p);
 

@@ -17,7 +17,7 @@ import { weekWindowVN } from './plan';
 import { guessGroup, isDiscontinuedGroup } from './gen/products.mjs';
 import { CONTENT_KIND_BY_DOW, CONTENT_PURPOSE } from './plan-live';
 import { loadPostingPlan, slotsForDate, groupsForDate, type EffectiveSlot } from './posting-plan';
-import { planShareLots, type DayLot } from './share-lot';
+import { planShareLots, type DayLot, type SlotLot, type SlotLotInput } from './share-lot';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -29,6 +29,8 @@ export type WeekCellItem = {
   time?: string;
   channel?: 'facebook' | 'youtube' | 'tiktok';
   group?: string | null;
+  slotIndex?: number;            // ô giờ trong ngày (khớp brief.plan_slot.index)
+  lot?: SlotLot | null;          // 16/9: lô 4 nhóm chia sẻ của CHÍNH Ô này (Facebook)
 };
 
 export type WeekDayView = {
@@ -110,7 +112,7 @@ export async function buildWeekPlanView(
     const slot = b.rotation_slot === 'sang' ? 'sang' : b.rotation_slot === 'chieu' ? 'chieu' : (vn.getUTCHours() < 12 ? 'sang' : 'chieu');
     if (slot === 'sang') a.ranMorning = true; else a.ranAfternoon = true;
     const psl = b.plan_slot || null;
-    const item: WeekCellItem = { text: String(r.title || '(không tên)'), state: 'done', contentId: String(r.id), time: psl?.time, channel: psl?.channel, group: psl?.group_label ?? null };
+    const item: WeekCellItem = { text: String(r.title || '(không tên)'), state: 'done', contentId: String(r.id), time: psl?.time, channel: psl?.channel, group: psl?.group_label ?? null, slotIndex: psl && Number.isInteger(Number(psl.index)) ? Number(psl.index) : undefined };
     if (b.post_kind === 'content' || b.rotation_group === 'Bài content') {
       if (!a.content) a.content = item;
       continue;
@@ -175,10 +177,6 @@ export async function buildWeekPlanView(
 
   // Số bài/ngày + nhóm chia sẻ đọc từ LỊCH ĐĂNG CỐ ĐỊNH (app_config mkt_posting_plan).
   const pp = await loadPostingPlan(client);
-  // 15/9: lô 4 nhóm/ngày cho cả tuần (nhóm ghim ở lịch luôn nằm trong lô ngày đó).
-  const pinnedByDate: Record<string, string[]> = {};
-  for (const date of dayDates) pinnedByDate[date] = slotsForDate(pp.plan, date, pp.shareGroups).map((s) => s.group_id || '').filter(Boolean);
-  const lots = await planShareLots(client, dayDates, pinnedByDate, now);
 
   // Rút n hướng dự kiến cho 1 lượt chạy: mỗi bài trong lượt phải KHÁC sản phẩm
   // (usedInThisRun của rotate); hết hướng hợp lệ thì ô đó rơi về "theo trọng số".
@@ -221,7 +219,10 @@ export async function buildWeekPlanView(
     const mSale = daySlots.filter((s) => s.window === 'sang' && s.kind === 'sale');
     const aSale = daySlots.filter((s) => s.window === 'chieu' && s.kind === 'sale');
     const cSlot = daySlots.find((s) => s.kind === 'content') || null;
-    const decorate = (items: WeekCellItem[], slots: EffectiveSlot[]) => items.map((it, k) => (it.time ? it : { ...it, time: slots[k]?.time, channel: slots[k]?.channel, group: slots[k]?.group_label ?? null }));
+    const decorate = (items: WeekCellItem[], slots: EffectiveSlot[]) => items.map((it, k) => {
+      const sl = it.slotIndex !== undefined ? slots.find((x) => x.index === it.slotIndex) || slots[k] : slots[k];
+      return it.time ? { ...it, slotIndex: it.slotIndex ?? sl?.index } : { ...it, time: sl?.time, channel: sl?.channel, group: sl?.group_label ?? null, slotIndex: sl?.index };
+    });
 
     let morning: WeekCellItem[] = actual?.morning ? [...actual.morning] : [];
     let afternoonSale: WeekCellItem[] = actual?.afternoon ? [...actual.afternoon] : [];
@@ -234,12 +235,16 @@ export async function buildWeekPlanView(
       }
       if (!(isToday && actual?.ranAfternoon)) {
         if (afternoonSale.length < aSale.length) afternoonSale = [...afternoonSale, ...draw(date, aSale.slice(afternoonSale.length))];
-        if (!content && cSlot) content = { text: ck?.label || 'Content', state: 'planned', time: cSlot.time, channel: cSlot.channel, group: cSlot.group_label };
+        if (!content && cSlot) content = { text: ck?.label || 'Content', state: 'planned', time: cSlot.time, channel: cSlot.channel, group: cSlot.group_label, slotIndex: cSlot.index };
       }
       morning = decorate(morning, mSale);
       afternoonSale = decorate(afternoonSale, aSale);
-      if (content && !content.time && cSlot) content = { ...content, time: cSlot.time, channel: cSlot.channel, group: cSlot.group_label };
+      if (content && !content.time && cSlot) content = { ...content, time: cSlot.time, channel: cSlot.channel, group: cSlot.group_label, slotIndex: cSlot.index };
     }
+    if (content && content.slotIndex === undefined && cSlot) content = { ...content, slotIndex: cSlot.index };
+    // Bài thật cũ không có plan_slot: gán ô theo thứ tự giờ để có lô nhóm.
+    morning = morning.map((it, k) => (it.slotIndex === undefined ? { ...it, slotIndex: mSale[k]?.index } : it));
+    afternoonSale = afternoonSale.map((it, k) => (it.slotIndex === undefined ? { ...it, slotIndex: aSale[k]?.index } : it));
 
     const groups = groupsForDate(pp.plan, date, pp.shareGroups);
 
@@ -254,11 +259,27 @@ export async function buildWeekPlanView(
       contentLabel: ck?.label || 'Content',
       contentPurpose: ck ? CONTENT_PURPOSE[ck.kind] : undefined,
       groups,
-      lot: lots[date] || null,
+      lot: null, // điền sau khi tính lô theo ô (bên dưới)
       contentWindow: cSlot ? cSlot.window : 'chieu',
       overridden: daySlots[0]?.overridden ?? false,
     };
   });
+
+  // 16/9: LÔ NHÓM THEO TỪNG Ô ĐĂNG (mỗi buổi Facebook 4 nhóm). Ghép contentId của bài thật vào ô.
+  const slotsByDate: Record<string, SlotLotInput[]> = {};
+  for (const d of days) {
+    const rows = weekRowsOf(d);
+    slotsByDate[d.date] = slotsForDate(pp.plan, d.date, pp.shareGroups).map((s) => {
+      const row = rows.find((r) => r.slotIndex === s.index);
+      return { index: s.index, time: s.time, kind: s.kind, channel: s.channel, group_id: s.group_id, contentId: row?.contentId || null };
+    });
+  }
+  const lots = await planShareLots(client, slotsByDate, now);
+  for (const d of days) {
+    d.lot = lots[d.date] || null;
+    const attach = (it: WeekCellItem | null) => { if (it && d.lot) it.lot = d.lot.slots.find((s) => s.index === it.slotIndex) || null; };
+    d.morning.forEach(attach); d.afternoonSale.forEach(attach); attach(d.content);
+  }
 
   return { window: win, days, hasFallback, productsWithImages };
 }
