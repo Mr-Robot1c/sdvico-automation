@@ -405,6 +405,10 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     }
     if (!viol.length && !worn.length && !mustMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate) break;
   }
+  // 17/9 tối (bản 492313ac: cảnh GIẢI PHÁP bị cắt rỗng vì dính cụm cấm nên biến mất, video bán hàng
+  // không còn cảnh sản phẩm): giữ bản gốc từng cảnh; cắt xong mà rỗng thì KHÔI PHỤC lời gốc (chấp
+  // nhận sót 1 cụm cấm còn hơn mất cả nhịp cấu trúc).
+  const originalNarrations = (parsed.vertical?.scenes || []).map((s) => String(s?.narration || ''));
   if (viol.length) {
     // Dự phòng: cắt câu sai khỏi từng cảnh, cảnh rỗng sẽ bị fix() loại.
     for (const k of ['vertical', 'horizontal']) {
@@ -425,6 +429,13 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     }
     console.warn('[script] da cat cau nhac san pham khac / phan tram khong nguon / cum da mon:', bad.join(', '));
   }
+  // Khôi phục cảnh bị cắt rỗng (mọi đường cắt ở trên).
+  (parsed.vertical?.scenes || []).forEach((sc, i) => {
+    if (!String(sc?.narration || '').trim() && originalNarrations[i]) {
+      sc.narration = originalNarrations[i];
+      console.warn(`[script] canh ${i + 1} (${sc?.role || '?'}) bi cat rong — khoi phuc loi goc de khong mat canh.`);
+    }
+  });
 
   // 17/9 vòng 6: sinh lại vẫn dài thì CẮT câu cuối của empathy (rồi hook) cho hình máy vào trước giây 15.
   if (solutionLate && parsed.vertical?.scenes) {
@@ -483,9 +494,15 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     const code = (guardName.match(/[A-Za-z]{2,}-?\d+\w*/) || [])[0] || guardName;
     const anyHas = vertical.some((s) => norm(s.narration).includes(norm(guardName)) || norm(s.narration).includes(norm(code)));
     if (!anyHas) {
-      const sol = vertical.find((s) => s.role === 'solution') || vertical[vertical.length - 1];
-      sol.narration = `Đây là ${guardName}! ${sol.narration}`;
-      console.warn(`[script] loi thoai mat ten "${guardName}" (thuong do cat cau) — da chen cau ten vao canh giai phap.`);
+      // 17/9 tối: CHỈ chèn vào cảnh giải pháp/thưởng/chốt — chèn vào cảnh nỗi đau là tên máy dính liền
+      // câu hỏng hóc (nghe như máy SDVICO hỏng, lỗi user đã mắng).
+      const sol = vertical.find((s) => ['solution', 'reward', 'closing'].includes(s.role));
+      if (sol) {
+        sol.narration = `Đây là ${guardName}! ${sol.narration}`;
+        console.warn(`[script] loi thoai mat ten "${guardName}" (thuong do cat cau) — da chen cau ten vao canh giai phap.`);
+      } else {
+        console.warn(`[script] loi thoai mat ten "${guardName}" nhung khong co canh giai phap de chen — bo qua.`);
+      }
     }
   }
   // 8/9: cảnh cuối video bán hàng phải có câu mốc giá đọc được (model quên thì nối vào).
