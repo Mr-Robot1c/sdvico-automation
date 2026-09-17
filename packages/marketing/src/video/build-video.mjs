@@ -17,7 +17,7 @@ import { generateVideoScript, stripGreeting } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
 import { getPriceTeaser, redactExactPrices, outroKeyword } from '../products.mjs';
-import { outroText as outroTextFor, outroScreenKeyword, mustUseRoleFor, modelMismatch } from './rules.mjs';
+import { outroText as outroTextFor, outroScreenKeyword, mustUseRoleFor } from './rules.mjs';
 import { pickFreshClips, clipLabel } from './fresh-clip.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { pythonCmd } from '../platform.mjs';
@@ -786,15 +786,8 @@ async function main() {
     const seen = new Set(assets.map((a) => a.id));
     for (const a of lifeAssets || []) if (!seen.has(a.id)) assets.push(a);
   }
-  // 17/9 vòng 4 (ChatGPT soi: video đọc SF300B nhưng nhãn trên máy trong ảnh ghi SF58B): tư liệu mang
-  // MÃ MODEL KHÁC bị loại khỏi kho dựng của video này (rules.mjs modelMismatch; 2 ảnh SF58B đã ghi chú
-  // vào description). Lọc cả pool lẫn danh sách chọn clip bắt buộc.
-  const mismatched = assets.filter((a) => modelMismatch(a, productGroup));
-  if (mismatched.length) {
-    console.warn(`Loại ${mismatched.length} tư liệu mang mã model khác:`, mismatched.map((a) => `"${String(a.title).slice(0, 45)}"`).join(', '));
-    assets = assets.filter((a) => !modelMismatch(a, productGroup));
-  }
-  const cleanProductAssets = productAssets.filter((a) => !modelMismatch(a, productGroup));
+  // 17/9 tối (user: "SF58B là gì kệ nó, cứ dùng bình thường, sản phẩm chỉ có trong catalog"): ĐÃ GỠ
+  // luật modelMismatch từng loại 2 ảnh dán nhãn SF58B — nhãn trên máy trong ảnh không quyết định model.
   const describedCount = assets.filter((a) => a.description).length;
   console.log(`Sản phẩm: ${productGroup} (${productAssets.length} tư liệu sản phẩm + ${assets.length - productAssets.length} tư liệu đời sống; ${describedCount}/${assets.length} có mô tả${describedCount < assets.length / 2 ? ' — chạy mo-ta-tu-lieu.mjs để khớp cảnh tốt hơn' : ''})`);
   // 9/9 (user: video "người thật tàu thật"): ÉP CLIP THẬT vào cảnh 1. Bài content: clip rotate
@@ -802,7 +795,7 @@ async function main() {
   // Không có clip mới -> null, video dựng như cũ (ảnh + clip cũ do model chọn).
   const contentVideo = productGroup === CONTENT_GROUP || brief.post_kind === 'content';
   let mustUseAssetId = brief.content_clip_id && assets.some((a) => a.id === brief.content_clip_id) ? brief.content_clip_id : null;
-  if (!mustUseAssetId) mustUseAssetId = pickFreshClips(cleanProductAssets)[0]?.id || null;
+  if (!mustUseAssetId) mustUseAssetId = pickFreshClips(productAssets)[0]?.id || null;
   // 17/9 chiều (user: video lọc nước mở màn "thợ máy sửa lần thứ ba" trên hình máy SEA-40 của công ty đang
   // chạy): clip sản phẩm đang chạy/lắp đặt vào cảnh GIẢI PHÁP, chỉ clip quay sự cố mới làm cảnh 1 (rules.mjs).
   const mustUseRole = mustUseRoleFor(assets.find((a) => a.id === mustUseAssetId), contentVideo);

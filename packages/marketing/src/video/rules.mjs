@@ -206,23 +206,3 @@ export function mustUseRoleFor(asset, contentVideo) {
   const text = `${asset.title || ''} ${asset.description || ''}`;
   return PROBLEM_CLIP_RE.test(text) ? 'hook' : 'solution';
 }
-
-// 17/9 vòng 4 (ChatGPT soi: video đọc "SF300B" nhưng nhãn trên máy trong ảnh ghi "SF58B" — 2 mã model
-// trong 1 video làm mất độ tin): tư liệu có MÃ MODEL KHÁC với sản phẩm của video thì loại khỏi kho
-// dựng. Mã nhận theo mẫu SF/SD/SEA + số; mô tả tư liệu nào nhắc mã lạ là bị chặn (2 ảnh SF58B đã được
-// ghi chú vào brand_assets.description ngày 17/9).
-const GROUP_MODELS = {
-  '9. Máy Lọc Dầu Diesel SD12-300': ['sf300b', 'sd12300', 'sd12'],
-  '6. Thiết bị lọc dầu SF-50': ['sf50'],
-  '2. Máy lọc nước biển SEA-40': ['sea40'],
-};
-export function modelMismatch(asset, group) {
-  const allowed = GROUP_MODELS[group];
-  if (!allowed) return false;
-  const t = `${asset?.title || ''} ${asset?.description || ''}`.toLowerCase();
-  const tokens = t.match(/\b(?:sf|sd|sea)\s?-?\s?\d+[a-z]?\b/gi) || [];
-  return tokens.some((tk) => {
-    const norm = tk.toLowerCase().replace(/[\s-]/g, '');
-    return !allowed.some((m) => norm === m || norm.startsWith(m));
-  });
-}
