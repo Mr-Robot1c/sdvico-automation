@@ -127,6 +127,9 @@ export function ruleScore(asset, role, opts = {}) {
     // 17/9 vòng 6 (ChatGPT: video cộng đồng "bằng chứng làm thật bị dồn về cuối"): cảnh story ưu tiên
     // hình NGƯỜI đang làm việc hơn tàu/cảng chung chung.
     if (role === 'story') s += count(t, ['kỹ thuật', 'thợ', 'thao tác', 'kiểm tra', 'lắp', 'sửa', 'nhân viên']) * 2;
+    // 17/9 vòng 7 (ChatGPT soi: clip story chọn theo TIÊU ĐỀ "thợ kiểm tra" nhưng khung hình toàn cận
+    // máy, người rõ mãi giây 14): mô tả ghi rõ không thấy người thì cảnh cần người tránh ra.
+    if (fold(t).includes('khong thay nguoi')) s -= 6;
     s -= count(t, SHINY_WORDS) * 3;
     if (isContentFolder) s += 3;            // đời sống nghề, tàu thật
     if (isVideoAsset(asset)) s += 2;        // cảnh vấn đề cần chuyển động

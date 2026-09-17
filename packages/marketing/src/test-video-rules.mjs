@@ -148,6 +148,14 @@ const blocks = buildBlocks('Sửa tới lần thứ ba trong tháng rồi mà m�
 ok('mọi mẩu phụ đề <= MAX_CHARS', blocks.every((b) => b.text.length <= MAX_CHARS), blocks.map((b) => b.text.length));
 ok('mẩu cuối kết đúng thời lượng', Math.abs(blocks[blocks.length - 1].end - 9) < 1e-9);
 ok('ghép mẩu = nguyên văn', blocks.map((b) => b.text).join(' ') === 'Sửa tới lần thứ ba trong tháng rồi mà máy vẫn cứ hỏng, anh thợ máy vừa lắc đầu vừa than.');
+// 17/9 vòng 7 (ChatGPT: "tuyệt đối không cắt giữa từ ghép"): miệt mài, trực tiếp phải liền nhau.
+const bMiet = buildBlocks('Anh em kỹ thuật đang miệt mài thao tác dữ lắm nha anh em ơi!', 6).map((b) => b.text);
+ok('không cắt giữa "miệt mài"', bMiet.every((t) => !t.endsWith('miệt')), bMiet);
+const bTruc = buildBlocks('Nhớ lại những ngày trực tiếp ra cảng hỗ trợ bà con mình.', 6).map((b) => b.text);
+ok('không cắt giữa "trực tiếp"', bTruc.every((t) => !t.endsWith('trực')), bTruc);
+const bTk = buildBlocks('Máy giúp bảo vệ bơm cao áp và tiết kiệm đáng kể chi phí nhiên liệu cho anh em!', 8).map((b) => b.text);
+ok('không cắt giữa "tiết kiệm đáng kể"', bTk.every((t) => !t.endsWith('tiết kiệm') && !t.endsWith('tiết')), bTk);
+
 // Câu 7e9cab1a từng bị cắt "trên boong hôi" / "rình với...": chia đều phải giữ "hôi rình" liền nhau.
 const b2 = buildBlocks('Thùng nước trên boong hôi rình với đục ngầu rồi anh ơi!', 6).map((b) => b.text);
 ok('không đứt cụm "hôi rình"', b2.some((t) => t.includes('hôi rình')), b2);

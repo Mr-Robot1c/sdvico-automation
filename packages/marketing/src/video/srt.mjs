@@ -18,6 +18,12 @@ const DANGLING = new Set(['từ', 'của', 'và', 'với', 'là', 'thì', 'mà',
 // Mã sản phẩm (SEA-40, SF300B...): không cắt ngay trước mã để mã đi liền với tên máy.
 const CODE_RE = /^[a-z]{2,}[-]?\d/i;
 
+// 17/9 vòng 7 (ChatGPT: "tuyệt đối không cắt giữa từ ghép như trực tiếp, miệt mài"): cặp âm tiết tạo
+// từ ghép hay gặp trong lời video — điểm cắt rơi vào giữa cặp thì phạt nặng. So không dấu, chữ thường.
+// ("kiệm đáng" không phải từ ghép nhưng chặn cắt "tiết kiệm | đáng kể".)
+const COMPOUND_PAIRS = new Set(['miet mai', 'truc tiep', 'tiet kiem', 'dang ke', 'kiem dang', 'tron ven', 'sach se', 'sinh hoat', 'ky thuat', 'thiet bi', 'dong co', 'nhien lieu', 'chi phi', 'bao ve', 'kim phun', 'cao ap', 'hanh trinh', 'chuyen bien', 'nuoc ngot', 'dau mo', 'ho tro', 'ba con', 'anh em', 'tho may', 'may moc', 'cam nhan', 'vat va', 'thao tac', 'kiem tra', 'lap dat', 'sua chua', 'xa bo', 'danh bat', 'thu hoach', 'ngu dan', 'can ban', 'tac nghen', 'thoai mai', 'chu dong', 'yen tam', 'an tam', 'duc ngau', 'loay hoay', 'khuc khac', 'nang gat', 'thuyen vien', 'cong lap', 'loi loc', 'vuon khoi', 'nho neo', 'van phong', 'man hinh', 'may tinh', 'cham tay', 'siet chat', 'con oc']);
+const foldWord = (w) => String(w || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]/g, '');
+
 // Chia một cụm dài thành 2 nửa gần bằng nhau tại ranh giới từ, ưu tiên điểm cắt đứng TRƯỚC từ nối;
 // nửa nào còn dài quá thì chia tiếp (đệ quy).
 function splitBalanced(text) {
@@ -31,8 +37,10 @@ function splitBalanced(text) {
     const next = words[i + 1].toLowerCase().replace(/[^\p{L}]/gu, '');
     // Cắt SAU mã sản phẩm là điểm ngắt đẹp (tên máy kết thúc bằng mã): thưởng thêm.
     // Cắt ngay sau CON SỐ trần thì số lìa đơn vị ("56 | triệu"): phạt. Cắt sau HƯ TỪ cũng phạt.
+    // Cắt GIỮA TỪ GHÉP ("miệt | mài", "trực | tiếp") phạt nặng nhất (17/9 vòng 7).
     const cur = words[i].toLowerCase().replace(/[^\p{L}]/gu, '');
-    const score = Math.abs(prefixLen - mid) - (CONNECTORS.has(next) ? 6 : 0) + (CODE_RE.test(words[i + 1]) ? 12 : 0) - (CODE_RE.test(words[i]) ? 6 : 0) + (/^\d+([.,]\d+)?$/.test(words[i]) ? 6 : 0) + (DANGLING.has(cur) ? 8 : 0);
+    const pair = `${foldWord(words[i])} ${foldWord(words[i + 1])}`;
+    const score = Math.abs(prefixLen - mid) - (CONNECTORS.has(next) ? 6 : 0) + (CODE_RE.test(words[i + 1]) ? 12 : 0) - (CODE_RE.test(words[i]) ? 6 : 0) + (/^\d+([.,]\d+)?$/.test(words[i]) ? 6 : 0) + (DANGLING.has(cur) ? 8 : 0) + (COMPOUND_PAIRS.has(pair) ? 14 : 0);
     if (score < bestScore) { bestScore = score; best = i; }
   }
   return [...splitBalanced(words.slice(0, best + 1).join(' ')), ...splitBalanced(words.slice(best + 1).join(' '))];
