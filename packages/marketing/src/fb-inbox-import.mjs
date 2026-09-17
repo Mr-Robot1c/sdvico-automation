@@ -8,7 +8,7 @@
 //
 // Cách chạy: node packages/marketing/src/fb-inbox-import.mjs <file.json> [--dry]
 // JSON: { page: "SDVICO VN", read_at: ISO, conversations: [ { name, messages: [ { from: "khach"|"page",
-//   text, time } ] } ] }  — time là chuỗi giờ VN dạng "2026-09-07 14:03" hoặc mô tả ("Wed", "25 Aug");
+//   text, time } ], labels: ["Intake","ad_id...."], ad: true|false } ] }  — time là chuỗi giờ VN dạng "2026-09-07 14:03" hoặc mô tả ("Wed", "25 Aug");
 //   không ép được thì để nguyên chuỗi, ghi vào raw_payload.
 // Mỗi hội thoại -> tối đa 1 lead mỗi lượt: tin KHÁCH gửi gần nhất (bỏ tin page, tin tự động, sticker).
 // MỐC LỌC (Thanh 9/9: "chỉ lấy tin nhắn từ tháng 7 trở lên vì trước đó tôi không có can thiệp vào"):
@@ -110,24 +110,29 @@ for (const c of convs) {
     }
   }
   seen.add(k);
+  // 17/9: thẻ Meta "ad_id...." ở dòng danh sách = hội thoại bắt đầu từ quảng cáo -> nguồn facebook_ads
+  // (Thanh 17/9: "lấy nó để gán cũng được mà"). Thẻ bị Meta cắt chữ nên không có số ad, chỉ có cờ.
+  const labels = Array.isArray(c.labels) ? c.labels.map((x) => norm(x)).filter(Boolean) : [];
+  const fromAd = c.ad === true || labels.some((x) => /^ad_id/i.test(x));
   rows.push({
-    source: 'facebook_message',
+    source: fromAd ? 'facebook_ads' : 'facebook_message',
     fb_user_id: null,
     fb_user_name: name.slice(0, 120),
     fb_profile_url: PAGE_URL,
     message: norm(last.text).slice(0, 2000),
     status: 'new',
-    note: `Đọc từ hộp thư page SDVICO VN (phiên Chrome) ${String(data.read_at || '').slice(0, 10)}; tin khách gần nhất: ${last.time || '?'}; ${khach.length} tin khách`,
+    note: `${fromAd ? 'Từ quảng cáo Facebook (thẻ ad_id trong hộp thư). ' : ''}Đọc từ hộp thư page SDVICO VN (phiên Chrome) ${String(data.read_at || '').slice(0, 10)}; tin khách gần nhất: ${last.time || '?'}; ${khach.length} tin khách`,
     raw_payload: {
       source: 'inbox_chrome', page_label: 'real', conversation: name, created_time: last.time || null,
+      labels, from_ad: fromAd,
       customer_messages: khach.length, all_customer_texts: khach.slice(-5).map((m) => norm(m.text).slice(0, 300)),
       read_at: data.read_at || null, run_file: basename(file),
     },
   });
 }
 
-console.log(`hoi thoai: ${convs.length} | lead moi: ${rows.length} | bo qua: ${skipped.length} | tin khach truoc ${INBOX_SINCE_LABEL} da loai: ${oldMsgs}`);
-for (const r of rows) console.log('  +', r.fb_user_name, '|', r.message.slice(0, 70));
+console.log(`hoi thoai: ${convs.length} | lead moi: ${rows.length} (tu quang cao: ${rows.filter((r) => r.source === 'facebook_ads').length}) | bo qua: ${skipped.length} | tin khach truoc ${INBOX_SINCE_LABEL} da loai: ${oldMsgs}`);
+for (const r of rows) console.log('  +', r.fb_user_name, r.source === 'facebook_ads' ? '[ADS]' : '', '|', r.message.slice(0, 70));
 for (const s of skipped) console.log('  -', s.name, '|', s.why);
 let inserted = 0; let err = null;
 if (DRY) { console.log('(dry, khong ghi)'); }
@@ -136,7 +141,7 @@ else if (rows.length) {
   if (r.ok) inserted = rows.length; else err = `HTTP ${r.status} ${(await r.text()).slice(0, 200)}`;
 }
 if (!DRY) {
-  await runLog(err ? 'error' : 'ok', { file: basename(file), conversations: convs.length, inserted, skipped: skipped.length, old_messages_dropped: oldMsgs, since: INBOX_SINCE_LABEL, error: err });
+  await runLog(err ? 'error' : 'ok', { file: basename(file), conversations: convs.length, inserted, from_ads: rows.filter((r) => r.source === 'facebook_ads').length, skipped: skipped.length, old_messages_dropped: oldMsgs, since: INBOX_SINCE_LABEL, error: err });
   console.log(err ? 'LOI ' + err : `da ghi ${inserted} lead`);
 }
 process.exitCode = err ? 1 : 0;
