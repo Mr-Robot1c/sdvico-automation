@@ -320,8 +320,9 @@ export default function ShareGroups({
                     Mỗi ngày {size} nhóm, mỗi nhóm 1 bài, xoay đều để 7 ngày phủ hết. Dán link, bấm Post trong group rồi bấm ✓ Đã chia.
                   </p>
                 ) : null}
+                {/* 17/9: lot đã tải về mà vẫn rỗng thì nói đúng lý do, đừng treo chữ "Đang tải". */}
                 {items.length === 0 ? (
-                  <p className="sub" style={{ margin: '0 0 8px' }}>{groups.length ? 'Đang tải lô hôm nay...' : 'Chưa có group nào. Thêm bên dưới.'}</p>
+                  <p className="sub" style={{ margin: '0 0 8px' }}>{!groups.length ? 'Chưa có group nào. Thêm bên dưới.' : lot ? 'Các nhóm đều đã nhận bài hôm nay — bấm "Xem tất cả" nếu vẫn muốn chia.' : 'Đang tải lô hôm nay...'}</p>
                 ) : (
                   <ul style={{ listStyle: 'none', margin: '0 0 8px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {items.map(renderRow)}

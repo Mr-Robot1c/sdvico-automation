@@ -191,5 +191,25 @@ export async function lotForContent(client: Client, contentId: string): Promise<
     const full = base.allGroups.find((g) => g.id === it.id);
     return { id: it.id, label: it.label, url: it.url, sharedToday: it.done ? (full?.sharedToday || { id: 'da-ghi', content_id: contentId, shared_at: '' }) : null, sharedThisPost: it.done, lastSharedAt: full?.lastSharedAt || null, daysSince: full?.daysSince ?? null };
   });
-  return { date, lotSize: sl.lotSize, doneToday: sl.done, lot, allGroups: base.allGroups };
+  // 17/9 (Thanh: "hôm nay cái lô group không hiện"): bài xếp ô HÔM QUA nhưng đăng trễ sáng nay
+  // -> ô 'past' không rút bù nhóm -> lô rỗng, popover kẹt "Đang tải lô hôm nay...". Popover là
+  // công cụ HÀNH ĐỘNG (bài đã đăng, người đang cần chia), nên lô thiếu thì bù nhóm theo thứ tự
+  // ưu tiên của lô ngày (chưa chia hôm nay, lâu nhất trước). Bảng Kế hoạch (planShareLots) giữ
+  // nguyên: ô quá khứ vẫn chỉ ghi nhóm đã chia thật.
+  const target = Math.max(Number(sl.lotSize) || 0, base.lotSize);
+  if (lot.length < target) {
+    const seen = new Set(lot.map((x) => x.id));
+    const oldestFirst = [...base.allGroups].sort((a, b) => {
+      const ta = a.lastSharedAt ? new Date(a.lastSharedAt).getTime() : 0;
+      const tb = b.lastSharedAt ? new Date(b.lastSharedAt).getTime() : 0;
+      return ta - tb;
+    });
+    for (const g of [...base.lot, ...oldestFirst]) {
+      if (lot.length >= target) break;
+      if (seen.has(g.id) || g.sharedToday) continue;
+      seen.add(g.id);
+      lot.push(g);
+    }
+  }
+  return { date, lotSize: target, doneToday: sl.done, lot, allGroups: base.allGroups };
 }
