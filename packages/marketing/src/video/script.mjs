@@ -474,13 +474,18 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   }
   // 17/9 vòng 7 (cắt câu chứa "sạch bóng" làm mất luôn tên máy — video bán hàng đọc "Thiết bị có độ
   // lọc..." không ai biết máy gì): cảnh giải pháp phải GỌI TÊN sản phẩm; mất thì chèn câu tên lên đầu.
-  if (!opts.contentVideo && shownName && vertical.length) {
+  // 17/9 tối: SEA-40 không có PUBLIC_NAME nên chốt này từng bị bỏ qua (video mất tên máy khi câu chứa
+  // tên bị cắt vì cụm cấm) — thiếu tên công khai thì lấy tên nhóm bỏ số thứ tự ("Máy lọc nước biển SEA-40").
+  const guardName = shownName || (!opts.contentVideo && opts.productGroup ? String(opts.productGroup).replace(/^\d+\.\s*/, '').trim() : null);
+  if (!opts.contentVideo && guardName && vertical.length) {
     const norm = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ');
-    const anyHas = vertical.some((s) => norm(s.narration).includes(norm(shownName)));
+    // Chấp nhận tên đầy đủ HOẶC riêng mã máy (model hay viết "máy SEA-40" thay vì nguyên tên nhóm).
+    const code = (guardName.match(/[A-Za-z]{2,}-?\d+\w*/) || [])[0] || guardName;
+    const anyHas = vertical.some((s) => norm(s.narration).includes(norm(guardName)) || norm(s.narration).includes(norm(code)));
     if (!anyHas) {
       const sol = vertical.find((s) => s.role === 'solution') || vertical[vertical.length - 1];
-      sol.narration = `Đây là ${shownName}! ${sol.narration}`;
-      console.warn(`[script] loi thoai mat ten "${shownName}" (thuong do cat cau) — da chen cau ten vao canh giai phap.`);
+      sol.narration = `Đây là ${guardName}! ${sol.narration}`;
+      console.warn(`[script] loi thoai mat ten "${guardName}" (thuong do cat cau) — da chen cau ten vao canh giai phap.`);
     }
   }
   // 8/9: cảnh cuối video bán hàng phải có câu mốc giá đọc được (model quên thì nối vào).

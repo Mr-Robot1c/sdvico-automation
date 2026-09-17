@@ -7,7 +7,7 @@
 //   node packages/marketing/src/video/build-video.mjs [contentId] [--voice vi-VN-HoaiMyNeural] [--out DIR]
 import { createClient } from '@supabase/supabase-js';
 import { spawn } from 'node:child_process';
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, copyFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { loadRealEnv } from './env.mjs';
@@ -284,7 +284,9 @@ async function localTTSWav(text, workDir, tag) {
   const r = await fetch(base + '/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, ...(voiceStyle ? { temperature: voiceStyle.temperature } : {}) }),
+    // 17/9 tối (user: "chất giọng cứ khác nhau hoài"): BỎ nhiệt độ theo loại bài (0,8..0,9 mỗi video một
+    // màu) — MỘT nhiệt độ cố định cho mọi video/cảnh. TTS_LOCAL_TEMP đổi được, mặc định 0.8.
+    body: JSON.stringify({ text, temperature: Number(process.env.TTS_LOCAL_TEMP || 0.8) || 0.8 }),
     signal: AbortSignal.timeout(180000),
   });
   if (!r.ok) throw new Error('local-tts HTTP ' + r.status + ': ' + (await r.text().catch(() => '')).slice(0, 120));
@@ -322,7 +324,10 @@ const OUTRO_PROSODY = { semiDelta: 0, tempoMul: 1.0 };
 // 10/9 (3): tidy.py làm luôn cắt đầu đuôi + nén lặng bên trong + mờ dần (xem ghi chú TRIM ở trên)
 // và trả f0 của khúc đã dọn. Trả { path (WAV đã dọn), semi }. tidy.py lỗi -> dùng WAV gốc, semi 0.
 const TTS_F0_TARGET = Number(process.env.TTS_F0_TARGET || 240) || 240;
-async function tidyWav(wav, workDir, tag) {
+// opts.normalize=false (17/9 tối, user: "chất giọng cứ khác nhau hoài, fix 1 lần luôn"): các khúc cắt
+// từ CÙNG MỘT lần gọi VieNeu (whole-take) không được kéo cao độ nữa — asetrate đổi formant, mỗi khúc
+// kéo một lượng khác nhau chính là thủ phạm "mỗi cảnh một giọng".
+async function tidyWav(wav, workDir, tag, { normalize = true } = {}) {
   const out = join(workDir, `${tag}_tidy.wav`);
   try {
     const res = await python('tidy.py', [wav, out]);
@@ -331,7 +336,7 @@ async function tidyWav(wav, workDir, tag) {
     // 11/9: dịch bằng asetrate đổi luôn màu giọng (formant), kéo 1,5 nửa cung là nghe như người khác
     // (Thanh: "2 giọng"). Kẹp ±1,0 nửa cung (≈6%, formant lệch ít) thay vì ±2,5; ffmpeg đóng gói
     // không có rubberband để giữ formant.
-    if (process.env.TTS_F0_NORMALIZE !== 'off' && f0 && n >= 10) {
+    if (normalize && process.env.TTS_F0_NORMALIZE !== 'off' && f0 && n >= 10) {
       semi = Math.max(-1.0, Math.min(1.0, 12 * Math.log2(TTS_F0_TARGET / f0)));
     }
     if (cuts) console.log(`  (${tag}: nén ${cuts} khoảng lặng bên trong khúc)`);
@@ -340,6 +345,87 @@ async function tidyWav(wav, workDir, tag) {
     console.warn(`  (${tag}: tidy.py lỗi "${String(e?.message || e).slice(0, 80)}", dùng khúc gốc, không chuẩn hoá cao độ)`);
     return { path: wav, semi: 0 };
   }
+}
+
+// ============ MỘT HƠI ĐỌC (17/9 tối, user: "chất giọng cứ khác nhau hoài, fix 1 lần luôn") ============
+// Gốc bệnh: mỗi cảnh một lần gọi VieNeu -> màu giọng trôi giữa các lần gọi (f0 219..258 Hz), code phải
+// kéo từng cảnh về 240 Hz bằng asetrate -> formant mỗi cảnh lệch một kiểu = "mỗi cảnh một giọng".
+// Trị tận gốc: CẢ VIDEO (mọi cảnh + outro) đọc bằng MỘT lần gọi VieNeu = một dòng lấy mẫu, một màu
+// giọng, cao độ tự liền mạch -> KHÔNG kéo cao độ nữa. Cắt thành cảnh tại KHOẢNG LẶNG gần mốc tỷ lệ
+// ký tự (như splitAtSilence nhưng N mốc). Không tìm đủ khoảng lặng -> trả null, rơi về cách cũ.
+async function detectSilences(wavPath) {
+  const { FFMPEG } = await import('./ffmpeg.mjs');
+  const { spawn } = await import('node:child_process');
+  const args = ['-i', wavPath, '-af', 'silencedetect=noise=-30dB:d=0.12', '-f', 'null', '-'];
+  const stderr = await new Promise((resolve, reject) => {
+    const p = spawn(FFMPEG, args, { windowsHide: true });
+    let err = '';
+    p.stderr.on('data', (d) => { err += d; });
+    p.on('close', () => resolve(err));
+    p.on('error', reject);
+  });
+  const starts = [];
+  const ends = [];
+  for (const line of String(stderr).split('\n')) {
+    const a = line.match(/silence_start: ([\d.]+)/);
+    if (a) starts.push(parseFloat(a[1]));
+    const b = line.match(/silence_end: ([\d.]+)/);
+    if (b) ends.push(parseFloat(b[1]));
+  }
+  const out = [];
+  for (let i = 0; i < Math.min(starts.length, ends.length); i++) out.push({ start: starts[i], end: ends[i], mid: (starts[i] + ends[i]) / 2, len: ends[i] - starts[i] });
+  return out;
+}
+
+// texts: lời từng khúc (cảnh 0..n-1, khúc cuối là outro). Trả mảng đường dẫn mp3 theo thứ tự, hoặc null.
+async function localTTSWholeTake(texts, workDir, tag = 'take') {
+  const cleaned = texts.map((t) => spellPhones(cleanNarration(t)));
+  if (cleaned.some((t) => !t)) return null;
+  const full = cleaned.join('\n\n');
+  const wav = await localTTSWav(full, workDir, tag);
+  const total = await probeDuration(wav);
+  const perChar = total / full.replace(/\s+/g, ' ').length;
+  // Đọc quá nhanh/chậm so với ~14 ký tự/giây = VieNeu lặp hoặc nuốt chữ -> bỏ, về cách cũ.
+  if (perChar < 0.04 || perChar > 0.16) {
+    console.warn(`  (${tag}: một hơi đọc ${total.toFixed(1)}s cho ${full.length} ký tự — nghi lặp/nuốt chữ, về đọc từng cảnh)`);
+    return null;
+  }
+  const silences = (await detectSilences(wav)).filter((s) => s.start > 0.4 && s.end < total - 0.4);
+  const totalChars = cleaned.reduce((a, t) => a + t.length, 0);
+  const cuts = [];
+  let acc = 0;
+  let prev = 0;
+  for (let i = 0; i < cleaned.length - 1; i++) {
+    acc += cleaned[i].length;
+    const expect = (acc / totalChars) * total;
+    const win = Math.max(1.4, total * 0.08);
+    let best = null;
+    for (const s of silences) {
+      if (s.mid <= prev + 0.8 || Math.abs(s.mid - expect) > win) continue;
+      const score = Math.abs(s.mid - expect) - s.len * 0.5; // ưu tiên khoảng lặng dài (ranh giới cảnh)
+      if (!best || score < best.score) best = { mid: s.mid, score };
+    }
+    if (!best) {
+      console.warn(`  (${tag}: không thấy khoảng lặng quanh mốc ${expect.toFixed(1)}s — về đọc từng cảnh)`);
+      return null;
+    }
+    cuts.push(best.mid);
+    prev = best.mid;
+  }
+  const bounds = [0, ...cuts, total];
+  const outPaths = [];
+  for (let i = 0; i < cleaned.length; i++) {
+    const raw = join(workDir, `${tag}_c${i}.wav`);
+    await ffmpeg(['-y', '-i', wav, '-ss', bounds[i].toFixed(3), '-t', (bounds[i + 1] - bounds[i]).toFixed(3), '-c:a', 'pcm_s16le', raw]);
+    // Cùng một hơi đọc: KHÔNG kéo cao độ (normalize=false), chỉ dọn lặng + tempo chung.
+    const t = await tidyWav(raw, workDir, `${tag}_c${i}`, { normalize: false });
+    const mp3 = join(workDir, `${tag}_c${i}.mp3`);
+    const af = [livelyFilter(48000, { semiDelta: 0 }), sentenceGap(cleaned[i])].filter(Boolean).join(',');
+    await ffmpeg(['-y', '-i', t.path, ...(af ? ['-af', af] : []), '-c:a', 'libmp3lame', '-q:a', '4', mp3]);
+    outPaths.push(mp3);
+  }
+  console.log(`  (một hơi đọc: ${total.toFixed(1)}s cắt thành ${cleaned.length} khúc tại ${cuts.map((c) => c.toFixed(1)).join(', ')}s — một màu giọng, không kéo cao độ)`);
+  return outPaths;
 }
 
 async function localTTS(cleanText, outPath, workDir, tag) {
@@ -513,6 +599,33 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
       built = [];
       sceneAudios = [];
       let outroDone = false;
+      // 17/9 tối (user: "chất giọng cứ khác nhau hoài, fix 1 lần luôn"): giọng local đọc CẢ VIDEO một
+      // hơi (mọi cảnh + outro trong MỘT lần gọi VieNeu) rồi cắt tại khoảng lặng — một màu giọng, không
+      // kéo cao độ từng cảnh nữa. Cắt không được thì tự về đọc từng cảnh như cũ.
+      if (engine === 'local') {
+        const takePaths = await localTTSWholeTake([...scenes.map((s) => s.narration), OUTRO_TEXT], fdir)
+          .catch((e) => { console.warn(`  (một hơi đọc lỗi "${String(e?.message || e).slice(0, 100)}" — về đọc từng cảnh)`); return null; });
+        if (takePaths) {
+          for (let i = 0; i < scenes.length; i++) {
+            const audio = takePaths[i];
+            const dur = await probeDuration(audio);
+            sceneAudios.push(audio);
+            const asset = assetPaths.get(scenes[i].assetId);
+            built.push({
+              videoPath: asset.local,
+              audioPath: audio,
+              durationSec: dur,
+              text: scenes[i].narration,
+              kind: asset.kind === 'image' ? 'image' : 'video',
+              assetId: scenes[i].assetId,
+              role: scenes[i].role || null,
+            });
+          }
+          await copyFile(takePaths[scenes.length], outroAudio);
+          engineUsed = engine;
+          break;
+        }
+      }
       for (let i = 0; i < scenes.length; i++) {
         const s = scenes[i];
         const audio = join(fdir, `sc${i}.mp3`);
