@@ -10,8 +10,11 @@ export const MAX_CHARS = 40; // mỗi mẩu tối đa ~40 ký tự
 
 // Từ nối hay đứng ĐẦU vế mới: cắt ngay trước các từ này thì mẩu trước trọn ý ("...hôi rình" | "với đục
 // ngầu..."), cắt sau chúng thì đứt cụm. Chia đều thuần ký tự từng cắt "trên boong hôi" / "rình với...".
-const CONNECTORS = new Set(['với', 'rồi', 'mà', 'thì', 'là', 'để', 'cho', 'nên', 'vì', 'và', 'hay', 'hoặc', 'đành', 'chứ', 'nhưng', 'khi', 'lúc', 'nếu', 'bằng', 'trong', 'ngoài', 'trên', 'dưới', 'vừa', 'suốt', 'sau', 'trước', 'giữa', 'theo', 'như', 'về']);
-// (không đưa 'còn' vào: 'chỉ còn 3 X triệu' mà cắt trước 'còn' là đứt cụm giá)
+const CONNECTORS = new Set(['với', 'rồi', 'mà', 'thì', 'là', 'để', 'cho', 'nên', 'vì', 'và', 'hay', 'hoặc', 'đành', 'chứ', 'nhưng', 'khi', 'lúc', 'nếu', 'bằng', 'trong', 'ngoài', 'vừa', 'suốt', 'giữa', 'theo', 'như', 'về']);
+// (không đưa 'còn', 'trước', 'sau', 'trên', 'dưới' vào: "chỉ còn 3 X triệu", "chuyến trước", "trên boong"
+// mà cắt ngay trước các chữ này là đứt cụm — bản dựng 17/9 tối từng ra "chuyến / trước loay hoay")
+// Hư từ KHÔNG được đứng cuối dòng ("với độ lọc từ" | "1 tới 10..." đọc rất cụt): phạt điểm cắt sau chúng.
+const DANGLING = new Set(['từ', 'của', 'và', 'với', 'là', 'thì', 'mà', 'để', 'cho', 'nên', 'vì', 'đã', 'đang', 'sẽ', 'rất', 'giúp', 'bằng', 'tới', 'đến', 'các', 'những', 'một', 'chỉ', 'còn', 'trong', 'trên', 'dưới', 'khi', 'lúc', 'vừa', 'cũng', 'lại', 'như', 'theo', 'về', 'bị', 'được', 'có', 'không', 'chưa', 'đừng', 'phải']);
 // Mã sản phẩm (SEA-40, SF300B...): không cắt ngay trước mã để mã đi liền với tên máy.
 const CODE_RE = /^[a-z]{2,}[-]?\d/i;
 
@@ -27,8 +30,9 @@ function splitBalanced(text) {
     const prefixLen = words.slice(0, i + 1).join(' ').length;
     const next = words[i + 1].toLowerCase().replace(/[^\p{L}]/gu, '');
     // Cắt SAU mã sản phẩm là điểm ngắt đẹp (tên máy kết thúc bằng mã): thưởng thêm.
-    // Cắt ngay sau CON SỐ trần thì số lìa đơn vị ("56 | triệu"): phạt.
-    const score = Math.abs(prefixLen - mid) - (CONNECTORS.has(next) ? 6 : 0) + (CODE_RE.test(words[i + 1]) ? 12 : 0) - (CODE_RE.test(words[i]) ? 6 : 0) + (/^\d+([.,]\d+)?$/.test(words[i]) ? 6 : 0);
+    // Cắt ngay sau CON SỐ trần thì số lìa đơn vị ("56 | triệu"): phạt. Cắt sau HƯ TỪ cũng phạt.
+    const cur = words[i].toLowerCase().replace(/[^\p{L}]/gu, '');
+    const score = Math.abs(prefixLen - mid) - (CONNECTORS.has(next) ? 6 : 0) + (CODE_RE.test(words[i + 1]) ? 12 : 0) - (CODE_RE.test(words[i]) ? 6 : 0) + (/^\d+([.,]\d+)?$/.test(words[i]) ? 6 : 0) + (DANGLING.has(cur) ? 8 : 0);
     if (score < bestScore) { bestScore = score; best = i; }
   }
   return [...splitBalanced(words.slice(0, best + 1).join(' ')), ...splitBalanced(words.slice(best + 1).join(' '))];
