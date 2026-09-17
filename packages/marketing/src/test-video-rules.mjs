@@ -19,6 +19,7 @@ const ok = (name, cond, got) => cases.push({ name, ok: !!cond, got });
 eq('lọc nước: bắt "lọc dầu"', crossProductViolations('Lọc dầu ngao ngán lúc đứng dưới khoang tàu.', G2), ['lọc dầu']);
 eq('lọc dầu: bắt "nước ngọt" (492313ac mở màn nước ngọt)', crossProductViolations('Lúc ra khơi đầy ắp nước ngọt, lúc về bến hầm chứa cạn khô', G9), ['nước ngọt']);
 eq('lọc dầu: "tách nước trong dầu" KHÔNG bị bắt (tính năng SF300B)', crossProductViolations('Máy tách nước lẫn trong dầu, kim phun sạch.', G9), []);
+eq('lọc dầu: bắt "ca nước" (492313ac dựng lại vẫn chia từng ca nước)', crossProductViolations('tàu mình loay hoay chia từng ca nước để rửa máy lọc', G9), ['ca nước']);
 eq('lọc nước: câu sạch', crossProductViolations('Nước ngọt lọc ra dùng thoải mái cả chuyến.', G2), []);
 eq('content: không có nhóm -> không bắt', crossProductViolations('lọc dầu lọc nước gì cũng nói', CONTENT_GROUP), []);
 ok('SF-50 dùng chung luật với SD12-300', crossProductTerms('6. Thiết bị lọc dầu SF-50') === CROSS_PRODUCT_TERMS[G9]);

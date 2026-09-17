@@ -12,7 +12,8 @@
 // Sản phẩm "kia" của cặp lọc dầu / lọc nước: video nhóm này KHÔNG được nhắc từ của nhóm kia.
 // SF300B có tách nước lẫn trong dầu, nên với video lọc dầu chỉ cấm cụm chỉ MÁY lọc nước và nước
 // uống, không cấm chữ "nước" trần.
-const WATER_TERMS = ['lọc nước', 'máy lọc nước', 'nước ngọt', 'nước lợ', 'nước mặn', 'nước biển thành nước'];
+// 17/9 (2): bản dựng lại 492313ac (lọc dầu) vẫn mở màn "chia từng ca nước để rửa máy" -> thêm cụm nỗi đau thiếu nước.
+const WATER_TERMS = ['lọc nước', 'máy lọc nước', 'nước ngọt', 'nước lợ', 'nước mặn', 'nước biển thành nước', 'ca nước', 'thùng nước', 'trữ nước', 'nước trữ', 'chở nước', 'hụt nước', 'thiếu nước'];
 const FUEL_TERMS = ['lọc dầu', 'máy lọc dầu', 'bộ lọc dầu', 'cặn dầu', 'dầu bẩn', 'kim phun', 'bơm cao áp', 'tạp chất trong dầu'];
 export const CROSS_PRODUCT_TERMS = {
   '2. Máy lọc nước biển SEA-40': FUEL_TERMS,
