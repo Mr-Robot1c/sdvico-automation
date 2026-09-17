@@ -6,7 +6,7 @@ import { guardLines, guardViolations, stripViolatingSentences } from '../product
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
 import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool } from './scene-match.mjs';
-import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm } from './rules.mjs';
+import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -197,6 +197,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'ĐÂY LÀ VIDEO CỘNG ĐỒNG "NGƯỜI THẬT TÀU THẬT": dựng từ clip THẬT đội SDVICO quay tại tàu, cảng, xưởng. KHÔNG bán hàng, KHÔNG nhắc giá, KHÔNG kêu nhắn Page hay gọi điện. Sản phẩm chỉ xuất hiện khi bài nguồn kể tới, và chỉ như một phần câu chuyện.',
     `KIỂU KỂ CỦA VIDEO NÀY: "${STYLE.label}". Bám đúng kiểu này, không trộn kiểu khác.`,
     `CẢNH ĐẦU: ${STYLE.open}. Câu đầu tiên là câu người xem nghe đầu tiên, phải khác hẳn các video trước.`,
+    'CẢNH GIỮA PHẢI CÓ NGƯỜI LÀM VIỆC SỚM (17/9 vòng 6, ChatGPT: "bằng chứng làm thật bị dồn về cuối"): cảnh story ĐẦU TIÊN ưu tiên hình NGƯỜI SDVICO đang thao tác (kỹ thuật viên kiểm tra, lắp, sửa) — hình tàu, cảng, biển chỉ làm nền SAU đó.',
     'CẢNH GIỮA: kể chuyện có người: ai đang làm gì, vất vả chỗ nào, bà con nói gì. Chạm 1 chữ cảm xúc NGHỀ / TIỀN / RỦI RO / TỰ HÀO như bài nguồn. Không bịa tên người, con số không có trong bài nguồn. Địa điểm (tên cảng, tỉnh) chỉ nói nếu bài nguồn có. KỂ LẠI BẰNG LỜI CỦA MÌNH: giữ ý của bài nguồn nhưng KHÔNG chép nguyên câu, không lặp lại cụm từ của bài nguồn quá 5 chữ liền nhau.',
     `CẢNH CUỐI: ${STYLE.close}. Không lời kêu gọi bán hàng.`,
     `CỤM ĐÃ MÒN, CẤM DÙNG (đã lặp ở nhiều video trước, kể cả khi bài nguồn có): ${WORN_PHRASES.map((p) => `"${p}"`).join(', ')}. Muốn nói ý đó thì tìm cách nói khác.`,
@@ -209,6 +210,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       ? `CHỈ NÓI VỀ ĐÚNG SẢN PHẨM CỦA BÀI (17/9): toàn bộ lời thoại chỉ được nói về ${shownName || opts.productGroup}. CẤM nhắc sản phẩm kia hay nỗi đau của sản phẩm kia: ${crossTerms.map((p) => `"${p}"`).join(', ')}. Tình huống mất mát ở trên có nêu cả dầu lẫn nước thì CHỈ lấy vế thuộc sản phẩm này.`
       : '',
     hookTerm ? `CẢNH 1 PHẢI LỘ SẢN PHẨM SỚM (17/9 vòng 2): trong 2 câu đầu tiên phải có chữ "${hookTerm}" để người xem biết ngay video nói về chuyện ${hookTerm} trên tàu, không mở màn mơ hồ.` : '',
+    !opts.contentVideo ? 'HÌNH SẢN PHẨM PHẢI RA TRƯỚC GIÂY 15 (17/9 vòng 6, luật cứng): tổng lời cảnh hook + empathy TỐI ĐA 55 từ (~15 giây đọc) để cảnh giải pháp chiếu máy thật vào sớm. Gọi tên máy trong phụ đề KHÔNG thay được hình máy.' : '',
+    'CÂU KẾT QUẢ PHẢI CÓ HÌNH CHỨNG MINH (17/9 vòng 6): không nói "tuyệt đối", "đảm bảo 100%", "sạch bong" hay kết quả vận hành (máy nổ êm, dầu sạch) nếu tư liệu không quay được điều đó; thay bằng lợi ích MÔ TẢ ("nước sau lọc dùng cho sinh hoạt", "giữ dầu sạch hơn trước khi vào máy").',
     'TỶ LỆ PHẦN TRĂM (17/9, Điều cấm 5): CẤM mọi con số phần trăm ("40%", "gần 40 phần trăm chi phí") không có nguyên văn trong BÀI NGUỒN hoặc THÔNG SỐ ĐƯỢC PHÉP bên dưới. Không có thì nói "một phần lớn", "cả đống tiền".',
     'NỖI ĐAU LÀ CỦA TÀU CHƯA LẮP MÁY SDVICO (17/9 chiều): máy hỏng, sửa hoài, cặn, nước đục, cạn nước trong cảnh đầu và cảnh đồng cảm là chuyện của tàu CHƯA có thiết bị SDVICO. TUYỆT ĐỐI KHÔNG viết như thể máy SDVICO hỏng hay phải sửa; không đặt tên máy SDVICO vào câu tả sự cố.',
     'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển bị bỏ dở, tàu nằm bờ). Không lan man.',
@@ -327,6 +330,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   let pct = [];     // 17/9: phần trăm không có nguồn
   let hookMiss = false; // 17/9 vòng 2: cảnh 1 chưa có chữ sản phẩm (dầu / nước)
   let hookPinMiss = false; // 17/9 vòng 3: lời cảnh 1 không ăn nhập tư liệu cảnh 1 đã chọn trước
+  let solutionLate = false; // 17/9 vòng 6: lời trước cảnh giải pháp quá dài, hình máy ra muộn
   // 17/9: clip bắt buộc cảnh 1 — kịch bản mở màn không ăn nhập nội dung clip thì sinh lại 1 lần.
   const mustAsset = opts.mustUseAssetId ? assets.find((a) => a.id === opts.mustUseAssetId) : null;
   let mustMiss = false;
@@ -344,7 +348,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       + (!hookMiss ? '' :
       `\n\nLẦN TRƯỚC CẢNH 1 KHÔNG CÓ CHỮ "${hookTerm}" trong 2 câu đầu — người xem không biết video nói về gì. Viết lại cảnh 1 nêu thẳng chuyện ${hookTerm} trên tàu.`)
       + (!hookPinMiss ? '' :
-      `\n\nLẦN TRƯỚC LỜI CẢNH 1 KHÔNG ĂN NHẬP TƯ LIỆU CẢNH 1 ĐÃ CHỌN. Hình cảnh 1 là: ${String(hookPin?.description || hookPin?.title || '').replace(/\s+/g, ' ').slice(0, 220)}. Viết lại cảnh 1 tả đúng hình đó, không nhắc người hay vật không có trong hình.`);
+      `\n\nLẦN TRƯỚC LỜI CẢNH 1 KHÔNG ĂN NHẬP TƯ LIỆU CẢNH 1 ĐÃ CHỌN. Hình cảnh 1 là: ${String(hookPin?.description || hookPin?.title || '').replace(/\s+/g, ' ').slice(0, 220)}. Viết lại cảnh 1 tả đúng hình đó, không nhắc người hay vật không có trong hình.`)
+      + (!solutionLate ? '' :
+      '\n\nLẦN TRƯỚC LỜI TRƯỚC CẢNH GIẢI PHÁP QUÁ DÀI — hình máy ra sau giây 15. Rút hook + empathy xuống TỐI ĐA 55 từ tổng cộng, mỗi cảnh 2 câu ngắn.');
     const res = await generateWithRetry(ai, {
       model: MKT_MODEL,
       contents: user + extra,
@@ -373,6 +379,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     const firstNarr = String((parsed.vertical?.scenes || [])[0]?.narration || '').toLowerCase();
     hookMiss = !!hookTerm && !!firstNarr && !firstNarr.includes(hookTerm);
     if (hookMiss) console.warn(`[script] canh 1 chua co chu "${hookTerm}" (lan ${attempt + 1}) — nguoi xem khong biet video noi ve gi.`);
+    solutionLate = !opts.contentVideo && wordsBeforeSolution(parsed.vertical?.scenes || []) > 58;
+    if (solutionLate) console.warn(`[script] loi truoc canh giai phap ${wordsBeforeSolution(parsed.vertical?.scenes || [])} tu (> 58) — hinh may se ra muon (lan ${attempt + 1}).`);
     hookPinMiss = false;
     if (hookPin) {
       const first = (parsed.vertical?.scenes || [])[0];
@@ -395,7 +403,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         }
       }
     }
-    if (!viol.length && !worn.length && !mustMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss) break;
+    if (!viol.length && !worn.length && !mustMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate) break;
   }
   if (viol.length) {
     // Dự phòng: cắt câu sai khỏi từng cảnh, cảnh rỗng sẽ bị fix() loại.
@@ -418,6 +426,14 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     console.warn('[script] da cat cau nhac san pham khac / phan tram khong nguon / cum da mon:', bad.join(', '));
   }
 
+  // 17/9 vòng 6: sinh lại vẫn dài thì CẮT câu cuối của empathy (rồi hook) cho hình máy vào trước giây 15.
+  if (solutionLate && parsed.vertical?.scenes) {
+    const r = trimEarlyScenes(parsed.vertical.scenes, 58);
+    if (r.trimmed) {
+      parsed.vertical.scenes = r.scenes;
+      console.warn('[script] da cat bot loi hook/empathy de canh giai phap vao truoc giay 15 (17/9 vong 6)');
+    }
+  }
   const ids = new Set(assets.map((a) => a.id));
   // 15/9: tách 2 bước — lời thoại + "visual" ở trên; HÌNH khớp ở đây bằng scene-match.mjs (mô tả tư liệu +
   // luật vai cảnh). Bỏ hẳn fallback assets[i % n] (xoay vòng mù nội dung — gốc lỗi "nói máy hư mà chiếu máy mới").

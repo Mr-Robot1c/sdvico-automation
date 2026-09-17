@@ -93,6 +93,9 @@ export const EXTRA_WORN = [
   // 17/9 vòng 5 (ChatGPT 68/68/65): "thốt lên" lặp 3 vòng liền ở kiểu mở trích lời, "hoài niệm" /
   // "bám trụ" là văn phim thương hiệu, "sạch bong" là kết quả mạnh không hình nào chứng minh.
   'thốt lên', 'hoài niệm', 'bám trụ', 'sạch bong', 'thấu hiểu',
+  // 17/9 vòng 6 (ChatGPT: "câu kết quả không được quảng cáo mạnh hơn dữ liệu"): tuyệt đối, giòn tan,
+  // đội nón ra đi, lo trọn vẹn, vững tâm, hụt hẫng, vang lên; "sạch bóng" là biến thể của "sạch bong".
+  'tuyệt đối', 'giòn tan', 'đội nón', 'trọn vẹn', 'vững tâm', 'hụt hẫng', 'vang lên', 'sạch bóng',
 ];
 
 // Outro = MỘT câu, MỘT hành động (user 17/9 theo ChatGPT: "không nên vừa bảo gọi, vừa bảo comment,
@@ -208,4 +211,40 @@ export function mustUseRoleFor(asset, contentVideo) {
   if (contentVideo || !asset) return 'hook';
   const text = `${asset.title || ''} ${asset.description || ''}`;
   return PROBLEM_CLIP_RE.test(text) ? 'hook' : 'solution';
+}
+
+// 17/9 vòng 6 (ChatGPT: lọc dầu gọi tên SF300B ở giây 8 nhưng HÌNH máy tới giây 23 mới ra — "sản phẩm
+// bán hàng phải xuất hiện bằng hình trong 10 tới 15 giây"): tổng lời hook + empathy phải <= maxWords
+// (~15s đọc) để cảnh giải pháp (hình máy) vào sớm. Sinh lại không đạt thì CẮT câu cuối của empathy
+// (rồi của hook) cho tới khi đạt, giữ tối thiểu 1 câu mỗi cảnh.
+export function wordsBeforeSolution(scenes) {
+  let n = 0;
+  for (const s of Array.isArray(scenes) ? scenes : []) {
+    if (String(s?.role || '').toLowerCase() === 'solution') break;
+    n += String(s?.narration || '').trim().split(/\s+/).filter(Boolean).length;
+  }
+  return n;
+}
+export function trimEarlyScenes(scenes, maxWords = 58) {
+  const list = (Array.isArray(scenes) ? scenes : []).map((s) => ({ ...s }));
+  let trimmed = false;
+  const dropLastSentence = (scene) => {
+    const sents = String(scene.narration || '').trim().split(/(?<=[.!?…])\s+/).filter(Boolean);
+    if (sents.length < 2) return false;
+    scene.narration = sents.slice(0, -1).join(' ');
+    return true;
+  };
+  const early = () => list.filter((s) => String(s.role || '').toLowerCase() !== 'solution' || false);
+  void early;
+  let guard = 12;
+  while (wordsBeforeSolution(list) > maxWords && guard-- > 0) {
+    const idx = list.findIndex((s) => String(s.role || '').toLowerCase() === 'solution');
+    const before = idx < 0 ? list : list.slice(0, idx);
+    // Cắt từ cảnh SÁT cảnh giải pháp ngược lên (empathy trước, hook sau cùng).
+    let cut = false;
+    for (let i = before.length - 1; i >= 0 && !cut; i--) cut = dropLastSentence(before[i]);
+    if (!cut) break;
+    trimmed = true;
+  }
+  return { scenes: list, trimmed };
 }

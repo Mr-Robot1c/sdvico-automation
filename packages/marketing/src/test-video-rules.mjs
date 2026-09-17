@@ -3,7 +3,7 @@
 // tách cảnh giá, phụ đề ngắn dòng. Chạy: npm run test:video. Không cần mạng, không cần GEMINI_API_KEY.
 import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
-  stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm,
+  stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
 } from './video/rules.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
@@ -123,6 +123,23 @@ eq('clip xử lý sự cố -> cảnh 1', mustUseRoleFor({ title: 'Xử lý sự
 eq('clip kỹ thuật viên lắp đặt -> cảnh giải pháp', mustUseRoleFor({ title: 'Ky thuat vien lap dat may loc nuoc bien SDVICO', description: 'lap dat tren tau' }, false), 'solution');
 eq('video content luôn cảnh 1', mustUseRoleFor({ title: 'Máy lọc nước biển SDVICO hoạt động' }, true), 'hook');
 eq('không clip -> cảnh 1', mustUseRoleFor(null, false), 'hook');
+
+// 6e. Hình sản phẩm phải ra trước ~15 giây (vòng 6: lọc dầu gọi tên ở giây 8 nhưng hình máy giây 23).
+const earlyScenes = [
+  { role: 'hook', narration: 'Một hai ba bốn năm sáu bảy tám chín mười. Một hai ba bốn năm sáu bảy tám chín mười một hai ba bốn năm!' },
+  { role: 'empathy', narration: 'Một hai ba bốn năm sáu bảy tám chín mười một hai ba bốn năm. Một hai ba bốn năm sáu bảy tám chín mười!' },
+  { role: 'solution', narration: 'Cảnh máy.' },
+];
+eq('wordsBeforeSolution đếm đúng', wordsBeforeSolution(earlyScenes), 50);
+const rt = trimEarlyScenes(earlyScenes, 45);
+ok('tách bớt câu cho hình máy vào sớm', rt.trimmed && wordsBeforeSolution(rt.scenes) <= 45, wordsBeforeSolution(rt.scenes));
+ok('cắt câu cuối empathy trước, hook giữ nguyên', rt.scenes[0].narration === earlyScenes[0].narration && rt.scenes[1].narration.split(/(?<=[.!?])\s+/).length === 1);
+ok('cảnh giải pháp không bị đụng', rt.scenes[2].narration === 'Cảnh máy.');
+ok('đã đạt thì không cắt', !trimEarlyScenes([{ role: 'hook', narration: 'Ngắn.' }, { role: 'solution', narration: 'Máy.' }], 58).trimmed);
+// Cụm claim tuyệt đối vòng 6.
+for (const p of ['tuyệt đối', 'giòn tan', 'đội nón', 'sạch bóng', 'vững tâm']) {
+  ok(`EXTRA_WORN vòng 6 có "${p}"`, EXTRA_WORN.includes(p));
+}
 
 // 7. Phụ đề trọn ý (vòng 1: chữ leo giữa khung -> trần 40; vòng 5: cắt greedy đứt cụm "trên boong hôi" /
 // "rình với đục ngầu" -> chia theo câu, vế, rồi chia đều).
