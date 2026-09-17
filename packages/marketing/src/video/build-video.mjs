@@ -478,8 +478,12 @@ async function whisperArtifact(sceneAudios, workDir, tag) {
 // 11/9 (3) (Thanh: 2 câu outro = 2 lần gọi VieNeu = 2 màu giọng): outro MỘT câu, một "nha" ở cuối.
 // 17/9 (ChatGPT chấm: "video chỉ nên 1 CTA, outro 3-4 giây"; user: "rút còn bình luận thôi"): outro
 // chỉ còn "Bình luận <từ khóa>", bỏ nhắn Page + đọc số điện thoại. Câu ở rules.mjs (outroTextFor).
+// 17/9 vòng 2 (ChatGPT: video cộng đồng kêu "lọc dầu hay lọc nước" = lạc vai): video content từ khóa SDVICO.
+function outroKeywordVideo(productGroup) {
+  return productGroup === 'Content' ? 'SDVICO' : outroKeyword(productGroup);
+}
 function outroText(productGroup) {
-  return outroTextFor(outroKeyword(productGroup));
+  return outroTextFor(outroKeywordVideo(productGroup));
 }
 
 // opts.priceBadge / opts.badgeFromScene (8/9): tem giá úp mở trên hình, xem assemble.mjs.
@@ -573,7 +577,7 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
     if (pos > 0 && text.length) badgeOffsetSec = Math.max(0, last.durationSec * (pos / text.length) - 0.4);
     if (pos < 0) console.warn('  (tem giá: không thấy câu giá trong cảnh cuối, hiện tem từ đầu cảnh cuối)');
   }
-  await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio, priceBadge: opts.priceBadge || null, badgeFromScene, badgeOffsetSec, outroKeyword: outroScreenKeyword(outroKeyword(opts.productGroup)) });
+  await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio, priceBadge: opts.priceBadge || null, badgeFromScene, badgeOffsetSec, outroKeyword: outroScreenKeyword(outroKeywordVideo(opts.productGroup)) });
   const totalDur = await probeDuration(out);
   // 15/9 (Thanh: trang Video phải hiện "lấy tư liệu nào, dùng ở giây nào"): dòng thời gian từng cảnh.
   let t = 0;

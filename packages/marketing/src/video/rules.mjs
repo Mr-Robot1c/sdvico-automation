@@ -76,15 +76,31 @@ export function stripSentencesWith(text, phrases) {
 // Cụm sáo ChatGPT chỉ ra 17/9 (cả 3 video): giọng "video thương hiệu", ngư dân nghe 1 câu biết ngay quảng cáo.
 export const EXTRA_WORN = [
   'thuận buồm xuôi gió', 'đầy ắp khoang', 'xót cả ruột', 'xót ruột', 'lăn lộn', 'hại lắm nha',
-  'bảo vệ sức khỏe', 'thấu hiểu sóng gió', 'sóng gió ngoài khơi', 'lênh đênh bám biển', 'ngao ngán',
+  'bảo vệ sức khỏe', 'thấu hiểu sóng gió', 'sóng gió ngoài khơi', 'lênh đênh', 'ngao ngán',
   'mấy ai thấu hiểu', 'suốt hành trình dài',
+  // 17/9 vòng 2 (ChatGPT chấm lại 60/61/52: "vẫn còn một lớp sáo rỗng khác"): "May mà có" mở cảnh giải
+  // pháp ở CẢ 2 video bán hàng = khuôn mới; "chuyến lướt sóng", "trọn gói từ A tới Z" là văn AI.
+  'may mà có', 'tự dưng', 'đồng hành cùng bà con', 'lướt sóng', 'thấu hết', 'nhọc nhằn',
+  'trọn gói từ a tới z', 'từ a tới z', 'tấp nập kéo lưới', 'tiếc nuối', 'yên tâm bám biển', 'cực tốt',
+  'đổ sông đổ bể', 'đổ sông đổ biển', 'trôi tuột',
 ];
 
 // Outro = MỘT câu, MỘT hành động (user 17/9 theo ChatGPT: "không nên vừa bảo gọi, vừa bảo comment,
 // vừa bảo nhắn Page trong một đoạn cuối ngắn"). Một "nha" ở cuối, một lần gọi VieNeu (luật 11/9).
 // keyword: 'lọc dầu' | 'lọc nước' | 'lọc dầu hay lọc nước' (video content).
 export function outroText(keyword) {
+  // 17/9 vòng 2 (ChatGPT: video cộng đồng mà kêu "bình luận lọc dầu hay lọc nước" = quảng cáo trá hình,
+  // lạc vai trò): video content kêu bình luận SDVICO ủng hộ đội, không nhắc sản phẩm.
+  if (keyword === 'SDVICO') return 'Thấy đội SDVICO làm thật ngoài tàu, bình luận SDVICO ủng hộ anh em nha!';
   return `Bình luận ${keyword || 'lọc dầu hay lọc nước'}, bên em tư vấn đúng loại cho tàu anh em nha!`;
+}
+
+// Chữ người xem cần biết ngay từ cảnh 1 của video bán hàng (17/9 vòng 2, ChatGPT: "người xem chưa biết
+// chuyện này liên quan tới lọc dầu"): video lọc dầu 2 câu đầu phải có chữ "dầu", lọc nước phải có "nước".
+export function hookProductTerm(group) {
+  if (group === '2. Máy lọc nước biển SEA-40') return 'nước';
+  if (group === '9. Máy Lọc Dầu Diesel SD12-300' || group === '6. Thiết bị lọc dầu SF-50') return 'dầu';
+  return null;
 }
 
 // Chữ in trên màn hình outro: từ khóa viết HOA để bà con chép y nguyên vào bình luận.
@@ -149,11 +165,15 @@ export function splitNarrationMiddle(text) {
 // một hình lặp lại, retention rơi"): cảnh dùng ẢNH mà lời thoại >= maxWords từ thì tách đôi ở ranh
 // giới câu, nửa sau đổi sang tư liệu khác (pickAsset(prevAssetId, role, visual) -> id; trả null hoặc
 // cùng id thì KHÔNG tách vì hình không đổi). Cảnh clip thật giữ nguyên (đã có chuyển động).
-export function splitLongImageScenes(scenes, { maxWords = 40, isImage, pickAsset } = {}) {
+// videoToo (17/9 vòng 2, ChatGPT: video lọc nước cảnh clip tàu sửa đứng 12 giây — "lỗi hình tĩnh đã được
+// chuyển chỗ"): true thì cảnh CLIP dài cũng tách đôi đổi hình như cảnh ảnh. Cảnh mang clip bắt buộc
+// (matchBy 'must') và cảnh giá không tách.
+export function splitLongImageScenes(scenes, { maxWords = 40, isImage, pickAsset, videoToo = false } = {}) {
   const out = [];
   let split = false;
   for (const s of Array.isArray(scenes) ? scenes : []) {
-    if (s.role === 'price' || typeof isImage !== 'function' || !isImage(s.assetId) || wordCount(s.narration) < maxWords) { out.push(s); continue; }
+    const splittable = typeof isImage === 'function' && (isImage(s.assetId) || videoToo);
+    if (s.role === 'price' || s.matchBy === 'must' || !splittable || wordCount(s.narration) < maxWords) { out.push(s); continue; }
     const parts = splitNarrationMiddle(s.narration);
     const second = parts && typeof pickAsset === 'function' ? pickAsset(s.assetId, s.role, s.visual) : null;
     if (!parts || !second || second === s.assetId) { out.push(s); continue; }

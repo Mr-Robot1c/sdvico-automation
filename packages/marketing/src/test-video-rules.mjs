@@ -3,7 +3,7 @@
 // tách cảnh giá, phụ đề ngắn dòng. Chạy: npm run test:video. Không cần mạng, không cần GEMINI_API_KEY.
 import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
-  stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor,
+  stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm,
 } from './video/rules.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
@@ -53,6 +53,26 @@ ok('outro lọc dầu đọc đúng từ khóa', outroText(outroKeyword(G9)).inc
 ok('outro lọc nước đọc đúng từ khóa', outroText(outroKeyword(G2)).includes('Bình luận lọc nước,'));
 ok('outro ngắn (<= 16 từ, đọc ~4s)', outroText(outroKeyword(G2)).split(/\s+/).length <= 16, outroText(outroKeyword(G2)));
 eq('chữ màn hình outro in hoa', outroScreenKeyword(outroKeyword(G9)), 'LỌC DẦU');
+// 17/9 vòng 2: video cộng đồng bình luận SDVICO, không nhắc sản phẩm (ChatGPT: CTA sản phẩm lạc vai cộng đồng).
+const tCom = outroText('SDVICO');
+ok('outro cộng đồng kêu bình luận SDVICO', tCom.includes('bình luận SDVICO') && !/lọc dầu|lọc nước|Page|gọi/i.test(tCom), tCom);
+ok('outro cộng đồng một câu một "nha"', (tCom.match(/nha!/g) || []).length === 1 && (tCom.match(/[.!?]/g) || []).length === 1, tCom);
+ok('outro cộng đồng style sạch', scanStyle(tCom).length === 0, scanStyle(tCom));
+
+// Cụm sáo vòng 2 (ChatGPT: "May mà có" mở cảnh giải pháp ở cả 2 video bán hàng).
+for (const p of ['may mà có', 'trọn gói từ a tới z', 'lướt sóng', 'tiếc nuối']) {
+  ok(`EXTRA_WORN vòng 2 có "${p}"`, EXTRA_WORN.includes(p));
+}
+// Outro và câu giá không được dính chính danh sách cấm (worn quét toàn lời thoại).
+for (const t of [outroText(outroKeyword(G9)), outroText('SDVICO'), PRICE_TEASER[G9].spoken, PRICE_TEASER[G2].spoken]) {
+  ok(`văn cố định sạch cụm cấm: "${t.slice(0, 30)}..."`, !EXTRA_WORN.some((p) => t.toLowerCase().includes(p)), EXTRA_WORN.filter((p) => t.toLowerCase().includes(p)));
+}
+
+// Hook phải lộ sản phẩm sớm (vòng 2).
+eq('hookProductTerm lọc nước', hookProductTerm(G2), 'nước');
+eq('hookProductTerm lọc dầu', hookProductTerm(G9), 'dầu');
+eq('hookProductTerm SF-50', hookProductTerm('6. Thiết bị lọc dầu SF-50'), 'dầu');
+eq('hookProductTerm content', hookProductTerm(CONTENT_GROUP), null);
 
 // 6. Tách cảnh giá (7e9cab1a: ảnh nền trắng 20 giây vì cảnh cuối gánh cả câu chốt + câu giá).
 const teaser2 = PRICE_TEASER[G2];
@@ -84,6 +104,13 @@ ok('không tư liệu thay thế -> không tách', !splitLongImageScenes([longIm
 ok('cảnh ngắn -> không tách', !splitLongImageScenes([{ narration: 'Ngắn thôi. Hai câu.', assetId: 'img-1' }], { isImage: () => true, pickAsset: () => 'img-2' }).split);
 ok('cảnh giá không tách', !splitLongImageScenes([{ ...longImg, role: 'price' }], { isImage: () => true, pickAsset: () => 'img-2' }).split);
 eq('splitNarrationMiddle 1 câu -> null', splitNarrationMiddle('Một câu thôi.'), null);
+// 17/9 vòng 2: cảnh CLIP dài cũng tách khi videoToo (video lọc nước clip tàu sửa đứng 12s), trừ clip bắt buộc.
+const longClip = { ...longImg, assetId: 'clip-x' };
+const kinds2 = { 'clip-x': 'video', 'img-2': 'image' };
+const rv = splitLongImageScenes([longClip], { isImage: (id) => kinds2[id] === 'image', videoToo: true, pickAsset: () => 'img-2' });
+ok('videoToo: cảnh clip 43 từ tách đôi', rv.split && rv.scenes.length === 2 && rv.scenes[1].assetId === 'img-2');
+ok('không videoToo: cảnh clip giữ nguyên', !splitLongImageScenes([longClip], { isImage: (id) => kinds2[id] === 'image', pickAsset: () => 'img-2' }).split);
+ok('clip bắt buộc (matchBy must) không tách', !splitLongImageScenes([{ ...longClip, matchBy: 'must' }], { isImage: () => true, videoToo: true, pickAsset: () => 'img-2' }).split);
 
 // 6c. Clip bắt buộc nằm ở cảnh nào (7e9cab1a: máy SEA-40 đang chạy bị gán cảnh "thợ máy sửa lần thứ ba").
 eq('clip máy đang chạy -> cảnh giải pháp', mustUseRoleFor({ title: 'Máy lọc nước biển SDVICO hoạt động trên tàu cá Bình Thuận', description: 'Cận cảnh máy lọc nước đang chạy, đồng hồ áp suất' }, false), 'solution');

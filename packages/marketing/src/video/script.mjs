@@ -6,7 +6,7 @@ import { guardLines, guardViolations, stripViolatingSentences } from '../product
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
 import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool } from './scene-match.mjs';
-import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText } from './rules.mjs';
+import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -128,6 +128,10 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   const crossTerms = !opts.contentVideo ? crossProductTerms(opts.productGroup) : [];
   // 17/9 chiều: clip bắt buộc nằm ở cảnh nào (build-video quyết qua rules.mjs mustUseRoleFor): 'hook' | 'solution'.
   const mustRole = opts.mustUseRole === 'solution' ? 'solution' : 'hook';
+  // 17/9 vòng 2: từ khóa outro của video này (content = SDVICO, không nhắc sản phẩm).
+  const outroKw = opts.contentVideo ? 'SDVICO' : outroKeywordOf(opts.productGroup);
+  // 17/9 vòng 2 (ChatGPT: "người xem chưa biết chuyện này liên quan tới lọc dầu"): 2 câu đầu phải có chữ sản phẩm.
+  const hookTerm = !opts.contentVideo ? hookProductTerm(opts.productGroup) : null;
   // 17/9: mọi tỷ lệ phần trăm phải có trong BÀI NGUỒN hoặc thông số được phép (492313ac đọc "ngốn gần
   // 40 phần trăm chi phí chuyến đi" không có nguồn — Điều cấm 5). Soát sau khi sinh: unsourcedPercents.
   const percentSources = [content.title || '', content.draft || '', ...allowed];
@@ -196,6 +200,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     crossTerms.length
       ? `CHỈ NÓI VỀ ĐÚNG SẢN PHẨM CỦA BÀI (17/9): toàn bộ lời thoại chỉ được nói về ${shownName || opts.productGroup}. CẤM nhắc sản phẩm kia hay nỗi đau của sản phẩm kia: ${crossTerms.map((p) => `"${p}"`).join(', ')}. Tình huống mất mát ở trên có nêu cả dầu lẫn nước thì CHỈ lấy vế thuộc sản phẩm này.`
       : '',
+    hookTerm ? `CẢNH 1 PHẢI LỘ SẢN PHẨM SỚM (17/9 vòng 2): trong 2 câu đầu tiên phải có chữ "${hookTerm}" để người xem biết ngay video nói về chuyện ${hookTerm} trên tàu, không mở màn mơ hồ.` : '',
     'TỶ LỆ PHẦN TRĂM (17/9, Điều cấm 5): CẤM mọi con số phần trăm ("40%", "gần 40 phần trăm chi phí") không có nguyên văn trong BÀI NGUỒN hoặc THÔNG SỐ ĐƯỢC PHÉP bên dưới. Không có thì nói "một phần lớn", "cả đống tiền".',
     'NỖI ĐAU LÀ CỦA TÀU CHƯA LẮP MÁY SDVICO (17/9 chiều): máy hỏng, sửa hoài, cặn, nước đục, cạn nước trong cảnh đầu và cảnh đồng cảm là chuyện của tàu CHƯA có thiết bị SDVICO. TUYỆT ĐỐI KHÔNG viết như thể máy SDVICO hỏng hay phải sửa; không đặt tên máy SDVICO vào câu tả sự cố.',
     'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển tiếc nuối, tàu nằm bờ). Không lan man.',
@@ -211,7 +216,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     ...(opts.contentVideo ? CONTENT_STRUCTURE : SALES_STRUCTURE),
     shownName ? `TÊN SẢN PHẨM: gọi đúng "${shownName}" trong lời thoại, KHÔNG gọi tên khác, KHÔNG đọc mã SD12-300.` : '',
     teaser
-      ? `GIÁ (luật 8/9, BẮT BUỘC): CẢNH CUỐI phải có đúng 1 câu mốc giá, dùng NGUYÊN VĂN: "${teaser.spoken}". Câu này CHỈ nói giá, KHÔNG kêu bình luận, nhắn Page hay gọi (phần OUTRO cuối video đã lo: "${outroText(outroKeywordOf(opts.productGroup))}"). Các cảnh khác cũng không nhắc bình luận, nhắn Page hay gọi. TUYỆT ĐỐI KHÔNG đọc giá chính xác (không 9.900.000, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu), KHÔNG tự thêm con số tiền nào khác. Các cảnh trước KHÔNG nhắc giá.`
+      ? `GIÁ (luật 8/9, BẮT BUỘC): CẢNH CUỐI phải có đúng 1 câu mốc giá, dùng NGUYÊN VĂN: "${teaser.spoken}". Câu này CHỈ nói giá, KHÔNG kêu bình luận, nhắn Page hay gọi (phần OUTRO cuối video đã lo: "${outroText(outroKw)}"). Các cảnh khác cũng không nhắc bình luận, nhắn Page hay gọi. TUYỆT ĐỐI KHÔNG đọc giá chính xác (không 9.900.000, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu), KHÔNG tự thêm con số tiền nào khác. Các cảnh trước KHÔNG nhắc giá.`
       : '',
     ...guardLines(`${content.title || ''} ${content.draft || ''} ${content.brief?.rotation_group || ''}`),
     'Số theo chuẩn Việt Nam (dấu chấm ngăn hàng nghìn). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
@@ -234,7 +239,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       : '',
     'Lời thoại mỗi cảnh là câu nói trơn, không ghi chú, không tiêu đề, vì sẽ được máy đọc thành tiếng.',
     'CẤM CHÉP VÍ DỤ (5/9: video SF-50 đọc y nguyên câu mẫu trong hướng dẫn): mọi câu VÍ DỤ trong hướng dẫn này chỉ minh họa CẤU TRÚC và cố ý nói về chủ đề khác; không được chép nguyên văn hay gần nguyên văn, không lấy sản phẩm/tình huống trong ví dụ. Lời thoại phải viết MỚI từ chính BÀI NGUỒN bên dưới, dùng tình huống và con số có trong bài.',
-    `CẤM cảnh cuối gọi điện / mời liên hệ / kêu bình luận - phần OUTRO cuối video đã đọc "${outroText(outroKeywordOf(opts.productGroup))}" rồi, KHÔNG lặp lại ở nội dung chính (tránh trùng).`,
+    `CẤM cảnh cuối gọi điện / mời liên hệ / kêu bình luận - phần OUTRO cuối video đã đọc "${outroText(outroKw)}" rồi, KHÔNG lặp lại ở nội dung chính (tránh trùng).`,
     'Cảnh cuối nên là một câu chốt ngắn về lợi ích/thông điệp sản phẩm (vd "yên tâm vươn khơi cùng thiết bị bền bỉ"), KHÔNG nhắc số điện thoại hay từ "gọi", "liên hệ".',
     'MỌI SỐ phải VIẾT DẠNG SỐ (95%, 220V, 80 lít, 0939 243 222, 5 năm...), KHÔNG viết ra chữ ("chín lăm phần trăm", "hai trăm hai mươi vôn"). Lý do: PHỤ ĐỀ video lấy nguyên văn kịch bản này - bà con nhìn thấy "95%" dễ hiểu hơn "chín lăm phần trăm". Máy đọc tiếng sẽ tự đọc số ra chữ.',
     '',
@@ -283,7 +288,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
           '',
           'CẢNH 3 role="solution" (10-15s, ~35-45 từ):',
           '  LỐI THOÁT bằng sản phẩm + PHẦN THƯỞNG cụ thể + CHỐT lợi ích. Có chỗ nêu 2-3 lợi ích cụ thể (dầu sạch, máy khỏe, tiết kiệm bao nhiêu). KHÔNG nhắc gọi/liên hệ (outro cố định lo).' + priceException,
-          '  Ví dụ về CẤU TRÚC (chủ đề khác, CẤM chép): "May mà có bộ sạc thông minh giữ bình luôn no điện, đèn sáng suốt đêm không lo! Bình bền gấp đôi, đỡ tiền thay, chuyến nào cũng trọn con nước. Yên tâm bám biển dài ngày nha anh em."',
+          // 17/9 vòng 2: ví dụ cũ mở bằng "May mà có" + kết "Yên tâm bám biển" — cả 2 đã vào danh sách cấm
+          // (cả 2 video bán hàng đều chép khuôn "May mà có..."), đổi ví dụ để model khỏi học lại.
+          '  Ví dụ về CẤU TRÚC (chủ đề khác, CẤM chép): "Đổi qua bộ sạc thông minh là bình luôn no điện, đèn sáng suốt đêm không lo! Bình bền gấp đôi, đỡ tiền thay, chuyến nào cũng trọn con nước."',
         ]
       : [
           'ĐÂY LÀ VIDEO DÀI (40-60 giây). CHÍNH XÁC 5 CẢNH, role LẦN LƯỢT: "hook", "empathy", "solution", "reward", "closing".',
@@ -307,6 +314,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   let worn = [];
   let cross = [];   // 17/9: cụm sản phẩm kia lọt vào video bán hàng
   let pct = [];     // 17/9: phần trăm không có nguồn
+  let hookMiss = false; // 17/9 vòng 2: cảnh 1 chưa có chữ sản phẩm (dầu / nước)
   // 17/9: clip bắt buộc cảnh 1 — kịch bản mở màn không ăn nhập nội dung clip thì sinh lại 1 lần.
   const mustAsset = opts.mustUseAssetId ? assets.find((a) => a.id === opts.mustUseAssetId) : null;
   let mustMiss = false;
@@ -320,7 +328,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       + (!cross.length ? '' :
       `\n\nLẦN TRƯỚC LỜI THOẠI NHẮC SẢN PHẨM KHÁC: ${cross.map((p) => `"${p}"`).join(', ')}. Video này chỉ về ${shownName || opts.productGroup}; viết lại, bỏ hẳn các ý đó.`)
       + (!pct.length ? '' :
-      `\n\nLẦN TRƯỚC LỜI THOẠI CÓ SỐ PHẦN TRĂM KHÔNG CÓ NGUỒN: ${pct.map((p) => `"${p}"`).join(', ')}. Bỏ con số, nói chung chung ("một phần lớn", "cả đống tiền").`);
+      `\n\nLẦN TRƯỚC LỜI THOẠI CÓ SỐ PHẦN TRĂM KHÔNG CÓ NGUỒN: ${pct.map((p) => `"${p}"`).join(', ')}. Bỏ con số, nói chung chung ("một phần lớn", "cả đống tiền").`)
+      + (!hookMiss ? '' :
+      `\n\nLẦN TRƯỚC CẢNH 1 KHÔNG CÓ CHỮ "${hookTerm}" trong 2 câu đầu — người xem không biết video nói về gì. Viết lại cảnh 1 nêu thẳng chuyện ${hookTerm} trên tàu.`);
     const res = await generateWithRetry(ai, {
       model: MKT_MODEL,
       contents: user + extra,
@@ -346,6 +356,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     if (cross.length) console.warn(`[script] loi thoai nhac san pham KHAC (lan ${attempt + 1}): ${cross.join(' | ')}`);
     pct = unsourcedPercents(all, percentSources);
     if (pct.length) console.warn(`[script] loi thoai co phan tram KHONG NGUON (lan ${attempt + 1}): ${pct.join(' | ')}`);
+    const firstNarr = String((parsed.vertical?.scenes || [])[0]?.narration || '').toLowerCase();
+    hookMiss = !!hookTerm && !!firstNarr && !firstNarr.includes(hookTerm);
+    if (hookMiss) console.warn(`[script] canh 1 chua co chu "${hookTerm}" (lan ${attempt + 1}) — nguoi xem khong biet video noi ve gi.`);
     // 17/9: cảnh 1 phải chung từ ngữ với mô tả clip bắt buộc (visualOverlap 0 = mở màn lạc đề).
     mustMiss = false;
     if (mustAsset) {
@@ -360,7 +373,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         }
       }
     }
-    if (!viol.length && !worn.length && !mustMiss && !cross.length && !pct.length) break;
+    if (!viol.length && !worn.length && !mustMiss && !cross.length && !pct.length && !hookMiss) break;
   }
   if (viol.length) {
     // Dự phòng: cắt câu sai khỏi từng cảnh, cảnh rỗng sẽ bị fix() loại.
@@ -444,6 +457,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     const groupForPool = opts.contentVideo ? null : opts.productGroup || null;
     const r = splitLongImageScenes(vertical, {
       isImage,
+      videoToo: true, // 17/9 vòng 2: cảnh clip 12s đứng nguyên cũng tách (trừ clip bắt buộc và cảnh giá)
       pickAsset: (prevId, role, visual) => pickByRole(problemPool(assets, role, groupForPool), role, { prevId, usedCount, visual })?.id || null,
     });
     if (r.split) { vertical = r.scenes; console.log('[script] tach canh anh dai thanh 2 canh doi hinh (17/9)'); }
