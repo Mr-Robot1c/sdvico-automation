@@ -17,6 +17,7 @@ import { generateVideoScript, stripGreeting } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
 import { getPriceTeaser, redactExactPrices, outroKeyword } from '../products.mjs';
+import { outroText as outroTextFor, outroScreenKeyword } from './rules.mjs';
 import { pickFreshClips, clipLabel } from './fresh-clip.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { pythonCmd } from '../platform.mjs';
@@ -474,11 +475,11 @@ async function whisperArtifact(sceneAudios, workDir, tag) {
 // 10/9 (Thanh): outro gộp 3 đường liên hệ, câu kêu bình luận từ khóa dời từ cảnh giá xuống đây.
 // 10/9 (2): từ khóa bình luận theo ĐÚNG sản phẩm của video (outroKeyword): video lọc nước đọc
 // "bình luận lọc nước", video lọc dầu đọc "bình luận lọc dầu"; video content giữ câu gộp.
+// 11/9 (3) (Thanh: 2 câu outro = 2 lần gọi VieNeu = 2 màu giọng): outro MỘT câu, một "nha" ở cuối.
+// 17/9 (ChatGPT chấm: "video chỉ nên 1 CTA, outro 3-4 giây"; user: "rút còn bình luận thôi"): outro
+// chỉ còn "Bình luận <từ khóa>", bỏ nhắn Page + đọc số điện thoại. Câu ở rules.mjs (outroTextFor).
 function outroText(productGroup) {
-  // 11/9 (3) (Thanh: 2 câu outro = 2 lần gọi VieNeu = 2 màu giọng; gộp 1 lần gọi thì lặp đuôi vì cả
-  // 2 câu đều kết "nha!"): outro thành MỘT câu, một "nha" ở cuối, đọc một lần gọi (cách cũ trước 5/9,
-  // chưa từng lặp) -> một giọng, không lặp.
-  return `Nhắn tin cho Page SDVICO, không thì bình luận ${outroKeyword(productGroup)}, hoặc gọi số 0939 243 222, để bên em tư vấn cho anh em nha!`;
+  return outroTextFor(outroKeyword(productGroup));
 }
 
 // opts.priceBadge / opts.badgeFromScene (8/9): tem giá úp mở trên hình, xem assemble.mjs.
@@ -538,7 +539,7 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
           role: s.role || null,
         });
       }
-      // Outro đọc số 0939 243 222 (spellPhones đọc từng chữ số). Đường edge tự chống chịu
+      // Outro đọc "Bình luận <từ khóa>" (17/9, không còn đọc số điện thoại). Đường edge tự chống chịu
       // (không throw); đường gemini throw thì cả bản rơi xuống edge cùng nhau. Gemini đã đọc
       // chung với cảnh cuối ở trên thì bỏ qua.
       if (!outroDone) await tts(OUTRO_TEXT, outroAudio, voice, fdir, 'outro', engine);
@@ -572,7 +573,7 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
     if (pos > 0 && text.length) badgeOffsetSec = Math.max(0, last.durationSec * (pos / text.length) - 0.4);
     if (pos < 0) console.warn('  (tem giá: không thấy câu giá trong cảnh cuối, hiện tem từ đầu cảnh cuối)');
   }
-  await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio, priceBadge: opts.priceBadge || null, badgeFromScene, badgeOffsetSec });
+  await assembleVideo({ scenes: built, format, workDir: fdir, brandLine: BRAND_LINE, outPath: out, outroAudioPath: outroAudio, priceBadge: opts.priceBadge || null, badgeFromScene, badgeOffsetSec, outroKeyword: outroScreenKeyword(outroKeyword(opts.productGroup)) });
   const totalDur = await probeDuration(out);
   // 15/9 (Thanh: trang Video phải hiện "lấy tư liệu nào, dùng ở giây nào"): dòng thời gian từng cảnh.
   let t = 0;

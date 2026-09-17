@@ -1,7 +1,10 @@
 // Dựng block phụ đề từ text kịch bản (chính xác, không qua ASR) và thời lượng cảnh.
 // Chia text thành mẩu ngắn dễ đọc, timing theo tỉ lệ số ký tự.
 
-const MAX_CHARS = 46; // mỗi mẩu tối đa ~46 ký tự cho dễ đọc
+// 17/9 (ChatGPT chấm 3 video: "chữ nằm ngay giữa khung, đè lên người và máy"): mẩu 46 ký tự ở cỡ chữ
+// 13,5 trên khung 1080 ngang bị libass bẻ thành 2-3 dòng, khối chữ leo lên tới 1/3 chiều cao. Rút
+// còn 30 ký tự -> tối đa 2 dòng, khối chữ ở thấp trong vùng MarginV (Thanh đã chỉnh 8/9), không đè chủ thể.
+export const MAX_CHARS = 30; // mỗi mẩu tối đa ~30 ký tự
 
 // Chia câu dài thành các mẩu <= MAX_CHARS, cắt ở ranh giới từ.
 function chunk(text) {

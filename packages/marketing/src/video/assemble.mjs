@@ -59,7 +59,8 @@ async function buildSceneSegment(scene, fmt, workDir, index) {
 // badgeFromScene: tem hiện từ cảnh nội dung thứ N (0-based); badgeOffsetSec: lệch thêm bao nhiêu giây
 // trong cảnh đó (8/9 tối, Thanh: "gần tới lúc đọc phần giảm giá thì mới hiện tem", kẻo bà con thấy
 // giá sớm rồi bỏ đi). Tem giữ tới hết phần nội dung, không đè intro/outro.
-export async function assembleVideo({ scenes, format, workDir, brandLine, outPath, outroAudioPath = null, priceBadge = null, badgeFromScene = 0, badgeOffsetSec = 0 }) {
+// outroKeyword (17/9): chữ in hoa trên màn hình outro ("LỌC DẦU"), null = chữ chung.
+export async function assembleVideo({ scenes, format, workDir, brandLine, outPath, outroAudioPath = null, priceBadge = null, badgeFromScene = 0, badgeOffsetSec = 0, outroKeyword = null }) {
   const fmt = FORMATS[format];
   if (!fmt) throw new Error(`format khong hop le: ${format}`);
   await ensureFonts(workDir);
@@ -75,7 +76,7 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
   let introDur = 0;
   let outroDur = 0;
   try {
-    const b = await buildBumpers({ workDir, fmt, outroAudioPath });
+    const b = await buildBumpers({ workDir, fmt, outroAudioPath, outroKeyword });
     introSeg = b.introSeg;
     outroSeg = b.outroSeg;
     // Thời lượng thật để banner "SDVICO • Hotline" CHỈ hiện ở cảnh nội dung, không đè lên

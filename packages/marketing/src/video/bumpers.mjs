@@ -16,7 +16,11 @@ const FPS = 30;
 // toi 3s hien chu Nghe ca thinh vuong la duoc" -> clip cat 3,3s (slogan hien xong ~3,0s), tieng
 // -14 dB + fade 0,5s cuoi. 15/9 sep: "nho lai 15%" -> -16 dB. Thieu file hoac ban ngang thi ve intro bang canvas
 // nhu cu. INTRO_CLIP=duong-dan-khac de thu clip khac.
+// 17/9 (ChatGPT cham 3 video: "4 giay logo dang giet hook, ngu dan khong cho logo"; user: "intro rut
+// ngan lai cung duoc"): clip 3,3s duoc TUA NHANH cho vua INTRO_SEC (mac dinh 2,0s) — van du bot nuoc
+// gom logo + chu SDVICO + slogan, chi nhanh hon. INTRO_SEC=3.3 de ve nguyen toc do cu.
 const INTRO_CLIP = process.env.INTRO_CLIP || join(HERE, 'assets', 'intro-doc.mp4');
+const INTRO_SEC = Math.max(1, Number(process.env.INTRO_SEC) || 2.0);
 
 let fontsReady = false;
 function registerFontsFromWorkdir(workDir) {
@@ -203,9 +207,12 @@ async function drawIntroFrame(W, H, t, dur) {
   return cv.toBuffer('image/png');
 }
 
-// Vẽ 1 frame OUTRO tại t. Timeline: 0-0.7s logo pop + fade; 0.6-1.4s "Gọi ngay cho SDVICO" slide;
-// 1.3-2.0s số điện thoại scale-in + PULSE nhẹ liên tục; 1.8-2.5s slogan fade.
-async function drawOutroFrame(W, H, t, dur) {
+// Vẽ 1 frame OUTRO tại t. Timeline: 0-0.7s logo pop + fade; 0.6-1.4s "Bình luận ngay" slide;
+// 1.3-2.0s TỪ KHÓA scale-in + PULSE nhẹ liên tục; 1.8-2.5s slogan fade.
+// 17/9 (user theo ChatGPT: outro 1 hành động): màn hình outro hiện TỪ KHÓA BÌNH LUẬN (LỌC DẦU / LỌC
+// NƯỚC) thay cho số điện thoại; số vẫn ở dải "SDVICO • Hotline" trên các cảnh nội dung.
+// opts.keyword: chữ in hoa cần bà con chép vào bình luận.
+async function drawOutroFrame(W, H, t, dur, opts = {}) {
   const cv = createCanvas(W, H);
   const ctx = cv.getContext('2d');
   drawBackground(ctx, W, H, t);
@@ -226,17 +233,17 @@ async function drawOutroFrame(W, H, t, dur) {
     drawLogoDisk(ctx, logo, W / 2, cy, disk, p);
   }
 
-  // "Gọi ngay tổng đài": slide từ trái vào + fade 0.6-1.4s.
+  // "Bình luận ngay": slide từ trái vào + fade 0.6-1.4s.
   const headT = easeOut((t - 0.6) / 0.8);
   if (headT > 0) {
     const offset = -120 * (1 - headT);
-    drawText(ctx, 'Gọi ngay cho SDVICO', W / 2 + offset, H * pos.headY, {
+    drawText(ctx, 'Bình luận ngay', W / 2 + offset, H * pos.headY, {
       font: `${Math.round(base * 0.045)}px BVP-Black`, alpha: Math.min(1, headT),
       maxWidth: W * 0.92
     });
   }
 
-  // Số điện thoại: scale-in + PULSE liên tục sau đó (nhấp nhẹ 1.0-1.05).
+  // Từ khóa bình luận: scale-in + PULSE liên tục sau đó (nhấp nhẹ 1.0-1.05).
   const phoneInT = easeOut((t - 1.3) / 0.7);
   if (phoneInT > 0) {
     const scaleIn = 0.7 + 0.3 * Math.min(1, phoneInT);
@@ -245,7 +252,7 @@ async function drawOutroFrame(W, H, t, dur) {
     const finalScale = scaleIn * pulse;
 
     const phoneBase = Math.round(base * (isPortrait ? 0.095 : 0.09));
-    const phoneText = '0939 243 222';
+    const phoneText = String(opts.keyword || 'LỌC DẦU HAY LỌC NƯỚC');
     // Tính font tối đa fit W*0.88
     let f = phoneBase;
     ctx.font = `${f}px BVP-Black`;
@@ -311,42 +318,54 @@ async function renderBumperMp4(drawFrame, framesDir, W, H, dur, audioPath, outSe
 
 // Ma hoa lai clip intro ve DUNG tham so cua cac canh (H.264 yuv420p 30fps, timescale 30000, AAC
 // 44100 stereo) de concat -c copy khong loi. Clip 1080x1920 nen scale la no-op, van giu de an toan.
-async function renderIntroFromClip(clipPath, W, H, outSeg, workDir) {
-  await ffmpeg([
-    '-y', '-i', clipPath,
-    '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},format=yuv420p`,
+// 17/9: tua nhanh clip cho vua INTRO_SEC (setpts + atempo, atempo ffmpeg dong goi 2018 chi nhan 0,5..2,0
+// nen kep he so <= 2). Clip ngan hon INTRO_SEC thi giu nguyen.
+async function renderIntroFromClip(clipPath, W, H, outSeg, workDir, targetSec = INTRO_SEC) {
+  let clipDur = 0;
+  try { clipDur = await probeDuration(clipPath); } catch { clipDur = 0; }
+  const factor = clipDur > targetSec + 0.05 ? Math.min(2, clipDur / targetSec) : 1;
+  const speedV = factor > 1 ? `setpts=PTS/${factor.toFixed(4)},` : '';
+  const args = ['-y', '-i', clipPath,
+    '-vf', `${speedV}scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},format=yuv420p`];
+  if (factor > 1) args.push('-af', `atempo=${factor.toFixed(4)}`, '-t', (clipDur / factor).toFixed(3));
+  args.push(
     '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
     '-r', String(FPS), '-video_track_timescale', String(FPS * 1000),
     '-c:a', 'aac', '-ar', '44100', '-ac', '2',
     outSeg,
-  ], { cwd: workDir });
+  );
+  await ffmpeg(args, { cwd: workDir });
+  if (factor > 1) console.log(`  (intro ${clipDur.toFixed(1)}s tua nhanh x${factor.toFixed(2)} -> ${(clipDur / factor).toFixed(1)}s)`);
   return outSeg;
 }
 
 // Tạo intro và outro cho một FORMAT. Trả về {introSeg, outroSeg} là tên file mp4 trong workDir để
 // concat cùng cảnh chính. outroAudioPath: mp3 TTS đọc tổng đài (đã sinh sẵn), có thể null.
 // Xem trước 1 frame (dùng cho scripts/preview-bumpers.mjs) — không ảnh hưởng pipeline.
-export async function previewFrame(kind, W, H, t, dur) {
-  return kind === 'outro' ? drawOutroFrame(W, H, t, dur) : drawIntroFrame(W, H, t, dur);
+export async function previewFrame(kind, W, H, t, dur, opts = {}) {
+  return kind === 'outro' ? drawOutroFrame(W, H, t, dur, opts) : drawIntroFrame(W, H, t, dur);
 }
 
-export async function buildBumpers({ workDir, fmt, outroAudioPath = null, introDurSec = 2.8, outroDurSec = 4 }) {
+// outroKeyword: chữ in hoa hiện trên màn hình outro (17/9), vd "LỌC DẦU".
+// 17/9: outro chỉ còn 1 câu ngắn (~3-4s đọc) nên mặc định 3,5s + đệm 0,8s sau tiếng (trước 4s + 1,2s
+// cho câu 3 vế đọc số điện thoại ~10s; ChatGPT: "outro 10-12s chiếm 1/4 video, retention rơi").
+export async function buildBumpers({ workDir, fmt, outroAudioPath = null, introDurSec = INTRO_SEC, outroDurSec = 3.5, outroKeyword = null }) {
   registerFontsFromWorkdir(workDir);
-  // Outro dài đủ đọc hết TTS (đọc "0939 243 222" từng số ~6s).
   let outroActualDur = outroDurSec;
   if (outroAudioPath) {
     try {
       const audioDur = await probeDuration(outroAudioPath);
-      outroActualDur = Math.max(outroDurSec, audioDur + 1.2);
+      outroActualDur = Math.max(outroDurSec, audioDur + 0.8);
     } catch { /* thiếu audio -> giữ default */ }
   }
   const introFramesDir = join(workDir, '_intro_frames');
   const outroFramesDir = join(workDir, '_outro_frames');
   if (fmt.h > fmt.w && existsSync(INTRO_CLIP)) {
-    await renderIntroFromClip(INTRO_CLIP, fmt.w, fmt.h, 'intro.mp4', workDir);
+    await renderIntroFromClip(INTRO_CLIP, fmt.w, fmt.h, 'intro.mp4', workDir, introDurSec);
   } else {
     await renderBumperMp4(drawIntroFrame, introFramesDir, fmt.w, fmt.h, introDurSec, null, 'intro.mp4', workDir);
   }
-  await renderBumperMp4(drawOutroFrame, outroFramesDir, fmt.w, fmt.h, outroActualDur, outroAudioPath, 'outro.mp4', workDir);
+  const drawOutro = (W, H, t, dur) => drawOutroFrame(W, H, t, dur, { keyword: outroKeyword });
+  await renderBumperMp4(drawOutro, outroFramesDir, fmt.w, fmt.h, outroActualDur, outroAudioPath, 'outro.mp4', workDir);
   return { introSeg: 'intro.mp4', outroSeg: 'outro.mp4' };
 }
