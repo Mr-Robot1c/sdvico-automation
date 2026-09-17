@@ -59,9 +59,10 @@ ok('outro cộng đồng kêu bình luận SDVICO', tCom.includes('bình luận 
 ok('outro cộng đồng một câu một "nha"', (tCom.match(/nha!/g) || []).length === 1 && (tCom.match(/[.!?]/g) || []).length === 1, tCom);
 ok('outro cộng đồng style sạch', scanStyle(tCom).length === 0, scanStyle(tCom));
 
-// Cụm sáo vòng 2 (ChatGPT: "May mà có" mở cảnh giải pháp ở cả 2 video bán hàng).
-for (const p of ['may mà có', 'trọn gói từ a tới z', 'lướt sóng', 'tiếc nuối']) {
-  ok(`EXTRA_WORN vòng 2 có "${p}"`, EXTRA_WORN.includes(p));
+// Cụm sáo vòng 2 + vòng 3 (ChatGPT: "May mà có" mở cảnh giải pháp ở cả 2 video bán hàng; vòng 3 thêm
+// "sương chưa tan", "kiên cường", "lau mồ hôi" lặp 3 vòng liền).
+for (const p of ['may mà có', 'trọn gói từ a tới z', 'lướt sóng', 'tiếc nuối', 'sương chưa tan', 'kiên cường', 'lau mồ hôi', 'khúc ruột']) {
+  ok(`EXTRA_WORN có "${p}"`, EXTRA_WORN.includes(p));
 }
 // Outro và câu giá không được dính chính danh sách cấm (worn quét toàn lời thoại).
 for (const t of [outroText(outroKeyword(G9)), outroText('SDVICO'), PRICE_TEASER[G9].spoken, PRICE_TEASER[G2].spoken]) {
@@ -111,6 +112,10 @@ const rv = splitLongImageScenes([longClip], { isImage: (id) => kinds2[id] === 'i
 ok('videoToo: cảnh clip 43 từ tách đôi', rv.split && rv.scenes.length === 2 && rv.scenes[1].assetId === 'img-2');
 ok('không videoToo: cảnh clip giữ nguyên', !splitLongImageScenes([longClip], { isImage: (id) => kinds2[id] === 'image', pickAsset: () => 'img-2' }).split);
 ok('clip bắt buộc (matchBy must) không tách', !splitLongImageScenes([{ ...longClip, matchBy: 'must' }], { isImage: () => true, videoToo: true, pickAsset: () => 'img-2' }).split);
+// 17/9 vòng 3: ảnh tách sớm hơn clip (ảnh >= 30 từ, clip >= 40 từ).
+const img35 = { narration: 'Một hai ba bốn năm sáu bảy tám chín mười một hai ba bốn năm sáu bảy tám chín mười. Một hai ba bốn năm sáu bảy tám chín mười một hai ba bốn.', assetId: 'img-1', role: 'empathy', visual: 'tàu' };
+ok('ảnh 34 từ tách (ngưỡng 30)', splitLongImageScenes([img35], { isImage: () => true, pickAsset: () => 'img-2' }).split);
+ok('clip 34 từ KHÔNG tách (ngưỡng 40)', !splitLongImageScenes([{ ...img35, assetId: 'clip-x' }], { isImage: (id) => id !== 'clip-x', videoToo: true, pickAsset: () => 'img-2' }).split);
 
 // 6c. Clip bắt buộc nằm ở cảnh nào (7e9cab1a: máy SEA-40 đang chạy bị gán cảnh "thợ máy sửa lần thứ ba").
 eq('clip máy đang chạy -> cảnh giải pháp', mustUseRoleFor({ title: 'Máy lọc nước biển SDVICO hoạt động trên tàu cá Bình Thuận', description: 'Cận cảnh máy lọc nước đang chạy, đồng hồ áp suất' }, false), 'solution');

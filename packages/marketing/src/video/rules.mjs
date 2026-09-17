@@ -83,6 +83,10 @@ export const EXTRA_WORN = [
   'may mà có', 'tự dưng', 'đồng hành cùng bà con', 'lướt sóng', 'thấu hết', 'nhọc nhằn',
   'trọn gói từ a tới z', 'từ a tới z', 'tấp nập kéo lưới', 'tiếc nuối', 'yên tâm bám biển', 'cực tốt',
   'đổ sông đổ bể', 'đổ sông đổ biển', 'trôi tuột',
+  // 17/9 vòng 3 (ChatGPT: "văn phim thương hiệu / copywriting du lịch"): sương chưa tan, kiên cường,
+  // nhịp sóng, khúc ruột, bủa vây; "lau mồ hôi" lặp ở 3 vòng liền, "đau thắt" là dọa chứ không phải thông tin.
+  'sương chưa tan', 'bủa vây', 'khúc ruột', 'kiên cường', 'nhịp sóng', 'đau thắt', 'ùa về',
+  'lau mồ hôi', 'gọi ai cứu',
 ];
 
 // Outro = MỘT câu, MỘT hành động (user 17/9 theo ChatGPT: "không nên vừa bảo gọi, vừa bảo comment,
@@ -168,12 +172,16 @@ export function splitNarrationMiddle(text) {
 // videoToo (17/9 vòng 2, ChatGPT: video lọc nước cảnh clip tàu sửa đứng 12 giây — "lỗi hình tĩnh đã được
 // chuyển chỗ"): true thì cảnh CLIP dài cũng tách đôi đổi hình như cảnh ảnh. Cảnh mang clip bắt buộc
 // (matchBy 'must') và cảnh giá không tách.
-export function splitLongImageScenes(scenes, { maxWords = 40, isImage, pickAsset, videoToo = false } = {}) {
+// imageMaxWords (17/9 vòng 3, ChatGPT: máy SF300B đứng 6 giây, cabin 8 giây vẫn dài): ảnh tĩnh tách
+// sớm hơn clip — ảnh >= 30 từ (~8 giây), clip >= 40 từ (~11 giây).
+export function splitLongImageScenes(scenes, { maxWords = 40, imageMaxWords = 30, isImage, pickAsset, videoToo = false } = {}) {
   const out = [];
   let split = false;
   for (const s of Array.isArray(scenes) ? scenes : []) {
-    const splittable = typeof isImage === 'function' && (isImage(s.assetId) || videoToo);
-    if (s.role === 'price' || s.matchBy === 'must' || !splittable || wordCount(s.narration) < maxWords) { out.push(s); continue; }
+    const isImg = typeof isImage === 'function' && isImage(s.assetId);
+    const splittable = typeof isImage === 'function' && (isImg || videoToo);
+    const limit = isImg ? imageMaxWords : maxWords;
+    if (s.role === 'price' || s.matchBy === 'must' || !splittable || wordCount(s.narration) < limit) { out.push(s); continue; }
     const parts = splitNarrationMiddle(s.narration);
     const second = parts && typeof pickAsset === 'function' ? pickAsset(s.assetId, s.role, s.visual) : null;
     if (!parts || !second || second === s.assetId) { out.push(s); continue; }

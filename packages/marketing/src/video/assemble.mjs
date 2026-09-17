@@ -14,8 +14,15 @@ export const FORMATS = {
   horizontal: { w: 1920, h: 1080, subFont: 13, subMargin: 55 },
 };
 
+// 17/9 vòng 3 (ChatGPT chấm lại: "nền blur hai đầu làm hình chính nhỏ lại, B2B cần nhìn máy và thao
+// tác; không cần nền blur, crop mạnh hơn sẽ tốt hơn"): mặc định CROP LẤP KHUNG (cover). Ảnh tĩnh
+// thêm zoom chậm ~8% cho đỡ đứng hình (ChatGPT: máy SF300B đứng nguyên 6 giây). FIT_MODE=blur về kiểu cũ.
+const FIT_MODE = process.env.FIT_MODE || 'cover';
+
 // Chuẩn hóa một cảnh -> sceneN.mp4 (đồng nhất codec để nối bằng -c copy).
-async function buildSceneSegment(scene, fmt, workDir, index) {
+// noSub (17/9 vòng 3): cảnh giá đã có tem giá to giữa hình, phụ đề đọc lại y chang = 1 thông tin hiện
+// 2 chỗ (ChatGPT) -> cảnh giá tắt phụ đề, tem lo phần chữ, giọng vẫn đọc đủ.
+async function buildSceneSegment(scene, fmt, workDir, index, { noSub = false } = {}) {
   const seg = `scene${index}.mp4`;
   const srtName = `scene${index}.srt`;
   const blocks = buildBlocks(scene.text || '', scene.durationSec);
@@ -25,19 +32,32 @@ async function buildSceneSegment(scene, fmt, workDir, index) {
     `Fontname=${FONT_REGULAR},FontSize=${fmt.subFont},` +
     `PrimaryColour=&H00FFFFFF,OutlineColour=&H00202020,BorderStyle=1,Outline=2,Shadow=0,` +
     `Alignment=2,MarginV=${fmt.subMargin}`;
-  // Filter FIT-IN-BLUR-BACKGROUND: giữ nguyên tỷ lệ ảnh gốc (không crop, không méo). Nếu ảnh
-  // khác tỷ lệ khung, phủ 2 bên bằng chính ảnh đó phóng to + BLUR mạnh (kiểu TikTok/Reels).
-  const vf =
-    `[0:v]split[bg0][fg0];` +
-    `[bg0]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=increase,crop=${fmt.w}:${fmt.h},` +
-    `boxblur=luma_radius=20:luma_power=2:chroma_radius=20:chroma_power=1,` +
-    `eq=brightness=-0.05:saturation=0.85,fps=30,format=yuv420p[bg];` +
-    `[fg0]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=decrease,fps=30,format=yuv420p[fg];` +
-    `[bg][fg]overlay=(W-w)/2:(H-h)/2,` +
-    `subtitles=${srtName}:fontsdir=.:force_style='${style}'[v]`;
+  const subFilter = noSub ? '' : `,subtitles=${srtName}:fontsdir=.:force_style='${style}'`;
+  const coverImage = FIT_MODE !== 'blur' && scene.kind === 'image';
+  let vf;
+  if (FIT_MODE === 'blur') {
+    // Kiểu cũ FIT-IN-BLUR-BACKGROUND: giữ nguyên tỷ lệ, phủ 2 đầu bằng chính hình phóng to + blur.
+    vf =
+      `[0:v]split[bg0][fg0];` +
+      `[bg0]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=increase,crop=${fmt.w}:${fmt.h},` +
+      `boxblur=luma_radius=20:luma_power=2:chroma_radius=20:chroma_power=1,` +
+      `eq=brightness=-0.05:saturation=0.85,fps=30,format=yuv420p[bg];` +
+      `[fg0]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=decrease,fps=30,format=yuv420p[fg];` +
+      `[bg][fg]overlay=(W-w)/2:(H-h)/2${subFilter}[v]`;
+  } else if (coverImage) {
+    // Ảnh: crop lấp khung ở 2x rồi zoompan phóng chậm tới 1.08 (Ken Burns nhẹ), xuất đúng WxH.
+    const totalFrames = Math.max(2, Math.round(scene.durationSec * 30));
+    vf =
+      `[0:v]scale=${fmt.w * 2}:${fmt.h * 2}:force_original_aspect_ratio=increase,crop=${fmt.w * 2}:${fmt.h * 2},` +
+      `zoompan=z='1+0.08*on/${totalFrames}':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${totalFrames}:s=${fmt.w}x${fmt.h}:fps=30,` +
+      `format=yuv420p${subFilter}[v]`;
+  } else {
+    // Clip: crop lấp khung, chủ thể chiếm trọn 9:16.
+    vf = `[0:v]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=increase,crop=${fmt.w}:${fmt.h},fps=30,format=yuv420p${subFilter}[v]`;
+  }
 
   const inputArgs = scene.kind === 'image'
-    ? ['-loop', '1', '-framerate', '30', '-i', scene.videoPath]
+    ? (coverImage ? ['-i', scene.videoPath] : ['-loop', '1', '-framerate', '30', '-i', scene.videoPath])
     : ['-stream_loop', '-1', '-i', scene.videoPath];
 
   await ffmpeg([
@@ -67,7 +87,8 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
 
   const segs = [];
   for (let i = 0; i < scenes.length; i++) {
-    segs.push(await buildSceneSegment(scenes[i], fmt, workDir, i));
+    // 17/9 vòng 3: cảnh giá có tem giá thì tắt phụ đề (1 thông tin chỉ hiện 1 chỗ).
+    segs.push(await buildSceneSegment(scenes[i], fmt, workDir, i, { noSub: !!priceBadge && scenes[i].role === 'price' }));
   }
 
   // Intro + Outro: đóng khung hai đầu video (logo/tổng đài SDVICO). Không chặn dây chuyền nếu lỗi.
