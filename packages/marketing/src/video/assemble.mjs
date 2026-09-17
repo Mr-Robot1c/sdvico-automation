@@ -140,7 +140,8 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
     for (let i = 0; i < Math.min(badgeFromScene, scenes.length); i++) start += scenes[i].durationSec;
     start += Math.max(0, Number(badgeOffsetSec) || 0);
     const end = totalDur > 0 ? totalDur - outroDur : 0;
-    const badgeFont = fmt.w >= 1920 ? 34 : 46;
+    // 17/9 vòng 4 (ChatGPT: box giá phủ lên cảnh lắp đặt khá nặng): 46 -> 36, vẫn đọc được trên điện thoại.
+    const badgeFont = fmt.w >= 1920 ? 30 : 36;
     const en = end > start ? `:enable='between(t,${start.toFixed(2)},${end.toFixed(2)})'` : '';
     badgeFilter =
       `,drawtext=fontfile=BeVietnamPro-Black.ttf:textfile=badge.txt:` +

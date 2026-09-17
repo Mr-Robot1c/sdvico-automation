@@ -87,6 +87,9 @@ export const EXTRA_WORN = [
   // nhịp sóng, khúc ruột, bủa vây; "lau mồ hôi" lặp ở 3 vòng liền, "đau thắt" là dọa chứ không phải thông tin.
   'sương chưa tan', 'bủa vây', 'khúc ruột', 'kiên cường', 'nhịp sóng', 'đau thắt', 'ùa về',
   'lau mồ hôi', 'gọi ai cứu',
+  // 17/9 vòng 4 (ChatGPT 70/66/68): "ai hiểu hết sóng gió", "thấu được cái cực nhọc", "êm ru",
+  // "biết bao nhiêu", "mất toi" — vẫn là văn quảng cáo, không phải thông tin.
+  'thấu được', 'êm ru', 'biết bao nhiêu', 'mất toi', 'ai hiểu hết',
 ];
 
 // Outro = MỘT câu, MỘT hành động (user 17/9 theo ChatGPT: "không nên vừa bảo gọi, vừa bảo comment,
@@ -174,7 +177,8 @@ export function splitNarrationMiddle(text) {
 // (matchBy 'must') và cảnh giá không tách.
 // imageMaxWords (17/9 vòng 3, ChatGPT: máy SF300B đứng 6 giây, cabin 8 giây vẫn dài): ảnh tĩnh tách
 // sớm hơn clip — ảnh >= 30 từ (~8 giây), clip >= 40 từ (~11 giây).
-export function splitLongImageScenes(scenes, { maxWords = 40, imageMaxWords = 30, isImage, pickAsset, videoToo = false } = {}) {
+// 17/9 vòng 4 (ChatGPT: ảnh SF300B 6s + cảnh tàu 7s vẫn dài, B-roll nên 3-4s): ảnh 24 từ (~6,5s), clip 36 từ (~10s).
+export function splitLongImageScenes(scenes, { maxWords = 36, imageMaxWords = 24, isImage, pickAsset, videoToo = false } = {}) {
   const out = [];
   let split = false;
   for (const s of Array.isArray(scenes) ? scenes : []) {
@@ -201,4 +205,24 @@ export function mustUseRoleFor(asset, contentVideo) {
   if (contentVideo || !asset) return 'hook';
   const text = `${asset.title || ''} ${asset.description || ''}`;
   return PROBLEM_CLIP_RE.test(text) ? 'hook' : 'solution';
+}
+
+// 17/9 vòng 4 (ChatGPT soi: video đọc "SF300B" nhưng nhãn trên máy trong ảnh ghi "SF58B" — 2 mã model
+// trong 1 video làm mất độ tin): tư liệu có MÃ MODEL KHÁC với sản phẩm của video thì loại khỏi kho
+// dựng. Mã nhận theo mẫu SF/SD/SEA + số; mô tả tư liệu nào nhắc mã lạ là bị chặn (2 ảnh SF58B đã được
+// ghi chú vào brand_assets.description ngày 17/9).
+const GROUP_MODELS = {
+  '9. Máy Lọc Dầu Diesel SD12-300': ['sf300b', 'sd12300', 'sd12'],
+  '6. Thiết bị lọc dầu SF-50': ['sf50'],
+  '2. Máy lọc nước biển SEA-40': ['sea40'],
+};
+export function modelMismatch(asset, group) {
+  const allowed = GROUP_MODELS[group];
+  if (!allowed) return false;
+  const t = `${asset?.title || ''} ${asset?.description || ''}`.toLowerCase();
+  const tokens = t.match(/\b(?:sf|sd|sea)\s?-?\s?\d+[a-z]?\b/gi) || [];
+  return tokens.some((tk) => {
+    const norm = tk.toLowerCase().replace(/[\s-]/g, '');
+    return !allowed.some((m) => norm === m || norm.startsWith(m));
+  });
 }

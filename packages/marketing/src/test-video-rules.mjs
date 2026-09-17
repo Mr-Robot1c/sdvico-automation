@@ -3,7 +3,7 @@
 // tách cảnh giá, phụ đề ngắn dòng. Chạy: npm run test:video. Không cần mạng, không cần GEMINI_API_KEY.
 import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
-  stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm,
+  stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, modelMismatch,
 } from './video/rules.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
@@ -115,7 +115,7 @@ ok('clip bắt buộc (matchBy must) không tách', !splitLongImageScenes([{ ...
 // 17/9 vòng 3: ảnh tách sớm hơn clip (ảnh >= 30 từ, clip >= 40 từ).
 const img35 = { narration: 'Một hai ba bốn năm sáu bảy tám chín mười một hai ba bốn năm sáu bảy tám chín mười. Một hai ba bốn năm sáu bảy tám chín mười một hai ba bốn.', assetId: 'img-1', role: 'empathy', visual: 'tàu' };
 ok('ảnh 34 từ tách (ngưỡng 30)', splitLongImageScenes([img35], { isImage: () => true, pickAsset: () => 'img-2' }).split);
-ok('clip 34 từ KHÔNG tách (ngưỡng 40)', !splitLongImageScenes([{ ...img35, assetId: 'clip-x' }], { isImage: (id) => id !== 'clip-x', videoToo: true, pickAsset: () => 'img-2' }).split);
+ok('clip 34 từ KHÔNG tách (ngưỡng 36)', !splitLongImageScenes([{ ...img35, assetId: 'clip-x' }], { isImage: (id) => id !== 'clip-x', videoToo: true, pickAsset: () => 'img-2' }).split);
 
 // 6c. Clip bắt buộc nằm ở cảnh nào (7e9cab1a: máy SEA-40 đang chạy bị gán cảnh "thợ máy sửa lần thứ ba").
 eq('clip máy đang chạy -> cảnh giải pháp', mustUseRoleFor({ title: 'Máy lọc nước biển SDVICO hoạt động trên tàu cá Bình Thuận', description: 'Cận cảnh máy lọc nước đang chạy, đồng hồ áp suất' }, false), 'solution');
@@ -123,6 +123,15 @@ eq('clip xử lý sự cố -> cảnh 1', mustUseRoleFor({ title: 'Xử lý sự
 eq('clip kỹ thuật viên lắp đặt -> cảnh giải pháp', mustUseRoleFor({ title: 'Ky thuat vien lap dat may loc nuoc bien SDVICO', description: 'lap dat tren tau' }, false), 'solution');
 eq('video content luôn cảnh 1', mustUseRoleFor({ title: 'Máy lọc nước biển SDVICO hoạt động' }, true), 'hook');
 eq('không clip -> cảnh 1', mustUseRoleFor(null, false), 'hook');
+
+// 6d. Mã model khác (vòng 4: video đọc SF300B nhưng nhãn trên máy trong ảnh ghi SF58B).
+ok('SF58B trong mô tả -> loại khỏi video SF300B', modelMismatch({ title: 'Máy lọc dầu SF300B, ảnh sản phẩm 2', description: 'nhãn trên máy ghi BỘ LỌC DẦU SF58B, video đang gọi SF300B' }, G9));
+ok('SF300B đúng nhóm -> giữ', !modelMismatch({ title: 'Máy lọc dầu SF300B nhìn 3 mặt', description: 'thiết bị inox' }, G9));
+ok('SD12-300 đúng nhóm -> giữ', !modelMismatch({ title: 'Dàn máy lọc dầu diesel SD12-300 tại xưởng', description: '' }, G9));
+ok('SEA-40 lọt vào video lọc dầu -> loại', modelMismatch({ title: 'Cụm đồng hồ máy lọc nước biển SEA-40', description: '' }, G9));
+ok('SEA-40 đúng video lọc nước -> giữ', !modelMismatch({ title: 'Máy lọc nước biển SEA-40', description: '' }, G2));
+ok('không mã model -> giữ', !modelMismatch({ title: 'Tàu cá neo đậu tại cảng', description: 'tàu cũ' }, G9));
+ok('không nhóm -> không lọc', !modelMismatch({ title: 'SF58B', description: '' }, CONTENT_GROUP));
 
 // 7. Phụ đề ngắn dòng (ChatGPT: chữ leo lên giữa khung): mọi mẩu <= MAX_CHARS, MAX_CHARS <= 32.
 ok('MAX_CHARS <= 32', MAX_CHARS <= 32, MAX_CHARS);
