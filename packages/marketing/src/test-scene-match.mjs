@@ -101,5 +101,23 @@ const G9 = '9. Máy Lọc Dầu Diesel SD12-300';
 check(problemPool([...messyContent, assets[1]], 'hook', G9).some((a) => a.id === 'a-dirty'), 'video lọc dầu: cốc lọc dầu cặn đen vẫn được vào cảnh nỗi đau');
 check(!problemPool([...messyContent, assets[1]], 'hook', G2).some((a) => a.id === 'a-dirty'), 'video lọc nước: cốc lọc dầu cặn đen bị loại khỏi cảnh nỗi đau');
 
+// 17/9 vòng 9 (ChatGPT chấm lọc nước 60/100: cảnh 1 "thùng inox trên boong" chiếu ảnh "Hội thảo tập
+// huấn ngư dân"): ảnh hội thảo / tập huấn / trình chiếu không phải đời sống nghề, phải rời kho nỗi đau.
+const seminar = { id: 'c-seminar', kind: 'image', title: 'Hội thảo tập huấn và phổ biến thiết bị cho ngư dân', folder: 'Content', description: 'Khung cảnh hội thảo tập huấn có đông đảo ngư dân, màn hình trình chiếu và người thuyết trình ở bục phát biểu' };
+const pool10 = problemPool([...messyContent, seminar], 'hook', G2).map((a) => a.id);
+check(!pool10.includes('c-seminar'), `ảnh hội thảo bị loại khỏi cảnh nỗi đau (${pool10.join(',')})`);
+check(pool10.includes('c-boat'), 'tàu cũ vẫn ở lại kho nỗi đau');
+
+// 17/9 vòng 9 (ChatGPT: ảnh SF300B đứng 13,7 giây — model chọn cùng tư liệu cho 2 cảnh giải pháp liền
+// nhau, luật "không trùng cảnh liền trước" mới chỉ nằm trong prompt): pick trùng prevId phải bị chọn lại.
+const dupScenes = [
+  { role: 'solution', narration: 'Đã có máy lọc dầu SF300B giữ dầu sạch.', visual: 'máy lọc dầu SF300B' },
+  { role: 'reward', narration: 'Kim phun với bơm cao áp được bảo vệ.', visual: 'máy đang chạy trên tàu' },
+];
+const dupModel = async () => ({ text: JSON.stringify({ picks: [{ scene: 1, asset_id: assets[0].id, fit: 9, why: 'máy' }, { scene: 2, asset_id: assets[0].id, fit: 9, why: 'máy' }] }) });
+const picks11 = await matchScenesToAssets({ ai: null, generate: dupModel, model: 'x', scenes: dupScenes, assets, log: { warn() {}, log() {} } });
+check(picks11[0].assetId === assets[0].id, 'cảnh 1 giữ pick của model');
+check(picks11[1].assetId !== picks11[0].assetId, `2 cảnh liền nhau không trùng tư liệu (${picks11[0].assetId} vs ${picks11[1].assetId})`);
+
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
 process.exit(fails ? 1 : 0);

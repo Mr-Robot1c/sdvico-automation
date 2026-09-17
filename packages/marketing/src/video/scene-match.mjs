@@ -62,7 +62,10 @@ function hasFault(text) {
 // máy lọc / linh kiện SDVICO / giấy tờ / văn phòng khỏi kho Content trước, còn gì mới lấy.
 // Cụm chung (giấy tờ, văn phòng, linh kiện, bình inox...) + cụm của SẢN PHẨM KIA (rules.mjs crossProductTerms:
 // video lọc nước loại ảnh cốc lọc dầu cặn; video lọc dầu vẫn được dùng ảnh đó vì đúng nỗi đau của nó).
-const NOT_PAIN_WORDS = ['lắp ráp', 'hậu trường', 'linh kiện', 'bình chứa', 'bình lọc', 'inox', 'đầu bơm', 'hộp số', 'chế tạo', 'sdvico', 'văn bản', 'nghị quyết', 'quyết định', 'bánh kem', 'sinh nhật', 'túi vải', 'hàng hóa', 'cuộn', 'văn phòng', 'máy tính', 'nhân viên'];
+// 17/9 vòng 9 (ChatGPT chấm lọc nước 60/100: cảnh 1 "thùng inox trên boong cạn đáy" chiếu ảnh "Hội thảo
+// tập huấn ngư dân" — hội trường, màn chiếu, bục phát biểu; ảnh nằm folder Content và không dính từ nào
+// trong danh sách nên lọt kho nỗi đau): cảnh họp hành / trình chiếu không phải đời sống nghề trên tàu.
+const NOT_PAIN_WORDS = ['lắp ráp', 'hậu trường', 'linh kiện', 'bình chứa', 'bình lọc', 'inox', 'đầu bơm', 'hộp số', 'chế tạo', 'sdvico', 'văn bản', 'nghị quyết', 'quyết định', 'bánh kem', 'sinh nhật', 'túi vải', 'hàng hóa', 'cuộn', 'văn phòng', 'máy tính', 'nhân viên', 'hội thảo', 'tập huấn', 'trình chiếu', 'thuyết trình', 'hội nghị', 'phòng họp', 'bục phát biểu', 'tọa đàm', 'lớp học'];
 function isPainLife(a, group) {
   const t = textOf(a);
   return count(t, NOT_PAIN_WORDS) === 0 && count(t, crossProductTerms(group)) === 0;
@@ -241,6 +244,11 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
           log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chọn "${byId.get(mid).title}" nhưng luật vai cảnh chấm ${rs} (hình mới bóng cho cảnh vấn đề) -> chọn lại theo luật`);
         } else if (PROBLEM_ROLES.has(role) && !pool.some((a) => a.id === mid)) {
           log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chọn "${byId.get(mid).title}" là tư liệu folder sản phẩm (máy SDVICO) cho cảnh vấn đề -> chọn lại trong kho Content`);
+        } else if (mid === prevId && assets.length > 1) {
+          // 17/9 vòng 9 (ChatGPT: ảnh SF300B đứng 13,7 giây liền — model chọn cùng tư liệu cho các cảnh
+          // liên tiếp; luật "không dùng 1 tư liệu cho 2 cảnh liền nhau" mới chỉ nằm trong prompt): ép lại
+          // bằng máy — pick của model trùng cảnh liền trước thì chọn theo luật (pickByRole đã phạt prevId).
+          log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chọn trùng tư liệu cảnh liền trước "${byId.get(mid).title}" -> chọn lại theo luật để hình đổi`);
         } else {
           pick = { assetId: mid, fit, why: String(mp.why || '').slice(0, 160), by: 'model' };
         }

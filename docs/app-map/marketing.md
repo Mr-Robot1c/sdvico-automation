@@ -241,3 +241,4 @@ Diễn giải từng bước:
 - Video một bản dọc và một bản ngang, đăng chế độ không công khai.
 
 Cập nhật lần cuối: 21/8/2026.
+<!-- re-verified: 2026-09-17 - vong 9 ChatGPT (69/71/60): rules.mjs tach cau chap nhan dau dong kep sau !? ("thot len" het lot), breakLongSentences be cau 40 tu noi bang phay (cat duoc tung cum cam, canh anh dai tach doi duoc), imageryDriftSentences/cutImageryDrift cat cau ta canh vat khong co trong tu lieu (mam com tren boong tren clip van phong); scene-match NOT_PAIN_WORDS + hoi thao/tap huan/trinh chieu, model pick trung tu lieu canh lien truoc bi chon lai; script.mjs ap 3 luat + soat troi hinh trong vong sinh lai; srt.mjs cung regex tach cau. Test 123/123 + test:scene. -->

@@ -4,6 +4,7 @@
 import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
   stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
+  breakLongSentences, imageryDriftSentences, cutImageryDrift,
 } from './video/rules.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
@@ -167,6 +168,37 @@ eq('2 câu ngắn = 2 mẩu theo câu', b3, ['Máy nổ êm hơn.', 'Kỹ thuậ
 // Câu dài có vế: cắt tại dấu phẩy, không cắt giữa vế.
 const b4 = buildBlocks('Máy cơ giảm từ 45 triệu chỉ còn 3 X triệu, máy điện giảm từ 56 triệu chỉ còn 4 X triệu, đã gồm công lắp!', 8).map((b) => b.text);
 ok('vế giá không bị đứt giữa chừng', b4.every((t) => t.length <= MAX_CHARS) && b4.some((t) => t.startsWith('Máy cơ giảm')) && b4.some((t) => t.startsWith('máy điện giảm')), b4);
+
+// 17/9 vòng 9 — (a) câu trích kết thúc !" làm regex tách câu bó tay, "thốt lên" lọt vào video 7e9cab1a.
+eq('cắt được câu sau câu trích đóng bằng !"',
+  stripSentencesWith('"Thùng chứa cạn sạch rồi anh em ơi!" Câu nói đó anh thợ máy vừa nói giữa trưa.', ['giữa trưa']),
+  '"Thùng chứa cạn sạch rồi anh em ơi!"');
+// (b) câu 40 từ nối 4 vế bằng phẩy (cảnh giải pháp 492313ac) — bẻ thành câu ngắn để cắt được từng cụm cấm.
+const MEGA = 'May mà có Máy lọc dầu SF300B giữ dầu sạch bong, với độ lọc từ 1 tới 10 micromet giúp tách sạch nước, bảo vệ kim phun và bơm cao áp, đồng thời tiết kiệm 5 tới 10% nhiên liệu cho anh em yên tâm bám biển!';
+const broken = breakLongSentences(MEGA);
+ok('câu 40 từ bẻ thành nhiều câu', broken.split(/(?<=[.!?…])\s+/).length >= 3, broken);
+ok('mỗi câu sau khi bẻ <= 20 từ', broken.split(/(?<=[.!?…])\s+/).every((s) => s.split(/\s+/).length <= 20), broken);
+const cutMega = stripSentencesWith(broken, ['may mà có', 'sạch bong', 'yên tâm bám biển']);
+ok('bẻ xong cắt cụm cấm còn giữ được thông tin', cutMega.includes('kim phun') && !cutMega.includes('sạch bong') && !cutMega.includes('yên tâm bám biển'), cutMega);
+eq('câu ngắn giữ nguyên', breakLongSentences('Máy nổ êm hơn. Kỹ thuật lắp tận bến!'), 'Máy nổ êm hơn. Kỹ thuật lắp tận bến!');
+eq('số thập phân "1,5" không bị bẻ', breakLongSentences('Máy tiết kiệm 1,5 lít mỗi giờ.'), 'Máy tiết kiệm 1,5 lít mỗi giờ.');
+// (c) lời trôi khỏi hình: "mâm cơm trên boong" đọc trên clip văn phòng (8c8347a4), "thùng inox" trên ảnh hội thảo (7e9cab1a).
+const OFFICE = 'Nữ nhân viên văn phòng SDVICO ngồi làm việc trước màn hình máy tính, người rõ từ đầu';
+eq('bắt câu mâm cơm trên boong trên hình văn phòng',
+  imageryDriftSentences('Nhìn anh em thao tác máy móc qua màn hình. Đã lắm những lúc quây quần bên mâm cơm nóng trên boong!', OFFICE),
+  ['Đã lắm những lúc quây quần bên mâm cơm nóng trên boong!']);
+eq('hình có boong thì không bắt', imageryDriftSentences('Bữa cơm trên boong tàu vui lắm.', 'Ngư dân ăn cơm trên boong tàu cá'), []);
+eq('bắt "ở cảng" trên hình văn phòng (nguyên từ, không dính "cảnh")', imageryDriftSentences('Chiều muộn ở cảng, nhìn anh em thao tác.', 'Cảnh quay nhân viên văn phòng'), ['Chiều muộn ở cảng, nhìn anh em thao tác.']);
+eq('cắt giữ câu khớp hình', cutImageryDrift('Nhìn anh em qua màn hình. Nhớ mâm cơm trên boong!', OFFICE), 'Nhìn anh em qua màn hình.');
+eq('cắt hết thì trả rỗng để người gọi giữ bản gốc', cutImageryDrift('Nhớ mâm cơm nóng trên boong!', OFFICE), '');
+eq('không trôi thì giữ nguyên', cutImageryDrift('Máy khục khặc vì cặn bẩn.', OFFICE), 'Máy khục khặc vì cặn bẩn.');
+// (d) cụm sáo vòng 9 phải nằm trong EXTRA_WORN.
+for (const p of ['nhớ quá', 'đã lắm', 'quây quần', 'mâm cơm', 'cạn đáy', 'một giọt nước', 'không còn lo', 'loay hoay']) {
+  ok(`EXTRA_WORN vòng 9 có "${p}"`, EXTRA_WORN.includes(p));
+}
+// (e) phụ đề: câu trích đóng bằng !" tách thành mẩu riêng, không dính câu sau.
+const bQuote = buildBlocks('"Hết nước rồi anh em ơi!" Anh thợ máy vừa nói vậy đó.', 6).map((b) => b.text);
+ok('phụ đề tách sau câu trích !"', bQuote[0] === '"Hết nước rồi anh em ơi!"', bQuote);
 
 const failed = cases.filter((c) => !c.ok);
 for (const c of cases) console.log(`${c.ok ? 'OK  ' : 'FAIL'} ${c.name}${c.ok ? '' : ` -> got ${JSON.stringify(c.got)}${c.want !== undefined ? ` want ${JSON.stringify(c.want)}` : ''}`}`);

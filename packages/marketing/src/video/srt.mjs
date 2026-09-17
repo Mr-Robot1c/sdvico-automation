@@ -51,7 +51,8 @@ function chunk(text) {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if (!clean) return [];
   const out = [];
-  for (const sent of clean.split(/(?<=[.!?…])\s+/)) {
+  // 17/9 vòng 9: câu trích kết thúc bằng !" — cho phép dấu đóng kép đứng sau dấu câu (cùng luật rules.mjs).
+  for (const sent of clean.split(/(?<=[.!?…]["”’»)]?)\s+/)) {
     if (sent.length <= MAX_CHARS) { out.push(sent); continue; }
     // Gom các vế (kết bằng dấu phẩy) vào mẩu <= MAX_CHARS.
     let cur = '';

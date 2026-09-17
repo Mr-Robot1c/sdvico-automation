@@ -6,7 +6,7 @@ import { guardLines, guardViolations, stripViolatingSentences } from '../product
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
 import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool } from './scene-match.mjs';
-import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes } from './rules.mjs';
+import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -222,7 +222,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   const system = [
     'Bạn dựng kịch bản video ngắn cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     'Giọng gần gũi bà con ngư dân, câu ngắn gọn, dễ nghe khi lồng tiếng. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM trong bài nguồn (xem SỰ THẬT NGHỀ bên dưới); KHÔNG tự thêm lợi ích không có trong bài.',
-    'LỜI THOẠI PHẢI CÓ CẢM XÚC như người kể chuyện cho bạn nghe (sếp góp ý 21/8: giọng đọc đều đều buồn ngủ): xen câu hỏi tu từ đúng chỗ (tự nghĩ câu mới theo nội dung, KHÔNG dùng lại "Bà con có thấy vậy không?" vì đã mòn), câu cảm ngắn ("Đã lắm!", "Yên tâm hẳn!"), ngắt nhịp bằng dấu phẩy và câu ngắn 6 tới 12 chữ. Máy đọc lên xuống giọng THEO DẤU CÂU, nên dấu chấm hỏi, chấm than, dấu phẩy đặt đúng chỗ là giọng có hồn. BẮT BUỘC (sếp 5/9, các sếp chê giọng đều đều): MỖI CẢNH có ít nhất 1 câu cảm ngắn kết bằng dấu chấm than hoặc 1 câu hỏi ngắn kết bằng dấu chấm hỏi; câu dài quá 14 chữ phải tách thành 2 câu.',
+    'LỜI THOẠI PHẢI CÓ CẢM XÚC như người kể chuyện cho bạn nghe (sếp góp ý 21/8: giọng đọc đều đều buồn ngủ): xen câu hỏi tu từ đúng chỗ (tự nghĩ câu mới theo nội dung, KHÔNG dùng lại "Bà con có thấy vậy không?" vì đã mòn), câu cảm ngắn ("Nhẹ cả người!", "Yên tâm hẳn!"), ngắt nhịp bằng dấu phẩy và câu ngắn 6 tới 12 chữ. Máy đọc lên xuống giọng THEO DẤU CÂU, nên dấu chấm hỏi, chấm than, dấu phẩy đặt đúng chỗ là giọng có hồn. BẮT BUỘC (sếp 5/9, các sếp chê giọng đều đều): MỖI CẢNH có ít nhất 1 câu cảm ngắn kết bằng dấu chấm than hoặc 1 câu hỏi ngắn kết bằng dấu chấm hỏi; câu dài quá 14 chữ phải tách thành 2 câu.',
     'KHÔNG MỞ ĐẦU BẰNG LỜI CHÀO (sếp bỏ 4/9): CẤM mọi câu chào kiểu "Alo alo bà con ơi!", "Hello anh em đi biển ơi!", "Hello các thuyền trưởng!", "Hello các con vợ ơi!", "Anh em ơi, nghe nè!", "Xin chào bà con", "Chào cả nhà"... Câu ĐẦU TIÊN của video phải là HOOK vào thẳng vấn đề, không chào, không xưng tên kênh. Cả video vẫn nói như người trẻ kể chuyện cho anh em đi biển nghe: năng lượng cao, tự nhiên, có thể chêm "nha", "nè", "luôn á"; NHƯNG vẫn tôn trọng bà con, không chửi bậy, không lố tới mức mất uy tín thiết bị.',
     ...(opts.contentVideo ? CONTENT_STRUCTURE : SALES_STRUCTURE),
     shownName ? `TÊN SẢN PHẨM: gọi đúng "${shownName}" trong lời thoại, KHÔNG gọi tên khác, KHÔNG đọc mã SD12-300.` : '',
@@ -384,9 +384,12 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     hookPinMiss = false;
     if (hookPin) {
       const first = (parsed.vertical?.scenes || [])[0];
-      if (first && visualOverlap(`${first.visual || ''} ${first.narration || ''}`, hookPin) === 0) {
+      // 17/9 vòng 9: overlap > 0 chưa đủ — model có thể ghi "visual" đúng hình nhưng LỜI vẫn tả cảnh vật
+      // không có trong hình ("thùng inox trên boong" trên ảnh hội thảo). Soát thêm lời trôi khỏi hình.
+      const drift = first ? imageryDriftSentences(first.narration || '', `${hookPin.title || ''} ${hookPin.description || ''}`) : [];
+      if (first && (visualOverlap(`${first.visual || ''} ${first.narration || ''}`, hookPin) === 0 || drift.length)) {
         hookPinMiss = true;
-        console.warn(`[script] loi canh 1 khong an nhap tu lieu da chon "${String(hookPin.title || '').slice(0, 50)}" (lan ${attempt + 1}) — sinh lai theo mo ta hinh.`);
+        console.warn(`[script] loi canh 1 khong an nhap tu lieu da chon "${String(hookPin.title || '').slice(0, 50)}" (lan ${attempt + 1})${drift.length ? ` — cau troi khoi hinh: "${drift[0].slice(0, 60)}"` : ''} — sinh lai theo mo ta hinh.`);
       }
     }
     // 17/9: cảnh 1 phải chung từ ngữ với mô tả clip bắt buộc (visualOverlap 0 = mở màn lạc đề).
@@ -397,13 +400,26 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       const target = mustRole === 'solution' ? (scs.find((s) => String(s?.role || '').toLowerCase() === 'solution') || scs[scs.length - 1]) : scs[0];
       if (target) {
         const ov = visualOverlap(`${target.visual || ''} ${target.narration || ''}`, mustAsset);
-        if (ov === 0) {
+        // 17/9 vòng 9: cảnh gắn clip bắt buộc cũng soát lời trôi khỏi hình (video cộng đồng 8c8347a4 đọc
+        // "quây quần bên mâm cơm nóng trên boong" trên clip văn phòng dù câu đầu đã viết đúng theo clip).
+        const drift = imageryDriftSentences(target.narration || '', `${mustAsset.title || ''} ${mustAsset.description || ''}`);
+        if (ov === 0 || drift.length) {
           mustMiss = true;
-          console.warn(`[script] canh ${mustRole === 'solution' ? 'giai phap' : '1'} khong an nhap clip bat buoc "${String(mustAsset.title || '').slice(0, 50)}" (lan ${attempt + 1}) — sinh lai theo mo ta clip.`);
+          console.warn(`[script] canh ${mustRole === 'solution' ? 'giai phap' : '1'} khong an nhap clip bat buoc "${String(mustAsset.title || '').slice(0, 50)}" (lan ${attempt + 1})${drift.length ? ` — cau troi khoi hinh: "${drift[0].slice(0, 60)}"` : ''} — sinh lai theo mo ta clip.`);
         }
       }
     }
     if (!viol.length && !worn.length && !mustMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate) break;
+  }
+  // 17/9 vòng 9: bẻ câu 30-40 từ nối bằng dấu phẩy thành câu ngắn TRƯỚC mọi đường cắt — câu khổng lồ
+  // làm cắt-cụm-cấm rỗng cả cảnh (bị khôi phục nguyên cụm cấm) và làm tách-cảnh-dài bất lực (ảnh đứng
+  // 13,7 giây). Prompt đã cấm câu quá 14 chữ nhưng model vẫn viết.
+  for (const k of ['vertical', 'horizontal']) {
+    for (const sc of parsed[k]?.scenes || []) {
+      if (!sc) continue;
+      const broken = breakLongSentences(sc.narration || '');
+      if (broken !== sc.narration) { sc.narration = broken; console.warn(`[script] cau qua dai noi bang day phay — da be thanh cau ngan (${k})`); }
+    }
   }
   // 17/9 tối (bản 492313ac: cảnh GIẢI PHÁP bị cắt rỗng vì dính cụm cấm nên biến mất, video bán hàng
   // không còn cảnh sản phẩm): giữ bản gốc từng cảnh; cắt xong mà rỗng thì KHÔI PHỤC lời gốc (chấp
@@ -482,6 +498,23 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   // 17/9 vòng 3: cảnh 1 dùng đúng tư liệu đã chọn trước (lời đã viết theo mô tả hình này).
   if (hookPin && vertical.length && vertical[0].matchBy !== 'must') {
     vertical[0] = { ...vertical[0], assetId: hookPin.id, matchBy: 'hook-pin', why: 'tư liệu cảnh 1 chọn trước, lời viết theo hình (17/9 vòng 3)' };
+  }
+  // 17/9 vòng 9 (ChatGPT: "nút thắt là đồng bộ lời với đúng cảnh" — "mâm cơm trên boong" đọc trên clip
+  // văn phòng, "thùng inox trên boong" trên ảnh hội thảo): sau khi biết cảnh nào mang tư liệu nào, cắt
+  // câu tả cảnh vật KHÔNG có trong mô tả tư liệu (chỉ cảnh vấn đề / đời sống; cắt hết thì giữ nguyên
+  // như luật cắt cụm cấm, có log để soi).
+  for (const [i, s] of vertical.entries()) {
+    if (!['hook', 'empathy', 'story'].includes(s.role)) continue;
+    const a = assets.find((x) => x.id === s.assetId);
+    if (!a) continue;
+    const cut = cutImageryDrift(s.narration, `${a.title || ''} ${a.description || ''} ${a.label || ''}`);
+    if (cut === s.narration) continue;
+    if (cut) {
+      console.warn(`[script] canh ${i + 1} (${s.role}): cat cau ta canh vat khong co trong tu lieu "${String(a.title || '').slice(0, 50)}"`);
+      s.narration = cut;
+    } else {
+      console.warn(`[script] canh ${i + 1} (${s.role}): loi troi khoi hinh nhung cat het se rong canh — giu nguyen (can soi tay)`);
+    }
   }
   // 17/9 vòng 7 (cắt câu chứa "sạch bóng" làm mất luôn tên máy — video bán hàng đọc "Thiết bị có độ
   // lọc..." không ai biết máy gì): cảnh giải pháp phải GỌI TÊN sản phẩm; mất thì chèn câu tên lên đầu.

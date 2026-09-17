@@ -61,12 +61,19 @@ export function unsourcedPercents(text, sources = []) {
   return out;
 }
 
+// 17/9 vòng 9 (ChatGPT: "thốt lên" và "sạch bong" vẫn lọt vào video dù đã cấm từ vòng 5): câu trích kết
+// thúc bằng !" hay ?" làm regex tách câu cũ (nhìn đúng 1 ký tự trước khoảng trắng) không tách được, cả
+// cụm dài thành "1 câu" — cắt là rỗng cảnh nên bộ khôi phục giữ nguyên cụm cấm. Cho phép dấu đóng
+// ngoặc/kép đứng giữa dấu câu và khoảng trắng.
+const SENT_SPLIT = /(?<=[.!?…]["”’»)]?)\s+/;
+const SENT_SPLIT_NL = /(?<=[.!?…]["”’»)]?)\s+|\n/;
+
 // Bỏ các CÂU chứa bất kỳ cụm nào trong phrases (không phân biệt hoa thường). Dự phòng khi sinh lại vẫn dính.
 export function stripSentencesWith(text, phrases) {
   const bad = (phrases || []).map((p) => String(p).toLowerCase()).filter(Boolean);
   if (!bad.length) return text;
   return String(text || '')
-    .split(/(?<=[.!?…])\s+|\n/)
+    .split(SENT_SPLIT_NL)
     .filter((s) => !bad.some((b) => s.toLowerCase().includes(b)))
     .join(' ')
     .replace(/\s{2,}/g, ' ')
@@ -96,6 +103,10 @@ export const EXTRA_WORN = [
   // 17/9 vòng 6 (ChatGPT: "câu kết quả không được quảng cáo mạnh hơn dữ liệu"): tuyệt đối, giòn tan,
   // đội nón ra đi, lo trọn vẹn, vững tâm, hụt hẫng, vang lên; "sạch bóng" là biến thể của "sạch bong".
   'tuyệt đối', 'giòn tan', 'đội nón', 'trọn vẹn', 'vững tâm', 'hụt hẫng', 'vang lên', 'sạch bóng',
+  // 17/9 vòng 9 (ChatGPT 69/71/60: "Nhớ quá những chuyến bám biển", "Đã lắm những lúc quây quần bên
+  // mâm cơm nóng trên boong", "cạn đáy rồi anh em ơi", "không còn một giọt nước", "không còn lo cạn
+  // nước", "loay hoay sửa máy" — văn AI kể chuyện / kịch hóa, không phải thông tin).
+  'nhớ quá', 'đã lắm', 'quây quần', 'mâm cơm', 'cạn đáy', 'một giọt nước', 'không còn lo', 'loay hoay',
 ];
 
 // Outro = MỘT câu, MỘT hành động (user 17/9 theo ChatGPT: "không nên vừa bảo gọi, vừa bảo comment,
@@ -122,7 +133,7 @@ export function outroScreenKeyword(keyword) {
 }
 
 const wordCount = (s) => String(s || '').trim().split(/\s+/).filter(Boolean).length;
-const sentencesOf = (s) => String(s || '').trim().split(/(?<=[.!?…])\s+/).filter(Boolean);
+const sentencesOf = (s) => String(s || '').trim().split(SENT_SPLIT).filter(Boolean);
 // Chuẩn hóa để so câu giá (cùng cách ensureSpokenTeaser trong products.mjs): model hay viết "9,X triệu"
 // thay vì "9 phẩy X triệu".
 const normPrice = (t) => String(t || '').toLowerCase().replace(/,\s*x/g, 'phẩyx').replace(/\s+/g, '');
@@ -225,11 +236,69 @@ export function wordsBeforeSolution(scenes) {
   }
   return n;
 }
+// 17/9 vòng 9 (ChatGPT: cảnh giải pháp lọc dầu là MỘT câu 40 từ nối 4 vế bằng dấu phẩy, chứa cùng lúc
+// "may mà có" + "sạch bong" + "yên tâm bám biển"; cắt câu là rỗng cảnh nên bộ khôi phục giữ nguyên cả
+// 3 cụm cấm, và ảnh SF300B đứng 13,7 giây vì cảnh "1 câu" không tách đôi được): câu nhiều hơn maxWords
+// từ mà có dấu phẩy thì bẻ tại ranh giới vế thành các câu <= chunkWords từ. Prompt đã cấm câu quá 14
+// chữ nhưng model vẫn viết — đây là chốt máy. Chỉ tách ở ", " (phẩy + khoảng trắng) nên số kiểu "1,5"
+// không bị đụng.
+export function breakLongSentences(text, { maxWords = 20, chunkWords = 14 } = {}) {
+  const out = [];
+  for (const sent of sentencesOf(text)) {
+    if (wordCount(sent) <= maxWords || !/,\s/.test(sent)) { out.push(sent); continue; }
+    const clauses = sent.split(/,\s+/);
+    const chunks = [];
+    let cur = '';
+    for (const c of clauses) {
+      const cand = cur ? `${cur}, ${c}` : c;
+      if (cur && wordCount(cand) > chunkWords) { chunks.push(cur); cur = c; } else cur = cand;
+    }
+    if (cur) chunks.push(cur);
+    out.push(...chunks.map((c, i) => {
+      let t = c.trim().replace(/,$/, '');
+      if (i > 0) t = t.charAt(0).toUpperCase() + t.slice(1);
+      if (i < chunks.length - 1 && !/[.!?…]["”’»)]?$/.test(t)) t += '.';
+      return t;
+    }));
+  }
+  return out.join(' ').trim();
+}
+
+// 17/9 vòng 9 (ChatGPT: video cộng đồng đọc "quây quần bên mâm cơm nóng trên boong" trên clip VĂN PHÒNG,
+// lọc nước mở màn "thùng inox trên boong đã cạn đáy" trên ảnh HỘI THẢO — "nút thắt hiện tại là đồng bộ
+// lời mới với đúng cảnh cũ"): câu nhắc CẢNH VẬT CỤ THỂ (boong, mâm cơm, thùng nước, cảng...) thì mô tả
+// tư liệu của cảnh phải có cảnh vật đó; không có = "lời trôi khỏi hình". Chỉ dùng cho cảnh vấn đề / đời
+// sống (hook, empathy, story) — câu lợi ích ở cảnh giải pháp không bị đụng. So không dấu; từ ngắn so
+// nguyên từ ("cảng" -> "cang" không được dính "cảnh" -> "canh").
+const IMAGERY_TERMS = ['trên boong', 'boong tàu', 'mâm cơm', 'thùng inox', 'thùng nước', 'trưa nắng', 'sương mù', 'sương mờ', 'chợ cá', 'kéo lưới', 'mẻ lưới', 'phòng họp', 'hội thảo', 'văn phòng', 'bến cá', 'cảng'];
+const foldText = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+function hasImagery(foldedText, term) {
+  const f = foldText(term);
+  if (f.includes(' ') || f.length > 4) return foldedText.includes(f);
+  return new RegExp(`(^|[^a-z0-9])${f}($|[^a-z0-9])`).test(foldedText);
+}
+export function imageryDriftSentences(narration, assetText) {
+  const at = foldText(assetText);
+  const out = [];
+  for (const sent of sentencesOf(narration)) {
+    const fs = foldText(sent);
+    const terms = IMAGERY_TERMS.filter((t) => hasImagery(fs, t));
+    if (terms.length && !terms.some((t) => hasImagery(at, t))) out.push(sent);
+  }
+  return out;
+}
+// Cắt các câu trôi khỏi hình; cắt hết thì trả '' (người gọi tự quyết giữ bản gốc, như luật cắt cụm cấm).
+export function cutImageryDrift(narration, assetText) {
+  const bad = new Set(imageryDriftSentences(narration, assetText));
+  if (!bad.size) return String(narration || '');
+  return sentencesOf(narration).filter((s) => !bad.has(s)).join(' ').trim();
+}
+
 export function trimEarlyScenes(scenes, maxWords = 58) {
   const list = (Array.isArray(scenes) ? scenes : []).map((s) => ({ ...s }));
   let trimmed = false;
   const dropLastSentence = (scene) => {
-    const sents = String(scene.narration || '').trim().split(/(?<=[.!?…])\s+/).filter(Boolean);
+    const sents = sentencesOf(scene.narration);
     if (sents.length < 2) return false;
     scene.narration = sents.slice(0, -1).join(' ');
     return true;
