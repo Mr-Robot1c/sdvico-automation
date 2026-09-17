@@ -21,6 +21,11 @@ const nextConfig = {
   // Native binary (.node) — để Next require lúc chạy, không nhồi vào bundle webpack.
   // Ghép logo dùng @napi-rs/canvas (external, tự trace như banner) + logo nhúng base64.
   experimental: {
+    // 17/9 (Thanh: "bấm chuyển đổi giữa các trang vẫn còn quá chậm"): giữ trang đã xem trong
+    // cache trình duyệt 30 giây — bấm qua lại giữa các menu là hiện NGAY, không chờ máy chủ
+    // dựng lại. Dữ liệu chậm tối đa 30s; AutoRefresh / bấm Duyệt (router.refresh, revalidate)
+    // vẫn ép mới ngay như cũ.
+    staleTimes: { dynamic: 30 },
     serverComponentsExternalPackages: ['@napi-rs/canvas'],
     // 8/9 GIẢM FUNCTIONS STORAGE (Vercel báo team a-644f hết 10 GB): trước đây
     // outputFileTracingIncludes nhét binary ffmpeg linux (~68 MB, nén ~23 MB) vào MỌI function
