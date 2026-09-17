@@ -42,5 +42,17 @@ console.log('4. Clip thật bắt buộc ở cảnh 1');
 const picks3 = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes, assets, mustUseAssetId: 'v-boat', log: { warn() {}, log() {} } });
 check(picks3[0].assetId === 'v-boat' && picks3[0].by === 'must', 'cảnh 1 = clip bắt buộc');
 
+// 17/9 (bài 8c8347a4: lời "cảng cá sương mờ" nhưng clip văn phòng): điểm khớp cảnh 1 phải là
+// điểm THẬT, không gán cứng 10 — kịch bản lệch clip thì fit thấp để script.mjs sinh lại.
+console.log('5. Clip bắt buộc nhưng lời lệch -> fit thấp, không phải 10');
+const officeAssets = [...assets, { id: 'v-office', kind: 'video', title: 'Nhan vien van phong thao tac may tinh', folder: 'Content', description: 'Nhan vien nu ngoi truoc may tinh van phong, cuoi vui ve, khong co thiet bi tau ca', label: 'CLIP THẬT MỚI', fresh: true }];
+const mismatchScenes = [{ role: 'hook', narration: 'Sáng sớm sương mờ buông xuống cảng cá vắng lặng.', visual: 'Bình minh sương mờ trên cảng cá vắng lặng' }, ...scenes.slice(1)];
+const picks4 = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: mismatchScenes, assets: officeAssets, mustUseAssetId: 'v-office', log: { warn() {}, log() {} } });
+check(picks4[0].assetId === 'v-office' && picks4[0].by === 'must', 'cảnh 1 vẫn dùng clip bắt buộc (luật 9/9 giữ)');
+check(picks4[0].fit < 5, `fit thật khi lệch (${picks4[0].fit}) phải dưới 5, không gán cứng 10`);
+const matchScenes2 = [{ role: 'hook', narration: 'Ngồi văn phòng nhìn màn hình máy tính, nhớ biển.', visual: 'nhân viên văn phòng ngồi trước máy tính' }, ...scenes.slice(1)];
+const picks5 = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: matchScenes2, assets: officeAssets, mustUseAssetId: 'v-office', log: { warn() {}, log() {} } });
+check(picks5[0].fit >= 5, `lời khớp clip thì fit khá (${picks5[0].fit} >= 5)`);
+
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
 process.exit(fails ? 1 : 0);

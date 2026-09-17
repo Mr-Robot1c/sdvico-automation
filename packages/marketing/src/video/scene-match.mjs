@@ -26,17 +26,29 @@ const SOLUTION_WORDS = ['lắp', 'lắp đặt', 'đang chạy', 'vận hành', 
 function textOf(a) {
   return `${a.title || ''} ${a.description || ''} ${a.label || ''}`.toLowerCase();
 }
-function count(text, words) {
+// 17/9: so KHÔNG DẤU cả hai phía (mô tả cũ hay ghi không dấu); từ ngắn <= 3 ký tự sau khi bỏ
+// dấu ("cũ" -> "cu") phải khớp nguyên từ, tránh dính "cua", "cum"...
+function count(text, list) {
+  const t = fold(text);
   let n = 0;
-  for (const w of words) if (text.includes(w)) n += 1;
+  for (const w of list) {
+    const f = fold(w);
+    const hit = f.length <= 3 ? new RegExp(`(^|[^a-z0-9])${f}($|[^a-z0-9])`).test(t) : t.includes(f);
+    if (hit) n += 1;
+  }
   return n;
 }
 function isVideoAsset(a) { return a.kind === 'video' || a.kind === 'clip'; }
 
 // Từ có nghĩa trong câu "hình cần" (>= 3 ký tự, bỏ từ nối) để so với tiêu đề + mô tả tư liệu.
-const STOP = new Set(['của', 'cho', 'với', 'trên', 'trong', 'đang', 'một', 'các', 'những', 'này', 'kia', 'và', 'hoặc', 'cảnh', 'hình', 'ảnh', 'clip', 'video', 'thấy', 'cần', 'có', 'là', 'được', 'tại', 'từ', 'đến', 'khi', 'thì', 'mà', 'rất', 'nhiều', 'đó']);
+// 17/9: QUY VỀ KHÔNG DẤU trước khi so — nhiều mô tả tư liệu cũ ghi không dấu ("Nhan vien van
+// phong"), so có dấu vs không dấu trượt hết làm visualOverlap luôn bằng 0 với các tư liệu đó.
+function fold(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+}
+const STOP = new Set(['cua', 'cho', 'voi', 'tren', 'trong', 'dang', 'mot', 'cac', 'nhung', 'nay', 'kia', 'va', 'hoac', 'canh', 'hinh', 'anh', 'clip', 'video', 'thay', 'can', 'co', 'la', 'duoc', 'tai', 'tu', 'den', 'khi', 'thi', 'ma', 'rat', 'nhieu', 'do']);
 function words(text) {
-  return String(text || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3 && !STOP.has(w));
+  return fold(text).split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3 && !STOP.has(w));
 }
 // Số từ trùng giữa "hình cần" của cảnh và tư liệu (0..n) — tín hiệu nội dung trực tiếp.
 export function visualOverlap(visual, asset) {
@@ -160,7 +172,16 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
     const prevId = i > 0 ? out[i - 1]?.assetId || null : null;
     let pick = null;
     if (i === 0 && mustUseAssetId && ids.has(mustUseAssetId)) {
-      pick = { assetId: mustUseAssetId, fit: 10, why: 'clip thật bắt buộc (9/9)', by: 'must' };
+      // 17/9 (bài 8c8347a4 lời "cảng cá sương mờ" nhưng clip là văn phòng): vẫn ÉP clip thật
+      // (luật 9/9) nhưng điểm khớp phải là điểm THẬT — model chấm nếu có, không thì đo trùng
+      // từ với "hình cần"; lệch thì cảnh báo to (script.mjs đã có vòng sinh lại theo mô tả clip).
+      const mp = modelPicks.find((p) => Number(p?.scene) === 1);
+      const sameId = mp && String(mp.asset_id || '') === mustUseAssetId;
+      const mFit = sameId && Number.isFinite(Number(mp.fit)) ? Math.max(0, Math.min(10, Number(mp.fit))) : null;
+      const fit = mFit ?? Math.max(0, Math.min(10, 3 + visualOverlap(scenes[0]?.visual || '', byId.get(mustUseAssetId)) * 2));
+      const why = (sameId && mp.why ? String(mp.why).slice(0, 140) + ' — ' : '') + 'clip thật bắt buộc (9/9)';
+      if (fit < 5) log.warn(`[scene-match] cảnh 1: clip bắt buộc "${String(byId.get(mustUseAssetId)?.title || '').slice(0, 50)}" khớp lời YẾU (fit=${fit}) — kịch bản chưa mở theo nội dung clip.`);
+      pick = { assetId: mustUseAssetId, fit, why, by: 'must' };
     } else {
       const mp = modelPicks.find((p) => Number(p?.scene) === i + 1);
       const mid = mp ? String(mp.asset_id || '') : '';
