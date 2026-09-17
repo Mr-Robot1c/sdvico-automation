@@ -75,5 +75,31 @@ check(problemPool(gaugeAssets, 'solution').length === gaugeAssets.length, 'probl
 const faultClip = { id: 'v-fault', kind: 'video', title: 'Xử lý sự cố máy lọc dầu SD12-300', folder: '9. Máy Lọc Dầu Diesel SD12-300', description: 'thợ tháo cốc lọc đầy cặn' };
 check(problemPool([faultClip, assets[0]], 'hook').some((a) => a.id === 'v-fault') && !problemPool([faultClip, assets[0]], 'hook').some((a) => a.id === 'a-new'), 'clip quay sự cố ở folder sản phẩm vẫn được vào cảnh vấn đề');
 
+// 17/9 chiều (3): kho Content lẫn ảnh ruột máy lọc dầu, bình inox, văn bản, bánh sinh nhật -> cảnh nỗi đau
+// chỉ lấy tư liệu đời sống nghề (tàu, cảng, ngư dân, khoang máy).
+console.log('8. Cảnh nỗi đau không lấy ảnh ruột máy / giấy tờ / văn phòng dù nằm ở kho Content');
+const messyContent = [
+  { id: 'c-parts', kind: 'image', title: 'Hậu trường lắp ráp thiết bị tàu cá của SDVICO', folder: 'Content', description: 'Canh goc close-up hai ong thiet bi cu co dau ban va linh kien ben trong' },
+  { id: 'c-tank', kind: 'image', title: 'Bình chứa inox chuyên dụng dùng cho thiết bị tàu cá', folder: 'Content', description: 'Binh loc dau va nuoc bien bang inox co nhieu vet ban' },
+  { id: 'c-cake', kind: 'image', title: 'Bánh kem mừng kỷ niệm sinh nhật tại văn phòng', folder: 'Content', description: 'Bánh kem đặt trên bàn làm việc' },
+  { id: 'c-doc', kind: 'image', title: 'Nghị quyết của Hội đồng nhân dân', folder: 'Content', description: 'Văn bản pháp lý' },
+  { id: 'c-boat', kind: 'image', title: 'Tàu cá neo đậu tại cảng trong chuyến đi biển', folder: 'Content', description: 'Tau ca cu, son bong troc, co nguoi dang sua chua tren tau' },
+  { id: 'c-engine', kind: 'image', title: 'Thợ máy đang kiểm tra sửa chữa động cơ tàu cá', folder: 'Content', description: 'Hai thợ máy đang đứng sửa chữa phần động cơ trên tàu cá' },
+  assets[3],
+];
+const G2 = '2. Máy lọc nước biển SEA-40';
+const pool8 = problemPool(messyContent, 'empathy', G2).map((a) => a.id);
+check(pool8.includes('c-boat') && pool8.includes('c-engine'), `giữ tàu cũ + thợ máy (${pool8.join(',')})`);
+check(!pool8.some((id) => ['c-parts', 'c-tank', 'c-cake', 'c-doc', 'v-install'].includes(id)), 'loại ruột máy, bình inox, bánh kem, văn bản, clip lắp đặt');
+const waterScenes = [{ role: 'hook', narration: 'Thùng chứa trên boong cạn sạch nước rồi anh em ơi!', visual: 'thùng nước cạn đáy trên boong tàu' }, { role: 'empathy', narration: 'Hết nước ngọt đành nhổ neo quay bờ sớm.', visual: 'tàu cá quay về cảng' }, scenes[2]];
+const partsModel = async () => ({ text: JSON.stringify({ picks: [{ scene: 1, asset_id: 'c-parts', fit: 8, why: 'ống' }, { scene: 2, asset_id: 'c-tank', fit: 8, why: 'bình' }, { scene: 3, asset_id: 'v-install', fit: 9, why: 'lắp' }] }) });
+const picks9 = await matchScenesToAssets({ ai: null, generate: partsModel, model: 'x', scenes: waterScenes, assets: messyContent, productGroup: G2, log: { warn() {}, log() {} } });
+check(['c-boat', 'c-engine'].includes(picks9[0].assetId) && ['c-boat', 'c-engine'].includes(picks9[1].assetId), `cảnh hết nước không còn ảnh ruột máy lọc dầu (${picks9[0].assetId}, ${picks9[1].assetId})`);
+check(picks9[0].assetId !== picks9[1].assetId, 'hai cảnh nỗi đau liền nhau khác tư liệu');
+// Cùng kho đó nhưng video LỌC DẦU: cốc lọc dầu đầy cặn (a-dirty) là nỗi đau đúng, phải được giữ; video lọc nước thì loại.
+const G9 = '9. Máy Lọc Dầu Diesel SD12-300';
+check(problemPool([...messyContent, assets[1]], 'hook', G9).some((a) => a.id === 'a-dirty'), 'video lọc dầu: cốc lọc dầu cặn đen vẫn được vào cảnh nỗi đau');
+check(!problemPool([...messyContent, assets[1]], 'hook', G2).some((a) => a.id === 'a-dirty'), 'video lọc nước: cốc lọc dầu cặn đen bị loại khỏi cảnh nỗi đau');
+
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
 process.exit(fails ? 1 : 0);

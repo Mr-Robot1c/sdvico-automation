@@ -18,6 +18,8 @@
 //     đặt, máy chạy; ảnh sản phẩm được phép.
 //   - Không dùng cùng một tư liệu ở 2 cảnh liền nhau nếu còn lựa chọn khác.
 
+import { crossProductTerms } from './rules.mjs';
+
 const PROBLEM_ROLES = new Set(['hook', 'empathy', 'story']);
 const PROBLEM_WORDS = ['cũ', 'hư', 'hỏng', 'bẩn', 'cặn', 'đục', 'sửa', 'tháo', 'khói', 'rỉ', 'gỉ', 'nằm bờ', 'lợ', 'mặn', 'lọc thô bẩn', 'đen', 'nghẹt', 'kẹt', 'chết máy', 'biển', 'tàu', 'ngư dân', 'bà con', 'cảng', 'khoang máy', 'thợ máy', 'lưới', 'khơi', 'sóng', 'ra khơi', 'cập bến'];
 const SHINY_WORDS = ['mới', 'trưng bày', 'nền trắng', 'studio', 'showroom', 'bóng', 'catalog', 'ảnh sản phẩm', 'đóng gói', 'hộp'];
@@ -54,9 +56,22 @@ function hasFault(text) {
   }
   return count(raw, FAULT_WORDS) > 0;
 }
-export function problemPool(assets, role) {
+// 17/9 chiều (3) (user: "script nói hết sạch nước ngọt mà đem ảnh máy lọc dầu vô"): kho Content lẫn ảnh ruột
+// máy lọc dầu ("Hậu trường lắp ráp thiết bị", "ống thiết bị cũ có dầu bẩn"), bình inox, văn bản, bánh sinh
+// nhật... Cảnh nỗi đau chỉ được là ĐỜI SỐNG NGHỀ (tàu, cảng, ngư dân, khoang máy, thợ máy): loại tư liệu có
+// máy lọc / linh kiện SDVICO / giấy tờ / văn phòng khỏi kho Content trước, còn gì mới lấy.
+// Cụm chung (giấy tờ, văn phòng, linh kiện, bình inox...) + cụm của SẢN PHẨM KIA (rules.mjs crossProductTerms:
+// video lọc nước loại ảnh cốc lọc dầu cặn; video lọc dầu vẫn được dùng ảnh đó vì đúng nỗi đau của nó).
+const NOT_PAIN_WORDS = ['lắp ráp', 'hậu trường', 'linh kiện', 'bình chứa', 'bình lọc', 'inox', 'đầu bơm', 'hộp số', 'chế tạo', 'sdvico', 'văn bản', 'nghị quyết', 'quyết định', 'bánh kem', 'sinh nhật', 'túi vải', 'hàng hóa', 'cuộn', 'văn phòng', 'máy tính', 'nhân viên'];
+function isPainLife(a, group) {
+  const t = textOf(a);
+  return count(t, NOT_PAIN_WORDS) === 0 && count(t, crossProductTerms(group)) === 0;
+}
+export function problemPool(assets, role, group = null) {
   if (!PROBLEM_ROLES.has(role)) return assets;
   const content = assets.filter((a) => String(a.folder || a.product_group || '') === 'Content');
+  const life = content.filter((a) => isPainLife(a, group));
+  if (life.length) return life;
   if (content.length) return content;
   const fault = assets.filter((a) => hasFault(textOf(a)));
   return fault.length ? fault : assets;
@@ -150,7 +165,8 @@ export function assetListForPrompt(assets) {
 // Trả về mảng cùng độ dài scenes: {assetId, fit, why, by: 'model'|'rule'|'must'}.
 // mustUseIndex (17/9 chiều): cảnh nào bị ép dùng clip bắt buộc (0 = cảnh 1 như luật 9/9; video bán hàng có clip
 // sản phẩm đang chạy thì là cảnh giải pháp, xem rules.mjs mustUseRoleFor).
-export async function matchScenesToAssets({ ai, generate, model, scenes, assets, mustUseAssetId = null, mustUseIndex = 0, log = console }) {
+// productGroup (17/9 chiều (3)): nhóm sản phẩm của video bán hàng, để cảnh nỗi đau loại tư liệu của sản phẩm kia.
+export async function matchScenesToAssets({ ai, generate, model, scenes, assets, mustUseAssetId = null, mustUseIndex = 0, productGroup = null, log = console }) {
   const ids = new Set(assets.map((a) => a.id));
   const mustIdx = Math.max(0, Math.min(scenes.length - 1, Number.isInteger(mustUseIndex) ? mustUseIndex : 0));
   const byId = new Map(assets.map((a) => [a.id, a]));
@@ -211,7 +227,7 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
       const mp = modelPicks.find((p) => Number(p?.scene) === i + 1);
       const mid = mp ? String(mp.asset_id || '') : '';
       const fit = mp ? Number(mp.fit) : NaN;
-      const pool = problemPool(assets, role);
+      const pool = problemPool(assets, role, productGroup);
       if (mid && ids.has(mid) && mid !== mustUseAssetId && Number.isFinite(fit) && fit >= 5) {
         // Kiểm lại bằng luật: cảnh vấn đề mà model chọn ảnh sản phẩm bóng (điểm luật âm) thì bỏ.
         const rs = ruleScore(byId.get(mid), role, { visual: scenes[i].visual });

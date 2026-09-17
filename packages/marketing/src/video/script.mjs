@@ -5,7 +5,7 @@ import { knownFactValues, testFactValues } from '../product-facts.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
-import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole } from './scene-match.mjs';
+import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool } from './scene-match.mjs';
 import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
@@ -406,6 +406,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   const picks = assets.length
     ? await matchScenesToAssets({
         ai, generate: generateWithRetry, model: MKT_MODEL, scenes: rawScenes, assets, mustUseAssetId: opts.mustUseAssetId || null, log: console,
+        productGroup: opts.contentVideo ? null : opts.productGroup || null,
         // 17/9 chiều: clip máy đang chạy ép vào cảnh giải pháp (không có role solution thì cảnh cuối).
         mustUseIndex: mustRole === 'solution' ? Math.max(0, (() => { const k = rawScenes.findIndex((s) => s.role === 'solution'); return k >= 0 ? k : rawScenes.length - 1; })()) : 0,
       })
@@ -438,9 +439,12 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     const isImage = (id) => { const a = assets.find((x) => x.id === id); return !!a && a.kind !== 'video' && a.kind !== 'clip'; };
     const usedCount = new Map();
     for (const s of vertical) usedCount.set(s.assetId, (usedCount.get(s.assetId) || 0) + 1);
+    // 17/9 chiều (3): nửa sau của cảnh nỗi đau cũng phải chọn trong kho đời sống nghề (problemPool), không lấy
+    // ruột máy lọc dầu / ảnh máy công ty (bản dựng lại 7e9cab1a cảnh 3 lấy "Hậu trường lắp ráp thiết bị").
+    const groupForPool = opts.contentVideo ? null : opts.productGroup || null;
     const r = splitLongImageScenes(vertical, {
       isImage,
-      pickAsset: (prevId, role, visual) => pickByRole(assets, role, { prevId, usedCount, visual })?.id || null,
+      pickAsset: (prevId, role, visual) => pickByRole(problemPool(assets, role, groupForPool), role, { prevId, usedCount, visual })?.id || null,
     });
     if (r.split) { vertical = r.scenes; console.log('[script] tach canh anh dai thanh 2 canh doi hinh (17/9)'); }
   }
