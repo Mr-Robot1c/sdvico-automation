@@ -3,7 +3,7 @@
 // tách cảnh giá, phụ đề ngắn dòng. Chạy: npm run test:video. Không cần mạng, không cần GEMINI_API_KEY.
 import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
-  stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle,
+  stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor,
 } from './video/rules.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
@@ -84,6 +84,13 @@ ok('không tư liệu thay thế -> không tách', !splitLongImageScenes([longIm
 ok('cảnh ngắn -> không tách', !splitLongImageScenes([{ narration: 'Ngắn thôi. Hai câu.', assetId: 'img-1' }], { isImage: () => true, pickAsset: () => 'img-2' }).split);
 ok('cảnh giá không tách', !splitLongImageScenes([{ ...longImg, role: 'price' }], { isImage: () => true, pickAsset: () => 'img-2' }).split);
 eq('splitNarrationMiddle 1 câu -> null', splitNarrationMiddle('Một câu thôi.'), null);
+
+// 6c. Clip bắt buộc nằm ở cảnh nào (7e9cab1a: máy SEA-40 đang chạy bị gán cảnh "thợ máy sửa lần thứ ba").
+eq('clip máy đang chạy -> cảnh giải pháp', mustUseRoleFor({ title: 'Máy lọc nước biển SDVICO hoạt động trên tàu cá Bình Thuận', description: 'Cận cảnh máy lọc nước đang chạy, đồng hồ áp suất' }, false), 'solution');
+eq('clip xử lý sự cố -> cảnh 1', mustUseRoleFor({ title: 'Xử lý sự cố kỹ thuật máy lọc dầu SD12-300', description: 'Thợ máy kiểm tra máy trong khoang' }, false), 'hook');
+eq('clip kỹ thuật viên lắp đặt -> cảnh giải pháp', mustUseRoleFor({ title: 'Ky thuat vien lap dat may loc nuoc bien SDVICO', description: 'lap dat tren tau' }, false), 'solution');
+eq('video content luôn cảnh 1', mustUseRoleFor({ title: 'Máy lọc nước biển SDVICO hoạt động' }, true), 'hook');
+eq('không clip -> cảnh 1', mustUseRoleFor(null, false), 'hook');
 
 // 7. Phụ đề ngắn dòng (ChatGPT: chữ leo lên giữa khung): mọi mẩu <= MAX_CHARS, MAX_CHARS <= 32.
 ok('MAX_CHARS <= 32', MAX_CHARS <= 32, MAX_CHARS);

@@ -1,6 +1,6 @@
 // test-scene-match.mjs — kiểm luật khớp cảnh ↔ tư liệu (không gọi mạng). Chạy: npm run test:scene
 // Bài toán sếp nêu 15/9: kịch bản "máy hư, nước đục" KHÔNG được chiếu ảnh máy mới bóng.
-import { matchScenesToAssets, pickByRole, ruleScore } from './video/scene-match.mjs';
+import { matchScenesToAssets, pickByRole, ruleScore, problemPool } from './video/scene-match.mjs';
 
 const assets = [
   { id: 'a-new', kind: 'image', title: 'Máy lọc dầu SF300B đặt trên tàu', folder: '6. Thiết bị lọc dầu SF-50', description: 'Máy lọc dầu mới bóng, nền trắng trưng bày, không có người | Hợp cảnh: san_pham_moi' },
@@ -53,6 +53,27 @@ check(picks4[0].fit < 5, `fit thật khi lệch (${picks4[0].fit}) phải dướ
 const matchScenes2 = [{ role: 'hook', narration: 'Ngồi văn phòng nhìn màn hình máy tính, nhớ biển.', visual: 'nhân viên văn phòng ngồi trước máy tính' }, ...scenes.slice(1)];
 const picks5 = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: matchScenes2, assets: officeAssets, mustUseAssetId: 'v-office', log: { warn() {}, log() {} } });
 check(picks5[0].fit >= 5, `lời khớp clip thì fit khá (${picks5[0].fit} >= 5)`);
+
+// 17/9 chiều (video lọc nước 7e9cab1a: "thợ máy sửa lần thứ ba" trên hình máy SEA-40 của công ty đang chạy):
+// clip sản phẩm đang chạy ép vào cảnh GIẢI PHÁP (mustUseIndex), cảnh 1 phải là tư liệu khác.
+console.log('6. Clip máy đang chạy ép vào cảnh giải pháp, không vào cảnh 1');
+const picks6 = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes, assets, mustUseAssetId: 'v-install', mustUseIndex: 2, log: { warn() {}, log() {} } });
+check(picks6[2].assetId === 'v-install' && picks6[2].by === 'must', 'cảnh 3 (solution) = clip bắt buộc');
+check(picks6[0].assetId !== 'v-install' && picks6[0].by !== 'must', 'cảnh 1 không dùng clip máy đang chạy');
+const picks7 = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes, assets, mustUseAssetId: 'v-boat', mustUseIndex: 99, log: { warn() {}, log() {} } });
+check(picks7[2].assetId === 'v-boat' && picks7[2].by === 'must', 'mustUseIndex vượt số cảnh thì kẹp về cảnh cuối');
+
+// 17/9 chiều (2): cảnh vấn đề chiếu ảnh đồng hồ máy SEA-40 (folder sản phẩm, không có từ "mới bóng" nên luật
+// cũ không bác). Nay cảnh vấn đề chỉ lấy kho Content hoặc tư liệu quay sự cố.
+console.log('7. Cảnh vấn đề không được dùng tư liệu folder sản phẩm (kể cả không "mới bóng")');
+const gaugeAssets = [...assets, { id: 'a-gauge', kind: 'image', title: 'Cụm đồng hồ áp suất và màng lọc máy lọc nước biển SEA-40', folder: '2. Máy lọc nước biển SEA-40', description: 'Cận cảnh đồng hồ áp suất và hệ thống ống dẫn của thiết bị trong nhà xưởng' }];
+const gaugeModel = async () => ({ text: JSON.stringify({ picks: [{ scene: 1, asset_id: 'a-gauge', fit: 8, why: 'có máy lọc nước' }, { scene: 2, asset_id: 'v-boat', fit: 8, why: 'tàu' }, { scene: 3, asset_id: 'v-install', fit: 9, why: 'lắp' }] }) });
+const picks8 = await matchScenesToAssets({ ai: null, generate: gaugeModel, model: 'x', scenes, assets: gaugeAssets, log: { warn() {}, log() {} } });
+check(picks8[0].assetId !== 'a-gauge' && ['a-dirty', 'v-boat'].includes(picks8[0].assetId), `cảnh hook bác ảnh đồng hồ máy công ty, lấy kho Content (${picks8[0].assetId})`);
+check(problemPool(gaugeAssets, 'hook').every((a) => a.folder === 'Content'), 'problemPool(hook) chỉ còn kho Content');
+check(problemPool(gaugeAssets, 'solution').length === gaugeAssets.length, 'problemPool(solution) giữ nguyên');
+const faultClip = { id: 'v-fault', kind: 'video', title: 'Xử lý sự cố máy lọc dầu SD12-300', folder: '9. Máy Lọc Dầu Diesel SD12-300', description: 'thợ tháo cốc lọc đầy cặn' };
+check(problemPool([faultClip, assets[0]], 'hook').some((a) => a.id === 'v-fault') && !problemPool([faultClip, assets[0]], 'hook').some((a) => a.id === 'a-new'), 'clip quay sự cố ở folder sản phẩm vẫn được vào cảnh vấn đề');
 
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
 process.exit(fails ? 1 : 0);

@@ -126,6 +126,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   // dưới khoang tàu" trong khi hình là máy lọc nước; video lọc dầu 492313ac mở màn bằng "đầy ắp nước
   // ngọt, về bến cạn khô". Cụm của sản phẩm kia bị cấm trong prompt + soát sau khi sinh (rules.mjs).
   const crossTerms = !opts.contentVideo ? crossProductTerms(opts.productGroup) : [];
+  // 17/9 chiều: clip bắt buộc nằm ở cảnh nào (build-video quyết qua rules.mjs mustUseRoleFor): 'hook' | 'solution'.
+  const mustRole = opts.mustUseRole === 'solution' ? 'solution' : 'hook';
   // 17/9: mọi tỷ lệ phần trăm phải có trong BÀI NGUỒN hoặc thông số được phép (492313ac đọc "ngốn gần
   // 40 phần trăm chi phí chuyến đi" không có nguồn — Điều cấm 5). Soát sau khi sinh: unsourcedPercents.
   const percentSources = [content.title || '', content.draft || '', ...allowed];
@@ -195,6 +197,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       ? `CHỈ NÓI VỀ ĐÚNG SẢN PHẨM CỦA BÀI (17/9): toàn bộ lời thoại chỉ được nói về ${shownName || opts.productGroup}. CẤM nhắc sản phẩm kia hay nỗi đau của sản phẩm kia: ${crossTerms.map((p) => `"${p}"`).join(', ')}. Tình huống mất mát ở trên có nêu cả dầu lẫn nước thì CHỈ lấy vế thuộc sản phẩm này.`
       : '',
     'TỶ LỆ PHẦN TRĂM (17/9, Điều cấm 5): CẤM mọi con số phần trăm ("40%", "gần 40 phần trăm chi phí") không có nguyên văn trong BÀI NGUỒN hoặc THÔNG SỐ ĐƯỢC PHÉP bên dưới. Không có thì nói "một phần lớn", "cả đống tiền".',
+    'NỖI ĐAU LÀ CỦA TÀU CHƯA LẮP MÁY SDVICO (17/9 chiều): máy hỏng, sửa hoài, cặn, nước đục, cạn nước trong cảnh đầu và cảnh đồng cảm là chuyện của tàu CHƯA có thiết bị SDVICO. TUYỆT ĐỐI KHÔNG viết như thể máy SDVICO hỏng hay phải sửa; không đặt tên máy SDVICO vào câu tả sự cố.',
     'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển tiếc nuối, tàu nằm bờ). Không lan man.',
     'CẢNH GIỮA: lối thoát bằng LỢI ÍCH cụ thể (không liệt kê thông số kỹ thuật khô) → phần thưởng cụ thể (đỡ tốn bao nhiêu, đi được bao xa, chở thêm được gì) → tin cậy 1 câu ngắn (lắp tận bến, bảo hành).',
     'CẢNH CUỐI: 1 câu chốt ngắn về LỢI ÍCH/thông điệp sản phẩm (đã có luật ở trên), có thể là câu hỏi mở nhẹ cho bà con nghĩ tiếp. KHÔNG nhắc "gọi", "liên hệ", "hotline" — outro cố định đầu ký đã lo phần đó.',
@@ -221,6 +224,11 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       ? (() => {
           const m = assets.find((a) => a.id === opts.mustUseAssetId);
           const desc = String(m?.description || m?.title || '').replace(/\s+/g, ' ').trim().slice(0, 260);
+          // 17/9 chiều (user: video lọc nước mở màn "thợ máy sửa lần thứ ba" trên hình máy SEA-40 của công ty
+          // đang chạy): clip sản phẩm đang chạy phải vào cảnh GIẢI PHÁP, cảnh đầu là nỗi đau trên tàu CHƯA lắp.
+          if (mustRole === 'solution') {
+            return `TƯ LIỆU BẮT BUỘC (9/9, sửa 17/9): cảnh GIẢI PHÁP (role solution) phải dùng id=${opts.mustUseAssetId} (clip thật mới quay MÁY SDVICO ĐANG CHẠY / ĐANG LẮP). CLIP NÀY QUAY: ${desc || '(chưa có mô tả)'}. Lời thoại và "visual" cảnh giải pháp PHẢI tả đúng những gì clip quay. Cảnh ĐẦU và cảnh ĐỒNG CẢM KHÔNG dùng clip này: nỗi đau phải là chuyện trên tàu CHƯA LẮP máy SDVICO (hình tàu thật, khoang máy cũ, thợ sửa máy cũ). TUYỆT ĐỐI KHÔNG viết như thể máy SDVICO hỏng, sửa hoài, ra cặn, cạn nước.`;
+          }
           return `TƯ LIỆU BẮT BUỘC (9/9): cảnh ĐẦU TIÊN phải dùng id=${opts.mustUseAssetId} (clip thật mới quay). CLIP NÀY QUAY: ${desc || '(chưa có mô tả)'}. LỜI THOẠI và "visual" của cảnh đầu PHẢI xuất phát từ đúng những gì clip quay — mở màn bằng chính cảnh trong clip rồi dẫn vào chuyện; CẤM tả cảnh không có trong clip (bình minh, cảng cá, sóng gió, khoang máy...) nếu clip không quay cảnh đó. Các cảnh khác ưu tiên tư liệu có nhãn clip thật hơn ảnh.`;
         })()
       : '',
@@ -308,7 +316,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       + (!worn.length ? '' :
       `\n\nLẦN TRƯỚC LỜI THOẠI VẪN DÙNG CỤM ĐÃ MÒN: ${worn.map((p) => `"${p}"`).join(', ')}. Viết lại toàn bộ, diễn đạt khác hẳn, tuyệt đối không dùng các cụm đó.`)
       + (!mustMiss ? '' :
-      `\n\nLẦN TRƯỚC CẢNH ĐẦU KHÔNG ĂN NHẬP CLIP BẮT BUỘC. Clip quay: ${String(mustAsset?.description || mustAsset?.title || '').replace(/\s+/g, ' ').slice(0, 260)}. Viết lại cảnh đầu: lời thoại và "visual" phải tả và dẫn chuyện từ ĐÚNG cảnh trong clip đó.`)
+      `\n\nLẦN TRƯỚC CẢNH ${mustRole === 'solution' ? 'GIẢI PHÁP' : 'ĐẦU'} KHÔNG ĂN NHẬP CLIP BẮT BUỘC. Clip quay: ${String(mustAsset?.description || mustAsset?.title || '').replace(/\s+/g, ' ').slice(0, 260)}. Viết lại cảnh ${mustRole === 'solution' ? 'giải pháp' : 'đầu'}: lời thoại và "visual" phải tả và dẫn chuyện từ ĐÚNG cảnh trong clip đó.`)
       + (!cross.length ? '' :
       `\n\nLẦN TRƯỚC LỜI THOẠI NHẮC SẢN PHẨM KHÁC: ${cross.map((p) => `"${p}"`).join(', ')}. Video này chỉ về ${shownName || opts.productGroup}; viết lại, bỏ hẳn các ý đó.`)
       + (!pct.length ? '' :
@@ -341,12 +349,14 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     // 17/9: cảnh 1 phải chung từ ngữ với mô tả clip bắt buộc (visualOverlap 0 = mở màn lạc đề).
     mustMiss = false;
     if (mustAsset) {
-      const first = (parsed.vertical?.scenes || [])[0];
-      if (first) {
-        const ov = visualOverlap(`${first.visual || ''} ${first.narration || ''}`, mustAsset);
+      // 17/9 chiều: so với cảnh mang clip bắt buộc (cảnh 1, hoặc cảnh giải pháp khi clip là máy đang chạy).
+      const scs = parsed.vertical?.scenes || [];
+      const target = mustRole === 'solution' ? (scs.find((s) => String(s?.role || '').toLowerCase() === 'solution') || scs[scs.length - 1]) : scs[0];
+      if (target) {
+        const ov = visualOverlap(`${target.visual || ''} ${target.narration || ''}`, mustAsset);
         if (ov === 0) {
           mustMiss = true;
-          console.warn(`[script] canh 1 khong an nhap clip bat buoc "${String(mustAsset.title || '').slice(0, 50)}" (lan ${attempt + 1}) — sinh lai theo mo ta clip.`);
+          console.warn(`[script] canh ${mustRole === 'solution' ? 'giai phap' : '1'} khong an nhap clip bat buoc "${String(mustAsset.title || '').slice(0, 50)}" (lan ${attempt + 1}) — sinh lai theo mo ta clip.`);
         }
       }
     }
@@ -394,7 +404,11 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     })
     .filter((s) => s.narration);
   const picks = assets.length
-    ? await matchScenesToAssets({ ai, generate: generateWithRetry, model: MKT_MODEL, scenes: rawScenes, assets, mustUseAssetId: opts.mustUseAssetId || null, log: console })
+    ? await matchScenesToAssets({
+        ai, generate: generateWithRetry, model: MKT_MODEL, scenes: rawScenes, assets, mustUseAssetId: opts.mustUseAssetId || null, log: console,
+        // 17/9 chiều: clip máy đang chạy ép vào cảnh giải pháp (không có role solution thì cảnh cuối).
+        mustUseIndex: mustRole === 'solution' ? Math.max(0, (() => { const k = rawScenes.findIndex((s) => s.role === 'solution'); return k >= 0 ? k : rawScenes.length - 1; })()) : 0,
+      })
     : rawScenes.map(() => null);
   let vertical = rawScenes
     .map((s, i) => {

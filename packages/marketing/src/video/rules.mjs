@@ -163,3 +163,14 @@ export function splitLongImageScenes(scenes, { maxWords = 40, isImage, pickAsset
   }
   return { scenes: out, split };
 }
+
+// 17/9 chiều (user: video lọc nước 7e9cab1a mở màn "thợ máy sửa tới lần thứ ba" trên hình MÁY SEA-40 CỦA
+// CÔNG TY đang chạy, nghe như máy SDVICO hỏng hoài): luật 9/9 ép clip thật mới nhất vào CẢNH 1, nhưng cảnh 1
+// video bán hàng là cảnh NỖI ĐAU. Clip sản phẩm đang chạy/lắp đặt phải vào cảnh GIẢI PHÁP; chỉ clip quay
+// sự cố, máy hư, thợ sửa mới được làm cảnh 1. Video content giữ cảnh 1 như cũ.
+const PROBLEM_CLIP_RE = /sự cố|su co|hỏng|hong|hư |hu |trục trặc|truc trac|cặn|can ban|đục|duc ngau|bẩn|khục|khuc|nghẹt|nghet|tắc|xả cặn|xa can|bảo trì|bao tri/i;
+export function mustUseRoleFor(asset, contentVideo) {
+  if (contentVideo || !asset) return 'hook';
+  const text = `${asset.title || ''} ${asset.description || ''}`;
+  return PROBLEM_CLIP_RE.test(text) ? 'hook' : 'solution';
+}

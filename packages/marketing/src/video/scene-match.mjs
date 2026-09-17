@@ -40,6 +40,28 @@ function count(text, list) {
 }
 function isVideoAsset(a) { return a.kind === 'video' || a.kind === 'clip'; }
 
+// 17/9 chiều (video lọc nước 7e9cab1a: cảnh "thùng nước cạn" chiếu ảnh đồng hồ máy SEA-40 của công ty):
+// cảnh VẤN ĐỀ không được dùng tư liệu folder SẢN PHẨM (máy SDVICO đang chạy, ảnh máy) trừ khi tư liệu
+// đó quay sự cố / sửa chữa. Có tư liệu Content (tàu thật, khoang máy, thợ) thì bắt buộc lấy từ đó.
+// Thứ tự: (1) kho Content nếu có; (2) không có thì tư liệu sản phẩm có từ sự cố; (3) không có nữa mới lấy hết.
+// So từ sự cố CÓ DẤU, nguyên từ (bộ so không dấu biến "cận cảnh" thành "can" trùng "cặn" -> ảnh đồng hồ máy
+// lọt vào nhóm sự cố); mô tả không dấu thì mới so không dấu.
+const FAULT_WORDS = ['hư', 'hỏng', 'sự cố', 'cặn', 'đục', 'bẩn', 'sửa', 'tháo', 'rỉ', 'gỉ', 'nghẹt', 'kẹt', 'chết máy', 'trục trặc', 'bảo trì', 'đen'];
+function hasFault(text) {
+  const raw = String(text || '').toLowerCase();
+  if (/[àáảãạăâđèéẻẽẹêìíỉĩịòóỏõọôơùúủũụưỳýỷỹỵ]/.test(raw)) {
+    return FAULT_WORDS.some((w) => new RegExp(`(^|[^\\p{L}])${w}($|[^\\p{L}])`, 'u').test(raw));
+  }
+  return count(raw, FAULT_WORDS) > 0;
+}
+export function problemPool(assets, role) {
+  if (!PROBLEM_ROLES.has(role)) return assets;
+  const content = assets.filter((a) => String(a.folder || a.product_group || '') === 'Content');
+  if (content.length) return content;
+  const fault = assets.filter((a) => hasFault(textOf(a)));
+  return fault.length ? fault : assets;
+}
+
 // Từ có nghĩa trong câu "hình cần" (>= 3 ký tự, bỏ từ nối) để so với tiêu đề + mô tả tư liệu.
 // 17/9: QUY VỀ KHÔNG DẤU trước khi so — nhiều mô tả tư liệu cũ ghi không dấu ("Nhan vien van
 // phong"), so có dấu vs không dấu trượt hết làm visualOverlap luôn bằng 0 với các tư liệu đó.
@@ -126,8 +148,11 @@ export function assetListForPrompt(assets) {
 // scenes: [{role, narration, visual}] ; assets: [{id, kind, title, description, folder, label, fresh}]
 // generate: async (params) => res (generateWithRetry của script.mjs, đã có model chain).
 // Trả về mảng cùng độ dài scenes: {assetId, fit, why, by: 'model'|'rule'|'must'}.
-export async function matchScenesToAssets({ ai, generate, model, scenes, assets, mustUseAssetId = null, log = console }) {
+// mustUseIndex (17/9 chiều): cảnh nào bị ép dùng clip bắt buộc (0 = cảnh 1 như luật 9/9; video bán hàng có clip
+// sản phẩm đang chạy thì là cảnh giải pháp, xem rules.mjs mustUseRoleFor).
+export async function matchScenesToAssets({ ai, generate, model, scenes, assets, mustUseAssetId = null, mustUseIndex = 0, log = console }) {
   const ids = new Set(assets.map((a) => a.id));
+  const mustIdx = Math.max(0, Math.min(scenes.length - 1, Number.isInteger(mustUseIndex) ? mustUseIndex : 0));
   const byId = new Map(assets.map((a) => [a.id, a]));
   const out = scenes.map(() => null);
   let modelPicks = [];
@@ -140,7 +165,7 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
       '- Ưu tiên clip (video) cho cảnh có chuyển động; ưu tiên tư liệu có nhãn CLIP THẬT.',
       '- Không dùng cùng một tư liệu cho 2 cảnh liền nhau nếu còn tư liệu khác hợp.',
       '- Chỉ được dùng id có trong danh sách. Không có tư liệu hợp thật sự thì vẫn chọn cái ÍT SAI NHẤT và cho điểm thấp (fit <= 4) kèm lý do.',
-      mustUseAssetId && ids.has(mustUseAssetId) ? `- Cảnh 1 BẮT BUỘC dùng id=${mustUseAssetId}.` : '',
+      mustUseAssetId && ids.has(mustUseAssetId) ? `- Cảnh ${mustIdx + 1} BẮT BUỘC dùng id=${mustUseAssetId}. Các cảnh khác KHÔNG dùng id này.` : '',
       '',
       'TƯ LIỆU CÓ SẴN:',
       assetListForPrompt(assets),
@@ -171,26 +196,29 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
     const role = scenes[i].role || (i === 0 ? 'hook' : i === scenes.length - 1 ? 'closing' : 'solution');
     const prevId = i > 0 ? out[i - 1]?.assetId || null : null;
     let pick = null;
-    if (i === 0 && mustUseAssetId && ids.has(mustUseAssetId)) {
+    if (i === mustIdx && mustUseAssetId && ids.has(mustUseAssetId)) {
       // 17/9 (bài 8c8347a4 lời "cảng cá sương mờ" nhưng clip là văn phòng): vẫn ÉP clip thật
       // (luật 9/9) nhưng điểm khớp phải là điểm THẬT — model chấm nếu có, không thì đo trùng
       // từ với "hình cần"; lệch thì cảnh báo to (script.mjs đã có vòng sinh lại theo mô tả clip).
-      const mp = modelPicks.find((p) => Number(p?.scene) === 1);
+      const mp = modelPicks.find((p) => Number(p?.scene) === mustIdx + 1);
       const sameId = mp && String(mp.asset_id || '') === mustUseAssetId;
       const mFit = sameId && Number.isFinite(Number(mp.fit)) ? Math.max(0, Math.min(10, Number(mp.fit))) : null;
-      const fit = mFit ?? Math.max(0, Math.min(10, 3 + visualOverlap(scenes[0]?.visual || '', byId.get(mustUseAssetId)) * 2));
+      const fit = mFit ?? Math.max(0, Math.min(10, 3 + visualOverlap(scenes[mustIdx]?.visual || '', byId.get(mustUseAssetId)) * 2));
       const why = (sameId && mp.why ? String(mp.why).slice(0, 140) + ' — ' : '') + 'clip thật bắt buộc (9/9)';
-      if (fit < 5) log.warn(`[scene-match] cảnh 1: clip bắt buộc "${String(byId.get(mustUseAssetId)?.title || '').slice(0, 50)}" khớp lời YẾU (fit=${fit}) — kịch bản chưa mở theo nội dung clip.`);
+      if (fit < 5) log.warn(`[scene-match] cảnh ${mustIdx + 1}: clip bắt buộc "${String(byId.get(mustUseAssetId)?.title || '').slice(0, 50)}" khớp lời YẾU (fit=${fit}) — kịch bản chưa viết theo nội dung clip.`);
       pick = { assetId: mustUseAssetId, fit, why, by: 'must' };
     } else {
       const mp = modelPicks.find((p) => Number(p?.scene) === i + 1);
       const mid = mp ? String(mp.asset_id || '') : '';
       const fit = mp ? Number(mp.fit) : NaN;
-      if (mid && ids.has(mid) && Number.isFinite(fit) && fit >= 5) {
+      const pool = problemPool(assets, role);
+      if (mid && ids.has(mid) && mid !== mustUseAssetId && Number.isFinite(fit) && fit >= 5) {
         // Kiểm lại bằng luật: cảnh vấn đề mà model chọn ảnh sản phẩm bóng (điểm luật âm) thì bỏ.
         const rs = ruleScore(byId.get(mid), role, { visual: scenes[i].visual });
         if (PROBLEM_ROLES.has(role) && rs < 0) {
           log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chọn "${byId.get(mid).title}" nhưng luật vai cảnh chấm ${rs} (hình mới bóng cho cảnh vấn đề) -> chọn lại theo luật`);
+        } else if (PROBLEM_ROLES.has(role) && !pool.some((a) => a.id === mid)) {
+          log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chọn "${byId.get(mid).title}" là tư liệu folder sản phẩm (máy SDVICO) cho cảnh vấn đề -> chọn lại trong kho Content`);
         } else {
           pick = { assetId: mid, fit, why: String(mp.why || '').slice(0, 160), by: 'model' };
         }
@@ -198,7 +226,7 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
         log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chấm fit=${fit} thấp ("${String(mp?.why || '').slice(0, 80)}") -> chọn theo luật vai cảnh`);
       }
       if (!pick) {
-        const a = pickByRole(assets, role, { prevId, usedCount, visual: scenes[i].visual });
+        const a = pickByRole(pool, role, { prevId, usedCount, visual: scenes[i].visual });
         if (a) pick = { assetId: a.id, fit: Math.max(0, Math.min(10, 4 + ruleScore(a, role, { visual: scenes[i].visual }) / 2)), why: 'chọn theo luật vai cảnh (mô tả tư liệu + hình cần)', by: 'rule' };
       }
     }

@@ -17,7 +17,7 @@ import { generateVideoScript, stripGreeting } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
 import { getPriceTeaser, redactExactPrices, outroKeyword } from '../products.mjs';
-import { outroText as outroTextFor, outroScreenKeyword } from './rules.mjs';
+import { outroText as outroTextFor, outroScreenKeyword, mustUseRoleFor } from './rules.mjs';
 import { pickFreshClips, clipLabel } from './fresh-clip.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { pythonCmd } from '../platform.mjs';
@@ -790,7 +790,10 @@ async function main() {
   const contentVideo = productGroup === CONTENT_GROUP || brief.post_kind === 'content';
   let mustUseAssetId = brief.content_clip_id && assets.some((a) => a.id === brief.content_clip_id) ? brief.content_clip_id : null;
   if (!mustUseAssetId) mustUseAssetId = pickFreshClips(productAssets)[0]?.id || null;
-  if (mustUseAssetId) console.log('Clip thật bắt buộc (cảnh 1):', assets.find((a) => a.id === mustUseAssetId)?.title, `(${mustUseAssetId.slice(0, 8)})`);
+  // 17/9 chiều (user: video lọc nước mở màn "thợ máy sửa lần thứ ba" trên hình máy SEA-40 của công ty đang
+  // chạy): clip sản phẩm đang chạy/lắp đặt vào cảnh GIẢI PHÁP, chỉ clip quay sự cố mới làm cảnh 1 (rules.mjs).
+  const mustUseRole = mustUseRoleFor(assets.find((a) => a.id === mustUseAssetId), contentVideo);
+  if (mustUseAssetId) console.log(`Clip thật bắt buộc (cảnh ${mustUseRole === 'hook' ? '1' : 'giải pháp'}):`, assets.find((a) => a.id === mustUseAssetId)?.title, `(${mustUseAssetId.slice(0, 8)})`);
   else console.log('Không có clip Zalo mới trong 14 ngày, model tự chọn tư liệu như cũ.');
 
   // Kịch bản. 29/8 (bỏ A/B): chế độ SHORTS 10-20 giây giờ theo cờ brief.video_short (rotate
@@ -805,7 +808,7 @@ async function main() {
     content,
     assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, label: clipLabel(a), description: a.description || '', folder: a.product_group || '', fresh: /MỚI/.test(clipLabel(a)) })),
     PRODUCT_FACTS,
-    { short: isShort, productGroup, salesVideo, mustUseAssetId, contentVideo },
+    { short: isShort, productGroup, salesVideo, mustUseAssetId, mustUseRole, contentVideo },
     _tokenLogClient
   );
   console.log('Tư liệu dùng trong cảnh:', (script.sceneAssets || []).map((id) => id.slice(0, 8)).join(', '));
