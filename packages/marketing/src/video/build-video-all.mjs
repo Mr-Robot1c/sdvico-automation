@@ -29,11 +29,27 @@ function passthrough() {
   return out;
 }
 
+// 17/9 (Thanh: run_log chỉ ghi "mã lỗi 1", không biết lỗi gì): stdout/stderr của tiến trình
+// con vẫn in ra console như cũ, nhưng giữ lại đuôi để rút DÒNG LỖI cuối ghi vào run_log.
 function runChild(contentId, extra) {
   return new Promise((resolve) => {
-    const proc = spawn('node', [join(HERE, 'build-video.mjs'), contentId, ...extra], { stdio: 'inherit' });
-    proc.on('error', () => resolve(1));
-    proc.on('close', (code) => resolve(code ?? 1));
+    const proc = spawn('node', [join(HERE, 'build-video.mjs'), contentId, ...extra], { stdio: ['inherit', 'pipe', 'pipe'] });
+    const tail = [];
+    const keep = (buf, out) => {
+      const s = buf.toString();
+      out.write(s);
+      for (const line of s.split(/\r?\n/)) {
+        const t = line.trim();
+        if (t) { tail.push(t); if (tail.length > 40) tail.shift(); }
+      }
+    };
+    proc.stdout.on('data', (b) => keep(b, process.stdout));
+    proc.stderr.on('data', (b) => keep(b, process.stderr));
+    proc.on('error', (e) => resolve({ code: 1, errLine: String(e?.message || e) }));
+    proc.on('close', (code) => {
+      const errLine = [...tail].reverse().find((l) => /LỖI|Lỗi|lỗi|Error|error|throw/i.test(l)) || tail[tail.length - 1] || '';
+      resolve({ code: code ?? 1, errLine });
+    });
   });
 }
 
@@ -116,7 +132,7 @@ async function runOnce(client, { requested, limit, extra }) {
       }).eq('id', c.id);
     } catch { /* khong giu duoc ve thi van dung nhu cu, chi mat lop bao ve */ }
 
-    const code = await runChild(c.id, extra);
+    const { code, errLine } = await runChild(c.id, extra);
     if (code === 0) {
       ok++;
       await logVideo(client, 'ok', { content_id: c.id, title: c.title || null, attempt: attempts + 1 });
@@ -135,7 +151,7 @@ async function runOnce(client, { requested, limit, extra }) {
       const attemptNo = attempts + 1;
       const gaveUp = attemptNo >= MAX_ATTEMPTS;
       console.error(`  Bai ${c.id.slice(0, 8)} loi (exit ${code}), lan thu ${attemptNo}/${MAX_ATTEMPTS}${gaveUp ? ' — DUNG HAN (video_failed=true)' : `, cho ${CLAIM_TTL_MS / 60000} phut roi moi thu lai`}.`);
-      await logVideo(client, 'error', { content_id: c.id, title: c.title || null, exit_code: code, attempt: attemptNo, gave_up: gaveUp });
+      await logVideo(client, 'error', { content_id: c.id, title: c.title || null, exit_code: code, attempt: attemptNo, gave_up: gaveUp, error: String(errLine || '').slice(0, 300) });
       if (gaveUp) {
         // Het luot: ha co video_requested de UI khong hien "Da yeu cau" treo mai, danh dau
         // video_failed. Muon thu lai: sua brief go video_failed/video_attempts roi bam lai nut.

@@ -711,17 +711,22 @@ async function main() {
   if (contentId) {
     // Nhận cả UUID đầy đủ lẫn prefix (vd 8 ký tự đầu) — tiện chạy tay. UUID không dùng LIKE được
     // nên với prefix phải quét rồi so trong JS.
+    // 17/9 (vụ 14/9 bài 492313ac exit 1): truy vấn lỗi thoáng qua bị NUỐT rồi báo nhầm
+    // "không tìm thấy bài" — giờ lỗi đọc DB phải nói đúng là lỗi đọc DB (cùng bài học 13/9).
     if (contentId.length >= 32) {
-      const { data } = await client.from('mkt_content').select('id, title, draft, brief, needs_gov_review').eq('id', contentId).maybeSingle();
+      const { data, error } = await client.from('mkt_content').select('id, title, draft, brief, needs_gov_review').eq('id', contentId).maybeSingle();
+      if (error) throw new Error(`Đọc bài nguồn từ mkt_content lỗi: ${error.message}`);
       content = data;
     } else {
-      const { data } = await client.from('mkt_content').select('id, title, draft, brief, needs_gov_review').order('created_at', { ascending: false }).limit(500);
+      const { data, error } = await client.from('mkt_content').select('id, title, draft, brief, needs_gov_review').order('created_at', { ascending: false }).limit(500);
+      if (error) throw new Error(`Đọc bài nguồn từ mkt_content lỗi: ${error.message}`);
       content = (data || []).find((c) => String(c.id).startsWith(contentId));
     }
     if (content?.id) contentId = content.id;
   } else {
-    const { data } = await client.from('mkt_content').select('id, title, draft, brief, needs_gov_review')
+    const { data, error } = await client.from('mkt_content').select('id, title, draft, brief, needs_gov_review')
       .not('draft', 'is', null).order('created_at', { ascending: false }).limit(1);
+    if (error) throw new Error(`Đọc bài nguồn từ mkt_content lỗi: ${error.message}`);
     content = data?.[0];
   }
   if (!content) throw new Error('Không tìm thấy nội dung nguồn (mkt_content có draft).');
