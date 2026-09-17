@@ -119,9 +119,13 @@ export function postedChannelsLabel(posted: string[] | null | undefined, short =
   return uniq.map((c) => map[c] || c).join(short ? ', ' : ' + ');
 }
 
-// Nhãn mục đích bài: bán hàng hay nội dung nuôi trang. Rõ hơn nhãn "ý định" SEO.
+// Nhãn mục đích bài: bán hàng hay content nuôi trang. Rõ hơn nhãn "ý định" SEO.
+// 17/9 (Thanh: "bỏ chữ Sạch, thay vào loại bài viết như content hay bán hàng"): đổi
+// "Nội dung" thành "Content" theo cách gọi của đội, thêm Video và Blog cho đủ loại.
 export function purposeLabel(postKind?: string, format?: string): string {
-  if (postKind === 'content') return 'Nội dung';
+  if (postKind === 'video' || format === 'video') return 'Video';
+  if (postKind === 'content') return 'Content';
+  if (format === 'article') return 'Blog';
   if (format === 'social') return 'Bán hàng';
   return '';
 }

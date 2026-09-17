@@ -5,7 +5,7 @@ import { editDraft, retryFacebookPublish, requestVideoForContent } from '../acti
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import ShareGroups from './share-groups';
-import { channelsLabel, planChannelLabel, riskMeta, formatRelative, formatDateTimeVN } from '../labels';
+import { channelsLabel, planChannelLabel, purposeLabel, riskMeta, formatRelative, formatDateTimeVN } from '../labels';
 import PlatformLogo, { type PlatformKey } from './platform-logo';
 import TikTokPrivateChip from './tiktok-private-chip';
 import ExportTiktokButton from './export-tiktok-button';
@@ -245,7 +245,10 @@ export default async function BangSection() {
                         <span className="badge badge-format" title="Kênh bài sẽ đăng (theo ô Lịch đăng cố định)">📍 {planChannelLabel(p.plan_channel, chans, p.post_reel === true)}</span>
                         {p.ab_variant ? <span className="badge badge-ab">🧪 Thử {p.ab_variant}</span> : null}
                         {brief.video_requested === true ? <span className="badge badge-video-pending">🎬 Đang làm video AI</span> : null}
-                        <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
+                        {/* 17/9 (Thanh): bỏ chữ "Sạch" — thay bằng LOẠI BÀI (Bán hàng / Content / Video / Blog);
+                            nhãn rủi ro chỉ hiện khi bài THẬT SỰ cần rà (amber/red), giữ điều cấm 3 nhìn thấy được. */}
+                        {(() => { const t = purposeLabel(p.post_kind || brief.post_kind, p.format || c?.brief?.format); return t ? <span className="badge" title="Loại bài: bán hàng / content nuôi trang / video / blog">{t === 'Bán hàng' ? '🛒' : t === 'Content' ? '📖' : t === 'Video' ? '🎬' : '📰'} {t}</span> : null; })()}
+                        {p.risk === 'amber' || p.risk === 'red' ? <span className={`badge tone-${rk.tone}`}>{rk.label}</span> : null}
                         {p.plan_time ? <span className="badge tone-default" title="Ô giờ trong Lịch đăng cố định">🗓 {String(p.plan_time).slice(11, 16)} · {CHANNEL_LABEL[(p.plan_channel === 'youtube' ? 'youtube' : p.plan_channel === 'tiktok' ? 'tiktok' : 'facebook') as 'facebook' | 'youtube' | 'tiktok']}{p.plan_group ? ` · 👥 ${p.plan_group}` : ''}</span> : null}
                       </div>
                       {(brief as any).insight_line ? (

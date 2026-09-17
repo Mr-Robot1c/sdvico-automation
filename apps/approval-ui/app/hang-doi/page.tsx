@@ -301,7 +301,8 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   {info.postKind === 'video' && cid && videoSourceTitle.get(cid)
                     ? <span className="badge badge-video-linked" title="Video này dựng từ bài chữ bên dưới. Bài chữ và video duyệt riêng.">🔗 Video của bài: {videoSourceTitle.get(cid)}</span>
                     : null}
-                  <span className={`badge tone-${rk.tone}`}>{rk.label}</span>
+                  {/* 17/9 (Thanh): "Sạch" bỏ — loại bài đã có badge purposeLabel ở trên; rủi ro chỉ hiện khi cần rà. */}
+                  {info.risk === 'amber' || info.risk === 'red' ? <span className={`badge tone-${rk.tone}`}>{rk.label}</span> : null}
                 </div>
 
                 {img || vid || (cid && linkedVideo.get(cid)?.videoAssetId) ? (
