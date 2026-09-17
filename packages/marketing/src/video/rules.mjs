@@ -92,20 +92,27 @@ export function outroScreenKeyword(keyword) {
 }
 
 const wordCount = (s) => String(s || '').trim().split(/\s+/).filter(Boolean).length;
+const sentencesOf = (s) => String(s || '').trim().split(/(?<=[.!?…])\s+/).filter(Boolean);
+// Chuẩn hóa để so câu giá (cùng cách ensureSpokenTeaser trong products.mjs): model hay viết "9,X triệu"
+// thay vì "9 phẩy X triệu".
+const normPrice = (t) => String(t || '').toLowerCase().replace(/,\s*x/g, 'phẩyx').replace(/\s+/g, '');
 
 // Tách câu giá khỏi cảnh cuối thành cảnh riêng khi cảnh cuối quá dài (>= maxWords từ). Trả về
 // { scenes, split } — scenes mới (không đổi mảng vào), split=true khi có tách. pickAsset(prevAssetId)
-// trả assetId cho cảnh giá (null = dùng lại tư liệu cảnh cuối).
+// trả assetId cho cảnh giá (null = dùng lại tư liệu cảnh cuối). Câu giá nhận ra theo spokenKey đã
+// chuẩn hóa (model có thể viết lại câu giá bằng lời khác một chút).
 export function splitPriceScene(scenes, teaser, { maxWords = 32, pickAsset = null } = {}) {
   const list = Array.isArray(scenes) ? scenes.slice() : [];
   if (!teaser?.spoken || !list.length) return { scenes: list, split: false };
   const last = list[list.length - 1];
   const narration = String(last.narration || '');
-  const at = narration.indexOf(teaser.spoken);
-  if (at <= 0) return { scenes: list, split: false }; // không có câu giá, hoặc cả cảnh chỉ là câu giá
   if (wordCount(narration) < maxWords) return { scenes: list, split: false };
-  const before = narration.slice(0, at).trim();
-  const priceText = narration.slice(at).trim();
+  const sents = sentencesOf(narration);
+  const key = normPrice(teaser.spokenKey || teaser.spoken);
+  const idx = sents.findIndex((s) => normPrice(s).includes(key));
+  if (idx <= 0) return { scenes: list, split: false }; // không có câu giá, hoặc cả cảnh mở đầu bằng câu giá
+  const before = sents.slice(0, idx).join(' ').trim();
+  const priceText = sents.slice(idx).join(' ').trim();
   if (!before) return { scenes: list, split: false };
   const priceAsset = (typeof pickAsset === 'function' ? pickAsset(last.assetId) : null) || last.assetId;
   list[list.length - 1] = { ...last, narration: before };
@@ -119,4 +126,39 @@ export function splitPriceScene(scenes, teaser, { maxWords = 32, pickAsset = nul
     why: 'cảnh giá tách riêng để ảnh sản phẩm không đứng quá lâu (17/9)',
   });
   return { scenes: list, split: true };
+}
+
+// Tách lời thoại ở ranh giới câu gần giữa nhất. Trả về [nửa đầu, nửa sau] hoặc null nếu chỉ 1 câu.
+export function splitNarrationMiddle(text) {
+  const sents = sentencesOf(text);
+  if (sents.length < 2) return null;
+  const total = sents.reduce((a, s) => a + s.length, 0);
+  let best = 0;
+  let bestDiff = Infinity;
+  let acc = 0;
+  for (let i = 0; i < sents.length - 1; i++) {
+    acc += sents[i].length;
+    const diff = Math.abs(acc - total / 2);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  }
+  return [sents.slice(0, best + 1).join(' '), sents.slice(best + 1).join(' ')];
+}
+
+// 17/9 (bản dựng lại 492313ac: cảnh 2 ảnh tĩnh 17s, cảnh 3 ảnh tĩnh 19,5s — ChatGPT: "hơn 20 giây nhìn
+// một hình lặp lại, retention rơi"): cảnh dùng ẢNH mà lời thoại >= maxWords từ thì tách đôi ở ranh
+// giới câu, nửa sau đổi sang tư liệu khác (pickAsset(prevAssetId, role, visual) -> id; trả null hoặc
+// cùng id thì KHÔNG tách vì hình không đổi). Cảnh clip thật giữ nguyên (đã có chuyển động).
+export function splitLongImageScenes(scenes, { maxWords = 40, isImage, pickAsset } = {}) {
+  const out = [];
+  let split = false;
+  for (const s of Array.isArray(scenes) ? scenes : []) {
+    if (s.role === 'price' || typeof isImage !== 'function' || !isImage(s.assetId) || wordCount(s.narration) < maxWords) { out.push(s); continue; }
+    const parts = splitNarrationMiddle(s.narration);
+    const second = parts && typeof pickAsset === 'function' ? pickAsset(s.assetId, s.role, s.visual) : null;
+    if (!parts || !second || second === s.assetId) { out.push(s); continue; }
+    out.push({ ...s, narration: parts[0] });
+    out.push({ ...s, narration: parts[1], assetId: second, matchBy: 'rule-split', why: 'cảnh ảnh dài tách đôi, đổi hình (17/9)' });
+    split = true;
+  }
+  return { scenes: out, split };
 }

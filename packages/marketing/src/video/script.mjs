@@ -6,7 +6,7 @@ import { guardLines, guardViolations, stripViolatingSentences } from '../product
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
 import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole } from './scene-match.mjs';
-import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, outroText } from './rules.mjs';
+import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -359,13 +359,18 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     }
     console.warn('[script] da cat cau SAI NGHE khoi loi thoai:', viol.map((v) => v.phrase).join(', '));
   }
-  // 17/9: sinh lại vẫn dính sản phẩm khác / phần trăm không nguồn -> cắt câu chứa (dự phòng như sai nghề).
-  if (cross.length || pct.length) {
-    const bad = [...cross, ...pct];
+  // 17/9: sinh lại vẫn dính sản phẩm khác / phần trăm không nguồn / cụm đã mòn -> cắt câu chứa (dự phòng
+  // như sai nghề; bản dựng lại 7e9cab1a vẫn còn "bảo vệ sức khỏe" sau 2 lần sinh). Cảnh mà cắt hết
+  // câu thì giữ nguyên lời cũ (không để mất cảnh, nhất là cảnh 1 gắn clip bắt buộc).
+  if (cross.length || pct.length || worn.length) {
+    const bad = [...cross, ...pct, ...worn];
     for (const k of ['vertical', 'horizontal']) {
-      for (const sc of parsed[k]?.scenes || []) sc.narration = stripSentencesWith(sc.narration || '', bad);
+      for (const sc of parsed[k]?.scenes || []) {
+        const cut = stripSentencesWith(sc.narration || '', bad);
+        if (cut && cut !== sc.narration) sc.narration = cut;
+      }
     }
-    console.warn('[script] da cat cau nhac san pham khac / phan tram khong nguon:', bad.join(', '));
+    console.warn('[script] da cat cau nhac san pham khac / phan tram khong nguon / cum da mon:', bad.join(', '));
   }
 
   const ids = new Set(assets.map((a) => a.id));
@@ -412,6 +417,18 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       pickAsset: (prevId) => pickByRole(assets, 'closing', { prevId, usedCount, visual: 'máy đang lắp trên tàu, đang chạy, kỹ thuật bàn giao' })?.id || null,
     });
     if (r.split) { vertical = r.scenes; console.log('[script] tach cau gia thanh canh rieng (17/9) de anh san pham khong dung qua lau'); }
+  }
+  // 17/9 (bản dựng lại 492313ac: cảnh 2 ảnh tàu 17s, cảnh 3 ảnh máy 19,5s): cảnh dùng ẢNH mà lời dài
+  // thì tách đôi ở ranh giới câu, nửa sau đổi sang tư liệu khác để hình không đứng yên quá ~10s.
+  {
+    const isImage = (id) => { const a = assets.find((x) => x.id === id); return !!a && a.kind !== 'video' && a.kind !== 'clip'; };
+    const usedCount = new Map();
+    for (const s of vertical) usedCount.set(s.assetId, (usedCount.get(s.assetId) || 0) + 1);
+    const r = splitLongImageScenes(vertical, {
+      isImage,
+      pickAsset: (prevId, role, visual) => pickByRole(assets, role, { prevId, usedCount, visual })?.id || null,
+    });
+    if (r.split) { vertical = r.scenes; console.log('[script] tach canh anh dai thanh 2 canh doi hinh (17/9)'); }
   }
   for (const [i, s] of vertical.entries()) {
     const a = assets.find((x) => x.id === s.assetId);

@@ -3,7 +3,7 @@
 // tách cảnh giá, phụ đề ngắn dòng. Chạy: npm run test:video. Không cần mạng, không cần GEMINI_API_KEY.
 import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
-  stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene,
+  stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle,
 } from './video/rules.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
@@ -66,6 +66,23 @@ ok('không tách khi cảnh cuối ngắn', !splitPriceScene([shortLast], PRICE_
 ok('không tách khi không có teaser', !splitPriceScene([longLast], null).split);
 ok('không tách khi thiếu câu giá', !splitPriceScene([{ narration: 'a '.repeat(40), assetId: 'x' }], teaser2).split);
 ok('pickAsset null -> dùng lại tư liệu cảnh cuối', splitPriceScene([longLast], teaser2).scenes[1].assetId === 'img-white');
+// Model viết lại câu giá kiểu "3X triệu" (không đúng nguyên văn): vẫn nhận ra theo spokenKey chuẩn hóa.
+const rewritten = { narration: 'Lắp một lần, nước ngọt dùng cả chuyến, anh em khỏi chia từng ca nữa nha! Máy chạy êm, ít hỏng vặt, thợ bên em lắp tận bến. Máy cơ giảm từ 45 triệu chỉ còn 3X triệu, máy điện 56 triệu còn 4X triệu, gồm công lắp!', assetId: 'img', role: 'closing' };
+const r2 = splitPriceScene([rewritten], teaser2);
+ok('nhận câu giá viết lại "3X triệu"', r2.split && r2.scenes[1].narration.startsWith('Máy cơ giảm'), r2.scenes.map((s) => s.narration));
+
+// 6b. Cảnh ảnh tĩnh dài tách đôi (bản dựng lại 492313ac: ảnh 17s + 19,5s).
+const longImg = { narration: 'Đang đánh bắt xa bờ mà gặp cảnh này thì tiền bạc đội nón ra đi vì tốn kém tiền phụ tùng và tiền dầu mọc lên từng ngày. Thời gian thì trôi tuột đi trong lúc chờ đợi sửa chữa, lỡ hết cả chuyến biển dài ngày. Bạn ghe bên cạnh thì trúng mùa kéo lưới đều đều, còn mình đứng ngồi không yên!', assetId: 'img-1', role: 'empathy', visual: 'tàu' };
+const kinds = { 'img-1': 'image', 'img-2': 'image', 'clip-1': 'video' };
+const r3 = splitLongImageScenes([{ narration: 'Hook dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài dài. Hai.', assetId: 'clip-1', role: 'hook' }, longImg], { isImage: (id) => kinds[id] === 'image', pickAsset: (prev) => (prev === 'img-1' ? 'img-2' : null) });
+ok('cảnh ảnh dài tách đôi, clip giữ nguyên', r3.split && r3.scenes.length === 3 && r3.scenes[0].assetId === 'clip-1');
+eq('nửa sau đổi hình, giữ role', [r3.scenes[2].assetId, r3.scenes[2].role, r3.scenes[2].matchBy], ['img-2', 'empathy', 'rule-split']);
+ok('tách ở ranh giới câu, nửa đầu kết bằng dấu câu', /[.!?]$/.test(r3.scenes[1].narration) && r3.scenes[1].narration.length < longImg.narration.length);
+ok('ghép lại = nguyên văn', `${r3.scenes[1].narration} ${r3.scenes[2].narration}` === longImg.narration);
+ok('không tư liệu thay thế -> không tách', !splitLongImageScenes([longImg], { isImage: () => true, pickAsset: () => 'img-1' }).split);
+ok('cảnh ngắn -> không tách', !splitLongImageScenes([{ narration: 'Ngắn thôi. Hai câu.', assetId: 'img-1' }], { isImage: () => true, pickAsset: () => 'img-2' }).split);
+ok('cảnh giá không tách', !splitLongImageScenes([{ ...longImg, role: 'price' }], { isImage: () => true, pickAsset: () => 'img-2' }).split);
+eq('splitNarrationMiddle 1 câu -> null', splitNarrationMiddle('Một câu thôi.'), null);
 
 // 7. Phụ đề ngắn dòng (ChatGPT: chữ leo lên giữa khung): mọi mẩu <= MAX_CHARS, MAX_CHARS <= 32.
 ok('MAX_CHARS <= 32', MAX_CHARS <= 32, MAX_CHARS);
