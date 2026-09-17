@@ -472,6 +472,17 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   if (hookPin && vertical.length && vertical[0].matchBy !== 'must') {
     vertical[0] = { ...vertical[0], assetId: hookPin.id, matchBy: 'hook-pin', why: 'tư liệu cảnh 1 chọn trước, lời viết theo hình (17/9 vòng 3)' };
   }
+  // 17/9 vòng 7 (cắt câu chứa "sạch bóng" làm mất luôn tên máy — video bán hàng đọc "Thiết bị có độ
+  // lọc..." không ai biết máy gì): cảnh giải pháp phải GỌI TÊN sản phẩm; mất thì chèn câu tên lên đầu.
+  if (!opts.contentVideo && shownName && vertical.length) {
+    const norm = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ');
+    const anyHas = vertical.some((s) => norm(s.narration).includes(norm(shownName)));
+    if (!anyHas) {
+      const sol = vertical.find((s) => s.role === 'solution') || vertical[vertical.length - 1];
+      sol.narration = `Đây là ${shownName}! ${sol.narration}`;
+      console.warn(`[script] loi thoai mat ten "${shownName}" (thuong do cat cau) — da chen cau ten vao canh giai phap.`);
+    }
+  }
   // 8/9: cảnh cuối video bán hàng phải có câu mốc giá đọc được (model quên thì nối vào).
   if (teaser && vertical.length) {
     const last = vertical[vertical.length - 1];
