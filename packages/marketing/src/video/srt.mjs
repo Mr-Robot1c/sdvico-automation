@@ -1,25 +1,59 @@
 // Dựng block phụ đề từ text kịch bản (chính xác, không qua ASR) và thời lượng cảnh.
 // Chia text thành mẩu ngắn dễ đọc, timing theo tỉ lệ số ký tự.
 
-// 17/9 (ChatGPT chấm 3 video: "chữ nằm ngay giữa khung, đè lên người và máy"): mẩu 46 ký tự ở cỡ chữ
-// 13,5 trên khung 1080 ngang bị libass bẻ thành 2-3 dòng, khối chữ leo lên tới 1/3 chiều cao. Rút
-// còn 30 ký tự -> tối đa 2 dòng, khối chữ ở thấp trong vùng MarginV (Thanh đã chỉnh 8/9), không đè chủ thể.
-export const MAX_CHARS = 30; // mỗi mẩu tối đa ~30 ký tự
+// 17/9 (ChatGPT vòng 1: "chữ đè lên người và máy"): 46 ký tự bẻ thành 2-3 dòng leo giữa khung -> rút 30.
+// 17/9 vòng 5 (ChatGPT: cắt 30 ký tự greedy làm đứt cụm — "trên boong hôi" / "rình với đục ngầu",
+// "SF300B giữ" / "dầu sạch bong", người xem phải ghép 3 frame mới hiểu 1 câu, còn dễ đọc nhầm chữ):
+// chia THEO Ý — nguyên câu nếu vừa, rồi theo vế (dấu phẩy), vế dài thì chia ĐỀU ở ranh giới từ
+// (không greedy để khỏi lòi mẩu cụt 1-2 chữ). Trần nới lên 40 ký tự (~2 dòng), vẫn dưới mức 46 bị chê.
+export const MAX_CHARS = 40; // mỗi mẩu tối đa ~40 ký tự
 
-// Chia câu dài thành các mẩu <= MAX_CHARS, cắt ở ranh giới từ.
-function chunk(text) {
-  const words = text.replace(/\s+/g, ' ').trim().split(' ');
-  const out = [];
-  let cur = '';
-  for (const w of words) {
-    if (cur && (cur.length + 1 + w.length) > MAX_CHARS) {
-      out.push(cur);
-      cur = w;
-    } else {
-      cur = cur ? `${cur} ${w}` : w;
-    }
+// Từ nối hay đứng ĐẦU vế mới: cắt ngay trước các từ này thì mẩu trước trọn ý ("...hôi rình" | "với đục
+// ngầu..."), cắt sau chúng thì đứt cụm. Chia đều thuần ký tự từng cắt "trên boong hôi" / "rình với...".
+const CONNECTORS = new Set(['với', 'rồi', 'mà', 'thì', 'là', 'để', 'cho', 'nên', 'vì', 'và', 'hay', 'hoặc', 'đành', 'chứ', 'nhưng', 'khi', 'lúc', 'nếu', 'bằng', 'trong', 'ngoài', 'trên', 'dưới', 'vừa', 'suốt', 'sau', 'trước', 'giữa', 'theo', 'như', 'về']);
+// (không đưa 'còn' vào: 'chỉ còn 3 X triệu' mà cắt trước 'còn' là đứt cụm giá)
+// Mã sản phẩm (SEA-40, SF300B...): không cắt ngay trước mã để mã đi liền với tên máy.
+const CODE_RE = /^[a-z]{2,}[-]?\d/i;
+
+// Chia một cụm dài thành 2 nửa gần bằng nhau tại ranh giới từ, ưu tiên điểm cắt đứng TRƯỚC từ nối;
+// nửa nào còn dài quá thì chia tiếp (đệ quy).
+function splitBalanced(text) {
+  if (text.length <= MAX_CHARS) return [text];
+  const words = text.split(' ');
+  const mid = text.length / 2;
+  let best = 0;
+  let bestScore = Infinity;
+  for (let i = 0; i < words.length - 1; i++) {
+    const prefixLen = words.slice(0, i + 1).join(' ').length;
+    const next = words[i + 1].toLowerCase().replace(/[^\p{L}]/gu, '');
+    // Cắt SAU mã sản phẩm là điểm ngắt đẹp (tên máy kết thúc bằng mã): thưởng thêm.
+    // Cắt ngay sau CON SỐ trần thì số lìa đơn vị ("56 | triệu"): phạt.
+    const score = Math.abs(prefixLen - mid) - (CONNECTORS.has(next) ? 6 : 0) + (CODE_RE.test(words[i + 1]) ? 12 : 0) - (CODE_RE.test(words[i]) ? 6 : 0) + (/^\d+([.,]\d+)?$/.test(words[i]) ? 6 : 0);
+    if (score < bestScore) { bestScore = score; best = i; }
   }
-  if (cur) out.push(cur);
+  return [...splitBalanced(words.slice(0, best + 1).join(' ')), ...splitBalanced(words.slice(best + 1).join(' '))];
+}
+
+// Chia text thành các mẩu trọn ý: câu -> vế theo dấu phẩy -> chia đều theo từ.
+function chunk(text) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return [];
+  const out = [];
+  for (const sent of clean.split(/(?<=[.!?…])\s+/)) {
+    if (sent.length <= MAX_CHARS) { out.push(sent); continue; }
+    // Gom các vế (kết bằng dấu phẩy) vào mẩu <= MAX_CHARS.
+    let cur = '';
+    for (const clause of sent.split(/(?<=,)\s+/)) {
+      const cand = cur ? `${cur} ${clause}` : clause;
+      if (cand.length <= MAX_CHARS) { cur = cand; continue; }
+      if (cur) out.push(cur);
+      if (clause.length <= MAX_CHARS) { cur = clause; continue; }
+      const pieces = splitBalanced(clause);
+      out.push(...pieces.slice(0, -1));
+      cur = pieces[pieces.length - 1];
+    }
+    if (cur) out.push(cur);
+  }
   return out;
 }
 

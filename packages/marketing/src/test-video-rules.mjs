@@ -124,11 +124,24 @@ eq('clip kỹ thuật viên lắp đặt -> cảnh giải pháp', mustUseRoleFor
 eq('video content luôn cảnh 1', mustUseRoleFor({ title: 'Máy lọc nước biển SDVICO hoạt động' }, true), 'hook');
 eq('không clip -> cảnh 1', mustUseRoleFor(null, false), 'hook');
 
-// 7. Phụ đề ngắn dòng (ChatGPT: chữ leo lên giữa khung): mọi mẩu <= MAX_CHARS, MAX_CHARS <= 32.
-ok('MAX_CHARS <= 32', MAX_CHARS <= 32, MAX_CHARS);
-const blocks = buildBlocks('Sửa tới lần thứ ba trong tháng rồi mà máy vẫn cứ hỏng, anh thợ máy vừa lau mồ hôi trán vừa lắc đầu ngao ngán.', 9);
+// 7. Phụ đề trọn ý (vòng 1: chữ leo giữa khung -> trần 40; vòng 5: cắt greedy đứt cụm "trên boong hôi" /
+// "rình với đục ngầu" -> chia theo câu, vế, rồi chia đều).
+ok('MAX_CHARS <= 40', MAX_CHARS <= 40, MAX_CHARS);
+const blocks = buildBlocks('Sửa tới lần thứ ba trong tháng rồi mà máy vẫn cứ hỏng, anh thợ máy vừa lắc đầu vừa than.', 9);
 ok('mọi mẩu phụ đề <= MAX_CHARS', blocks.every((b) => b.text.length <= MAX_CHARS), blocks.map((b) => b.text.length));
 ok('mẩu cuối kết đúng thời lượng', Math.abs(blocks[blocks.length - 1].end - 9) < 1e-9);
+ok('ghép mẩu = nguyên văn', blocks.map((b) => b.text).join(' ') === 'Sửa tới lần thứ ba trong tháng rồi mà máy vẫn cứ hỏng, anh thợ máy vừa lắc đầu vừa than.');
+// Câu 7e9cab1a từng bị cắt "trên boong hôi" / "rình với...": chia đều phải giữ "hôi rình" liền nhau.
+const b2 = buildBlocks('Thùng nước trên boong hôi rình với đục ngầu rồi anh ơi!', 6).map((b) => b.text);
+ok('không đứt cụm "hôi rình"', b2.some((t) => t.includes('hôi rình')), b2);
+// Câu ngắn vừa 1 mẩu thì giữ nguyên câu.
+eq('câu <= 40 ký tự = 1 mẩu nguyên câu', buildBlocks('Đã có máy lọc dầu SF300B.', 3).map((b) => b.text), ['Đã có máy lọc dầu SF300B.']);
+// Nhiều câu: mỗi câu 1 mẩu, không dính sang nhau.
+const b3 = buildBlocks('Máy nổ êm hơn. Kỹ thuật lắp tận bến cho anh em!', 6).map((b) => b.text);
+eq('2 câu ngắn = 2 mẩu theo câu', b3, ['Máy nổ êm hơn.', 'Kỹ thuật lắp tận bến cho anh em!']);
+// Câu dài có vế: cắt tại dấu phẩy, không cắt giữa vế.
+const b4 = buildBlocks('Máy cơ giảm từ 45 triệu chỉ còn 3 X triệu, máy điện giảm từ 56 triệu chỉ còn 4 X triệu, đã gồm công lắp!', 8).map((b) => b.text);
+ok('vế giá không bị đứt giữa chừng', b4.every((t) => t.length <= MAX_CHARS) && b4.some((t) => t.startsWith('Máy cơ giảm')) && b4.some((t) => t.startsWith('máy điện giảm')), b4);
 
 const failed = cases.filter((c) => !c.ok);
 for (const c of cases) console.log(`${c.ok ? 'OK  ' : 'FAIL'} ${c.name}${c.ok ? '' : ` -> got ${JSON.stringify(c.got)}${c.want !== undefined ? ` want ${JSON.stringify(c.want)}` : ''}`}`);

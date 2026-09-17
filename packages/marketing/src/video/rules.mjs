@@ -90,6 +90,9 @@ export const EXTRA_WORN = [
   // 17/9 vòng 4 (ChatGPT 70/66/68): "ai hiểu hết sóng gió", "thấu được cái cực nhọc", "êm ru",
   // "biết bao nhiêu", "mất toi" — vẫn là văn quảng cáo, không phải thông tin.
   'thấu được', 'êm ru', 'biết bao nhiêu', 'mất toi', 'ai hiểu hết',
+  // 17/9 vòng 5 (ChatGPT 68/68/65): "thốt lên" lặp 3 vòng liền ở kiểu mở trích lời, "hoài niệm" /
+  // "bám trụ" là văn phim thương hiệu, "sạch bong" là kết quả mạnh không hình nào chứng minh.
+  'thốt lên', 'hoài niệm', 'bám trụ', 'sạch bong', 'thấu hiểu',
 ];
 
 // Outro = MỘT câu, MỘT hành động (user 17/9 theo ChatGPT: "không nên vừa bảo gọi, vừa bảo comment,
