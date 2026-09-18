@@ -4,7 +4,7 @@
 import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
   stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
-  breakLongSentences, imageryDriftSentences, cutImageryDrift,
+  breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases,
 } from './video/rules.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
@@ -195,6 +195,19 @@ eq('không trôi thì giữ nguyên', cutImageryDrift('Máy khục khặc vì c�
 // (d) cụm sáo vòng 9 phải nằm trong EXTRA_WORN.
 for (const p of ['nhớ quá', 'đã lắm', 'quây quần', 'mâm cơm', 'cạn đáy', 'một giọt nước', 'không còn lo', 'loay hoay']) {
   ok(`EXTRA_WORN vòng 9 có "${p}"`, EXTRA_WORN.includes(p));
+}
+// 18/9 vòng 10 — (f) câu tả NGƯỜI trên hình không có người ("bạn ghe nhìn cười trừ" trên cabin trống).
+const CABIN = 'Không gian buồng lái tàu cá có ghế lái bằng gỗ, bảng điều khiển, không có người';
+eq('bắt "cười trừ" trên hình không người', imageryDriftSentences('Bạn ghe nhìn cười trừ mà rầu!', CABIN), ['Bạn ghe nhìn cười trừ mà rầu!']);
+eq('hình có thợ máy thì câu bàn tay được giữ', imageryDriftSentences('Đôi bàn tay thợ bám đầy dầu nhớt!', 'Thợ máy đang sửa động cơ trên tàu cá'), []);
+eq('"cuối" không bị nhầm thành "cười"', imageryDriftSentences('Cuối chuyến biển máy vẫn chạy tốt.', CABIN), []);
+// (g) cảnh nỗi đau trỏ "máy ... này" vào sự cố (vòng 10: câu mở lọc nước gây lẫn máy đang bán với máy hỏng).
+eq('bắt "máy lọc nước này sửa"', selfProductFaultPhrases('"Máy lọc nước này sửa tới lần thứ ba rồi đấy!"'), ['máy lọc nước này']);
+eq('bắt "máy này hỏng"', selfProductFaultPhrases('Máy này hỏng hoài chịu sao thấu?'), ['máy này hỏng']);
+eq('"máy lọc cũ" không bị bắt', selfProductFaultPhrases('Bộ máy lọc cũ trên tàu nghẹt cặn.'), []);
+// (h) cụm sáo vòng 10 nằm trong EXTRA_WORN.
+for (const p of ['ruột gan', 'gan ruột', 'cười trừ', 'tinh mơ', 'hoàn thiện từng con máy']) {
+  ok(`EXTRA_WORN vòng 10 có "${p}"`, EXTRA_WORN.includes(p));
 }
 // (e) phụ đề: câu trích đóng bằng !" tách thành mẩu riêng, không dính câu sau.
 const bQuote = buildBlocks('"Hết nước rồi anh em ơi!" Anh thợ máy vừa nói vậy đó.', 6).map((b) => b.text);

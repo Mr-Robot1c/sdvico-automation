@@ -107,6 +107,11 @@ export const EXTRA_WORN = [
   // mâm cơm nóng trên boong", "cạn đáy rồi anh em ơi", "không còn một giọt nước", "không còn lo cạn
   // nước", "loay hoay sửa máy" — văn AI kể chuyện / kịch hóa, không phải thông tin).
   'nhớ quá', 'đã lắm', 'quây quần', 'mâm cơm', 'cạn đáy', 'một giọt nước', 'không còn lo', 'loay hoay',
+  // 18/9 vòng 10 (cả 3 ĐỀU ĐẠT MỨC ĐĂNG 74/72/77 nhưng ChatGPT còn chê): "rầu hết cả ruột gan" /
+  // "xót gan ruột" là biến thể mới của họ "xót ruột"; "cười trừ" tả người không có trong hình;
+  // "tinh mơ" là mốc thời gian hình không xác nhận được; "hoàn thiện từng con máy" gợi SDVICO
+  // là bên CHẾ TẠO máy (sai vai nhà phân phối, Điều cấm 4).
+  'ruột gan', 'gan ruột', 'cười trừ', 'tinh mơ', 'hoàn thiện từng con máy',
 ];
 
 // Outro = MỘT câu, MỘT hành động (user 17/9 theo ChatGPT: "không nên vừa bảo gọi, vừa bảo comment,
@@ -277,16 +282,44 @@ function hasImagery(foldedText, term) {
   if (f.includes(' ') || f.length > 4) return foldedText.includes(f);
   return new RegExp(`(^|[^a-z0-9])${f}($|[^a-z0-9])`).test(foldedText);
 }
+// 18/9 vòng 10 (ChatGPT chấm lọc dầu: "bạn ghe nhìn cười trừ" trong khi hình cabin KHÔNG có người —
+// lỗi cụ thể cần ưu tiên; trước đó "anh thợ máy thốt lên" cũng trên hình không người): câu tả NGƯỜI
+// đang làm gì thấy được (cười, bàn tay, ánh mắt...) thì tư liệu phải có người. So CÓ DẤU phía lời
+// ("cười" và "cuối" cùng gấp thành "cuoi" nên không so không dấu được); phía mô tả tư liệu so không
+// dấu (mô tả cũ hay ghi không dấu), và mô tả ghi rõ "không thấy người" thì coi như không có người.
+const PERSON_SENT_TERMS = ['cười', 'nụ cười', 'bàn tay', 'gương mặt', 'ánh mắt', 'lắc đầu', 'thốt lên'];
+const PERSON_ASSET_WORDS = ['nguoi', 'tho', 'ngu dan', 'nhan vien', 'ky thuat', 'anh em', 'ba con', 'thuyen vien', 'thuyen truong', 'chu tau'];
+const sentHasPerson = (sent) => {
+  const s = String(sent || '').toLowerCase();
+  return PERSON_SENT_TERMS.some((t) => new RegExp(`(^|\\P{L})${t}(\\P{L}|$)`, 'u').test(s));
+};
+const assetHasPerson = (foldedAsset) => {
+  if (foldedAsset.includes('khong thay nguoi') || foldedAsset.includes('khong co nguoi')) return false;
+  return PERSON_ASSET_WORDS.some((w) => (w.length <= 4
+    ? new RegExp(`(^|[^a-z0-9])${w}($|[^a-z0-9])`).test(foldedAsset)
+    : foldedAsset.includes(w)));
+};
 export function imageryDriftSentences(narration, assetText) {
   const at = foldText(assetText);
+  const personOk = assetHasPerson(at);
   const out = [];
   for (const sent of sentencesOf(narration)) {
     const fs = foldText(sent);
     const terms = IMAGERY_TERMS.filter((t) => hasImagery(fs, t));
-    if (terms.length && !terms.some((t) => hasImagery(at, t))) out.push(sent);
+    if (terms.length && !terms.some((t) => hasImagery(at, t))) { out.push(sent); continue; }
+    if (!personOk && sentHasPerson(sent)) out.push(sent);
   }
   return out;
 }
+// 18/9 vòng 10 (ChatGPT chấm lọc nước 77 nhưng dặn: câu mở "Máy lọc nước này sửa tới lần thứ ba"
+// khiến người xem hiểu chiếc máy ĐANG BÁN chính là chiếc vừa bị chê hỏng liên tục): cảnh nỗi đau
+// (hook/empathy) của video bán hàng không được trỏ "máy ... này" vào sự cố. Trả về các cụm dính.
+const SELF_FAULT_PHRASES = ['máy lọc nước này', 'máy lọc dầu này', 'máy này sửa', 'máy này hỏng', 'máy này lại', 'máy này cứ'];
+export function selfProductFaultPhrases(narration) {
+  const t = String(narration || '').toLowerCase();
+  return SELF_FAULT_PHRASES.filter((p) => t.includes(p));
+}
+
 // Cắt các câu trôi khỏi hình; cắt hết thì trả '' (người gọi tự quyết giữ bản gốc, như luật cắt cụm cấm).
 export function cutImageryDrift(narration, assetText) {
   const bad = new Set(imageryDriftSentences(narration, assetText));

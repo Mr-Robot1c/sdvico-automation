@@ -6,7 +6,7 @@ import { guardLines, guardViolations, stripViolatingSentences } from '../product
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
 import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool } from './scene-match.mjs';
-import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift } from './rules.mjs';
+import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -213,7 +213,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     !opts.contentVideo ? 'HÌNH SẢN PHẨM PHẢI RA TRƯỚC GIÂY 15 (17/9 vòng 6, luật cứng): tổng lời cảnh hook + empathy TỐI ĐA 55 từ (~15 giây đọc) để cảnh giải pháp chiếu máy thật vào sớm. Gọi tên máy trong phụ đề KHÔNG thay được hình máy.' : '',
     'CÂU KẾT QUẢ PHẢI CÓ HÌNH CHỨNG MINH (17/9 vòng 6): không nói "tuyệt đối", "đảm bảo 100%", "sạch bong" hay kết quả vận hành (máy nổ êm, dầu sạch) nếu tư liệu không quay được điều đó; thay bằng lợi ích MÔ TẢ ("nước sau lọc dùng cho sinh hoạt", "giữ dầu sạch hơn trước khi vào máy").',
     'TỶ LỆ PHẦN TRĂM (17/9, Điều cấm 5): CẤM mọi con số phần trăm ("40%", "gần 40 phần trăm chi phí") không có nguyên văn trong BÀI NGUỒN hoặc THÔNG SỐ ĐƯỢC PHÉP bên dưới. Không có thì nói "một phần lớn", "cả đống tiền".',
-    'NỖI ĐAU LÀ CỦA TÀU CHƯA LẮP MÁY SDVICO (17/9 chiều): máy hỏng, sửa hoài, cặn, nước đục, cạn nước trong cảnh đầu và cảnh đồng cảm là chuyện của tàu CHƯA có thiết bị SDVICO. TUYỆT ĐỐI KHÔNG viết như thể máy SDVICO hỏng hay phải sửa; không đặt tên máy SDVICO vào câu tả sự cố.',
+    'NỖI ĐAU LÀ CỦA TÀU CHƯA LẮP MÁY SDVICO (17/9 chiều): máy hỏng, sửa hoài, cặn, nước đục, cạn nước trong cảnh đầu và cảnh đồng cảm là chuyện của tàu CHƯA có thiết bị SDVICO. TUYỆT ĐỐI KHÔNG viết như thể máy SDVICO hỏng hay phải sửa; không đặt tên máy SDVICO vào câu tả sự cố. Cũng KHÔNG viết "máy lọc nước này", "máy lọc dầu này", "máy này sửa/hỏng" trong cảnh nỗi đau (18/9 vòng 10: người xem tưởng chiếc máy đang bán chính là chiếc vừa bị chê hỏng) — gọi là "máy lọc cũ", "bộ lọc cũ trên tàu".',
     'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển bị bỏ dở, tàu nằm bờ). Không lan man.',
     'CẢNH GIỮA: lối thoát bằng LỢI ÍCH cụ thể (không liệt kê thông số kỹ thuật khô) → phần thưởng cụ thể (đỡ tốn bao nhiêu, đi được bao xa, chở thêm được gì) → tin cậy 1 câu ngắn (lắp tận bến, bảo hành).',
     'CẢNH CUỐI: 1 câu chốt ngắn về LỢI ÍCH/thông điệp sản phẩm (đã có luật ở trên), có thể là câu hỏi mở nhẹ cho bà con nghĩ tiếp. KHÔNG nhắc "gọi", "liên hệ", "hotline" — outro cố định đầu ký đã lo phần đó.',
@@ -331,6 +331,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   let hookMiss = false; // 17/9 vòng 2: cảnh 1 chưa có chữ sản phẩm (dầu / nước)
   let hookPinMiss = false; // 17/9 vòng 3: lời cảnh 1 không ăn nhập tư liệu cảnh 1 đã chọn trước
   let solutionLate = false; // 17/9 vòng 6: lời trước cảnh giải pháp quá dài, hình máy ra muộn
+  let painSelf = []; // 18/9 vòng 10: cảnh nỗi đau trỏ "máy lọc ... này" vào sự cố (tưởng máy đang bán hỏng)
   // 17/9: clip bắt buộc cảnh 1 — kịch bản mở màn không ăn nhập nội dung clip thì sinh lại 1 lần.
   const mustAsset = opts.mustUseAssetId ? assets.find((a) => a.id === opts.mustUseAssetId) : null;
   let mustMiss = false;
@@ -350,7 +351,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       + (!hookPinMiss ? '' :
       `\n\nLẦN TRƯỚC LỜI CẢNH 1 KHÔNG ĂN NHẬP TƯ LIỆU CẢNH 1 ĐÃ CHỌN. Hình cảnh 1 là: ${String(hookPin?.description || hookPin?.title || '').replace(/\s+/g, ' ').slice(0, 220)}. Viết lại cảnh 1 tả đúng hình đó, không nhắc người hay vật không có trong hình.`)
       + (!solutionLate ? '' :
-      '\n\nLẦN TRƯỚC LỜI TRƯỚC CẢNH GIẢI PHÁP QUÁ DÀI — hình máy ra sau giây 15. Rút hook + empathy xuống TỐI ĐA 55 từ tổng cộng, mỗi cảnh 2 câu ngắn.');
+      '\n\nLẦN TRƯỚC LỜI TRƯỚC CẢNH GIẢI PHÁP QUÁ DÀI — hình máy ra sau giây 15. Rút hook + empathy xuống TỐI ĐA 55 từ tổng cộng, mỗi cảnh 2 câu ngắn.')
+      + (!painSelf.length ? '' :
+      `\n\nLẦN TRƯỚC CẢNH NỖI ĐAU VIẾT ${painSelf.map((p) => `"${p}"`).join(', ')} — người xem tưởng chiếc máy đang bán chính là chiếc hỏng. Viết lại, gọi là "máy lọc cũ" / "bộ lọc cũ trên tàu", không dùng chữ "này".`);
     const res = await generateWithRetry(ai, {
       model: MKT_MODEL,
       contents: user + extra,
@@ -381,6 +384,16 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     if (hookMiss) console.warn(`[script] canh 1 chua co chu "${hookTerm}" (lan ${attempt + 1}) — nguoi xem khong biet video noi ve gi.`);
     solutionLate = !opts.contentVideo && wordsBeforeSolution(parsed.vertical?.scenes || []) > 58;
     if (solutionLate) console.warn(`[script] loi truoc canh giai phap ${wordsBeforeSolution(parsed.vertical?.scenes || [])} tu (> 58) — hinh may se ra muon (lan ${attempt + 1}).`);
+    // 18/9 vòng 10: cảnh nỗi đau không được trỏ "máy lọc ... này" vào sự cố.
+    painSelf = [];
+    if (!opts.contentVideo) {
+      for (const [si, sc] of (parsed.vertical?.scenes || []).entries()) {
+        const role = String(sc?.role || '').toLowerCase();
+        if (si !== 0 && !['hook', 'empathy', 'story'].includes(role)) continue;
+        painSelf.push(...selfProductFaultPhrases(sc?.narration || ''));
+      }
+      if (painSelf.length) console.warn(`[script] canh noi dau tro "may ... nay" vao su co (lan ${attempt + 1}): ${painSelf.join(' | ')} — nguoi xem tuong may dang ban hong.`);
+    }
     hookPinMiss = false;
     if (hookPin) {
       const first = (parsed.vertical?.scenes || [])[0];
@@ -409,7 +422,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         }
       }
     }
-    if (!viol.length && !worn.length && !mustMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate) break;
+    if (!viol.length && !worn.length && !mustMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate && !painSelf.length) break;
   }
   // 17/9 vòng 9: bẻ câu 30-40 từ nối bằng dấu phẩy thành câu ngắn TRƯỚC mọi đường cắt — câu khổng lồ
   // làm cắt-cụm-cấm rỗng cả cảnh (bị khôi phục nguyên cụm cấm) và làm tách-cảnh-dài bất lực (ảnh đứng
@@ -444,6 +457,17 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       }
     }
     console.warn('[script] da cat cau nhac san pham khac / phan tram khong nguon / cum da mon:', bad.join(', '));
+  }
+  // 18/9 vòng 10: sinh lại vẫn trỏ "máy ... này" vào sự cố -> cắt câu chứa khỏi cảnh nỗi đau (dự phòng,
+  // cảnh rỗng sẽ được khối khôi phục bên dưới trả lời gốc).
+  if (painSelf.length) {
+    for (const [si, sc] of (parsed.vertical?.scenes || []).entries()) {
+      const role = String(sc?.role || '').toLowerCase();
+      if (si !== 0 && !['hook', 'empathy', 'story'].includes(role)) continue;
+      const cut = stripSentencesWith(sc.narration || '', painSelf);
+      if (cut && cut !== sc.narration) sc.narration = cut;
+    }
+    console.warn('[script] da cat cau "may ... nay" khoi canh noi dau:', painSelf.join(', '));
   }
   // Khôi phục cảnh bị cắt rỗng (mọi đường cắt ở trên).
   (parsed.vertical?.scenes || []).forEach((sc, i) => {
