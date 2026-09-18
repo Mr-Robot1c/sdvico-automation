@@ -45,6 +45,18 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           MKT_MODEL: ${{ secrets.MKT_MODEL }}
+      - name: Keo diem tu khoa that tu Google Search Console (viec B, 18/9)
+        if: always()
+        # Chua co quyen GSC (anh Thanh chua them tai khoan dich vu) -> script tu ghi run_log
+        # 'skipped' va thoat 0; continue-on-error la luoi an toan THEM cho loi mang/API bat
+        # ngo, khong duoc lam hong buoc audit + de xuat tu khoa o tren.
+        continue-on-error: true
+        run: node packages/marketing/src/gsc-keo-so.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          GSC_SITE_URL: ${{ secrets.GSC_SITE_URL }}
       - name: Up bao cao
         if: always()
         uses: actions/upload-artifact@v4

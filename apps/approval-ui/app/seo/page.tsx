@@ -3,6 +3,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import { siteUrl, publicBlogUrl } from '../../lib/seo';
 import { gscConfigured, type GscPage } from '../../lib/gsc';
 import { cachedPublicPosts, cachedGscLatest } from '../../lib/cached';
+import { loadSeoQueriesSummary } from '../../lib/seo-queries';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang SEO: bai da dang len web cong khai
 // (/blog), kho tu khoa, va suc khoe SEO (sitemap, audit gan nhat). Y chang layout SEO cua
@@ -69,6 +70,24 @@ export default async function Page() {
     else cur.count++;
   }
   const blogSlugByContentId = new Map(posts.map((p) => [p.contentId, p.slug]));
+  // 18/9 (việc B, plan-seo-vong-kin-tu-khoa-18-09.md): số THẬT Google theo từ khóa — bảng
+  // mkt_seo_queries CHƯA có dữ liệu tới khi anh Thành thêm quyền Search Console, hàm này tự
+  // nuốt lỗi/bảng thiếu (available:false), trang không vỡ.
+  const [seoQueries, idxRes] = await Promise.all([
+    loadSeoQueriesSummary(client, keywords.map((k) => String(k.keyword || ''))),
+    // Đếm trang đã index (tùy chọn, rẻ): chỉ hiện khi có sẵn run_log của script kiểm index —
+    // script đó NGOÀI phạm vi đợt này (plan mục 3, bước 4), chưa chạy thì bỏ qua im lặng.
+    client
+      .from('run_log')
+      .select('detail, created_at')
+      .eq('task', 'mkt.gsc_index_check')
+      .order('created_at', { ascending: false })
+      .limit(1),
+  ]);
+  const idxRow = ((idxRes.data || [])[0]) as any;
+  const idxIndexed = Number(idxRow?.detail?.indexed);
+  const idxTotal = Number(idxRow?.detail?.total);
+  const hasIdxCount = idxRow && Number.isFinite(idxIndexed) && Number.isFinite(idxTotal) && idxTotal > 0;
   const audit = auditRows[0] || null;
   // 1/9: audit chạy hằng tuần cho NHIỀU URL (sdvico.vn + trang bài viết) — lấy bản mới nhất
   // của từng URL cho khối Sức khỏe SEO.
@@ -244,6 +263,59 @@ export default async function Page() {
           </div>
         </section>
       </div>
+
+      {/* ===== TU KHOA TREN GOOGLE (viec B, 18/9) ===== */}
+      <section className="blk">
+        <h2><span aria-hidden="true">📈</span> Từ khóa trên Google (28 ngày)</h2>
+        {!seoQueries.available ? (
+          <p className="sub" style={{ margin: 0 }}>Chưa có số Google. Chờ anh Thành thêm quyền Search Console.</p>
+        ) : (
+          <>
+            {hasIdxCount ? (
+              <p className="sub" style={{ margin: '0 0 10px', fontSize: '.85rem' }}>
+                🔎 {fmt(idxIndexed)}/{fmt(idxTotal)} bài đã được Google index (lần kiểm {fmtDT(idxRow.created_at)}).
+              </p>
+            ) : null}
+            <div className="tablewrap">
+              <table className="datatable">
+                <thead>
+                  <tr>
+                    <th>Từ khóa Google đã ghi nhận</th>
+                    <th className="num" style={{ width: 70 }}>Click</th>
+                    <th className="num" style={{ width: 80 }}>Hiển thị</th>
+                    <th className="num" style={{ width: 64 }}>Vị trí</th>
+                    <th className="num" style={{ width: 64 }}>Điểm</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {seoQueries.top.map((r, i) => (
+                    <tr key={`${r.query}-${i}`}>
+                      <td className="cell-title">{r.query || <span className="sub">(không rõ)</span>}</td>
+                      <td className="num">{fmt(r.clicks)}</td>
+                      <td className="num">{fmt(r.impressions)}</td>
+                      <td className="num">{r.position ? r.position.toFixed(1).replace('.', ',') : '—'}</td>
+                      <td className="num">{fmt(Math.round(r.score))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {seoQueries.missingFromKeywords.length > 0 ? (
+              <div style={{ marginTop: 12 }}>
+                <h3 style={{ fontSize: '.92rem', margin: '0 0 8px' }}>Google đã thấy nhưng kho chưa có bài</h3>
+                <div style={{ display: 'grid', gap: 6 }}>
+                  {seoQueries.missingFromKeywords.map((r, i) => (
+                    <div key={`${r.query}-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: '.88rem' }}>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.query}</span>
+                      <span className="sub" style={{ flexShrink: 0, fontSize: '.8rem' }}>{fmt(r.impressions)} hiển thị</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
+      </section>
     </main>
   );
 }

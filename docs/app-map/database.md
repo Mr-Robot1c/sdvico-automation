@@ -2,8 +2,9 @@
 
 > Load khi / Load when: cần biết lược đồ bảng, cột chính và chính sách RLS. Nguồn sự thật là `supabase/migrations` (doc này tóm tắt, migration mới thì cập nhật ở đây cùng commit).
 covers: supabase/migrations
-last_verified: 2026-09-16
+last_verified: 2026-09-18
 ttl_days: 180
+<!-- re-verified: 2026-09-18 - Migration 20260918180000_mkt_seo_queries (viec B, plan-seo-vong-kin-tu-khoa-18-09.md): bang moi mkt_seo_queries (query, page, clicks, impressions, position, window_start, window_end, pulled_at) + index (query, window_end) + RLS policy staff_all. Ghi boi packages/marketing/src/gsc-keo-so.mjs (npm run gsc:keo, cron Thu 2 sau seo-audit trong seo-weekly.yml). Doc boi apps/approval-ui/lib/seo-queries.ts, trang /seo khoi "Tu khoa tren Google (28 ngay)". CHUA AP DB - orchestrator ap qua db-apply.mjs hoac SQL Editor; script tu ghi run_log 'skipped' khi bang chua ton tai hoac chua co quyen GSC, khong loi do. -->
 <!-- re-verified: 2026-09-16 - 2 migration 20260915120000 (mkt_leads.forwarded_*) + 20260915130000 (brand_assets.description) DA AP DB boi Thanh 16/9 (kiem tra select OK). forwarded_* khong con hien tren UI (Thanh bo Chuyen NV). brand_assets.storage_path tu 16/9 co dang "gdrive:<id>/<ten>" cho tu lieu tren Google Drive (doi-kho-sang-drive.mjs doi ca tu lieu cu). -->
 <!-- re-verified: 2026-09-15 (2) - Migration 20260915130000_brand_assets_description: them brand_assets.description text (mo ta noi dung: canh gi, tinh trang moi/cu/hu/ban/can/duc, boi canh, hop canh) + described_at timestamptz. Ghi boi up-media-kho-tu-lieu.mjs (luc up) va mo-ta-tu-lieu.mjs (bo sung tu lieu cu); doc boi day chuyen video (scene-match.mjs) de hinh di doi voi loi. Code roi ve cot cu neu CHUA AP. CHUA AP DB -> Thanh chay SQL Editor cung 20260915120000. -->
 <!-- re-verified: 2026-09-15 - Migration 20260915120000_mkt_leads_forwarded: them 2 cot mkt_leads.forwarded_to text + forwarded_at timestamptz (ke hoach "SDVICO sua web" cua Thanh 15/9: nut Chuyen NV phai de lai dau ai nhan, luc nao). Ghi boi server action recordLeadForward (app/actions.ts); trang /khach-hang tu roi ve bo cot cu neu migration CHUA AP (hien canh bao do). CHUA AP DB (db-apply IPv6) -> Thanh chay SQL Editor. -->
@@ -55,6 +56,7 @@ Chi tiết cột và chính sách nằm trong `supabase/migrations`. Cách áp d
 | hr_candidates | Tuyển dụng | Ứng viên, dữ liệu cá nhân (consent_at, retention_until, dedup_key) | Bật, dữ liệu cá nhân |
 | hr_applications | Tuyển dụng | Hồ sơ ứng tuyển, dữ liệu cá nhân | Bật, dữ liệu cá nhân |
 | product_facts | Marketing | Dữ kiện sản phẩm SDVICO (chống bịa, điều cấm 5) | Bật, staff |
+| mkt_seo_queries | Marketing | Việc B plan 18/9: số THẬT Google Search Console theo TỪNG từ khóa (`query`, `page`, `clicks`, `impressions`, `position`, khung `window_start`/`window_end`). Ghi bởi `gsc-keo-so.mjs` (cron Thứ 2 sau seo-audit) — xoá dòng cùng `window_end` rồi chèn lại (idempotent). Trống tới khi anh Thành thêm quyền Search Console. Trang `/seo` đọc để tính điểm `clicks*10 + impressions/10` | Bật, staff |
 | app_config | Chung | Cấu hình khóa–giá trị, có công tắc dừng khẩn (emergency_stop), lịch đăng cố định (mkt_posting_plan), nhóm chia sẻ (mkt_share_groups), focus (mkt_focus), mục tiêu tuần (mkt_weekly_goal) | Bật, staff |
 | daily_counters | Chung | Bộ đếm hạn mức theo tài khoản/loại/ngày. Giữ chỗ qua hàm nguyên tử `reserve_daily_quota` (kind `post` = trần đăng ngày, kind `rotate_run` = vé 1 lượt rotate/slot/ngày) | Bật, staff |
 
