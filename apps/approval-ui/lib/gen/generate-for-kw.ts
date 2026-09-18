@@ -29,7 +29,10 @@ const FORMATS = [
 // nhưng điều cấm 3 muốn cấp quản lý duyệt ngay khi CHÍNH từ khóa đã gợi chủ đề này, không chờ
 // bản nháp viết ra mới chặn. Cụm dịch vụ giám sát hành trình là nhóm ưu tiên cao nhất trong kho
 // (191/192 từ chưa có bài) nên an toàn ở bước này quan trọng hơn tốc độ tự đăng.
-const KEYWORD_GOV_HINTS = ['giám sát hành trình', 'quy định'];
+// 18/9 live-run lesson: keyword 'sửa thiết bị giám sát tàu cá ở Hà Tĩnh' auto-published because
+// it lacks the word 'hành trình'. Bare 'giám sát' + VMS always mean the mandated tracking device
+// in this catalog, so match the shorter stems too.
+const KEYWORD_GOV_HINTS = ['giám sát', 'vms', 'quy định'];
 
 // Từ khóa CÓ nhắc quy định nhà nước/IUU/Cục Thủy sản/Kiểm ngư/giám sát hành trình thì bắt buộc
 // đi qua hàng đợi duyệt cấp quản lý, không được tự đăng blog dù bản nháp sinh ra sạch.
