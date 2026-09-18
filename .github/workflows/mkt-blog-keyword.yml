@@ -1,0 +1,32 @@
+name: Cron hang ngay - bai blog theo kho tu khoa
+
+# Viec A (docs/plans/plan-seo-vong-kin-tu-khoa-18-09.md, 18/9): moi ngay boc toi da 3 tu khoa
+# CHUA co bai trong mkt_keywords (191/192 tu dang trong), sinh bai bang duong /api/blog-keyword.
+# Bai website sach (risk none) TU DANG blog; tu khoa cham quy dinh nha nuoc / IUU / Cuc Thuy san /
+# Kiem ngu / giam sat hanh trinh KHONG tu dang, luon roi vao hang doi duyet cap quan ly (dieu cam 3).
+# CRON_SECRET giong cac route cron khac (mkt-metrics-pull, rotate).
+
+on:
+  schedule:
+    - cron: '0 23 * * *' # 23:00 UTC = 6h sang VN hang ngay
+  workflow_dispatch:
+
+concurrency:
+  group: mkt-blog-keyword
+  cancel-in-progress: false
+
+jobs:
+  blog-keyword:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sinh bai theo tu khoa (toi da 3 tu/luot)
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "Thieu CRON_SECRET"; exit 1; fi
+          code=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://sdvico-mktit.vercel.app/api/blog-keyword")
+          echo "blog-keyword HTTP $code"
+          head -c 1000 /tmp/resp.json; echo
+          test "$code" = "200"

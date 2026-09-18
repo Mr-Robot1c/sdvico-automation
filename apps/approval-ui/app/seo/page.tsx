@@ -27,7 +27,7 @@ export default async function Page() {
 
   // 16/9 (Thanh: web chậm là ưu tiên nhất): 2 nguồn nặng (bài công khai + snapshot Search
   // Console 1.500 dòng) đi qua cache 5/10 phút — lib/cached.ts.
-  const [posts, gscRaw, kwRes, auditRes] = await Promise.all([
+  const [posts, gscRaw, kwRes, auditRes, kwContentRes] = await Promise.all([
     cachedPublicPosts(200),
     // 15/9: số Google Search Console (click / hiển thị / CTR / vị trí 28 ngày) cho từng bài.
     cachedGscLatest(),
@@ -42,6 +42,15 @@ export default async function Page() {
       .eq('task', 'mkt.seo_audit')
       .order('created_at', { ascending: false })
       .limit(12),
+    // 18/9 (việc A, vòng kín SEO): số bài + bài gần nhất theo TỪNG từ khóa — 1 truy vấn duy
+    // nhất, gộp đếm trong JS (KHÔNG lặp truy vấn cho từng từ khóa trong danh sách).
+    client
+      .from('mkt_content')
+      .select('id, title, brief, created_at')
+      .not('brief->>keyword_id', 'is', null)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(3000),
   ]);
   const pct = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
   const gscOn = gscConfigured();
@@ -49,6 +58,17 @@ export default async function Page() {
 
   const keywords = (kwRes.data || []) as any[];
   const auditRows = (auditRes.data || []) as any[];
+  // Đếm bài theo keyword_id (hàng đã sắp created_at giảm dần -> lần gặp ĐẦU TIÊN của mỗi
+  // keyword_id chính là bài gần nhất).
+  const kwPostStats = new Map<string, { count: number; latestId: string; latestTitle: string }>();
+  for (const r of (kwContentRes.data || []) as any[]) {
+    const kid = String(r.brief?.keyword_id || '');
+    if (!kid) continue;
+    const cur = kwPostStats.get(kid);
+    if (!cur) kwPostStats.set(kid, { count: 1, latestId: String(r.id), latestTitle: String(r.title || '') });
+    else cur.count++;
+  }
+  const blogSlugByContentId = new Map(posts.map((p) => [p.contentId, p.slug]));
   const audit = auditRows[0] || null;
   // 1/9: audit chạy hằng tuần cho NHIỀU URL (sdvico.vn + trang bài viết) — lấy bản mới nhất
   // của từng URL cho khối Sức khỏe SEO.
@@ -149,13 +169,39 @@ export default async function Page() {
           {keywords.length === 0 ? (
             <p className="sub" style={{ margin: 0 }}>Kho từ khóa trống. Chạy seed keywords hoặc thêm tay ở trang Kho từ khóa.</p>
           ) : (
-            <div style={{ display: 'grid', gap: 6 }}>
-              {keywords.slice(0, 8).map((k) => (
-                <div key={k.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: '.88rem' }}>
-                  <span className="badge tone-demo" style={{ flexShrink: 0 }}>{String(k.intent || 'thông tin')}</span>
-                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(k.keyword)}</span>
-                </div>
-              ))}
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div className="tablewrap">
+                <table className="datatable">
+                  <thead>
+                    <tr>
+                      <th>Từ khóa</th>
+                      <th style={{ width: 90 }}>Ý định</th>
+                      <th className="num" style={{ width: 60 }}>Số bài</th>
+                      <th>Bài gần nhất</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {keywords.slice(0, 8).map((k) => {
+                      const stat = kwPostStats.get(String(k.id));
+                      const slug = stat ? blogSlugByContentId.get(stat.latestId) : undefined;
+                      return (
+                        <tr key={k.id}>
+                          <td className="cell-title" style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(k.keyword)}</td>
+                          <td><span className="badge tone-demo">{String(k.intent || 'thông tin')}</span></td>
+                          <td className="num">{stat ? fmt(stat.count) : 0}</td>
+                          <td className="sub" style={{ fontSize: '.85rem' }}>
+                            {!stat ? '—' : slug ? (
+                              <a className="src" href={publicBlogUrl(slug)} target="_blank" rel="noreferrer">{stat.latestTitle.slice(0, 46)} ↗</a>
+                            ) : (
+                              <Link className="src" href="/noi-dung">{stat.latestTitle.slice(0, 46)}</Link>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
               <Link href="/tu-khoa" className="src" style={{ fontSize: '.85rem' }}>Xem cả kho {fmt(keywords.length)} từ khóa →</Link>
             </div>
           )}
