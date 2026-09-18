@@ -64,6 +64,12 @@ function cleanNarration(text) {
     // Chi ap cho GIONG DOC, chu tren man hinh / caption giu nguyen "Page".
     .replace(/\bfan\s?page\b/gi, 'phen pây')
     .replace(/\bpage\b/gi, 'pây')
+    // 18/9 (user: "lúc đọc SF300B vẫn bị khựng lại 1 nhịp nhẹ"): VieNeu gặp mã thô thì ngắt 0,12s
+    // trước mã + 0,37s trong mã (đo A/B 3 lần trên server 8199, kết quả tất định theo text). Đánh
+    // vần sẵn thì đọc liền mạch, chỉ còn 1 nghỉ ngắn TỰ NHIÊN sau tên máy, lại nhanh hơn 0,36s.
+    // Chỉ áp cho GIỌNG ĐỌC — phụ đề/caption/tem giá giữ nguyên "SF300B".
+    .replace(/\bSF\s?-?\s?300\s?B\b/gi, 'ét ép ba trăm bê')
+    .replace(/\bSF\s?-?\s?50\b/gi, 'ét ép năm mươi')
     .replace(/\s+/g, ' ')
     .trim();
 }
