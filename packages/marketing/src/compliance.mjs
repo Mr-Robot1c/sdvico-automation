@@ -27,8 +27,16 @@ export const REGULATION_TERMS = [
   'giấy phép khai thác',
 ];
 
-// Ngưỡng mét của tàu là nội dung quy định (tàu từ 15 mét phải lắp). Bắt "15 mét", "12m".
-const REGULATION_PATTERNS = [/\b\d{1,2}\s?mét\b/i, /\btàu[^.]{0,20}\b\d{1,2}\s?m\b/i];
+// Ngưỡng mét của tàu là nội dung quy định (tàu từ 15 mét phải lắp). 18/9: bài bán lọc dầu 492313ac
+// có VÍ DỤ tính dầu "Tàu 15 m, máy 400 cv, 8 người, chuyến 15 ngày" (nguồn Dân trí) bị mẫu cũ
+// (/\d{1,2} mét/ trần + /tàu ... \d m/) bắt nhầm thành quy định -> bài mất giá úp mở, giọng video
+// thành "bài quy định". Số mét chỉ là QUY ĐỊNH khi đi kèm ngữ cảnh luật: "tàu từ X mét", "trở lên",
+// "phải lắp", "bắt buộc", "thuộc diện", "quy định", "đăng kiểm", "giám sát hành trình".
+const REGULATION_PATTERNS = [
+  /\btàu\s+từ\s+\d{1,2}\s?m(ét)?\b/i,
+  /\btàu[^.]{0,30}\b\d{1,2}\s?m(ét)?\b[^.]{0,50}(trở lên|phải lắp|bắt buộc|thuộc diện|quy định|đăng kiểm|giám sát hành trình)/i,
+  /\b\d{1,2}\s?m(ét)?\s+trở lên\b/i,
+];
 
 // Phần mềm và dịch vụ của đối tác. Không được mô tả như của SDVICO.
 export const PARTNER_TERMS = [

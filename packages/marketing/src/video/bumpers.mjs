@@ -211,6 +211,9 @@ async function drawIntroFrame(W, H, t, dur) {
 // 1.3-2.0s TỪ KHÓA scale-in + PULSE nhẹ liên tục; 1.8-2.5s slogan fade.
 // 17/9 (user theo ChatGPT: outro 1 hành động): màn hình outro hiện TỪ KHÓA BÌNH LUẬN (LỌC DẦU / LỌC
 // NƯỚC) thay cho số điện thoại; số vẫn ở dải "SDVICO • Hotline" trên các cảnh nội dung.
+// 18/9 (user coi bản vòng 10: "outro bị thiếu sdt để người khác thấy rồi kìa"): dải hotline trên đầu
+// KHÔNG hiện trong outro nên khúc cuối không còn số nào — thêm lại dòng "Hotline 0939 243 222" nhỏ
+// dưới từ khóa; hành động chính vẫn là MỘT lệnh bình luận (giữ luật 17/9).
 // opts.keyword: chữ in hoa cần bà con chép vào bình luận.
 async function drawOutroFrame(W, H, t, dur, opts = {}) {
   const cv = createCanvas(W, H);
@@ -219,8 +222,8 @@ async function drawOutroFrame(W, H, t, dur, opts = {}) {
   const logo = await getLogo();
   const isPortrait = H > W;
   const pos = isPortrait
-    ? { logoY: 0.28, headY: 0.5, phoneY: 0.6, sloganY: 0.72, logoRatio: 0.28 }
-    : { logoY: 0.08, headY: 0.4, phoneY: 0.6, sloganY: 0.85, logoRatio: 0.18 };
+    ? { logoY: 0.28, headY: 0.5, phoneY: 0.6, hotlineY: 0.675, sloganY: 0.73, logoRatio: 0.28 }
+    : { logoY: 0.08, headY: 0.4, phoneY: 0.6, hotlineY: 0.72, sloganY: 0.85, logoRatio: 0.18 };
   const base = isPortrait ? H : Math.min(W, H * 1.6);
 
   // Logo pop-in.
@@ -272,6 +275,15 @@ async function drawOutroFrame(W, H, t, dur, opts = {}) {
     ctx.fillStyle = '#ffcc00';
     ctx.fillText(phoneText, 0, 0);
     ctx.restore();
+  }
+
+  // Hotline nhỏ dưới từ khóa, fade in 1.6-2.3s (18/9: outro phải có số cho bà con thấy).
+  const hotT = easeOut((t - 1.6) / 0.7);
+  if (hotT > 0) {
+    drawText(ctx, 'Hotline 0939 243 222', W / 2, H * pos.hotlineY, {
+      font: `${Math.round(base * 0.034)}px BVP-Black`, color: 'rgba(255,255,255,0.95)', alpha: Math.min(1, hotT),
+      maxWidth: W * 0.92
+    });
   }
 
   // Slogan fade in 1.8-2.5s.

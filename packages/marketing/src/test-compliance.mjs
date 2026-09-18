@@ -37,6 +37,18 @@ const cases = [
     text: 'Thiết bị GS-TEST-01 đạt chuẩn kháng nước IP67, pin 10000 mAh.',
     mong: 'amber',
   },
+  // 18/9: bài bán lọc dầu 492313ac có VÍ DỤ tính dầu "Tàu 15 m, máy 400 cv..." (nguồn Dân trí) bị
+  // mẫu mét cũ bắt nhầm thành quy định -> video mất giá úp mở. Số mét không kèm ngữ cảnh luật = sạch.
+  {
+    ten: 'Ví dụ tính dầu có "Tàu 15 m" KHÔNG phải quy định',
+    text: 'Tàu 15 m, máy 400 cv, 8 người, chuyến 15 ngày: khoảng 150 lít dầu mỗi ngày. Lọc sạch dầu là đỡ hao thấy rõ.',
+    mong: 'none',
+  },
+  {
+    ten: 'Số mét kèm ngữ cảnh luật vẫn là quy định (đỏ)',
+    text: 'Tàu dài 15 mét trở lên thuộc diện phải lắp thiết bị giám sát hành trình.',
+    mong: 'red',
+  },
 ];
 
 let pass = 0;

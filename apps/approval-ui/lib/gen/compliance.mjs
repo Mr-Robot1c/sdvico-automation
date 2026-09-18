@@ -27,8 +27,14 @@ export const REGULATION_TERMS = [
   'giấy phép khai thác',
 ];
 
-// Ngưỡng mét của tàu là nội dung quy định (tàu từ 15 mét phải lắp). Bắt "15 mét", "12m".
-const REGULATION_PATTERNS = [/\b\d{1,2}\s?mét\b/i, /\btàu[^.]{0,20}\b\d{1,2}\s?m\b/i];
+// Ngưỡng mét của tàu là nội dung quy định (tàu từ 15 mét phải lắp). 18/9: ví dụ tính dầu
+// "Tàu 15 m, máy 400 cv" bị mẫu cũ bắt nhầm thành quy định (xem packages/marketing/src/compliance.mjs).
+// Số mét chỉ là QUY ĐỊNH khi đi kèm ngữ cảnh luật. BẢN SAO — sửa thì sửa cả file gốc.
+const REGULATION_PATTERNS = [
+  /\btàu\s+từ\s+\d{1,2}\s?m(ét)?\b/i,
+  /\btàu[^.]{0,30}\b\d{1,2}\s?m(ét)?\b[^.]{0,50}(trở lên|phải lắp|bắt buộc|thuộc diện|quy định|đăng kiểm|giám sát hành trình)/i,
+  /\b\d{1,2}\s?m(ét)?\s+trở lên\b/i,
+];
 
 // Phần mềm và dịch vụ của đối tác. Không được mô tả như của SDVICO.
 export const PARTNER_TERMS = [
