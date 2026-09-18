@@ -82,17 +82,21 @@ function fmt(sec) {
 }
 
 // Trả về [{start,end,text}] cho một cảnh dài durationSec giây (tính từ 0).
-export function buildBlocks(text, durationSec) {
+// speechSec (18/9, user: "giây 0:11-0:13 khựng 1 nhịp, giọng và phụ đề không đi kịp nhau"): phần
+// ĐỌC THẬT của cảnh — durationSec còn chứa 0,16-0,26s đệm thở cuối khúc tiếng, chia chữ trên cả
+// durationSec làm chữ trễ dần so với giọng và câu chót đứng thêm ~0,3s sau khi giọng dứt.
+export function buildBlocks(text, durationSec, { speechSec = null } = {}) {
   const parts = chunk(text);
   if (!parts.length) return [];
+  const dur = Math.min(durationSec, Math.max(0.6, Number(speechSec) || durationSec));
   const totalChars = parts.reduce((a, p) => a + p.length, 0) || 1;
   const blocks = [];
   let t = 0;
   for (let i = 0; i < parts.length; i++) {
-    const share = (parts[i].length / totalChars) * durationSec;
+    const share = (parts[i].length / totalChars) * dur;
     const start = t;
-    let end = i === parts.length - 1 ? durationSec : t + share;
-    if (end - start < 0.6) end = Math.min(durationSec, start + 0.6);
+    let end = i === parts.length - 1 ? dur : t + share;
+    if (end - start < 0.6) end = Math.min(dur, start + 0.6);
     blocks.push({ start, end, text: parts[i] });
     t = end;
   }

@@ -212,6 +212,12 @@ for (const p of ['ruột gan', 'gan ruột', 'cười trừ', 'tinh mơ', 'hoàn
 // (e) phụ đề: câu trích đóng bằng !" tách thành mẩu riêng, không dính câu sau.
 const bQuote = buildBlocks('"Hết nước rồi anh em ơi!" Anh thợ máy vừa nói vậy đó.', 6).map((b) => b.text);
 ok('phụ đề tách sau câu trích !"', bQuote[0] === '"Hết nước rồi anh em ơi!"', bQuote);
+// (i) 18/9 (user: "giây 0:11-0:13 khựng 1 nhịp, giọng và phụ đề không đi kịp"): cảnh mang 0,26s đệm
+// thở cuối khúc tiếng — phụ đề phải kết ở thời gian ĐỌC (speechSec), không đứng thêm hết cả đệm.
+const bPad = buildBlocks('Cặn bẩn lọt vào làm kim phun nghẹt cứng, tiền sửa tốn cả chục triệu bạc!', 5.43, { speechSec: 5.17 });
+ok('mẩu chót kết tại speechSec (không ăn vào đệm thở)', Math.abs(bPad[bPad.length - 1].end - 5.17) < 1e-9, bPad[bPad.length - 1]);
+const bNoPad = buildBlocks('Máy nổ êm hơn.', 3);
+ok('không truyền speechSec thì như cũ (kết tại durationSec)', Math.abs(bNoPad[bNoPad.length - 1].end - 3) < 1e-9);
 
 const failed = cases.filter((c) => !c.ok);
 for (const c of cases) console.log(`${c.ok ? 'OK  ' : 'FAIL'} ${c.name}${c.ok ? '' : ` -> got ${JSON.stringify(c.got)}${c.want !== undefined ? ` want ${JSON.stringify(c.want)}` : ''}`}`);

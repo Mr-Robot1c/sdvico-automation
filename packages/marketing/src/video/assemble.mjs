@@ -25,7 +25,8 @@ const FIT_MODE = process.env.FIT_MODE || 'cover';
 async function buildSceneSegment(scene, fmt, workDir, index, { noSub = false } = {}) {
   const seg = `scene${index}.mp4`;
   const srtName = `scene${index}.srt`;
-  const blocks = buildBlocks(scene.text || '', scene.durationSec);
+  // 18/9: phụ đề chia trên phần ĐỌC (trừ đệm thở padSec cuối khúc tiếng) — xem padSecOf ở build-video.
+  const blocks = buildBlocks(scene.text || '', scene.durationSec, { speechSec: scene.durationSec - (Number(scene.padSec) || 0) });
   await writeFile(join(workDir, srtName), blocksToSrt(blocks), 'utf8');
 
   const style =
@@ -65,6 +66,9 @@ async function buildSceneSegment(scene, fmt, workDir, index, { noSub = false } =
     '-t', scene.durationSec.toFixed(3),
     '-filter_complex', vf,
     '-map', '[v]', '-map', '1:a',
+    // 18/9 (đo bản e335de29: tiếng AAC mỗi đoạn ngắn hơn hình 12-59ms, nối 5 đoạn thành hụt tiếng
+    // ở mép cảnh): apad đắp lặng cho tiếng đầy đúng -t như hình, hết khe hụt khi concat -c copy.
+    '-af', 'apad',
     '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
     '-r', '30', '-video_track_timescale', '30000',
     '-c:a', 'aac', '-ar', '44100', '-ac', '2',

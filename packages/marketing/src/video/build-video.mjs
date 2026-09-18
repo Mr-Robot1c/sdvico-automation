@@ -115,9 +115,15 @@ function livelyArgs(sampleRate, opts) {
 // (0,10s x 48kHz = 4800 mau). CI dung cung binary nay.
 // 5/9 (sep: "nghi hoi giua cac dau nhu ! lau them xiu"): sau cau cam/cau hoi nghi 0,26s, sau cau
 // thuong 0,16s (truoc do 0,10s deu).
+// 18/9 (user nghe bản e335de29: "giây 0:11-0:13 khựng 1 nhịp, giọng và phụ đề không đi kịp nhau"):
+// khoảng đệm này nằm TRONG durationSec của cảnh, mà phụ đề chia thời gian theo cả durationSec ->
+// càng cuối cảnh chữ càng trễ hơn giọng, câu chót đứng thêm ~0,3s sau khi giọng dứt. padSecOf tách
+// riêng để build-video truyền xuống phụ đề (assemble/srt) trừ đúng phần đệm ra khỏi quỹ thời gian chữ.
+export function padSecOf(sentence) {
+  return /[!?]$/.test(String(sentence || '').trim()) ? 0.26 : 0.16;
+}
 function sentenceGap(sentence) {
-  const sec = /[!?]$/.test(sentence) ? 0.26 : 0.16;
-  return `apad=pad_len=${Math.round(sec * 48000)}`;
+  return `apad=pad_len=${Math.round(padSecOf(sentence) * 48000)}`;
 }
 // Tạo mp3 LẶNG dài `sec` giây (dự phòng khi TTS lỗi: cảnh vẫn dựng, có phụ đề, chỉ mất tiếng cảnh đó).
 async function silentAudio(outPath, sec) {
@@ -615,6 +621,8 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
               videoPath: asset.local,
               audioPath: audio,
               durationSec: dur,
+              // 18/9: đệm thở cuối khúc (sentenceGap) nằm trong dur — phụ đề chỉ được chia trên phần ĐỌC.
+              padSec: padSecOf(spellPhones(cleanNarration(scenes[i].narration))),
               text: scenes[i].narration,
               kind: asset.kind === 'image' ? 'image' : 'video',
               assetId: scenes[i].assetId,
@@ -650,6 +658,7 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
           videoPath: asset.local,
           audioPath: audio,
           durationSec: dur,
+          padSec: padSecOf(cleanLast || s.narration), // 18/9: xem ghi chú padSecOf
           text: s.narration,
           kind: asset.kind === 'image' ? 'image' : 'video',
           assetId: s.assetId,
