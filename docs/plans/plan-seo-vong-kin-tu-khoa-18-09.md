@@ -85,3 +85,16 @@ Trả lời đúng câu sếp "ai kiếm nhiều hơn": số Google thật, khô
 - Bài blog tự đăng phải né: giá chính xác (chỉ 9,X / 3X / 4X triệu), "nhiều tàu đã dùng" khi chưa có
   khách thật, mô tả phần mềm đối tác như của SDVICO (điều cấm 4, 5).
 - Deploy = push origin main, đồng bộ ngay2-marketing, ff checkout chính (diff file M trước khi checkout).
+
+## 6. Việc C (đã chốt 19/9, làm khi bảng Google có ~2 tuần số): nối BOSS với số Google
+
+- BOSS (apps/approval-ui/lib/plan.ts) hiện KHÔNG đọc mkt_seo_queries (soát 19/9). Nối 2 chỗ:
+  1. Lúc soạn kế hoạch tuần: đọc top 10 query theo score = clicks*10 + impressions/10 của 28 ngày
+     gần nhất, đưa vào phần knowledge/publicHighlights làm nguồn gợi hướng bài (đánh dấu nguồn
+     "Google Search"); query dính giám sát/VMS/IUU vẫn phải qua duyệt cấp quản lý như mọi hướng khác.
+  2. AI Đánh giá (learn-weekly): bài blog có brief.keyword_id được cộng điểm theo clicks của các
+     query khớp trang bài đó (join mkt_seo_queries.page với slug bài), để trọng số sản phẩm phản
+     ánh cả kênh tìm kiếm chứ không chỉ Facebook.
+- Điều kiện bắt đầu: anh Thành đã cấp quyền SA, gsc-keo-so chạy ok tối thiểu 2 lượt Thứ 2 (bảng có
+  2 cửa sổ 28 ngày), GSC_SITE_URL đã chốt bằng npm run gsc:kiem và đặt secret.
+- KHÔNG làm sớm khi bảng rỗng: BOSS đọc bảng rỗng chỉ thêm nhánh chết khó test.
