@@ -133,6 +133,9 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
     .from('mkt_posts')
     .select('content_id, channel, external_url, published_at')
     .eq('status', 'published')
+    // 19/9: also honor soft-deleted post rows. Retracting one channel (set deleted_at on the
+    // mkt_posts row) used to be ignored here, so a pulled blog post kept serving 200.
+    .is('deleted_at', null)
     .not('external_url', 'is', null)
     .order('published_at', { ascending: false })
     .limit(limit);
