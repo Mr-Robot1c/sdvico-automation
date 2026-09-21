@@ -57,7 +57,7 @@ export type GenerateForKwResult = { count: number; gen: string; blogUrl: string 
 export async function generateForKw(
   client: any,
   kw: any,
-  opts: { forceReview?: boolean } = {}
+  opts: { forceReview?: boolean; articleOnly?: boolean } = {}
 ): Promise<GenerateForKwResult> {
   const { data: factRows } = await client
     .from('product_facts')
@@ -69,7 +69,10 @@ export async function generateForKw(
   const all: any = await (generateAllFormats as any)(kw, { facts });
   let count = 0;
   let blogUrl: string | null = null;
-  for (const fmt of FORMATS) {
+  // 21/9 (Thanh: keyword cron flooded the review queue): the daily keyword loop only wants the
+  // blog article; social + video spawns tripled the rows. Manual UI flow keeps the full set.
+  const formats = opts.articleOnly ? FORMATS.filter((f) => f.key === 'article') : FORMATS;
+  for (const fmt of formats) {
     const piece = all[fmt.key];
     const text = `${piece.title}\n${piece.draft}`;
     const assess: any = (assessDraft as any)(text, { knownFactValues: known, testFactValues: testVals });

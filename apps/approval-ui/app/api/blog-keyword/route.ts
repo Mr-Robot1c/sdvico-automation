@@ -35,6 +35,7 @@ export async function GET(req: Request) {
   const client = getServerClient();
   const startedAt = Date.now();
   let picked = 0;
+  let govPicked = 0;
   let published = 0;
   let review = 0;
   const errors: string[] = [];
@@ -92,7 +93,11 @@ export async function GET(req: Request) {
     for (const kw of chosen) {
       try {
         const forceReview = keywordNeedsGovReview(kw.keyword);
-        const { blogUrl } = await generateForKw(client, kw, { forceReview });
+        // 21/9: at most 1 gov-review keyword per run so the manager approval queue grows slowly;
+        // prefer keywords that can auto-publish to keep the blog moving without human bottleneck.
+        if (forceReview && govPicked >= 1) continue;
+        if (forceReview) govPicked++;
+        const { blogUrl } = await generateForKw(client, kw, { forceReview, articleOnly: true });
         if (blogUrl) published++; else review++;
         results.push({ keyword: kw.keyword, blogUrl });
       } catch (e: any) {
