@@ -96,7 +96,9 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.cache/huggingface
-          key: vieneu-tts-v1
+          # v2 (21/9): repo model VieNeu đổi cấu trúc 16/9 (thêm vieneu_backbone_shared.data)
+          # nên cache v1 cũ không còn khớp, mỗi lượt phải tải lại model. Đổi khóa để lưu bản mới.
+          key: vieneu-tts-v2
 
       - name: Cai goi tieng noi
         if: github.event_name != 'schedule' || steps.peek.outputs.work != '0'
@@ -107,6 +109,13 @@ jobs:
       # Không lên nổi trong 450s thì KHÔNG đặt TTS_LOCAL_URL -> build tự rơi về gemini/edge.
       - name: Bat server giong My Duyen
         if: github.event_name != 'schedule' || steps.peek.outputs.work != '0'
+        env:
+          # 21/9 (video từ 18/9 rớt về giọng Leda): model VieNeu bản 16/9 tách trọng số ra file
+          # ngoài vieneu_backbone_shared.data; cache HuggingFace mặc định trỏ file qua symlink
+          # sang thư mục blobs khác, onnxruntime mới kiểm "external data path escapes model
+          # directory" nên TỪ CHỐI nạp -> server chết lúc khởi động, build rơi về gemini/edge.
+          # Tắt symlink để cache chép file THẬT vào thư mục snapshot, onnxruntime nạp bình thường.
+          HF_HUB_DISABLE_SYMLINKS: '1'
         run: |
           nohup python packages/marketing/src/voice/local-tts-server-vieneu.py > /tmp/vieneu.log 2>&1 &
           echo "Cho model nap (lan dau phai tai model, cac lan sau co cache)..."
