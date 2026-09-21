@@ -111,6 +111,44 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
   // Tab Bảng bài viết (mặc định): board duyệt + vận hành. Tab Tổng quan cũ (TongQuanSection)
   // đã bỏ 27/8 — dashboard mới nằm ở /tong-quan.
   if (tab === 'bang') {
+    // 21/9 (Thanh: "muốn xuất hiện mấy block như xem tất cả để khỏi kéo xuống"): thêm dải chip
+    // tóm tắt số bài theo trạng thái ngay dưới đầu bảng. Cùng công thức effStatus với tab
+    // "Bài viết" flat (đọc mkt_content 200 dòng gần nhất + đối chiếu approval_queue) nên số
+    // chip khớp với chip trong ảnh 2 anh gửi. Bấm chip -> chuyển sang danh sách flat có lọc.
+    const [{ data: recentRows }, { data: qRowsAll }] = await Promise.all([
+      client
+        .from('mkt_content')
+        .select('id, status')
+        .in('kind', ['article', 'social'])
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(200),
+      client
+        .from('approval_queue')
+        .select('payload, status')
+        .eq('kind', 'mkt_publish_content'),
+    ]);
+    const qStatusByCid = new Map<string, string>();
+    for (const q of qRowsAll || []) {
+      const cid = (q as any).payload?.content_id as string | undefined;
+      if (!cid) continue;
+      // Dòng mới nhất thắng — approval_queue đã order theo created_at desc mặc định.
+      if (!qStatusByCid.has(cid)) qStatusByCid.set(cid, (q as any).status);
+    }
+    const effOf = (row: { id: string; status: string | null }) => {
+      const qs = qStatusByCid.get(row.id);
+      if (qs === 'approved') return 'approved';
+      if (qs === 'rejected') return 'rejected';
+      if (qs === 'pending') return 'review';
+      return row.status || 'draft';
+    };
+    let cAll = 0;
+    const cByStatus = { review: 0, approved: 0, rejected: 0 } as Record<string, number>;
+    for (const r of recentRows || []) {
+      cAll += 1;
+      const s = effOf(r as any);
+      if (s === 'review' || s === 'approved' || s === 'rejected') cByStatus[s] += 1;
+    }
     return (
       <main>
         <header className="head-row">
@@ -122,6 +160,21 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
           </div>
         </header>
         {typeChips}
+        <nav className="filters" aria-label="Lối tắt sang danh sách theo trạng thái">
+          <Link className="chip" href="/noi-dung?loai=bai-viet" title="Xem toàn bộ bài viết ở danh sách chi tiết">
+            Tất cả <span className="n">{cAll}</span>
+          </Link>
+          {STATUS_TABS.map((s) => (
+            <Link
+              key={s.key}
+              className="chip"
+              href={`/noi-dung?loai=bai-viet&trangthai=${s.key}`}
+              title={`Mở danh sách bài ${s.label.toLowerCase()}`}
+            >
+              {s.label} <span className="n">{cByStatus[s.key] || 0}</span>
+            </Link>
+          ))}
+        </nav>
         <BangSection />
       </main>
     );
