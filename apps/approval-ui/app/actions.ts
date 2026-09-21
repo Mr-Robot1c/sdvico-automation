@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache';
 import { waitUntil } from '@vercel/functions';
 import { getServerClient } from '../lib/supabase-server';
+import { publishContentToWebsite } from '../lib/gen/publish-website';
 import { postVideoToTikTok } from '../lib/tiktok';
 import { isEmergencyStopped } from '../lib/safety';
 import { fetchWithRetry } from '../lib/retry';
@@ -605,7 +606,9 @@ export async function decideForm(formData: FormData) {
         const jobs: Promise<unknown>[] = [];
         // 21/8: vòng lặp từng thiếu 'youtube' -> nhánh youtube phía dưới KHÔNG BAO GIỜ chạy,
         // bài duyệt xong chỉ lên FB + TikTok dù channels có youtube (user báo).
-        for (const ch of ['facebook', 'tiktok', 'youtube']) {
+        // 21/9: 'website' was missing here, so approved blog articles (gov-reviewed keyword
+        // posts) never actually published. publishContentToWebsite is idempotent.
+        for (const ch of ['facebook', 'tiktok', 'youtube', 'website']) {
           if (!channels.includes(ch)) continue;
           if (ch === 'facebook') jobs.push(publishContentToFacebook(bgClient, contentId, scheduledAt));
           // TikTok API bỏ (user 26/8): app SDVICO không được TikTok audit ("internal company
@@ -618,6 +621,7 @@ export async function decideForm(formData: FormData) {
             try { await bgClient.from('run_log').insert({ task: 'mkt.publish_tiktok', actor: 'decideForm', status: 'skipped', detail: { contentId, reason: 'tiktok-api-disabled: dung nut Xuat TikTok o /noi-dung' } }); } catch { /* bỏ qua */ }
           }
           if (ch === 'youtube') jobs.push(publishContentToYoutube(bgClient, contentId));
+          if (ch === 'website') jobs.push(publishContentToWebsite(bgClient, contentId, { actor: 'nguoi-bam' }));
         }
         await Promise.allSettled(jobs);
         // 4/9 khuya (ô TikTok trong lịch cố định): bài CHỈ TikTok không có API đăng -> ghi log
