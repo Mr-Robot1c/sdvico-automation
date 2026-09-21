@@ -1,4 +1,4 @@
-name: Dựng video theo yêu cầu
+﻿name: Dựng video theo yêu cầu
 
 # Quét mkt_content có brief.video_requested (bấm nút 🎬 ở /san-xuat hoặc /noi-dung), tự dựng
 # video (FB 16:9 + TikTok dọc) rồi đẩy vào Hàng đợi duyệt. KHÔNG tự đăng — người bấm Duyệt mới
@@ -27,7 +27,7 @@ name: Dựng video theo yêu cầu
 
 on:
   schedule:
-    - cron: '*/30 0-16 * * *'
+    - cron: '0 */3 * * *'
   workflow_dispatch:
     inputs:
       limit:
