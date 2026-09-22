@@ -133,6 +133,12 @@ export async function generateForKw(
         content_id: inserted?.id,
         format: fmt.key,
         channel: fmt.channel,
+        // 22/9: decideForm reads payload.channels (plural) to know where to publish. Missing it
+        // defaults to ['facebook'], so gov-review article rows (giám sát keywords, forceReview)
+        // were sent to Facebook when approved and NEVER reached the blog — publishContentToWebsite
+        // (which also assigns the cover) was skipped. Declaring the channel explicitly makes the
+        // queue payload self-describing and lets the approve loop hit the right branch.
+        channels: [fmt.channel],
         keyword: kw.keyword,
         intent: kw.intent,
         landing_url: kw.landing_url,
