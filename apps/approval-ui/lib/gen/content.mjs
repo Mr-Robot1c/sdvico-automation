@@ -317,28 +317,69 @@ function boundarySystem(facts) {
   ].join('\n');
 }
 
+// Khung bài website xoay theo băm từ khóa (23/9, Thanh: "các bài SEO cứ gần giống nhau quá"):
+// kho từ khóa có nhiều cụm anh em chỉ khác tên tỉnh, prompt cũ lại đưa CÙNG một danh sách
+// sections cho mọi từ cùng ý định nên bài nào cũng một khuôn "trả lời, các bước, lưu ý, gọi
+// tổng đài". Băm từ khóa để mỗi từ (kể cả hai tỉnh cạnh nhau) rơi vào khung khác nhau, và
+// chạy lại cùng từ khóa vẫn ra cùng khung (tất định, dễ dò).
+const ARTICLE_SHAPES = [
+  'Khung bài: GIẢI ĐÁP. Trả lời gọn ý chính ngay đoạn đầu, sau đó mỗi ý một đoạn đi sâu hơn, cuối bài thêm hai câu hỏi đáp ngắn bà con hay thắc mắc.',
+  'Khung bài: KỂ CHUYỆN. Mở bằng một tình huống cụ thể một chủ tàu gặp phải, từ đó dẫn vào vấn đề rồi hướng dẫn cách xử lý cho người đọc.',
+  'Khung bài: CÁC BƯỚC. Vào đề một đoạn ngắn rồi trình bày Bước 1, Bước 2... mỗi bước một đoạn, chốt bằng lỗi hay gặp và cách tránh.',
+  'Khung bài: HỎI ĐÁP. Cả bài là bốn năm câu hỏi bà con hay hỏi về chủ đề này, mỗi câu hỏi một đoạn trả lời thẳng vào việc.',
+  'Khung bài: SAI HAY GẶP. Nêu hai ba cách làm sai hoặc hiểu lầm phổ biến quanh chủ đề, rồi chỉ cách làm đúng cho từng cái.',
+  'Khung bài: DANH SÁCH KIỂM TRA. Vào đề ngắn rồi liệt kê các mục cần kiểm tra hoặc chuẩn bị, mỗi mục một đoạn ngắn kèm lý do.',
+];
+
+// Băm chuỗi tất định (không phụ thuộc phiên chạy) để chọn khung bài và góc mở theo từ khóa.
+// Trộn kiểu xxhash (imul + xor-shift) thay vì h*31: các từ khóa anh em chỉ khác đuôi tên tỉnh
+// mà dùng h*31 thì dễ rơi cùng một khung; seed khác nhau cho khung và góc để hai lựa chọn
+// không dính vào nhau.
+function hashStr(s, seed = 0) {
+  let h = seed >>> 0;
+  for (const ch of String(s || '')) h = Math.imul(h ^ ch.codePointAt(0), 2654435761) >>> 0;
+  h ^= h >>> 16;
+  h = Math.imul(h, 2246822519) >>> 0;
+  h ^= h >>> 13;
+  return h >>> 0;
+}
+
 // Sinh CẢ BA định dạng trong một lần gọi Gemini, trả JSON { article, social, video }.
-export async function generateFormatsLLM(brief, facts = []) {
+// avoid: các bài article đã đăng gần đây / cùng cụm từ khóa ({ title, opening }) — đưa vào
+// prompt để cấm lặp mở bài, khung bài, câu chữ (chống bài SEO na ná nhau, 23/9).
+export async function generateFormatsLLM(brief, facts = [], avoid = []) {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   const system = boundarySystem(facts) + '\n\n' + [
     'Tạo ba phiên bản nội dung cho cùng một từ khóa:',
-    '- article: bài website dài, trả lời ngay đầu bài, có vài đoạn phân tích, dẫn về tổng đài.',
+    '- article: bài website 350 tới 500 chữ, văn bản thường không markdown, các đoạn cách nhau một dòng trống, trả lời ý chính ngay đoạn đầu, dẫn về tổng đài ở cuối.',
     '- social: bài Facebook ngắn, hai tới bốn câu, một hook và một lời kêu gọi liên hệ.',
     '- video: kịch bản video dọc 60 giây, bốn nhịp có mốc thời gian [0-3s], [3-10s], [10-45s], [45-60s].',
   ].join('\n');
 
-  const user = [
+  const shape = ARTICLE_SHAPES[hashStr(brief.keyword, 1) % ARTICLE_SHAPES.length];
+  const angle = DRAFT_ANGLES[hashStr(brief.keyword, 2) % DRAFT_ANGLES.length];
+  const userParts = [
     `Từ khóa: "${brief.keyword}". Ý định: ${brief.intent}.`,
-    `Các phần gợi ý cho bài dài: ${(brief.sections || []).join('; ')}.`,
-  ].join('\n');
+    `${shape}`,
+    `Góc tiếp cận cho đoạn mở bài: ${angle}.`,
+    'Từ khóa gắn với địa phương nào thì viết đúng bối cảnh nghề biển ở đó, nhưng CHỈ nêu chi tiết địa phương chắc chắn đúng, không bịa tên cảng, ngư trường hay số liệu.',
+  ];
+  if (avoid.length) {
+    userParts.push(
+      'Các bài đã đăng gần đây trên blog. TUYỆT ĐỐI không lặp lại cách mở bài, khung bài hay câu chữ của chúng. Bài cùng chủ đề chỉ khác địa phương thì bài mới phải khác hẳn cách triển khai, không được chỉ thay tên tỉnh:'
+    );
+    for (const a of avoid) userParts.push(`- "${a.title}": ${a.opening}...`);
+  }
+  const user = userParts.join('\n');
 
   const res = await genOnce(ai, {
     model: MKT_MODEL,
     contents: user,
     config: {
       systemInstruction: system,
+      temperature: 1.0,
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'OBJECT',
@@ -353,11 +394,11 @@ export async function generateFormatsLLM(brief, facts = []) {
 }
 
 // Điều phối: sinh ba định dạng, ưu tiên Gemini khi có khóa, không thì bản mẫu.
-export async function generateAllFormats(kw, { facts = [] } = {}) {
+export async function generateAllFormats(kw, { facts = [], avoid = [] } = {}) {
   const brief = buildBrief(kw);
   if (process.env.GEMINI_API_KEY) {
     try {
-      const f = await generateFormatsLLM(brief, facts);
+      const f = await generateFormatsLLM(brief, facts, avoid);
       const title = draftTitle(brief);
       return {
         brief: { ...brief, generator: 'gemini' },

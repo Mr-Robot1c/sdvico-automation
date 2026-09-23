@@ -46,6 +46,59 @@ export { REGULATION_TERMS };
 
 export type GenerateForKwResult = { count: number; gen: string; blogUrl: string | null };
 
+// 23/9 (Thanh: "các bài SEO cứ gần giống nhau quá"): kho từ khóa có nhiều cụm anh em chỉ khác
+// tên tỉnh (gia hạn cước giám sát... Hà Tĩnh / Kiên Giang...), bài sinh ra trùng nhau tới ~90%.
+// Gom các bài article đã có: ưu tiên bài TRÙNG CỤM từ khóa nhất (đo bằng tỉ lệ chữ chung) rồi
+// thêm bài mới đăng gần đây, đưa vào prompt Gemini để cấm lặp mở bài, khung bài, câu chữ.
+function kwWords(s: string): string[] {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 2);
+}
+
+async function loadAvoidList(client: any, keyword: string): Promise<Array<{ title: string; opening: string }>> {
+  try {
+    const { data } = await client
+      .from('mkt_content')
+      .select('title,draft,brief,created_at')
+      .eq('kind', 'article')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(40);
+    const rows: any[] = data || [];
+    const cur = new Set(kwWords(keyword));
+    const scored = rows.map((r) => {
+      const ws = kwWords(r?.brief?.keyword || r?.title || '');
+      const shared = ws.filter((w) => cur.has(w)).length;
+      return { r, score: ws.length ? shared / Math.max(cur.size, ws.length) : 0 };
+    });
+    const seen = new Set<string>();
+    const pick: any[] = [];
+    // Tối đa 3 bài trùng cụm nhất (score >= 0.5 mới coi là cùng cụm) + bù bài mới nhất cho đủ 6.
+    for (const s of [...scored].sort((a, b) => b.score - a.score)) {
+      if (pick.length >= 3 || s.score < 0.5) break;
+      if (seen.has(s.r.title)) continue;
+      seen.add(s.r.title);
+      pick.push(s.r);
+    }
+    for (const s of scored) {
+      if (pick.length >= 6) break;
+      if (seen.has(s.r.title)) continue;
+      seen.add(s.r.title);
+      pick.push(s.r);
+    }
+    return pick.map((r) => ({
+      title: String(r.title || ''),
+      opening: String(r.draft || '').replace(/\s+/g, ' ').trim().slice(0, 200)
+    }));
+  } catch {
+    // Không gom được bài cũ thì sinh như trước, đừng chặn cả vòng viết bài.
+    return [];
+  }
+}
+
 // Lõi dùng chung cho nút "Sinh bài", nút "Viết bài" ở /tu-khoa, và cron /api/blog-keyword: sinh
 // 3 định dạng cho MỘT từ khóa. 3/9 (user chốt): bản WEBSITE sạch (risk none, không chạm quy định)
 // TỰ ĐĂNG blog luôn — blog là web của mình; chỉ bài NỀN TẢNG (Facebook/video) mới qua hàng đợi
@@ -66,7 +119,8 @@ export async function generateForKw(
   const known = (knownFactValues as any)(facts);
   const testVals = (testFactValues as any)(facts);
 
-  const all: any = await (generateAllFormats as any)(kw, { facts });
+  const avoid = await loadAvoidList(client, kw?.keyword || '');
+  const all: any = await (generateAllFormats as any)(kw, { facts, avoid });
   let count = 0;
   let blogUrl: string | null = null;
   // 21/9 (Thanh: keyword cron flooded the review queue): the daily keyword loop only wants the
