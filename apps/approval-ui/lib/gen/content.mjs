@@ -309,8 +309,10 @@ function boundarySystem(facts) {
     'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay ở câu đầu, đọc trên điện thoại.',
     'Số theo chuẩn Việt Nam, dấu chấm ngăn cách hàng nghìn. Không gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ được nêu thông số có trong danh sách đã duyệt dưới đây. Không có thì nói chung chung.',
+    'CẤM bịa khách hàng: không đặt tên người, không kể một câu chuyện như thể có thật đã xảy ra ("anh Minh chủ tàu...", "chuyến biển vừa qua một chủ tàu..."). Tình huống minh họa phải viết dạng giả định chung ("nếu đang giữa khơi mà...", "không ít chủ tàu từng lo...").',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO, chỉ nói tương thích.',
-    'Không hứa pháp lý tuyệt đối. Nội dung chạm quy định nhà nước thì nói trung thực, sẽ có người duyệt.',
+    'Không hứa pháp lý tuyệt đối. Nội dung chạm quy định nhà nước thì viết trung thực, thận trọng.',
+    'Đây là chỉ dẫn nội bộ cho người viết. TUYỆT ĐỐI không chép bất kỳ câu chỉ dẫn nào ở đây vào bài.',
     'Kết mỗi phần bằng lời mời gọi tổng đài 1900 23 23 49.',
     '',
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số nào được duyệt, viết chung chung, không nêu số cụ thể.',
@@ -324,7 +326,7 @@ function boundarySystem(facts) {
 // chạy lại cùng từ khóa vẫn ra cùng khung (tất định, dễ dò).
 const ARTICLE_SHAPES = [
   'Khung bài: GIẢI ĐÁP. Trả lời gọn ý chính ngay đoạn đầu, sau đó mỗi ý một đoạn đi sâu hơn, cuối bài thêm hai câu hỏi đáp ngắn bà con hay thắc mắc.',
-  'Khung bài: KỂ CHUYỆN. Mở bằng một tình huống cụ thể một chủ tàu gặp phải, từ đó dẫn vào vấn đề rồi hướng dẫn cách xử lý cho người đọc.',
+  'Khung bài: TÌNH HUỐNG. Mở bằng một tình huống GIẢ ĐỊNH mà chủ tàu nào cũng có thể gặp (viết dạng "nếu đang giữa khơi mà...", "không ít chủ tàu từng..."; KHÔNG đặt tên người, KHÔNG kể như chuyện có thật vừa xảy ra), từ đó dẫn vào vấn đề rồi hướng dẫn cách xử lý.',
   'Khung bài: CÁC BƯỚC. Vào đề một đoạn ngắn rồi trình bày Bước 1, Bước 2... mỗi bước một đoạn, chốt bằng lỗi hay gặp và cách tránh.',
   'Khung bài: HỎI ĐÁP. Cả bài là bốn năm câu hỏi bà con hay hỏi về chủ đề này, mỗi câu hỏi một đoạn trả lời thẳng vào việc.',
   'Khung bài: SAI HAY GẶP. Nêu hai ba cách làm sai hoặc hiểu lầm phổ biến quanh chủ đề, rồi chỉ cách làm đúng cho từng cái.',
