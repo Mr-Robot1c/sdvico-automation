@@ -603,6 +603,39 @@ export async function decideForm(formData: FormData) {
           });
           return;
         }
+        // 23/9 (Thanh: "viết lại luôn hai bài đó đi" — 2 bài SEO gia hạn cước na ná nhau): phiếu
+        // VIẾT LẠI bài blog đã đăng. Bản viết lại là một mkt_content riêng (content_id) nên thẻ
+        // duyệt hiện đúng bản mới và sửa tay được như mọi phiếu; payload.rewrite_of trỏ bài gốc
+        // đang sống. Duyệt = chép draft mới vào bài gốc (tiêu đề giữ nguyên nên slug và URL không
+        // đổi), rồi đưa bản nháp riêng vào thùng rác cho kho gọn. KHÔNG rơi xuống vòng đăng kênh
+        // bên dưới — bài gốc đã có mkt_posts website, mà content_id ở đây là bản nháp phụ, đăng
+        // nó sẽ ra một bài blog MỚI trùng nội dung. Máy chỉ ghi phiếu, người bấm Duyệt mới thay
+        // bài (điều cấm 3 giữ nguyên: các phiếu này luôn needs_gov_review).
+        if (payload.rewrite_of) {
+          const targetId = String(payload.rewrite_of);
+          const { data: src } = await bgClient.from('mkt_content').select('draft').eq('id', contentId).maybeSingle();
+          const newDraft = String((src as any)?.draft || '').trim();
+          let rwErr: string | null = null;
+          if (!newDraft) rwErr = 'ban viet lai rong';
+          else {
+            const { error: upErr } = await bgClient.from('mkt_content').update({ draft: newDraft }).eq('id', targetId);
+            rwErr = upErr?.message || null;
+          }
+          if (!rwErr) {
+            await bgClient.from('mkt_content').update({ deleted_at: new Date().toISOString() }).eq('id', contentId);
+            try { const { bustCache, TAG } = await import('../lib/cached'); bustCache(TAG.content); } catch { /* bỏ qua */ }
+            revalidatePath('/blog');
+          }
+          await bgClient.from('run_log').insert({
+            task: 'mkt.blog_rewrite',
+            actor: 'decideForm',
+            status: rwErr ? 'error' : 'ok',
+            detail: { draft_content_id: contentId, target_content_id: targetId, error: rwErr, msg: rwErr ? null : 'thay draft bai da dang sau khi Duyet, giu nguyen URL' }
+          });
+          revalidatePath('/hang-doi');
+          revalidatePath('/noi-dung');
+          return;
+        }
         const jobs: Promise<unknown>[] = [];
         // 21/8: vòng lặp từng thiếu 'youtube' -> nhánh youtube phía dưới KHÔNG BAO GIỜ chạy,
         // bài duyệt xong chỉ lên FB + TikTok dù channels có youtube (user báo).
