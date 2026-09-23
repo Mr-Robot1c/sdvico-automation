@@ -92,9 +92,19 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
     .order('created_at', { ascending: false });
 
   const raw = (data || []) as Item[];
+  // 23/9 (đồng bộ với /tong-quan): bài đã vào Thùng rác (mkt_content.deleted_at) vẫn còn thẻ pending
+  // vì soft-delete 26/8 cố ý không đụng approval_queue — ẩn thẻ đó khỏi hàng đợi cho khớp các trang
+  // bài viết; khôi phục từ Thùng rác thì thẻ tự hiện lại.
+  const rawCids = [...new Set(raw.map((it) => contentIdOf(it.payload)).filter((x): x is string => !!x))];
+  let rawVisible = raw;
+  if (rawCids.length) {
+    const { data: delRows } = await client.from('mkt_content').select('id').in('id', rawCids).not('deleted_at', 'is', null);
+    const deleted = new Set((delRows || []).map((d: any) => String(d.id)));
+    if (deleted.size) rawVisible = raw.filter((it) => { const cid = contentIdOf(it.payload); return !cid || !deleted.has(cid); });
+  }
   // Bản deploy marketing-only chỉ hiện mục marketing (kind bắt đầu bằng 'mkt'), ẩn HR và demo.
   const marketingOnly = process.env.MARKETING_ONLY === 'true' || process.env.MARKETING_ONLY === '1';
-  const all = marketingOnly ? raw.filter((it) => it.kind.startsWith('mkt')) : raw;
+  const all = marketingOnly ? rawVisible.filter((it) => it.kind.startsWith('mkt')) : rawVisible;
 
   // Đếm theo loại để dựng thanh lọc.
   const counts = new Map<string, number>();

@@ -155,7 +155,19 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     if (cid && !queueByCid.has(cid)) queueByCid.set(cid, r);
   }
 
-  const pending = queueRows.filter((r) => r.status === 'pending');
+  // 23/9 (user: ô Cần làm báo "2 bài kẹt Chờ duyệt quá 24 giờ" mà Bảng bài viết trống): soft-delete
+  // (26/8, cách C) cố ý KHÔNG đụng approval_queue, nên bài đã vào Thùng rác vẫn còn thẻ pending —
+  // các trang bài viết ẩn bài deleted, người duyệt không thấy gì để bấm, thẻ treo mãi. Mọi con số
+  // pending ở đây (nút Duyệt bài + ô Cần làm) phải bỏ thẻ của bài đã xóa; khôi phục từ Thùng rác
+  // thì thẻ tự được đếm lại.
+  const pendingRaw = queueRows.filter((r) => r.status === 'pending');
+  const pendingCids = [...new Set(pendingRaw.map((r) => String(r.payload?.content_id || '')).filter(Boolean))];
+  const deletedCids = new Set<string>();
+  if (pendingCids.length) {
+    const { data: delRows } = await client.from('mkt_content').select('id').in('id', pendingCids).not('deleted_at', 'is', null);
+    for (const d of delRows || []) deletedCids.add(String((d as any).id));
+  }
+  const pending = pendingRaw.filter((r) => !deletedCids.has(String(r.payload?.content_id || '')));
   const rejected = queueRows.filter((r) => r.status === 'rejected');
   const scheduled = queueRows.filter((r) => {
     if (r.status !== 'approved') return false;
