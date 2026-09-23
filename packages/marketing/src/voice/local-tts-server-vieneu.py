@@ -46,7 +46,15 @@ REP_PENALTY = float(os.environ.get("SDVICO_TTS_REP_PENALTY", "1.35"))
 print(f"[vieneu] dang nap model (giong: {VOICE})...", flush=True)
 from vieneu import Vieneu  # noqa: E402 — import sau print để log sớm khi khởi động chậm
 
-tts = Vieneu()  # v3turbo, ONNX CPU
+# 23/9 (máy user có GPU cũ, torch 2.4 + cu118: đường CUDA graph của vieneu vỡ "operation not
+# permitted when stream is capturing"; ẩn GPU bằng CUDA_VISIBLE_DEVICES rỗng cũng chết vì
+# _resolve_dtype gọi torch.cuda.is_bf16_supported() không kiểm is_available trước — bug torch 2.4):
+# cho ép device/dtype qua env. Mặc định "auto" giữ nguyên hành vi cũ, CI không đổi gì.
+# Máy Windows chạy: SDVICO_TTS_DEVICE=cpu SDVICO_TTS_DTYPE=float32.
+tts = Vieneu(
+    device=os.environ.get("SDVICO_TTS_DEVICE", "auto"),
+    dtype=os.environ.get("SDVICO_TTS_DTYPE", "auto"),
+)  # v3turbo, ONNX CPU
 tts.infer("Khởi động.", voice=VOICE)  # warm-up + fail sớm nếu tên giọng sai
 print("[vieneu] san sang", flush=True)
 
