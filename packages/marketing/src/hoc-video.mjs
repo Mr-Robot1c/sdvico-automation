@@ -176,7 +176,7 @@ for (const v of videos) {
           'Day la video tu lieu tu nhom Zalo noi bo cua SDVICO, cong ty phan phoi thiet bi cho ngu dan va tau ca',
           '(may loc dau, loc nuoc bien, thiet bi giam sat hanh trinh, dien thoai ve tinh...).',
           'Xem video va viet ban tom tat tieng Viet gom 3 phan:',
-          '1. Canh quay: quay gi, o dau (tren tau, cang, xuong...), thay thiet bi gi, khong khi the nao.',
+          '1. Canh quay: quay gi, o dau (tren tau, cang, xuong...), thay thiet bi gi, khong khi the nao. Co NGUOI thi ta ro tung nguoi: nam hay nu (khong ro thi ghi "khong ro"), mac gi, dang cam gi, dang lam gi.',
           '2. Loi thoai: ai noi gi (tom y, khong can nguyen van; khong co tieng noi thi ghi ro).',
           '3. Goi y su dung: tu lieu nay hop cum bai nao (ban hang, doi song ngu dan, huong dan ky thuat, hau truong lap dat), co diem gi dat gia.',
           'Van phong cau ngan, gan gui. KHONG bia chi tiet khong thay trong video.',

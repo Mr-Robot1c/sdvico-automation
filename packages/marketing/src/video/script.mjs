@@ -6,7 +6,7 @@ import { guardLines, guardViolations, stripViolatingSentences } from '../product
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
 import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool } from './scene-match.mjs';
-import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases } from './rules.mjs';
+import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -239,17 +239,17 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     opts.mustUseAssetId
       ? (() => {
           const m = assets.find((a) => a.id === opts.mustUseAssetId);
-          const desc = String(m?.description || m?.title || '').replace(/\s+/g, ' ').trim().slice(0, 260);
+          const desc = String(m?.description || m?.title || '').replace(/\s+/g, ' ').trim().slice(0, 600);
           // 17/9 chiều (user: video lọc nước mở màn "thợ máy sửa lần thứ ba" trên hình máy SEA-40 của công ty
           // đang chạy): clip sản phẩm đang chạy phải vào cảnh GIẢI PHÁP, cảnh đầu là nỗi đau trên tàu CHƯA lắp.
           if (mustRole === 'solution') {
-            return `TƯ LIỆU BẮT BUỘC (9/9, sửa 17/9): cảnh GIẢI PHÁP (role solution) phải dùng id=${opts.mustUseAssetId} (clip thật mới quay MÁY SDVICO ĐANG CHẠY / ĐANG LẮP). CLIP NÀY QUAY: ${desc || '(chưa có mô tả)'}. Lời thoại và "visual" cảnh giải pháp PHẢI tả đúng những gì clip quay. Cảnh ĐẦU và cảnh ĐỒNG CẢM KHÔNG dùng clip này: nỗi đau phải là chuyện trên tàu CHƯA LẮP máy SDVICO (hình tàu thật, khoang máy cũ, thợ sửa máy cũ). TUYỆT ĐỐI KHÔNG viết như thể máy SDVICO hỏng, sửa hoài, ra cặn, cạn nước.`;
+            return `TƯ LIỆU BẮT BUỘC (9/9, sửa 17/9): cảnh GIẢI PHÁP (role solution) phải dùng id=${opts.mustUseAssetId} (clip thật mới quay MÁY SDVICO ĐANG CHẠY / ĐANG LẮP). CLIP NÀY QUAY: ${desc || '(chưa có mô tả)'}. Lời thoại và "visual" cảnh giải pháp PHẢI tả đúng những gì clip quay. Cảnh ĐẦU và cảnh ĐỒNG CẢM KHÔNG dùng clip này: nỗi đau phải là chuyện trên tàu CHƯA LẮP máy SDVICO (hình tàu thật, khoang máy cũ, thợ sửa máy cũ). TUYỆT ĐỐI KHÔNG viết như thể máy SDVICO hỏng, sửa hoài, ra cặn, cạn nước. Mô tả KHÔNG ghi nam hay nữ thì gọi trung tính ("nhân viên SDVICO", "người thợ"), CẤM đoán "anh" hay "chị". CẤM thêm đồ vật hay hành động không có trong mô tả (vali, xách đồ nghề, bước xuống mạn...).`;
           }
-          return `TƯ LIỆU BẮT BUỘC (9/9): cảnh ĐẦU TIÊN phải dùng id=${opts.mustUseAssetId} (clip thật mới quay). CLIP NÀY QUAY: ${desc || '(chưa có mô tả)'}. LỜI THOẠI và "visual" của cảnh đầu PHẢI xuất phát từ đúng những gì clip quay — mở màn bằng chính cảnh trong clip rồi dẫn vào chuyện; CẤM tả cảnh không có trong clip (bình minh, cảng cá, sóng gió, khoang máy...) nếu clip không quay cảnh đó. Các cảnh khác ưu tiên tư liệu có nhãn clip thật hơn ảnh.`;
+          return `TƯ LIỆU BẮT BUỘC (9/9): cảnh ĐẦU TIÊN phải dùng id=${opts.mustUseAssetId} (clip thật mới quay). CLIP NÀY QUAY: ${desc || '(chưa có mô tả)'}. LỜI THOẠI và "visual" của cảnh đầu PHẢI xuất phát từ đúng những gì clip quay — mở màn bằng chính cảnh trong clip rồi dẫn vào chuyện; CẤM tả cảnh không có trong clip (bình minh, cảng cá, sóng gió, khoang máy...) nếu clip không quay cảnh đó. Các cảnh khác ưu tiên tư liệu có nhãn clip thật hơn ảnh. Mô tả KHÔNG ghi nam hay nữ thì gọi trung tính ("nhân viên SDVICO", "người thợ"), CẤM đoán "anh" hay "chị". CẤM thêm đồ vật hay hành động không có trong mô tả (vali, xách đồ nghề, bước xuống mạn...).`;
         })()
       : '',
     hookPin
-      ? `TƯ LIỆU CẢNH 1 ĐÃ CHỌN (17/9 vòng 3): cảnh ĐẦU TIÊN sẽ chiếu id=${hookPin.id} — ${String(hookPin.description || hookPin.title || '').replace(/\s+/g, ' ').trim().slice(0, 220)}. Lời thoại và "visual" cảnh 1 phải tả ĐÚNG những gì hình này có rồi dẫn vào nỗi đau; CẤM nhắc người hay vật KHÔNG có trong hình (không "anh thợ máy nói" nếu hình không có người, không "thùng nước" nếu hình không có thùng).`
+      ? `TƯ LIỆU CẢNH 1 ĐÃ CHỌN (17/9 vòng 3): cảnh ĐẦU TIÊN sẽ chiếu id=${hookPin.id} — ${String(hookPin.description || hookPin.title || '').replace(/\s+/g, ' ').trim().slice(0, 220)}. Lời thoại và "visual" cảnh 1 phải tả ĐÚNG những gì hình này có rồi dẫn vào nỗi đau; CẤM nhắc người hay vật KHÔNG có trong hình (không "anh thợ máy nói" nếu hình không có người, không "thùng nước" nếu hình không có thùng). Mô tả không ghi nam hay nữ thì gọi trung tính, không đoán "anh" hay "chị".`
       : '',
     'Lời thoại mỗi cảnh là câu nói trơn, không ghi chú, không tiêu đề, vì sẽ được máy đọc thành tiếng.',
     'CẤM CHÉP VÍ DỤ (5/9: video SF-50 đọc y nguyên câu mẫu trong hướng dẫn): mọi câu VÍ DỤ trong hướng dẫn này chỉ minh họa CẤU TRÚC và cố ý nói về chủ đề khác; không được chép nguyên văn hay gần nguyên văn, không lấy sản phẩm/tình huống trong ví dụ. Lời thoại phải viết MỚI từ chính BÀI NGUỒN bên dưới, dùng tình huống và con số có trong bài.',
@@ -341,7 +341,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       + (!worn.length ? '' :
       `\n\nLẦN TRƯỚC LỜI THOẠI VẪN DÙNG CỤM ĐÃ MÒN: ${worn.map((p) => `"${p}"`).join(', ')}. Viết lại toàn bộ, diễn đạt khác hẳn, tuyệt đối không dùng các cụm đó.`)
       + (!mustMiss ? '' :
-      `\n\nLẦN TRƯỚC CẢNH ${mustRole === 'solution' ? 'GIẢI PHÁP' : 'ĐẦU'} KHÔNG ĂN NHẬP CLIP BẮT BUỘC. Clip quay: ${String(mustAsset?.description || mustAsset?.title || '').replace(/\s+/g, ' ').slice(0, 260)}. Viết lại cảnh ${mustRole === 'solution' ? 'giải pháp' : 'đầu'}: lời thoại và "visual" phải tả và dẫn chuyện từ ĐÚNG cảnh trong clip đó.`)
+      `\n\nLẦN TRƯỚC CẢNH ${mustRole === 'solution' ? 'GIẢI PHÁP' : 'ĐẦU'} KHÔNG ĂN NHẬP CLIP BẮT BUỘC. Clip quay: ${String(mustAsset?.description || mustAsset?.title || '').replace(/\s+/g, ' ').slice(0, 600)}. Viết lại cảnh ${mustRole === 'solution' ? 'giải pháp' : 'đầu'}: lời thoại và "visual" phải tả và dẫn chuyện từ ĐÚNG cảnh trong clip đó.`)
       + (!cross.length ? '' :
       `\n\nLẦN TRƯỚC LỜI THOẠI NHẮC SẢN PHẨM KHÁC: ${cross.map((p) => `"${p}"`).join(', ')}. Video này chỉ về ${shownName || opts.productGroup}; viết lại, bỏ hẳn các ý đó.`)
       + (!pct.length ? '' :
@@ -399,7 +399,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       const first = (parsed.vertical?.scenes || [])[0];
       // 17/9 vòng 9: overlap > 0 chưa đủ — model có thể ghi "visual" đúng hình nhưng LỜI vẫn tả cảnh vật
       // không có trong hình ("thùng inox trên boong" trên ảnh hội thảo). Soát thêm lời trôi khỏi hình.
-      const drift = first ? imageryDriftSentences(first.narration || '', `${hookPin.title || ''} ${hookPin.description || ''}`) : [];
+      const pinText = `${hookPin.title || ''} ${hookPin.description || ''}`;
+      const drift = first ? [...imageryDriftSentences(first.narration || '', pinText), ...inventedDetailSentences(first.narration || '', pinText)] : [];
       if (first && (visualOverlap(`${first.visual || ''} ${first.narration || ''}`, hookPin) === 0 || drift.length)) {
         hookPinMiss = true;
         console.warn(`[script] loi canh 1 khong an nhap tu lieu da chon "${String(hookPin.title || '').slice(0, 50)}" (lan ${attempt + 1})${drift.length ? ` — cau troi khoi hinh: "${drift[0].slice(0, 60)}"` : ''} — sinh lai theo mo ta hinh.`);
@@ -415,7 +416,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         const ov = visualOverlap(`${target.visual || ''} ${target.narration || ''}`, mustAsset);
         // 17/9 vòng 9: cảnh gắn clip bắt buộc cũng soát lời trôi khỏi hình (video cộng đồng 8c8347a4 đọc
         // "quây quần bên mâm cơm nóng trên boong" trên clip văn phòng dù câu đầu đã viết đúng theo clip).
-        const drift = imageryDriftSentences(target.narration || '', `${mustAsset.title || ''} ${mustAsset.description || ''}`);
+        const mustText = `${mustAsset.title || ''} ${mustAsset.description || ''}`;
+        const drift = [...imageryDriftSentences(target.narration || '', mustText), ...inventedDetailSentences(target.narration || '', mustText)];
         if (ov === 0 || drift.length) {
           mustMiss = true;
           console.warn(`[script] canh ${mustRole === 'solution' ? 'giai phap' : '1'} khong an nhap clip bat buoc "${String(mustAsset.title || '').slice(0, 50)}" (lan ${attempt + 1})${drift.length ? ` — cau troi khoi hinh: "${drift[0].slice(0, 60)}"` : ''} — sinh lai theo mo ta clip.`);

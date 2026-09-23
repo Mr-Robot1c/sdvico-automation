@@ -311,6 +311,32 @@ export function imageryDriftSentences(narration, assetText) {
   }
   return out;
 }
+// 23/9 (bài 1f608ee3 "Ra cảng xem thợ kiểm tra máy": mô tả clip chỉ ghi "nhân viên SDVICO gặp khách
+// cầm hồ sơ tại cảng" nhưng lời mở đọc "ANH nhân viên XÁCH VALI DỤNG CỤ bước xuống MẠN" — guard cũ chỉ
+// bắt lời THIẾU từ chung với mô tả, không bắt lời BỊA THÊM): câu nhắc ĐẠO CỤ/HÀNH ĐỘNG cụ thể (vali,
+// xách, xuống mạn...) thì mô tả tư liệu phải có; gọi người kèm GIỚI TÍNH (anh/chị/chú/cô + nhân viên/
+// thợ/kỹ thuật/khách) thì mô tả phải ghi giới tính đó. Giới tính phía mô tả so bản CÓ DẤU ("cô"/"chị"
+// gấp không dấu thành "co"/"chi" dính "có"/"chi phí"). Chỉ dùng cho cảnh gắn clip bắt buộc / tư liệu
+// cảnh 1 đã chọn — không quét cả kịch bản để khỏi bắt oan cảnh tự do.
+const PROP_TERMS = ['vali', 'va li', 'đồ nghề', 'hộp dụng cụ', 'túi đồ', 'thùng đồ', 'xách', 'khiêng', 'vác', 'bưng', 'xuống mạn', 'mạn tàu'];
+const GENDER_ROLE = '(nhân viên|thợ|kỹ thuật|khách)';
+const MALE_SENT = new RegExp(`(^|\\P{L})(anh|chú|ông)\\s+${GENDER_ROLE}`, 'u');
+const FEMALE_SENT = new RegExp(`(^|\\P{L})(chị|cô|bà)\\s+${GENDER_ROLE}`, 'u');
+export function inventedDetailSentences(narration, assetText) {
+  const at = foldText(assetText);
+  const raw = String(assetText || '').toLowerCase();
+  const assetMale = /(^|\P{L})(anh|chú|ông|đàn ông)(\P{L}|$)/u.test(raw);
+  const assetFemale = /(^|\P{L})(chị|cô|bà|phụ nữ)(\P{L}|$)/u.test(raw);
+  const out = [];
+  for (const sent of sentencesOf(narration)) {
+    const s = String(sent).toLowerCase();
+    const fs = foldText(sent);
+    if (PROP_TERMS.some((t) => hasImagery(fs, t) && !hasImagery(at, t))) { out.push(sent); continue; }
+    if (MALE_SENT.test(s) && !assetMale) { out.push(sent); continue; }
+    if (FEMALE_SENT.test(s) && !assetFemale) out.push(sent);
+  }
+  return out;
+}
 // 18/9 vòng 10 (ChatGPT chấm lọc nước 77 nhưng dặn: câu mở "Máy lọc nước này sửa tới lần thứ ba"
 // khiến người xem hiểu chiếc máy ĐANG BÁN chính là chiếc vừa bị chê hỏng liên tục): cảnh nỗi đau
 // (hook/empathy) của video bán hàng không được trỏ "máy ... này" vào sự cố. Trả về các cụm dính.

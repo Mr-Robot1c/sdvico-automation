@@ -4,7 +4,7 @@
 import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
   stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
-  breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases,
+  breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences,
 } from './video/rules.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
@@ -201,6 +201,16 @@ const CABIN = 'Không gian buồng lái tàu cá có ghế lái bằng gỗ, b�
 eq('bắt "cười trừ" trên hình không người', imageryDriftSentences('Bạn ghe nhìn cười trừ mà rầu!', CABIN), ['Bạn ghe nhìn cười trừ mà rầu!']);
 eq('hình có thợ máy thì câu bàn tay được giữ', imageryDriftSentences('Đôi bàn tay thợ bám đầy dầu nhớt!', 'Thợ máy đang sửa động cơ trên tàu cá'), []);
 eq('"cuối" không bị nhầm thành "cười"', imageryDriftSentences('Cuối chuyến biển máy vẫn chạy tốt.', CABIN), []);
+// 12. Bịa thêm chi tiết (23/9 bài 1f608ee3: "anh nhân viên xách vali dụng cụ bước xuống mạn" trên clip
+// chị nhân viên cầm điện thoại trước trung tâm quản lý cảng).
+const CLIP_CANG = 'Nhân viên SDVICO mặc áo đồng phục gặp gỡ khách hàng cầm hồ sơ tại cảng cá Cà Ná, xung quanh là tàu cá neo đậu';
+eq('bắt "xách vali" không có trong mô tả', inventedDetailSentences('Anh nhân viên SDVICO vừa nói, vừa xách vali dụng cụ.', CLIP_CANG), ['Anh nhân viên SDVICO vừa nói, vừa xách vali dụng cụ.']);
+eq('bắt "xuống mạn" không có trong mô tả', inventedDetailSentences('Bước thật nhanh xuống mạn.', CLIP_CANG), ['Bước thật nhanh xuống mạn.']);
+eq('bắt gán giới tính khi mô tả không ghi', inventedDetailSentences('Anh nhân viên ra cảng sớm.', CLIP_CANG), ['Anh nhân viên ra cảng sớm.']);
+eq('mô tả có "chị" thì "chị nhân viên" được giữ', inventedDetailSentences('Chị nhân viên cầm điện thoại quay lại.', 'Chị nhân viên SDVICO cầm điện thoại đi trước trung tâm quản lý cảng'), []);
+eq('mô tả có "anh thợ" thì "anh thợ" được giữ', inventedDetailSentences('Anh thợ máy cúi xuống kiểm tra.', 'Anh thợ máy đang tháo bầu lọc trong khoang máy'), []);
+eq('gọi trung tính thì không bắt', inventedDetailSentences('Nhân viên SDVICO ra cảng gặp khách.', CLIP_CANG), []);
+eq('mô tả có "xách" thì "xách" được giữ', inventedDetailSentences('Tay xách túi đồ đi dọc cầu cảng.', 'Ngư dân xách túi đồ, túi đồ nặng, đi dọc cầu cảng'), []);
 // (g) cảnh nỗi đau trỏ "máy ... này" vào sự cố (vòng 10: câu mở lọc nước gây lẫn máy đang bán với máy hỏng).
 eq('bắt "máy lọc nước này sửa"', selfProductFaultPhrases('"Máy lọc nước này sửa tới lần thứ ba rồi đấy!"'), ['máy lọc nước này']);
 eq('bắt "máy này hỏng"', selfProductFaultPhrases('Máy này hỏng hoài chịu sao thấu?'), ['máy này hỏng']);

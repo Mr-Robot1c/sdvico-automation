@@ -56,6 +56,27 @@ function listMedia(dir, depth = 0) {
   return out;
 }
 
+// 23/9: bóc phần "1. Cảnh quay" trong bản tóm tắt .md của hoc-video: từ dòng chứa "Cảnh quay" tới
+// trước dòng "Lời thoại" (hoặc mục 2.), bỏ ký tự markdown, ép về một dòng. Không thấy thì trả null
+// để rơi về mo_ta như cũ. Tối đa 700 ký tự (description tổng vẫn cắt 1000).
+function extractCanhQuay(summary) {
+  const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+  const lines = String(summary || '').split(/\r?\n/);
+  const start = lines.findIndex((l) => fold(l).includes('canh quay'));
+  if (start < 0) return null;
+  const out = [];
+  const rest = lines[start].split(':').slice(1).join(':').replace(/\*\*/g, '').trim();
+  if (rest) out.push(rest);
+  for (let i = start + 1; i < lines.length; i++) {
+    const f = fold(lines[i]);
+    if (f.includes('loi thoai') || /^\s*(?:\*\*|##)?\s*2\./.test(lines[i])) break;
+    const clean = lines[i].replace(/^[\s*#>-]+/, '').replace(/\*\*/g, '').trim();
+    if (clean) out.push(clean);
+  }
+  const text = out.join(' ').replace(/\s+/g, ' ').trim();
+  return text ? text.slice(0, 700) : null;
+}
+
 // Tim ban tom tat video (hoc-video dat ten video-tom-tat-<folder>-<base>.md trong AI/<ngay>/).
 function findVideoSummary(folder, name) {
   const base = name.replace(/\.[^.]+$/, '');
@@ -82,9 +103,12 @@ const FOLDER_LIST = FOLDERS.map((f) => `- ${f}`).join('\n');
 const RULES = [
   'Ban phan loai TU LIEU marketing cho SDVICO (thiet bi tau ca).',
   'Chi tra JSON dung dang, khong them chu nao ngoai JSON:',
-  '{"loai":"tu_lieu"|"giay_to_ca_nhan"|"man_hinh_app"|"khong_dung_duoc","folder":"<mot dong trong danh sach>","tieu_de":"<8-12 chu tieng Viet mo ta noi dung>","mo_ta":"<1-2 cau co dau: thay gi, o dau, tinh trang moi/cu/hu/ban/can/duc/dang sua/dang chay, co nguoi khong>","hop_canh":["van_de"|"giai_phap"|"doi_song"|"san_pham_moi"|"lap_dat"|"huong_dan"],"tu_khoa":["3-8 tu khoa"]}',
+  '{"loai":"tu_lieu"|"giay_to_ca_nhan"|"man_hinh_app"|"khong_dung_duoc","folder":"<mot dong trong danh sach>","tieu_de":"<8-12 chu tieng Viet mo ta noi dung>","mo_ta":"<2-3 cau co dau: thay gi, o dau, tinh trang moi/cu/hu/ban/can/duc/dang sua/dang chay; co NGUOI thi ta ro tung nguoi>","hop_canh":["van_de"|"giai_phap"|"doi_song"|"san_pham_moi"|"lap_dat"|"huong_dan"],"tu_khoa":["3-8 tu khoa"]}',
   // 15/9 (sep: kich ban phai di doi voi hinh): mo_ta + hop_canh luu vao brand_assets.description de day chuyen video khop canh.
   'mo_ta: ghi RO tinh trang (may moi bong / may cu ri set / can dau den / nuoc duc / tho dang thao sua...) vi day chuyen video se chon hinh theo mo ta nay; khong bia chi tiet khong thay.',
+  // 23/9 (bài 1f608ee3 đọc "anh nhân viên xách vali xuống mạn" trên clip CHỊ nhân viên cầm điện thoại):
+  // mô tả thiếu chi tiết người thì khâu kịch bản tự bịa. Bắt tả người thật kỹ.
+  'mo_ta khi co NGUOI: ghi ro may nguoi, nam hay nu (khong ro thi ghi "khong ro"), mac gi, dang cam gi, dang lam gi, o dau (truoc nha, tren boong, trong khoang may...). Kich ban video se goi nguoi va ta hanh dong DUNG THEO mo_ta nay, ta thieu la video doc sai.',
   'loai "giay_to_ca_nhan": can cuoc, ho chieu, bang lai, giay to co ten/so ca nhan (KE CA chup mot phan).',
   'loai "man_hinh_app": screenshot man hinh dien thoai/app/phan mem. KE CA anh chup THAT nhung co OVERLAY cua app (logo TikTok/YouTube/Facebook/Instagram, nut like/tim, so hotline, ten kenh, sub-title, chu keu goi ghim tren anh) => day la screenshot tu nen tang khac, KHONG dung lam tu lieu san pham cua SDVICO — TUYET DOI khong dat vao folder san pham.',
   'loai "khong_dung_duoc": mo nhoe, khong lien quan san pham hay doi song nghe ca.',
@@ -165,9 +189,10 @@ for (const m of media) {
   if (m.size > max) { skip += 1; console.log(`  - ${m.name}: qua lon (${Math.round(m.size / 1e6)}MB), de lai`); continue; }
 
   let cls = null;
+  let summary = null;
   try {
     if (isVideo) {
-      const summary = findVideoSummary(m.folder, m.name);
+      summary = findVideoSummary(m.folder, m.name);
       if (!summary) { skip += 1; console.log(`  - ${m.name}: chua co ban tom tat (hoc-video chay truoc), de lan sau`); continue; }
       cls = await classifyVideoBySummary(summary);
     } else {
@@ -198,8 +223,12 @@ for (const m of media) {
       if (r.status === 0 && existsSync(outp)) { buf = readFileSync(outp); unlinkSync(outp); }
     } catch { /* giu file goc */ }
   }
-  const description = cls.mo_ta
-    ? `${String(cls.mo_ta).trim()}${Array.isArray(cls.hop_canh) && cls.hop_canh.length ? ` | Hợp cảnh: ${cls.hop_canh.map(String).join(', ')}` : ''}${Array.isArray(cls.tu_khoa) && cls.tu_khoa.length ? ` | Từ khoá: ${cls.tu_khoa.map(String).join(', ')}` : ''}`.slice(0, 1000)
+  // 23/9 (bài 1f608ee3: mo_ta nén 2 tầng rơi hết chi tiết người, kịch bản bịa "anh nhân viên xách vali"):
+  // video lấy NGUYÊN phần "Cảnh quay" của bản tóm tắt hoc-video (Gemini xem video THẬT, chi tiết hơn)
+  // làm mô tả; mo_ta 1-2 câu chỉ còn là dự phòng. Ảnh giữ đường cũ (classifyImage nhìn ảnh trực tiếp).
+  const moTaChinh = (isVideo ? extractCanhQuay(summary) : null) || (cls.mo_ta ? String(cls.mo_ta).trim() : '');
+  const description = moTaChinh
+    ? `${moTaChinh}${Array.isArray(cls.hop_canh) && cls.hop_canh.length ? ` | Hợp cảnh: ${cls.hop_canh.map(String).join(', ')}` : ''}${Array.isArray(cls.tu_khoa) && cls.tu_khoa.length ? ` | Từ khoá: ${cls.tu_khoa.map(String).join(', ')}` : ''}`.slice(0, 1000)
     : null;
 
   // 15/9 (sếp: media Zalo lên Google Drive cho khỏi đầy Supabase): có GOOGLE_SA_JSON + GDRIVE_FOLDER_ID
