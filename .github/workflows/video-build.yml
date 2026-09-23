@@ -20,14 +20,15 @@
 # Whisper vẫn --skip-whisper: phụ đề lấy từ kịch bản, không lệ thuộc ASR, đỡ phút CI.
 #
 # Trigger:
-#   - schedule 30 phút/lần trong 7h-23h30 giờ VN (cron chạy theo UTC, VN = UTC+7). Ban đêm
-#     không quét — cần gấp thì nút 🎬 (workflow_dispatch) vẫn chạy ngay bất kể giờ.
+#   - schedule 2 lần/ngày: 5h sáng + 13h chiều VN (22h + 6h UTC) — giãn từ 3h/lần từ 22/9/2026
+#     vì cháy 100% quota Actions 2000 phút, chờ reset 01/10. Mỗi lượt limit 3 bài nên phủ được
+#     cả FB + TikTok trong ngày. Sau 01/10 xem xét đưa lại 3h/lần nếu cần.
 #   - workflow_dispatch: chạy tay trên GitHub UI hoặc backend Vercel gọi khi bấm nút 🎬.
 #     Lượt dispatch KHÔNG ngó trước (bấm nút nghĩa là có việc).
 
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '0 22,6 * * *'
   workflow_dispatch:
     inputs:
       limit:

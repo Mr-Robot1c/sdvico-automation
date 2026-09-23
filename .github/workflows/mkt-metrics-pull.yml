@@ -1,7 +1,8 @@
-name: Cron 1 tieng - so lieu + sinh noi dung
+name: Cron 6 tieng - so lieu + sinh noi dung
 
-# GỌI 2 endpoint trên Vercel mỗi 1 tiếng (26/8/2026 dời từ 30 phút xuống 1 tiếng để đỡ hao quota
-# GitHub Actions 2.000 phút/tháng miễn phí — 30 phút/lần đã đốt hết quota trước 26/8):
+# GỌI 2 endpoint trên Vercel mỗi 6 tiếng (22/9/2026 giãn từ 1 tiếng xuống 6 tiếng vì cháy 100%
+# quota Actions 2000 phút, chờ reset 01/10. Cron Vercel /api/rotate vẫn giữ 8h+14h VN nên đây
+# chỉ là lưới an toàn — 4 lần/ngày là đủ):
 #  1) /api/mkt-metrics-pull  - cập nhật mkt_metrics + học tri thức + sinh kế hoạch theo lịch.
 #  2) /api/rotate            - sinh bài chờ duyệt (sang 2 bài bán, chieu 1 bán + 1 content).
 #     Route có GUARD 1 lần/slot/ngày (VN) nên gọi nhiều lần vẫn chỉ tạo 1 đợt bài mỗi slot;
@@ -10,7 +11,7 @@ name: Cron 1 tieng - so lieu + sinh noi dung
 
 on:
   schedule:
-    - cron: '0 * * * *' # mỗi 1 tiếng, phút 0
+    - cron: '0 */6 * * *' # 6 tieng/lan (0h, 6h, 12h, 18h UTC = 7h, 13h, 19h, 1h VN)
   workflow_dispatch:
     inputs:
       force_rotate:
