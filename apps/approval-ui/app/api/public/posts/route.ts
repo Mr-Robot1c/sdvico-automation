@@ -4,7 +4,7 @@ import { loadPublicPosts, siteUrl } from '../../../../lib/seo';
 
 // 4/9: API JSON CONG KHAI, CHI DOC, cho sdvico.vn (SPA Vite tren IIS) hien blog tu he Marketing.
 // Chi tra bai DA DANG (mkt_posts status=published) - dung nguon voi trang /blog cua app.
-// Khong can dang nhap (middleware bo qua /api/*), khong doc bang nao khac. Cache 5 phut o CDN.
+// Khong can dang nhap (middleware bo qua /api/*), khong doc bang nao khac. Cache 10 phut o CDN, stale toi 7 ngay de che cold-start.
 export const dynamic = 'force-dynamic';
 
 const ALLOWED_ORIGINS = ['https://sdvico.vn', 'https://www.sdvico.vn', 'http://localhost:8080'];
@@ -15,7 +15,7 @@ function corsHeaders(origin: string | null): Record<string, string> {
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Vary': 'Origin',
-    'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+    'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=604800',
   };
 }
 
