@@ -32,13 +32,16 @@ function contentTypeInstruction(t) {
 }
 
 // Vài góc tiếp cận để mỗi lần sinh ra một kiểu mở bài khác nhau (chống trùng lặp).
+// 24/9: gỡ 2 góc dễ mời văn sáo ("chi tiết nhỏ đời thường", "so sánh trước sau" — hay ra
+// câu hoa mỹ "nhìn ánh đèn vươn khơi lấp lánh" hoặc kể chuyện bịa) — vì các góc này bị
+// dùng chung cho MỌI khung, kể cả khung GIẢI ĐÁP muốn trả lời ngay đầu (đá nhau).
 const DRAFT_ANGLES = [
   'mở bằng một tình huống thực tế khi ra khơi',
   'mở bằng một câu hỏi cho bà con rồi trả lời gọn',
   'nhấn mạnh lợi ích thiết thực và tiết kiệm chi phí',
   'chia sẻ như một người trong nghề nói với nhau',
-  'so sánh cảm nhận trước và sau khi dùng',
-  'kể một chi tiết nhỏ đời thường rồi dẫn vào nội dung',
+  'trả lời thẳng ý chính ngay câu đầu, không rào đón',
+  'nêu vấn đề chủ tàu hay gặp rồi vào giải pháp ngay',
 ];
 
 // Bộ hashtag ĐÚNG theo hình: đoán sản phẩm từ tên ảnh/video + tiêu đề (guessGroup) rồi lấy thẻ
@@ -307,6 +310,7 @@ function boundarySystem(facts) {
   return [
     'Bạn viết nội dung marketing cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay ở câu đầu, đọc trên điện thoại.',
+    'CẤM văn hoa mỹ / dịch máy. Không mở bài bằng cảnh vật lãng mạn ("nhìn ánh đèn vươn khơi lấp lánh", "giữa trùng khơi lộng gió", "sóng vỗ mạn tàu", "bình minh trên biển"). Không dùng cụm sáo "quan trọng nhường nào", "đóng vai trò cốt lõi", "sự an toàn và thông suốt", "trong thời đại ngày nay", "không thể phủ nhận". Vào việc ngay.',
     'Số theo chuẩn Việt Nam, dấu chấm ngăn cách hàng nghìn. Không gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ được nêu thông số có trong danh sách đã duyệt dưới đây. Không có thì nói chung chung.',
     'CẤM bịa khách hàng: không đặt tên người, không kể một câu chuyện như thể có thật đã xảy ra ("anh Minh chủ tàu...", "chuyến biển vừa qua một chủ tàu..."). Tình huống minh họa phải viết dạng giả định chung ("nếu đang giữa khơi mà...", "không ít chủ tàu từng lo...").',
