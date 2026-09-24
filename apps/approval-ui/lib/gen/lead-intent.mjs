@@ -29,11 +29,13 @@ function normalize(text) {
 // ("gia đình tôi làm nghề biển" không phải hỏi giá). "bao nhieu" đi kèm đơn vị kỹ thuật (lít, cv...)
 // là hỏi thông số, để rơi xuống ky_thuat.
 const RULES = [
-  ['gia', [/bao nhieu(?! (lit|cv|hp|kw|met|m)\b)/, /nhieu tien/, /\bbn tien\b/, /bao gia/, /tra gop/, /khuyen mai/, /giam gia/, /\bgia\b/]],
+  ['gia', [/bao nhieu(?! (lit|cv|hp|kw|met|m)\b)/, /nhieu tien/, /\bbn tien\b/, /\bbnhieu\b/, /\bbnhiu\b/, /bao nhiu\b/, /bao gia/, /tra gop/, /khuyen mai/, /giam gia/, /\bgia\b/]],
   ['lap_dat', [/lap dat/, /\blap o\b/, /ai lap/, /lap tai/, /lap cho/, /thi cong/, /lap duoc khong/]],
   ['bao_hanh', [/bao hanh/, /bao tri/, /sua chua/, /hu thi/, /hong thi/, /doi tra/]],
   ['so_sanh', [/so voi/, /khac gi/, /tot hon/, /loai nao tot/, /nen mua loai nao/, /hon nhau/]],
-  ['ky_thuat', [/cong suat/, /thong so/, /chay dau/, /loc duoc/, /may co/, /may dien/, /bao nhieu lit/, /\d\s*cv\b/, /\bcv\b/, /dung cho tau/, /tau dai/, /hoat dong/, /xai duoc/]],
+  ['ky_thuat', [/cong suat/, /thong so/, /chay dau/, /loc duoc/, /may co/, /may dien/, /bao nhieu lit/, /\d\s*cv\b/, /\bcv\b/, /dung cho tau/, /tau dai/, /hoat dong/, /xai duoc/,
+    // Khách tự nêu cỡ máy hoặc hãng máy của họ ("930CV Komatsu", "Cummins k19 750hp", "500 mã lực") là câu về kỹ thuật.
+    /\d\s*(hp|kw|mw|ngua)\b/, /ma luc/, /may phat/, /\b(cummins|komatsu|mtu|yanmar|caterpillar|mitsubishi|hino|isuzu|daewoo|doosan|volvo|scania)\b/]],
 ];
 
 export function guessIntent(text) {

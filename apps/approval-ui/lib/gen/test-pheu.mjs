@@ -24,6 +24,13 @@ eq('intent: ưu tiên giá', guessIntent('giá bao nhiêu, chạy dầu gì'), '
 eq('intent: rỗng', guessIntent(''), 'khac');
 eq('intent: null', guessIntent(null), 'khac');
 eq('intent: bao nhiêu lít là kỹ thuật', guessIntent('máy lọc được bao nhiêu lít một giờ'), 'ky_thuat');
+eq('intent: gõ tắt bnhiu', guessIntent('Máy lọc nước biển bnhiu tiền ah?'), 'gia');
+eq('intent: cỡ máy nêu tự do', guessIntent('930CV máy KOMATSU'), 'ky_thuat');
+eq('intent: hãng máy + hp', guessIntent('Cummins k19 g4 750hp'), 'ky_thuat');
+eq('intent: mã lực', guessIntent('Comin500 mã lực'), 'ky_thuat');
+eq('intent: máy phát điện', guessIntent('Mình đang xài máy phát điện MTU 2.2 MW'), 'ky_thuat');
+eq('intent: chào chung vẫn là khác', guessIntent('chào ad ạ'), 'khac');
+eq('intent: xin ảnh vẫn là khác', guessIntent('Cho xin ảnh cụ thể'), 'khac');
 ok('INTENTS 6 giá trị, đủ nhãn', INTENTS.length === 6 && INTENTS.every((i) => INTENT_LABEL[i]));
 
 // 2. Luật 3 chạm
