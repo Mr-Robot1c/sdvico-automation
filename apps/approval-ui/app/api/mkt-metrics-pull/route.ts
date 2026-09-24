@@ -88,6 +88,36 @@ export async function GET(req: Request) {
     inbox = { pulled: 0, skipped: 0, errors: [String(e?.message || e).slice(0, 160)] };
   }
 
+  // 24/9 (sếp Long: dữ liệu hoá chuỗi để biết khách kẹt ở đâu): phân loại lead chưa có intent.
+  // Làm ở MỘT CHỖ này thay vì sửa 4 điểm insert (Chrome import chạy local ngoài git, webhook,
+  // Graph, nhập tay) — lead mới vào kiểu gì thì lượt cron sau cũng được phân loại. Tất định,
+  // không LLM, không đáng kể vào maxDuration 90s.
+  let classified = 0;
+  try {
+    const { data: unclassified } = await client
+      .from('mkt_leads').select('id, message, product_guess').is('intent', null).limit(50);
+    if (unclassified?.length) {
+      const { guessIntent } = await import('../../../lib/gen/lead-intent.mjs');
+      const { guessGroup } = await import('../../../lib/gen/products.mjs');
+      for (const r of unclassified as any[]) {
+        const patch: Record<string, unknown> = { intent: guessIntent(String(r.message || '')) };
+        if (!r.product_guess) {
+          const g = guessGroup(String(r.message || ''));
+          if (g) patch.product_guess = g;
+        }
+        await client.from('mkt_leads').update(patch).eq('id', r.id);
+        classified++;
+      }
+    }
+  } catch { /* phân loại lỗi không làm vỡ cron */ }
+
+  // 24/9: nhắc lại khách đã liên hệ mà im re — máy chỉ SOẠN NHÁP vào hàng đợi (điều cấm 1).
+  let fu: { drafted: number; candidates: number; errors: string[] } = { drafted: 0, candidates: 0, errors: [] };
+  try {
+    const { draftFollowups } = await import('../../../lib/followup');
+    fu = await draftFollowups(client);
+  } catch (e: any) { fu.errors = [String(e?.message || e).slice(0, 160)]; }
+
   // 15/9 (sếp: số click/hiển thị Google ở bài SEO): Search Console 1 lượt/ngày sau 6h VN (số trễ 2 ngày),
   // chống trùng bằng run_log mkt.gsc_pull hôm nay. Chưa cấu hình -> bỏ qua im lặng.
   let gsc: { pulled: number; matched: number; errors: string[]; skipped?: string } = { pulled: 0, matched: 0, errors: [] };
@@ -149,7 +179,7 @@ export async function GET(req: Request) {
       task: 'mkt.metrics_pull',
       actor: 'cron',
       status: errs.length && !(res?.pulled > 0) ? 'error' : 'ok',
-      detail: { pulled: res?.pulled ?? 0, errors: errs.slice(0, 5), insightErrs, notes, ytPulled: yt.pulled, ytErrors: yt.errors.slice(0, 3), ttPulled: tt.pulled, ttMatched: tt.matched, ttErrors: tt.errors.slice(0, 3), inboxPulled: inbox.pulled, inboxSkipped: inbox.skipped, inboxErrors: inbox.errors.slice(0, 3), ms: Date.now() - startedAt },
+      detail: { pulled: res?.pulled ?? 0, errors: errs.slice(0, 5), insightErrs, notes, ytPulled: yt.pulled, ytErrors: yt.errors.slice(0, 3), ttPulled: tt.pulled, ttMatched: tt.matched, ttErrors: tt.errors.slice(0, 3), inboxPulled: inbox.pulled, inboxSkipped: inbox.skipped, inboxErrors: inbox.errors.slice(0, 3), leadClassified: classified, followupDrafted: fu.drafted, ms: Date.now() - startedAt },
     });
   } catch { /* không để lỗi ghi log làm hỏng cron */ }
 

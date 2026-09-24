@@ -708,6 +708,117 @@ export async function updateLeadStatus(formData: FormData) {
   revalidatePath('/noi-dung');
 }
 
+// 24/9 (sếp Long: "câu trả lời đầu tiên của em chưa chuẩn"): soạn NHÁP trả lời cho 1 lead và đẩy vào
+// approval_queue status 'pending'. Máy chỉ soạn (điều cấm 1): người đọc, sửa, TỰ GỬI trong Messenger rồi
+// bấm Đã gửi tay (markReplySentAction). Không throw để client hiện lỗi mềm.
+export type DraftReplyResult =
+  | { ok: true; queueId: string; body: string; note: string; risk: string; needsManager: boolean; reused: boolean }
+  | { ok: false; error: string };
+
+export async function draftReplyAction(formData: FormData): Promise<DraftReplyResult> {
+  const leadId = String(formData.get('lead_id') || '').trim();
+  if (!leadId) return { ok: false, error: 'Thiếu mã khách.' };
+  try {
+    const client = getServerClient();
+    // Chống bấm đúp tốn quota: đã có nháp pending cho lead này thì trả lại nháp đó.
+    const { data: existing } = await client
+      .from('approval_queue')
+      .select('id, payload')
+      .eq('kind', 'mkt_send_message')
+      .eq('status', 'pending')
+      .eq('payload->>lead_id', leadId)
+      .limit(1);
+    const ex = (existing || [])[0] as any;
+    if (ex) {
+      const p = ex.payload || {};
+      return { ok: true, queueId: ex.id, body: String(p.body || ''), note: String(p.note || ''), risk: String(p.risk || 'none'), needsManager: !!p.needs_manager_approval, reused: true };
+    }
+
+    // Cột intent có từ migration 20260924180000; chưa áp thì rơi về bộ cột cũ để nút vẫn soạn được.
+    let { data: lead, error: leadErr } = await client
+      .from('mkt_leads')
+      .select('id, fb_user_name, message, intent, product_guess, raw_payload')
+      .eq('id', leadId)
+      .maybeSingle();
+    if (leadErr) {
+      ({ data: lead, error: leadErr } = await client
+        .from('mkt_leads')
+        .select('id, fb_user_name, message, product_guess, raw_payload')
+        .eq('id', leadId)
+        .maybeSingle());
+    }
+    if (leadErr || !lead) return { ok: false, error: 'Không tìm thấy khách này.' };
+    const l = lead as any;
+    // raw_payload không đồng nhất giữa các đường vào (Chrome có all_customer_texts, Graph/webhook thì không).
+    const rawHist = l.raw_payload?.all_customer_texts;
+    const history = Array.isArray(rawHist) ? rawHist.map((t: unknown) => String(t)).filter(Boolean).slice(-5) : [];
+
+    const { draftLeadReply } = await import('../lib/hoi-dap-bot');
+    const d = await draftLeadReply(client, {
+      id: l.id, fb_user_name: l.fb_user_name, message: String(l.message || ''),
+      intent: l.intent || null, product_guess: l.product_guess || null, history,
+    });
+
+    // @ts-ignore — module JS thuần
+    const { assessDraft } = await import('../lib/gen/compliance.mjs');
+    // @ts-ignore — module JS thuần
+    const { PRODUCT_FACTS, knownFactValues, testFactValues } = await import('../lib/gen/product-facts.mjs');
+    // @ts-ignore — module JS thuần
+    const { INTENT_LABEL } = await import('../lib/gen/lead-intent.mjs');
+    const assessment = assessDraft(d.body, {
+      knownFactValues: knownFactValues(PRODUCT_FACTS),
+      testFactValues: testFactValues(PRODUCT_FACTS),
+    });
+
+    const { data: ins, error: insErr } = await client
+      .from('approval_queue')
+      .insert({
+        kind: 'mkt_send_message',
+        status: 'pending',
+        title: `Trả lời ${l.fb_user_name || 'khách'}: ${(INTENT_LABEL as Record<string, string>)[l.intent] || 'Chưa phân loại'}`,
+        payload: {
+          channel: 'facebook_inbox', lead_id: leadId, body: d.body, note: d.note,
+          intent: l.intent || null, product_guess: l.product_guess || null, touch: 0,
+          needs_manager_approval: assessment.needsManagerApproval, risk: assessment.risk, compliance: assessment.flags,
+        },
+      })
+      .select('id')
+      .single();
+    if (insErr || !ins) return { ok: false, error: 'Lưu nháp vào hàng đợi lỗi, thử lại sau.' };
+
+    try {
+      await client.from('run_log').insert({
+        task: 'mkt.reply_draft', actor: 'gemini', status: 'ok',
+        detail: { lead_id: leadId, intent: l.intent || null, model: d.model, risk: assessment.risk },
+      });
+    } catch { /* log lỗi không chặn kết quả */ }
+    revalidatePath('/khach-hang');
+    return { ok: true, queueId: (ins as any).id, body: d.body, note: d.note, risk: assessment.risk, needsManager: assessment.needsManagerApproval, reused: false };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || 'Bot chưa soạn được, thử lại sau ít phút.').slice(0, 200) };
+  }
+}
+
+// Người đã TỰ GỬI tin trong Messenger rồi bấm Đã gửi tay: ghi lại việc đó (approved chỉ đổi khi còn pending),
+// lead mới thì sang Đã liên hệ, lead khác chỉ chạm updated_at (mốc tính follow-up 3 chạm). Không có máy gửi tin nào.
+export async function markReplySentAction(formData: FormData) {
+  const queueId = String(formData.get('queue_id') || '').trim();
+  const leadId = String(formData.get('lead_id') || '').trim();
+  if (!queueId || !leadId) return;
+  const client = getServerClient();
+  const nowIso = new Date().toISOString();
+  await client
+    .from('approval_queue')
+    .update({ status: 'approved', decided_at: nowIso, note: 'Người gửi tay trong Messenger' })
+    .eq('id', queueId)
+    .eq('status', 'pending');
+  const { data: lead } = await client.from('mkt_leads').select('status').eq('id', leadId).maybeSingle();
+  const patch: Record<string, unknown> = { updated_at: nowIso };
+  if ((lead as any)?.status === 'new') patch.status = 'contacted';
+  await client.from('mkt_leads').update(patch).eq('id', leadId);
+  revalidatePath('/khach-hang');
+}
+
 // 9/9 (lenh sep Long 15:12): KHO HOI DAP theo san pham — moi cau khach hoi + cau tra loi da dung
 // luu lai, la dau vao cho Bot Live Stream phase 2 va bot noi bo /hoi-dap. Nguoi nhap, nguoi xac nhan;
 // may khong tu nhan khach (dieu cam 1). Bang mkt_product_qa (migration 20260909170000).

@@ -15,6 +15,8 @@ import { webSearch, webSearchProvider, formatHitsForPrompt } from './web-search'
 import { logTokenUsage } from './gen/token-log.mjs';
 // @ts-ignore — module JS thuần
 import { PRODUCTS, getFeatures, PRICE_TEASER, SHOPEE_LINK, PUBLIC_NAME } from './gen/products.mjs';
+// @ts-ignore — module JS thuần
+import { REPLY_FRAME, CUSTOMER_PSYCHOLOGY } from './gen/reply-playbook.mjs';
 
 type AnyClient = { from: (t: string) => any };
 
@@ -135,6 +137,10 @@ export async function buildKnowledgeText(client: AnyClient): Promise<{ qa: QaRow
   lines.push('- Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya là phần mềm/dịch vụ của ĐỐI TÁC. SDVICO chỉ phân phối thiết bị tương thích, không sở hữu phần mềm của họ.');
   lines.push('- Kênh online (Page Facebook, TikTok, Zalo, Shopee) do nhân viên kênh online tự trả lời và tự chốt, không chuyển Kinh doanh (lệnh sếp Long 9/9/2026). Kinh doanh (Tiến, Hòa, Linh) chỉ cấp thông tin sản phẩm.');
   lines.push('- Bài công khai chỉ ghi giá úp mở theo câu giá ở mục C; số đầy đủ chỉ nói trong inbox hoặc trên sàn. Nội dung về quy định nhà nước, IUU, Cục Thủy sản, Kiểm ngư phải qua duyệt cấp quản lý trước khi đăng.');
+  lines.push('');
+  lines.push('=== E. KHUNG TRẢ LỜI KHÁCH + TÂM LÝ KHÁCH (chỉ đạo sếp Long 24/9; kinh nghiệm chung, không phải số liệu SDVICO) ===');
+  lines.push(REPLY_FRAME);
+  lines.push(CUSTOMER_PSYCHOLOGY);
   return { qa, text: lines.join('\n') };
 }
 
@@ -293,4 +299,46 @@ export async function askBot(client: AnyClient, question: string, history: BotTu
     return { id, product_group: r.product_group, question: r.question, verified: r.verified, source: r.source };
   });
   return { answer, found, scope, used_ids: usedIds, model, sources, web_sources: web, searched };
+}
+
+// 24/9 (sếp Long: "câu trả lời đầu tiên của em chưa chuẩn... tăng attention từ 10 lên 20 lên 30",
+// "đưa vô cho AI nó dạy về tâm lý khách hàng"): soạn NHÁP trả lời inbox cho 1 lead. Máy chỉ soạn,
+// người đọc, sửa, TỰ GỬI trong Messenger rồi bấm Đã gửi tay (điều cấm 1). Số liệu SDVICO chỉ từ kho.
+export type ReplyDraftInput = {
+  id: string; fb_user_name: string | null; message: string;
+  intent: string | null; product_guess: string | null;
+  history: string[]; // raw_payload.all_customer_texts nếu có
+};
+export type ReplyDraftResult = { body: string; note: string; model: string };
+
+export async function draftLeadReply(client: AnyClient, lead: ReplyDraftInput): Promise<ReplyDraftResult> {
+  const { text } = await buildKnowledgeText(client);
+  const prompt = [
+    'Bạn soạn NHÁP tin nhắn trả lời khách qua inbox Facebook cho nhân viên SDVICO. Nhân viên sẽ đọc, sửa và tự gửi.',
+    `Hôm nay: ${todayVN()}.`,
+    '',
+    'KHUNG BẮT BUỘC:', REPLY_FRAME, '',
+    'TÂM LÝ KHÁCH (kinh nghiệm chung, không phải số liệu SDVICO):', CUSTOMER_PSYCHOLOGY, '',
+    'LUẬT CỨNG:',
+    '- Giá và thông số SDVICO CHỈ lấy từ kho bên dưới. Kho không có thì hỏi ngược nhu cầu khách, TUYỆT ĐỐI không bịa số.',
+    '- Đây là inbox riêng nên ĐƯỢC nói giá đầy đủ nếu kho có giá đó. Nói giá thì phải kèm ĐÚNG điều kiện kho ghi cùng giá (đã hay chưa gồm VAT, vận chuyển, công lắp đặt), không được bỏ hay đổi điều kiện.',
+    '- Xưng "em", gọi "anh chị". Không đoán giới tính qua tên: chỉ gọi "anh" hay "chị" khi chính khách đã tự xưng, còn lại gọi "anh chị" (có thể chào kèm tên). Câu ngắn. Không gạch dài, không mũi tên, không emoji, không markdown. Số kiểu Việt Nam (9.900.000 đ).',
+    '- Không mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO.',
+    '- Nội dung chạm quy định nhà nước, IUU, Kiểm ngư thì chỉ hẹn "em kiểm tra lại và trả lời anh chị sau", không tự trả lời.',
+    '',
+    'ĐẦU RA: DUY NHẤT một JSON {"body": string, "note": string}.',
+    '- body: tin nhắn hoàn chỉnh gửi khách (tối đa 4 câu + 1 câu hỏi ngược ở cuối).',
+    '- note: 1 câu cho NHÂN VIÊN, nói rõ mục tiêu của tin này (ví dụ: kéo khách nói cỡ tàu để báo đúng giá).',
+    '',
+    '===== KHO KIẾN THỨC SDVICO =====', text, '===== HẾT KHO =====', '',
+    `Khách: ${lead.fb_user_name || '(chưa rõ tên)'}`,
+    `Loại câu hỏi máy đoán: ${lead.intent || 'chưa rõ'}. Sản phẩm máy đoán: ${lead.product_guess || 'chưa rõ'}.`,
+    lead.history.length ? `Các tin khách đã nhắn (cũ tới mới):\n${lead.history.map((t) => `- ${t}`).join('\n')}` : '',
+    `Tin mới nhất của khách: ${lead.message}`,
+  ].join('\n');
+  const res = await callModel(() => prompt, client, false);
+  const parsed = parseJson(res.text) as any;
+  const body = String(parsed.body || parsed.answer || '').trim();
+  if (!body) throw new Error('Bot không soạn được nháp.');
+  return { body: body.slice(0, 1500), note: String(parsed.note || '').trim().slice(0, 300), model: res.model };
 }
