@@ -16,11 +16,41 @@ export const dynamic = 'force-dynamic';
 // 3 từ khóa x 3 định dạng x Gemini (~20s timeout mỗi lần gọi) có thể mất vài phút.
 export const maxDuration = 180;
 
-const PICK_LIMIT = 3;
+// 25/9 (Thanh: "dcm sao nó vẫn cứ y như nhau vậy" — 5/6 bài gần nhất là "giám sát hành trình",
+// 3 bài có "Hà Tĩnh"): giảm 3 → 2 bài/ngày; feed thưa hơn và ép chọn chủ đề đa dạng ở dưới.
+const PICK_LIMIT = 2;
 const CANDIDATE_LIMIT = 300; // đủ dư 192 từ hiện có, chừa chỗ kho lớn lên
+// Không chọn từ khóa cùng chủ đề với bài đã đăng trong ngần này ngày (đo bằng ti lệ chữ chung).
+const NEARBY_DAYS = 14;
+const TOPIC_OVERLAP = 0.4; // >= 0.4 = trùng chủ đề, không pick
 
 function normKeyword(s: string): string {
   return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Từ dừng thường gặp — không tính vào so trùng chủ đề (nếu giữ thì mọi bài có chữ "tàu cá" đều
+// bị coi là cùng chủ đề). Loại luôn động từ dịch vụ (sửa, thay, gia hạn, mua, lắp...) để
+// "sửa thiết bị giám sát Hà Tĩnh" và "thay thiết bị giám sát Hà Tĩnh" ra chung 1 chủ đề.
+const STOP = new Set([
+  'là', 'gì', 'thế', 'nào', 'sao', 'của', 'cho', 'trên', 'dưới', 'ở', 'tại', 'và', 'hay', 'khi',
+  'nếu', 'bằng', 'với', 'không', 'chưa', 'đâu', 'mua', 'bán', 'thuê', 'sửa', 'thay', 'lắp', 'đặt',
+  'gia', 'hạn', 'cước', 'nạp', 'tiền', 'phí', 'giá', 'bao', 'nhiêu', 'nhất', 'rẻ', 'tốt', 'uy',
+  'tín', 'chính', 'hãng', 'các', 'loại', 'kiểu', 'nào', 'này', 'kia', 'cần', 'phải'
+]);
+
+function topicTokens(s: string): Set<string> {
+  return new Set(
+    String(s || '').toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/)
+      .filter((w) => w.length >= 2 && !STOP.has(w))
+  );
+}
+
+function topicOverlap(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+  let shared = 0;
+  for (const w of a) if (b.has(w)) shared++;
+  return shared / Math.min(a.size, b.size);
 }
 
 export async function GET(req: Request) {
@@ -78,16 +108,52 @@ export async function GET(req: Request) {
     }
 
     const eligible = allKw.filter((k) => !doneIds.has(String(k.id)) && !doneKeywords.has(normKeyword(k.keyword)));
-    // Cụm dịch vụ giám sát hành trình đi trước ở CÙNG mức priority (plan 18/9: giá trị tra
-    // cứu cao, ít đối thủ, 191/192 từ trống chủ yếu là cụm này). Array.sort ổn định (Node/V8)
-    // nên thứ tự created_at asc trong cùng nhóm priority/giám-sát vẫn giữ nguyên.
+    // 25/9: BỎ ưu tiên "giám sát" trước (plan 18/9 cũ: ưu tiên vì 191/192 từ trống là cụm này —
+    // nay đã đăng 4-5 bài giám sát trong 5 ngày, quá tải chủ đề). Sort thuần theo priority +
+    // created_at asc để đi đều mọi cụm.
     eligible.sort((a, b) => {
       if (b.priority !== a.priority) return b.priority - a.priority;
-      const ag = /giám sát/i.test(a.keyword) ? 0 : 1;
-      const bg = /giám sát/i.test(b.keyword) ? 0 : 1;
-      return ag - bg;
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+      return ta - tb;
     });
-    const chosen = eligible.slice(0, PICK_LIMIT);
+
+    // 25/9 (Thanh: "y như nhau"): chống trùng chủ đề. Gom bag-of-words (bỏ stopword + động từ
+    // dịch vụ) các bài article đã đăng trong NEARBY_DAYS ngày để biết chủ đề nào đang nóng.
+    // Từ khóa nào rơi vào chủ đề đã có (overlap >= TOPIC_OVERLAP) thì bỏ qua ở lượt này; và
+    // 3 bài chọn ra cũng KHÔNG được cùng chủ đề với nhau — pick từ khóa tiếp theo phải cách
+    // xa tất cả bài đã pick trong lượt.
+    const cutoff = new Date(Date.now() - NEARBY_DAYS * 24 * 3600 * 1000).toISOString();
+    const { data: recentArticles } = await client
+      .from('mkt_content')
+      .select('brief,title,created_at')
+      .eq('kind', 'article')
+      .is('deleted_at', null)
+      .gte('created_at', cutoff)
+      .limit(60);
+    const recentTopics = (recentArticles || []).map((r: any) =>
+      topicTokens(r?.brief?.keyword || r?.title || '')
+    );
+
+    const chosen: any[] = [];
+    const chosenTopics: Set<string>[] = [];
+    const skipped: Array<{ keyword: string; reason: string }> = [];
+    for (const k of eligible) {
+      if (chosen.length >= PICK_LIMIT) break;
+      const tk = topicTokens(k.keyword);
+      const clashRecent = recentTopics.find((rt) => topicOverlap(tk, rt) >= TOPIC_OVERLAP);
+      if (clashRecent) {
+        skipped.push({ keyword: k.keyword, reason: 'trung chu de bai gan day' });
+        continue;
+      }
+      const clashLot = chosenTopics.find((ct) => topicOverlap(tk, ct) >= TOPIC_OVERLAP);
+      if (clashLot) {
+        skipped.push({ keyword: k.keyword, reason: 'trung chu de bai khac trong lot' });
+        continue;
+      }
+      chosen.push(k);
+      chosenTopics.push(tk);
+    }
     picked = chosen.length;
 
     for (const kw of chosen) {
@@ -116,7 +182,7 @@ export async function GET(req: Request) {
       task: 'mkt.blog_keyword',
       actor: 'cron',
       status,
-      detail: { picked, published, review, ms: Date.now() - startedAt, errors: errors.slice(0, 5), results }
+      detail: { picked, published, review, ms: Date.now() - startedAt, errors: errors.slice(0, 5), results, skipped: skipped.slice(0, 10) }
     });
 
     try {
