@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { waitUntil } from '@vercel/functions';
 import { getServerClient } from '../lib/supabase-server';
 import { publishContentToWebsite } from '../lib/gen/publish-website';
+import { hasPublishedWebsitePost, requestPublicSiteRefresh } from '../lib/public-site-refresh';
 import { postVideoToTikTok } from '../lib/tiktok';
 import { isEmergencyStopped } from '../lib/safety';
 import { fetchWithRetry } from '../lib/retry';
@@ -625,6 +626,11 @@ export async function decideForm(formData: FormData) {
             await bgClient.from('mkt_content').update({ deleted_at: new Date().toISOString() }).eq('id', contentId);
             try { const { bustCache, TAG } = await import('../lib/cached'); bustCache(TAG.content); } catch { /* bỏ qua */ }
             revalidatePath('/blog');
+            await requestPublicSiteRefresh(bgClient, {
+              event: 'updated',
+              postId: targetId,
+              reason: 'approved rewrite replaced the live article body',
+            });
           }
           await bgClient.from('run_log').insert({
             task: 'mkt.blog_rewrite',
@@ -2039,6 +2045,7 @@ export async function deleteContent(formData: FormData) {
   const id = String(formData.get('content_id') || '');
   if (!id) return;
   const client = getServerClient();
+  const affectedPublicSite = await hasPublishedWebsitePost(client, id);
   const { error } = await client.from('mkt_content').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   if (error) throw new Error('Soft-delete lỗi: ' + error.message);
   try {
@@ -2046,6 +2053,7 @@ export async function deleteContent(formData: FormData) {
       task: 'mkt.content_soft_deleted', actor: 'user', status: 'ok', detail: { contentId: id }
     });
   } catch { /* bỏ qua */ }
+  if (affectedPublicSite) await requestPublicSiteRefresh(client, { event: 'unpublished', postId: id, reason: 'live article moved to trash' });
   revalidatePath('/noi-dung');
   revalidatePath('/do-luong');
 }
@@ -2059,6 +2067,14 @@ export async function deleteContents(formData: FormData) {
     .split(',').map((x) => x.trim()).filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 200);
   if (!ids.length) return;
   const client = getServerClient();
+  const { data: websitePosts } = await client
+    .from('mkt_posts')
+    .select('content_id')
+    .in('content_id', ids)
+    .eq('channel', 'website')
+    .eq('status', 'published')
+    .is('deleted_at', null)
+    .limit(200);
   const { error } = await client.from('mkt_content').update({ deleted_at: new Date().toISOString() }).in('id', ids);
   if (error) throw new Error('Soft-delete lỗi: ' + error.message);
   try {
@@ -2066,6 +2082,9 @@ export async function deleteContents(formData: FormData) {
       task: 'mkt.content_soft_deleted', actor: 'user', status: 'ok', detail: { contentIds: ids, count: ids.length, batch: true }
     });
   } catch { /* bỏ qua */ }
+  if ((websitePosts || []).length) {
+    await requestPublicSiteRefresh(client, { event: 'unpublished', reason: `batch trash removed ${(websitePosts || []).length} live articles` });
+  }
   revalidatePath('/noi-dung');
   revalidatePath('/do-luong');
 }
@@ -2077,6 +2096,9 @@ export async function restoreContent(formData: FormData) {
   const client = getServerClient();
   const { error } = await client.from('mkt_content').update({ deleted_at: null }).eq('id', id);
   if (error) throw new Error('Khôi phục lỗi: ' + error.message);
+  if (await hasPublishedWebsitePost(client, id)) {
+    await requestPublicSiteRefresh(client, { event: 'restored', postId: id, reason: 'live website article restored from trash' });
+  }
   revalidatePath('/noi-dung');
 }
 
@@ -2086,6 +2108,7 @@ export async function hardDeleteContent(formData: FormData) {
   const id = String(formData.get('content_id') || '');
   if (!id) return;
   const client = getServerClient();
+  const affectedPublicSite = await hasPublishedWebsitePost(client, id);
   await Promise.all([
     client.from('approval_queue').delete().eq('payload->>content_id', id),
     client.from('mkt_posts').delete().eq('content_id', id),
@@ -2097,6 +2120,7 @@ export async function hardDeleteContent(formData: FormData) {
       task: 'mkt.content_hard_deleted', actor: 'user', status: 'ok', detail: { contentId: id }
     });
   } catch { /* bỏ qua */ }
+  if (affectedPublicSite) await requestPublicSiteRefresh(client, { event: 'deleted', postId: id, reason: 'live article permanently deleted' });
   revalidatePath('/noi-dung');
   revalidatePath('/do-luong');
 }

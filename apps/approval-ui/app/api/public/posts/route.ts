@@ -35,6 +35,7 @@ export async function GET(req: Request) {
   const all = await loadPublicPosts(client, 500);
   const base = siteUrl();
   const map = (p: (typeof all)[number]) => ({
+    contentId: p.contentId,
     slug: p.slug,
     title: p.title,
     excerpt: p.excerpt,

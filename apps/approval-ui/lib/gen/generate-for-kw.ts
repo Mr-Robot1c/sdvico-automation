@@ -5,8 +5,7 @@
 // không gọi thẳng được từ Route Handler vì tham số `client` không tuần tự hoá được). Tách ra
 // module thuần TypeScript này để dùng chung cho CẢ BA nơi: 2 server action cũ (generateNow,
 // generateFromKeyword) và route cron mới /api/blog-keyword — không chép code 2 bản.
-import { slugify, siteUrl } from '../seo';
-import { ensureCoverForContent } from '../cover-image';
+import { publishContentToWebsite } from './publish-website';
 // Các module sinh nội dung dùng chung (bản .mjs chép từ packages/marketing).
 // @ts-ignore module JS không có kiểu
 import { generateAllFormats } from './content.mjs';
@@ -145,35 +144,20 @@ export async function generateForKw(
         // bài đã viết theo TỪNG từ khóa (trước đây chỉ so brief.keyword lỏng lẻo).
         brief: { ...all.brief, format: fmt.key, risk, compliance: flagsAll, keyword_id: kw?.id ?? null },
         draft: piece.draft,
-        status: autoBlog ? 'published' : risk === 'red' ? 'review' : 'draft',
+        // Auto blog becomes published only after the shared website-publish write succeeds.
+        status: risk === 'red' ? 'review' : 'draft',
         needs_gov_review: risk === 'red'
       })
       .select('id')
       .single();
 
     if (autoBlog && inserted?.id) {
-      // Slug đúng format loadPublicPosts đang dò: <slug tiêu đề>-<8 ký tự đầu id>.
-      const slug = `${slugify(piece.title)}-${String(inserted.id).slice(0, 8)}`;
-      const url = `${siteUrl()}/blog/${slug}`;
-      const { error: postErr } = await client.from('mkt_posts').insert({
-        content_id: inserted.id,
-        channel: 'website',
-        status: 'published',
-        external_url: url,
-        published_at: new Date().toISOString()
+      const published = await publishContentToWebsite(client, inserted.id, {
+        actor: 'generateForKw',
+        keyword: kw.keyword,
       });
-      if (!postErr) {
-        blogUrl = url;
-        // 3/9 (user: "blog không được dính trùng ảnh"): gắn ảnh RIÊNG cho bài ngay lúc đăng
-        // — folder nhóm trước, không có thì Gemini kiếm Google/Unsplash có chấm điểm.
-        // Best effort: thiếu ảnh chỉ ra placeholder, không chặn việc đăng.
-        const cover = await ensureCoverForContent(client, inserted.id);
-        await client.from('run_log').insert({
-          task: 'mkt.blog_publish',
-          actor: 'nguoi-bam',
-          status: 'ok',
-          detail: { content_id: inserted.id, url, keyword: kw.keyword, cover: cover.via, msg: 'bài Website sạch tự đăng blog' }
-        });
+      if (published.ok) {
+        blogUrl = published.url;
         count++;
         continue; // đã đăng blog — KHÔNG vào hàng đợi duyệt
       }

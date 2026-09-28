@@ -1,6 +1,7 @@
 import { getServerClient } from '../supabase-server';
 import { ensureCoverForContent } from '../cover-image';
 import { siteUrl, slugify } from '../seo';
+import { requestPublicSiteRefresh } from '../public-site-refresh';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -66,5 +67,14 @@ export async function publishContentToWebsite(
     status: 'ok',
     detail: { content_id: contentId, url: finalUrl, keyword: opts.keyword ?? null, cover: coverVia, msg: existing ? 'bai da co tren blog (bo qua)' : 'dang blog sau khi Duyet' }
   });
-  return { ok: true, url: finalUrl };
+  const refresh = await requestPublicSiteRefresh(client, {
+    event: existing ? 'updated' : 'published',
+    postId: contentId,
+    reason: existing ? 'website publish called for an existing live article' : 'website article published',
+  });
+  return {
+    ok: true,
+    url: finalUrl,
+    ...(refresh.requested ? {} : { error: `Đã đăng bài nhưng chưa yêu cầu được website đồng bộ: ${refresh.error || 'unknown error'}` }),
+  };
 }
