@@ -125,8 +125,10 @@ function livelyArgs(sampleRate, opts) {
 // khoảng đệm này nằm TRONG durationSec của cảnh, mà phụ đề chia thời gian theo cả durationSec ->
 // càng cuối cảnh chữ càng trễ hơn giọng, câu chót đứng thêm ~0,3s sau khi giọng dứt. padSecOf tách
 // riêng để build-video truyền xuống phụ đề (assemble/srt) trừ đúng phần đệm ra khỏi quỹ thời gian chữ.
+// 29/9 (sếp Long "chỉnh nhịp điệu voice tự nhiên hơn"): chuyển cảnh = chuyển ý, người thật nghỉ 0,3-0,5s;
+// đệm cũ 0,16/0,26 ngắn hơn cả dấu phẩy. Nay 0,30 câu thường, 0,42 câu !/? (khán giả nửa giây ngấm).
 export function padSecOf(sentence) {
-  return /[!?]$/.test(String(sentence || '').trim()) ? 0.26 : 0.16;
+  return /[!?]$/.test(String(sentence || '').trim()) ? 0.42 : 0.30;
 }
 function sentenceGap(sentence) {
   return `apad=pad_len=${Math.round(padSecOf(sentence) * 48000)}`;
@@ -342,7 +344,10 @@ const TTS_F0_TARGET = Number(process.env.TTS_F0_TARGET || 240) || 240;
 async function tidyWav(wav, workDir, tag, { normalize = true } = {}) {
   const out = join(workDir, `${tag}_tidy.wav`);
   try {
-    const res = await python('tidy.py', [wav, out]);
+    // 29/9 sếp Long "nhịp điệu voice tự nhiên hơn": trần nén lặng nội bộ 0,25 (trị bug ngất 1,6s 10/9) ép phẳng
+    // mọi nghỉ cuối câu về ~0,22s; 0,55 giữ nghỉ cuối câu 0,3-0,55s của VieNeu, lặng 1,6s vẫn bị nén còn 0,55.
+    const maxgap = Number(process.env.TTS_PAUSE_MAXGAP || 0.55) || 0.55;
+    const res = await python('tidy.py', [wav, out, '--maxgap', String(maxgap)]);
     const { f0 = 0, n = 0, cuts = 0 } = JSON.parse(res.split('\n').pop() || '{}');
     let semi = 0;
     // 11/9: dịch bằng asetrate đổi luôn màu giọng (formant), kéo 1,5 nửa cung là nghe như người khác

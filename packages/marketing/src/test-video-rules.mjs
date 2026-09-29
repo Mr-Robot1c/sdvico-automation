@@ -229,6 +229,15 @@ ok('mẩu chót kết tại speechSec (không ăn vào đệm thở)', Math.abs(
 const bNoPad = buildBlocks('Máy nổ êm hơn.', 3);
 ok('không truyền speechSec thì như cũ (kết tại durationSec)', Math.abs(bNoPad[bNoPad.length - 1].end - 3) < 1e-9);
 
+// 29/9 nhịp điệu voice: padSecOf 0,30/0,42, tidyWav truyền --maxgap (build-video chạy main() khi import nên đọc mã nguồn)
+import { readFileSync } from 'node:fs';
+const bvSrc = readFileSync(new URL('./video/build-video.mjs', import.meta.url), 'utf8');
+const padFn = new Function(`${bvSrc.match(/export function padSecOf[\s\S]*?\r?\n\}/)[0].replace('export ', '')}; return padSecOf;`)();
+ok('padSecOf câu thường 0,30', padFn('Máy chạy êm.') === 0.30, padFn('Máy chạy êm.'));
+ok('padSecOf câu ? 0,42', padFn('Bà con thấy sao?') === 0.42);
+ok('padSecOf câu ! 0,42', padFn('Ra khơi an tâm!') === 0.42);
+ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXGAP \|\| 0\.55/.test(bvSrc));
+
 const failed = cases.filter((c) => !c.ok);
 for (const c of cases) console.log(`${c.ok ? 'OK  ' : 'FAIL'} ${c.name}${c.ok ? '' : ` -> got ${JSON.stringify(c.got)}${c.want !== undefined ? ` want ${JSON.stringify(c.want)}` : ''}`}`);
 console.log(`\n${cases.length - failed.length}/${cases.length} đạt`);
