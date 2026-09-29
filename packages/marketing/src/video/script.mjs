@@ -511,6 +511,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     ? await matchScenesToAssets({
         ai, generate: generateWithRetry, model: MKT_MODEL, scenes: rawScenes, assets, mustUseAssetId: opts.mustUseAssetId || null, log: console,
         productGroup: opts.contentVideo ? null : opts.productGroup || null,
+        // 29/9: tư liệu đã lên video 14 ngày gần nhất (build-video đếm) — scene-match phạt điểm để xoay kho.
+        recentUse: opts.recentUse || new Map(),
         // 17/9 chiều: clip máy đang chạy ép vào cảnh giải pháp (không có role solution thì cảnh cuối).
         mustUseIndex: mustRole === 'solution' ? Math.max(0, (() => { const k = rawScenes.findIndex((s) => s.role === 'solution'); return k >= 0 ? k : rawScenes.length - 1; })()) : 0,
       })

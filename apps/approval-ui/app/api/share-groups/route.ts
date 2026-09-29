@@ -22,6 +22,11 @@ type SavedGroup = { id: string; label: string; url: string };
 const BANNED_GROUP_IDS = new Set([
   '339378517866408', // Máy Thủy Tàu Thuyền (gỡ 12/9)
   '1098764867171270', // MUA BÁN TÀU THUYỀN - NGƯ LƯỚI CỤ - HẬU CẦN NGHỀ CÁ (gỡ 24/9)
+  // 29/9 quét cả 44 group bằng tài khoản đăng bài: 4 nhóm dưới không có ô đăng bài
+  '669333773732583', // Cộng Đồng Ngư Dân Việt: Kiến Thức Và Kinh Nghiệm
+  'ngudanvietnam', // Ngư Dân Việt Nam
+  '198385317894035', // giao lưu anh em dân biển ba miền
+  '529670360854668', // Hội Ngư Dân Việt Nam
 ]);
 
 function normalize(raw: any): SavedGroup[] {

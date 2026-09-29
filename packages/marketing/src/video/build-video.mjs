@@ -918,12 +918,38 @@ async function main() {
   // luật modelMismatch từng loại 2 ảnh dán nhãn SF58B — nhãn trên máy trong ảnh không quyết định model.
   const describedCount = assets.filter((a) => a.description).length;
   console.log(`Sản phẩm: ${productGroup} (${productAssets.length} tư liệu sản phẩm + ${assets.length - productAssets.length} tư liệu đời sống; ${describedCount}/${assets.length} có mô tả${describedCount < assets.length / 2 ? ' — chạy mo-ta-tu-lieu.mjs để khớp cảnh tốt hơn' : ''})`);
+  // 29/9 (Thanh: "1 số video gần đây bắt đầu dùng chung video nội bộ"): đếm tư liệu đã lên các video
+  // 14 ngày gần nhất (5 video 23-29/9 chung đúng 4 clip vì trọng tâm dồn một sản phẩm, bộ điểm cao nhất
+  // thắng y hệt mỗi ngày). Map id -> số video, đưa cho scene-match phạt điểm và xoay clip bắt buộc.
+  const recentUse = new Map();
+  try {
+    const { data: recentVids } = await client.from('mkt_content')
+      .select('id, brief')
+      .not('brief->video_scene_assets', 'is', null)
+      .neq('id', contentId)
+      .gte('created_at', new Date(Date.now() - 14 * 86400e3).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(12);
+    for (const r of recentVids || []) {
+      const b = r.brief || {};
+      const seen = new Set(Array.isArray(b.video_scene_assets) ? b.video_scene_assets.map(String) : []);
+      if (b.video_must_use) seen.add(String(b.video_must_use));
+      for (const id of seen) recentUse.set(id, (recentUse.get(id) || 0) + 1);
+    }
+    if (recentUse.size) console.log(`Tư liệu đã lên video 14 ngày qua: ${recentUse.size} cái (né lặp khi chọn cảnh).`);
+  } catch (e) { console.warn('Không đọc được tư liệu video gần đây (bỏ qua né lặp):', e?.message || e); }
   // 9/9 (user: video "người thật tàu thật"): ÉP CLIP THẬT vào cảnh 1. Bài content: clip rotate
-  // đã chọn (brief.content_clip_id). Bài bán: clip Zalo mới nhất (14 ngày) của folder sản phẩm.
+  // đã chọn (brief.content_clip_id). Bài bán: clip Zalo tươi (14 ngày) của folder sản phẩm.
   // Không có clip mới -> null, video dựng như cũ (ảnh + clip cũ do model chọn).
   const contentVideo = productGroup === CONTENT_GROUP || brief.post_kind === 'content';
   let mustUseAssetId = brief.content_clip_id && assets.some((a) => a.id === brief.content_clip_id) ? brief.content_clip_id : null;
-  if (!mustUseAssetId) mustUseAssetId = pickFreshClips(productAssets)[0]?.id || null;
+  if (!mustUseAssetId) {
+    // 29/9: [0] luôn là clip mới nhất nên một clip dính 6 video liền — xoay sang clip tươi ÍT LÊN
+    // VIDEO nhất trước, bằng nhau thì mới nhất trước (kho chỉ có 1 clip tươi thì vẫn dùng nó).
+    const fresh = pickFreshClips(productAssets)
+      .sort((a, b) => (recentUse.get(a.id) || 0) - (recentUse.get(b.id) || 0) || Date.parse(b.created_at) - Date.parse(a.created_at));
+    mustUseAssetId = fresh[0]?.id || null;
+  }
   // 17/9 chiều (user: video lọc nước mở màn "thợ máy sửa lần thứ ba" trên hình máy SEA-40 của công ty đang
   // chạy): clip sản phẩm đang chạy/lắp đặt vào cảnh GIẢI PHÁP, chỉ clip quay sự cố mới làm cảnh 1 (rules.mjs).
   const mustUseRole = mustUseRoleFor(assets.find((a) => a.id === mustUseAssetId), contentVideo);
@@ -942,7 +968,7 @@ async function main() {
     content,
     assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, label: clipLabel(a), description: a.description || '', folder: a.product_group || '', fresh: /MỚI/.test(clipLabel(a)) })),
     PRODUCT_FACTS,
-    { short: isShort, productGroup, salesVideo, mustUseAssetId, mustUseRole, contentVideo },
+    { short: isShort, productGroup, salesVideo, mustUseAssetId, mustUseRole, contentVideo, recentUse },
     _tokenLogClient
   );
   console.log('Tư liệu dùng trong cảnh:', (script.sceneAssets || []).map((id) => id.slice(0, 8)).join(', '));

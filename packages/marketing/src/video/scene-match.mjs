@@ -149,13 +149,18 @@ export function ruleScore(asset, role, opts = {}) {
 }
 
 // Chọn theo luật cho 1 cảnh, tránh trùng cảnh liền trước và hạn chế lặp trong video.
-export function pickByRole(assets, role, { prevId = null, usedCount = new Map(), visual = '' } = {}) {
+// 29/9 (Thanh: "1 số video gần đây bắt đầu dùng chung video nội bộ"): thêm recentUse = Map(id -> số
+// video 14 ngày gần nhất đã dùng tư liệu đó). Từ khi trọng tâm dồn về một sản phẩm, mọi video cùng
+// nhóm nên bộ "điểm cao nhất" thắng y hệt mỗi ngày (5 video 23-29/9 chung đúng 4 clip) — phạt điểm
+// theo số lần vừa lên video để kho được xoay đều; kho ít tư liệu thì phạt chỉ đổi thứ tự, không làm rỗng.
+export function pickByRole(assets, role, { prevId = null, usedCount = new Map(), visual = '', recentUse = new Map() } = {}) {
   let best = null;
   let bestScore = -Infinity;
   for (const a of assets) {
     let s = ruleScore(a, role, { visual });
     if (a.id === prevId) s -= 6;
     s -= (usedCount.get(a.id) || 0) * 2;
+    s -= Math.min(recentUse.get(a.id) || 0, 3) * 2;
     if (s > bestScore) { bestScore = s; best = a; }
   }
   return best;
@@ -175,7 +180,7 @@ export function assetListForPrompt(assets) {
 // mustUseIndex (17/9 chiều): cảnh nào bị ép dùng clip bắt buộc (0 = cảnh 1 như luật 9/9; video bán hàng có clip
 // sản phẩm đang chạy thì là cảnh giải pháp, xem rules.mjs mustUseRoleFor).
 // productGroup (17/9 chiều (3)): nhóm sản phẩm của video bán hàng, để cảnh nỗi đau loại tư liệu của sản phẩm kia.
-export async function matchScenesToAssets({ ai, generate, model, scenes, assets, mustUseAssetId = null, mustUseIndex = 0, productGroup = null, log = console }) {
+export async function matchScenesToAssets({ ai, generate, model, scenes, assets, mustUseAssetId = null, mustUseIndex = 0, productGroup = null, recentUse = new Map(), log = console }) {
   const ids = new Set(assets.map((a) => a.id));
   const mustIdx = Math.max(0, Math.min(scenes.length - 1, Number.isInteger(mustUseIndex) ? mustUseIndex : 0));
   const byId = new Map(assets.map((a) => [a.id, a]));
@@ -191,6 +196,12 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
       '- Không dùng cùng một tư liệu cho 2 cảnh liền nhau nếu còn tư liệu khác hợp.',
       '- Chỉ được dùng id có trong danh sách. Không có tư liệu hợp thật sự thì vẫn chọn cái ÍT SAI NHẤT và cho điểm thấp (fit <= 4) kèm lý do.',
       mustUseAssetId && ids.has(mustUseAssetId) ? `- Cảnh ${mustIdx + 1} BẮT BUỘC dùng id=${mustUseAssetId}. Các cảnh khác KHÔNG dùng id này.` : '',
+      (() => {
+        // 29/9: kể cho model biết tư liệu nào vừa lên các video gần đây để người xem không thấy video nào cũng một bộ hình.
+        const worn = assets.filter((a) => (recentUse.get(a.id) || 0) > 0 && a.id !== mustUseAssetId)
+          .sort((a, b) => (recentUse.get(b.id) || 0) - (recentUse.get(a.id) || 0)).slice(0, 15);
+        return worn.length ? `- Các tư liệu sau VỪA LÊN video trong 2 tuần qua, TRÁNH dùng lại nếu còn tư liệu khác hợp: ${worn.map((a) => `${a.id} (${recentUse.get(a.id)} lần)`).join(', ')}.` : '';
+      })(),
       '',
       'TƯ LIỆU CÓ SẴN:',
       assetListForPrompt(assets),
@@ -249,6 +260,10 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
           // liên tiếp; luật "không dùng 1 tư liệu cho 2 cảnh liền nhau" mới chỉ nằm trong prompt): ép lại
           // bằng máy — pick của model trùng cảnh liền trước thì chọn theo luật (pickByRole đã phạt prevId).
           log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chọn trùng tư liệu cảnh liền trước "${byId.get(mid).title}" -> chọn lại theo luật để hình đổi`);
+        } else if ((recentUse.get(mid) || 0) >= 2 && pool.some((a) => a.id !== mid && (recentUse.get(a.id) || 0) < 2)) {
+          // 29/9: model chọn tư liệu đã lên >= 2 video gần đây trong khi kho còn cái ít dùng — ép xoay
+          // bằng máy (pickByRole phạt recentUse), người xem hết cảnh "video nào cũng đúng bộ clip đó".
+          log.warn(`[scene-match] cảnh ${i + 1} (${role}): "${byId.get(mid).title}" đã lên ${recentUse.get(mid)} video 2 tuần qua -> chọn lại theo luật để xoay kho`);
         } else {
           pick = { assetId: mid, fit, why: String(mp.why || '').slice(0, 160), by: 'model' };
         }
@@ -256,7 +271,7 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
         log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chấm fit=${fit} thấp ("${String(mp?.why || '').slice(0, 80)}") -> chọn theo luật vai cảnh`);
       }
       if (!pick) {
-        const a = pickByRole(pool, role, { prevId, usedCount, visual: scenes[i].visual });
+        const a = pickByRole(pool, role, { prevId, usedCount, visual: scenes[i].visual, recentUse });
         if (a) pick = { assetId: a.id, fit: Math.max(0, Math.min(10, 4 + ruleScore(a, role, { visual: scenes[i].visual }) / 2)), why: 'chọn theo luật vai cảnh (mô tả tư liệu + hình cần)', by: 'rule' };
       }
     }

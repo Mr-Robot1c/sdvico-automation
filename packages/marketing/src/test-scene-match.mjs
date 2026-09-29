@@ -119,5 +119,18 @@ const picks11 = await matchScenesToAssets({ ai: null, generate: dupModel, model:
 check(picks11[0].assetId === assets[0].id, 'cảnh 1 giữ pick của model');
 check(picks11[1].assetId !== picks11[0].assetId, `2 cảnh liền nhau không trùng tư liệu (${picks11[0].assetId} vs ${picks11[1].assetId})`);
 
+// 29/9 (Thanh: "1 số video gần đây bắt đầu dùng chung video nội bộ" — 5 video 23-29/9 chung đúng 4 clip):
+// tư liệu vừa lên nhiều video 2 tuần qua phải nhường chỗ khi kho còn cái khác hợp.
+console.log('12. Xoay kho: tư liệu vừa lên nhiều video gần đây phải nhường chỗ');
+const twin = { id: 'v-boat-2', kind: 'video', title: 'Ghe cá về bến chiều muộn', folder: 'Content', description: 'Clip ghe gỗ cũ về bến, ngư dân khiêng cá, khoang máy tàu | Hợp cảnh: doi_song' };
+const recentUse = new Map([['v-boat', 3]]);
+check(pickByRole([assets[2], twin], 'hook', { recentUse }).id === 'v-boat-2', 'pickByRole né clip đã lên 3 video, lấy clip cùng loại ít dùng');
+const wornModel = async () => ({ text: JSON.stringify({ picks: [{ scene: 1, asset_id: 'v-boat', fit: 9, why: 'tàu' }, { scene: 2, asset_id: 'a-dirty', fit: 8, why: 'cặn' }, { scene: 3, asset_id: 'v-install', fit: 9, why: 'lắp' }] }) });
+const picks12 = await matchScenesToAssets({ ai: null, generate: wornModel, model: 'x', scenes, assets: [...assets, twin], recentUse, log: { warn() {}, log() {} } });
+check(picks12[0].assetId !== 'v-boat', `cảnh 1: model chọn clip đã lên 3 video bị ép chọn lại (${picks12[0].assetId})`);
+check(picks12[1].assetId && picks12[1].assetId !== picks12[0].assetId, 'cảnh 2: có tư liệu và không trùng cảnh 1 (cảnh 1 đổi thành a-dirty nên pick a-dirty của model nhường theo luật liền kề)');
+const picks13 = await matchScenesToAssets({ ai: null, generate: wornModel, model: 'x', scenes, assets, recentUse: new Map([['v-boat', 3], ['a-dirty', 3]]), log: { warn() {}, log() {} } });
+check(picks13[0] && picks13[0].assetId, 'kho toàn tư liệu mòn: vẫn chọn được, không để cảnh trống');
+
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
 process.exit(fails ? 1 : 0);
