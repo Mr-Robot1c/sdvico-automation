@@ -744,15 +744,19 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   const videoH = horizontalPath ? await uploadVideo(horizontalPath, 'ngang') : videoV;
 
   // Caption ngắn + hashtag đúng sản phẩm.
-  const { guessGroup, productHashtags, DEFAULT_HASHTAGS } = await import('../products.mjs');
+  const { guessGroup, productHashtags, DEFAULT_HASHTAGS, shopeeLink } = await import('../products.mjs');
   const grp = guessGroup(`${content.title || ''} ${title}`);
   const tags = [...DEFAULT_HASHTAGS, ...(grp ? productHashtags(grp) : [])].join(' ');
-  // 9/9 (Thanh) từng chèn dòng "Đặt trên Shopee..." ở đây; 11/9 chiều BỎ (cùng luật với bài bán ở
-  // social.mjs: link sàn đứng giữa câu giá và câu gọi nghe lạc nhịp).
+  // 9/9 (Thanh) từng chèn dòng "Đặt trên Shopee..." ở đây; 11/9 chiều BỎ (link đứng giữa câu giá và
+  // câu gọi nghe lạc nhịp). 30/9 SẾP LONG BẬT LẠI ("nhúng link vô các video của fb của mình đi"):
+  // dòng Shopee đặt CUỐI caption, SAU câu gọi và TRƯỚC hashtag để không lặp lỗi lạc nhịp cũ.
+  // Nhóm chưa có link trên sàn (SHOPEE_LINK) thì không có dòng này. Bài bán chữ (social.mjs) vẫn
+  // KHÔNG chèn — sếp chỉ nói video.
+  const shopLine = grp && shopeeLink(grp) ? `\n\nĐặt nhanh trên Shopee, giao tận nơi: ${shopeeLink(grp)}` : '';
   // 8/9: bài video riêng (content/thủ công) cũng mang mốc giá úp mở khi sản phẩm có giá.
   const caption = teaser
-    ? `${title}\n\n${teaser.text}. Nhắn hoặc để số, bên em gửi giá chính xác và xếp kỹ thuật lắp tận tàu.\n\nGọi 0939 243 222 để được tư vấn tận nơi.\n\n${tags}`
-    : `${title}\n\nGọi 0939 243 222 để được tư vấn tận nơi.\n\n${tags}`;
+    ? `${title}\n\n${teaser.text}. Nhắn hoặc để số, bên em gửi giá chính xác và xếp kỹ thuật lắp tận tàu.\n\nGọi 0939 243 222 để được tư vấn tận nơi.${shopLine}\n\n${tags}`
+    : `${title}\n\nGọi 0939 243 222 để được tư vấn tận nơi.${shopLine}\n\n${tags}`;
   const risk = script.assessment?.risk === 'red' ? 'red' : script.assessment?.risk === 'amber' ? 'amber' : 'none';
 
   // Chọn 1 ẢNH SẢN PHẨM để thả vào bình luận đầu của bài video (bà con thấy sản phẩm rõ,
