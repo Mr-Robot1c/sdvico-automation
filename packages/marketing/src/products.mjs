@@ -257,6 +257,8 @@ export const SHOPEE_LINK = {
   '9. Máy Lọc Dầu Diesel SD12-300': 'https://shopee.vn/product/212723941/29945752663/',
   // 10/9 (Thanh): S-Tracking cung len Shopee (dao quyet dinh 7/9). Hang Viettel, SDVICO phan phoi + lap.
   '3. Thiết bị giám sát hành trình Viettel S-Tracking': 'https://shopee.vn/product/212723941/56017649187/',
+  // 30/9 (Thanh): ắc quy Globe WPM-220 lên gian Shopee (listing docs/plans/listing-shopee-ac-quy-30-09.md).
+  '7. Ắc quy Accu Nano SDViCo': 'https://shopee.vn/product/212723941/57818583405/',
 };
 export function shopeeLink(group) {
   return SHOPEE_LINK[group] || null;
