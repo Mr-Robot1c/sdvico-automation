@@ -25,7 +25,11 @@ export const MAX_SLOTS_PER_DAY = 4;
 // Kênh v1: chỉ 2 kênh máy đăng được qua API khi bấm Duyệt (actions.ts decideForm).
 // TikTok (xuất tay) và Zalo (chưa nối API) KHÔNG đưa vào lịch.
 export type PostingChannel = 'facebook' | 'youtube' | 'tiktok';
-export type PostingKind = 'sale' | 'content';
+// 30/9 (sếp Long qua Thanh: "mỗi ngày đăng 1 video bản tin"): thêm loại khung 'bantin' — video
+// bản tin do NGƯỜI dựng và gửi, máy chỉ soạn caption + đẩy hàng đợi (phiên Claude làm khi nhận
+// file). Máy sinh bài (rotate) và bản sống (plan-live) BỎ QUA khung này; nó chỉ để lịch ghi rõ
+// hôm nào giờ nào có bản tin (feedback 14/9: lịch phải ghi rõ đăng gì).
+export type PostingKind = 'sale' | 'content' | 'bantin';
 export type PostingSlot = {
   time: string;                 // "HH:mm" giờ VN
   channel: PostingChannel;
@@ -58,7 +62,7 @@ export type EffectiveSlot = PostingSlot & {
 };
 
 export const CHANNEL_LABEL: Record<PostingChannel, string> = { facebook: 'Facebook Page', youtube: 'YouTube', tiktok: 'TikTok (xuất tay)' };
-export const KIND_LABEL: Record<PostingKind, string> = { sale: 'Bài bán', content: 'Bài content' };
+export const KIND_LABEL: Record<PostingKind, string> = { sale: 'Bài bán', content: 'Bài content', bantin: 'Bản tin' };
 export const DOW_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 export const DOW_LONG = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 // Thứ tự hiển thị T2..CN (giá trị = index getUTCDay).
@@ -94,7 +98,7 @@ export function normalizeSlot(raw: any): PostingSlot | null {
   const time = String(raw.time || '').trim();
   if (!TIME_RE.test(time)) return null;
   const channel: PostingChannel = raw.channel === 'youtube' ? 'youtube' : raw.channel === 'tiktok' ? 'tiktok' : 'facebook';
-  const kind: PostingKind = raw.kind === 'content' ? 'content' : 'sale';
+  const kind: PostingKind = raw.kind === 'content' ? 'content' : raw.kind === 'bantin' ? 'bantin' : 'sale';
   const gid = raw.group_id ? String(raw.group_id).trim().slice(0, 120) : '';
   return { time, channel, kind, group_id: channel === 'facebook' && gid ? gid : null };
 }
@@ -148,7 +152,7 @@ export function defaultPostingPlan(shareGroups: ShareGroup[] = []): PostingPlan 
 //   - Khung giờ: bài bán sáng hay tối luân phiên theo ngày, đảo chiều mỗi tuần.
 // Nền tảng chưa sẵn sàng (thiếu token / không folder có clip) thì ngày đó rơi về Facebook.
 export type ProposeInput = { shareGroups: ShareGroup[]; youtubeReady: boolean; tiktokReady: boolean; clipFolders: number; weekStart: string };
-export const BOSS_TIMES = { morning: '08:00', evening: '19:30' } as const;
+export const BOSS_TIMES = { morning: '08:00', evening: '19:30', bantin: '18:00' } as const;
 const SALE_CYCLE: PostingChannel[] = ['facebook', 'youtube', 'tiktok', 'facebook', 'youtube', 'tiktok', 'facebook'];
 
 // Số tuần kể từ epoch của một ngày YYYY-MM-DD — để xoay điểm bắt đầu group theo tuần.
@@ -187,7 +191,10 @@ export function proposePostingPlan(input: ProposeInput, now: Date = new Date()):
     const contentGroup = saleCh === 'facebook' ? null : nextGroup(usedToday);
     const sale: PostingSlot = { time: saleMorning ? BOSS_TIMES.morning : BOSS_TIMES.evening, channel: saleCh, kind: 'sale', group_id: saleGroup };
     const content: PostingSlot = { time: saleMorning ? BOSS_TIMES.evening : BOSS_TIMES.morning, channel: 'facebook', kind: 'content', group_id: contentGroup };
-    const slots = saleMorning ? [sale, content] : [content, sale];
+    // 30/9: khung Bản tin 18:00 hằng ngày (sếp Long) — người gửi video, máy soạn caption; BOSS
+    // xếp lại tuần mới vẫn giữ khung này.
+    const bantin: PostingSlot = { time: BOSS_TIMES.bantin, channel: 'facebook', kind: 'bantin', group_id: null };
+    const slots = [...(saleMorning ? [sale, content] : [content, sale]), bantin].sort((a, b) => a.time.localeCompare(b.time));
     for (const s of slots) if (s.group_id) usage.set(s.group_id, (usage.get(s.group_id) || 0) + 1);
     days[String(dowIdx)] = { slots };
   });
@@ -201,6 +208,7 @@ export function proposePostingPlan(input: ProposeInput, now: Date = new Date()):
   const notes: string[] = [
     `Lịch tuần ${fmtDM(input.weekStart)} đến ${fmtDM(weekEnd)}. Sáng Thứ 2 tuần sau BOSS xếp bản mới (đổi thứ tự nền tảng và khung giờ); trong tuần chỉ bạn sửa mới đổi.`,
     `Mỗi ngày 1 bài bán + 1 bài content ở 2 khung ${BOSS_TIMES.morning} và ${BOSS_TIMES.evening}, bán sáng hay bán tối luân phiên. Bài bán tuần này: ${saleLine}. Content luôn Facebook ở khung còn lại.`,
+    `Khung ${BOSS_TIMES.bantin} hằng ngày: Bản tin thủy sản (video dọc người dựng gửi, máy soạn caption và đẩy hàng đợi, mục chính sách cần cấp quản lý duyệt). Máy KHÔNG tự sinh bài cho khung này — chưa có video thì khung để trống.`,
     input.youtubeReady
       ? `YouTube: máy tự đăng khi Duyệt (${input.clipFolders} folder sản phẩm có clip để dựng video).`
       : 'YouTube chưa vào lịch: cần YOUTUBE_REFRESH_TOKEN trên Vercel và folder sản phẩm có clip gốc (ngày YouTube tạm về Facebook).',

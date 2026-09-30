@@ -371,7 +371,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                   <tr key={`${d.date}-${k}`} className={d.isToday ? 'row-today' : undefined}>
                     {k === 0 ? dayCell : null}
                     <td style={{ whiteSpace: 'nowrap' }}>{r.time || (r.window === 'sang' ? 'sáng' : 'chiều')}</td>
-                    <td>{r.kind === 'sale' ? 'Bài bán' : <span title={d.contentPurpose || ''}>Content</span>}</td>
+                    <td>{r.kind === 'sale' ? 'Bài bán' : r.kind === 'bantin' ? 'Bản tin' : <span title={d.contentPurpose || ''}>Content</span>}</td>
                     <td>
                       <span className={`ch-chip ${r.channel || 'facebook'}`}>{r.channel ? CHANNEL_LABEL[r.channel] : 'Facebook Page'}</span>
                       {r.group ? <div className="sub" style={{ fontSize: '.74rem', marginTop: 2 }}>📌 {r.group}</div> : null}

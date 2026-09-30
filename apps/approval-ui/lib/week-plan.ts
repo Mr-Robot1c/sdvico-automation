@@ -47,12 +47,15 @@ export type WeekDayView = {
   lot: DayLot | null;            // 15/9: LÔ đủ 4 nhóm phải chia hôm đó (thật cho ngày qua/hôm nay, dự kiến cho ngày tới)
   contentWindow: 'sang' | 'chieu';
   overridden: boolean;           // ngày này đang dùng lịch riêng
+  // 30/9: khung Bản tin 18:00 (video người gửi, máy soạn caption) — chỉ hiển thị, máy không sinh bài.
+  bantin?: { time: string; channel: 'facebook' | 'youtube' | 'tiktok'; window: 'sang' | 'chieu'; index: number } | null;
 };
 
 // 15/9 (Thanh): bảng tuần đổi sang MỖI BÀI 1 DÒNG nhiều cột — làm phẳng 3 ô sáng/chiều/content.
-export type WeekRow = WeekCellItem & { window: 'sang' | 'chieu'; kind: 'sale' | 'content'; label: string };
+export type WeekRow = WeekCellItem & { window: 'sang' | 'chieu'; kind: 'sale' | 'content' | 'bantin'; label: string };
 export function weekRowsOf(d: WeekDayView): WeekRow[] {
   const rows: WeekRow[] = [];
+  if (d.bantin) rows.push({ text: 'Bản tin thủy sản', product: 'Video dọc người dựng gửi, máy soạn caption, cần sếp duyệt', state: 'planned', time: d.bantin.time, channel: d.bantin.channel, slotIndex: d.bantin.index, window: d.bantin.window, kind: 'bantin', label: 'Bản tin thủy sản (video người gửi)' });
   for (const it of d.morning) rows.push({ ...it, window: 'sang', kind: 'sale', label: it.text });
   for (const it of d.afternoonSale) rows.push({ ...it, window: 'chieu', kind: 'sale', label: it.text });
   if (d.content) rows.push({ ...d.content, window: d.contentWindow, kind: 'content', label: d.content.state === 'done' ? d.content.text : `Content ${d.contentLabel}` });
@@ -219,6 +222,7 @@ export async function buildWeekPlanView(
     const mSale = daySlots.filter((s) => s.window === 'sang' && s.kind === 'sale');
     const aSale = daySlots.filter((s) => s.window === 'chieu' && s.kind === 'sale');
     const cSlot = daySlots.find((s) => s.kind === 'content') || null;
+    const bSlot = daySlots.find((s) => s.kind === 'bantin') || null; // 30/9: khung bản tin, chỉ hiển thị
     const decorate = (items: WeekCellItem[], slots: EffectiveSlot[]) => items.map((it, k) => {
       const sl = it.slotIndex !== undefined ? slots.find((x) => x.index === it.slotIndex) || slots[k] : slots[k];
       return it.time ? { ...it, slotIndex: it.slotIndex ?? sl?.index } : { ...it, time: sl?.time, channel: sl?.channel, group: sl?.group_label ?? null, slotIndex: sl?.index };
@@ -262,6 +266,7 @@ export async function buildWeekPlanView(
       lot: null, // điền sau khi tính lô theo ô (bên dưới)
       contentWindow: cSlot ? cSlot.window : 'chieu',
       overridden: daySlots[0]?.overridden ?? false,
+      bantin: bSlot ? { time: bSlot.time, channel: bSlot.channel, window: bSlot.window, index: bSlot.index } : null,
     };
   });
 
@@ -269,7 +274,8 @@ export async function buildWeekPlanView(
   const slotsByDate: Record<string, SlotLotInput[]> = {};
   for (const d of days) {
     const rows = weekRowsOf(d);
-    slotsByDate[d.date] = slotsForDate(pp.plan, d.date, pp.shareGroups).map((s) => {
+    // 30/9: khung bản tin không vào lô chia sẻ group (chỉ đăng Page, không tăng lượt chia).
+    slotsByDate[d.date] = slotsForDate(pp.plan, d.date, pp.shareGroups).filter((s) => s.kind !== 'bantin').map((s) => {
       const row = rows.find((r) => r.slotIndex === s.index);
       return { index: s.index, time: s.time, kind: s.kind, channel: s.channel, group_id: s.group_id, contentId: row?.contentId || null };
     });
