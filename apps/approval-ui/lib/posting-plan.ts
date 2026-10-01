@@ -152,7 +152,8 @@ export function defaultPostingPlan(shareGroups: ShareGroup[] = []): PostingPlan 
 //   - Khung giờ: bài bán sáng hay tối luân phiên theo ngày, đảo chiều mỗi tuần.
 // Nền tảng chưa sẵn sàng (thiếu token / không folder có clip) thì ngày đó rơi về Facebook.
 export type ProposeInput = { shareGroups: ShareGroup[]; youtubeReady: boolean; tiktokReady: boolean; clipFolders: number; weekStart: string };
-export const BOSS_TIMES = { morning: '08:00', evening: '19:30', bantin: '18:00' } as const;
+// 1/10 Thanh doi khung ban tin 18:00 -> 17:00 (dang 17h hang ngay).
+export const BOSS_TIMES = { morning: '08:00', evening: '19:30', bantin: '17:00' } as const;
 const SALE_CYCLE: PostingChannel[] = ['facebook', 'youtube', 'tiktok', 'facebook', 'youtube', 'tiktok', 'facebook'];
 
 // Số tuần kể từ epoch của một ngày YYYY-MM-DD — để xoay điểm bắt đầu group theo tuần.
