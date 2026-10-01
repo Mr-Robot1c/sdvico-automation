@@ -1,6 +1,6 @@
 // test-scene-match.mjs — kiểm luật khớp cảnh ↔ tư liệu (không gọi mạng). Chạy: npm run test:scene
 // Bài toán sếp nêu 15/9: kịch bản "máy hư, nước đục" KHÔNG được chiếu ảnh máy mới bóng.
-import { matchScenesToAssets, pickByRole, ruleScore, problemPool, refinePicksByImagery } from './video/scene-match.mjs';
+import { matchScenesToAssets, pickByRole, ruleScore, problemPool, refinePicksByImagery, pickStoryboard } from './video/scene-match.mjs';
 
 const assets = [
   { id: 'a-new', kind: 'image', title: 'Máy lọc dầu SF300B đặt trên tàu', folder: '6. Thiết bị lọc dầu SF-50', description: 'Máy lọc dầu mới bóng, nền trắng trưng bày, không có người | Hợp cảnh: san_pham_moi' },
@@ -192,6 +192,45 @@ console.log('15. Lời đọc nhắc kỹ thuật thì hình cảng thua, dù h�
   const portModel2 = async () => ({ text: JSON.stringify({ picks: [{ scene: 1, asset_id: 'v-port2', fit: 8, why: 'cảng' }] }) });
   const picks15 = await matchScenesToAssets({ ai: null, generate: portModel2, model: 'x', scenes: [sc], assets: [portClip2, techClip2], log: { warn() {}, log() {} } });
   check(picks15[0].assetId === 'v-tech2', 'model chọn cảng bị bác theo LỜI ĐỌC (' + picks15[0].assetId + ')');
+}
+
+// 1/10 (Thanh bỏ bài 22452d7f sau 5 bản dựng "viết lời trước, ghép hình sau"): video CONTENT chọn TRỌN
+// BỘ hình trước, rồi mới viết lời theo bộ hình. pickStoryboard trả bộ 3-4 tư liệu theo thứ tự cảnh.
+console.log('16. pickStoryboard: chọn trọn bộ hình trước khi viết lời');
+{
+  const mkClip = (id, desc, extra = {}) => ({ id, kind: 'video', title: `Clip ${id}`, folder: 'Content', description: desc, ...extra });
+  const c1 = mkClip('s-c1', 'Ngư dân kéo lưới trên boong tàu cá, sóng biển nhẹ, trời sáng sớm');
+  const c2 = mkClip('s-c2', 'Thợ máy kiểm tra động cơ trong khoang máy tàu cá, tay siết ốc');
+  const c3 = mkClip('s-c3', 'Tàu cá neo đậu ở cảng, ngư dân chuẩn bị ra khơi, bốc xếp đá lạnh');
+  const c4 = mkClip('s-c4', 'Thợ kỹ thuật lắp đặt thiết bị lên tàu cá, đang thao tác trong khoang máy');
+  const img = { id: 's-img', kind: 'image', title: 'Ảnh tàu cá', folder: 'Content', description: '' };
+  const kho = [img, c1, c2, c3, c4];
+  const sb = pickStoryboard(kho, { mustAsset: c3 });
+  check(Array.isArray(sb) && sb.length === 4, `kho đủ thì bộ 4 hình (${sb && sb.length})`);
+  check(sb[0].id === 's-c3', 'clip bắt buộc luôn đứng đầu bộ');
+  check(new Set(sb.map((a) => a.id)).size === sb.length, 'không trùng tư liệu trong bộ');
+  check(!sb.some((a) => a.id === 's-img'), 'ảnh không mô tả xếp sau clip có mô tả (kho đủ clip thì không vào bộ)');
+  const sbNoMust = pickStoryboard(kho, {});
+  check(sbNoMust.length === 4 && sbNoMust.every((a) => a.kind === 'video'), 'không có clip bắt buộc: vẫn ưu tiên clip có mô tả');
+  // Né recentUse: 4 clip y hệt nhau, 1 cái vừa lên 3 video thì bị loại khi chỉ lấy 3.
+  const same = 'Tàu cá neo ở cảng, ngư dân sắp xếp lưới trên boong tàu buổi sáng';
+  const tt = ['t-1', 't-2', 't-3', 't-4'].map((id) => mkClip(id, same));
+  const sbRecent = pickStoryboard(tt, { size: 3, recentUse: new Map([['t-1', 3]]) });
+  check(sbRecent.length === 3 && !sbRecent.some((a) => a.id === 't-1'), `né tư liệu vừa lên 3 video (${sbRecent.map((a) => a.id).join(',')})`);
+  // Mô tả "không thấy người" xếp sau tư liệu có người.
+  const noPerson = mkClip('n-1', 'Cận cảnh động cơ tàu cá trong khoang máy, không thấy người trong khung hình');
+  const person = mkClip('n-2', 'Cận cảnh động cơ tàu cá trong khoang máy, thợ máy đang siết ốc trong khung hình');
+  const sbPerson = pickStoryboard([noPerson, person], { size: 2 });
+  check(sbPerson[0].id === 'n-2' && sbPerson[1].id === 'n-1', 'tư liệu "không thấy người" xếp sau tư liệu có người');
+  // Kho thiếu: tụt xuống số có được; dưới 2 thì null.
+  check(pickStoryboard([c1, c2, c3]).length === 3, 'kho chỉ có 3 tư liệu thì bộ 3 hình');
+  check(pickStoryboard([c1, c2], { mustAsset: c1 }).length === 2, 'must + 1 tư liệu khác thì bộ 2 hình');
+  check(pickStoryboard([c1]) === null, 'kho 1 tư liệu thì null (caller rơi về đường cũ)');
+  check(pickStoryboard([c1], { mustAsset: c1 }) === null, 'chỉ có clip bắt buộc, không còn gì khác thì null');
+  check(pickStoryboard([]) === null && pickStoryboard(null) === null, 'kho rỗng thì null');
+  // Folder sản phẩm không lọt vào bộ khi kho Content còn.
+  const prod = { id: 'p-1', kind: 'video', title: 'Máy lọc đang chạy', folder: '2. Máy lọc nước biển SEA-40', description: 'Máy lọc nước SEA-40 đang chạy ra nước trong tại bến, kỹ thuật bàn giao' };
+  check(!pickStoryboard([prod, c1, c2, c3]).some((a) => a.id === 'p-1'), 'tư liệu folder sản phẩm không vào bộ hình đời sống khi kho Content còn');
 }
 
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');

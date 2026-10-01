@@ -18,7 +18,7 @@
 //     đặt, máy chạy; ảnh sản phẩm được phép.
 //   - Không dùng cùng một tư liệu ở 2 cảnh liền nhau nếu còn lựa chọn khác.
 
-import { crossProductTerms, imageryDriftSentences, cutImageryDrift } from './rules.mjs';
+import { crossProductTerms, imageryDriftSentences, cutImageryDrift, inventedDetailSentences } from './rules.mjs';
 
 const PROBLEM_ROLES = new Set(['hook', 'empathy', 'story']);
 const PROBLEM_WORDS = ['cũ', 'hư', 'hỏng', 'bẩn', 'cặn', 'đục', 'sửa', 'tháo', 'khói', 'rỉ', 'gỉ', 'nằm bờ', 'lợ', 'mặn', 'lọc thô bẩn', 'đen', 'nghẹt', 'kẹt', 'chết máy', 'biển', 'tàu', 'ngư dân', 'bà con', 'cảng', 'khoang máy', 'thợ máy', 'lưới', 'khơi', 'sóng', 'ra khơi', 'cập bến'];
@@ -176,6 +176,59 @@ export function pickByRole(assets, role, { prevId = null, usedCount = new Map(),
     if (s > bestScore) { bestScore = s; best = a; }
   }
   return best;
+}
+
+// 1/10 (Thanh bỏ bài 22452d7f sau 5 bản dựng): video CONTENT chọn TRỌN BỘ hình trước khi viết
+// lời. Bộ 3-4 tư liệu: clip bắt buộc đứng đầu (nếu có), còn lại lấy từ kho đời sống (problemPool
+// role 'story'), ưu tiên CLIP hơn ảnh, CÓ MÔ TẢ, ít lên video gần đây (recentUse), không trùng
+// nhau; tư liệu mô tả "không thấy người" xếp sau. Trả mảng asset theo thứ tự cảnh.
+// mustAsset: object asset (caller tra theo id); size = 4 khi kho đủ, tụt xuống số có được; dưới 2
+// tư liệu dùng được thì trả null (caller rơi về đường cũ: viết lời trước, ghép hình sau).
+export function pickStoryboard(assets, { mustAsset = null, recentUse = new Map(), size = 4, productGroup = null } = {}) {
+  const list = Array.isArray(assets) ? assets : [];
+  const out = [];
+  const used = new Set();
+  const must = mustAsset && mustAsset.id ? (list.find((a) => a.id === mustAsset.id) || mustAsset) : null;
+  if (must) { out.push(must); used.add(must.id); }
+  const want = Math.max(2, Number.isInteger(size) ? size : 4);
+  const pool = problemPool(list, 'story', productGroup).filter((a) => a && a.id && !used.has(a.id));
+  const scored = pool.map((a, idx) => {
+    let s = ruleScore(a, 'story', {});
+    s -= Math.min(recentUse.get(a.id) || 0, 3) * 2;
+    if (String(a.description || '').trim().length >= 40) s += 3;
+    if (isVideoAsset(a)) s += 2;
+    if (fold(textOf(a)).includes('khong thay nguoi')) s -= 4;
+    return { a, s, idx };
+  }).sort((x, y) => (y.s - x.s) || (x.idx - y.idx));
+  for (const { a } of scored) {
+    if (out.length >= want) break;
+    if (used.has(a.id)) continue;
+    out.push(a);
+    used.add(a.id);
+  }
+  return out.length >= 2 ? out : null;
+}
+
+// 1/10: soát lời từng cảnh với MÔ TẢ tư liệu đã chốt cho cảnh đó (video content storyboard-first).
+// scenes: [{narration}]; sb: mảng asset theo thứ tự cảnh. Trả danh sách cảnh LỆCH:
+// [{ index, scene (1-based), asset, reason: 'no-overlap'|'drift'|'invented', sentences: [...] }].
+// 'no-overlap' (lời không chung từ nào với mô tả) chỉ xét cảnh không phải cảnh cuối: cảnh kết là
+// câu hỏi giao lưu nên có thể không chung từ với hình, nhưng vẫn bị soát trôi hình / bịa chi tiết.
+export function storyboardDrift(scenes, sb) {
+  const out = [];
+  const n = Math.min((scenes || []).length, (sb || []).length);
+  for (let i = 0; i < n; i++) {
+    const a = sb[i];
+    const narr = String(scenes[i]?.narration || '');
+    if (!a || !narr.trim()) continue;
+    const text = `${a.title || ''} ${a.description || ''} ${a.label || ''}`;
+    const drift = imageryDriftSentences(narr, text);
+    if (drift.length) { out.push({ index: i, scene: i + 1, asset: a, reason: 'drift', sentences: drift }); continue; }
+    const invented = inventedDetailSentences(narr, text);
+    if (invented.length) { out.push({ index: i, scene: i + 1, asset: a, reason: 'invented', sentences: invented }); continue; }
+    if (i < (sb.length - 1) && visualOverlap(narr, a) === 0) out.push({ index: i, scene: i + 1, asset: a, reason: 'no-overlap', sentences: [] });
+  }
+  return out;
 }
 
 // Danh sách tư liệu đưa cho model chấm — kèm mô tả, folder, nhãn clip thật.

@@ -10,6 +10,7 @@ import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
 import { scanStyle } from './brand-voice-check.mjs';
 import { applySemanticRewrites, semanticRecheck } from './video/script.mjs';
+import { storyboardDrift } from './video/scene-match.mjs';
 
 const G9 = '9. Máy Lọc Dầu Diesel SD12-300';
 const G2 = '2. Máy lọc nước biển SEA-40';
@@ -332,6 +333,33 @@ ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXG
     const gen = async (_ai, p) => { seen.push(String(p.contents)); return { text: JSON.stringify({ picks: [{ scene: 1, fit: 1 }, { scene: 2, fit: 9 }] }) }; };
     await semanticRecheck({ ai: null, rawScenes: sc, picks: pk, assets: [pump], skip: [0], generate: gen, model: 'x', log: quiet });
     ok('semanticRecheck: cảnh skip không vào prompt chấm, không viết lại', !seen[0].includes('CẢNH 1 ') && seen.length === 1 && sc[0].narration === OLD, seen); }
+}
+
+// 1/10: storyboardDrift (video content storyboard-first) — soát lời từng cảnh với mô tả đúng hình đã chốt.
+{
+  const hinhCang = { id: 'sb-1', kind: 'video', title: 'Cảnh ngư dân chuẩn bị ra khơi ở cảng', folder: 'Content', description: 'Cảnh nhộn nhịp tại cảng cá trên bờ, tàu neo đậu, ngư dân chuẩn bị ra khơi' };
+  const hinhMay = { id: 'sb-2', kind: 'video', title: 'Cận cảnh động cơ', folder: 'Content', description: 'Cận cảnh động cơ tàu cá trong khoang máy, không thấy người' };
+  const hinhTau = { id: 'sb-3', kind: 'video', title: 'Tàu cá neo ở cảng', folder: 'Content', description: 'Tàu cá neo đậu ở cảng buổi chiều, ngư dân đứng trên boong' };
+  const sbSet = [hinhCang, hinhMay, hinhTau];
+  const clean = [
+    { narration: 'Tàu neo đậu ở cảng, ngư dân chuẩn bị ra khơi.' },
+    { narration: 'Động cơ nằm trong khoang máy, tiếng máy đều đều.' },
+    { narration: 'Tàu của bà con thì sao?' },
+  ];
+  eq('storyboardDrift: lời bám đúng hình thì không cảnh nào lệch', storyboardDrift(clean, sbSet).map((m) => m.scene), []);
+  const drifted = [clean[0], { narration: 'Mồ hôi vã ra giữa không gian chòng chành sóng nước.' }, clean[2]];
+  const d1 = storyboardDrift(drifted, sbSet);
+  ok('storyboardDrift: lời biển động trên hình khoang máy bị bắt (cảnh 2, drift)', d1.length === 1 && d1[0].scene === 2 && d1[0].reason === 'drift' && d1[0].asset.id === 'sb-2', d1);
+  const noOv = [clean[0], { narration: 'Bình lặng một buổi mai.' }, clean[2]];
+  const d2 = storyboardDrift(noOv, sbSet);
+  ok('storyboardDrift: lời không chung từ nào với mô tả hình (cảnh giữa) bị bắt no-overlap', d2.length === 1 && d2[0].scene === 2 && d2[0].reason === 'no-overlap', d2);
+  const lastFree = [clean[0], clean[1], { narration: 'Bà con nghĩ sao về chuyện này?' }];
+  eq('storyboardDrift: cảnh cuối (câu hỏi giao lưu) không bị bắt no-overlap', storyboardDrift(lastFree, sbSet), []);
+  const person = [{ narration: 'Anh thợ máy cười nói với chúng tôi.' }, clean[1], clean[2]];
+  const d3 = storyboardDrift(person, sbSet);
+  ok('storyboardDrift: chi tiết người không có trong mô tả (anh thợ máy) bị bắt cảnh 1', d3.some((m) => m.scene === 1 && (m.reason === 'invented' || m.reason === 'drift')), d3);
+  eq('storyboardDrift: số cảnh ít hơn bộ hình chỉ soát phần có, không lỗi', storyboardDrift([clean[0]], sbSet), []);
+  eq('storyboardDrift: đầu vào rỗng không lỗi', [storyboardDrift([], sbSet), storyboardDrift(null, null)], [[], []]);
 }
 
 const failed = cases.filter((c) => !c.ok);
