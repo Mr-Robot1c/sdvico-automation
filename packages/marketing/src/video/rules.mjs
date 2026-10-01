@@ -275,7 +275,10 @@ export function breakLongSentences(text, { maxWords = 20, chunkWords = 14 } = {}
 // tư liệu của cảnh phải có cảnh vật đó; không có = "lời trôi khỏi hình". Chỉ dùng cho cảnh vấn đề / đời
 // sống (hook, empathy, story) — câu lợi ích ở cảnh giải pháp không bị đụng. So không dấu; từ ngắn so
 // nguyên từ ("cảng" -> "cang" không được dính "cảnh" -> "canh").
-const IMAGERY_TERMS = ['trên boong', 'boong tàu', 'mâm cơm', 'thùng inox', 'thùng nước', 'trưa nắng', 'sương mù', 'sương mờ', 'chợ cá', 'kéo lưới', 'mẻ lưới', 'phòng họp', 'hội thảo', 'văn phòng', 'bến cá', 'cảng'];
+// 1/10 (Thanh xem bản dựng lại 22452d7f: lời "vệt dầu bám trên con ốc gỉ sét" trên clip thợ lắp
+// THIẾT BỊ MỚI): thêm nhóm chi tiết cận cảnh hay bị bịa — ốc vít gỉ sét, vệt dầu — mô tả clip
+// không nhắc thì câu tả mấy thứ này phải bị coi là trôi khỏi hình.
+const IMAGERY_TERMS = ['trên boong', 'boong tàu', 'mâm cơm', 'thùng inox', 'thùng nước', 'trưa nắng', 'sương mù', 'sương mờ', 'chợ cá', 'kéo lưới', 'mẻ lưới', 'phòng họp', 'hội thảo', 'văn phòng', 'bến cá', 'cảng', 'ốc gỉ', 'ốc rỉ', 'con ốc', 'gỉ sét', 'rỉ sét', 'vệt dầu', 'dầu bám', 'đi dây điện'];
 const foldText = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
 function hasImagery(foldedText, term) {
   const f = foldText(term);

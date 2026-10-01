@@ -119,6 +119,14 @@ export function extractFirstJson(text) {
   return null;
 }
 
+// 1/10 (Thanh xem 22452d7f: lời "đội ngũ kỹ thuật cúi gằm đi dây điện" trên hình CẢNG CÁ + TÀU):
+// ruleScore cộng 2 điểm cho MỌI từ nghề biển (tàu, cảng, ngư dân...) nên ảnh cảng chung chung
+// thắng cả khi cảnh cần hình NGƯỜI THỢ đang làm việc (clip thợ quen lại bị recentUse phạt).
+// Luật mới: "hình cần" của cảnh nhắc người làm việc mà tư liệu không có ai làm việc thì trừ 8.
+const WORKER_WORDS = ['thợ', 'kỹ thuật', 'kĩ thuật', 'lắp', 'sửa', 'thao tác', 'kiểm tra', 'đi dây', 'nhân viên', 'công nhân', 'bảo trì', 'tháo'];
+function needsWorker(visual) { return count(String(visual || '').toLowerCase(), WORKER_WORDS) > 0; }
+function hasWorker(assetText) { return count(assetText, [...WORKER_WORDS, 'người đàn ông', 'ngư dân đang', 'đang làm']) > 0; }
+
 // Điểm luật cho 1 tư liệu với 1 vai cảnh (càng cao càng hợp). Dùng cho fallback và để kiểm model.
 export function ruleScore(asset, role, opts = {}) {
   const t = textOf(asset);
@@ -127,6 +135,7 @@ export function ruleScore(asset, role, opts = {}) {
   let s = 0;
   if (PROBLEM_ROLES.has(role)) {
     s += count(t, PROBLEM_WORDS) * 2;
+    if (needsWorker(opts.visual) && !hasWorker(t)) s -= 8; // 1/10: cảnh cần thợ, hình không có ai làm việc
     // 17/9 vòng 6 (ChatGPT: video cộng đồng "bằng chứng làm thật bị dồn về cuối"): cảnh story ưu tiên
     // hình NGƯỜI đang làm việc hơn tàu/cảng chung chung.
     if (role === 'story') s += count(t, ['kỹ thuật', 'thợ', 'thao tác', 'kiểm tra', 'lắp', 'sửa', 'nhân viên']) * 2;
@@ -260,6 +269,9 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
           // liên tiếp; luật "không dùng 1 tư liệu cho 2 cảnh liền nhau" mới chỉ nằm trong prompt): ép lại
           // bằng máy — pick của model trùng cảnh liền trước thì chọn theo luật (pickByRole đã phạt prevId).
           log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chọn trùng tư liệu cảnh liền trước "${byId.get(mid).title}" -> chọn lại theo luật để hình đổi`);
+        } else if (PROBLEM_ROLES.has(role) && needsWorker(scenes[i].visual) && !hasWorker(textOf(byId.get(mid))) && pool.some((a) => hasWorker(textOf(a)))) {
+          // 1/10: cảnh cần người thợ mà model chọn hình không có ai làm việc, kho còn hình có người -> chọn lại.
+          log.warn(`[scene-match] cảnh ${i + 1} (${role}): lời cần NGƯỜI THỢ nhưng "${byId.get(mid).title}" không có ai làm việc -> chọn lại theo luật`);
         } else if ((recentUse.get(mid) || 0) >= 2 && pool.some((a) => a.id !== mid && (recentUse.get(a.id) || 0) < 2)) {
           // 29/9: model chọn tư liệu đã lên >= 2 video gần đây trong khi kho còn cái ít dùng — ép xoay
           // bằng máy (pickByRole phạt recentUse), người xem hết cảnh "video nào cũng đúng bộ clip đó".

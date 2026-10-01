@@ -190,6 +190,13 @@ eq('bắt câu mâm cơm trên boong trên hình văn phòng',
 eq('hình có boong thì không bắt', imageryDriftSentences('Bữa cơm trên boong tàu vui lắm.', 'Ngư dân ăn cơm trên boong tàu cá'), []);
 eq('bắt "ở cảng" trên hình văn phòng (nguyên từ, không dính "cảnh")', imageryDriftSentences('Chiều muộn ở cảng, nhìn anh em thao tác.', 'Cảnh quay nhân viên văn phòng'), ['Chiều muộn ở cảng, nhìn anh em thao tác.']);
 eq('cắt giữ câu khớp hình', cutImageryDrift('Nhìn anh em qua màn hình. Nhớ mâm cơm trên boong!', OFFICE), 'Nhìn anh em qua màn hình.');
+// 1/10 (Thanh xem 22452d7f: "vệt dầu bám trên con ốc gỉ sét" đọc trên clip thợ lắp THIẾT BỊ MỚI):
+// chi tiết cận cảnh ốc vít gỉ sét, vệt dầu không có trong mô tả clip phải bị coi là trôi khỏi hình.
+const NEW_INSTALL = 'Khoang máy chật chội trên tàu cá, thợ đang thao tác lắp đặt thiết bị mới';
+eq('bắt "con ốc gỉ sét, vệt dầu" trên clip lắp máy mới',
+  imageryDriftSentences('Từng vệt dầu bám chặt trên con ốc gỉ sét nè!', NEW_INSTALL),
+  ['Từng vệt dầu bám chặt trên con ốc gỉ sét nè!']);
+eq('hình có rỉ sét thì không bắt', imageryDriftSentences('Con ốc gỉ sét bám đầy dầu.', 'Cận cảnh con ốc rỉ sét, gỉ sét bám vệt dầu trên máy cũ'), []);
 eq('cắt hết thì trả rỗng để người gọi giữ bản gốc', cutImageryDrift('Nhớ mâm cơm nóng trên boong!', OFFICE), '');
 eq('không trôi thì giữ nguyên', cutImageryDrift('Máy khục khặc vì cặn bẩn.', OFFICE), 'Máy khục khặc vì cặn bẩn.');
 // (d) cụm sáo vòng 9 phải nằm trong EXTRA_WORN.

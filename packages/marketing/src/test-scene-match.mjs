@@ -132,5 +132,19 @@ check(picks12[1].assetId && picks12[1].assetId !== picks12[0].assetId, 'cảnh 2
 const picks13 = await matchScenesToAssets({ ai: null, generate: wornModel, model: 'x', scenes, assets, recentUse: new Map([['v-boat', 3], ['a-dirty', 3]]), log: { warn() {}, log() {} } });
 check(picks13[0] && picks13[0].assetId, 'kho toàn tư liệu mòn: vẫn chọn được, không để cảnh trống');
 
+// 1/10 (Thanh xem 22452d7f: "đội ngũ kỹ thuật đi dây điện" trên hình cảng cá + tàu): cảnh cần
+// NGƯỜI THỢ thì tư liệu toàn tàu/cảng không người làm việc phải thua tư liệu có thợ, kể cả khi
+// tư liệu thợ bị recentUse phạt và tư liệu cảng đầy từ nghề biển.
+console.log('13. Cảnh cần người thợ không được chiếu cảng cá chung chung');
+const portClip = { id: 'v-port', kind: 'video', title: 'Cảnh ngư dân chuẩn bị ra khơi ở cảng', folder: 'Content', description: 'Cảnh hoạt động nhộn nhịp tại cảng cá, tàu thuyền neo đậu, ngư dân, biển, ra khơi | Hợp cảnh: doi_song' };
+const techClip = { id: 'v-tech', kind: 'video', title: 'Thợ kỹ thuật lắp đặt thiết bị trong khoang máy', folder: 'Content', description: 'Thợ đang thao tác lắp đặt thiết bị trong khoang máy tàu chật hẹp | Hợp cảnh: van_de' };
+const techScene = { role: 'story', narration: 'Đội ngũ kỹ thuật cúi gằm đi dây điện cho chuẩn xác.', visual: 'thợ kỹ thuật đang đi dây điện lắp đặt trong khoang máy' };
+check(pickByRole([portClip, techClip], 'story', { visual: techScene.visual, recentUse: new Map([['v-tech', 3]]) }).id === 'v-tech', 'clip thợ thắng ảnh cảng dù bị phạt xoay kho');
+const portModel = async () => ({ text: JSON.stringify({ picks: [{ scene: 1, asset_id: 'v-port', fit: 8, why: 'cảng' }] }) });
+const picks14 = await matchScenesToAssets({ ai: null, generate: portModel, model: 'x', scenes: [techScene], assets: [portClip, techClip], log: { warn() {}, log() {} } });
+check(picks14[0].assetId === 'v-tech', `model chọn cảng cho cảnh cần thợ bị ép chọn lại (${picks14[0].assetId})`);
+const seaScene = { role: 'empathy', narration: 'Tàu nằm bờ chờ con nước.', visual: 'tàu cá neo đậu ở cảng' };
+check(pickByRole([portClip, techClip], 'empathy', { visual: seaScene.visual }).id === 'v-port', 'cảnh không cần thợ vẫn chọn được ảnh cảng');
+
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
 process.exit(fails ? 1 : 0);
