@@ -1,0 +1,28 @@
+# Kích tay vòng xoay sinh bài khi cron Vercel lặn (1/10: cron chiều 14h không nổ, khung 19:30
+# thiếu bài bán). Chỉ chạy bằng tay (workflow_dispatch), gọi /api/rotate với CRON_SECRET —
+# đúng đường cron thật, không mở khóa gì thêm. Bài sinh ra vẫn nằm hàng đợi chờ người Duyệt.
+name: Goi rotate tay
+on:
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "Cua so sinh bai (sang / chieu)"
+        required: true
+        default: "chieu"
+        type: choice
+        options: [sang, chieu]
+
+jobs:
+  goi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Goi /api/rotate
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SLOT: ${{ inputs.slot }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "Thieu CRON_SECRET"; exit 1; fi
+          curl -sS --fail-with-body --max-time 240 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://sdvico-mktit.vercel.app/api/rotate?slot=$SLOT"
