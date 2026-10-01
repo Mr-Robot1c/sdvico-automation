@@ -197,6 +197,11 @@ eq('bắt "con ốc gỉ sét, vệt dầu" trên clip lắp máy mới',
   imageryDriftSentences('Từng vệt dầu bám chặt trên con ốc gỉ sét nè!', NEW_INSTALL),
   ['Từng vệt dầu bám chặt trên con ốc gỉ sét nè!']);
 eq('hình có rỉ sét thì không bắt', imageryDriftSentences('Con ốc gỉ sét bám đầy dầu.', 'Cận cảnh con ốc rỉ sét, gỉ sét bám vệt dầu trên máy cũ'), []);
+// 1/10 (2): bản dựng lần 2 cảnh 2 đọc "chòng chành sóng nước" trên hình CẢNG CÁ TRÊN BỜ.
+eq('bắt "chòng chành sóng nước" trên hình cảng cá trên bờ',
+  imageryDriftSentences('Mồ hôi vã ra giữa không gian chòng chành sóng nước.', 'Cảnh ngư dân chuẩn bị ra khơi tại bến cảng cá, tàu neo đậu trên bờ'),
+  ['Mồ hôi vã ra giữa không gian chòng chành sóng nước.']);
+eq('hình có sóng nước thì không bắt', imageryDriftSentences('Giữa không gian chòng chành sóng nước.', 'Thợ sửa máy trên tàu, sóng nước chòng chành'), []);
 eq('cắt hết thì trả rỗng để người gọi giữ bản gốc', cutImageryDrift('Nhớ mâm cơm nóng trên boong!', OFFICE), '');
 eq('không trôi thì giữ nguyên', cutImageryDrift('Máy khục khặc vì cặn bẩn.', OFFICE), 'Máy khục khặc vì cặn bẩn.');
 // (d) cụm sáo vòng 9 phải nằm trong EXTRA_WORN.

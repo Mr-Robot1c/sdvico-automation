@@ -1,6 +1,6 @@
 // test-scene-match.mjs — kiểm luật khớp cảnh ↔ tư liệu (không gọi mạng). Chạy: npm run test:scene
 // Bài toán sếp nêu 15/9: kịch bản "máy hư, nước đục" KHÔNG được chiếu ảnh máy mới bóng.
-import { matchScenesToAssets, pickByRole, ruleScore, problemPool } from './video/scene-match.mjs';
+import { matchScenesToAssets, pickByRole, ruleScore, problemPool, refinePicksByImagery } from './video/scene-match.mjs';
 
 const assets = [
   { id: 'a-new', kind: 'image', title: 'Máy lọc dầu SF300B đặt trên tàu', folder: '6. Thiết bị lọc dầu SF-50', description: 'Máy lọc dầu mới bóng, nền trắng trưng bày, không có người | Hợp cảnh: san_pham_moi' },
@@ -145,6 +145,41 @@ const picks14 = await matchScenesToAssets({ ai: null, generate: portModel, model
 check(picks14[0].assetId === 'v-tech', `model chọn cảng cho cảnh cần thợ bị ép chọn lại (${picks14[0].assetId})`);
 const seaScene = { role: 'empathy', narration: 'Tàu nằm bờ chờ con nước.', visual: 'tàu cá neo đậu ở cảng' };
 check(pickByRole([portClip, techClip], 'empathy', { visual: seaScene.visual }).id === 'v-port', 'cảnh không cần thợ vẫn chọn được ảnh cảng');
+
+// 1/10 (2) (Thanh: bài 22452d7f dựng lần 2 vẫn cảnh 2 đọc "chòng chành sóng nước" trên hình CẢNG CÁ TRÊN BỜ):
+// sau khi ghép hình phải soát lời từng cảnh với mô tả hình đã chọn.
+console.log('14. Soát sau ghép: lời lệch hình thì đổi hình / cắt câu / cảnh báo');
+const quiet = { warn() {}, log() {} };
+const portShore = { id: 'v-port2', kind: 'video', title: 'Cảnh ngư dân chuẩn bị ra khơi ở cảng', folder: 'Content', description: 'Cảnh nhộn nhịp tại cảng cá trên bờ, tàu neo đậu, ngư dân chuẩn bị ra khơi | Hợp cảnh: doi_song' };
+const seaClip = { id: 'v-sea', kind: 'video', title: 'Thợ sửa máy trên biển', folder: 'Content', description: 'Thợ sửa máy trên tàu giữa biển, sóng nước chòng chành, thao tác trong khoang máy | Hợp cảnh: doi_song' };
+const swayScene = { role: 'empathy', narration: 'Mồ hôi vã ra giữa không gian chòng chành sóng nước.', visual: 'ngư dân làm việc trên tàu giữa biển' };
+const mk = (id) => ({ assetId: id, fit: 7, why: 'x', by: 'model' });
+const r1 = refinePicksByImagery({
+  scenes: [{ role: 'hook', narration: 'Máy khục khặc.', visual: 'tàu' }, swayScene, { role: 'solution', narration: 'Lắp máy xong.', visual: 'máy' }],
+  picks: [mk('a-new'), mk('v-port2'), mk('v-install')], assets: [portShore, seaClip, assets[0], assets[3]], log: quiet,
+});
+check(r1.picks[1].assetId === 'v-sea' && r1.picks[1].by === 'imagery', `lời biển động trên hình cảng đổi sang ảnh biển (${r1.picks[1].assetId}/${r1.picks[1].by})`);
+check(r1.narrations[1] === swayScene.narration, 'đổi hình được thì giữ nguyên lời');
+const calm = { role: 'empathy', narration: 'Tàu nằm bờ chờ con nước.', visual: 'tàu nằm bờ' };
+const r2 = refinePicksByImagery({ scenes: [{ role: 'hook', narration: 'Máy khục khặc.', visual: 'tàu' }, calm], picks: [mk('a-new'), mk('v-port2')], assets: [portShore, seaClip, assets[0]], log: quiet });
+check(r2.picks[1].assetId === 'v-port2' && r2.picks[1].by === 'model', 'lời khớp hình thì pick giữ nguyên');
+const twoSent = { role: 'empathy', narration: 'Mồ hôi vã ra giữa không gian chòng chành sóng nước. Tàu nằm bờ chờ con nước.', visual: 'tàu' };
+const r3 = refinePicksByImagery({ scenes: [{ role: 'hook', narration: 'Máy khục khặc.', visual: 'tàu' }, twoSent], picks: [mk('a-new'), mk('v-port2')], assets: [portShore], log: quiet });
+check(r3.picks[1].assetId === 'v-port2', 'kho không còn hình hợp thì không đổi');
+check(r3.narrations[1] === 'Tàu nằm bờ chờ con nước.', `cắt câu lệch, còn câu sạch (${r3.narrations[1]})`);
+const r4 = refinePicksByImagery({ scenes: [{ role: 'hook', narration: 'Máy khục khặc.', visual: 'tàu' }, swayScene], picks: [mk('a-new'), mk('v-port2')], assets: [portShore], log: quiet });
+check(r4.narrations[1] === swayScene.narration, 'cắt sẽ rỗng thì GIỮ NGUYÊN lời');
+check(r4.picks[1].why.includes('CẢNH BÁO'), `ghi CẢNH BÁO vào why cho người duyệt (${r4.picks[1].why})`);
+const r5 = refinePicksByImagery({
+  scenes: [{ role: 'empathy', narration: swayScene.narration, visual: swayScene.visual }, calm],
+  picks: [{ assetId: 'v-port2', fit: 8, why: 'clip thật bắt buộc', by: 'must' }, mk('a-dirty')], assets: [portShore, seaClip, assets[1]], mustIdx: 0, log: quiet,
+});
+check(r5.picks[0].assetId === 'v-port2' && r5.picks[0].by === 'must' && r5.narrations[0] === swayScene.narration, 'cảnh must được miễn, không đổi gì');
+const r6 = refinePicksByImagery({
+  scenes: [swayScene, { role: 'hook', narration: 'Máy khục khặc.', visual: 'tàu' }],
+  picks: [mk('v-port2'), mk('a-dirty')], assets: [portShore, seaClip, assets[1]], skip: [0], log: quiet,
+});
+check(r6.picks[0].assetId === 'v-port2', 'cảnh nằm trong skip (hookPin ghi đè) cũng được miễn');
 
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
 process.exit(fails ? 1 : 0);

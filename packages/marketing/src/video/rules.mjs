@@ -278,7 +278,8 @@ export function breakLongSentences(text, { maxWords = 20, chunkWords = 14 } = {}
 // 1/10 (Thanh xem bản dựng lại 22452d7f: lời "vệt dầu bám trên con ốc gỉ sét" trên clip thợ lắp
 // THIẾT BỊ MỚI): thêm nhóm chi tiết cận cảnh hay bị bịa — ốc vít gỉ sét, vệt dầu — mô tả clip
 // không nhắc thì câu tả mấy thứ này phải bị coi là trôi khỏi hình.
-const IMAGERY_TERMS = ['trên boong', 'boong tàu', 'mâm cơm', 'thùng inox', 'thùng nước', 'trưa nắng', 'sương mù', 'sương mờ', 'chợ cá', 'kéo lưới', 'mẻ lưới', 'phòng họp', 'hội thảo', 'văn phòng', 'bến cá', 'cảng', 'ốc gỉ', 'ốc rỉ', 'con ốc', 'gỉ sét', 'rỉ sét', 'vệt dầu', 'dầu bám', 'đi dây điện'];
+// 1/10 (2): lần dựng thứ 2 cảnh 2 đọc "chòng chành sóng nước" trên hình CẢNG CÁ TRÊN BỜ — thêm nhóm tả biển động.
+const IMAGERY_TERMS = ['trên boong', 'boong tàu', 'mâm cơm', 'thùng inox', 'thùng nước', 'trưa nắng', 'sương mù', 'sương mờ', 'chợ cá', 'kéo lưới', 'mẻ lưới', 'phòng họp', 'hội thảo', 'văn phòng', 'bến cá', 'cảng', 'ốc gỉ', 'ốc rỉ', 'con ốc', 'gỉ sét', 'rỉ sét', 'vệt dầu', 'dầu bám', 'đi dây điện', 'chòng chành', 'sóng nhồi', 'lắc lư', 'sóng nước', 'giữa khơi', 'giữa biển', 'lênh đênh'];
 const foldText = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
 function hasImagery(foldedText, term) {
   const f = foldText(term);

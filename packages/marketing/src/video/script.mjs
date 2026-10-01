@@ -5,7 +5,7 @@ import { knownFactValues, testFactValues } from '../product-facts.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
-import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool } from './scene-match.mjs';
+import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery } from './scene-match.mjs';
 import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
@@ -507,6 +507,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       return { role, narration, visual, hint };
     })
     .filter((s) => s.narration);
+  // 1/10: chỉ số cảnh mang clip bắt buộc — dùng chung cho matchScenesToAssets và bước soát sau ghép.
+  const mustIdxScene = mustRole === 'solution' ? Math.max(0, (() => { const k = rawScenes.findIndex((s) => s.role === 'solution'); return k >= 0 ? k : rawScenes.length - 1; })()) : 0;
   const picks = assets.length
     ? await matchScenesToAssets({
         ai, generate: generateWithRetry, model: MKT_MODEL, scenes: rawScenes, assets, mustUseAssetId: opts.mustUseAssetId || null, log: console,
@@ -514,9 +516,18 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         // 29/9: tư liệu đã lên video 14 ngày gần nhất (build-video đếm) — scene-match phạt điểm để xoay kho.
         recentUse: opts.recentUse || new Map(),
         // 17/9 chiều: clip máy đang chạy ép vào cảnh giải pháp (không có role solution thì cảnh cuối).
-        mustUseIndex: mustRole === 'solution' ? Math.max(0, (() => { const k = rawScenes.findIndex((s) => s.role === 'solution'); return k >= 0 ? k : rawScenes.length - 1; })()) : 0,
+        mustUseIndex: mustIdxScene,
       })
     : rawScenes.map(() => null);
+  // 1/10 (Thanh, bài 22452d7f: lời "chòng chành sóng nước" trên hình CẢNG CÁ TRÊN BỜ): soát lời từng cảnh với
+  // mô tả hình ĐÃ CHỌN (trừ cảnh must, và cảnh 1 khi hookPin sẽ ghi đè hình) — xem refinePicksByImagery.
+  if (assets.length) {
+    const refined = refinePicksByImagery({
+      scenes: rawScenes, picks, assets, mustIdx: mustIdxScene, skip: hookPin ? [0] : [],
+      productGroup: opts.contentVideo ? null : opts.productGroup || null, recentUse: opts.recentUse || new Map(), log: console,
+    });
+    refined.narrations.forEach((n, i) => { if (n && n !== rawScenes[i].narration) rawScenes[i].narration = n; });
+  }
   let vertical = rawScenes
     .map((s, i) => {
       const assetId = picks[i]?.assetId || s.hint || null;
