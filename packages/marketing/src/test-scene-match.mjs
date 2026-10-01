@@ -181,5 +181,18 @@ const r6 = refinePicksByImagery({
 });
 check(r6.picks[0].assetId === 'v-port2', 'cảnh nằm trong skip (hookPin ghi đè) cũng được miễn');
 
+// 1/10 (2) (ban dung lan 3: LOI "anh em ky thuat can chinh" van len hinh cang vi "hinh can" cua
+// model viet chung chung): needsWorker phai xet ca LOI DOC, khong chi truong visual.
+console.log('15. Lời đọc nhắc kỹ thuật thì hình cảng thua, dù hình-cần chung chung');
+{
+  const portClip2 = { id: 'v-port2', kind: 'video', title: 'Cảnh ngư dân chuẩn bị ra khơi ở cảng', folder: 'Content', description: 'Cảnh hoạt động nhộn nhịp tại cảng cá, tàu thuyền neo đậu, ngư dân, biển, ra khơi' };
+  const techClip2 = { id: 'v-tech2', kind: 'video', title: 'Thợ kỹ thuật lắp đặt thiết bị trong khoang máy', folder: 'Content', description: 'Thợ đang thao tác lắp đặt thiết bị trong khoang máy tàu chật hẹp' };
+  const sc = { role: 'story', narration: 'Anh em kỹ thuật vẫn kiên nhẫn căn chỉnh từng li cho thật chuẩn xác.', visual: 'không khí làm việc khẩn trương trên tàu' };
+  check(pickByRole([portClip2, techClip2], 'story', { visual: sc.visual, speech: sc.narration, recentUse: new Map([['v-tech2', 3]]) }).id === 'v-tech2', 'lời nhắc kỹ thuật: clip thợ thắng ảnh cảng dù visual chung chung');
+  const portModel2 = async () => ({ text: JSON.stringify({ picks: [{ scene: 1, asset_id: 'v-port2', fit: 8, why: 'cảng' }] }) });
+  const picks15 = await matchScenesToAssets({ ai: null, generate: portModel2, model: 'x', scenes: [sc], assets: [portClip2, techClip2], log: { warn() {}, log() {} } });
+  check(picks15[0].assetId === 'v-tech2', 'model chọn cảng bị bác theo LỜI ĐỌC (' + picks15[0].assetId + ')');
+}
+
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
 process.exit(fails ? 1 : 0);
