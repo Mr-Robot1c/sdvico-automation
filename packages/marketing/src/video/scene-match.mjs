@@ -18,7 +18,7 @@
 //     đặt, máy chạy; ảnh sản phẩm được phép.
 //   - Không dùng cùng một tư liệu ở 2 cảnh liền nhau nếu còn lựa chọn khác.
 
-import { crossProductTerms, imageryDriftSentences, cutImageryDrift, inventedDetailSentences } from './rules.mjs';
+import { crossProductTerms, imageryDriftSentences, cutImageryDrift, inventedDetailSentences, sbDescriptiveSentences } from './rules.mjs';
 
 const PROBLEM_ROLES = new Set(['hook', 'empathy', 'story']);
 const PROBLEM_WORDS = ['cũ', 'hư', 'hỏng', 'bẩn', 'cặn', 'đục', 'sửa', 'tháo', 'khói', 'rỉ', 'gỉ', 'nằm bờ', 'lợ', 'mặn', 'lọc thô bẩn', 'đen', 'nghẹt', 'kẹt', 'chết máy', 'biển', 'tàu', 'ngư dân', 'bà con', 'cảng', 'khoang máy', 'thợ máy', 'lưới', 'khơi', 'sóng', 'ra khơi', 'cập bến'];
@@ -224,6 +224,35 @@ export function storyboardDrift(scenes, sb) {
     const text = `${a.title || ''} ${a.description || ''} ${a.label || ''}`;
     const drift = imageryDriftSentences(narr, text);
     if (drift.length) { out.push({ index: i, scene: i + 1, asset: a, reason: 'drift', sentences: drift }); continue; }
+    const invented = inventedDetailSentences(narr, text);
+    if (invented.length) { out.push({ index: i, scene: i + 1, asset: a, reason: 'invented', sentences: invented }); continue; }
+    if (i < (sb.length - 1) && visualOverlap(narr, a) === 0) out.push({ index: i, scene: i + 1, asset: a, reason: 'no-overlap', sentences: [] });
+  }
+  return out;
+}
+
+// 2/10 đêm (sinh lời 2 bước): storyboardDrift cắt MỌI câu chứa từ tả cảnh không có trong hình, nên model
+// chỉ còn đường an toàn là tả từng hình và mạch chuyện không bao giờ hình thành. Bản bọc này chia hai loại:
+// câu TẢ (khớp sbDescriptiveSentences: "X đang làm Y", "Đây là...") trôi khỏi hình thì vẫn bị bắt như cũ;
+// câu KỂ trôi khỏi hình ("ba giờ sáng giữa khơi, tiếng máy nổ đều") được TỪ THA, chỉ cảnh báo. Câu bịa chi
+// tiết (đạo cụ, giới tính người) và no-overlap giữ nguyên hiệu lực cho mọi câu. Hàm gốc storyboardDrift
+// không đổi (chỗ khác vẫn dùng). log: null để im lặng (test).
+export function storyboardDriftKeChuyen(scenes, sb, { log = console } = {}) {
+  const out = [];
+  const n = Math.min((scenes || []).length, (sb || []).length);
+  for (let i = 0; i < n; i++) {
+    const a = sb[i];
+    const narr = String(scenes[i]?.narration || '');
+    if (!a || !narr.trim()) continue;
+    const text = `${a.title || ''} ${a.description || ''} ${a.label || ''}`;
+    const drift = imageryDriftSentences(narr, text);
+    if (drift.length) {
+      const desc = new Set(sbDescriptiveSentences(narr));
+      const cut = drift.filter((s) => desc.has(s));
+      const tha = drift.filter((s) => !desc.has(s));
+      if (tha.length && log) log.warn(`[script] storyboard: canh ${i + 1} co cau ke troi khoi hinh nhung giu (cau ke, khong phai cau ta): "${tha[0].slice(0, 60)}"`);
+      if (cut.length) { out.push({ index: i, scene: i + 1, asset: a, reason: 'drift', sentences: cut }); continue; }
+    }
     const invented = inventedDetailSentences(narr, text);
     if (invented.length) { out.push({ index: i, scene: i + 1, asset: a, reason: 'invented', sentences: invented }); continue; }
     if (i < (sb.length - 1) && visualOverlap(narr, a) === 0) out.push({ index: i, scene: i + 1, asset: a, reason: 'no-overlap', sentences: [] });

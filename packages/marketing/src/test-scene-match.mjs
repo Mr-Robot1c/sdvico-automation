@@ -1,6 +1,6 @@
 // test-scene-match.mjs — kiểm luật khớp cảnh ↔ tư liệu (không gọi mạng). Chạy: npm run test:scene
 // Bài toán sếp nêu 15/9: kịch bản "máy hư, nước đục" KHÔNG được chiếu ảnh máy mới bóng.
-import { matchScenesToAssets, pickByRole, ruleScore, problemPool, refinePicksByImagery, pickStoryboard } from './video/scene-match.mjs';
+import { matchScenesToAssets, pickByRole, ruleScore, problemPool, refinePicksByImagery, pickStoryboard, storyboardDrift, storyboardDriftKeChuyen } from './video/scene-match.mjs';
 
 const assets = [
   { id: 'a-new', kind: 'image', title: 'Máy lọc dầu SF300B đặt trên tàu', folder: '6. Thiết bị lọc dầu SF-50', description: 'Máy lọc dầu mới bóng, nền trắng trưng bày, không có người | Hợp cảnh: san_pham_moi' },
@@ -231,6 +231,48 @@ console.log('16. pickStoryboard: chọn trọn bộ hình trước khi viết l�
   // Folder sản phẩm không lọt vào bộ khi kho Content còn.
   const prod = { id: 'p-1', kind: 'video', title: 'Máy lọc đang chạy', folder: '2. Máy lọc nước biển SEA-40', description: 'Máy lọc nước SEA-40 đang chạy ra nước trong tại bến, kỹ thuật bàn giao' };
   check(!pickStoryboard([prod, c1, c2, c3]).some((a) => a.id === 'p-1'), 'tư liệu folder sản phẩm không vào bộ hình đời sống khi kho Content còn');
+}
+
+// 2/10 đêm (sinh lời 2 bước): storyboardDriftKeChuyen — câu TẢ trôi hình vẫn bị cắt, câu KỂ trôi hình được tha,
+// câu bịa chi tiết vẫn bị bắt ở mọi câu.
+{
+  console.log('storyboardDriftKeChuyen: guard drift chỉ cắt câu tả, tha câu kể');
+  const silent = { warn: () => {} };
+  const hinhCang = { id: 'k-1', kind: 'video', title: 'Cảng cá Long Hải', folder: 'Content', description: 'Cảnh nhộn nhịp tại cảng cá trên bờ, tàu neo đậu, ngư dân chuẩn bị ra khơi' };
+  const hinhMay = { id: 'k-2', kind: 'video', title: 'Cận cảnh động cơ', folder: 'Content', description: 'Cận cảnh động cơ tàu cá trong khoang máy, không thấy người' };
+  const hinhCuoi = { id: 'k-3', kind: 'video', title: 'Tàu cá neo ở cảng', folder: 'Content', description: 'Tàu cá neo đậu ở cảng buổi chiều, ngư dân đứng trên boong' };
+  const sbSet = [hinhCang, hinhMay, hinhCuoi];
+  const cuoi = { narration: 'Bà con nghĩ sao về chuyện này?' };
+  const mau = { narration: 'Tàu neo đậu ở cảng, mình nhớ chuyến ra khơi.' };
+  // Câu kể ngôi mình trôi khỏi hình khoang máy: gốc bắt (drift), bản bọc tha.
+  const ke = [mau, { narration: 'Động cơ trong khoang máy chạy đều. Ba giờ sáng giữa khơi, mình nghe tiếng sóng mà yên tâm.' }, cuoi];
+  const goc = storyboardDrift(ke, sbSet);
+  check(goc.length === 1 && goc[0].reason === 'drift', 'tiền đề: storyboardDrift gốc bắt câu kể trôi khỏi hình (drift)');
+  const boc = storyboardDriftKeChuyen(ke, sbSet, { log: silent });
+  check(boc.length === 0, 'bản bọc: câu kể ngôi mình trôi khỏi hình được tha, cảnh không bị bắt');
+  // Cảnh bị tha phải có cảnh báo.
+  const warns = [];
+  storyboardDriftKeChuyen(ke, sbSet, { log: { warn: (m) => warns.push(m) } });
+  check(warns.length === 1 && /canh 2/.test(warns[0]), 'bản bọc: câu kể được tha thì console.warn đúng 1 cảnh báo (cảnh 2)');
+  // Câu TẢ ("X đang làm Y") trôi khỏi hình: vẫn bị bắt, chỉ câu tả nằm trong sentences.
+  const ta = [mau, { narration: 'Thợ máy đang kéo lưới giữa khơi. Mình nhớ tiếng máy đều.' }, cuoi];
+  const bt = storyboardDriftKeChuyen(ta, sbSet, { log: silent });
+  check(bt.length === 1 && bt[0].reason === 'drift' && bt[0].scene === 2 && bt[0].sentences.length === 1 && /đang/.test(bt[0].sentences[0]), 'bản bọc: câu TẢ trôi hình vẫn bị bắt, câu kể cùng cảnh không nằm trong sentences');
+  // Câu bịa chi tiết (giới tính người không có trong mô tả) vẫn bị bắt dù là câu kể.
+  const bia = [{ narration: 'Anh thợ máy cười nói với mình ở cảng.' }, ke[1], cuoi];
+  const bb = storyboardDriftKeChuyen(bia, sbSet, { log: silent });
+  check(bb.some((m) => m.scene === 1 && m.reason === 'invented'), 'bản bọc: câu bịa giới tính người (anh thợ máy) vẫn bị bắt invented');
+  // Bịa đạo cụ.
+  const vali = [{ narration: 'Mình xách vali xuống cảng sáng nay.' }, ke[1], cuoi];
+  check(storyboardDriftKeChuyen(vali, sbSet, { log: silent }).some((m) => m.scene === 1 && m.reason === 'invented'), 'bản bọc: câu bịa đạo cụ (xách vali) vẫn bị bắt invented');
+  // no-overlap giữ nguyên cho cảnh giữa, tha cho cảnh cuối.
+  const noOv = [mau, { narration: 'Bình lặng một buổi mai.' }, cuoi];
+  const bn = storyboardDriftKeChuyen(noOv, sbSet, { log: silent });
+  check(bn.length === 1 && bn[0].scene === 2 && bn[0].reason === 'no-overlap', 'bản bọc: cảnh giữa không chung từ nào với hình vẫn bị no-overlap');
+  check(storyboardDriftKeChuyen([mau, ke[1], { narration: 'Anh em nghĩ sao?' }], sbSet, { log: silent }).length === 0, 'bản bọc: cảnh cuối câu hỏi giao lưu không bị no-overlap');
+  // Hàm gốc không đổi hành vi với câu tả; đầu vào rỗng không lỗi.
+  check(storyboardDrift(ta, sbSet).length === 1, 'hàm gốc storyboardDrift giữ nguyên (vẫn bắt)');
+  check(storyboardDriftKeChuyen([], sbSet).length === 0 && storyboardDriftKeChuyen(null, null).length === 0, 'bản bọc: đầu vào rỗng không lỗi');
 }
 
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
