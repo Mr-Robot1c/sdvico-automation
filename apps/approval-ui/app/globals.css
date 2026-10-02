@@ -1891,3 +1891,59 @@ button.topbar-back { font: inherit; cursor: pointer; }
 }
 @keyframes lead-drawer-in { from { transform: translateX(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .lead-open { animation: none !important; } }
+
+/* ===== SIDEBAR NHÓM ĐÓNG/MỞ (2/10, theo ảnh mẫu của sếp) =====
+   Hàng cha = nhãn (link sang trang gốc) + chevron (chỉ đóng/mở). Mục con thụt vào, chữ nhỏ hơn một nấc.
+   Hiệu ứng mở/đóng dùng grid-template-rows 0fr/1fr (không cần đo chiều cao bằng JS). */
+.nav-acc { gap: 4px; }
+.nav-acc-group { display: flex; flex-direction: column; }
+.nav-parent { display: flex; align-items: stretch; gap: 2px; }
+.nav-parent .nav-parent-link { flex: 1 1 auto; min-width: 0; }
+.nav-parent.has-on .nav-parent-link, .nav-parent-btn.has-on { color: var(--ink); font-weight: 600; }
+.nav-chev {
+  flex: none; width: 34px; display: grid; place-items: center;
+  background: none; border: 0; border-radius: 8px; cursor: pointer; color: var(--ink-2);
+}
+.nav-chev:hover { background: var(--surface-2); color: var(--ink); }
+.nav-chev-ico {
+  display: inline-block; width: 7px; height: 7px; flex: none;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform .18s ease; margin: 0 4px;
+}
+.nav-acc-group.is-open .nav-chev-ico { transform: rotate(45deg); }
+/* Hàng cha chỉ có nút (Tuyển dụng, Hệ thống): cả hàng bấm để đóng/mở. */
+.nav-parent-btn { width: 100%; background: none; border: 0; cursor: pointer; text-align: left; font-family: inherit; }
+.nav-parent-btn .nav-parent-label { flex: 1 1 auto; min-width: 0; }
+.nav-parent-btn .nav-chev-ico { margin-right: 6px; }
+.nav-sub {
+  display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden;
+  transition: grid-template-rows .2s ease, opacity .18s ease, visibility 0s linear .2s;
+}
+.nav-acc-group.is-open > .nav-sub {
+  grid-template-rows: 1fr; opacity: 1; visibility: visible;
+  transition: grid-template-rows .2s ease, opacity .18s ease, visibility 0s;
+}
+.nav-sub-in {
+  min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 1px;
+  margin: 0 0 0 19px; padding-left: 0; border-left: 1px solid var(--line);
+}
+.tab.nav-child { padding: 6px 10px 6px 16px; font-size: 13px; font-weight: 500; border-radius: 6px; margin-left: 4px; }
+.tab.nav-child.on { font-weight: 600; }
+@media (max-width: 767px) {
+  .nav-chev { width: 44px; min-height: 44px; }
+  .tab.nav-child { min-height: 44px; }
+  .nav-parent-btn { min-height: 44px; }
+  .nav-parent-btn .nav-chev-ico { margin-right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-sub, .nav-acc-group.is-open > .nav-sub, .nav-chev-ico { transition: none !important; }
+}
+
+/* Trang /ban-tin: khung nhúng Studio Bản tin (localhost:8899). */
+.studio-state { max-width: 640px; }
+.studio-bar { margin: 0 0 8px; font-size: 13px; }
+.studio-frame {
+  display: block; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+  height: calc(100vh - 210px); min-height: 600px;
+}
+.studio-frame[hidden] { display: none; }
