@@ -1,3 +1,5 @@
+import { PUBLIC_HOTLINE_DISPLAY } from '../../lib/public-contact';
+
 export const metadata = { title: 'Điều khoản sử dụng — SDVICO Marketing' };
 
 export default function Page() {
@@ -37,7 +39,7 @@ export default function Page() {
       <p>
         Công ty TNHH Hiệp Lực Phát Triển Việt (SDVICO)
         <br />
-        Website: sdvico.vn — Hotline: 1900 23 23 49
+        Website: sdvico.vn — Hotline: {PUBLIC_HOTLINE_DISPLAY}
       </p>
     </main>
   );

@@ -1,3 +1,5 @@
+import { PUBLIC_HOTLINE_DISPLAY, PUBLIC_HOTLINE_TEL } from '../../lib/public-contact';
+
 export const metadata = { title: 'Yêu cầu xoá dữ liệu — SDVICO Marketing' };
 
 // Trang Data Deletion Instructions — Facebook BAT BUOC co URL rieng cho viec user request
@@ -38,8 +40,7 @@ export default function Page() {
           <i>“Yêu cầu xoá dữ liệu — [Tên Facebook của bà con]”</i>.
         </li>
         <li>
-          <b>Gọi hotline</b> <a href="tel:1900232349">1900 23 23 49</a>, bấm phím nhánh chăm sóc khách
-          hàng, đề nghị xoá dữ liệu.
+          <b>Gọi hotline</b> <a href={PUBLIC_HOTLINE_TEL}>{PUBLIC_HOTLINE_DISPLAY}</a>, đề nghị xoá dữ liệu.
         </li>
       </ol>
 
@@ -68,7 +69,7 @@ export default function Page() {
         <br />
         Địa chỉ: 283 Nguyễn Hữu Cảnh, Vũng Tàu
         <br />
-        Website: <a href="https://sdvico.vn" target="_blank" rel="noreferrer">sdvico.vn</a> — Hotline: 1900 23 23 49
+        Website: <a href="https://sdvico.vn" target="_blank" rel="noreferrer">sdvico.vn</a> — Hotline: {PUBLIC_HOTLINE_DISPLAY}
       </p>
     </main>
   );

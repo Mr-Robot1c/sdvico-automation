@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { canonicalUrl, siteUrl } from '../../../../lib/seo';
+import { selfCanonicalUrl, siteUrl } from '../../../../lib/seo';
 import { PRODUCT_CATALOG } from '../../../../lib/product-catalog';
 import TopicHubView, { STORY_TOPIC, topicOf } from '../topic-hub-view';
 
@@ -20,8 +20,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description: `Tổng hợp bài viết, kinh nghiệm sử dụng và câu chuyện thực tế về ${p.name} cho tàu cá. ${p.short}`,
     openGraph: { title, description: p.short, url, type: 'website', siteName: 'SDVICO' },
-    // 2/10: canonical ve ten mien cong ty sdvico.vn (og:url giu trang nay).
-    alternates: { canonical: canonicalUrl(`/blog/chu-de/${p.slug}`) }
+    // 2/10 (audit lan 3): canonical = SELF. sdvico.vn la SPA tra cung 1 shell cho moi duong dan
+    // (xem lib/seo.ts selfCanonicalUrl); chi chuyen lai khi sdvico.vn render noi dung tuong duong tung URL.
+    alternates: { canonical: selfCanonicalUrl(`/blog/chu-de/${p.slug}`) }
   };
 }
 

@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { findProductBySlug, PRODUCT_CATALOG } from '../../../lib/product-catalog';
-import { canonicalUrl, isProductOf, loadPublicPosts, optImg, optImgAbs, siteUrl, type PublicPost } from '../../../lib/seo';
+import { isProductOf, loadPublicPosts, optImg, optImgAbs, selfCanonicalUrl, siteUrl, type PublicPost } from '../../../lib/seo';
 import { getPublicClient } from '../../../lib/supabase-server';
 import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
 import { safeJsonLd } from '../../../lib/jsonld';
+import { PUBLIC_HOTLINE_DISPLAY, PUBLIC_HOTLINE_TEL } from '../../../lib/public-contact';
 import ContactButtons from '../../contact-buttons';
 import PostCard from '../../blog/post-card';
 import { assetPublicUrl } from '../../../lib/asset-url';
@@ -44,8 +45,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ...(ogImage ? { images: [{ url: ogImage, alt: p.name }] } : {})
     },
     twitter: { card: ogImage ? 'summary_large_image' : 'summary', title, description: p.short, ...(ogImage ? { images: [ogImage] } : {}) },
-    // 2/10: canonical ve ten mien cong ty (og:url giu trang nay, giong bai blog).
-    alternates: { canonical: canonicalUrl(`/san-pham/${p.slug}`) }
+    // 2/10 (audit lan 3): canonical = SELF. sdvico.vn la SPA tra cung 1 shell cho moi duong dan
+    // (xem lib/seo.ts selfCanonicalUrl); chi chuyen lai khi sdvico.vn render noi dung tuong duong tung URL.
+    alternates: { canonical: selfCanonicalUrl(`/san-pham/${p.slug}`) }
   };
 }
 
@@ -83,7 +85,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
   const [images, related, ads] = await Promise.all([loadImages(p), loadRelatedPosts(p), loadAdsConfig(getPublicClient())]);
 
-  const url = canonicalUrl(`/san-pham/${p.slug}`);
+  const url = selfCanonicalUrl(`/san-pham/${p.slug}`); // khớp canonical (self)
   // JSON-LD Product: name, image, description, brand. CỐ Ý KHÔNG có `offers`/giá/availability:
   // luật công ty (chính sách giá 9/9 + điều cấm 5) chỉ cho công khai mốc úp mở, số giá chính xác
   // không lên bài công khai; một Offer không giá còn bị Google coi là thiếu trường. brand: sản
@@ -165,7 +167,7 @@ export default async function ProductDetailPage({ params }: Props) {
         ) : null}
 
         <p className="pub-note">
-          Cần tư vấn {p.shortName}? Gọi <a href="tel:1900232349">1900 23 23 49</a> hoặc xem <Link href="/san-pham">sản phẩm khác</Link>.
+          Cần tư vấn {p.shortName}? Gọi <a href={PUBLIC_HOTLINE_TEL}>{PUBLIC_HOTLINE_DISPLAY}</a> hoặc xem <Link href="/san-pham">sản phẩm khác</Link>.
         </p>
       </main>
     </>

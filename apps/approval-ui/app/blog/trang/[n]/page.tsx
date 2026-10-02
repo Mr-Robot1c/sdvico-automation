@@ -34,8 +34,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description: 'Kinh nghiệm sử dụng thiết bị tàu cá, mẹo tiết kiệm dầu, nước ngọt ngoài khơi và câu chuyện thực tế của ngư dân do SDVICO chia sẻ.',
     openGraph: { title, url, type: 'website', siteName: 'SDVICO' },
-    // sdvico.vn (SPA của anh Thành) không có đường dẫn /blog/trang/N nên canonical tự trỏ trang
-    // này, còn trang 1 canonical về sdvico.vn/blog. noindex để không nhân bản danh sách trên hai
+    // sdvico.vn (SPA của anh Thành, trả cùng 1 shell cho mọi đường dẫn, audit 2/10 lần 3) không có
+    // nội dung riêng cho /blog/trang/N nên canonical tự trỏ trang này (SELF, cùng lý do với
+    // /san-pham và chủ đề, xem lib/seo.ts selfCanonicalUrl), còn trang 1 canonical về sdvico.vn/blog. noindex để không nhân bản danh sách trên hai
     // tên miền; follow để Google vẫn lần theo link sang từng bài (canonical về sdvico.vn).
     alternates: { canonical: url },
     robots: { index: false, follow: true }

@@ -70,16 +70,16 @@ export function publicBlogUrl(slug?: string): string {
   return slug ? `${publicBlogBase()}/${slug}` : publicBlogBase();
 }
 
-// 2/10 (đợt C, audit production): MỘT tên miền chuẩn cho canonical = https://sdvico.vn. Trước đây
-// trang chủ đề blog và toàn bộ trang sản phẩm canonical về sdvico-mktit.vercel.app (trùng nội
-// dung với sdvico.vn). og:url vẫn giữ siteUrl() như bài blog (xem chú thích publicBlogBase).
-export function publicSiteOrigin(): string {
-  const explicit = (process.env.PUBLIC_SITE_ORIGIN || '').trim();
-  return (explicit || 'https://sdvico.vn').replace(/\/$/, '');
-}
-export function canonicalUrl(path: string): string {
+// 2/10 (audit production lần 3): canonical của /san-pham, /san-pham/[slug], /blog/chu-de/[slug]
+// là CHÍNH URL trên domain đang phục vụ (siteUrl, tức self). Đợt C sáng 2/10 từng trỏ sang
+// https://sdvico.vn nhưng audit đo: sdvico.vn là SPA trả CÙNG một shell (~1.061 byte, title chung)
+// cho MỌI đường dẫn kể cả đường dẫn rác, nên canonical sang đó là trỏ vào trang nghèo nội dung
+// và Google có thể gom trang sản phẩm giàu nội dung vào shell. Chỉ BÀI BLOG /blog/[slug] vẫn
+// canonical về sdvico.vn (quyết định 7/9, số GSC đang chảy, xem publicBlogUrl ở trên).
+// ĐIỀU KIỆN chuyển lại sdvico.vn: khi sdvico.vn render title/H1/nội dung tương đương cho từng URL.
+export function selfCanonicalUrl(path: string): string {
   const p = String(path || '');
-  return `${publicSiteOrigin()}${p.startsWith('/') ? p : `/${p}`}`;
+  return `${siteUrl()}${p.startsWith('/') ? p : `/${p}`}`;
 }
 
 // Ngày đăng chuẩn ISO cho JSON-LD.

@@ -1,3 +1,5 @@
+import { PUBLIC_HOTLINE_DISPLAY } from '../../lib/public-contact';
+
 export const metadata = { title: 'Chính sách quyền riêng tư — SDVICO Marketing' };
 
 // Cap nhat 25/8/2026: bo sung muc "Du lieu khach hang qua Facebook webhook" — tinh
@@ -80,7 +82,7 @@ export default function Page() {
         <br />
         Địa chỉ: 283 Nguyễn Hữu Cảnh, Vũng Tàu
         <br />
-        Website: <a href="https://sdvico.vn" target="_blank" rel="noreferrer">sdvico.vn</a> — Hotline: 1900 23 23 49
+        Website: <a href="https://sdvico.vn" target="_blank" rel="noreferrer">sdvico.vn</a> — Hotline: {PUBLIC_HOTLINE_DISPLAY}
         <br />
         Email: congnghebien.sdvico@gmail.com (dùng chung cho mọi yêu cầu về dữ liệu cá nhân)
       </p>

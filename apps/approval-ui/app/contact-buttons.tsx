@@ -1,6 +1,7 @@
 'use client';
 
 import { trackContact } from './tracking';
+import { PUBLIC_HOTLINE_DISPLAY, PUBLIC_HOTLINE_TEL } from '../lib/public-contact';
 
 // Nut lien he tren trang public (blog/san-pham). Bam -> ban tracking Contact len Pixel + GA4
 // roi mo Messenger / goi / Zalo. Deep link mang theo ref/UTM de doi chieu don ve tu AD.
@@ -29,10 +30,10 @@ export default function ContactButtons({
       {/* 2/10 Thanh chốt: hotline public thống nhất 0939 243 222 (trùng bài bán, thay 0254 của 28/8). */}
       <a
         className="contact-btn"
-        href="tel:0939243222"
+        href={PUBLIC_HOTLINE_TEL}
         onClick={() => trackContact('call', campaign)}
       >
-        📞 Gọi 0939 243 222
+        📞 Gọi {PUBLIC_HOTLINE_DISPLAY}
       </a>
       {zaloUrl ? (
         <a

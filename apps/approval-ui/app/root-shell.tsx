@@ -21,6 +21,7 @@ import Tracking from './tracking';
 // 2/10 (responsive mobile đợt 1): thanh đầu trang gọn + menu trượt cho điện thoại.
 import ThemeToggle from './theme-toggle';
 import { crumbFor, parentFor } from '../lib/routes';
+import { PUBLIC_HOTLINE_DISPLAY, PUBLIC_HOTLINE_TEL } from '../lib/public-contact';
 
 // Dưới 768px sidebar nội bộ thành menu trượt (off-canvas). Mốc này phải khớp @media (max-width: 767px) trong globals.css.
 const MOBILE_MAX = 767;
@@ -94,9 +95,9 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
             {/* 2/10 Thanh chốt (audit đóng gói chê hotline lệch số): mọi trang public dùng
                 0939 243 222, trùng số trên bài bán và caption video. Lịch sử: 28/8 sếp từng
                 đổi sang 0254 359 6868 theo sdvico.vn, nay thống nhất lại một số. */}
-            <a className="pub-call" href="tel:0939243222" aria-label="Gọi 0939 243 222">
+            <a className="pub-call" href={PUBLIC_HOTLINE_TEL} aria-label={`Gọi ${PUBLIC_HOTLINE_DISPLAY}`}>
               <span aria-hidden="true">📞</span>
-              <span className="pub-call-txt">0939 243 222</span>
+              <span className="pub-call-txt">{PUBLIC_HOTLINE_DISPLAY}</span>
             </a>
           </div>
         </header>
@@ -111,7 +112,7 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
               </div>
             </div>
             <nav className="pub-footer-links" aria-label="Liên kết chân trang">
-              <a href="tel:0939243222">Hotline 0939 243 222</a>
+              <a href={PUBLIC_HOTLINE_TEL}>Hotline {PUBLIC_HOTLINE_DISPLAY}</a>
               <a href="https://sdvico.vn" target="_blank" rel="noopener noreferrer">sdvico.vn</a>
               <Link href="/privacy">Chính sách</Link>
               <Link href="/terms">Điều khoản</Link>

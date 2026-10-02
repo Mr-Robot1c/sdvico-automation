@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { PRODUCT_CATALOG } from '../../lib/product-catalog';
-import { canonicalUrl, isProductOf, optImg, siteUrl } from '../../lib/seo';
+import { isProductOf, optImg, selfCanonicalUrl, siteUrl } from '../../lib/seo';
 import { getPublicClient } from '../../lib/supabase-server';
 import { assetPublicUrl } from '../../lib/asset-url';
 
@@ -19,8 +19,9 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESC,
   openGraph: { title: TITLE, description: DESC, url: `${siteUrl()}/san-pham`, type: 'website', siteName: 'SDVICO' },
-  // 2/10: canonical ve ten mien cong ty (og:url giu trang nay, giong bai blog).
-  alternates: { canonical: canonicalUrl('/san-pham') }
+  // 2/10 (audit lan 3): canonical = SELF. sdvico.vn la SPA tra cung 1 shell cho moi duong dan
+  // (xem lib/seo.ts selfCanonicalUrl); chi chuyen lai khi sdvico.vn render noi dung tuong duong tung URL.
+  alternates: { canonical: selfCanonicalUrl('/san-pham') }
 };
 
 // Đếm bài đã đăng + lấy 1 ảnh đại diện cho MỖI sản phẩm (design-spec màn 4: card có ảnh thật).

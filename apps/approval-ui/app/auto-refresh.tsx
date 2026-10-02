@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 // Tự làm mới dữ liệu máy chủ mỗi số giây, không tải lại cả trang.
@@ -24,41 +24,64 @@ export default function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
     return () => clearInterval(tick);
   }, []);
 
+  // 2/10 (audit lần 3): modal đang mở (ViewModal "Xem bài viết", lead/plan quick-view...) mà
+  // router.refresh() chạy thì danh sách dựng lại và modal biến mất giữa lúc người duyệt đang đọc.
+  // ViewModal đặt body.dataset.modalOpen = số modal đang mở; <dialog open> bất kỳ cũng tính (dự
+  // phòng cho modal không dùng ViewModal). Có modal thì chỉ ghi "nợ", đóng modal mới trả.
+  const modalOpen = () =>
+    Number(document.body.dataset.modalOpen || 0) > 0 || !!document.querySelector('dialog[open]');
+
+  const refreshNow = useCallback(() => {
+    lastRefreshAt.current = Date.now();
+    owed.current = false;
+    router.refresh();
+    setLeft(seconds);
+  }, [router, seconds]);
+
   // Khi đếm về 0: làm mới dữ liệu máy chủ (ngoài render, an toàn) rồi đặt lại đồng hồ.
-  // Tab đang ẩn thì chỉ ghi "nợ", đợi tab hiện lại mới làm mới (xem effect bên dưới).
+  // Tab đang ẩn hoặc đang có modal mở thì chỉ ghi "nợ", đợi tab hiện lại / modal đóng mới làm mới.
   useEffect(() => {
     if (left <= 0) {
-      if (document.hidden) {
+      if (document.hidden || modalOpen()) {
         owed.current = true;
         return;
       }
-      lastRefreshAt.current = Date.now();
-      owed.current = false;
-      router.refresh();
-      setLeft(seconds);
+      refreshNow();
     }
-  }, [left, seconds, router]);
+  }, [left, refreshNow]);
 
   // 16/9 (Thanh: "refresh 30s chả có tác dụng"): tab nằm nền bị trình duyệt bóp đồng hồ nên
   // quay lại tab là số cũ, phải chờ thêm 1 vòng. 2/10: tính theo giờ thật (Date.now) thay vì đếm
   // tick: tab hiện lại mà đã quá hạn (hoặc đang nợ) thì làm mới 1 lần NGAY rồi đặt lại đồng hồ;
   // chưa quá hạn thì chỉ chỉnh lại số đếm cho đúng, không gọi máy chủ.
+  // Modal đóng (sự kiện 'sdvico:modal-closed' từ ViewModal, hoặc 'close' của <dialog> bất kỳ,
+  // bắt ở pha capture vì sự kiện này không nổi bọt): đang nợ thì trả nợ đúng 1 lần.
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
       const elapsed = (Date.now() - lastRefreshAt.current) / 1000;
       if (owed.current || elapsed >= seconds) {
-        lastRefreshAt.current = Date.now();
-        owed.current = false;
-        router.refresh();
-        setLeft(seconds);
+        if (modalOpen()) {
+          owed.current = true;
+          return;
+        }
+        refreshNow();
       } else {
         setLeft(Math.max(1, Math.ceil(seconds - elapsed)));
       }
     };
+    const onModalClosed = () => {
+      if (owed.current && !document.hidden && !modalOpen()) refreshNow();
+    };
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [seconds, router]);
+    window.addEventListener('sdvico:modal-closed', onModalClosed);
+    document.addEventListener('close', onModalClosed, true);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('sdvico:modal-closed', onModalClosed);
+      document.removeEventListener('close', onModalClosed, true);
+    };
+  }, [seconds, refreshNow]);
 
   return (
     <span className="refresh">Tự làm mới sau {Math.max(left, 0)} giây</span>

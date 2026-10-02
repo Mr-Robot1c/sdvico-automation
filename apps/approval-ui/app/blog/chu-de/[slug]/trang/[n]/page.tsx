@@ -33,7 +33,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description: p.short,
     openGraph: { title, url, type: 'website', siteName: 'SDVICO' },
-    // Giống /blog/trang/N: sdvico.vn không có đường dẫn này, nên canonical tự trỏ, noindex + follow.
+    // Giống /blog/trang/N: canonical SELF (cùng trang 1 chủ đề, 2/10 audit lần 3: sdvico.vn là SPA
+    // trả cùng 1 shell cho mọi đường dẫn, xem lib/seo.ts selfCanonicalUrl), noindex + follow.
     alternates: { canonical: url },
     robots: { index: false, follow: true }
   };
