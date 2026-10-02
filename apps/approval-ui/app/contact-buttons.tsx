@@ -26,13 +26,13 @@ export default function ContactButtons({
       >
         💬 Nhắn tin cho Page SDVICO
       </a>
-      {/* 28/8 sếp đổi hotline nút liên hệ public: 0254 359 6868 (số trên sdvico.vn). */}
+      {/* 2/10 Thanh chốt: hotline public thống nhất 0939 243 222 (trùng bài bán, thay 0254 của 28/8). */}
       <a
         className="contact-btn"
-        href="tel:02543596868"
+        href="tel:0939243222"
         onClick={() => trackContact('call', campaign)}
       >
-        📞 Gọi 0254 359 6868
+        📞 Gọi 0939 243 222
       </a>
       {zaloUrl ? (
         <a

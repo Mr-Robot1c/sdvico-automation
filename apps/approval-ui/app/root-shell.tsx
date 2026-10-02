@@ -91,11 +91,12 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
               <Link href="/blog" className={path.startsWith('/blog') ? 'on' : ''} aria-current={path.startsWith('/blog') ? 'page' : undefined}>Bài viết</Link>
               <Link href="/san-pham" className={path.startsWith('/san-pham') ? 'on' : ''} aria-current={path.startsWith('/san-pham') ? 'page' : undefined}>Sản phẩm</Link>
             </nav>
-            {/* 28/8 sếp đổi hotline hiển thị trang public: 1900 23 23 49 -> 0254 359 6868
-                (số đang dùng trên sdvico.vn). Bài máy sinh + trang privacy/terms giữ số cũ. */}
-            <a className="pub-call" href="tel:02543596868" aria-label="Gọi 0254 359 6868">
+            {/* 2/10 Thanh chốt (audit đóng gói chê hotline lệch số): mọi trang public dùng
+                0939 243 222, trùng số trên bài bán và caption video. Lịch sử: 28/8 sếp từng
+                đổi sang 0254 359 6868 theo sdvico.vn, nay thống nhất lại một số. */}
+            <a className="pub-call" href="tel:0939243222" aria-label="Gọi 0939 243 222">
               <span aria-hidden="true">📞</span>
-              <span className="pub-call-txt">0254 359 6868</span>
+              <span className="pub-call-txt">0939 243 222</span>
             </a>
           </div>
         </header>
@@ -110,7 +111,7 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
               </div>
             </div>
             <nav className="pub-footer-links" aria-label="Liên kết chân trang">
-              <a href="tel:02543596868">Hotline 0254 359 6868</a>
+              <a href="tel:0939243222">Hotline 0939 243 222</a>
               <a href="https://sdvico.vn" target="_blank" rel="noopener noreferrer">sdvico.vn</a>
               <Link href="/privacy">Chính sách</Link>
               <Link href="/terms">Điều khoản</Link>

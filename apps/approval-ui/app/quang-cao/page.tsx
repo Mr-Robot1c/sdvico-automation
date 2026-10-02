@@ -94,7 +94,7 @@ export default async function Page() {
             </label>
             <label className="field-col">
               <span className="sub">Messenger username (m.me/…)</span>
-              <input className="note" name="messenger_username" defaultValue={cfg.messengerUsername || ''} placeholder="Ví dụ: sdvico.tbtc" style={{ maxWidth: 'none', width: '100%' }} />
+              <input className="note" name="messenger_username" defaultValue={cfg.messengerUsername || ''} placeholder="Ví dụ: SDVICOVN" style={{ maxWidth: 'none', width: '100%' }} />
             </label>
             <label className="field-col">
               <span className="sub">Zalo OA id (zalo.me/…)</span>

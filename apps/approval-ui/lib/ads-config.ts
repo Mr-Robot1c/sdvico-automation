@@ -45,7 +45,8 @@ export async function loadAdsConfig(clientArg?: AdsClient): Promise<AdsConfig> {
 
 // URL nhan tin Messenger co UTM (deep link). Chua cau hinh username -> ve Page mac dinh.
 export function messengerUrl(username: string | null, utm?: { source?: string; campaign?: string }): string {
-  const base = username ? `https://m.me/${username}` : 'https://www.facebook.com/sdvico.tbtc';
+  // 2/10 Thanh: Page chinh nhan khach la facebook.com/SDVICOVN — bo han sdvico.tbtc.
+  const base = username ? `https://m.me/${username}` : 'https://www.facebook.com/SDVICOVN';
   const params = new URLSearchParams();
   // Messenger ho tro ref param mang theo (webhook doc duoc). Nhet UTM vao ref.
   if (utm?.campaign) params.set('ref', `utm_${utm.source || 'site'}_${utm.campaign}`);
