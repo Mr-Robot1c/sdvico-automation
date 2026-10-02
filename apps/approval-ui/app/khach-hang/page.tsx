@@ -3,6 +3,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import { updateLeadStatus, addLeadManual, addProductQa } from '../actions';
 import LeadStepper, { STEP_LABEL } from './lead-stepper';
 import DeleteLeadButton from './delete-lead-button';
+import LeadRow, { LeadMore } from './lead-row';
 import SaveQaButton from './save-qa-button';
 import DedupLeadsBar from './dedup-leads-bar';
 import DraftReplyButton, { type PendingDraft } from './draft-reply-button';
@@ -241,7 +242,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
           <p className="sub">Máy bắt comment và tin nhắn hỏi mua dưới bài đăng; khách gọi / Zalo thì bấm ➕ Thêm khách.</p>
         </div>
       ) : (
-        <div className="tablewrap table-scroll">
+        <div className="tablewrap table-scroll lead-wrap">
           <table className="datatable lead-table">
             <thead>
               <tr>
@@ -266,9 +267,18 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                   `Mở dashboard: https://sdvico-mktit.vercel.app/khach-hang`,
                 ].filter(Boolean).join('\n');
                 return (
-                  <tr key={l.id}>
-                    <td className="sub" style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(l.created_at)}</td>
-                    <td>
+                  <LeadRow
+                    key={l.id}
+                    name={l.fb_user_name || '(chưa lấy được tên)'}
+                    icon={(SOURCE_LABEL[l.source] || '').split(' ')[0] || '👤'}
+                    sourceLabel={(SOURCE_LABEL[l.source] || l.source).replace(/^\S+\s/, '')}
+                    time={fmtDateTime(l.created_at)}
+                    message={String(l.message || '')}
+                    status={l.status}
+                    hasDraft={pendingByLead.has(l.id)}
+                  >
+                    <td className="sub" data-label="Lúc" style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(l.created_at)}</td>
+                    <td data-label="Khách">
                       <b>{l.fb_user_name || <span className="muted">(chưa lấy được tên)</span>}</b>
                       <div className="sub" style={{ fontSize: '.78rem' }}>{SOURCE_LABEL[l.source] || l.source}</div>
                       {l.fb_profile_url ? (
@@ -277,7 +287,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                         </a>
                       ) : null}
                     </td>
-                    <td>
+                    <td data-label="Hỏi gì">
                       <div className="lead-msg">{l.message}</div>
                       {relatedTitle ? <div className="sub" style={{ fontSize: '.78rem', marginTop: 2 }}>📎 {relatedTitle}</div> : null}
                       <div style={{ marginTop: 4 }}>
@@ -291,10 +301,10 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                       </div>
                       <DraftReplyButton leadId={l.id} fbUrl={l.fb_profile_url} pending={pendingByLead.get(l.id) || null} />
                     </td>
-                    <td>
+                    <td data-label="Bước">
                       <LeadStepper leadId={l.id} status={l.status} note={l.note || ''} lostReason={l.lost_reason || ''} />
                     </td>
-                    <td>
+                    <td data-label="Ghi chú">
                       <form action={updateLeadStatus} className="lead-note-form">
                         <input type="hidden" name="lead_id" value={l.id} />
                         <input type="hidden" name="status" value={l.status} />
@@ -302,13 +312,15 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                         <button className="btn ghost sm" type="submit">Lưu</button>
                       </form>
                     </td>
-                    <td>
-                      <DeleteLeadButton
-                        leadId={l.id}
-                        leadSummary={`${SOURCE_LABEL[l.source] || l.source} · ${l.fb_user_name || '(chưa lấy được tên)'} · "${(l.message || '').slice(0, 80)}"`}
-                      />
+                    <td className="lead-del-cell">
+                      <LeadMore>
+                        <DeleteLeadButton
+                          leadId={l.id}
+                          leadSummary={`${SOURCE_LABEL[l.source] || l.source} · ${l.fb_user_name || '(chưa lấy được tên)'} · "${(l.message || '').slice(0, 80)}"`}
+                        />
+                      </LeadMore>
                     </td>
-                  </tr>
+                  </LeadRow>
                 );
               })}
             </tbody>
