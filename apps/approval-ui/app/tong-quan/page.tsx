@@ -68,6 +68,9 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   mondayVN.setUTCDate(vnNow.getUTCDate() - ((vnNow.getUTCDay() + 6) % 7));
   const weekStartIso = new Date(mondayVN.toISOString().slice(0, 10) + 'T00:00:00+07:00').toISOString();
 
+  const today = todayVN();
+  const dayStartIso = new Date(today + 'T00:00:00+07:00').toISOString();
+
   // 200 bai moi nhat, KHONG ilike o DB — q loc bang JS de tile "Da viet" khong lech khi search.
   const contentQuery = client
     .from('mkt_content')
@@ -76,7 +79,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, todayView, leadsRes, yt, wonWeekRes, goalRes, shareLot, qaVerifiedRes, qaPendingRes] = await Promise.all([
+  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, todayView, leadsRes, yt, wonWeekRes, goalRes, shareLot, qaVerifiedRes, qaPendingRes, week, postsTodayRes, pageScansRes] = await Promise.all([
     client
       .from('approval_queue')
       .select('id, title, status, payload, created_at')
@@ -121,6 +124,11 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     // 12/9 (Thanh gật): dòng đếm kho hỏi đáp cho mục tiêu tuần 14–20/9 (kho tri thức bot live, đích 40 dòng đã xác nhận)
     client.from('mkt_product_qa').select('id', { count: 'exact', head: true }).eq('verified', true),
     client.from('mkt_product_qa').select('id', { count: 'exact', head: true }).eq('verified', false),
+    // 2/10 (Thanh: "load page hơi chậm"): 3 truy vấn dưới trước chạy ở vòng chờ riêng, nhưng KHÔNG phụ thuộc
+    // kết quả nào ở trên (chỉ cần dayStartIso) — gom vào đây để chạy song song.
+    (async () => { try { return await cachedWeekReport(0); } catch { return null as any; } })(),
+    client.from('mkt_posts').select('id', { count: 'exact', head: true }).eq('status', 'published').gte('published_at', dayStartIso).lte('published_at', new Date().toISOString()),
+    client.from('mkt_metrics').select('metrics, created_at').eq('source', 'facebook').eq('entity_ref', '__page_real__').not('metrics->suite28', 'is', null).order('created_at', { ascending: false }).limit(30),
   ]);
   const qaVerified = qaVerifiedRes.count ?? 0;
   const qaPending = qaPendingRes.count ?? 0;
@@ -163,21 +171,6 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const pendingRaw = queueRows.filter((r) => r.status === 'pending');
   const pendingCids = [...new Set(pendingRaw.map((r) => String(r.payload?.content_id || '')).filter(Boolean))];
   const deletedCids = new Set<string>();
-  if (pendingCids.length) {
-    const { data: delRows } = await client.from('mkt_content').select('id').in('id', pendingCids).not('deleted_at', 'is', null);
-    for (const d of delRows || []) deletedCids.add(String((d as any).id));
-  }
-  const pending = pendingRaw.filter((r) => !deletedCids.has(String(r.payload?.content_id || '')));
-  const rejected = queueRows.filter((r) => r.status === 'rejected');
-  const scheduled = queueRows.filter((r) => {
-    if (r.status !== 'approved') return false;
-    const s = String(r.payload?.scheduled_at || '');
-    if (!s) return false;
-    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-    if (!m) return false;
-    return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 7, +m[5]) > now;
-  });
-  const pendingStale = pending.filter((r) => now - new Date(r.created_at).getTime() > 24 * 3600 * 1000);
 
   // Y tuong = huong di bai viet cua ban ke hoach dang ap.
   const appliedPlan = planAppliedRes.data as any;
@@ -189,8 +182,6 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
 
   // Lead
   const leadNew = leads.filter((l) => String(l.status || 'new') === 'new');
-  const today = todayVN();
-  const dayStartIso = new Date(today + 'T00:00:00+07:00').toISOString();
   const leadToday = leads.filter((l) => String(l.created_at || '') >= dayStartIso);
   const leadAds = leads.filter((l) => String(l.source || '') === 'facebook_ads');
   const wonWeek = Number(wonWeekRes.count || 0);
@@ -203,12 +194,24 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const leadByCidEarly = new Map<string, number>();
   for (const l of leads) { const cid = String(l.content_id || ''); if (cid) leadByCidEarly.set(cid, (leadByCidEarly.get(cid) || 0) + 1); }
   const topLeadCidsEarly = [...leadByCidEarly.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([cid]) => cid);
-  const [week, postsTodayRes, pageScansRes, leadTitlesRes] = await Promise.all([
-    (async () => { try { return await cachedWeekReport(0); } catch { return null as any; } })(),
-    client.from('mkt_posts').select('id', { count: 'exact', head: true }).eq('status', 'published').gte('published_at', dayStartIso).lte('published_at', new Date().toISOString()),
-    client.from('mkt_metrics').select('metrics, created_at').eq('source', 'facebook').eq('entity_ref', '__page_real__').not('metrics->suite28', 'is', null).order('created_at', { ascending: false }).limit(30),
+  // 2/10: vòng chờ thứ 2 gom 3 truy vấn chỉ phụ thuộc kết quả vòng 1 (thẻ pending của bài đã xóa, tiêu đề bài hút khách, lô nhóm hôm nay).
+  const [delRowsRes, leadTitlesRes, todayLots] = await Promise.all([
+    pendingCids.length ? client.from('mkt_content').select('id').in('id', pendingCids).not('deleted_at', 'is', null) : Promise.resolve({ data: [] as any[] }),
     topLeadCidsEarly.length ? client.from('mkt_content').select('id, title').in('id', topLeadCidsEarly) : Promise.resolve({ data: [] as any[] }),
+    planShareLots(client, { [today]: todayView.rows.map((r) => ({ index: r.slot.index, time: r.slot.time, kind: r.slot.kind, channel: r.slot.channel, group_id: r.slot.group_id, contentId: r.contentId })) }),
   ]);
+  for (const d of ((delRowsRes as any).data || []) as any[]) deletedCids.add(String(d.id));
+  const pending = pendingRaw.filter((r) => !deletedCids.has(String(r.payload?.content_id || '')));
+  const rejected = queueRows.filter((r) => r.status === 'rejected');
+  const scheduled = queueRows.filter((r) => {
+    if (r.status !== 'approved') return false;
+    const s = String(r.payload?.scheduled_at || '');
+    if (!s) return false;
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!m) return false;
+    return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 7, +m[5]) > now;
+  });
+  const pendingStale = pending.filter((r) => now - new Date(r.created_at).getTime() > 24 * 3600 * 1000);
   const postsTodayCount = postsTodayRes.count;
   const scanList = ((pageScansRes as any).data || []) as any[];
   const scanCur = scanList[0]?.metrics || null;
@@ -278,7 +281,6 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const hasFilter = !!(q || fGd || fKenh || fKh);
 
   // 16/9 (Thanh: mỗi BUỔI 4 nhóm): lô nhóm theo từng ô đăng hôm nay, hiện ngay trong bảng Kế hoạch hôm nay.
-  const todayLots = await planShareLots(client, { [today]: todayView.rows.map((r) => ({ index: r.slot.index, time: r.slot.time, kind: r.slot.kind, channel: r.slot.channel, group_id: r.slot.group_id, contentId: r.contentId })) });
   const todayLot = todayLots[today] || null;
   const lotOfRow = (idx: number) => todayLot?.slots.find((s) => s.index === idx) || null;
 

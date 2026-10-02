@@ -33,7 +33,15 @@ const SOURCE_LABEL: Record<string, string> = {
   manual: '✍️ Nhập tay',
 };
 const FILTERS = ['all', 'new', 'contacted', 'won', 'lost', 'spam'] as const;
-const FILTER_LABEL: Record<string, string> = { all: 'Tất cả', ...STEP_LABEL };
+// 2/10 (Thanh: "mấy số này là gì"): mỗi tab lọc ghi rõ tên bước + số khách, theo đúng status trong DB
+// (all = mọi khách trừ Rác; new/contacted/won/lost/spam = đúng status đó). Nhãn chữ thuần, số nằm trong huy hiệu bên cạnh.
+const FILTER_LABEL: Record<string, string> = {
+  all: 'Tất cả', new: 'Mới', contacted: 'Đã liên hệ', won: 'Đã mua', lost: 'Không chốt', spam: 'Rác',
+};
+const FILTER_HINT: Record<string, string> = {
+  all: 'Mọi khách đang theo dõi (không tính Rác)', new: 'Khách mới hỏi, chưa liên hệ', contacted: 'Đã nhắn hoặc gọi, chờ khách chốt',
+  won: 'Khách đã mua', lost: 'Không chốt được (có ghi lý do)', spam: 'Tin rác, đã ẩn khỏi danh sách chính',
+};
 
 function fmtDateTime(iso: string | null): string {
   if (!iso) return '';
@@ -185,26 +193,37 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
         </div>
       </header>
 
-      <div className="lead-week">
-        <span>Tuần này: <b>{fmt(newWeekRes.count ?? 0)}</b> khách hỏi</span>
-        <span>💰 Đã mua: <b>{fmt(wonWeekRes.count ?? 0)}</b> / {fmt(wonTarget)} (mục tiêu tuần)</span>
-        <span>📣 Từ quảng cáo 7 ngày: <b>{fmt(ads7Res.count ?? 0)}</b></span>
+      {/* 2/10 (Thanh: khối đầu quá nhiều chữ, không nổi bật): gom thành thẻ số to + nhãn nhỏ, chi tiết xếp vào details. */}
+      <div className="stats lead-stats">
+        <div className="stat"><div className="stat-n">{fmt(newWeekRes.count ?? 0)}</div><div className="stat-l">khách hỏi tuần này</div></div>
+        <div className="stat"><div className="stat-n">{fmt(wonWeekRes.count ?? 0)}/{fmt(wonTarget)}</div><div className="stat-l">đã mua (mục tiêu tuần)</div></div>
+        <div className="stat"><div className="stat-n">{fmt(ads7Res.count ?? 0)}</div><div className="stat-l">từ quảng cáo 7 ngày</div></div>
+        {fAsked > 0 ? (
+          <div className="stat" title="Hỏi, đã liên hệ, đã mua trong 14 ngày gần nhất">
+            <div className="stat-n">{fmt(fAsked)} / {fmt(fContacted)} / {fmt(fWon)}</div>
+            <div className="stat-l">phễu 14 ngày: hỏi, đã liên hệ, đã mua (không chốt {fmt(fLost)})</div>
+          </div>
+        ) : null}
       </div>
 
       {fAsked > 0 ? (
-        <div className="lead-week" style={{ flexDirection: 'column', gap: 4 }}>
-          <span>Phễu 14 ngày: Hỏi <b>{fmt(fAsked)}</b> → Đã liên hệ <b>{fmt(fContacted)}</b> → 💰 Mua <b>{fmt(fWon)}</b> | ❌ Không chốt <b>{fmt(fLost)}</b></span>
-          <span>Theo SP: {spRank.map(([k, v]) => `${k} ${fmt(v.total)} (mua ${fmt(v.won)})`).join(' · ')}</span>
-          <span>Câu khách hỏi: {[...byIntent.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${fmt(n)}`).join(' · ')}</span>
-          {focus ? <span>Gợi ý focus (máy xếp, người quyết): <b>{focus[0]}</b> {focus[1].won > 0 ? `có ${fmt(focus[1].won)} khách mua` : 'nhiều khách hỏi nhất'} 14 ngày</span> : null}
-        </div>
+        <>
+          {focus ? (
+            <p className="lead-focus">Gợi ý focus (máy xếp, người quyết): <b>{focus[0]}</b> {focus[1].won > 0 ? `có ${fmt(focus[1].won)} khách mua` : 'nhiều khách hỏi nhất'} trong 14 ngày.</p>
+          ) : null}
+          <details className="lead-detail">
+            <summary>Chi tiết theo sản phẩm và theo câu khách hỏi</summary>
+            <div>Theo sản phẩm: {spRank.map(([k, v]) => `${k} ${fmt(v.total)} (mua ${fmt(v.won)})`).join(', ')}</div>
+            <div>Câu khách hỏi: {[...byIntent.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${fmt(n)}`).join(', ')}</div>
+          </details>
+        </>
       ) : null}
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 12px' }}>
         <nav className="filters" style={{ margin: 0 }} aria-label="Lọc theo bước">
           {FILTERS.map((s) => (
-            <Link key={s} href={hrefFor(s)} className={`chip ${filter === s ? 'on' : ''}`}>
-              {FILTER_LABEL[s]} <span className="n">{fmt(counts[s] || 0)}</span>
+            <Link key={s} href={hrefFor(s)} className={`chip ${filter === s ? 'on' : ''}`} title={FILTER_HINT[s]}>
+              <span>{FILTER_LABEL[s]}</span> <span className="n">{fmt(counts[s] || 0)}</span>
             </Link>
           ))}
         </nav>
@@ -276,7 +295,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
                       <LeadStepper leadId={l.id} status={l.status} note={l.note || ''} lostReason={l.lost_reason || ''} />
                     </td>
                     <td>
-                      <form action={updateLeadStatus} style={{ display: 'flex', gap: 4 }}>
+                      <form action={updateLeadStatus} className="lead-note-form">
                         <input type="hidden" name="lead_id" value={l.id} />
                         <input type="hidden" name="status" value={l.status} />
                         <input name="note" defaultValue={l.note || ''} placeholder="ghi chú..." className="note" style={{ width: 130, fontSize: '.82rem' }} />

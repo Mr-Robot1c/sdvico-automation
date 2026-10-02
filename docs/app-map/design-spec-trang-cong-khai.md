@@ -1,5 +1,6 @@
 > Load khi: task chạm UI trang công khai /blog, /blog/[slug], /blog/chu-de/[slug], /san-pham, /san-pham/[slug] (shell công khai trong root-shell.tsx)
 covers: apps/approval-ui/app/blog, apps/approval-ui/app/san-pham, apps/approval-ui/app/root-shell.tsx
+<!-- re-verified: 2026-10-02 (3) - root-shell.tsx CHI doi chu slogan duoi logo o sidebar NOI BO thanh "Nghe ca thinh vuong" (viet hoa chu dau); shell cong khai /blog, /san-pham KHONG doi. -->
 <!-- re-verified: 2026-10-02 - UI MUOT: /blog, /blog/[slug], /blog/chu-de/[slug] bo force-dynamic, doc du lieu qua getPublicClient() (khong no-store) => ISR 5 den 10 phut, [slug] them generateStaticParams; <img> trong post-card, san-pham, root-shell them loading=lazy/decoding=async (root-shell + hero bai chi decoding). Bo cuc, noi dung, meta, JSON-LD KHONG doi. -->
 <!-- re-verified: 2026-09-15 (2) - DOT 8: root-shell.tsx AskBotFab doi sang next/dynamic (ssr:false) — shell cong khai KHONG doi (fab chi render o shell noi bo); layout.tsx ads config cache 5 phut (Pixel/GA4 doi o /quang-cao ap sau toi da 5 phut). -->
 <!-- re-verified: 2026-09-15 - DOT 4 (kho tu lieu Google Drive): app/san-pham/page.tsx + app/san-pham/[slug]/page.tsx + lib/seo.ts + lib/cover-image.ts doi getPublicUrl -> assetPublicUrl (lib/asset-url.ts) de anh tren Drive ("gdrive:<id>/<ten>") hien duoc; giao dien trang cong khai KHONG doi. -->

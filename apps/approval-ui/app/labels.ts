@@ -130,15 +130,14 @@ export function purposeLabel(postKind?: string, format?: string): string {
   return '';
 }
 
-// Nhãn ý định tìm kiếm.
-export function intentLabel(i?: string): string {
-  switch (i) {
-    case 'thong_tin': return 'Thông tin';
-    case 'thuong_mai': return 'So sánh';
-    case 'giao_dich': return 'Giao dịch';
-    case 'dieu_huong': return 'Điều hướng';
-    default: return i || '';
-  }
+// Nhãn ý định tìm kiếm. 2/10 (Thanh: "đừng hiển thị data trong database"): MỘT map dùng chung cho /seo, /tu-khoa,
+// Hàng đợi, Bảng bài viết. Mã lạ giữ nguyên bản.
+export const INTENT_LABELS: Record<string, string> = {
+  thong_tin: 'Thông tin', thuong_mai: 'Thương mại', giao_dich: 'Giao dịch', dieu_huong: 'Điều hướng',
+};
+export function intentLabel(i?: string | null): string {
+  if (!i) return '';
+  return INTENT_LABELS[i] || i;
 }
 
 // Nhãn và màu mức rủi ro.
