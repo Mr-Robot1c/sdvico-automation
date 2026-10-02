@@ -28,8 +28,16 @@ export default function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
   // router.refresh() chạy thì danh sách dựng lại và modal biến mất giữa lúc người duyệt đang đọc.
   // ViewModal đặt body.dataset.modalOpen = số modal đang mở; <dialog open> bất kỳ cũng tính (dự
   // phòng cho modal không dùng ViewModal). Có modal thì chỉ ghi "nợ", đóng modal mới trả.
-  const modalOpen = () =>
-    Number(document.body.dataset.modalOpen || 0) > 0 || !!document.querySelector('dialog[open]');
+  const modalOpen = () => {
+    const anyDialog = !!document.querySelector('dialog[open]');
+    // 2/10 tối: số đếm chỉ do ViewModal (thẻ <dialog>) ghi. Không còn dialog nào mở mà số đếm
+    // vẫn > 0 nghĩa là cờ bị kẹt (vd ESC đóng dialog mà onClose React không nổ) — tự dọn,
+    // nếu không đồng hồ đứng ở 0 giây mãi mãi.
+    if (!anyDialog && Number(document.body.dataset.modalOpen || 0) > 0) {
+      delete document.body.dataset.modalOpen;
+    }
+    return anyDialog;
+  };
 
   const refreshNow = useCallback(() => {
     lastRefreshAt.current = Date.now();
@@ -76,10 +84,14 @@ export default function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('sdvico:modal-closed', onModalClosed);
     document.addEventListener('close', onModalClosed, true);
+    // Lưới an toàn (2/10 tối): lỡ sự kiện đóng modal không tới (cờ kẹt vừa được tự dọn trong
+    // modalOpen) thì mỗi 5 giây soát nợ một lần, khỏi đứng ở "0 giây" mãi.
+    const watchdog = setInterval(onModalClosed, 5000);
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('sdvico:modal-closed', onModalClosed);
       document.removeEventListener('close', onModalClosed, true);
+      clearInterval(watchdog);
     };
   }, [seconds, refreshNow]);
 

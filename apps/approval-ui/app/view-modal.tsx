@@ -37,7 +37,19 @@ export default function ViewModal({
     window.dispatchEvent(new Event('sdvico:modal-closed'));
   };
   // Đang mở mà component bị gỡ (điều hướng, danh sách dựng lại) thì phải trả số đếm.
-  useEffect(() => () => markClosed(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // 2/10 tối (kiểm thật trên prod): đóng bằng ESC thì onClose của React KHÔNG nổ (React 18
+  // không gắn được sự kiện 'close' không nổi bọt của <dialog>) -> số đếm kẹt ở 1, đồng hồ
+  // tự làm mới đứng im. Gắn thẳng listener 'close' gốc của trình duyệt vào dialog.
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    const onNativeClose = () => { stopMedia(); markClosed(); };
+    d.addEventListener('close', onNativeClose);
+    return () => {
+      d.removeEventListener('close', onNativeClose);
+      markClosed();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = () => {
     const d = ref.current;
