@@ -158,7 +158,9 @@ export default async function Page() {
               <div className="ag-head">
                 <span className="ag-name">{s.icon} {i + 1}. {s.name}</span>
               </div>
-              <span className="badge tone-demo" style={{ justifySelf: 'start' }}>{s.tool}</span>
+              {/* 29/9 (Thanh: "các ô ở trang video bị lòi ra ngoài"): .badge nowrap nên nhãn dài
+                  ("Facebook Reel · YouTube Shorts · TikTok") thò khỏi card hẹp — cho xuống dòng trong card. */}
+              <span className="badge tone-demo" style={{ justifySelf: 'start', maxWidth: '100%', whiteSpace: 'normal', lineHeight: 1.35 }}>{s.tool}</span>
               <p className="ag-role" style={{ margin: 0 }}>{s.desc}</p>
             </div>
           ))}

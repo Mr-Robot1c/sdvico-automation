@@ -125,8 +125,10 @@ function livelyArgs(sampleRate, opts) {
 // khoảng đệm này nằm TRONG durationSec của cảnh, mà phụ đề chia thời gian theo cả durationSec ->
 // càng cuối cảnh chữ càng trễ hơn giọng, câu chót đứng thêm ~0,3s sau khi giọng dứt. padSecOf tách
 // riêng để build-video truyền xuống phụ đề (assemble/srt) trừ đúng phần đệm ra khỏi quỹ thời gian chữ.
+// 29/9 (sếp Long "chỉnh nhịp điệu voice tự nhiên hơn"): chuyển cảnh = chuyển ý, người thật nghỉ 0,3-0,5s;
+// đệm cũ 0,16/0,26 ngắn hơn cả dấu phẩy. Nay 0,30 câu thường, 0,42 câu !/? (khán giả nửa giây ngấm).
 export function padSecOf(sentence) {
-  return /[!?]$/.test(String(sentence || '').trim()) ? 0.26 : 0.16;
+  return /[!?]$/.test(String(sentence || '').trim()) ? 0.42 : 0.30;
 }
 function sentenceGap(sentence) {
   return `apad=pad_len=${Math.round(padSecOf(sentence) * 48000)}`;
@@ -342,7 +344,10 @@ const TTS_F0_TARGET = Number(process.env.TTS_F0_TARGET || 240) || 240;
 async function tidyWav(wav, workDir, tag, { normalize = true } = {}) {
   const out = join(workDir, `${tag}_tidy.wav`);
   try {
-    const res = await python('tidy.py', [wav, out]);
+    // 29/9 sếp Long "nhịp điệu voice tự nhiên hơn": trần nén lặng nội bộ 0,25 (trị bug ngất 1,6s 10/9) ép phẳng
+    // mọi nghỉ cuối câu về ~0,22s; 0,55 giữ nghỉ cuối câu 0,3-0,55s của VieNeu, lặng 1,6s vẫn bị nén còn 0,55.
+    const maxgap = Number(process.env.TTS_PAUSE_MAXGAP || 0.55) || 0.55;
+    const res = await python('tidy.py', [wav, out, '--maxgap', String(maxgap)]);
     const { f0 = 0, n = 0, cuts = 0 } = JSON.parse(res.split('\n').pop() || '{}');
     let semi = 0;
     // 11/9: dịch bằng asetrate đổi luôn màu giọng (formant), kéo 1,5 nửa cung là nghe như người khác
@@ -739,15 +744,19 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   const videoH = horizontalPath ? await uploadVideo(horizontalPath, 'ngang') : videoV;
 
   // Caption ngắn + hashtag đúng sản phẩm.
-  const { guessGroup, productHashtags, DEFAULT_HASHTAGS } = await import('../products.mjs');
+  const { guessGroup, productHashtags, DEFAULT_HASHTAGS, shopeeLink } = await import('../products.mjs');
   const grp = guessGroup(`${content.title || ''} ${title}`);
   const tags = [...DEFAULT_HASHTAGS, ...(grp ? productHashtags(grp) : [])].join(' ');
-  // 9/9 (Thanh) từng chèn dòng "Đặt trên Shopee..." ở đây; 11/9 chiều BỎ (cùng luật với bài bán ở
-  // social.mjs: link sàn đứng giữa câu giá và câu gọi nghe lạc nhịp).
+  // 9/9 (Thanh) từng chèn dòng "Đặt trên Shopee..." ở đây; 11/9 chiều BỎ (link đứng giữa câu giá và
+  // câu gọi nghe lạc nhịp). 30/9 SẾP LONG BẬT LẠI ("nhúng link vô các video của fb của mình đi"):
+  // dòng Shopee đặt CUỐI caption, SAU câu gọi và TRƯỚC hashtag để không lặp lỗi lạc nhịp cũ.
+  // Nhóm chưa có link trên sàn (SHOPEE_LINK) thì không có dòng này. Bài bán chữ (social.mjs) vẫn
+  // KHÔNG chèn — sếp chỉ nói video.
+  const shopLine = grp && shopeeLink(grp) ? `\n\nĐặt nhanh trên Shopee, giao tận nơi: ${shopeeLink(grp)}` : '';
   // 8/9: bài video riêng (content/thủ công) cũng mang mốc giá úp mở khi sản phẩm có giá.
   const caption = teaser
-    ? `${title}\n\n${teaser.text}. Nhắn hoặc để số, bên em gửi giá chính xác và xếp kỹ thuật lắp tận tàu.\n\nGọi 0939 243 222 để được tư vấn tận nơi.\n\n${tags}`
-    : `${title}\n\nGọi 0939 243 222 để được tư vấn tận nơi.\n\n${tags}`;
+    ? `${title}\n\n${teaser.text}. Nhắn hoặc để số, bên em gửi giá chính xác và xếp kỹ thuật lắp tận tàu.\n\nGọi 0939 243 222 để được tư vấn tận nơi.${shopLine}\n\n${tags}`
+    : `${title}\n\nGọi 0939 243 222 để được tư vấn tận nơi.${shopLine}\n\n${tags}`;
   const risk = script.assessment?.risk === 'red' ? 'red' : script.assessment?.risk === 'amber' ? 'amber' : 'none';
 
   // Chọn 1 ẢNH SẢN PHẨM để thả vào bình luận đầu của bài video (bà con thấy sản phẩm rõ,
@@ -918,12 +927,38 @@ async function main() {
   // luật modelMismatch từng loại 2 ảnh dán nhãn SF58B — nhãn trên máy trong ảnh không quyết định model.
   const describedCount = assets.filter((a) => a.description).length;
   console.log(`Sản phẩm: ${productGroup} (${productAssets.length} tư liệu sản phẩm + ${assets.length - productAssets.length} tư liệu đời sống; ${describedCount}/${assets.length} có mô tả${describedCount < assets.length / 2 ? ' — chạy mo-ta-tu-lieu.mjs để khớp cảnh tốt hơn' : ''})`);
+  // 29/9 (Thanh: "1 số video gần đây bắt đầu dùng chung video nội bộ"): đếm tư liệu đã lên các video
+  // 14 ngày gần nhất (5 video 23-29/9 chung đúng 4 clip vì trọng tâm dồn một sản phẩm, bộ điểm cao nhất
+  // thắng y hệt mỗi ngày). Map id -> số video, đưa cho scene-match phạt điểm và xoay clip bắt buộc.
+  const recentUse = new Map();
+  try {
+    const { data: recentVids } = await client.from('mkt_content')
+      .select('id, brief')
+      .not('brief->video_scene_assets', 'is', null)
+      .neq('id', contentId)
+      .gte('created_at', new Date(Date.now() - 14 * 86400e3).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(12);
+    for (const r of recentVids || []) {
+      const b = r.brief || {};
+      const seen = new Set(Array.isArray(b.video_scene_assets) ? b.video_scene_assets.map(String) : []);
+      if (b.video_must_use) seen.add(String(b.video_must_use));
+      for (const id of seen) recentUse.set(id, (recentUse.get(id) || 0) + 1);
+    }
+    if (recentUse.size) console.log(`Tư liệu đã lên video 14 ngày qua: ${recentUse.size} cái (né lặp khi chọn cảnh).`);
+  } catch (e) { console.warn('Không đọc được tư liệu video gần đây (bỏ qua né lặp):', e?.message || e); }
   // 9/9 (user: video "người thật tàu thật"): ÉP CLIP THẬT vào cảnh 1. Bài content: clip rotate
-  // đã chọn (brief.content_clip_id). Bài bán: clip Zalo mới nhất (14 ngày) của folder sản phẩm.
+  // đã chọn (brief.content_clip_id). Bài bán: clip Zalo tươi (14 ngày) của folder sản phẩm.
   // Không có clip mới -> null, video dựng như cũ (ảnh + clip cũ do model chọn).
   const contentVideo = productGroup === CONTENT_GROUP || brief.post_kind === 'content';
   let mustUseAssetId = brief.content_clip_id && assets.some((a) => a.id === brief.content_clip_id) ? brief.content_clip_id : null;
-  if (!mustUseAssetId) mustUseAssetId = pickFreshClips(productAssets)[0]?.id || null;
+  if (!mustUseAssetId) {
+    // 29/9: [0] luôn là clip mới nhất nên một clip dính 6 video liền — xoay sang clip tươi ÍT LÊN
+    // VIDEO nhất trước, bằng nhau thì mới nhất trước (kho chỉ có 1 clip tươi thì vẫn dùng nó).
+    const fresh = pickFreshClips(productAssets)
+      .sort((a, b) => (recentUse.get(a.id) || 0) - (recentUse.get(b.id) || 0) || Date.parse(b.created_at) - Date.parse(a.created_at));
+    mustUseAssetId = fresh[0]?.id || null;
+  }
   // 17/9 chiều (user: video lọc nước mở màn "thợ máy sửa lần thứ ba" trên hình máy SEA-40 của công ty đang
   // chạy): clip sản phẩm đang chạy/lắp đặt vào cảnh GIẢI PHÁP, chỉ clip quay sự cố mới làm cảnh 1 (rules.mjs).
   const mustUseRole = mustUseRoleFor(assets.find((a) => a.id === mustUseAssetId), contentVideo);
@@ -942,7 +977,7 @@ async function main() {
     content,
     assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, label: clipLabel(a), description: a.description || '', folder: a.product_group || '', fresh: /MỚI/.test(clipLabel(a)) })),
     PRODUCT_FACTS,
-    { short: isShort, productGroup, salesVideo, mustUseAssetId, mustUseRole, contentVideo },
+    { short: isShort, productGroup, salesVideo, mustUseAssetId, mustUseRole, contentVideo, recentUse },
     _tokenLogClient
   );
   console.log('Tư liệu dùng trong cảnh:', (script.sceneAssets || []).map((id) => id.slice(0, 8)).join(', '));

@@ -66,7 +66,7 @@ ok('ensureCommentCta không nối đôi', (ensureCommentCta(`Hook.\n\n${commentC
 eq('shopee link lọc nước', shopeeLink(G2), 'https://shopee.vn/product/212723941/45017630539/');
 eq('shopee link lọc dầu', shopeeLink(G9), 'https://shopee.vn/product/212723941/29945752663/');
 eq('shopee link S-Tracking', shopeeLink('3. Thiết bị giám sát hành trình Viettel S-Tracking'), 'https://shopee.vn/product/212723941/56017649187/');
-eq('shopee không link ắc quy', shopeeLink('7. Ắc quy Accu Nano SDViCo'), null);
+eq('shopee link ắc quy (30/9 Globe WPM-220 lên gian)', shopeeLink('7. Ắc quy Accu Nano SDViCo'), 'https://shopee.vn/product/212723941/57818583405/');
 eq('shopee không link thì nguyên văn', ensureShopeeLink('Bài.', null), 'Bài.');
 ok('shopee nối cuối', ensureShopeeLink('Hook.\n\nThân bài.', SHOPEE_LINK[G9]).endsWith(SHOPEE_LINK[G9]));
 ok('shopee không nối đôi', (ensureShopeeLink(`Hook.\n\nĐặt trên Shopee: ${SHOPEE_LINK[G9]}`, SHOPEE_LINK[G9]).match(/shopee\.vn/g) || []).length === 1);
@@ -112,9 +112,15 @@ ok('audienceLines lọc dầu không câu hỏi', !audienceLines(G9).some((l) =>
   // 11/9 chiều: bài bán + caption video không chèn link Shopee, prompt không cho câu hỏi mở trước CTA.
   const { readFileSync } = await import('node:fs');
   const here = new URL('.', import.meta.url);
-  for (const rel of ['./social.mjs', '../../../apps/approval-ui/lib/gen/social.mjs', './video/build-video.mjs']) {
+  for (const rel of ['./social.mjs', '../../../apps/approval-ui/lib/gen/social.mjs']) {
     const src = readFileSync(new URL(rel, here), 'utf8');
     ok('không gọi ensureShopeeLink/shopeeLink: ' + rel, !/\b(?:ensureShopeeLink|shopeeLink)\(/.test(src));
+  }
+  // 30/9 (sếp Long: "nhúng link vô các video của fb của mình đi"): caption video PHẢI gọi shopeeLink
+  // (đảo lệnh 11/9 riêng cho video; bài bán chữ vẫn cấm như trên).
+  {
+    const src = readFileSync(new URL('./video/build-video.mjs', here), 'utf8');
+    ok('caption video có chèn link Shopee (lệnh sếp 30/9)', /\bshopeeLink\(/.test(src) && /Đặt nhanh trên Shopee/.test(src));
   }
   for (const rel of ['./social.mjs', '../../../apps/approval-ui/lib/gen/social.mjs']) {
     const src = readFileSync(new URL(rel, here), 'utf8');

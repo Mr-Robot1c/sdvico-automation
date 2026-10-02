@@ -45,6 +45,8 @@ function SlotTr({ prefix, i, slot, groups, dowIdx, dayCell, planRow }: {
         <select name={`${prefix}_${i}_kind`} defaultValue={slot?.kind || (i === 2 ? 'content' : 'sale')} aria-label="Loại bài">
           <option value="sale">Bài bán</option>
           <option value="content">Bài content</option>
+          {/* 30/9: khung bản tin — video người gửi, máy chỉ soạn caption, không tự sinh bài. */}
+          <option value="bantin">Bản tin (video người gửi)</option>
         </select>
         {slot?.kind === 'content' && ck ? <div className="sub" style={{ fontSize: '.76rem', marginTop: 2 }}>{ck.label}</div> : null}
       </td>

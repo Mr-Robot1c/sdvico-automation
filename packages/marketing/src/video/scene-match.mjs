@@ -18,7 +18,7 @@
 //     đặt, máy chạy; ảnh sản phẩm được phép.
 //   - Không dùng cùng một tư liệu ở 2 cảnh liền nhau nếu còn lựa chọn khác.
 
-import { crossProductTerms } from './rules.mjs';
+import { crossProductTerms, imageryDriftSentences, cutImageryDrift, inventedDetailSentences } from './rules.mjs';
 
 const PROBLEM_ROLES = new Set(['hook', 'empathy', 'story']);
 const PROBLEM_WORDS = ['cũ', 'hư', 'hỏng', 'bẩn', 'cặn', 'đục', 'sửa', 'tháo', 'khói', 'rỉ', 'gỉ', 'nằm bờ', 'lợ', 'mặn', 'lọc thô bẩn', 'đen', 'nghẹt', 'kẹt', 'chết máy', 'biển', 'tàu', 'ngư dân', 'bà con', 'cảng', 'khoang máy', 'thợ máy', 'lưới', 'khơi', 'sóng', 'ra khơi', 'cập bến'];
@@ -119,6 +119,17 @@ export function extractFirstJson(text) {
   return null;
 }
 
+// 1/10 (Thanh xem 22452d7f: lời "đội ngũ kỹ thuật cúi gằm đi dây điện" trên hình CẢNG CÁ + TÀU):
+// ruleScore cộng 2 điểm cho MỌI từ nghề biển (tàu, cảng, ngư dân...) nên ảnh cảng chung chung
+// thắng cả khi cảnh cần hình NGƯỜI THỢ đang làm việc (clip thợ quen lại bị recentUse phạt).
+// Luật mới: "hình cần" của cảnh nhắc người làm việc mà tư liệu không có ai làm việc thì trừ 8.
+const WORKER_WORDS = ['thợ', 'kỹ thuật', 'kĩ thuật', 'lắp', 'sửa', 'thao tác', 'kiểm tra', 'đi dây', 'nhân viên', 'công nhân', 'bảo trì', 'tháo', 'căn chỉnh'];
+// 1/10 (2) (bản dựng lần 3: LỜI "anh em kỹ thuật kiên nhẫn căn chỉnh" vẫn rơi lên hình cảng vì
+// model viết "hình cần" chung chung): xét CẢ LỜI ĐỌC lẫn "hình cần" — người xem nghe lời, không
+// đọc trường visual.
+function needsWorker(visual, narration = '') { return count(`${String(visual || '')} ${String(narration || '')}`.toLowerCase(), WORKER_WORDS) > 0; }
+function hasWorker(assetText) { return count(assetText, [...WORKER_WORDS, 'người đàn ông', 'ngư dân đang', 'đang làm']) > 0; }
+
 // Điểm luật cho 1 tư liệu với 1 vai cảnh (càng cao càng hợp). Dùng cho fallback và để kiểm model.
 export function ruleScore(asset, role, opts = {}) {
   const t = textOf(asset);
@@ -127,6 +138,7 @@ export function ruleScore(asset, role, opts = {}) {
   let s = 0;
   if (PROBLEM_ROLES.has(role)) {
     s += count(t, PROBLEM_WORDS) * 2;
+    if (needsWorker(opts.visual, opts.speech) && !hasWorker(t)) s -= 8; // 1/10: cảnh cần thợ, hình không có ai làm việc
     // 17/9 vòng 6 (ChatGPT: video cộng đồng "bằng chứng làm thật bị dồn về cuối"): cảnh story ưu tiên
     // hình NGƯỜI đang làm việc hơn tàu/cảng chung chung.
     if (role === 'story') s += count(t, ['kỹ thuật', 'thợ', 'thao tác', 'kiểm tra', 'lắp', 'sửa', 'nhân viên']) * 2;
@@ -149,16 +161,74 @@ export function ruleScore(asset, role, opts = {}) {
 }
 
 // Chọn theo luật cho 1 cảnh, tránh trùng cảnh liền trước và hạn chế lặp trong video.
-export function pickByRole(assets, role, { prevId = null, usedCount = new Map(), visual = '' } = {}) {
+// 29/9 (Thanh: "1 số video gần đây bắt đầu dùng chung video nội bộ"): thêm recentUse = Map(id -> số
+// video 14 ngày gần nhất đã dùng tư liệu đó). Từ khi trọng tâm dồn về một sản phẩm, mọi video cùng
+// nhóm nên bộ "điểm cao nhất" thắng y hệt mỗi ngày (5 video 23-29/9 chung đúng 4 clip) — phạt điểm
+// theo số lần vừa lên video để kho được xoay đều; kho ít tư liệu thì phạt chỉ đổi thứ tự, không làm rỗng.
+export function pickByRole(assets, role, { prevId = null, usedCount = new Map(), visual = '', speech = '', recentUse = new Map() } = {}) {
   let best = null;
   let bestScore = -Infinity;
   for (const a of assets) {
-    let s = ruleScore(a, role, { visual });
+    let s = ruleScore(a, role, { visual, speech });
     if (a.id === prevId) s -= 6;
     s -= (usedCount.get(a.id) || 0) * 2;
+    s -= Math.min(recentUse.get(a.id) || 0, 3) * 2;
     if (s > bestScore) { bestScore = s; best = a; }
   }
   return best;
+}
+
+// 1/10 (Thanh bỏ bài 22452d7f sau 5 bản dựng): video CONTENT chọn TRỌN BỘ hình trước khi viết
+// lời. Bộ 3-4 tư liệu: clip bắt buộc đứng đầu (nếu có), còn lại lấy từ kho đời sống (problemPool
+// role 'story'), ưu tiên CLIP hơn ảnh, CÓ MÔ TẢ, ít lên video gần đây (recentUse), không trùng
+// nhau; tư liệu mô tả "không thấy người" xếp sau. Trả mảng asset theo thứ tự cảnh.
+// mustAsset: object asset (caller tra theo id); size = 4 khi kho đủ, tụt xuống số có được; dưới 2
+// tư liệu dùng được thì trả null (caller rơi về đường cũ: viết lời trước, ghép hình sau).
+export function pickStoryboard(assets, { mustAsset = null, recentUse = new Map(), size = 4, productGroup = null } = {}) {
+  const list = Array.isArray(assets) ? assets : [];
+  const out = [];
+  const used = new Set();
+  const must = mustAsset && mustAsset.id ? (list.find((a) => a.id === mustAsset.id) || mustAsset) : null;
+  if (must) { out.push(must); used.add(must.id); }
+  const want = Math.max(2, Number.isInteger(size) ? size : 4);
+  const pool = problemPool(list, 'story', productGroup).filter((a) => a && a.id && !used.has(a.id));
+  const scored = pool.map((a, idx) => {
+    let s = ruleScore(a, 'story', {});
+    s -= Math.min(recentUse.get(a.id) || 0, 3) * 2;
+    if (String(a.description || '').trim().length >= 40) s += 3;
+    if (isVideoAsset(a)) s += 2;
+    if (fold(textOf(a)).includes('khong thay nguoi')) s -= 4;
+    return { a, s, idx };
+  }).sort((x, y) => (y.s - x.s) || (x.idx - y.idx));
+  for (const { a } of scored) {
+    if (out.length >= want) break;
+    if (used.has(a.id)) continue;
+    out.push(a);
+    used.add(a.id);
+  }
+  return out.length >= 2 ? out : null;
+}
+
+// 1/10: soát lời từng cảnh với MÔ TẢ tư liệu đã chốt cho cảnh đó (video content storyboard-first).
+// scenes: [{narration}]; sb: mảng asset theo thứ tự cảnh. Trả danh sách cảnh LỆCH:
+// [{ index, scene (1-based), asset, reason: 'no-overlap'|'drift'|'invented', sentences: [...] }].
+// 'no-overlap' (lời không chung từ nào với mô tả) chỉ xét cảnh không phải cảnh cuối: cảnh kết là
+// câu hỏi giao lưu nên có thể không chung từ với hình, nhưng vẫn bị soát trôi hình / bịa chi tiết.
+export function storyboardDrift(scenes, sb) {
+  const out = [];
+  const n = Math.min((scenes || []).length, (sb || []).length);
+  for (let i = 0; i < n; i++) {
+    const a = sb[i];
+    const narr = String(scenes[i]?.narration || '');
+    if (!a || !narr.trim()) continue;
+    const text = `${a.title || ''} ${a.description || ''} ${a.label || ''}`;
+    const drift = imageryDriftSentences(narr, text);
+    if (drift.length) { out.push({ index: i, scene: i + 1, asset: a, reason: 'drift', sentences: drift }); continue; }
+    const invented = inventedDetailSentences(narr, text);
+    if (invented.length) { out.push({ index: i, scene: i + 1, asset: a, reason: 'invented', sentences: invented }); continue; }
+    if (i < (sb.length - 1) && visualOverlap(narr, a) === 0) out.push({ index: i, scene: i + 1, asset: a, reason: 'no-overlap', sentences: [] });
+  }
+  return out;
 }
 
 // Danh sách tư liệu đưa cho model chấm — kèm mô tả, folder, nhãn clip thật.
@@ -175,7 +245,7 @@ export function assetListForPrompt(assets) {
 // mustUseIndex (17/9 chiều): cảnh nào bị ép dùng clip bắt buộc (0 = cảnh 1 như luật 9/9; video bán hàng có clip
 // sản phẩm đang chạy thì là cảnh giải pháp, xem rules.mjs mustUseRoleFor).
 // productGroup (17/9 chiều (3)): nhóm sản phẩm của video bán hàng, để cảnh nỗi đau loại tư liệu của sản phẩm kia.
-export async function matchScenesToAssets({ ai, generate, model, scenes, assets, mustUseAssetId = null, mustUseIndex = 0, productGroup = null, log = console }) {
+export async function matchScenesToAssets({ ai, generate, model, scenes, assets, mustUseAssetId = null, mustUseIndex = 0, productGroup = null, recentUse = new Map(), log = console }) {
   const ids = new Set(assets.map((a) => a.id));
   const mustIdx = Math.max(0, Math.min(scenes.length - 1, Number.isInteger(mustUseIndex) ? mustUseIndex : 0));
   const byId = new Map(assets.map((a) => [a.id, a]));
@@ -191,6 +261,12 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
       '- Không dùng cùng một tư liệu cho 2 cảnh liền nhau nếu còn tư liệu khác hợp.',
       '- Chỉ được dùng id có trong danh sách. Không có tư liệu hợp thật sự thì vẫn chọn cái ÍT SAI NHẤT và cho điểm thấp (fit <= 4) kèm lý do.',
       mustUseAssetId && ids.has(mustUseAssetId) ? `- Cảnh ${mustIdx + 1} BẮT BUỘC dùng id=${mustUseAssetId}. Các cảnh khác KHÔNG dùng id này.` : '',
+      (() => {
+        // 29/9: kể cho model biết tư liệu nào vừa lên các video gần đây để người xem không thấy video nào cũng một bộ hình.
+        const worn = assets.filter((a) => (recentUse.get(a.id) || 0) > 0 && a.id !== mustUseAssetId)
+          .sort((a, b) => (recentUse.get(b.id) || 0) - (recentUse.get(a.id) || 0)).slice(0, 15);
+        return worn.length ? `- Các tư liệu sau VỪA LÊN video trong 2 tuần qua, TRÁNH dùng lại nếu còn tư liệu khác hợp: ${worn.map((a) => `${a.id} (${recentUse.get(a.id)} lần)`).join(', ')}.` : '';
+      })(),
       '',
       'TƯ LIỆU CÓ SẴN:',
       assetListForPrompt(assets),
@@ -249,6 +325,13 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
           // liên tiếp; luật "không dùng 1 tư liệu cho 2 cảnh liền nhau" mới chỉ nằm trong prompt): ép lại
           // bằng máy — pick của model trùng cảnh liền trước thì chọn theo luật (pickByRole đã phạt prevId).
           log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chọn trùng tư liệu cảnh liền trước "${byId.get(mid).title}" -> chọn lại theo luật để hình đổi`);
+        } else if (PROBLEM_ROLES.has(role) && needsWorker(scenes[i].visual, scenes[i].narration) && !hasWorker(textOf(byId.get(mid))) && pool.some((a) => hasWorker(textOf(a)))) {
+          // 1/10: cảnh cần người thợ mà model chọn hình không có ai làm việc, kho còn hình có người -> chọn lại.
+          log.warn(`[scene-match] cảnh ${i + 1} (${role}): lời cần NGƯỜI THỢ nhưng "${byId.get(mid).title}" không có ai làm việc -> chọn lại theo luật`);
+        } else if ((recentUse.get(mid) || 0) >= 2 && pool.some((a) => a.id !== mid && (recentUse.get(a.id) || 0) < 2)) {
+          // 29/9: model chọn tư liệu đã lên >= 2 video gần đây trong khi kho còn cái ít dùng — ép xoay
+          // bằng máy (pickByRole phạt recentUse), người xem hết cảnh "video nào cũng đúng bộ clip đó".
+          log.warn(`[scene-match] cảnh ${i + 1} (${role}): "${byId.get(mid).title}" đã lên ${recentUse.get(mid)} video 2 tuần qua -> chọn lại theo luật để xoay kho`);
         } else {
           pick = { assetId: mid, fit, why: String(mp.why || '').slice(0, 160), by: 'model' };
         }
@@ -256,7 +339,7 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
         log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chấm fit=${fit} thấp ("${String(mp?.why || '').slice(0, 80)}") -> chọn theo luật vai cảnh`);
       }
       if (!pick) {
-        const a = pickByRole(pool, role, { prevId, usedCount, visual: scenes[i].visual });
+        const a = pickByRole(pool, role, { prevId, usedCount, visual: scenes[i].visual, speech: scenes[i].narration, recentUse });
         if (a) pick = { assetId: a.id, fit: Math.max(0, Math.min(10, 4 + ruleScore(a, role, { visual: scenes[i].visual }) / 2)), why: 'chọn theo luật vai cảnh (mô tả tư liệu + hình cần)', by: 'rule' };
       }
     }
@@ -264,4 +347,52 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
     out[i] = pick;
   }
   return out;
+}
+
+// 1/10 (Thanh, bài 22452d7f dựng 2 lần vẫn "lời biển - hình cảng"): sau khi ghép hình,
+// soát LỜI từng cảnh với MÔ TẢ hình đã chọn. Lệch thì đổi sang hình không lệch (giữ mọi
+// luật cũ: vai cảnh, recentUse, không trùng cảnh kề); kho hết hình hợp thì cắt câu lệch;
+// cắt rỗng thì giữ nguyên + ghi cảnh báo vào why cho người duyệt thấy ở cột "Ghép từ".
+// Cảnh mustIdx miễn: lời cảnh đó đã được sinh lại theo mô tả clip trong attempt loop.
+// skip (thêm khi thi công): chỉ số cảnh khác cũng miễn (cảnh 1 bị hookPin ghi đè hình sau đó).
+// scenes: [{role, narration, visual}]; picks: kết quả matchScenesToAssets (sửa tại chỗ);
+// Trả về { picks, narrations } — narrations là lời từng cảnh SAU khi có thể bị cắt.
+export function refinePicksByImagery({ scenes, picks, assets, mustIdx = 0, skip = [], productGroup = null, recentUse = new Map(), log = console }) {
+  const byId = new Map(assets.map((a) => [a.id, a]));
+  const usedCount = new Map();
+  for (const p of picks) if (p?.assetId) usedCount.set(p.assetId, (usedCount.get(p.assetId) || 0) + 1);
+  // Clip bắt buộc chỉ được ở cảnh must (luật 9/9): không đổi các cảnh khác sang nó.
+  const mustAssetId = picks[mustIdx]?.by === 'must' ? picks[mustIdx].assetId : null;
+  const skipSet = new Set(skip);
+  const narrations = scenes.map((s) => s.narration);
+  for (let i = 0; i < scenes.length; i++) {
+    const pick = picks[i];
+    if (!pick || i === mustIdx || skipSet.has(i)) continue;
+    const role = scenes[i].role || 'solution';
+    const cur = byId.get(pick.assetId);
+    const drift = imageryDriftSentences(narrations[i] || '', textOf(cur || {}));
+    if (!drift.length) continue;
+    const prevId = i > 0 ? picks[i - 1]?.assetId || null : null;
+    const nextId = picks[i + 1]?.assetId || null;
+    const pool = problemPool(assets, role, productGroup);
+    const fit = pool.filter((a) => a.id !== pick.assetId && a.id !== prevId && a.id !== nextId && a.id !== mustAssetId
+      && !imageryDriftSentences(narrations[i] || '', textOf(a)).length);
+    if (fit.length) {
+      usedCount.set(pick.assetId, Math.max(0, (usedCount.get(pick.assetId) || 0) - 1));
+      const a = pickByRole(fit, role, { prevId, usedCount, visual: scenes[i].visual, speech: narrations[i], recentUse });
+      usedCount.set(a.id, (usedCount.get(a.id) || 0) + 1);
+      log.warn(`[scene-match] cảnh ${i + 1} (${role}): lời lệch hình "${String(cur?.title || '').slice(0, 40)}" ("${drift[0].slice(0, 50)}") -> đổi sang "${String(a.title || '').slice(0, 40)}"`);
+      picks[i] = { assetId: a.id, fit: Math.max(0, Math.min(10, 4 + ruleScore(a, role, { visual: scenes[i].visual }) / 2)), why: 'đổi hình cho khớp lời (soát sau ghép 1/10)', by: 'imagery' };
+      continue;
+    }
+    const cut = cutImageryDrift(narrations[i] || '', textOf(cur || {}));
+    if (cut && cut.trim()) {
+      log.warn(`[scene-match] cảnh ${i + 1} (${role}): không còn hình hợp, cắt câu lệch "${drift[0].slice(0, 50)}"`);
+      narrations[i] = cut;
+    } else {
+      log.warn(`[scene-match] cảnh ${i + 1} (${role}): lời lệch hình nhưng cắt sẽ rỗng — GIỮ NGUYÊN, người duyệt tự cân.`);
+      picks[i] = { ...pick, why: `${pick.why || ''} | CẢNH BÁO: lời có thể lệch hình ("${drift[0].slice(0, 60)}")`.slice(0, 220) };
+    }
+  }
+  return { picks, narrations };
 }

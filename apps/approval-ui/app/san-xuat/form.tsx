@@ -68,6 +68,13 @@ export default function SanXuatForm({
   }, [lightbox]);
   // Filter theo folder sản phẩm để khung ảnh/video không rối. '' = tất cả.
   const [folder, setFolder] = useState<string>('');
+  // 29/9 (Thanh: "bấm vô xưởng sản xuất rất là lag"): kho 500 tư liệu render một lượt, riêng ~200 thẻ
+  // <video> là 200 trình phát media — trang khựng ngay khi mở. Mỗi khung chỉ hiện PAGE_SIZE cái đầu,
+  // bấm Hiện thêm mới render tiếp; đổi folder thì quay về trang đầu.
+  const PAGE_SIZE = 48;
+  const [imgLimit, setImgLimit] = useState(PAGE_SIZE);
+  const [vidLimit, setVidLimit] = useState(PAGE_SIZE);
+  const pickFolder = (g: string) => { setFolder(g); setImgLimit(PAGE_SIZE); setVidLimit(PAGE_SIZE); };
   const [postFb, setPostFb] = useState(true);
   const [postTt, setPostTt] = useState(false);
   const [contentType, setContentType] = useState<string>('tips');
@@ -116,8 +123,11 @@ export default function SanXuatForm({
   )).sort();
   const filterByFolder = <T extends { product_group: string | null }>(arr: T[]) =>
     folder ? arr.filter((a) => a.product_group === folder) : arr;
-  const shownImages = filterByFolder(images);
-  const shownVideos = filterByFolder(videos);
+  const allImages = filterByFolder(images);
+  const allVideos = filterByFolder(videos);
+  // Ảnh/video đã chọn luôn phải render (để chip + số thứ tự đúng) dù nằm ngoài trang đầu.
+  const shownImages = allImages.slice(0, imgLimit);
+  const shownVideos = allVideos.slice(0, vidLimit);
   const imgOrder = (id: string) => imgIds.indexOf(id) + 1;
   const vidOrder = (id: string) => vidIds.indexOf(id) + 1;
 
@@ -225,14 +235,14 @@ export default function SanXuatForm({
       {folderList.length > 1 ? (
         <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', padding: '8px 0' }}>
           <span className="muted" style={{ marginRight: 6 }}>📁 Lọc theo folder:</span>
-          <button type="button" className={`chip ${folder === '' ? 'on' : ''}`} onClick={() => setFolder('')}>
+          <button type="button" className={`chip ${folder === '' ? 'on' : ''}`} onClick={() => pickFolder('')}>
             Tất cả <span className="n">{images.length + videos.length}</span>
           </button>
           {folderList.map((g) => {
             const n = images.filter((a) => a.product_group === g).length + videos.filter((a) => a.product_group === g).length;
             const short = g.replace(/^\s*\d+\.\s*/, '').replace(/^(.{22}).+/, '$1…');
             return (
-              <button key={g} type="button" className={`chip ${folder === g ? 'on' : ''}`} onClick={() => setFolder(g)} title={g}>
+              <button key={g} type="button" className={`chip ${folder === g ? 'on' : ''}`} onClick={() => pickFolder(g)} title={g}>
                 {short} <span className="n">{n}</span>
               </button>
             );
@@ -243,7 +253,7 @@ export default function SanXuatForm({
       <section className="sx-slot">
         <header className="sx-slot-head">
           <span className="sx-slot-title">Khung ảnh {imgIds.length ? `— đã chọn ${imgIds.length}` : ''}</span>
-          <span className="muted">{shownImages.length}/{images.length}</span>
+          <span className="muted">{allImages.length}/{images.length}</span>
         </header>
 
         <div className="sx-preview">
@@ -312,6 +322,11 @@ export default function SanXuatForm({
         ) : (
           <p className="muted">{images.length ? 'Không có ảnh trong folder này. Bỏ lọc để xem tất cả.' : 'Kho ảnh đang trống. Tải ảnh lên bên dưới.'}</p>
         )}
+        {allImages.length > imgLimit ? (
+          <button type="button" className="btn ghost sm" style={{ alignSelf: 'center' }} onClick={() => setImgLimit((n) => n + PAGE_SIZE)}>
+            Hiện thêm ảnh (còn {allImages.length - imgLimit})
+          </button>
+        ) : null}
 
         <AssetUploader kind="image" group={folder} />
       </section>
@@ -319,7 +334,7 @@ export default function SanXuatForm({
       <section className="sx-slot">
         <header className="sx-slot-head">
           <span className="sx-slot-title">Khung video {vidIds.length ? `— đã chọn ${vidIds.length}` : ''}</span>
-          <span className="muted">{shownVideos.length}/{videos.length}</span>
+          <span className="muted">{allVideos.length}/{videos.length}</span>
         </header>
 
         <div className="sx-preview">
@@ -391,6 +406,11 @@ export default function SanXuatForm({
         ) : (
           <p className="muted">{videos.length ? 'Không có video trong folder này. Bỏ lọc để xem tất cả.' : 'Kho video đang trống. Tải video lên bên dưới.'}</p>
         )}
+        {allVideos.length > vidLimit ? (
+          <button type="button" className="btn ghost sm" style={{ alignSelf: 'center' }} onClick={() => setVidLimit((n) => n + PAGE_SIZE)}>
+            Hiện thêm video (còn {allVideos.length - vidLimit})
+          </button>
+        ) : null}
 
         <AssetUploader kind="video" group={folder} />
       </section>

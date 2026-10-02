@@ -5,7 +5,7 @@ import { knownFactValues, testFactValues } from '../product-facts.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
-import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool } from './scene-match.mjs';
+import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDrift } from './scene-match.mjs';
 import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
@@ -68,6 +68,143 @@ function parseJson(text) {
   const e = t.lastIndexOf('}');
   if (s >= 0 && e > s) t = t.slice(s, e + 1);
   return JSON.parse(t);
+}
+
+// 1/10 vòng 2 (Thanh, bài 22452d7f dựng 4 lần vẫn lệch): so CHỮ (từ khóa trong title/description) không
+// đo được NGHĨA — model viết kiểu lệch mới mỗi vòng ("đứng dưới hầm máy siết vòng gen" trên hình máy bơm
+// ngoài trời, "ngồi giữa chòng chành sóng nước" trên hình cảng) mà danh sách từ khóa không phủ nổi, còn kho
+// Content tuần này toàn cảnh cảng/bờ nên đổi hình kiểu gì cũng lệch. Đường đúng: nhờ model CHẤM nghĩa lời với
+// hình đã chọn, cảnh lệch thì VIẾT LẠI LỜI THEO MÔ TẢ HÌNH (nối đúng triết lý 15/9 "kịch bản đi đôi với video").
+// Gọi mạng chỉ ở 2 hàm mỏng (semanticFitCheck, semanticRewriteScenes); phần lưới + cập nhật nằm ở
+// applySemanticRewrites (thuần, test không mạng). Model lỗi/429/parse hỏng => bỏ qua bước, build vẫn chạy.
+export const SEMANTIC_FIT_MAX = 4;
+
+const assetTextOf = (a) => `${a?.title || ''} ${a?.description || ''} ${a?.label || ''}`.replace(/\s+/g, ' ').trim();
+const wordsOf = (t) => String(t || '').trim().split(/\s+/).filter(Boolean).length;
+
+// Chấm độ khớp nghĩa lời và hình cho mọi cảnh (trừ skip) bằng 1 lời gọi. Trả [{scene (1-based), fit, vi_sao}].
+// Lỗi bất kỳ => [] (coi như mọi cảnh đạt).
+export async function semanticFitCheck(ai, scenes, picks, assetById, { generate = generateWithRetry, model = MKT_MODEL, skip = [], client = null, log = console } = {}) {
+  const skipSet = new Set(skip);
+  const lines = [];
+  scenes.forEach((s, i) => {
+    if (skipSet.has(i)) return;
+    const a = assetById.get(picks[i]?.assetId);
+    if (!a) return;
+    lines.push(`CẢNH ${i + 1} [${s.role}] | LỜI: ${s.narration} | HÌNH ĐÃ CHỌN: ${String(assetTextOf(a)).slice(0, 320) || '(chưa có mô tả)'}`);
+  });
+  if (!lines.length) return [];
+  const system = 'Bạn là người duyệt video. Với từng cảnh, chấm hình đã chọn có KHỚP NGHĨA với lời đọc không khi hai thứ phát cùng lúc: 10 = đúng bối cảnh; 5 = không chướng; từ 4 trở xuống = người xem thấy sai (lời tả trong hầm máy mà hình ngoài trời, lời tả trên biển mà hình trên bờ, lời tả người đang làm việc mà hình không có ai...). Chỉ chấm theo MÔ TẢ hình, không suy diễn thêm.';
+  const user = `${lines.join('\n')}\n\nTrả JSON đúng dạng {"picks":[{"scene":1,"fit":0-10,"vi_sao":"một câu ngắn"}]}, mỗi cảnh một mục, không chữ ngoài JSON.`;
+  try {
+    const res = await generate(ai, { model, contents: user, config: { systemInstruction: system, responseMimeType: 'application/json' } });
+    logTokenUsage(client, 'creator_video_semantic_fit', res?.modelUsed || model, res?.usageMetadata);
+    const parsed = extractFirstJson(res?.text || '');
+    const list = Array.isArray(parsed?.picks) ? parsed.picks : [];
+    return list
+      .map((p) => ({ scene: Number(p?.scene), fit: Number(p?.fit), vi_sao: String(p?.vi_sao || '').trim().slice(0, 160) }))
+      .filter((p) => Number.isInteger(p.scene) && p.scene >= 1 && p.scene <= scenes.length && Number.isFinite(p.fit));
+  } catch (e) {
+    log.warn(`[script] soát nghĩa lời-hình bỏ qua (model lỗi: ${String(e?.message || e).slice(0, 80)}) — giữ nguyên.`);
+    return [];
+  }
+}
+
+// Viết lại lời các cảnh lệch (badIdx: chỉ số 0-based) theo MÔ TẢ hình, 1 lời gọi gộp. Trả [{scene (1-based), loi_moi}].
+export async function semanticRewriteScenes(ai, scenes, picks, assetById, badIdx, { generate = generateWithRetry, model = MKT_MODEL, client = null, log = console } = {}) {
+  if (!badIdx.length) return [];
+  const blocks = badIdx.map((i) => {
+    const a = assetById.get(picks[i]?.assetId);
+    const old = String(scenes[i].narration || '');
+    const nSent = Math.max(1, old.split(/(?<=[.!?…])\s+/).filter(Boolean).length);
+    const nWords = wordsOf(old);
+    return [
+      `CẢNH ${i + 1} [${scenes[i].role}]`,
+      `LỜI CŨ (lệch hình): ${old}`,
+      `MÔ TẢ HÌNH: ${assetTextOf(a).slice(0, 320)}`,
+      `Số câu tối đa: ${nSent}. Độ dài khoảng ${Math.round(nWords * 0.7)} tới ${Math.round(nWords * 1.3)} chữ.`,
+      `Ngữ cảnh (KHÔNG viết lại): cảnh trước: ${i > 0 ? scenes[i - 1].narration : '(không có)'} | cảnh sau: ${i + 1 < scenes.length ? scenes[i + 1].narration : '(không có)'}`,
+    ].join('\n');
+  });
+  const system = 'Bạn viết lời đọc cho video ngắn của SDVICO (thiết bị tàu cá), giọng nói chuyện với bà con ngư dân. Với từng cảnh, VIẾT LẠI lời cảnh theo ĐÚNG những gì MÔ TẢ HÌNH nói có: tả cảnh, vật, người có trong mô tả, không nhắc bối cảnh nào mô tả không ghi (không hầm máy nếu hình ngoài trời, không biển động nếu hình trên bờ, không người nếu hình không có người). Giữ mạch với cảnh trước và cảnh sau (chỉ đưa để làm ngữ cảnh, KHÔNG viết lại chúng). Không bịa chi tiết ngoài mô tả, không nhắc giá hay số tiền, không lời chào, mỗi câu tối đa 14 chữ, tôn trọng số câu tối đa. Gọi người trung tính ("nhân viên", "người thợ") nếu mô tả không ghi nam hay nữ.';
+  const user = `${blocks.join('\n\n')}\n\nTrả JSON đúng dạng {"scenes":[{"scene":1,"loi_moi":"lời đã viết lại"}]}, mỗi cảnh một mục, không chữ ngoài JSON.`;
+  try {
+    const res = await generate(ai, { model, contents: user, config: { systemInstruction: system, responseMimeType: 'application/json' } });
+    logTokenUsage(client, 'creator_video_semantic_rewrite', res?.modelUsed || model, res?.usageMetadata);
+    const parsed = extractFirstJson(res?.text || '');
+    const list = Array.isArray(parsed?.scenes) ? parsed.scenes : [];
+    return list
+      .map((p) => ({ scene: Number(p?.scene), loi_moi: String(p?.loi_moi || '').trim() }))
+      .filter((p) => Number.isInteger(p.scene) && p.loi_moi);
+  } catch (e) {
+    log.warn(`[script] viết lại lời theo hình bỏ qua (model lỗi: ${String(e?.message || e).slice(0, 80)}) — giữ nguyên.`);
+    return [];
+  }
+}
+
+// Phần THUẦN (không mạng): nhận kết quả model đã parse, đưa lời mới qua các lưới hiện có rồi mới nhận.
+// rawScenes: [{role, narration, ...}], picks: [{assetId, fit, why, by}] (cả hai sửa tại chỗ),
+// rewrites: [{scene (1-based), loi_moi}]. banned: cụm cấm/mòn (cắt câu chứa). extraBad(text, scene, i): hàm trả
+// thêm cụm cần cắt (sản phẩm kia, phần trăm không nguồn, máy này...). Trả { applied: [i], kept: [i] }.
+export function applySemanticRewrites(rawScenes, picks, rewrites, { skip = [], assetById = new Map(), banned = [], extraBad = null, log = console } = {}) {
+  const skipSet = new Set(skip);
+  const applied = [];
+  const kept = [];
+  for (const r of Array.isArray(rewrites) ? rewrites : []) {
+    const i = Number(r?.scene) - 1;
+    if (!Number.isInteger(i) || i < 0 || i >= rawScenes.length || skipSet.has(i)) continue;
+    const pick = picks[i];
+    const a = assetById.get(pick?.assetId);
+    if (!pick || !a) continue;
+    // Lưới giá + câu dài + cụm cấm: giống đường sinh kịch bản ban đầu.
+    let text = redactExactPrices(String(r?.loi_moi || '').trim());
+    text = breakLongSentences(text);
+    const bad = [...banned, ...(extraBad ? extraBad(text, rawScenes[i], i) : [])];
+    if (bad.length) text = stripSentencesWith(text, bad);
+    if (!text.trim()) {
+      log.warn(`[script] cảnh ${i + 1}: lời viết lại bị cắt rỗng bởi lưới cụm cấm — giữ lời cũ.`);
+      picks[i] = { ...pick, why: `${pick.why || ''} | CẢNH BÁO: lời có thể lệch hình, bản viết lại không qua lưới cụm cấm`.slice(0, 220) };
+      kept.push(i);
+      continue;
+    }
+    const at = assetTextOf(a);
+    const drift = [...imageryDriftSentences(text, at), ...inventedDetailSentences(text, at)];
+    if (drift.length) {
+      log.warn(`[script] cảnh ${i + 1}: lời viết lại vẫn trôi khỏi hình ("${drift[0].slice(0, 60)}") — giữ lời cũ.`);
+      picks[i] = { ...pick, why: `${pick.why || ''} | CẢNH BÁO: lời viết lại vẫn lệch hình ("${drift[0].slice(0, 60)}")`.slice(0, 220) };
+      kept.push(i);
+      continue;
+    }
+    rawScenes[i].narration = text;
+    picks[i] = { ...pick, why: 'viết lại lời theo hình (soát nghĩa 1/10)', by: 'semantic' };
+    applied.push(i);
+  }
+  return { applied, kept };
+}
+
+// Nối A + B + C: chấm nghĩa -> viết lại cảnh fit <= SEMANTIC_FIT_MAX -> nhận qua lưới. Chỉ gọi mạng khi có
+// pick; model lỗi => không đổi gì. Cảnh bị chấm lệch mà không được viết lại thì ghi CẢNH BÁO vào why.
+export async function semanticRecheck({ ai, rawScenes, picks, assets, skip = [], banned = [], extraBad = null, generate = generateWithRetry, model = MKT_MODEL, client = null, log = console }) {
+  const result = { applied: [], kept: [], flagged: [] };
+  if (!assets.length || !picks.some(Boolean)) return result;
+  const assetById = new Map(assets.map((a) => [a.id, a]));
+  const skipSet = new Set(skip);
+  const fits = await semanticFitCheck(ai, rawScenes, picks, assetById, { generate, model, skip, client, log });
+  const bad = fits.filter((f) => f.fit <= SEMANTIC_FIT_MAX && !skipSet.has(f.scene - 1) && picks[f.scene - 1]?.assetId);
+  for (const f of bad) log.warn(`[script] soát nghĩa: cảnh ${f.scene} chấm ${f.fit}/10 — ${f.vi_sao || 'lời lệch hình'}`);
+  if (!bad.length) return result;
+  const badIdx = [...new Set(bad.map((f) => f.scene - 1))];
+  const rewrites = await semanticRewriteScenes(ai, rawScenes, picks, assetById, badIdx, { generate, model, client, log });
+  const res = applySemanticRewrites(rawScenes, picks, rewrites, { skip, assetById, banned, extraBad, log });
+  result.applied = res.applied;
+  result.kept = res.kept;
+  for (const f of bad) {
+    const i = f.scene - 1;
+    if (res.applied.includes(i) || res.kept.includes(i)) continue;
+    picks[i] = { ...picks[i], why: `${picks[i].why || ''} | CẢNH BÁO: chấm lệch nghĩa ${f.fit}/10 (${f.vi_sao || 'lời lệch hình'}), chưa viết lại được`.slice(0, 220) };
+    result.flagged.push(i);
+  }
+  return result;
 }
 
 // content: {title, draft, brief}. assets: [{id, kind, title}]. facts: PRODUCT_FACTS.
@@ -219,12 +356,31 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'CẢNH CUỐI: 1 câu chốt ngắn về LỢI ÍCH/thông điệp sản phẩm (đã có luật ở trên), có thể là câu hỏi mở nhẹ cho bà con nghĩ tiếp. KHÔNG nhắc "gọi", "liên hệ", "hotline" — outro cố định đầu ký đã lo phần đó.',
   ];
 
+  // 1/10 (Thanh bỏ bài 22452d7f sau 5 bản dựng: "viết lời trước, tìm hình sau" vô nghiệm với kho Content
+  // mỏng, lời cuối cùng thành thuyết minh ảnh rời rạc): video CONTENT chốt TRỌN BỘ HÌNH TRƯỚC, model viết
+  // MỘT câu chuyện liền mạch bám đúng bộ hình. Chỉ nhánh content; không đủ tư liệu (sb null) thì chạy đường cũ.
+  // Video BÁN HÀNG không đổi một dòng.
+  const sbMustAsset = opts.mustUseAssetId ? assets.find((a) => a.id === opts.mustUseAssetId) || null : null;
+  const sb = opts.contentVideo ? pickStoryboard(assets, { mustAsset: sbMustAsset, recentUse: opts.recentUse || new Map(), productGroup: null }) : null;
+  const sbMode = !!(sb && sb.length);
+  const sbDesc = (a) => String(a.description || a.title || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+  if (sbMode) {
+    console.log(`Storyboard video content (1/10): ${sb.length} hình chốt trước: ${sb.map((a, i) => `${i + 1}) ${a.kind} "${String(a.title || '').slice(0, 40)}" (${String(a.id).slice(0, 8)})`).join(' | ')}`);
+  }
+  const STORYBOARD_STRUCTURE = !sbMode ? [] : [
+    CONTENT_STRUCTURE[0],
+    `BỘ HÌNH ĐÃ CHỐT TRƯỚC (1/10, Thanh: lời phải đi đôi với đúng hình): video có ĐÚNG ${sb.length} cảnh. Cảnh i chiếu đúng tư liệu i dưới đây, lời cảnh i phải bám NHỮNG GÌ MÔ TẢ NÓI CÓ:\n${sb.map((a, i) => `CẢNH ${i + 1} chiếu ${a.kind === 'video' || a.kind === 'clip' ? 'CLIP' : 'ẢNH'} "${String(a.title || '').trim()}": ${sbDesc(a)}`).join('\n')}`,
+    'Kể thành MỘT câu chuyện liền mạch từ bộ hình trên: cảnh 1 mở hút theo hình của nó, các cảnh giữa nối nhau bằng câu chuyển (không cảnh nào đứng riêng như thuyết minh ảnh rời rạc), cảnh cuối kết bằng đúng một câu hỏi giao lưu với bà con. Không bịa chi tiết (người, đồ vật, địa danh, hành động) không có trong mô tả hình của cảnh đó. Mỗi câu <= 14 chữ.',
+    'Chạm 1 chữ cảm xúc NGHỀ / TIỀN / RỦI RO / TỰ HÀO như bài nguồn. Không bịa tên người, con số không có trong bài nguồn. Địa điểm (tên cảng, tỉnh) chỉ nói nếu bài nguồn có và hình cho phép. KỂ LẠI BẰNG LỜI CỦA MÌNH: giữ ý của bài nguồn nhưng KHÔNG chép nguyên câu, không lặp lại cụm từ của bài nguồn quá 5 chữ liền nhau. Không lời kêu gọi bán hàng, không giá, không gọi, không nhắn Page.',
+    CONTENT_STRUCTURE[CONTENT_STRUCTURE.length - 1],
+  ];
+
   const system = [
     'Bạn dựng kịch bản video ngắn cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     'Giọng gần gũi bà con ngư dân, câu ngắn gọn, dễ nghe khi lồng tiếng. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM trong bài nguồn (xem SỰ THẬT NGHỀ bên dưới); KHÔNG tự thêm lợi ích không có trong bài.',
     'LỜI THOẠI PHẢI CÓ CẢM XÚC như người kể chuyện cho bạn nghe (sếp góp ý 21/8: giọng đọc đều đều buồn ngủ): xen câu hỏi tu từ đúng chỗ (tự nghĩ câu mới theo nội dung, KHÔNG dùng lại "Bà con có thấy vậy không?" vì đã mòn), câu cảm ngắn ("Nhẹ cả người!", "Yên tâm hẳn!"), ngắt nhịp bằng dấu phẩy và câu ngắn 6 tới 12 chữ. Máy đọc lên xuống giọng THEO DẤU CÂU, nên dấu chấm hỏi, chấm than, dấu phẩy đặt đúng chỗ là giọng có hồn. BẮT BUỘC (sếp 5/9, các sếp chê giọng đều đều): MỖI CẢNH có ít nhất 1 câu cảm ngắn kết bằng dấu chấm than hoặc 1 câu hỏi ngắn kết bằng dấu chấm hỏi; câu dài quá 14 chữ phải tách thành 2 câu.',
     'KHÔNG MỞ ĐẦU BẰNG LỜI CHÀO (sếp bỏ 4/9): CẤM mọi câu chào kiểu "Alo alo bà con ơi!", "Hello anh em đi biển ơi!", "Hello các thuyền trưởng!", "Hello các con vợ ơi!", "Anh em ơi, nghe nè!", "Xin chào bà con", "Chào cả nhà"... Câu ĐẦU TIÊN của video phải là HOOK vào thẳng vấn đề, không chào, không xưng tên kênh. Cả video vẫn nói như người trẻ kể chuyện cho anh em đi biển nghe: năng lượng cao, tự nhiên, có thể chêm "nha", "nè", "luôn á"; NHƯNG vẫn tôn trọng bà con, không chửi bậy, không lố tới mức mất uy tín thiết bị.',
-    ...(opts.contentVideo ? CONTENT_STRUCTURE : SALES_STRUCTURE),
+    ...(sbMode ? STORYBOARD_STRUCTURE : opts.contentVideo ? CONTENT_STRUCTURE : SALES_STRUCTURE),
     shownName ? `TÊN SẢN PHẨM: gọi đúng "${shownName}" trong lời thoại, KHÔNG gọi tên khác, KHÔNG đọc mã SD12-300.` : '',
     teaser
       ? `GIÁ (luật 8/9, BẮT BUỘC): CẢNH CUỐI phải có đúng 1 câu mốc giá, dùng NGUYÊN VĂN: "${teaser.spoken}". Câu này CHỈ nói giá, KHÔNG kêu bình luận, nhắn Page hay gọi (phần OUTRO cuối video đã lo: "${outroText(outroKw)}"). Các cảnh khác cũng không nhắc bình luận, nhắn Page hay gọi. TUYỆT ĐỐI KHÔNG đọc giá chính xác (không 9.900.000, không 42 triệu, không 9,9 triệu, không giá cũ 49 hay 38 triệu), KHÔNG tự thêm con số tiền nào khác. Các cảnh trước KHÔNG nhắc giá.`
@@ -233,7 +389,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'Số theo chuẩn Việt Nam (dấu chấm ngăn hàng nghìn). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung.',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO; chỉ nói phân phối, lắp đặt, tương thích.',
-    'MỖI CẢNH ghi field "visual" = HÌNH CẦN THẤY cho cảnh đó (1 câu cụ thể). Cảnh vấn đề (hook/empathy/story) hình phải là cảnh cũ/hư/cặn/nước đục/thợ đang sửa/tàu thật/khoang máy, KHÔNG phải sản phẩm mới bóng; cảnh giải pháp (solution/reward/closing) mới tới hình sản phẩm, lắp đặt, máy chạy. Field "asset_id" chỉ là GỢI Ý (tuỳ chọn) chọn từ danh sách theo MÔ TẢ tư liệu; máy sẽ khớp lại hình theo "visual" sau khi bạn viết xong.',
+    sbMode ? 'HÌNH ĐÃ CHỐT TRƯỚC (1/10): hình của từng cảnh là tư liệu đã nêu ở phần BỘ HÌNH, bạn KHÔNG chọn hình và KHÔNG cần ghi asset_id hay "visual". Chỉ viết lời thoại từng cảnh sao cho mọi câu đều tả hoặc dẫn từ đúng những gì hình đó có.' : 'MỖI CẢNH ghi field "visual" = HÌNH CẦN THẤY cho cảnh đó (1 câu cụ thể). Cảnh vấn đề (hook/empathy/story) hình phải là cảnh cũ/hư/cặn/nước đục/thợ đang sửa/tàu thật/khoang máy, KHÔNG phải sản phẩm mới bóng; cảnh giải pháp (solution/reward/closing) mới tới hình sản phẩm, lắp đặt, máy chạy. Field "asset_id" chỉ là GỢI Ý (tuỳ chọn) chọn từ danh sách theo MÔ TẢ tư liệu; máy sẽ khớp lại hình theo "visual" sau khi bạn viết xong.',
     // 17/9 (Thanh xem bài 8c8347a4: lời mở "cảng cá sương mờ" nhưng clip bắt buộc là nhân viên
     // văn phòng): kịch bản phải BIẾT clip quay gì và viết cảnh đầu THEO clip, không tả cảnh tự bịa.
     opts.mustUseAssetId
@@ -260,7 +416,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     allowed.length ? 'Thông số được phép nêu:\n' + allowed.join('\n') : 'Chưa có thông số được duyệt: nói chung chung, không nêu số cụ thể.',
     '',
     'Tư liệu có sẵn (chỉ được dùng id trong đây):',
-    assetList,
+    sbMode ? assetListForPrompt(sb) : assetList,
   ].filter((line) => line !== '').join('\n');
 
   const user = [
@@ -270,11 +426,18 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'Trả về JSON đúng cấu trúc sau, không thêm chữ ngoài JSON:',
     '{',
     '  "titles": ["ba tiêu đề khác nhau, ngắn, hấp dẫn"],',
-    '  "vertical": {"scenes": [{"role": "hook|empathy|solution|reward|closing", "narration": "câu thoại", "visual": "hình cần thấy cho cảnh này", "asset_id": "id gợi ý (tuỳ chọn)"}]}',
+    sbMode
+      ? '  "vertical": {"scenes": [{"role": "hook|story|closing", "narration": "câu thoại bám đúng hình của cảnh này"}]}'
+      : '  "vertical": {"scenes": [{"role": "hook|empathy|solution|reward|closing", "narration": "câu thoại", "visual": "hình cần thấy cho cảnh này", "asset_id": "id gợi ý (tuỳ chọn)"}]}',
     'CHỈ CÓ BẢN DỌC (vertical). Không sinh "horizontal" (sếp 5/9: mọi video đăng lên chỉ 1 dạng dọc cho đồng bộ).',
     '}',
     'FIELD "role" BẮT BUỘC — không được thiếu, không được trùng. Model hay bỏ qua role và gộp/bỏ nhịp; đây là cách ép cấu trúc.',
-    ...(opts.contentVideo
+    ...(sbMode
+      ? [
+          `ĐÂY LÀ VIDEO CỘNG ĐỒNG 30-45 giây. CHÍNH XÁC ${sb.length} CẢNH theo đúng bộ hình ở phần BỘ HÌNH: cảnh 1 role="hook" (8-12s, ~25-35 từ)${sb.length > 2 ? `, cảnh 2${sb.length > 3 ? ` tới ${sb.length - 1}` : ''} role="story" (mỗi cảnh ~35-45 từ)` : ''}, cảnh ${sb.length} role="closing" (6-10s, ~20-30 từ, đúng một câu hỏi giao lưu). KHÔNG thêm, KHÔNG bớt cảnh.`,
+          'Cả bài là MỘT câu chuyện liền mạch: cảnh sau nối tiếp cảnh trước bằng câu chuyển; mỗi câu chỉ nói điều mô tả hình của cảnh đó có.',
+        ]
+    : opts.contentVideo
       ? [
           'ĐÂY LÀ VIDEO CỘNG ĐỒNG 30-45 giây. CHÍNH XÁC 3 CẢNH, role LẦN LƯỢT: "hook", "story", "closing". KHÔNG thêm, KHÔNG bớt, KHÔNG lặp role.',
           `CẢNH 1 role="hook" (8-12s, ~25-35 từ): theo KIỂU KỂ "${STYLE.label}" ở trên (${STYLE.open}).`,
@@ -335,6 +498,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   // 17/9: clip bắt buộc cảnh 1 — kịch bản mở màn không ăn nhập nội dung clip thì sinh lại 1 lần.
   const mustAsset = opts.mustUseAssetId ? assets.find((a) => a.id === opts.mustUseAssetId) : null;
   let mustMiss = false;
+  let storyboardMiss = []; // 1/10: cảnh có lời lệch hình đã chốt trước (chỉ nhánh content storyboard-first)
+  let storyboardCountMiss = false;
+  const sbScenesOf = () => (parsed.vertical?.scenes || []).filter((s) => String(s?.narration || '').trim());
   for (let attempt = 0; attempt < 2; attempt++) {
     const extra = (!viol.length ? '' :
       `\n\nLẦN TRƯỚC LỜI THOẠI SAI NGHỀ, phải bỏ hẳn các ý: ${viol.map((v) => `"${v.phrase}"`).join(', ')}. ${viol[0].why}`)
@@ -342,6 +508,10 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       `\n\nLẦN TRƯỚC LỜI THOẠI VẪN DÙNG CỤM ĐÃ MÒN: ${worn.map((p) => `"${p}"`).join(', ')}. Viết lại toàn bộ, diễn đạt khác hẳn, tuyệt đối không dùng các cụm đó.`)
       + (!mustMiss ? '' :
       `\n\nLẦN TRƯỚC CẢNH ${mustRole === 'solution' ? 'GIẢI PHÁP' : 'ĐẦU'} KHÔNG ĂN NHẬP CLIP BẮT BUỘC. Clip quay: ${String(mustAsset?.description || mustAsset?.title || '').replace(/\s+/g, ' ').slice(0, 600)}. Viết lại cảnh ${mustRole === 'solution' ? 'giải pháp' : 'đầu'}: lời thoại và "visual" phải tả và dẫn chuyện từ ĐÚNG cảnh trong clip đó.`)
+      + (!storyboardCountMiss ? '' :
+      `\n\nLẦN TRƯỚC SỐ CẢNH SAI. Phải có ĐÚNG ${sb?.length} cảnh, mỗi cảnh ứng với đúng 1 hình trong BỘ HÌNH theo thứ tự.`)
+      + (!storyboardMiss.length ? '' :
+      storyboardMiss.map((m) => `\n\nLẦN TRƯỚC LỜI CẢNH ${m.scene} KHÔNG ĂN NHẬP HÌNH CỦA CẢNH ĐÓ${m.reason === 'no-overlap' ? ' (lời không nhắc gì có trong hình)' : m.sentences.length ? ` (câu trôi khỏi hình hoặc bịa chi tiết: "${m.sentences[0].slice(0, 80)}")` : ''}. Hình cảnh ${m.scene} là: ${String(m.asset?.title || '').trim()}. ${sbDesc(m.asset || {})}. Viết lại cảnh ${m.scene}: chỉ tả và dẫn chuyện từ ĐÚNG những gì hình đó có, không nhắc người hay vật không có trong mô tả, vẫn nối mạch với cảnh trước và cảnh sau.`).join(''))
       + (!cross.length ? '' :
       `\n\nLẦN TRƯỚC LỜI THOẠI NHẮC SẢN PHẨM KHÁC: ${cross.map((p) => `"${p}"`).join(', ')}. Video này chỉ về ${shownName || opts.productGroup}; viết lại, bỏ hẳn các ý đó.`)
       + (!pct.length ? '' :
@@ -424,7 +594,17 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         }
       }
     }
-    if (!viol.length && !worn.length && !mustMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate && !painSelf.length) break;
+    // 1/10: video content storyboard-first — lời từng cảnh phải bám mô tả đúng hình đã chốt cho cảnh đó.
+    storyboardMiss = [];
+    storyboardCountMiss = false;
+    if (sbMode) {
+      const scs = sbScenesOf();
+      storyboardCountMiss = scs.length !== sb.length;
+      storyboardMiss = storyboardDrift(scs, sb);
+      if (storyboardCountMiss) console.warn(`[script] storyboard: model tra ${scs.length} canh, can DUNG ${sb.length} (lan ${attempt + 1}) — sinh lai.`);
+      for (const m of storyboardMiss) console.warn(`[script] storyboard: canh ${m.scene} khong an nhap hinh chot truoc "${String(m.asset?.title || '').slice(0, 50)}" (${m.reason}, lan ${attempt + 1})${m.sentences.length ? ` — cau: "${m.sentences[0].slice(0, 60)}"` : ''} — sinh lai theo mo ta hinh.`);
+    }
+    if (!viol.length && !worn.length && !mustMiss && !storyboardMiss.length && !storyboardCountMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate && !painSelf.length) break;
   }
   // 17/9 vòng 9: bẻ câu 30-40 từ nối bằng dấu phẩy thành câu ngắn TRƯỚC mọi đường cắt — câu khổng lồ
   // làm cắt-cụm-cấm rỗng cả cảnh (bị khôi phục nguyên cụm cấm) và làm tách-cảnh-dài bất lực (ảnh đứng
@@ -479,6 +659,25 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     }
   });
 
+  // 1/10: storyboard-first — hết lượt sinh vẫn còn lời lệch hình thì CẮT câu trôi khỏi mô tả từng cảnh
+  // (cutImageryDrift); cảnh cắt xong rỗng thì giữ lời gốc + cảnh báo để người duyệt soi tay.
+  if (sbMode && storyboardMiss.length) {
+    const scs = sbScenesOf();
+    for (const m of storyboardMiss) {
+      const sc = scs[m.index];
+      if (!sc || !m.sentences.length) continue;
+      const orig = String(sc.narration || '');
+      const cut = cutImageryDrift(orig, `${m.asset.title || ''} ${m.asset.description || ''} ${m.asset.label || ''}`);
+      let next = cut;
+      for (const s of m.sentences) if (next.includes(s)) next = next.replace(s, '').replace(/\s{2,}/g, ' ').trim();
+      if (next && next !== orig) {
+        console.warn(`[script] storyboard: canh ${m.scene} cat cau troi khoi hinh "${m.sentences[0].slice(0, 60)}"`);
+        sc.narration = next;
+      } else if (!next) {
+        console.warn(`[script] storyboard: canh ${m.scene} cat het se rong — giu loi goc (can soi tay).`);
+      }
+    }
+  }
   // 17/9 vòng 6: sinh lại vẫn dài thì CẮT câu cuối của empathy (rồi hook) cho hình máy vào trước giây 15.
   if (solutionLate && parsed.vertical?.scenes) {
     const r = trimEarlyScenes(parsed.vertical.scenes, 58);
@@ -507,14 +706,62 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       return { role, narration, visual, hint };
     })
     .filter((s) => s.narration);
-  const picks = assets.length
+  // 1/10: chỉ số cảnh mang clip bắt buộc — dùng chung cho matchScenesToAssets và bước soát sau ghép.
+  const mustIdxScene = mustRole === 'solution' ? Math.max(0, (() => { const k = rawScenes.findIndex((s) => s.role === 'solution'); return k >= 0 ? k : rawScenes.length - 1; })()) : 0;
+  // 1/10: storyboard-first — hình đã chốt TRƯỚC khi viết lời nên KHÔNG ghép lại (không matchScenesToAssets,
+  // refine, semanticRecheck): lời cảnh i đã được sinh và soát theo đúng mô tả hình i. Số cảnh model trả có thể
+  // lệch sb.length: dư thì cắt cảnh thừa, thiếu thì cắt bớt hình cuối của bộ cho khớp.
+  let sbUse = null;
+  if (sbMode) {
+    if (rawScenes.length > sb.length) {
+      console.warn(`[script] storyboard: model tra ${rawScenes.length} canh > ${sb.length} hinh — cat canh thua.`);
+      rawScenes.length = sb.length;
+    }
+    sbUse = sb.slice(0, rawScenes.length);
+    if (sbUse.length < sb.length) console.warn(`[script] storyboard: model chi tra ${rawScenes.length} canh < ${sb.length} hinh — cat bot hinh cuoi cua bo cho khop.`);
+    rawScenes.forEach((s, i) => {
+      s.role = i === 0 ? 'hook' : i === sbUse.length - 1 ? 'closing' : 'story';
+      s.visual = sbDesc(sbUse[i]).slice(0, 300);
+      s.hint = null;
+    });
+  }
+  const picks = sbMode
+    ? sbUse.map((a) => ({ assetId: a.id, fit: 10, why: 'storyboard: hình chốt trước, lời viết theo hình', by: 'storyboard' }))
+    : assets.length
     ? await matchScenesToAssets({
         ai, generate: generateWithRetry, model: MKT_MODEL, scenes: rawScenes, assets, mustUseAssetId: opts.mustUseAssetId || null, log: console,
         productGroup: opts.contentVideo ? null : opts.productGroup || null,
+        // 29/9: tư liệu đã lên video 14 ngày gần nhất (build-video đếm) — scene-match phạt điểm để xoay kho.
+        recentUse: opts.recentUse || new Map(),
         // 17/9 chiều: clip máy đang chạy ép vào cảnh giải pháp (không có role solution thì cảnh cuối).
-        mustUseIndex: mustRole === 'solution' ? Math.max(0, (() => { const k = rawScenes.findIndex((s) => s.role === 'solution'); return k >= 0 ? k : rawScenes.length - 1; })()) : 0,
+        mustUseIndex: mustIdxScene,
       })
     : rawScenes.map(() => null);
+  // 1/10 (Thanh, bài 22452d7f: lời "chòng chành sóng nước" trên hình CẢNG CÁ TRÊN BỜ): soát lời từng cảnh với
+  // mô tả hình ĐÃ CHỌN (trừ cảnh must, và cảnh 1 khi hookPin sẽ ghi đè hình) — xem refinePicksByImagery.
+  if (assets.length && !sbMode) {
+    const refined = refinePicksByImagery({
+      scenes: rawScenes, picks, assets, mustIdx: mustIdxScene, skip: hookPin ? [0] : [],
+      productGroup: opts.contentVideo ? null : opts.productGroup || null, recentUse: opts.recentUse || new Map(), log: console,
+    });
+    refined.narrations.forEach((n, i) => { if (n && n !== rawScenes[i].narration) rawScenes[i].narration = n; });
+  }
+  // 1/10 vòng 2 (Thanh: bản dựng lần 4 đủ cả 3 bản vá từ khóa vẫn lệch 2 cảnh — "hầm máy siết vòng gen" trên
+  // hình bơm ngoài trời, "chòng chành sóng nước" trên hình cảng): từ khóa không đo được NGHĨA. Nhờ model chấm
+  // nghĩa lời với hình đã chọn, cảnh lệch thì VIẾT LẠI LỜI theo mô tả hình (semanticRecheck, +2 lời gọi,
+  // model lỗi/429 thì bỏ qua). Miễn: cảnh clip bắt buộc và cảnh 1 khi hookPin ghi đè hình.
+  if (assets.length && !sbMode) {
+    const semSkip = [...(picks[mustIdxScene]?.by === 'must' ? [mustIdxScene] : []), ...(hookPin ? [0] : [])];
+    const semBanned = opts.contentVideo ? WORN_PHRASES : SALES_WORN;
+    await semanticRecheck({
+      ai, rawScenes, picks, assets, skip: semSkip, banned: semBanned, client, log: console,
+      extraBad: (text, scene, si) => [
+        ...(crossTerms.length ? crossProductViolations(text, opts.productGroup) : []),
+        ...unsourcedPercents(text, percentSources),
+        ...(!opts.contentVideo && (si === 0 || ['hook', 'empathy', 'story'].includes(scene?.role)) ? selfProductFaultPhrases(text) : []),
+      ],
+    });
+  }
   let vertical = rawScenes
     .map((s, i) => {
       const assetId = picks[i]?.assetId || s.hint || null;
@@ -582,7 +829,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   }
   // 17/9 (bản dựng lại 492313ac: cảnh 2 ảnh tàu 17s, cảnh 3 ảnh máy 19,5s): cảnh dùng ẢNH mà lời dài
   // thì tách đôi ở ranh giới câu, nửa sau đổi sang tư liệu khác để hình không đứng yên quá ~10s.
-  {
+  // 1/10: storyboard-first KHÔNG tách cảnh ảnh dài: nửa sau sẽ sang hình khác trong khi lời vẫn viết theo hình đầu.
+  if (!sbMode) {
     const isImage = (id) => { const a = assets.find((x) => x.id === id); return !!a && a.kind !== 'video' && a.kind !== 'clip'; };
     const usedCount = new Map();
     for (const s of vertical) usedCount.set(s.assetId, (usedCount.get(s.assetId) || 0) + 1);

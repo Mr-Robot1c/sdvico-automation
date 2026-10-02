@@ -2,6 +2,7 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach
+<!-- re-verified: 2026-09-30 - KHUNG BAN TIN 18:00 (sep Long qua Thanh): lich dang co dinh them loai khung bantin — video nguoi gui, may soan caption, rotate/plan-live BO QUA (chi loc sale/content); bang tuan them dong Ban tin thuy san, form Lich co dinh them option, khung khong vao lo chia group; DB da ap khung vao 7 ngay tuan 28/9. Flow BOSS de xuat / NGUOI quyet KHONG doi; proposePostingPlan tuan moi tu giu khung. Chi tiet README.md cung ngay. -->
 <!-- re-verified: 2026-09-16 (4) - mo-ta-tu-lieu doc JSON ben hon; ban giao docs/plans/ban-giao-sua-web-16-09.md; Ke hoach/BOSS khong doi. -->
 <!-- re-verified: 2026-09-16 (3) - bo Chuyen NV o /khach-hang + script doi kho sang Drive; Ke hoach/BOSS khong doi. -->
 <!-- re-verified: 2026-09-16 (2) - Drive noi xong qua OAuth (packages/marketing/src/gdrive.mjs, google-oauth-drive.mjs); Ke hoach/BOSS khong doi. -->
@@ -31,7 +32,7 @@ covers: apps/approval-ui/app/ke-hoach, apps/approval-ui/lib/plan.ts, apps/approv
 <!-- re-verified: 2026-09-04 chieu - build-video.mjs: cleanNarration map "Page"->"pây" (sep doi 4/9 chieu) cho giong doc outro + stripGreeting canh 1 (bo loi chao, sep 4/9). Khong doi luong ke hoach/BA. -->
 <!-- re-verified: 2026-09-04 sang - packages/marketing/src doi (chi tiet o marketing.md cung gio): PRODUCTS them muc 9 SD12-300 + RULES phan loai anh nghiem hon. Flow ke hoach/BOSS/NV/AC KHONG doi. -->
 <!-- re-verified: 2026-09-04 sang (2) - up-media siet phan loai anh screenshot co overlay (chi tiet marketing.md cung gio). Flow KHONG doi. -->
-last_verified: 2026-09-15
+last_verified: 2026-09-30
 ttl_days: 90
 <!-- re-verified: 2026-09-03 toi - REFILL HUONG DI (NV3 nhanh nap lai khi can): co che mkt.suggestions_refill trong api/mkt-metrics-pull tu 20/8 CHUA TUNG chay (run_log 0 dong) vi dieu kien `fresh === 0` dem ca huong needs_gov_review + huong ket khong map folder (rotate bo qua, khong danh used_at) -> khong bao gio ve 0; su co 3/9 plan con 2 huong deu gov lam rotate roi fallback bam focus tu che (fromPlan=0). Hanh vi MOI: moi luot cron, neu huong SACH (chua dung + khong gov) cua ban dang ap < 3 thi BOSS sinh bo sung ngay — van cung duong generateContentDirections (goal + mkt_focus noi nhu generateAndStorePlan, avoidTitles 14 ngay, winners 70/30), ghi run_log mkt.suggestions_refill (ok/skipped/error), tran 4 luot/ngay. Flow NV3 sinh ke hoach T2/T6 + carry-over KHONG doi; huong gov van nam trong plan cho duyet (dieu cam 3 giu), chi khong duoc tinh la "con hang". -->
 <!-- re-verified: 2026-09-03 - Giam can egress cham packages/marketing/src (chi tiet marketing.md cung gio): chi them cacheControl khi upload. Flow ke hoach/NV/AC KHONG doi. -->

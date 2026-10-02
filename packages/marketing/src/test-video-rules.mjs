@@ -9,6 +9,8 @@ import {
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
 import { scanStyle } from './brand-voice-check.mjs';
+import { applySemanticRewrites, semanticRecheck } from './video/script.mjs';
+import { storyboardDrift } from './video/scene-match.mjs';
 
 const G9 = '9. Máy Lọc Dầu Diesel SD12-300';
 const G2 = '2. Máy lọc nước biển SEA-40';
@@ -190,6 +192,18 @@ eq('bắt câu mâm cơm trên boong trên hình văn phòng',
 eq('hình có boong thì không bắt', imageryDriftSentences('Bữa cơm trên boong tàu vui lắm.', 'Ngư dân ăn cơm trên boong tàu cá'), []);
 eq('bắt "ở cảng" trên hình văn phòng (nguyên từ, không dính "cảnh")', imageryDriftSentences('Chiều muộn ở cảng, nhìn anh em thao tác.', 'Cảnh quay nhân viên văn phòng'), ['Chiều muộn ở cảng, nhìn anh em thao tác.']);
 eq('cắt giữ câu khớp hình', cutImageryDrift('Nhìn anh em qua màn hình. Nhớ mâm cơm trên boong!', OFFICE), 'Nhìn anh em qua màn hình.');
+// 1/10 (Thanh xem 22452d7f: "vệt dầu bám trên con ốc gỉ sét" đọc trên clip thợ lắp THIẾT BỊ MỚI):
+// chi tiết cận cảnh ốc vít gỉ sét, vệt dầu không có trong mô tả clip phải bị coi là trôi khỏi hình.
+const NEW_INSTALL = 'Khoang máy chật chội trên tàu cá, thợ đang thao tác lắp đặt thiết bị mới';
+eq('bắt "con ốc gỉ sét, vệt dầu" trên clip lắp máy mới',
+  imageryDriftSentences('Từng vệt dầu bám chặt trên con ốc gỉ sét nè!', NEW_INSTALL),
+  ['Từng vệt dầu bám chặt trên con ốc gỉ sét nè!']);
+eq('hình có rỉ sét thì không bắt', imageryDriftSentences('Con ốc gỉ sét bám đầy dầu.', 'Cận cảnh con ốc rỉ sét, gỉ sét bám vệt dầu trên máy cũ'), []);
+// 1/10 (2): bản dựng lần 2 cảnh 2 đọc "chòng chành sóng nước" trên hình CẢNG CÁ TRÊN BỜ.
+eq('bắt "chòng chành sóng nước" trên hình cảng cá trên bờ',
+  imageryDriftSentences('Mồ hôi vã ra giữa không gian chòng chành sóng nước.', 'Cảnh ngư dân chuẩn bị ra khơi tại bến cảng cá, tàu neo đậu trên bờ'),
+  ['Mồ hôi vã ra giữa không gian chòng chành sóng nước.']);
+eq('hình có sóng nước thì không bắt', imageryDriftSentences('Giữa không gian chòng chành sóng nước.', 'Thợ sửa máy trên tàu, sóng nước chòng chành'), []);
 eq('cắt hết thì trả rỗng để người gọi giữ bản gốc', cutImageryDrift('Nhớ mâm cơm nóng trên boong!', OFFICE), '');
 eq('không trôi thì giữ nguyên', cutImageryDrift('Máy khục khặc vì cặn bẩn.', OFFICE), 'Máy khục khặc vì cặn bẩn.');
 // (d) cụm sáo vòng 9 phải nằm trong EXTRA_WORN.
@@ -228,6 +242,125 @@ const bPad = buildBlocks('Cặn bẩn lọt vào làm kim phun nghẹt cứng, t
 ok('mẩu chót kết tại speechSec (không ăn vào đệm thở)', Math.abs(bPad[bPad.length - 1].end - 5.17) < 1e-9, bPad[bPad.length - 1]);
 const bNoPad = buildBlocks('Máy nổ êm hơn.', 3);
 ok('không truyền speechSec thì như cũ (kết tại durationSec)', Math.abs(bNoPad[bNoPad.length - 1].end - 3) < 1e-9);
+
+// 29/9 nhịp điệu voice: padSecOf 0,30/0,42, tidyWav truyền --maxgap (build-video chạy main() khi import nên đọc mã nguồn)
+import { readFileSync } from 'node:fs';
+const bvSrc = readFileSync(new URL('./video/build-video.mjs', import.meta.url), 'utf8');
+const padFn = new Function(`${bvSrc.match(/export function padSecOf[\s\S]*?\r?\n\}/)[0].replace('export ', '')}; return padSecOf;`)();
+ok('padSecOf câu thường 0,30', padFn('Máy chạy êm.') === 0.30, padFn('Máy chạy êm.'));
+ok('padSecOf câu ? 0,42', padFn('Bà con thấy sao?') === 0.42);
+ok('padSecOf câu ! 0,42', padFn('Ra khơi an tâm!') === 0.42);
+ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXGAP \|\| 0\.55/.test(bvSrc));
+
+// 1/10 vòng 2 (Thanh, bài 22452d7f): soát NGHĨA lời-hình bằng model + viết lại lời cảnh lệch theo mô tả hình.
+// Test phần thuần applySemanticRewrites và nối semanticRecheck bằng model giả (không mạng).
+{
+  const quiet = { warn() {}, log() {} };
+  const pump = { id: 'v-pump', kind: 'video', title: 'Máy bơm ở cầu cảng', description: 'Máy bơm đặt ngoài trời ở cầu cảng, ngư dân đứng trên bờ nhìn tàu neo' };
+  const assetById = new Map([[pump.id, pump]]);
+  const OLD = 'Đứng dưới hầm máy, siết từng vòng gen giữa chòng chành sóng nước.';
+  const mkScenes = () => [{ role: 'story', narration: OLD }, { role: 'empathy', narration: 'Tiền sửa chữa cứ chồng lên.' }];
+  const mkPicks = () => [{ assetId: 'v-pump', fit: 7, why: 'model', by: 'model' }, { assetId: 'v-pump', fit: 7, why: 'model', by: 'model' }];
+
+  // Ca 1: lời mới sạch -> nhận, ghi dấu 'semantic'.
+  { const sc = mkScenes(); const pk = mkPicks();
+    const r = applySemanticRewrites(sc, pk, [{ scene: 1, loi_moi: 'Máy bơm đặt ngoài trời ở cầu cảng. Ngư dân đứng trên bờ nhìn tàu neo.' }], { assetById, log: quiet });
+    ok('soát nghĩa: lời mới sạch thì nhận', sc[0].narration.startsWith('Máy bơm đặt ngoài trời') && r.applied.join() === '0', sc[0].narration);
+    ok('soát nghĩa: ghi by semantic + why cho người duyệt', pk[0].by === 'semantic' && pk[0].why.includes('soát nghĩa 1/10'), pk[0]);
+    ok('soát nghĩa: cảnh không có rewrite không đổi', sc[1].narration === 'Tiền sửa chữa cứ chồng lên.' && pk[1].by === 'model'); }
+
+  // Ca 2: lời mới vẫn trôi khỏi hình -> giữ lời cũ + CẢNH BÁO.
+  { const sc = mkScenes(); const pk = mkPicks();
+    const r = applySemanticRewrites(sc, pk, [{ scene: 1, loi_moi: 'Anh em siết ốc giữa chòng chành sóng nước.' }], { assetById, log: quiet });
+    ok('soát nghĩa: lời mới vẫn drift thì giữ lời cũ', sc[0].narration === OLD && r.kept.join() === '0' && !r.applied.length, sc[0].narration);
+    ok('soát nghĩa: drift ghi CẢNH BÁO, giữ by cũ', pk[0].why.includes('CẢNH BÁO') && pk[0].by === 'model', pk[0]); }
+
+  // Ca 3: cảnh trong skip (must / hookPin) không đổi dù có rewrite.
+  { const sc = mkScenes(); const pk = mkPicks();
+    const r = applySemanticRewrites(sc, pk, [{ scene: 1, loi_moi: 'Máy bơm đặt ngoài trời ở cầu cảng.' }], { skip: [0], assetById, log: quiet });
+    ok('soát nghĩa: cảnh skip không đổi', sc[0].narration === OLD && pk[0].by === 'model' && !r.applied.length && !r.kept.length); }
+
+  // Ca 4: lời mới dính giá chính xác -> redact trước khi nhận.
+  { const sc = mkScenes(); const pk = mkPicks();
+    applySemanticRewrites(sc, pk, [{ scene: 1, loi_moi: 'Máy bơm đặt ngoài trời ở cầu cảng. Giá chỉ 9.900.000 đồng thôi.' }], { assetById, log: quiet });
+    ok('soát nghĩa: giá chính xác bị redact', !sc[0].narration.includes('9.900.000') && sc[0].narration.includes('9,X triệu'), sc[0].narration); }
+
+  // Ca 5: cụm cấm/mòn và hàm extraBad cắt câu chứa trước khi nhận; cắt rỗng thì giữ lời cũ.
+  { const sc = mkScenes(); const pk = mkPicks();
+    applySemanticRewrites(sc, pk, [{ scene: 1, loi_moi: 'Máy bơm đặt ngoài trời ở cầu cảng. Suốt hành trình dài, ai cũng mệt. Nhìn cái máy này là hết hồn.' }],
+      { assetById, banned: ['suốt hành trình dài'], extraBad: () => ['máy này'], log: quiet });
+    ok('soát nghĩa: cắt câu cụm mòn + extraBad', sc[0].narration === 'Máy bơm đặt ngoài trời ở cầu cảng.', sc[0].narration);
+    const sc2 = mkScenes(); const pk2 = mkPicks();
+    const r2 = applySemanticRewrites(sc2, pk2, [{ scene: 1, loi_moi: 'Suốt hành trình dài, ai cũng mệt.' }], { assetById, banned: ['suốt hành trình dài'], log: quiet });
+    ok('soát nghĩa: cắt rỗng thì giữ lời cũ + CẢNH BÁO', sc2[0].narration === OLD && r2.kept.join() === '0' && pk2[0].why.includes('CẢNH BÁO'), pk2[0]); }
+
+  // Ca 6: semanticRecheck với model giả: chấm 2 cảnh, cảnh 1 lệch -> viết lại; đúng 2 lời gọi.
+  { const sc = mkScenes(); const pk = mkPicks(); let calls = 0;
+    const gen = async (_ai, p) => {
+      calls += 1;
+      if (String(p.contents).includes('LỜI CŨ')) return { text: JSON.stringify({ scenes: [{ scene: 1, loi_moi: 'Máy bơm đặt ngoài trời ở cầu cảng.' }] }) };
+      return { text: JSON.stringify({ picks: [{ scene: 1, fit: 2, vi_sao: 'lời hầm máy, hình ngoài trời' }, { scene: 2, fit: 9, vi_sao: 'ổn' }] }) };
+    };
+    const r = await semanticRecheck({ ai: null, rawScenes: sc, picks: pk, assets: [pump], generate: gen, model: 'x', log: quiet });
+    ok('semanticRecheck: viết lại cảnh chấm <= 4, giữ cảnh ổn', sc[0].narration === 'Máy bơm đặt ngoài trời ở cầu cảng.' && sc[1].narration === 'Tiền sửa chữa cứ chồng lên.' && r.applied.join() === '0', sc[0].narration);
+    ok('semanticRecheck: đúng 2 lời gọi model', calls === 2, calls); }
+
+  // Ca 7: mọi cảnh đạt -> chỉ 1 lời gọi, không đổi gì.
+  { const sc = mkScenes(); const pk = mkPicks(); let calls = 0;
+    const gen = async () => { calls += 1; return { text: JSON.stringify({ picks: [{ scene: 1, fit: 8 }, { scene: 2, fit: 10 }] }) }; };
+    await semanticRecheck({ ai: null, rawScenes: sc, picks: pk, assets: [pump], generate: gen, model: 'x', log: quiet });
+    ok('semanticRecheck: không cảnh lệch thì dừng sau 1 lời gọi, lời giữ nguyên', calls === 1 && sc[0].narration === OLD); }
+
+  // Ca 8: model lỗi (429) / trả JSON hỏng -> bỏ qua bước, KHÔNG ném lỗi.
+  { const sc = mkScenes(); const pk = mkPicks();
+    const boom = async () => { throw new Error('429 RESOURCE_EXHAUSTED'); };
+    const r = await semanticRecheck({ ai: null, rawScenes: sc, picks: pk, assets: [pump], generate: boom, model: 'x', log: quiet });
+    ok('semanticRecheck: model 429 thì bỏ qua, build không chết', sc[0].narration === OLD && !r.applied.length);
+    const junk = async () => ({ text: 'không phải json' });
+    await semanticRecheck({ ai: null, rawScenes: sc, picks: pk, assets: [pump], generate: junk, model: 'x', log: quiet });
+    ok('semanticRecheck: JSON hỏng thì coi như mọi cảnh đạt', sc[0].narration === OLD); }
+
+  // Ca 9: cảnh bị chấm lệch nhưng model không trả bản viết lại -> ghi CẢNH BÁO, giữ lời.
+  { const sc = mkScenes(); const pk = mkPicks();
+    const gen = async (_ai, p) => (String(p.contents).includes('LỜI CŨ')
+      ? { text: JSON.stringify({ scenes: [] }) }
+      : { text: JSON.stringify({ picks: [{ scene: 1, fit: 3, vi_sao: 'lệch' }] }) });
+    const r = await semanticRecheck({ ai: null, rawScenes: sc, picks: pk, assets: [pump], generate: gen, model: 'x', log: quiet });
+    ok('semanticRecheck: chấm lệch mà không viết lại được thì CẢNH BÁO', sc[0].narration === OLD && r.flagged.join() === '0' && pk[0].why.includes('CẢNH BÁO'), pk[0]); }
+
+  // Ca 10: cảnh skip không bị đưa lên model chấm / viết lại.
+  { const sc = mkScenes(); const pk = mkPicks(); const seen = [];
+    const gen = async (_ai, p) => { seen.push(String(p.contents)); return { text: JSON.stringify({ picks: [{ scene: 1, fit: 1 }, { scene: 2, fit: 9 }] }) }; };
+    await semanticRecheck({ ai: null, rawScenes: sc, picks: pk, assets: [pump], skip: [0], generate: gen, model: 'x', log: quiet });
+    ok('semanticRecheck: cảnh skip không vào prompt chấm, không viết lại', !seen[0].includes('CẢNH 1 ') && seen.length === 1 && sc[0].narration === OLD, seen); }
+}
+
+// 1/10: storyboardDrift (video content storyboard-first) — soát lời từng cảnh với mô tả đúng hình đã chốt.
+{
+  const hinhCang = { id: 'sb-1', kind: 'video', title: 'Cảnh ngư dân chuẩn bị ra khơi ở cảng', folder: 'Content', description: 'Cảnh nhộn nhịp tại cảng cá trên bờ, tàu neo đậu, ngư dân chuẩn bị ra khơi' };
+  const hinhMay = { id: 'sb-2', kind: 'video', title: 'Cận cảnh động cơ', folder: 'Content', description: 'Cận cảnh động cơ tàu cá trong khoang máy, không thấy người' };
+  const hinhTau = { id: 'sb-3', kind: 'video', title: 'Tàu cá neo ở cảng', folder: 'Content', description: 'Tàu cá neo đậu ở cảng buổi chiều, ngư dân đứng trên boong' };
+  const sbSet = [hinhCang, hinhMay, hinhTau];
+  const clean = [
+    { narration: 'Tàu neo đậu ở cảng, ngư dân chuẩn bị ra khơi.' },
+    { narration: 'Động cơ nằm trong khoang máy, tiếng máy đều đều.' },
+    { narration: 'Tàu của bà con thì sao?' },
+  ];
+  eq('storyboardDrift: lời bám đúng hình thì không cảnh nào lệch', storyboardDrift(clean, sbSet).map((m) => m.scene), []);
+  const drifted = [clean[0], { narration: 'Mồ hôi vã ra giữa không gian chòng chành sóng nước.' }, clean[2]];
+  const d1 = storyboardDrift(drifted, sbSet);
+  ok('storyboardDrift: lời biển động trên hình khoang máy bị bắt (cảnh 2, drift)', d1.length === 1 && d1[0].scene === 2 && d1[0].reason === 'drift' && d1[0].asset.id === 'sb-2', d1);
+  const noOv = [clean[0], { narration: 'Bình lặng một buổi mai.' }, clean[2]];
+  const d2 = storyboardDrift(noOv, sbSet);
+  ok('storyboardDrift: lời không chung từ nào với mô tả hình (cảnh giữa) bị bắt no-overlap', d2.length === 1 && d2[0].scene === 2 && d2[0].reason === 'no-overlap', d2);
+  const lastFree = [clean[0], clean[1], { narration: 'Bà con nghĩ sao về chuyện này?' }];
+  eq('storyboardDrift: cảnh cuối (câu hỏi giao lưu) không bị bắt no-overlap', storyboardDrift(lastFree, sbSet), []);
+  const person = [{ narration: 'Anh thợ máy cười nói với chúng tôi.' }, clean[1], clean[2]];
+  const d3 = storyboardDrift(person, sbSet);
+  ok('storyboardDrift: chi tiết người không có trong mô tả (anh thợ máy) bị bắt cảnh 1', d3.some((m) => m.scene === 1 && (m.reason === 'invented' || m.reason === 'drift')), d3);
+  eq('storyboardDrift: số cảnh ít hơn bộ hình chỉ soát phần có, không lỗi', storyboardDrift([clean[0]], sbSet), []);
+  eq('storyboardDrift: đầu vào rỗng không lỗi', [storyboardDrift([], sbSet), storyboardDrift(null, null)], [[], []]);
+}
 
 const failed = cases.filter((c) => !c.ok);
 for (const c of cases) console.log(`${c.ok ? 'OK  ' : 'FAIL'} ${c.name}${c.ok ? '' : ` -> got ${JSON.stringify(c.got)}${c.want !== undefined ? ` want ${JSON.stringify(c.want)}` : ''}`}`);

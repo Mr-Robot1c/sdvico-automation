@@ -116,6 +116,17 @@ export async function buildTodayView(client: Client, now: Date = new Date()): Pr
   const rotation = contents.filter((c) => c.brief?.generator === 'rotation');
   const isContent = (c: C) => c.brief?.post_kind === 'content' || c.brief?.rotation_group === 'Bài content';
   const rows: TodayRow[] = slots.map((slot) => {
+    // 30/9: khung Bản tin — máy không sinh; ghép bài generator 'ban-tin' trong ngày nếu người đã
+    // gửi video (phiên Claude soạn), chưa có thì hiện chờ, KHÔNG rơi vào "máy lỡ lượt".
+    if (slot.kind === 'bantin') {
+      const bt = contents.find((x) => !used.has(x.id) && x.brief?.generator === 'ban-tin');
+      if (bt) {
+        used.add(bt.id);
+        const st = stageOf(bt);
+        return { slot, contentId: bt.id, title: bt.title, product: 'Bản tin thủy sản', stage: st.stage, scheduledAt: st.scheduledAt, publishedUrl: st.url, publishedChannels: st.channels };
+      }
+      return { slot, contentId: null, title: 'Bản tin thủy sản', product: 'Chờ người gửi video, máy soạn caption', stage: 'waiting', scheduledAt: null, publishedUrl: null, publishedChannels: [] };
+    }
     let c: C | undefined = rotation.find((x) => !used.has(x.id) && x.brief?.plan_slot?.date === date && Number(x.brief.plan_slot.index) === slot.index);
     if (!c) {
       c = rotation.find((x) => !used.has(x.id) && !x.brief?.plan_slot && (x.brief?.rotation_slot || 'chieu') === slot.window && isContent(x) === (slot.kind === 'content'));
