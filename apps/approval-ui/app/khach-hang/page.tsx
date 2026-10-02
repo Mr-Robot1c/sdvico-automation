@@ -20,7 +20,7 @@ import { INTENT_LABEL } from '../../lib/gen/lead-intent.mjs';
 // 16/9 (Thanh: "bỏ Chuyển NV, từ nay t phụ trách trả lời luôn — chính vì vậy mới cần con bot"): bỏ nút Chuyển NV,
 // khối NV nhận Zalo; cột forwarded_* trong DB giữ nhưng không hiện. Việc phụ (thêm tay, dọn trùng, rác) ở thanh góc phải.
 //
-// Máy chỉ ĐỌC và LƯU lead, không tự nhắn khách (điều cấm 1). Kênh online tự trả lời, tự chốt
+// Máy chỉ ĐỌC và LƯU lead, không tự nhắn khách (điều cấm 1). NGƯỜI trực kênh online tự trả lời, tự chốt
 // (lệnh sếp Long 9/9); không chốt được ghi "Không chốt" + lý do.
 export const dynamic = 'force-dynamic';
 // 24/9: nút "Soạn trả lời" gọi bot (chuỗi model tới ~58s) qua server action; action kế thừa maxDuration của trang.
@@ -165,7 +165,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
         <div>
           <h1>Khách hàng</h1>
           <p className="sub" style={{ margin: '4px 0 0' }}>
-            Người hỏi mua từ comment, tin nhắn Facebook, quảng cáo và nhập tay. Mỗi khách đi một đường: <b>Mới → Đã liên hệ → Đã mua</b> hoặc <b>Không chốt</b> (ghi lý do). Máy chỉ đọc và lưu; kênh online tự trả lời khách, thiếu thông tin thì hỏi bot.
+            Người hỏi mua từ comment, tin nhắn Facebook, quảng cáo và nhập tay. Mỗi khách đi một đường: <b>Mới → Đã liên hệ → Đã mua</b> hoặc <b>Không chốt</b> (ghi lý do). Máy chỉ đọc, lưu và soạn nháp, không tự gửi gì cho khách. Người trực kênh online tự trả lời và tự chốt, không chuyển Kinh doanh (lệnh sếp 9/9); thiếu thông tin thì hỏi bot.
           </p>
         </div>
         <div className="head-actions lead-toolbar">

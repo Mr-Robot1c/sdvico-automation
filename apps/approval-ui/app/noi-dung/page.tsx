@@ -13,7 +13,7 @@ import BangSection from './bang-section';
 import TikTokPrivateChip from './tiktok-private-chip';
 import { lengthLabel, channelsLabel, postedChannelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 import { assetPublicUrl } from '../../lib/asset-url';
-
+import { effContentStatus, isLivePost, latestQueueStatusByCid } from '../../lib/content-status';
 export const dynamic = 'force-dynamic';
 
 const STATUS: Record<string, { label: string; tone: string }> = {
@@ -25,9 +25,11 @@ const STATUS: Record<string, { label: string; tone: string }> = {
 };
 
 // Các mốc lọc theo trạng thái trên thanh chip.
+// 2/10 (audit đợt A): thêm "Đã đăng" để các chip cộng khớp với Tất cả (trước thiếu nhóm này nên 80 không bằng tổng chip).
 const STATUS_TABS: { key: string; label: string }[] = [
   { key: 'review', label: 'Chờ duyệt' },
   { key: 'approved', label: 'Đã duyệt' },
+  { key: 'published', label: 'Đã đăng' },
   { key: 'rejected', label: 'Đã từ chối' }
 ];
 
@@ -126,28 +128,27 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
       client
         .from('approval_queue')
         .select('payload, status')
-        .eq('kind', 'mkt_publish_content'),
+        .eq('kind', 'mkt_publish_content')
+        // 2/10: phải có order thì "phiếu mới nhất thắng" mới đúng (trước đây không order nên thứ tự tuỳ ý, số chip có thể lệch).
+        .order('created_at', { ascending: false })
+        .limit(1000),
     ]);
-    const qStatusByCid = new Map<string, string>();
-    for (const q of qRowsAll || []) {
-      const cid = (q as any).payload?.content_id as string | undefined;
-      if (!cid) continue;
-      // Dòng mới nhất thắng — approval_queue đã order theo created_at desc mặc định.
-      if (!qStatusByCid.has(cid)) qStatusByCid.set(cid, (q as any).status);
+    const qStatusByCid = latestQueueStatusByCid(qRowsAll as any[]);
+    // Lượt đăng thật của 200 bài này: có lượt đăng thì tính "Đã đăng" dù phiếu gần nhất là Từ chối.
+    const recentIds = (recentRows || []).map((r: any) => String(r.id));
+    const liveCids = new Set<string>();
+    if (recentIds.length) {
+      const nowIso = new Date().toISOString();
+      const { data: pRows } = await client.from('mkt_posts').select('content_id, published_at').eq('status', 'published').in('content_id', recentIds);
+      for (const p of pRows || []) if ((p as any).content_id && isLivePost(p as any, nowIso)) liveCids.add(String((p as any).content_id));
     }
-    const effOf = (row: { id: string; status: string | null }) => {
-      const qs = qStatusByCid.get(row.id);
-      if (qs === 'approved') return 'approved';
-      if (qs === 'rejected') return 'rejected';
-      if (qs === 'pending') return 'review';
-      return row.status || 'draft';
-    };
+    const effOf = (row: { id: string; status: string | null }) => effContentStatus(qStatusByCid.get(row.id), liveCids.has(row.id), row.status);
     let cAll = 0;
-    const cByStatus = { review: 0, approved: 0, rejected: 0 } as Record<string, number>;
+    const cByStatus = { review: 0, approved: 0, published: 0, rejected: 0 } as Record<string, number>;
     for (const r of recentRows || []) {
       cAll += 1;
       const s = effOf(r as any);
-      if (s === 'review' || s === 'approved' || s === 'rejected') cByStatus[s] += 1;
+      if (s in cByStatus) cByStatus[s] += 1;
     }
     return (
       <main>
@@ -175,6 +176,13 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
             </Link>
           ))}
         </nav>
+        {/* 2/10 (audit đợt A): ghi rõ phạm vi để số khớp được. Bốn chip trạng thái cộng với bài Nháp bằng đúng số Tất cả. */}
+        <p className="sub scope-note">
+          Phạm vi: {cAll.toLocaleString('vi-VN')} bài chữ (Bài dài và Bài ngắn, không tính video) mới nhất, không tính Thùng rác.
+          {' '}Chờ duyệt, Đã duyệt, Đã đăng, Đã từ chối và {Math.max(0, cAll - cByStatus.review - cByStatus.approved - cByStatus.published - cByStatus.rejected).toLocaleString('vi-VN')} bài Nháp cộng lại bằng Tất cả.
+          {' '}Bài đã có lượt đăng thật luôn tính Đã đăng, kể cả khi phiếu duyệt gần nhất là Từ chối.
+          {' '}Bảng bên dưới đếm theo phiếu duyệt (300 phiếu gần nhất, mỗi bài một thẻ) nên có thể gồm cả video.
+        </p>
         <BangSection />
       </main>
     );
@@ -199,23 +207,35 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
 
   // Trạng thái duyệt là ở approval_queue (nguồn sự thật của điều cấm 1). Lấy về để suy trạng thái
   // thực của mỗi bài: đã duyệt, đã từ chối, hay còn chờ.
+  // 2/10: order created_at GIẢM DẦN để phiếu MỚI NHẤT của mỗi bài thắng (trước không order, vòng lặp "dòng sau đè dòng trước"
+  // nên trạng thái phụ thuộc thứ tự trả về tuỳ ý của DB: bài có phiếu cũ + phiếu mới có thể hiện sai).
   const { data: qRows } = await client
     .from('approval_queue')
     .select('payload, status, decided_at')
-    .eq('kind', 'mkt_publish_content');
-  const queueStatus = new Map<string, string>();
+    .eq('kind', 'mkt_publish_content')
+    .order('created_at', { ascending: false })
+    .limit(1000);
+  const queueStatus = latestQueueStatusByCid(qRows as any[]);
   const decidedAt = new Map<string, string>();
   // Giờ hẹn đăng (payload.scheduled_at, decideForm ghi khi duyệt + hẹn). Bài đã duyệt mà có giờ hẹn
   // còn ở tương lai -> hiện "Đã duyệt, đợi hẹn giờ HH:mm dd/mm" (user 18/8).
   const scheduledAt = new Map<string, string>();
+  const seenQ = new Set<string>();
   for (const q of qRows || []) {
     const cid = (q.payload && typeof q.payload === 'object' ? (q.payload as any).content_id : null) as string | null;
-    if (cid) {
-      queueStatus.set(cid, q.status as string);
+    if (cid && !seenQ.has(cid)) {
+      seenQ.add(cid); // chỉ phiếu mới nhất của bài
       if ((q as any).decided_at) decidedAt.set(cid, (q as any).decided_at as string);
       const sa = (q.payload as any)?.scheduled_at as string | undefined;
       if (sa && q.status === 'approved') scheduledAt.set(cid, sa);
     }
+  }
+  // Lượt đăng thật của các bài đang xem (tối đa 200): có lượt đăng thì hiển thị Đã đăng, kể cả khi phiếu gần nhất là Từ chối.
+  const liveCids = new Set<string>();
+  if (rawItems.length) {
+    const nowIso = new Date().toISOString();
+    const { data: lp } = await client.from('mkt_posts').select('content_id, published_at').eq('status', 'published').in('content_id', rawItems.map((c) => c.id));
+    for (const p of lp || []) if ((p as any).content_id && isLivePost(p as any, nowIso)) liveCids.add(String((p as any).content_id));
   }
   // "YYYY-MM-DDTHH:mm" (giờ máy người duyệt = giờ VN) -> "HH:mm dd/mm/yyyy". Không đổi múi giờ.
   const fmtSchedule = (s: string): string => {
@@ -230,13 +250,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     const utcMs = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 7, +m[5]);
     return utcMs > Date.now();
   };
-  const effStatus = (c: Content): string => {
-    const qs = queueStatus.get(c.id);
-    if (qs === 'approved') return 'approved';
-    if (qs === 'rejected') return 'rejected';
-    if (qs === 'pending') return 'review';
-    return c.status || 'draft';
-  };
+  const effStatus = (c: Content): string => effContentStatus(queueStatus.get(c.id), liveCids.has(c.id), c.status);
 
   // Đếm theo trạng thái (trên tập đã lọc theo loại) để dựng thanh chip.
   const statusCount = new Map<string, number>();
@@ -377,6 +391,12 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
           </a>
         ))}
       </nav>
+      {/* 2/10 (audit đợt A): phạm vi số đếm. Bốn chip trạng thái + Nháp = Tất cả. */}
+      <p className="sub scope-note">
+        Phạm vi: {rawItems.length.toLocaleString('vi-VN')} {tab === 'video' ? 'kịch bản video' : 'bài chữ'} mới nhất{tab === 'thung-rac' ? ' trong Thùng rác' : ', không tính Thùng rác'} (tối đa 200).
+        {' '}Số Tất cả gồm cả {(rawItems.length - STATUS_TABS.reduce((s, t) => s + (statusCount.get(t.key) || 0), 0)).toLocaleString('vi-VN')} bài ở trạng thái Nháp không có chip riêng.
+        {' '}Bài đã có lượt đăng thật tính Đã đăng, kể cả khi phiếu duyệt gần nhất là Từ chối.
+      </p>
 
       {tab === 'video' ? (
         <div className="pipeline">
@@ -487,6 +507,10 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                       ) : (
                         <span className={`badge tone-${st.tone}`}>{st.label}</span>
                       )}
+                      {/* 2/10: bài có lượt đăng thật mà phiếu gần nhất là Từ chối (vd bấm nhầm sau khi đã đăng): ghi chú để khỏi tưởng bài bị chặn. */}
+                      {effStatus(c) === 'published' && queueStatus.get(c.id) === 'rejected' ? (
+                        <div className="muted" style={{ fontSize: '.74rem', marginTop: 4 }} title="Bài đã có lượt đăng thật. Phiếu duyệt gần nhất là Từ chối (có thể bấm nhầm sau khi đã đăng); dữ liệu giữ nguyên.">phiếu gần nhất: Từ chối</div>
+                      ) : null}
                       {blockedReason.get(c.id) ? (
                         <div style={{ marginTop: 4 }}>
                           <span className="badge tone-no">⛔ {blockedReason.get(c.id)}</span>

@@ -82,7 +82,7 @@ export default function Page() {
         <br />
         Website: <a href="https://sdvico.vn" target="_blank" rel="noreferrer">sdvico.vn</a> — Hotline: 1900 23 23 49
         <br />
-        Email: tuyendung@sdvico.vn (dùng chung cho mọi yêu cầu về dữ liệu cá nhân)
+        Email: congnghebien.sdvico@gmail.com (dùng chung cho mọi yêu cầu về dữ liệu cá nhân)
       </p>
     </main>
   );

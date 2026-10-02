@@ -68,7 +68,8 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
   // privacy/terms dung shell noi bo -> hien sidebar day link can dang nhap, Next prefetch cac
   // route do -> loi 401 dồn dập tren console + co the bat popup dang nhap tren trang cong khai
   // (20/8: user bao "web crash hoai"). Dua het ve public shell, KHONG link vao route noi bo.
-  const isPublic = /^\/(blog|san-pham|privacy|terms)(\/|$)/.test(path);
+  // 2/10 (audit đợt A): thêm /xoa-du-lieu (hướng dẫn xóa dữ liệu) — trước dùng shell nội bộ (hamburger + bot) cho khách.
+  const isPublic = /^\/(blog|san-pham|privacy|terms|xoa-du-lieu)(\/|$)/.test(path);
 
   if (isPublic) {
     return (

@@ -5,6 +5,7 @@ import ViewModal from '../view-modal';
 import { editDraft } from '../actions';
 import { kindMeta, formatRelative, formatDateTimeVN, payloadRows, intentLabel, planChannelLabel, purposeLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
 import { assetPublicUrl } from '../../lib/asset-url';
+import { publishTargetLines } from '../../lib/publish-targets';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 // (Hàng đợi duyệt hiện ảnh/video đã gắn từ payload.assets — build 2026-08-12.)
@@ -340,13 +341,18 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   </p>
                 ) : null}
 
+                {/* 2/10 (audit đợt A): nói rõ Duyệt xong bài đi đâu, đúng sự thật từng kênh. */}
+                <ul className="pub-target" aria-label="Đích đăng sau khi duyệt">
+                  {publishTargetLines(info.planChannel, info.channels).map((l) => <li key={l}>{l}</li>)}
+                </ul>
+
                 <div className="card-actions">
                   <ViewModal
                     title={cleanTitle}
                     label="Xem bài viết"
                     footer={
                       <>
-                        <span className="modal-foot-hint">Giờ hẹn và ghi chú đặt ở khung dưới thẻ bài. Để trống giờ hẹn thì đăng ngay.</span>
+                        <span className="modal-foot-hint">Giờ hẹn và ghi chú đặt ở khung dưới thẻ bài. Để trống giờ hẹn thì đăng ngay. Đích đăng ghi ngay dưới huy hiệu của thẻ bài.</span>
                         <button type="submit" form={`decide-${item.id}`} name="action" value="reject" className="btn ghost">Từ chối</button>
                         <button type="submit" form={`decide-${item.id}`} name="action" value="approve" className="btn ok">Duyệt</button>
                       </>

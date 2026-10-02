@@ -58,6 +58,17 @@ export default async function Page() {
         </div>
       </header>
 
+      {/* 2/10 (audit đợt A): nói đúng trạng thái module, khỏi tưởng đo chuyển đổi đã tự chạy. Tự đổi chữ khi đã dán mã. */}
+      <div className="applied-banner" role="status" style={{ borderLeftColor: 'var(--amber, #d97706)' }}>
+        <b>Trạng thái module</b>
+        <p>
+          {!cfg.pixelId && !cfg.ga4Id
+            ? 'Module đã sẵn sàng cấu hình. Chưa gắn Pixel và GA4 nên chưa đo chuyển đổi tự động.'
+            : `Đã nhập ${[cfg.pixelId ? 'Meta Pixel' : '', cfg.ga4Id ? 'GA4' : ''].filter(Boolean).join(' và ')}${cfg.pixelId && cfg.ga4Id ? '' : ', còn thiếu ' + (cfg.pixelId ? 'GA4' : 'Meta Pixel')}. Chuyển đổi chỉ đo được ở trang bài viết và trang sản phẩm công khai có gắn mã.`}
+          {' '}Đợt quảng cáo tháng 9/2026 được đo thủ công qua thẻ ad_id (nguồn "Quảng cáo Facebook" ở trang Khách hàng).
+        </p>
+      </div>
+
       {!tableReady ? (
         <div className="applied-banner" role="alert" style={{ borderLeftColor: 'var(--no, #d33)' }}>
           <b>⚠️ Chưa chạy migration bảng quảng cáo.</b>

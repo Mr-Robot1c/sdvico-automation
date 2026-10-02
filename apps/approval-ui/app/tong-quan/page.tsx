@@ -330,7 +330,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
             {leadNew.length ? (
               <div className="need-item">
                 <span className="need-n">{fmt(leadNew.length)}</span>
-                <span style={{ flex: 1 }}>người hỏi mua <b>chưa được trả lời</b>. Kênh online tự trả lời và tự chốt, không chuyển Kinh doanh (lệnh sếp 9/9); thiếu thông tin thì hỏi bot. <Link href="/khach-hang">Mở Khách hàng →</Link></span>
+                <span style={{ flex: 1 }}>người hỏi mua <b>chưa được trả lời</b> (trong 7 ngày qua). Người trực kênh online tự trả lời và tự chốt, không chuyển Kinh doanh (lệnh sếp 9/9); máy chỉ đọc, lưu và soạn nháp, không tự gửi. Thiếu thông tin thì hỏi bot. <Link href="/khach-hang">Mở Khách hàng →</Link></span>
               </div>
             ) : null}
           </div>
@@ -438,25 +438,27 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           <h2><span aria-hidden="true">📶</span> Tiến độ theo giai đoạn <span className="sub">ô đỏ = cần người động tay</span></h2>
           <div className="stage-flow">
             <Link href="/ke-hoach#huong-di" className="stage-node" title="Hướng đi bài viết BOSS đề xuất trong bản kế hoạch đang áp — bấm để xem">
-              <b>{fmt(ideaCount)}</b><span>Ý tưởng</span>
+              <b>{fmt(ideaCount)}</b><span>Ý tưởng</span><small className="stage-scope">kế hoạch đang áp</small>
             </Link>
             <span className="stage-sep" aria-hidden="true">→</span>
             <Link href="/tong-quan?gd=draft#tat-ca-noi-dung" className="stage-node" title="Bài đã viết xong còn ở bước nháp / đang sinh (trong 200 bài mới nhất)">
-              <b>{fmt(writtenCount)}</b><span>Đã viết</span>
+              <b>{fmt(writtenCount)}</b><span>Đã viết</span><small className="stage-scope">200 bài mới nhất</small>
             </Link>
             <span className="stage-sep" aria-hidden="true">→</span>
             <Link href="/tong-quan?gd=pending#tat-ca-noi-dung" className={`stage-node ${pending.length ? 'act' : ''}`} title="Bài chờ người bấm Duyệt — bấm để xem danh sách">
-              <b>{fmt(pending.length)}</b><span>Chờ duyệt</span>
+              <b>{fmt(pending.length)}</b><span>Chờ duyệt</span><small className="stage-scope">phiếu 60 ngày qua</small>
             </Link>
             <span className="stage-sep" aria-hidden="true">→</span>
             <Link href="/tong-quan?gd=scheduled#tat-ca-noi-dung" className="stage-node" title="Bài đã duyệt kèm giờ hẹn, tới giờ máy tự đăng — bấm để xem danh sách">
-              <b>{fmt(scheduled.length)}</b><span>Đã lên lịch</span>
+              <b>{fmt(scheduled.length)}</b><span>Đã lên lịch</span><small className="stage-scope">phiếu 60 ngày qua</small>
             </Link>
             <span className="stage-sep" aria-hidden="true">→</span>
             <Link href="/tong-quan?gd=published#tat-ca-noi-dung" className="stage-node done" title="Bài đã đăng thật lên các kênh — bấm để xem danh sách">
-              <b>{fmt(publishedCids.size)}</b><span>Đã đăng</span>
+              <b>{fmt(publishedCids.size)}</b><span>Đã đăng</span><small className="stage-scope">mọi bài, mọi kênh, 1.000 lượt đăng mới nhất</small>
             </Link>
           </div>
+          {/* 2/10 (audit đợt A): các ô đếm trên tập khác nhau nên KHÔNG cộng được thành một tổng. */}
+          <p className="sub scope-note">Mỗi ô đếm trên một tập riêng (ghi dưới số) nên không cộng được thành tổng. Đã đăng gồm cả blog và bài ngoài 200 bài mới nhất.</p>
         </section>
         <section className="blk">
           <h2><span aria-hidden="true">🛒</span> Người hỏi mua <span className="sub">({fmt(leads.length)} trong 7 ngày · {fmt(leadToday.length)} hôm nay · {fmt(leadAds.length)} từ quảng cáo)</span></h2>

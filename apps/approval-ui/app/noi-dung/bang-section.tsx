@@ -16,6 +16,7 @@ import LinkTikTokButton from './link-tiktok-button';
 import PexelsScenesButton from './pexels-scenes-button';
 import { isFutureVNLocal, CHANNEL_LABEL } from '../../lib/posting-plan';
 import { assetPublicUrl } from '../../lib/asset-url';
+import { publishTargetLines } from '../../lib/publish-targets';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
 // board thể hiện tổng quan"). Bốn cột theo dòng chảy: Chờ duyệt (duyệt ngay trên thẻ, vẫn
@@ -169,15 +170,18 @@ export default async function BangSection() {
   const nowIso = new Date().toISOString();
   const hasLivePost = (cid: string) => (postsByContent.get(cid) || []).some((p) => p.at && p.at <= nowIso);
   const approvedWaiting = items.filter((it) => it.status === 'approved' && !hasLivePost(it.cid));
+  // 2/10 (audit đợt A): bài đã có lượt đăng thật là "Đã đăng" dù phiếu gần nhất là Từ chối (vd bấm nhầm sau khi đã đăng).
+  // Trước đây bài như vậy nằm CẢ ở Đã đăng LẪN Từ chối (đếm 2 lần, còn có link FB/TikTok ở thẻ Từ chối). Giờ hai nhóm tách bạch.
+  // Phiếu còn pending vẫn ở cột Chờ duyệt, không lọt vào Đã đăng.
   const published = items
-    .filter((it) => hasLivePost(it.cid))
+    .filter((it) => it.status !== 'pending' && hasLivePost(it.cid))
     .sort((a, b) => {
       const la = (postsByContent.get(a.cid) || [])[0]?.at || '';
       const lb = (postsByContent.get(b.cid) || [])[0]?.at || '';
       return lb.localeCompare(la);
     });
   const rejected = items
-    .filter((it) => it.status === 'rejected')
+    .filter((it) => it.status === 'rejected' && !hasLivePost(it.cid))
     .sort((a, b) => (b.decidedAt || '').localeCompare(a.decidedAt || ''));
 
   // Nhãn kênh chuẩn (thay emoji thô); logo brthật vẽ bằng PlatformLogo.
@@ -256,6 +260,10 @@ export default async function BangSection() {
                           <span aria-hidden="true">🎯</span> {(brief as any).insight_line}
                         </p>
                       ) : null}
+                      {/* 2/10 (audit đợt A): nói rõ Duyệt xong bài đi đâu, đúng sự thật từng kênh. */}
+                      <ul className="pub-target" aria-label="Đích đăng sau khi duyệt">
+                        {publishTargetLines(p.plan_channel, chans).map((l) => <li key={l}>{l}</li>)}
+                      </ul>
                       {imgUrl || vidUrl ? (
                         <div className="card-media">
                           {imgUrl ? <img src={imgUrl} alt="" loading="lazy" decoding="async" /> : null}
@@ -279,7 +287,18 @@ export default async function BangSection() {
                         </p>
                       ) : null}
                       <div className="card-actions">
-                        <ViewModal title={title} label="Xem bài viết">
+                        {/* 2/10 (audit đợt A): thanh Duyệt / Từ chối dính đáy modal, cùng cơ chế với /hang-doi (submit qua form="decide-..."). */}
+                        <ViewModal
+                          title={title}
+                          label="Xem bài viết"
+                          footer={
+                            <>
+                              <span className="modal-foot-hint">Giờ hẹn và ghi chú đặt ở khung dưới thẻ bài. Để trống giờ hẹn thì đăng ngay. Đích đăng ghi ngay dưới huy hiệu của thẻ bài.</span>
+                              <button type="submit" form={`decide-${it.qid}`} name="action" value="reject" className="btn ghost">Từ chối</button>
+                              <button type="submit" form={`decide-${it.qid}`} name="action" value="approve" className="btn ok">Duyệt</button>
+                            </>
+                          }
+                        >
                           {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                           {c ? (
                             <details className="raw editbox">
@@ -350,6 +369,7 @@ export default async function BangSection() {
                       <DecideActions
                         id={it.qid}
                         title={title}
+                        formId={`decide-${it.qid}`}
                         hasTiktok={chans.includes('tiktok')}
                         videoUrl={vidUrl ?? null}
                         caption={c?.draft ?? null}
@@ -437,6 +457,9 @@ export default async function BangSection() {
                       <b>{title}{ab ? <span className="badge badge-ab" style={{ marginLeft: 6 }} title="Bài thử của cặp A/B theo hướng đi kế hoạch.">🧪 Thử {ab}</span> : null}</b>
                       {(brief as any).insight_line ? <span className="insight-line" title={(brief as any).insight_situation || ''}><span aria-hidden="true">🎯</span> {(brief as any).insight_line}</span> : null}
                       {lastAt ? <span className="muted" style={{ fontSize: '.8rem' }}>Đăng {formatRelative(lastAt)}</span> : null}
+                      {it.status === 'rejected' ? (
+                        <span className="muted" style={{ fontSize: '.74rem' }} title="Bài đã có lượt đăng thật. Phiếu duyệt gần nhất là Từ chối (có thể bấm nhầm sau khi đã đăng); dữ liệu giữ nguyên.">phiếu gần nhất: Từ chối</span>
+                      ) : null}
                       <div className="ch-links">
                         {posts.filter((x) => /^https?:/.test(x.url)).map((x, i) => {
                           // 29/8 (user): chip Facebook GIỐNG TikTok — CHỈ hiện khi đã Ghép FB chính
@@ -584,6 +607,12 @@ export default async function BangSection() {
               {col.moreHref ? (
                 <Link className="src" href={col.moreHref} style={{ fontSize: '.85rem' }}>Xem tất cả {col.countOverride ?? col.items.length} bài</Link>
               ) : null}
+              {/* 2/10 (audit đợt A): phạm vi số đếm của từng cột. */}
+              <p className="muted" style={{ fontSize: '.72rem', margin: '6px 0 0', lineHeight: 1.4 }}>
+                {col.key === 'status'
+                  ? `Số ${statusTotal} = ${published.length} đã đăng + ${rejected.length} từ chối thật, tính trong 300 phiếu duyệt gần nhất. Thẻ chỉ hiện ${PUB_CAP} bài đã đăng và ${REJ_CAP} bài từ chối mới nhất.`
+                  : 'Tính trong 300 phiếu duyệt gần nhất, mỗi bài một thẻ (phiếu mới nhất của bài).'}
+              </p>
             </div>
           ))}
         </div>

@@ -34,11 +34,11 @@ export default function Page() {
         </li>
         <li>
           <b>Gửi email</b> tới{' '}
-          <a href="mailto:tuyendung@sdvico.vn">tuyendung@sdvico.vn</a> với tiêu đề{' '}
+          <a href="mailto:congnghebien.sdvico@gmail.com">congnghebien.sdvico@gmail.com</a> với tiêu đề{' '}
           <i>“Yêu cầu xoá dữ liệu — [Tên Facebook của bà con]”</i>.
         </li>
         <li>
-          <b>Gọi hotline</b> <a href="tel:19002323 49">1900 23 23 49</a>, bấm phím nhánh chăm sóc khách
+          <b>Gọi hotline</b> <a href="tel:1900232349">1900 23 23 49</a>, bấm phím nhánh chăm sóc khách
           hàng, đề nghị xoá dữ liệu.
         </li>
       </ol>

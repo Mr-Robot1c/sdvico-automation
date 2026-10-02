@@ -57,12 +57,14 @@ export async function middleware(req: NextRequest) {
   // /privacy/ -> /privacy nhưng TikTok KHÔNG follow -> báo "no signature". Rewrite tại đây để cùng
   // URL trả thẳng HTML (kèm meta trong <head> layout) thay vì redirect.
   const pth = req.nextUrl.pathname;
-  if (/^\/(privacy|terms)\/$/.test(pth)) {
+  // 2/10 (audit đợt A): /xoa-du-lieu (hướng dẫn xóa dữ liệu, trang tĩnh không chứa dữ liệu) cũng phải MỞ: chính sách
+  // /privacy dẫn tới nó và Facebook yêu cầu URL xóa dữ liệu công khai; trước đây bị chặn bởi cổng đăng nhập.
+  if (/^\/(privacy|terms|xoa-du-lieu)\/$/.test(pth)) {
     const target = req.nextUrl.clone();
     target.pathname = pth.replace(/\/$/, '');
     return NextResponse.rewrite(target);
   }
-  if (/^\/(privacy|terms)(\/|$)/.test(pth)) return NextResponse.next();
+  if (/^\/(privacy|terms|xoa-du-lieu)(\/|$)/.test(pth)) return NextResponse.next();
 
   // SEO public routes (item 2, 20/8): trang bài blog + trang sản phẩm + sitemap + robots là
   // trang MỞ để Google/Bing/người ngoài xem — bỏ basic-auth. Trang duyệt nội bộ vẫn khóa.
