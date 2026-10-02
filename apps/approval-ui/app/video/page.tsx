@@ -82,9 +82,20 @@ export default async function Page() {
   type Tl = { assetId: string | null; role: string | null; kind: string; start: number; end: number; text: string };
   const contentByPrefix = new Map<string, any>();
   for (const c of contents) contentByPrefix.set(String(c.id).slice(0, 8), c);
+  // 2/10 (sổ QA): video content tự gắn vào CHÍNH bài (brief.assets.video/video_h/video_v) có thể không
+  // khớp tiền tố đường dẫn, làm cột "Ghép từ" trống dù brief có video_timeline. Thêm đường nối theo id asset.
+  const contentByAssetId = new Map<string, any>();
+  for (const c of contents) {
+    const as = c?.brief?.assets || {};
+    for (const k of ['video', 'video_h', 'video_v']) if (as[k]) contentByAssetId.set(String(as[k]), c);
+  }
+  const hasTl = (c: any) => Array.isArray(c?.brief?.video_timeline) && c.brief.video_timeline.length > 0;
   const sourceOf = (a: any): any | null => {
     const m = String(a.storage_path || '').match(/^video\/sdvico_([0-9a-f]{8})_/i);
-    return m ? contentByPrefix.get(m[1]) || null : null;
+    const byPath = m ? contentByPrefix.get(m[1]) || null : null;
+    const byId = contentByAssetId.get(String(a.id)) || null;
+    if (byPath && (hasTl(byPath) || !byId)) return byPath;
+    return byId || byPath;
   };
   const sceneIds = new Set<string>();
   for (const a of assets) {

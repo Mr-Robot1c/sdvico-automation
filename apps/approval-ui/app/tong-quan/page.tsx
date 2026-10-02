@@ -342,7 +342,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           <span className="sub">· {todayLabel} · {fmt(todayView.counts.total)} bài theo lịch{todayView.overridden ? ' · ✏️ lịch riêng hôm nay' : ''}{!todayView.saved ? ' · lịch mặc định (chưa lưu)' : ''}</span>
         </h2>
         <p className="sub" style={{ margin: '4px 0 8px', fontSize: '.85rem' }}>
-          📣 Chia sẻ group hôm nay: <b>{fmt(todayLot?.done || 0)}/{fmt(todayLot?.lotSize || 0)}</b> nhóm · mỗi buổi Facebook 4 nhóm, bấm <b>Mở nhóm</b> rồi <b>Đã chia</b> ngay trong cột Chia sẻ group bên dưới (máy không tự thấy việc chia trên Facebook).
+          📣 Chia sẻ group hôm nay: <b>{fmt(todayLot?.done || 0)}/{fmt(todayLot?.lotSize || 0)}</b> nhóm · mỗi buổi Facebook 4 nhóm, bấm <b>Mở nhóm</b> rồi <b>Đánh dấu đã chia</b> ngay trong cột Chia sẻ group bên dưới (máy không tự thấy việc chia trên Facebook).
         </p>
         {todayView.rows.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Hôm nay lịch không có bài nào. <Link href="/ke-hoach#lich-dang" className="src">Sửa lịch đăng →</Link></p>

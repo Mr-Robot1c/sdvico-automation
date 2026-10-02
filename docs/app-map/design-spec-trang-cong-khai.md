@@ -1,8 +1,9 @@
 > Load khi: task chạm UI trang công khai /blog, /blog/[slug], /blog/chu-de/[slug], /san-pham, /san-pham/[slug] (shell công khai trong root-shell.tsx)
 covers: apps/approval-ui/app/blog, apps/approval-ui/app/san-pham, apps/approval-ui/app/root-shell.tsx
+<!-- re-verified: 2026-10-02 - UI MUOT: /blog, /blog/[slug], /blog/chu-de/[slug] bo force-dynamic, doc du lieu qua getPublicClient() (khong no-store) => ISR 5 den 10 phut, [slug] them generateStaticParams; <img> trong post-card, san-pham, root-shell them loading=lazy/decoding=async (root-shell + hero bai chi decoding). Bo cuc, noi dung, meta, JSON-LD KHONG doi. -->
 <!-- re-verified: 2026-09-15 (2) - DOT 8: root-shell.tsx AskBotFab doi sang next/dynamic (ssr:false) — shell cong khai KHONG doi (fab chi render o shell noi bo); layout.tsx ads config cache 5 phut (Pixel/GA4 doi o /quang-cao ap sau toi da 5 phut). -->
 <!-- re-verified: 2026-09-15 - DOT 4 (kho tu lieu Google Drive): app/san-pham/page.tsx + app/san-pham/[slug]/page.tsx + lib/seo.ts + lib/cover-image.ts doi getPublicUrl -> assetPublicUrl (lib/asset-url.ts) de anh tren Drive ("gdrive:<id>/<ten>") hien duoc; giao dien trang cong khai KHONG doi. -->
-last_verified: 2026-09-07
+last_verified: 2026-10-02
 ttl_days: 90
 <!-- re-verified: 2026-09-09 chieu - root-shell.tsx CHI them <AskBotFab /> canh <BotChip /> o nhanh SHELL NOI BO (sau isPublic); shell cong khai /blog, /san-pham, /privacy, /terms KHONG doi, khong co nut bot o trang cong khai. -->
 <!-- re-verified: 2026-09-07 toi - Man 1 (/blog) + man 2 (/blog/[slug]) CHI doi meta: canonical + JSON-LD @id tro sdvico.vn/blog(/<slug>) (publicBlogUrl trong lib/seo.ts), og:url giu nguyen URL app. Giao dien, bo cuc, CTA, the bai KHONG doi. Doi chieu lai: man 1 chip chu de + luoi 3/2/1, man 2 tieu de + anh tren fold + 1 CTA + 3 bai khac van dung code. -->

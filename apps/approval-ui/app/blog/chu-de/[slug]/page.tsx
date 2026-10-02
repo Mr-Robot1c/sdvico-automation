@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { getServerClient } from '../../../../lib/supabase-server';
+import { getPublicClient } from '../../../../lib/supabase-server';
 import { displayProduct, isProductOf, loadPublicPosts, siteUrl } from '../../../../lib/seo';
 import { findProductBySlug, PRODUCT_CATALOG } from '../../../../lib/product-catalog';
 import { safeJsonLd } from '../../../../lib/jsonld';
 import PostCard from '../../post-card';
 
-export const dynamic = 'force-dynamic';
+// 2/10: bo force-dynamic (de revalidate, khach lanh chiu cold-start). Khong dung cookies/headers.
 export const revalidate = 600;
 
 // TRANG CHỦ ĐỀ (topic hub) cho SEO — user 20/8: "trang tổng hợp theo từ khóa".
@@ -45,7 +45,7 @@ export default async function TopicHubPage({ params }: Props) {
   const p = isStory(params.slug) ? STORY_TOPIC : findProductBySlug(params.slug);
   if (!p) notFound();
 
-  const client = getServerClient();
+  const client = getPublicClient();
   const posts = await loadPublicPosts(client, 300);
   const matched = isStory(params.slug)
     ? posts.filter((x) => !displayProduct(x.product))

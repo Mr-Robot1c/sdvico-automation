@@ -110,7 +110,7 @@ export default function ImageStudio({
         <div className="studio-grid">
           {results.map((it) => (
             <div className="studio-card" key={it.id}>
-              <img src={it.thumb} alt={it.author ? `Ảnh của ${it.author}` : 'Ảnh Unsplash'} loading="lazy" />
+              <img src={it.thumb} alt={it.author ? `Ảnh của ${it.author}` : 'Ảnh Unsplash'} loading="lazy" decoding="async" />
               <div className="studio-card-actions">
                 <button type="button" className="btn ghost sm" onClick={() => onInsert(it)} disabled={!!busy}>
                   {busy === 'ins-' + it.id ? '...' : 'Chèn ảnh'}

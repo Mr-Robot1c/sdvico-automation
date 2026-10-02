@@ -1531,6 +1531,8 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .pp-table input[type='time'] { width: 142px; min-width: 142px; font-variant-numeric: tabular-nums; }
 .pp-table .pp-c-on label { display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; color: var(--ink-2); white-space: nowrap; }
 .pp-row:not(.on) td:not(.pp-c-day):not(.pp-c-on) { opacity: .45; }
+.pp-pin > summary { cursor: pointer; font-size: .82rem; }
+.pp-pin[open] > summary { margin-bottom: 4px; }
 .pp-notes { margin: 0 0 10px; padding-left: 18px; font-size: .85rem; color: var(--ink-2); display: grid; gap: 2px; }
 
 /* 9/9: nut HOI BOT noi (ask-bot-fab.tsx) - dung TREN chip "Bot da hoc" (bottom 20px) de khong de nhau. */

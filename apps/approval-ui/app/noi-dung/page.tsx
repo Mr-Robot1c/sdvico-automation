@@ -535,7 +535,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                         )}
                         {img || vid ? (
                           <div className="modal-media">
-                            {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} /> : null}
+                            {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} loading="lazy" decoding="async" /> : null}
                             {vid ? (
                               <>
                                 <video src={vid.url} controls preload="metadata" playsInline poster={img?.url || undefined} />

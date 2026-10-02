@@ -1,23 +1,35 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { getServerClient } from '../../../lib/supabase-server';
+import { getPublicClient } from '../../../lib/supabase-server';
 import { catalogItemOf, fmtDateVN, isProductOf, loadPublicPost, loadPublicPosts, optImg, optImgAbs, publicBlogUrl, siteUrl } from '../../../lib/seo';
 import { loadAdsConfig, messengerUrl, zaloUrl } from '../../../lib/ads-config';
 import { safeJsonLd } from '../../../lib/jsonld';
 import ContactButtons from '../../contact-buttons';
 import PostCard from '../post-card';
 
-export const dynamic = 'force-dynamic';
+// 2/10: bo force-dynamic (de revalidate, khach lanh chiu cold-start). Khong dung cookies/headers.
 export const revalidate = 300;
 
 type Props = { params: { slug: string } };
+
+// 2/10: có generateStaticParams thì Next mới dựng sẵn (ISR) trang theo slug và làm mới theo
+// `revalidate`; thiếu nó, trang có tham số vẫn chạy dynamic và cold-start. Dựng sẵn các bài đang
+// đăng; lỗi mạng lúc build thì trả rỗng (bài mới vẫn được dựng ở lượt xem đầu rồi lưu cache).
+export async function generateStaticParams() {
+  try {
+    const posts = await loadPublicPosts(getPublicClient(), 500);
+    return posts.map((p) => ({ slug: p.slug }));
+  } catch {
+    return [];
+  }
+}
 
 // Meta OG + canonical để Facebook/Google/Zalo hiện đúng khi share link bài.
 // 7/9: canonical -> sdvico.vn/blog/<slug> (Google gom về tên miền công ty); og:url GIỮ trang này
 // (SPA sdvico.vn không có OG từng bài, xem lib/seo.ts publicBlogBase).
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const client = getServerClient();
+  const client = getPublicClient();
   const post = await loadPublicPost(client, params.slug);
   if (!post) return { title: 'Không tìm thấy bài viết — SDVICO' };
   const url = `${siteUrl()}/blog/${post.slug}`;
@@ -41,8 +53,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // điện thoại -> tiêu đề + ảnh trên fold, thân bài ~68 ký tự/dòng, 1 khối CTA (primary duy nhất)
 // rồi 3 bài khác (cùng sản phẩm trước, không có thì bài mới nhất).
 export default async function BlogDetailPage({ params }: Props) {
-  const client = getServerClient();
-  const [posts, ads] = await Promise.all([loadPublicPosts(client, 500), loadAdsConfig()]);
+  const client = getPublicClient();
+  const [posts, ads] = await Promise.all([loadPublicPosts(client, 500), loadAdsConfig(client)]);
   const post = posts.find((p) => p.slug === params.slug);
   if (!post) notFound();
 
@@ -92,7 +104,7 @@ export default async function BlogDetailPage({ params }: Props) {
           ) : null}
         </div>
         {post.imageUrl ? (
-          <img className="pub-read-hero" src={optImg(post.imageUrl, 1080) || undefined} alt={post.title} />
+          <img className="pub-read-hero" src={optImg(post.imageUrl, 1080) || undefined} alt={post.title} decoding="async" />
         ) : null}
         <div className="pub-read-body">{post.body}</div>
 

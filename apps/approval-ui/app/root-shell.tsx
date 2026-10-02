@@ -40,7 +40,7 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
         <header className="pub-header">
           <div className="pub-header-in">
             <Link href="/blog" className="pub-brand" aria-label="SDVICO, trang bài viết">
-              <img src="/logo-sdvico.png" alt="" width={40} height={40} aria-hidden="true" />
+              <img src="/logo-sdvico.png" alt="" width={40} height={40} aria-hidden="true" decoding="async" />
               <span>
                 <b>SDVICO</b>
                 <small>Công nghệ số cho ngành biển và thủy sản</small>
@@ -62,7 +62,7 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
         <footer className="pub-footer">
           <div className="pub-footer-in">
             <div className="pub-footer-brand">
-              <img src="/logo-sdvico.png" alt="" width={36} height={36} aria-hidden="true" />
+              <img src="/logo-sdvico.png" alt="" width={36} height={36} aria-hidden="true" decoding="async" />
               <div>
                 <b>SDVICO</b>
                 <p>Công nghệ số cho ngành biển và thủy sản</p>
@@ -88,7 +88,7 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
           {/* Logo THAT cua cong ty (public/logo-sdvico.png) — sep chot 20/8, bo SVG chu S tu ve. */}
           <div className="brand">
             <span className="brand-logo" aria-hidden="true">
-              <img src="/logo-sdvico.png" alt="" width={38} height={38} style={{ objectFit: 'contain', display: 'block' }} />
+              <img src="/logo-sdvico.png" alt="" width={38} height={38} decoding="async" style={{ objectFit: 'contain', display: 'block' }} />
             </span>
             <span className="brand-text">
               SDVICO<small>nghề cá thịnh vượng</small>

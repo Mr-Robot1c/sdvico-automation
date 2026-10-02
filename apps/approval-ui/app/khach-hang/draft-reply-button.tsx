@@ -56,9 +56,17 @@ export default function DraftReplyButton({ leadId, fbUrl, pending }: { leadId: s
 
   return (
     <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4, maxWidth: 520 }}>
-      <div className="sub" style={{ fontSize: '.78rem' }}>{draft.touch >= 1 ? `Chạm ${draft.touch}: nháp nhắc lại, ` : 'Nháp trả lời, '}sửa theo ý mình rồi tự gửi trong Messenger.</div>
+      {/* 2/10 (sổ QA): gom 2 câu hướng dẫn lặp ở mỗi dòng khách còn 1 dòng ngắn; mục tiêu đầy đủ của nháp nằm trong details. */}
+      <div className="sub" style={{ fontSize: '.78rem' }} title="Máy chỉ soạn nháp, không tự gửi. Bạn sửa theo ý mình, tự gửi trong Messenger rồi bấm Đã gửi tay.">
+        {draft.touch >= 1 ? `Chạm ${draft.touch}` : 'Nháp trả lời'}: sửa nháp rồi tự gửi trong Messenger, xong bấm Đã gửi tay
+      </div>
       <textarea className="note" rows={5} value={text} onChange={(e) => setText(e.target.value)} style={{ width: '100%', fontSize: '.85rem' }} aria-label="Nháp trả lời" />
-      {draft.note ? <div className="sub" style={{ fontSize: '.78rem' }}>{draft.note}</div> : null}
+      {draft.note ? (
+        <details className="sub" style={{ fontSize: '.78rem' }}>
+          <summary style={{ cursor: 'pointer' }}>Mục tiêu của nháp này</summary>
+          <div style={{ marginTop: 2 }}>{draft.note}</div>
+        </details>
+      ) : null}
       {draft.risk === 'red' || draft.needsManager ? (
         <div style={{ color: '#c0392b', fontSize: '.8rem', fontWeight: 600 }}>Nội dung chạm quy định, phải cấp quản lý duyệt trước khi gửi (Điều cấm 3).</div>
       ) : null}

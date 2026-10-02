@@ -92,9 +92,9 @@ export default async function ProductDetailPage({ params }: Props) {
         <section className="pub-hero">
           <div className="pub-hero-media">
             {images[0] ? (
-              <img src={optImg(images[0], 1080) || undefined} alt={p.name} />
+              <img src={optImg(images[0], 1080) || undefined} alt={p.name} decoding="async" />
             ) : (
-              <span className="pub-card-ph" aria-hidden="true"><img src="/logo-sdvico.png" alt="" /></span>
+              <span className="pub-card-ph" aria-hidden="true"><img src="/logo-sdvico.png" alt="" loading="lazy" decoding="async" /></span>
             )}
           </div>
           <div>
@@ -130,7 +130,7 @@ export default async function ProductDetailPage({ params }: Props) {
           <section className="pub-section">
             <h2>Ảnh sản phẩm và lắp đặt</h2>
             <div className="pub-gallery">
-              {images.slice(1).map((src, i) => (<img key={i} src={optImg(src, 640) || undefined} alt={`${p.name} ${i + 2}`} loading="lazy" />))}
+              {images.slice(1).map((src, i) => (<img key={i} src={optImg(src, 640) || undefined} alt={`${p.name} ${i + 2}`} loading="lazy" decoding="async" />))}
             </div>
           </section>
         ) : null}

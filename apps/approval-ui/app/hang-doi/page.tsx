@@ -317,7 +317,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
 
                 {img || vid || (cid && linkedVideo.get(cid)?.videoAssetId) ? (
                   <div className="card-media">
-                    {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} loading="lazy" /> : null}
+                    {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} loading="lazy" decoding="async" /> : null}
                     {vid ? (
                       <span className="card-media-vid">
                         <video src={`${vid.url}#t=2`} muted preload="none" />
@@ -363,7 +363,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                     ) : null}
                     {img || vid ? (
                       <div className="modal-media">
-                        {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} /> : null}
+                        {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} loading="lazy" decoding="async" /> : null}
                         {vid ? <video src={`${vid.url}#t=2`} controls preload="metadata" playsInline /> : null}
                       </div>
                     ) : null}
