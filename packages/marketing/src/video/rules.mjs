@@ -362,6 +362,22 @@ export function sbChatterSentences(narration) {
   return out;
 }
 
+// 2/10 (rào cứng): model né guard khớp-hình bằng cách TẢ hình ("Thợ máy đang lắp đặt thiết bị..."). Bắt câu tả
+// hình thuần ngôi thứ ba: có " đang " mà KHÔNG có ngôi kể (mình, tôi, ta, em, anh em, bà con, các bác, chúng mình,
+// tụi mình; "người ta" là ngôi thứ ba nên không tính), hoặc mở bằng "Đây là" / "Đó là". So không dấu.
+const SB_NARRATOR_RE = /(^|[^a-z0-9])(minh|toi|ta|em|anh em|ba con|cac bac|chung minh|tui minh)($|[^a-z0-9])/;
+export function sbDescriptiveSentences(narration) {
+  const out = [];
+  for (const sent of sentencesOf(narration)) {
+    const fs = foldText(sent).trim();
+    if (/^(day|do) la($|[^a-z0-9])/.test(fs)) { out.push(sent); continue; }
+    if (!/(^|[^a-z0-9])dang($|[^a-z0-9])/.test(fs)) continue;
+    if (SB_NARRATOR_RE.test(fs.replace(/nguoi ta/g, 'nguoixa'))) continue;
+    out.push(sent);
+  }
+  return out;
+}
+
 // Cắt các câu trôi khỏi hình; cắt hết thì trả '' (người gọi tự quyết giữ bản gốc, như luật cắt cụm cấm).
 export function cutImageryDrift(narration, assetText) {
   const bad = new Set(imageryDriftSentences(narration, assetText));

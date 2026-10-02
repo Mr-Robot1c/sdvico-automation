@@ -6,7 +6,7 @@ import { guardLines, guardViolations, stripViolatingSentences } from '../product
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
 import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDrift } from './scene-match.mjs';
-import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences } from './rules.mjs';
+import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -505,6 +505,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   let storyboardMiss = []; // 1/10: cảnh có lời lệch hình đã chốt trước (chỉ nhánh content storyboard-first)
   let storyboardCountMiss = false;
   let sbChatter = []; // 2/10: cảnh giữa bài có câu hỏi giao lưu kiểu "...phải không?" (chỉ cảnh cuối được hỏi)
+  let sbDescMiss = []; // 2/10: cảnh có từ 2 câu tả hình thuần trở lên (chỉ được tối đa 1 câu tả làm neo)
   const sbScenesOf = () => (parsed.vertical?.scenes || []).filter((s) => String(s?.narration || '').trim());
   for (let attempt = 0; attempt < 2; attempt++) {
     const extra = (!viol.length ? '' :
@@ -519,6 +520,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       storyboardMiss.map((m) => `\n\nLẦN TRƯỚC LỜI CẢNH ${m.scene} KHÔNG ĂN NHẬP HÌNH CỦA CẢNH ĐÓ${m.reason === 'no-overlap' ? ' (lời không nhắc gì có trong hình)' : m.sentences.length ? ` (câu trôi khỏi hình hoặc bịa chi tiết: "${m.sentences[0].slice(0, 80)}")` : ''}. Hình cảnh ${m.scene} là: ${String(m.asset?.title || '').trim()}. ${sbDesc(m.asset || {})}. Viết lại cảnh ${m.scene}: chỉ tả và dẫn chuyện từ ĐÚNG những gì hình đó có, không nhắc người hay vật không có trong mô tả, vẫn nối mạch với cảnh trước và cảnh sau.`).join(''))
       + (!sbChatter.length ? '' :
       sbChatter.map((m) => `\n\nLẦN TRƯỚC CẢNH ${m.scene} CÓ CÂU HỎI GIAO LƯU GIỮA BÀI: "${m.sentences[0].slice(0, 80)}". Câu hỏi giao lưu chỉ ở cảnh cuối, viết lại cảnh ${m.scene} thành lời kể theo bài nguồn, vẫn neo vào chi tiết có trong hình cảnh đó.`).join(''))
+      + (!sbDescMiss.length ? '' :
+      sbDescMiss.map((m) => `\n\nLẦN TRƯỚC CẢNH ${m.scene} CÓ ${m.sentences.length} CÂU TẢ HÌNH THUẦN (${m.sentences.slice(0, 3).map((x, k) => `"câu ${k + 1}: ${x.slice(0, 60)}"`).join(', ')}). Mỗi cảnh chỉ được TỐI ĐA MỘT câu tả hình làm neo; các câu còn lại phải KỂ CHUYỆN của bài nguồn (cảm xúc, vì sao, nghề, tiền) bằng ngôi kể mình/anh em.`).join(''))
       + (!cross.length ? '' :
       `\n\nLẦN TRƯỚC LỜI THOẠI NHẮC SẢN PHẨM KHÁC: ${cross.map((p) => `"${p}"`).join(', ')}. Video này chỉ về ${shownName || opts.productGroup}; viết lại, bỏ hẳn các ý đó.`)
       + (!pct.length ? '' :
@@ -605,6 +608,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     storyboardMiss = [];
     storyboardCountMiss = false;
     sbChatter = [];
+    sbDescMiss = [];
     if (sbMode) {
       const scs = sbScenesOf();
       storyboardCountMiss = scs.length !== sb.length;
@@ -614,11 +618,16 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         const hit = sbChatterSentences(sc.narration || '');
         if (hit.length) sbChatter.push({ scene: i + 1, index: i, sentences: hit });
       });
+      scs.forEach((sc, i) => {
+        const hit = sbDescriptiveSentences(sc.narration || '');
+        if (hit.length > 1) sbDescMiss.push({ scene: i + 1, index: i, sentences: hit });
+      });
+      for (const m of sbDescMiss) console.warn(`[script] storyboard: canh ${m.scene} co ${m.sentences.length} cau ta hinh thuan (lan ${attempt + 1}) — cau: "${m.sentences[1].slice(0, 60)}" — sinh lai thanh loi ke.`);
       for (const m of sbChatter) console.warn(`[script] storyboard: canh ${m.scene} co cau hoi giao luu giua bai (lan ${attempt + 1}) — cau: "${m.sentences[0].slice(0, 60)}" — sinh lai thanh loi ke.`);
       if (storyboardCountMiss) console.warn(`[script] storyboard: model tra ${scs.length} canh, can DUNG ${sb.length} (lan ${attempt + 1}) — sinh lai.`);
       for (const m of storyboardMiss) console.warn(`[script] storyboard: canh ${m.scene} khong an nhap hinh chot truoc "${String(m.asset?.title || '').slice(0, 50)}" (${m.reason}, lan ${attempt + 1})${m.sentences.length ? ` — cau: "${m.sentences[0].slice(0, 60)}"` : ''} — sinh lai theo mo ta hinh.`);
     }
-    if (!viol.length && !worn.length && !mustMiss && !storyboardMiss.length && !sbChatter.length && !storyboardCountMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate && !painSelf.length) break;
+    if (!viol.length && !worn.length && !mustMiss && !storyboardMiss.length && !sbChatter.length && !sbDescMiss.length && !storyboardCountMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate && !painSelf.length) break;
   }
   // 17/9 vòng 9: bẻ câu 30-40 từ nối bằng dấu phẩy thành câu ngắn TRƯỚC mọi đường cắt — câu khổng lồ
   // làm cắt-cụm-cấm rỗng cả cảnh (bị khôi phục nguyên cụm cấm) và làm tách-cảnh-dài bất lực (ảnh đứng
@@ -705,6 +714,22 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         sc.narration = next;
       } else if (!next) {
         console.warn(`[script] storyboard: canh ${m.scene} cat het cau hoi giao luu se rong — giu loi goc (can soi tay).`);
+      }
+    }
+  }
+  // 2/10 (rào cứng): hết lượt sinh vẫn còn cảnh có từ 2 câu tả hình thuần thì giữ câu tả ĐẦU làm neo, cắt từ câu thứ 2.
+  if (sbMode && sbDescMiss.length) {
+    const scs = sbScenesOf();
+    for (const m of sbDescMiss) {
+      const sc = scs[m.index];
+      if (!sc) continue;
+      const orig = String(sc.narration || '');
+      const next = stripSentencesWith(orig, m.sentences.slice(1));
+      if (next && next !== orig) {
+        console.warn(`[script] storyboard: canh ${m.scene} cat ${m.sentences.length - 1} cau ta hinh thuan tu cau thu 2 "${m.sentences[1].slice(0, 60)}"`);
+        sc.narration = next;
+      } else {
+        console.warn(`[script] storyboard: canh ${m.scene} cat cau ta hinh se rong — giu loi goc (can soi tay).`);
       }
     }
   }

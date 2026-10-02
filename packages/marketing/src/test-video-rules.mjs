@@ -4,7 +4,7 @@
 import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
   stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
-  breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences,
+  breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences,
 } from './video/rules.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
@@ -375,6 +375,24 @@ ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXG
   eq('sbChatter: không bắt câu hỏi tu từ "Sao dầu xuống nhanh vậy?"', sbChatterSentences('Sao dầu xuống nhanh vậy?'), []);
   eq('sbChatter: câu kể thường không có cụm hỏi thì không bắt', sbChatterSentences('Kho máy luôn thông thoáng.'), []);
   eq('sbChatter: chuỗi rỗng và null không lỗi', [sbChatterSentences(''), sbChatterSentences(null)], [[], []]);
+}
+
+// 2/10 (rào cứng): sbDescriptiveSentences — câu tả hình thuần ngôi thứ ba ("X đang làm Y", "Đây là ...") bị bắt.
+{
+  eq('sbDesc: bắt "Kỹ thuật viên đang lắp đặt máy móc."', sbDescriptiveSentences('Kỹ thuật viên đang lắp đặt máy móc.'), ['Kỹ thuật viên đang lắp đặt máy móc.']);
+  eq('sbDesc: bắt "Người ta đang tập trung..." (người ta là ngôi thứ ba)', sbDescriptiveSentences('Người ta đang tập trung làm việc trên boong tàu.'), ['Người ta đang tập trung làm việc trên boong tàu.']);
+  eq('sbDesc: bắt "Thợ máy đang lắp đặt thiết bị lọc nước biển."', sbDescriptiveSentences('Thợ máy đang lắp đặt thiết bị lọc nước biển.'), ['Thợ máy đang lắp đặt thiết bị lọc nước biển.']);
+  eq('sbDesc: bắt "Đây là cảnh ở cảng Long Hải."', sbDescriptiveSentences('Đây là cảnh ở cảng Long Hải.'), ['Đây là cảnh ở cảng Long Hải.']);
+  eq('sbDesc: bắt "Đó là" viết thường không dấu', sbDescriptiveSentences('do la may loc nuoc moi.'), ['do la may loc nuoc moi.']);
+  eq('sbDesc: bắt "dang" không dấu viết hoa', sbDescriptiveSentences('THO MAY DANG LAP THIET BI.'), ['THO MAY DANG LAP THIET BI.']);
+  eq('sbDesc: chỉ trả câu tả, giữ câu kể', sbDescriptiveSentences('Thợ máy đang lắp đặt. Mình nhớ chuyến đó. Đây là khoang máy.'), ['Thợ máy đang lắp đặt.', 'Đây là khoang máy.']);
+  eq('sbDesc: không bắt ngôi kể "Mình đang kể chuyện đêm qua cho anh em nghe."', sbDescriptiveSentences('Mình đang kể chuyện đêm qua cho anh em nghe.'), []);
+  eq('sbDesc: không bắt "Anh em mình đang giữa mùa con nước."', sbDescriptiveSentences('Anh em mình đang giữa mùa con nước.'), []);
+  eq('sbDesc: không bắt câu cảm "Nhẹ cả người!"', sbDescriptiveSentences('Nhẹ cả người!'), []);
+  eq('sbDesc: không bắt câu kể "Ba giờ sáng, tiếng máy nổ đều là mình yên tâm."', sbDescriptiveSentences('Ba giờ sáng, tiếng máy nổ đều là mình yên tâm.'), []);
+  eq('sbDesc: không bắt câu không có "đang" (chấp nhận lọt)', sbDescriptiveSentences('Sửa chữa ngay trong khoang tàu cá.'), []);
+  eq('sbDesc: ngôi kể "bà con" cũng loại trừ', sbDescriptiveSentences('Bà con đang chờ tàu cập bến.'), []);
+  eq('sbDesc: chuỗi rỗng và null không lỗi', [sbDescriptiveSentences(''), sbDescriptiveSentences(null)], [[], []]);
 }
 
 const failed = cases.filter((c) => !c.ok);
