@@ -5,6 +5,8 @@
 
 import { getServerClient } from './supabase-server';
 
+type AdsClient = ReturnType<typeof getServerClient>;
+
 export type AdsConfig = {
   pixelId: string | null;
   ga4Id: string | null;
@@ -22,9 +24,10 @@ function strOf(v: any): string | null {
   return null;
 }
 
-export async function loadAdsConfig(): Promise<AdsConfig> {
+export async function loadAdsConfig(clientArg?: AdsClient): Promise<AdsConfig> {
   try {
-    const client = getServerClient();
+    // 2/10: trang blog truyền client công khai (cache được) để trang không bị ép dynamic.
+    const client = clientArg || getServerClient();
     const { data } = await client.from('app_config').select('key, value').in('key', KEYS as unknown as string[]);
     const map = new Map<string, any>();
     for (const r of data || []) map.set((r as any).key, (r as any).value);

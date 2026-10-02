@@ -3,6 +3,7 @@
 // máy chủ dựng xong cả trang (Vercel lạnh có thể 1-3 giây) — cảm giác web đơ. Giờ bấm phát là
 // sang trang ngay với khung xám nhấp nháy, nội dung thật đổ vào sau.
 // Khung chỉ hiện sau 150ms (animation-delay) để trang nhanh không bị chớp.
+// 2/10: hiệu ứng nhấp nháy chỉ chạy khi người dùng không bật "giảm chuyển động" của hệ điều hành.
 export default function Loading() {
   const bar = (w: string, h = 14) => (
     <span className="ld-bar" style={{ width: w, height: h }} />
@@ -15,8 +16,9 @@ export default function Loading() {
         .ld-bar { display: block; border-radius: 8px; background: var(--surface-2); position: relative; overflow: hidden; }
         .ld-bar::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%);
           background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 7%, transparent), transparent);
-          animation: ld-sh 1.2s infinite; }
+          animation: none; }
         @keyframes ld-sh { to { transform: translateX(100%); } }
+        @media (prefers-reduced-motion: no-preference) { .ld-bar::after { animation: ld-sh 1.2s infinite; } }
         .ld-row { display: flex; gap: 12px; flex-wrap: wrap; }
         .ld-card { flex: 1 1 180px; border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; background: var(--surface); }
       `}</style>

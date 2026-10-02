@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { getServerClient } from '../../lib/supabase-server';
+import { getPublicClient } from '../../lib/supabase-server';
 import { loadPublicPosts, publicBlogUrl, siteUrl } from '../../lib/seo';
 import { PRODUCT_CATALOG } from '../../lib/product-catalog';
 import PostCard from './post-card';
 
-export const dynamic = 'force-dynamic';
+// 2/10 (Thanh: giao dien muot): BO force-dynamic — no DE revalidate nen khach lanh nao cung chiu
+// cold-start (do that 12,9 giay). Trang khong dung cookies/headers/searchParams nen cho ISR.
 export const revalidate = 300; // 5 phut — bai moi hien nhanh, khong go tay
 
 const SITE_TITLE = 'Bài viết SDVICO — Công nghệ số cho tàu cá';
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
 // Danh sách bài công khai (design-spec-trang-cong-khai màn 1): tiêu đề + 1 dòng phụ ngắn,
 // hàng chip chủ đề tên ngắn, lưới thẻ 3/2/1 cột. Không câu thuyết minh dài.
 export default async function BlogListPage() {
-  const client = getServerClient();
+  const client = getPublicClient();
   const posts = await loadPublicPosts(client, 200);
 
   return (

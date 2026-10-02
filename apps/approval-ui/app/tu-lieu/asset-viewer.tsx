@@ -30,7 +30,7 @@ export default function AssetViewer({ url, kind, title }: { url: string; kind: s
         title="Bấm để xem lớn"
       >
         {isImg ? (
-          <img src={url} alt={title} loading="lazy" />
+          <img src={url} alt={title} loading="lazy" decoding="async" />
         ) : isVid ? (
           <>
             <video src={url} muted preload="none" />
@@ -61,7 +61,7 @@ export default function AssetViewer({ url, kind, title }: { url: string; kind: s
           <div className="modal-body">
             <div className="modal-media">
               {!open ? null : isImg ? (
-                <img src={url} alt={title} />
+                <img src={url} alt={title} decoding="async" />
               ) : isVid ? (
                 <video src={url} controls autoPlay preload="metadata" />
               ) : isAudio ? (

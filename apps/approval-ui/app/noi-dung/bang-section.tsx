@@ -258,7 +258,7 @@ export default async function BangSection() {
                       ) : null}
                       {imgUrl || vidUrl ? (
                         <div className="card-media">
-                          {imgUrl ? <img src={imgUrl} alt="" loading="lazy" /> : null}
+                          {imgUrl ? <img src={imgUrl} alt="" loading="lazy" decoding="async" /> : null}
                           {vidUrl ? (
                             <span className="card-media-vid">
                               <video src={vidUrl} muted preload="none" />
@@ -293,7 +293,7 @@ export default async function BangSection() {
                           ) : null}
                           {imgUrl || vidUrl ? (
                             <div className="modal-media">
-                              {imgUrl ? <img src={imgUrl} alt="" /> : null}
+                              {imgUrl ? <img src={imgUrl} alt="" loading="lazy" decoding="async" /> : null}
                               {vidUrl ? (
                                 <>
                                   {/* Không dùng #t=2 + preload metadata ở đây (22/8: video đứng 0:00 trên bảng
@@ -393,7 +393,7 @@ export default async function BangSection() {
                         {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                         {schImg || schVid ? (
                           <div className="modal-media">
-                            {schImg ? <img src={schImg} alt="Ảnh bài viết" /> : null}
+                            {schImg ? <img src={schImg} alt="Ảnh bài viết" loading="lazy" decoding="async" /> : null}
                             {schVid ? <video src={schVid} controls preload="none" playsInline /> : null}
                           </div>
                         ) : null}
@@ -483,7 +483,7 @@ export default async function BangSection() {
                         {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                         {pubImg || pubVid ? (
                           <div className="modal-media">
-                            {pubImg ? <img src={pubImg} alt="Ảnh bài viết" /> : null}
+                            {pubImg ? <img src={pubImg} alt="Ảnh bài viết" loading="lazy" decoding="async" /> : null}
                             {pubVid ? <video src={pubVid} controls preload="none" playsInline /> : null}
                           </div>
                         ) : null}

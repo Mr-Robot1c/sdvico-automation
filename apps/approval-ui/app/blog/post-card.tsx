@@ -14,10 +14,10 @@ export default function PostCard({ post, hideProduct = false }: { post: PublicPo
     <article className="pub-card">
       <Link href={href} className="pub-card-media" aria-label={post.title} tabIndex={-1}>
         {post.imageUrl ? (
-          <img src={optImg(post.imageUrl, 640) || undefined} alt={post.title} loading="lazy" />
+          <img src={optImg(post.imageUrl, 640) || undefined} alt={post.title} loading="lazy" decoding="async" />
         ) : (
           <span className="pub-card-ph" aria-hidden="true">
-            <img src="/logo-sdvico.png" alt="" />
+            <img src="/logo-sdvico.png" alt="" loading="lazy" decoding="async" />
           </span>
         )}
       </Link>

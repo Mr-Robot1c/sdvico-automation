@@ -113,7 +113,7 @@ export default function PexelsScenesButton({ scenes, title, hook }: { scenes: Sc
                       style={{ width: '100%', borderRadius: 6, background: '#000' }}
                     />
                   ) : sc.pexels_image_url ? (
-                    <img src={sc.pexels_image_url} alt={sc.image_keyword_en || ''} style={{ width: '100%', borderRadius: 6 }} />
+                    <img src={sc.pexels_image_url} alt={sc.image_keyword_en || ''} loading="lazy" decoding="async" style={{ width: '100%', borderRadius: 6 }} />
                   ) : (
                     <div style={{ padding: 40, textAlign: 'center', background: 'var(--bg-2)', borderRadius: 6, color: 'var(--ink-2)' }}>
                       ⚠️ Không có URL Pexels
