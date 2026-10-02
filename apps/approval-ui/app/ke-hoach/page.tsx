@@ -393,7 +393,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <p className="sub" style={{ margin: '10px 0 0' }}>
           Tối 20h BOSS tự chỉnh trọng số theo số liệu ngày (tối đa 0,5 điểm). Chủ nhật 20h học số cả tuần trên Facebook, YouTube và TikTok. Thứ 2 8h ra kế hoạch tuần mới theo luật 70/30.
           {week.hasFallback ? ' Ô "hướng cạn" nghĩa là hướng đi đã hết — máy tự nạp thêm hướng mới trong ngày.' : ''}
-          {' '}Lô nhóm: MỖI BUỔI đăng Facebook chia 4 nhóm khác nhau (ngày 2 bài Facebook = 8 nhóm). Buổi đã qua hiện nhóm đã bấm "Đã chia", hôm nay bấm được ngay trong bảng, buổi tới là dự kiến máy xoay (nhóm lâu chưa chia lên trước). Đổi giờ/kênh/ghim nhóm ở khối Lịch đăng cố định ngay bên dưới.
+          {' '}Lô nhóm: MỖI BUỔI đăng Facebook chia 4 nhóm khác nhau (ngày 2 bài Facebook = 8 nhóm). Buổi đã qua hiện nhóm đã bấm "Đánh dấu đã chia", hôm nay bấm được ngay trong bảng, buổi tới là dự kiến máy xoay (nhóm lâu chưa chia lên trước). Đổi giờ/kênh/ghim nhóm ở khối Lịch đăng cố định ngay bên dưới.
         </p>
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
           <GeneratePostsButton action={generatePostsNow} />

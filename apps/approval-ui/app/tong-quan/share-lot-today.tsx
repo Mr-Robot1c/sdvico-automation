@@ -77,7 +77,7 @@ export default function ShareLotToday({
     <div className="lot-box">
       <div className="lot-head">
         <span>📣 {compact ? 'Buổi này' : 'Chia sẻ group hôm nay'}: <b>{done}/{lotSize}</b> nhóm</span>
-        {done >= lotSize ? <span className="lot-ok">✓ đủ lô</span> : compact ? null : <span className="sub">bấm <b>Mở nhóm</b>, đăng xong bấm <b>Đã chia</b></span>}
+        {done >= lotSize ? <span className="lot-ok">✓ đủ lô</span> : compact ? null : <span className="sub">bấm <b>Mở nhóm</b>, đăng xong bấm <b>Đánh dấu đã chia</b></span>}
       </div>
       <div className={`lot-chips ${compact ? 'compact' : ''}`}>
         {items.map((g) => (
@@ -90,7 +90,7 @@ export default function ShareLotToday({
               </button>
             ) : (
               <button type="button" className="lot-btn" disabled={busy === g.id} onClick={() => mark(g)} title="Ghi nhận bạn đã chia bài vào nhóm này hôm nay">
-                {busy === g.id ? '⏳' : 'Đã chia'}
+                {busy === g.id ? '⏳' : 'Đánh dấu đã chia'}
               </button>
             )}
           </div>

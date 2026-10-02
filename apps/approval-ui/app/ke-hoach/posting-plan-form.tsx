@@ -58,10 +58,19 @@ function SlotTr({ prefix, i, slot, groups, dowIdx, dayCell, planRow }: {
         </select>
       </td>
       <td className="pp-c-group">
-        <select name={`${prefix}_${i}_group`} defaultValue={slot?.group_id || ''} aria-label="Ghim nhóm chia sẻ">
-          <option value="">Theo lô tự rút (4 nhóm/buổi)</option>
-          {groups.map((g) => <option key={g.id} value={g.id}>👥 {g.label}</option>)}
-        </select>
+        {/* 2/10 (sổ QA): 28 ô × ~40 nhóm làm trang nặng ~1.100 mục. Gấp phần chọn nhóm vào details,
+            chỉ mở khi cần ghim; field vẫn nằm trong form nên lưu như cũ. */}
+        <details className="pp-pin">
+          <summary className="sub">
+            {slot?.group_id
+              ? `📌 ${groups.find((g) => g.id === slot.group_id)?.label || 'nhóm đã ghim'}`
+              : 'Theo lô tự rút (4 nhóm/buổi)'} ▾
+          </summary>
+          <select name={`${prefix}_${i}_group`} defaultValue={slot?.group_id || ''} aria-label="Ghim nhóm chia sẻ">
+            <option value="">Theo lô tự rút (4 nhóm/buổi)</option>
+            {groups.map((g) => <option key={g.id} value={g.id}>👥 {g.label}</option>)}
+          </select>
+        </details>
       </td>
     </tr>
     {slot && planRow ? (

@@ -298,7 +298,7 @@ export default function ShareGroups({
                       <button type="button" className="btn ghost sm" disabled={busyId === g.id} onClick={() => undoShared(g)} title="Bấm nhầm thì hoàn tác">Hoàn tác</button>
                     </>
                   ) : (
-                    <button type="button" className="btn sm" disabled={busyId === g.id} onClick={() => markShared(g)} title="Đã dán link và bấm Post trong group này">✓ Đã chia</button>
+                    <button type="button" className="btn sm" disabled={busyId === g.id} onClick={() => markShared(g)} title="Đã dán link và bấm Post trong group này">Đánh dấu đã chia</button>
                   )}
                   <button type="button" className="btn no sm" onClick={() => removeGroup(g.id)} aria-label="Xoá" title="Xoá khỏi danh sách">✕</button>
                 </li>
@@ -317,7 +317,7 @@ export default function ShareGroups({
                 </div>
                 {!showAll ? (
                   <p className="sub" style={{ margin: '0 0 6px', fontSize: 11 }}>
-                    Mỗi ngày {size} nhóm, mỗi nhóm 1 bài, xoay đều để 7 ngày phủ hết. Dán link, bấm Post trong group rồi bấm ✓ Đã chia.
+                    Mỗi ngày {size} nhóm, mỗi nhóm 1 bài, xoay đều để 7 ngày phủ hết. Dán link, bấm Post trong group rồi bấm Đánh dấu đã chia.
                   </p>
                 ) : null}
                 {/* 17/9: lot đã tải về mà vẫn rỗng thì nói đúng lý do, đừng treo chữ "Đang tải". */}

@@ -16,7 +16,7 @@ export default async function Page() {
   const [fb, tt, yt, za] = await Promise.all([fbStatus(), tiktokStatus(), getYouTubeChannelInfo(), zaloOaStatus(client)]);
   const rows = [
     { icon: '📘', name: 'Facebook', status: fb.ok, text: fb.text, href: '/facebook' },
-    { icon: '🎵', name: 'TikTok', status: tt.ok, text: tt.text, href: '/tiktok' },
+    { icon: '🎵', name: 'TikTok', status: tt.ok, manual: !!tt.manual, text: tt.text, href: '/tiktok' },
     {
       icon: '▶️', name: 'YouTube',
       status: !!(yt.configured && yt.channelTitle),
@@ -35,7 +35,7 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Kết nối kênh đăng</h1>
-          <p className="sub">Ba kênh máy tự đăng khi người bấm Duyệt. Xanh là chạy được, đỏ là cần cấu hình lại.</p>
+          <p className="sub">Facebook và YouTube máy tự đăng khi người bấm Duyệt, TikTok phải xuất tay. Xanh là chạy được, vàng là làm tay, đỏ là cần cấu hình lại.</p>
         </div>
       </header>
 
@@ -46,7 +46,7 @@ export default async function Page() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <b>{r.name}</b>
-                <span className={`badge ${r.status ? 'tone-ok' : 'tone-no'}`}>{r.status ? '✅ Sẵn sàng' : '⛔ Cần cấu hình'}</span>
+                <span className={`badge ${r.status ? (r.manual ? 'tone-demo' : 'tone-ok') : 'tone-no'}`}>{r.status ? (r.manual ? '🟡 Xuất tay' : '✅ Sẵn sàng') : '⛔ Cần cấu hình'}</span>
               </div>
               <p className="sub" style={{ margin: '4px 0 0' }}>{r.text}</p>
             </div>

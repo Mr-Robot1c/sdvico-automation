@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { deleteAsset, renameAsset, setAssetProductGroup, createProductFolder, deleteProductFolder } from '../actions';
 import AssetViewer from './asset-viewer';
@@ -53,7 +54,11 @@ function fmtDate(iso: string): string {
   return `${get('day')}/${get('month')}`;
 }
 
-export default async function Page({ searchParams }: { searchParams: { folder?: string } }) {
+// 2/10 (sổ QA): đổ cả ~300 tư liệu một lượt làm trang nặng. Mỗi lần chỉ dựng PAGE_SIZE ô đầu
+// (như Xưởng sản xuất), bấm "Hiện thêm" tăng ?n= lên một nấc. Số đếm vẫn là TỔNG thật.
+const PAGE_SIZE = 48;
+
+export default async function Page({ searchParams }: { searchParams: { folder?: string; n?: string } }) {
   const client = getServerClient();
   const [{ data, error }, { data: customCfg }] = await Promise.all([
     // User 27/8: video "Bai trend" khong hien o Kho tu lieu (san pham gian tiep, khong
@@ -96,6 +101,10 @@ export default async function Page({ searchParams }: { searchParams: { folder?: 
   const selected = rawSel && (folderKeys.includes(rawSel) || rawSel === UNASSIGNED) ? rawSel : '';
   const shown = selected ? (byGroup.get(selected) || []) : rows;
   const shownLabel = selected ? folderLabel(selected) : 'Tất cả tư liệu';
+  const nParam = Number(searchParams?.n);
+  const limit = Number.isFinite(nParam) && nParam >= PAGE_SIZE ? Math.min(Math.floor(nParam), 1000) : PAGE_SIZE;
+  const visible = shown.slice(0, limit);
+  const moreHref = `/tu-lieu?${selected ? `folder=${encodeURIComponent(selected)}&` : ''}n=${limit + PAGE_SIZE}`;
 
   return (
     <main>
@@ -172,7 +181,7 @@ export default async function Page({ searchParams }: { searchParams: { folder?: 
             </div>
           ) : (
             <ul className="lib-grid">
-              {shown.map((a) => (
+              {visible.map((a) => (
                 <li key={a.id} className="lib-card">
                   <div className="lib-thumb">
                     <AssetViewer url={urlOf(a.storage_path)} kind={a.kind} title={a.title} />
@@ -205,6 +214,13 @@ export default async function Page({ searchParams }: { searchParams: { folder?: 
               ))}
             </ul>
           )}
+          {shown.length > visible.length ? (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+              <Link className="btn ghost sm" href={moreHref} scroll={false}>
+                Hiện thêm tư liệu (đang hiện {visible.length}/{shown.length}, còn {shown.length - visible.length})
+              </Link>
+            </div>
+          ) : null}
         </div>
       </div>
     </main>

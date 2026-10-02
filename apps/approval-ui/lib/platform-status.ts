@@ -46,7 +46,9 @@ export async function fbStatus(): Promise<FbStatus> {
   }
   if (!pages.length) return { ok: false, text: 'Token lỗi: ' + (firstErr || 'không rõ'), pages: [], realPageUrl: realUrl };
 
-  const labels = pages.map((p) => `${p.name}${p.label === 'real' ? ' (chính thức)' : ' (test)'}`).join(', ');
+  // 2/10 (sổ QA): Page chính (token REAL) đứng đầu; page test chỉ là kênh phụ.
+  pages.sort((a, b) => (a.label === b.label ? 0 : a.label === 'real' ? -1 : 1));
+  const labels = pages.map((p) => `${p.name}${p.label === 'real' ? ' (Page chính)' : ' (kênh phụ, test)'}`).join(', ');
   return {
     ok: true,
     text: `Đã kết nối ${pages.length} Page: ${labels}. Máy tự đăng khi bấm Duyệt.`,
@@ -55,7 +57,7 @@ export async function fbStatus(): Promise<FbStatus> {
   };
 }
 
-export async function tiktokStatus(): Promise<{ ok: boolean; text: string }> {
+export async function tiktokStatus(): Promise<{ ok: boolean; text: string; manual?: boolean }> {
   try {
     const client = getServerClient();
     const { data } = await client
@@ -67,8 +69,10 @@ export async function tiktokStatus(): Promise<{ ok: boolean; text: string }> {
     const hasPublish = String((data as any).scope || '').includes('video.publish');
     return {
       ok: hasPublish,
+      // 2/10: API đăng TikTok đã bỏ từ 26/8, chỉ xuất tay.
+      manual: hasPublish,
       text: hasPublish
-        ? 'Đã kết nối, máy tự đăng video khi bấm Duyệt. Chưa qua audit nên chỉ đăng được chế độ riêng tư/bạn bè.'
+        ? 'Đã kết nối tài khoản để kéo số liệu. App chưa qua audit TikTok nên KHÔNG tự đăng: duyệt xong bấm Xuất TikTok ở Quản lý bài viết để đăng tay.'
         : 'Đã kết nối nhưng thiếu quyền video.publish, kết nối lại ở trang chi tiết.'
     };
   } catch {
