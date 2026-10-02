@@ -1,11 +1,15 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { PRODUCT_CATALOG } from '../../lib/product-catalog';
-import { isProductOf, optImg, siteUrl } from '../../lib/seo';
-import { getServerClient } from '../../lib/supabase-server';
+import { canonicalUrl, isProductOf, optImg, siteUrl } from '../../lib/seo';
+import { getPublicClient } from '../../lib/supabase-server';
 import { assetPublicUrl } from '../../lib/asset-url';
 
-export const dynamic = 'force-dynamic';
+// 2/10 (audit production: 6,5 giay van skeleton): NGUYEN NHAN la `force-dynamic` de len `revalidate`
+// + getServerClient ep fetch no-store, nen MOI luot xem chay lai 2 truy van Supabase (300 dong
+// brand_assets + 500 mkt_posts) tren ham lanh. Gio: getPublicClient (khong no-store) + bo
+// force-dynamic => ISR that, dung cung bai thuoc voi blog (90ddb56). Trang khong dung
+// cookies/headers/searchParams. H1, the san pham, anh nam san trong HTML may chu.
 export const revalidate = 600; // 10 phut
 
 const TITLE = 'Sản phẩm SDVICO — Thiết bị tàu cá và ngành biển';
@@ -15,14 +19,15 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESC,
   openGraph: { title: TITLE, description: DESC, url: `${siteUrl()}/san-pham`, type: 'website', siteName: 'SDVICO' },
-  alternates: { canonical: `${siteUrl()}/san-pham` }
+  // 2/10: canonical ve ten mien cong ty (og:url giu trang nay, giong bai blog).
+  alternates: { canonical: canonicalUrl('/san-pham') }
 };
 
 // Đếm bài đã đăng + lấy 1 ảnh đại diện cho MỖI sản phẩm (design-spec màn 4: card có ảnh thật).
 // 21/8: khớp theo isProductOf vì tên nhóm trong brand_assets/rotation_group có số thứ tự
 // ("6. Thiết bị lọc dầu SF-50") — so chuỗi thẳng như trước ra 0 ảnh, 0 bài.
 async function loadCardData(): Promise<{ counts: Record<string, number>; images: Record<string, string> }> {
-  const client = getServerClient();
+  const client = getPublicClient();
   const [{ data: postRows }, { data: assetRows }] = await Promise.all([
     client.from('mkt_posts').select('content_id, mkt_content!inner(brief)').eq('status', 'published').limit(500),
     client.from('brand_assets').select('storage_path, product_group').eq('kind', 'image').not('product_group', 'is', null).order('created_at', { ascending: true }).limit(300)

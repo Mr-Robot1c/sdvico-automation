@@ -1138,6 +1138,13 @@ a.chip:hover { filter: brightness(0.98); }
 .pub-empty { padding: 48px 16px; text-align: center; color: var(--ink-2); background: var(--surface); border: 1px dashed var(--line); border-radius: 12px; }
 .pub-empty p { margin: 0 0 8px; font-size: 17px; }
 
+/* 2/10 (đợt C): phân trang danh sách bài, nút chính "Xem thêm bài viết" 44px, link trang trước dạng chữ */
+.pub-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 20px; margin: 32px 0 0; }
+.pub-pager .pub-pager-more { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 24px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; text-decoration: none; }
+.pub-pager .pub-pager-more:hover { filter: brightness(1.06); }
+.pub-pager .pub-pager-prev { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-size: 15px; font-weight: 500; }
+.pub-pager .pub-pager-pos { font-size: 14px; color: var(--ink-2); }
+
 /* Trang đọc (bài viết, phần chữ trang sản phẩm) */
 .pub-read { max-width: var(--pub-read); margin: 0 auto; }
 .pub-read h1 { margin: 0 0 12px; font-size: 32px; line-height: 1.2; letter-spacing: -.01em; }

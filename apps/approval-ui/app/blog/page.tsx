@@ -1,9 +1,6 @@
-import Link from 'next/link';
 import type { Metadata } from 'next';
-import { getPublicClient } from '../../lib/supabase-server';
-import { loadPublicPosts, publicBlogUrl, siteUrl } from '../../lib/seo';
-import { PRODUCT_CATALOG } from '../../lib/product-catalog';
-import PostCard from './post-card';
+import { publicBlogUrl, siteUrl } from '../../lib/seo';
+import BlogListView from './blog-list-view';
 
 // 2/10 (Thanh: giao dien muot): BO force-dynamic — no DE revalidate nen khach lanh nao cung chiu
 // cold-start (do that 12,9 giay). Trang khong dung cookies/headers/searchParams nen cho ISR.
@@ -26,36 +23,8 @@ export const metadata: Metadata = {
   alternates: { canonical: publicBlogUrl() }
 };
 
-// Danh sách bài công khai (design-spec-trang-cong-khai màn 1): tiêu đề + 1 dòng phụ ngắn,
-// hàng chip chủ đề tên ngắn, lưới thẻ 3/2/1 cột. Không câu thuyết minh dài.
-export default async function BlogListPage() {
-  const client = getPublicClient();
-  const posts = await loadPublicPosts(client, 200);
-
-  return (
-    <main>
-      <header className="pub-head">
-        <h1>Bài viết</h1>
-        <p>Kinh nghiệm thiết bị tàu cá và chuyện nghề biển</p>
-      </header>
-
-      <nav className="pub-chips" aria-label="Chủ đề">
-        <Link key="chuyen-nghe-bien" href="/blog/chu-de/chuyen-nghe-bien">Chuyện nghề</Link>
-        {PRODUCT_CATALOG.map((t) => (
-          <Link key={t.slug} href={`/blog/chu-de/${t.slug}`}>{t.shortName}</Link>
-        ))}
-      </nav>
-
-      {posts.length === 0 ? (
-        <div className="pub-empty">
-          <p>Chưa có bài viết</p>
-          <Link href="/san-pham">Xem sản phẩm SDVICO</Link>
-        </div>
-      ) : (
-        <div className="pub-grid">
-          {posts.map((p) => <PostCard key={p.contentId} post={p} />)}
-        </div>
-      )}
-    </main>
-  );
+// Trang 1 của danh sách bài (18 bài). Các trang sau ở /blog/trang/[n] (đợt C 2/10), cùng
+// BlogListView. Không dùng searchParams để giữ ISR.
+export default function BlogListPage() {
+  return <BlogListView page={1} />;
 }

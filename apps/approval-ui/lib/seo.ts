@@ -70,6 +70,18 @@ export function publicBlogUrl(slug?: string): string {
   return slug ? `${publicBlogBase()}/${slug}` : publicBlogBase();
 }
 
+// 2/10 (đợt C, audit production): MỘT tên miền chuẩn cho canonical = https://sdvico.vn. Trước đây
+// trang chủ đề blog và toàn bộ trang sản phẩm canonical về sdvico-mktit.vercel.app (trùng nội
+// dung với sdvico.vn). og:url vẫn giữ siteUrl() như bài blog (xem chú thích publicBlogBase).
+export function publicSiteOrigin(): string {
+  const explicit = (process.env.PUBLIC_SITE_ORIGIN || '').trim();
+  return (explicit || 'https://sdvico.vn').replace(/\/$/, '');
+}
+export function canonicalUrl(path: string): string {
+  const p = String(path || '');
+  return `${publicSiteOrigin()}${p.startsWith('/') ? p : `/${p}`}`;
+}
+
 // Ngày đăng chuẩn ISO cho JSON-LD.
 function isoOrNull(v: string | null | undefined): string | null {
   if (!v) return null;
