@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { deleteKeyword, generateFromKeyword } from '../generate-action-exports';
+import { INTENT_LABELS as INTENT_LABEL } from '../labels';
 
 // 3/9 (kho đã 172+ từ, Gemini thêm 10/tuần): danh sách chuyển sang client để có Ô TÌM KIẾM
 // + giới hạn hiển thị, và nút "Viết bài" có trạng thái chạy (server action mất ~1 phút,
@@ -11,9 +12,6 @@ export type KwRow = {
   landing_url: string | null; source: string | null; hasPost: boolean;
 };
 
-const INTENT_LABEL: Record<string, string> = {
-  thong_tin: 'Thông tin', thuong_mai: 'So sánh', giao_dich: 'Giao dịch', dieu_huong: 'Điều hướng',
-};
 const INTENT_TONE: Record<string, string> = {
   thong_tin: 'web', thuong_mai: 'mkt', giao_dich: 'ok', dieu_huong: 'default',
 };

@@ -4,6 +4,7 @@ import { siteUrl, publicBlogUrl } from '../../lib/seo';
 import { gscConfigured, type GscPage } from '../../lib/gsc';
 import { cachedPublicPosts, cachedGscLatest } from '../../lib/cached';
 import { loadSeoQueriesSummary } from '../../lib/seo-queries';
+import { intentLabel } from '../labels';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang SEO: bai da dang len web cong khai
 // (/blog), kho tu khoa, va suc khoe SEO (sitemap, audit gan nhat). Y chang layout SEO cua
@@ -206,7 +207,7 @@ export default async function Page() {
                       return (
                         <tr key={k.id}>
                           <td className="cell-title" style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(k.keyword)}</td>
-                          <td><span className="badge tone-demo">{String(k.intent || 'thông tin')}</span></td>
+                          <td><span className="badge tone-demo">{intentLabel(String(k.intent || 'thong_tin'))}</span></td>
                           <td className="num">{stat ? fmt(stat.count) : 0}</td>
                           <td className="sub" style={{ fontSize: '.85rem' }}>
                             {!stat ? '—' : slug ? (
@@ -231,7 +232,8 @@ export default async function Page() {
           <div style={{ display: 'grid', gap: 8, fontSize: '.9rem' }}>
             <div className="need-item">
               <span>🗺️</span>
-              <span style={{ flex: 1 }}>Sitemap + robots.txt tự sinh — <a className="src" href={`${base}/sitemap.xml`} target="_blank" rel="noreferrer">mở sitemap ↗</a></span>
+              <span style={{ flex: 1 }}>Sitemap và robots.txt tự sinh.</span>
+              <a className="btn ghost sm" href={`${base}/sitemap.xml`} target="_blank" rel="noreferrer">Mở sitemap ↗</a>
             </div>
             {auditByUrl.length === 0 ? (
               <div className="need-item">

@@ -91,7 +91,7 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
               <img src="/logo-sdvico.png" alt="" width={38} height={38} decoding="async" style={{ objectFit: 'contain', display: 'block' }} />
             </span>
             <span className="brand-text">
-              SDVICO<small>nghề cá thịnh vượng</small>
+              SDVICO<small>Nghề cá thịnh vượng</small>
             </span>
           </div>
           <Nav marketingOnly={marketingOnly} />

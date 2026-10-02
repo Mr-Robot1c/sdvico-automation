@@ -1,15 +1,10 @@
 import { getServerClient } from '../../lib/supabase-server';
 import { addKeyword } from '../actions';
 import KeywordList, { type KwRow } from './keyword-list';
+import { INTENT_LABELS as INTENT_LABEL } from '../labels';
 
 export const dynamic = 'force-dynamic';
 
-const INTENT_LABEL: Record<string, string> = {
-  thong_tin: 'Thông tin',
-  thuong_mai: 'So sánh',
-  giao_dich: 'Giao dịch',
-  dieu_huong: 'Điều hướng'
-};
 // Màu badge theo nhóm ý định, để nhìn là phân biệt được ngay.
 const INTENT_TONE: Record<string, string> = {
   thong_tin: 'web',
@@ -76,7 +71,7 @@ export default async function Page({ searchParams }: { searchParams: { intent?: 
         <input name="keyword" placeholder="Từ khóa mới" aria-label="Từ khóa" required />
         <select name="intent" aria-label="Ý định" defaultValue="giao_dich">
           <option value="thong_tin">Thông tin</option>
-          <option value="thuong_mai">So sánh</option>
+          <option value="thuong_mai">Thương mại</option>
           <option value="giao_dich">Giao dịch</option>
           <option value="dieu_huong">Điều hướng</option>
         </select>
