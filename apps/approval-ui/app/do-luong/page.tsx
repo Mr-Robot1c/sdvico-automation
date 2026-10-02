@@ -312,7 +312,7 @@ function BangSoLieu({
         <span className="sub" style={{ fontSize: '.85rem', fontWeight: 400 }}>({rows.length} bài hôm nay)</span>
       </h2>
       {titleNote ? <p className="sub" style={{ margin: '0 0 8px' }}>{titleNote}</p> : null}
-      <div className="tablewrap">
+      <div className="tablewrap table-scroll">
         <table className="datatable">
           <thead>
             <tr>{headers.map((h, i) => <th key={i} className={i > 0 && i < headers.length - 1 ? 'num' : ''}>{h}</th>)}</tr>

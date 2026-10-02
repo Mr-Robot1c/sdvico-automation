@@ -6,10 +6,13 @@ import { useRef, type ReactNode } from 'react';
 export default function ViewModal({
   title,
   label = 'Xem chi tiết',
+  footer,
   children
 }: {
   title: string;
   label?: string;
+  /** Thanh hành động dính đáy modal (2/10): nằm ngoài vùng cuộn nên luôn thấy, vd nút Duyệt / Từ chối. */
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -68,6 +71,7 @@ export default function ViewModal({
             </button>
           </div>
           <div className="modal-body">{children}</div>
+          {footer ? <div className="modal-foot">{footer}</div> : null}
         </div>
       </dialog>
     </>

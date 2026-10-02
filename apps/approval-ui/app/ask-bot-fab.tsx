@@ -112,7 +112,7 @@ export default function AskBotFab() {
         onPointerMove={onPointerMove}
         onPointerUp={(e) => endDrag(e, true)}
         onPointerCancel={(e) => endDrag(e, false)}
-        aria-label={open ? 'Đóng khung hỏi bot' : 'Hỏi bot nội bộ'}
+        aria-label={open ? 'Đóng khung hỏi bot' : 'Hỏi bot'}
         title="Bấm để hỏi bot. Giữ và kéo để dời nút đi chỗ khác."
       >
         <span aria-hidden="true">💬</span>

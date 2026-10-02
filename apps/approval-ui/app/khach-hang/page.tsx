@@ -241,7 +241,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
           <p className="sub">Máy bắt comment và tin nhắn hỏi mua dưới bài đăng; khách gọi / Zalo thì bấm ➕ Thêm khách.</p>
         </div>
       ) : (
-        <div className="tablewrap">
+        <div className="tablewrap table-scroll">
           <table className="datatable lead-table">
             <thead>
               <tr>

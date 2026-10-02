@@ -301,7 +301,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
           ) : null}
 
           <h2 style={{ marginTop: 24 }}>Top 5 bài trong tuần</h2>
-          <div className="tablewrap">
+          <div className="tablewrap table-scroll">
             <table className="datatable">
               <thead>
                 <tr><th>Tên bài</th><th>Sản phẩm</th><th className="num">Điểm</th><th className="num">Tương tác</th><th className="num">Lượt xem</th><th className="num">Người thấy</th><th className="num">Giây xem</th></tr>
@@ -359,7 +359,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
                     <p className="sub" style={{ margin: 0 }}>Chưa có bài {s.label} nào trong tuần này.</p>
                   </div>
                 ) : (
-                  <div className="tablewrap">
+                  <div className="tablewrap table-scroll">
                     <table className="datatable">
                       <thead>
                         <tr>
@@ -397,7 +397,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
           })()}
 
           <h2 style={{ marginTop: 24 }}>Theo loại bài — tuần này</h2>
-          <div className="tablewrap">
+          <div className="tablewrap table-scroll">
             <table className="datatable">
               <thead>
                 <tr><th>Loại</th><th className="num">Số bài</th><th className="num">TB điểm</th><th className="num">TB tương tác/bài</th><th className="num">Tổng tương tác</th></tr>
@@ -420,7 +420,7 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
             <summary style={{ cursor: 'pointer' }}>
               <b>So sánh với tuần trước ({report.prevWindow.start.split('-').reverse().join('/')} đến {report.prevWindow.end.split('-').reverse().join('/')})</b>
             </summary>
-            <div className="tablewrap" style={{ marginTop: 12 }}>
+            <div className="tablewrap table-scroll" style={{ marginTop: 12 }}>
               <table className="datatable">
                 <thead>
                   <tr><th>Chỉ số</th><th className="num">Tuần này</th><th className="num">Tuần trước</th><th className="num">Thay đổi</th></tr>

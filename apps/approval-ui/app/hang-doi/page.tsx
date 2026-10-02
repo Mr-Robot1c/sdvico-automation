@@ -341,7 +341,17 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                 ) : null}
 
                 <div className="card-actions">
-                  <ViewModal title={cleanTitle} label="Xem bài viết">
+                  <ViewModal
+                    title={cleanTitle}
+                    label="Xem bài viết"
+                    footer={
+                      <>
+                        <span className="modal-foot-hint">Giờ hẹn và ghi chú đặt ở khung dưới thẻ bài. Để trống giờ hẹn thì đăng ngay.</span>
+                        <button type="submit" form={`decide-${item.id}`} name="action" value="reject" className="btn ghost">Từ chối</button>
+                        <button type="submit" form={`decide-${item.id}`} name="action" value="approve" className="btn ok">Duyệt</button>
+                      </>
+                    }
+                  >
                     {info.flags.length ? (
                       <div className="flagline">
                         {info.flags.map((f) => (
@@ -371,6 +381,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   <DecideActions
                     id={item.id}
                     title={cleanTitle}
+                    formId={`decide-${item.id}`}
                     hasTiktok={info.channels.includes('tiktok')}
                     videoUrl={vid?.url ?? null}
                     caption={draft ?? null}

@@ -153,7 +153,7 @@ export default function PostingPlanForm({ pp, lots = {}, rowsByDate = {}, change
         action={savePostingPlanWithReport}
         hint={<>Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h; giờ ở đây được điền sẵn vào ô hẹn giờ khi Duyệt. Nhóm chia sẻ: máy tự rút lô {lotByDow.values().next().value?.lotSize || 4} nhóm/ngày (cột "Lô hôm đó"); ô "Ghim nhóm" chỉ khi muốn ép 1 nhóm cụ thể. YouTube chỉ ra bài khi folder sản phẩm có clip. TikTok: máy dựng video, bạn Duyệt rồi Xuất TikTok tay.</>}
       >
-        <div className="tablewrap">
+        <div className="tablewrap table-scroll">
           <table className="datatable pp-table">
             <SlotHead />
             <tbody>
@@ -195,7 +195,7 @@ export default function PostingPlanForm({ pp, lots = {}, rowsByDate = {}, change
         <summary className="kh-summary">✏️ Sửa riêng một ngày <span className="sub">{ovDates.length ? `đang có lịch riêng: ${ovDates.join(', ')}` : 'chưa ngày nào có lịch riêng'}</span></summary>
         <form action={savePostingOverrideAction} style={{ marginTop: 10 }}>
           <label className="kh-inline"><span className="sub">Ngày</span><input type="date" name="ov_date" defaultValue={today} required style={{ maxWidth: 170 }} /></label>
-          <div className="tablewrap" style={{ marginTop: 8 }}>
+          <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
             <table className="datatable pp-table">
               <SlotHead />
               <tbody>

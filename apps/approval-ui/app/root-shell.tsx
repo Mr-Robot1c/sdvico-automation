@@ -7,7 +7,7 @@
 // Chỉ RootShell là client component (usePathname). Sidebar/TopHeader/BotChip đã là client
 // ở phiên trước — không đổi API của chúng.
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Nav from './nav';
@@ -18,9 +18,49 @@ import dynamic from 'next/dynamic';
 // 15/9 (web chậm): khung chat bot (bot-chat + fab) chỉ tải khi trang đã vẽ xong, không nằm trong gói đầu của mọi trang.
 const AskBotFab = dynamic(() => import('./ask-bot-fab'), { ssr: false });
 import Tracking from './tracking';
+// 2/10 (responsive mobile đợt 1): thanh đầu trang gọn + menu trượt cho điện thoại.
+import ThemeToggle from './theme-toggle';
+import { crumbFor, parentFor } from '../lib/routes';
+
+// Dưới 768px sidebar nội bộ thành menu trượt (off-canvas). Mốc này phải khớp @media (max-width: 767px) trong globals.css.
+const MOBILE_MAX = 767;
 
 export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: { children: ReactNode; marketingOnly: boolean; pixelId?: string | null; ga4Id?: string | null }) {
   const path = usePathname() || '/';
+  const [navOpen, setNavOpen] = useState(false);
+
+  // Đổi trang thì đóng menu trượt (chọn mục menu = đổi pathname).
+  useEffect(() => { setNavOpen(false); }, [path]);
+
+  // Menu đang mở: khóa cuộn nền, Esc đóng, xoay máy/kéo rộng quá mốc mobile thì đóng.
+  useEffect(() => {
+    if (!navOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); };
+    const onResize = () => { if (window.innerWidth > MOBILE_MAX) setNavOpen(false); };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [navOpen]);
+
+  // Đoạn mô tả dưới tiêu đề trang (.head-row > div > h1 + .sub) bị clamp 1 dòng trên điện thoại:
+  // bấm vào để mở rộng, bấm lại để thu. Gom 1 chỗ để mọi trang nội bộ dùng chung, khỏi sửa từng page.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      const el = t?.closest?.('.head-row > div > h1 + .sub') as HTMLElement | null;
+      if (!el || (t as HTMLElement).closest('a, button')) return;
+      el.classList.toggle('sub-open');
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
+
   // Trang ĐĂNG NHẬP: render trần — không sidebar nội bộ (chưa đăng nhập), không header
   // public (đây không phải trang cho khách). Form tự căn giữa bằng .login-wrap.
   if (path === '/dang-nhap') return <>{children}</>;
@@ -81,10 +121,19 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
   }
 
   // Trang nội bộ — shell cũ giữ nguyên.
+  const mCrumb = crumbFor(path);
+  const mParent = parentFor(path);
   return (
     <>
-      <div className="shell">
-        <aside className="sidebar" aria-label="Thanh điều hướng">
+      <div className={`shell${navOpen ? ' nav-open' : ''}`}>
+        {/* Lớp mờ phía sau menu trượt (chỉ hiện dưới 768px). Bấm là đóng menu. */}
+        <div className="m-backdrop" aria-hidden="true" onClick={() => setNavOpen(false)} />
+        <aside
+          id="sidebar-nav"
+          className="sidebar"
+          aria-label="Thanh điều hướng"
+          onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setNavOpen(false); }}
+        >
           {/* Logo THAT cua cong ty (public/logo-sdvico.png) — sep chot 20/8, bo SVG chu S tu ve. */}
           <div className="brand">
             <span className="brand-logo" aria-hidden="true">
@@ -102,6 +151,23 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
           </div>
         </aside>
         <div className="main-col">
+          {/* Thanh đầu trang gọn cho điện thoại (ẩn từ 768px trở lên, lúc đó dùng TopHeader như cũ). */}
+          <div className="m-bar">
+            <button
+              type="button"
+              className="m-menu-btn"
+              aria-label={navOpen ? 'Đóng menu' : 'Mở menu'}
+              aria-expanded={navOpen}
+              aria-controls="sidebar-nav"
+              onClick={() => setNavOpen((v) => !v)}
+            >
+              <span aria-hidden="true">{navOpen ? '✕' : '☰'}</span>
+            </button>
+            <span className="m-brand">SDVICO</span>
+            {mParent ? <Link href={mParent} className="m-back" aria-label="Quay lại trang cha" title="Quay lại">←</Link> : null}
+            <span className="m-title">{mCrumb}</span>
+            <ThemeToggle />
+          </div>
           <TopHeader marketingOnly={marketingOnly} />
           <div className="content">{children}</div>
         </div>

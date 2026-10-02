@@ -303,7 +303,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           📆 Kế hoạch tuần
           <span className="sub">{fmtDate(week.window.start)} – {fmtDate(week.window.end)} · mỗi bài một dòng · ✅ đã sinh, ▫️ dự kiến máy rút theo thứ tự ưu tiên</span>
         </h2>
-        <div className="tablewrap" style={{ marginTop: 8 }}>
+        <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
           <table className="datatable week-table">
             <thead>
               <tr>
@@ -409,7 +409,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           <span className="sub">BOSS sinh từ tri thức + số liệu · sản phẩm ưu tiên cao được rút trước · mỗi hướng ra đúng 1 bài</span>
         </h2>
         {suggestions.length ? (
-          <div className="tablewrap" style={{ marginTop: 8 }}>
+          <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
             <table className="datatable">
               <thead>
                 <tr>
@@ -462,7 +462,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <section className="blk">
           <h2>⚖️ Sản phẩm ưu tiên <span className="sub">trọng số BOSS chấm — cao thì hướng của sản phẩm đó chạy trước</span></h2>
           {products.length ? (
-            <div className="tablewrap" style={{ marginTop: 8 }}>
+            <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
               <table className="datatable">
                 <thead><tr><th>Sản phẩm</th><th className="num">Ưu tiên</th><th className="num">Tương tác/bài</th><th>Hướng xử lý</th></tr></thead>
                 <tbody>
@@ -547,7 +547,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       {repostSuggestions.length ? (
         <section className="blk">
           <h2>🔁 Nên đăng lại <span className="sub">bài từ 7 ngày trước có tương tác tốt nhất — người mở bài và chia sẻ tay</span></h2>
-          <div className="tablewrap" style={{ marginTop: 8 }}>
+          <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
             <table className="datatable">
               <thead><tr><th>Bài</th><th className="num">Tương tác</th><th>Đã đăng</th><th></th></tr></thead>
               <tbody>
@@ -570,7 +570,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <details className="blk">
           <summary className="kh-summary">📚 Lịch sử các bản kế hoạch <span className="sub">{vnInt(history.length)} bản cũ</span></summary>
           {history.length ? (
-            <div className="tablewrap" style={{ marginTop: 10 }}>
+            <div className="tablewrap table-scroll" style={{ marginTop: 10 }}>
               <table className="datatable">
                 <thead><tr><th>Sinh lúc</th><th>Loại</th><th className="center"></th></tr></thead>
                 <tbody>
@@ -595,7 +595,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
 
         <details className="blk">
           <summary className="kh-summary">❓ Khi nào bấm nút nào</summary>
-          <div className="tablewrap" style={{ marginTop: 10 }}>
+          <div className="tablewrap table-scroll" style={{ marginTop: 10 }}>
             <table className="datatable">
               <thead><tr><th style={{ width: 170 }}>Nút</th><th>Bấm khi nào</th></tr></thead>
               <tbody>

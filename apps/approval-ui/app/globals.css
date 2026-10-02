@@ -443,16 +443,12 @@ a.btn, a.btn:hover, a.btn:focus-visible { text-decoration: none; }
 .statcard-num { font-size: 28px; font-weight: 700; color: var(--ink); }
 .statcard.red .statcard-num { color: var(--no); }
 
-/* Mobile: sidebar dồn lên trên */
-@media (max-width: 760px) {
+/* Mobile (2/10, responsive đợt 1): sidebar thành menu trượt, xem khối "RESPONSIVE MOBILE ĐỢT 1" cuối file. */
+@media (max-width: 767px) {
   .shell { flex-direction: column; }
-  .sidebar { width: auto; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--line); padding: 12px 14px; }
-  .nav-groups { flex-direction: row; flex-wrap: wrap; gap: 10px; }
-  .nav-block { flex: 1 1 45%; }
   .tabs { flex-direction: column; }
   .content { padding: 0; }
-  main { padding: 18px 14px 88px; } /* 88px: chừa chip Bot nổi (audit H4) */
-  .sidebar-foot { display: none; } /* Đăng xuất mobile: đã có trên topbar (audit H1) */
+  main { padding: 18px 14px 72px; } /* 72px: chừa nút Hỏi bot nổi (audit H4) */
 }
 
 /* ===== Nút sinh nội dung và hàng nút phải header ===== */
@@ -1699,3 +1695,111 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .pf-foot-link:hover { text-decoration: underline; }
 .pf-foot-text { overflow: hidden; text-overflow: ellipsis; }
 .pf-foot-right { flex-shrink: 0; margin-left: auto; }
+
+/* ===== 2/10: RESPONSIVE MOBILE ĐỢT 1 (review UX 2/10: mobile 3/10) =====
+   Mốc duy nhất: dưới 768px là điện thoại. Từ 768px trở lên giữ nguyên bố cục máy tính.
+   W1 menu trượt, W2 nút 44px, W3 bảng cuộn riêng, W4 bot gọn, W5 mô tả 1 dòng, W6 luồng video, W7 thanh hành động modal. */
+
+/* Thanh đầu trang mobile + lớp mờ: ẩn trên máy tính, bật trong media bên dưới. */
+.m-bar, .m-backdrop { display: none; }
+
+/* W3: bảng rộng cuộn ngang TRONG khung của nó, không kéo cả trang. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; min-width: 0; }
+
+/* W6: luồng làm video 5 bước chia đều, hàng cuối giãn kín (không còn ô lẻ trống): 5 cột máy tính, 3+2 máy tính bảng, 1 cột điện thoại. */
+.flow-steps { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 0; }
+.flow-steps > .agent-card { flex: 1 1 170px; min-width: 0; }
+
+/* W7: thanh hành động dính đáy modal xem bài (nằm ngoài vùng cuộn của .modal-body). */
+.modal-foot {
+  display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px;
+  padding: 12px 20px; border-top: 1px solid var(--line); background: var(--surface);
+}
+.modal-foot-hint { margin-right: auto; color: var(--ink-2); font-size: 12.5px; min-width: 0; }
+
+@media (max-width: 767px) {
+  body { overflow-x: hidden; }
+  main { overflow-x: clip; padding-bottom: 72px; }
+  .tablewrap { max-width: 100%; -webkit-overflow-scrolling: touch; }
+
+  /* W1: sidebar thành menu trượt từ trái, đè lên nội dung. */
+  .topbar { display: none; }
+  .m-bar {
+    display: flex; align-items: center; gap: 8px;
+    position: sticky; top: 0; z-index: 20; height: 52px;
+    padding: 0 8px;
+    background: var(--surface); border-bottom: 1px solid var(--line);
+  }
+  .m-menu-btn, .m-back {
+    flex: none; width: 44px; height: 44px; display: grid; place-items: center;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
+    color: var(--ink); font: inherit; font-size: 20px; line-height: 1; cursor: pointer; text-decoration: none;
+  }
+  .m-back { font-size: 18px; color: var(--accent); background: var(--accent-bg); border-color: var(--accent); }
+  .m-brand { flex: none; font-weight: 800; font-size: 15px; letter-spacing: .02em; color: var(--accent); }
+  .m-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-size: 14px; font-weight: 600; }
+  .m-bar .theme-toggle { flex: none; width: 44px; height: 44px; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 10001;
+    width: min(300px, 86vw); height: 100vh; height: 100dvh;
+    padding: 18px 12px 14px; border-right: 1px solid var(--line); border-bottom: none;
+    transform: translateX(-102%); visibility: hidden; box-shadow: none;
+    transition: transform .22s ease, visibility 0s linear .22s;
+  }
+  .shell.nav-open .sidebar {
+    transform: none; visibility: visible; box-shadow: 8px 0 32px rgba(0, 0, 0, .28);
+    transition: transform .22s ease, visibility 0s;
+  }
+  .m-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 10000;
+    background: rgba(15, 23, 42, .5); opacity: 0; pointer-events: none; transition: opacity .2s ease;
+  }
+  .shell.nav-open .m-backdrop { opacity: 1; pointer-events: auto; }
+  .tab { min-height: 44px; }
+  .sidebar-foot { display: block; }
+  .sidebar-foot .foot-logout { display: inline-flex; align-items: center; min-height: 44px; }
+
+  /* W2: cỡ bấm ngón tay 44px, ô nhập 16px để iOS không tự phóng to. */
+  .btn, .btn.sm, a.btn, button.btn {
+    min-height: 44px; padding-top: 11px; padding-bottom: 11px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .lead-note-form .btn.sm, .lead-table td > .btn.sm { height: auto; min-height: 44px; }
+  .lead-note-form .note { height: auto; }
+  .chip, button.chip { min-height: 44px; padding-top: 10px; padding-bottom: 10px; }
+  .icon-btn { width: 44px; height: 44px; }
+  .topbar-back, .topbar-logout { min-height: 44px; display: inline-flex; align-items: center; }
+  button[type='submit'], input[type='submit'] { min-height: 44px; }
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']):not([type='range']):not([type='file']),
+  select, textarea { min-height: 44px; font-size: 16px; }
+  textarea { min-height: 88px; }
+  .head-actions { justify-content: flex-start; width: 100%; }
+
+  /* W4: bot gọn. Ẩn hẳn chip "Bot đã học"; nút Hỏi bot thu thành nút tròn 48px góc phải dưới. */
+  .bot-chip-wrap, .bot-reopen { display: none !important; }
+  .askbot-fab {
+    width: 48px; height: 48px; padding: 0; justify-content: center; gap: 0; font-size: 22px;
+    right: 12px !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .askbot-fab-text { display: none; }
+  .askbot-panel {
+    left: 8px; right: 8px !important; width: auto;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+    max-height: 72vh; max-height: 72dvh;
+  }
+
+  /* W5: đoạn mô tả dưới tiêu đề chỉ 1 dòng, bấm vào mở rộng (root-shell.tsx bật/tắt class sub-open). */
+  .head-row > div:first-child > h1 + .sub {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1;
+    overflow: hidden; cursor: pointer;
+  }
+  .head-row > div:first-child > h1 + .sub.sub-open { display: block; -webkit-line-clamp: unset; line-clamp: unset; }
+
+  /* W7: modal xem bài chiếm gần hết màn hình, thanh hành động gọn. */
+  .modal-foot { padding: 10px 14px; }
+  .modal-foot .btn { flex: 1 1 120px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .m-backdrop { transition: none !important; }
+}

@@ -51,7 +51,7 @@ export default async function Page({ searchParams }: { searchParams?: { kenh?: s
       {rows.length === 0 ? (
         <div className="empty"><div className="empty-icon" aria-hidden="true">🎬</div><p>Chưa có video nào đăng lên {KENH[kenh].label}.</p></div>
       ) : (
-        <div className="tablewrap">
+        <div className="tablewrap table-scroll">
           <table className="datatable">
             <thead>
               <tr>

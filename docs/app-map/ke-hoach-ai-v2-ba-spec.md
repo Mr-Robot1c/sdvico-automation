@@ -2,6 +2,7 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach
+<!-- re-verified: 2026-10-02 (4) - RESPONSIVE MOBILE DOT 1: /ke-hoach chi them class table-scroll vao cac .tablewrap (bang tuan, hang di, form lich); logic ke hoach/BOSS/lich dang khong doi. -->
 <!-- re-verified: 2026-10-02 - FIX 1 LUOT UI (so QA 2/10): form Lich dang co dinh /ke-hoach gap o Ghim nhom vao details, nhan nut Danh dau da chia; logic ke hoach/BOSS khong doi. -->
 <!-- re-verified: 2026-09-30 - KHUNG BAN TIN 18:00 (sep Long qua Thanh): lich dang co dinh them loai khung bantin — video nguoi gui, may soan caption, rotate/plan-live BO QUA (chi loc sale/content); bang tuan them dong Ban tin thuy san, form Lich co dinh them option, khung khong vao lo chia group; DB da ap khung vao 7 ngay tuan 28/9. Flow BOSS de xuat / NGUOI quyet KHONG doi; proposePostingPlan tuan moi tu giu khung. Chi tiet README.md cung ngay. -->
 <!-- re-verified: 2026-09-16 (4) - mo-ta-tu-lieu doc JSON ben hon; ban giao docs/plans/ban-giao-sua-web-16-09.md; Ke hoach/BOSS khong doi. -->

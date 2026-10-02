@@ -63,7 +63,7 @@ export default function PlanQuickView({ todayPlan }: { todayPlan: TodayPlan }) {
           <button type="button" className="btn ghost sm" onClick={() => dialogRef.current?.close()}>✕ Đóng</button>
         </div>
 
-        <table className="datatable" style={{ margin: 0 }}>
+        <div className="table-scroll"><table className="datatable" style={{ margin: 0 }}>
           <tbody>
             <tr>
               <td style={{ whiteSpace: 'nowrap', width: 130 }}><b>🕗 8h — 2 bài bán</b><div className="sub">theo hướng đi</div></td>
@@ -91,7 +91,7 @@ export default function PlanQuickView({ todayPlan }: { todayPlan: TodayPlan }) {
               </tr>
             ) : null}
           </tbody>
-        </table>
+        </table></div>
 
         <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
           <Link href="/ke-hoach" className="btn ok sm">Mở kế hoạch tuần đầy đủ →</Link>

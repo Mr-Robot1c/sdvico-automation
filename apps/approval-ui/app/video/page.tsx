@@ -163,7 +163,7 @@ export default async function Page() {
       {/* ===== LUONG LAM VIDEO ===== */}
       <section className="blk">
         <h2><span aria-hidden="true">⚙️</span> Luồng làm video <span className="sub">5 bước, AI của SDVICO tự chạy — người chỉ bấm Duyệt</span></h2>
-        <div className="blk-cols" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', marginBottom: 0 }}>
+        <div className="flow-steps">
           {steps.map((s, i) => (
             <div key={s.name} className="agent-card">
               <div className="ag-head">

@@ -144,7 +144,7 @@ export default async function Page() {
         {latest.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Chưa có bài công khai nào.</p>
         ) : (
-          <div className="tablewrap">
+          <div className="tablewrap table-scroll">
             <table className="datatable">
               <thead>
                 <tr>
@@ -190,7 +190,7 @@ export default async function Page() {
             <p className="sub" style={{ margin: 0 }}>Kho từ khóa trống. Chạy seed keywords hoặc thêm tay ở trang Kho từ khóa.</p>
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
-              <div className="tablewrap">
+              <div className="tablewrap table-scroll">
                 <table className="datatable">
                   <thead>
                     <tr>
@@ -278,7 +278,7 @@ export default async function Page() {
                 🔎 {fmt(idxIndexed)}/{fmt(idxTotal)} bài đã được Google index (lần kiểm {fmtDT(idxRow.created_at)}).
               </p>
             ) : null}
-            <div className="tablewrap">
+            <div className="tablewrap table-scroll">
               <table className="datatable">
                 <thead>
                   <tr>

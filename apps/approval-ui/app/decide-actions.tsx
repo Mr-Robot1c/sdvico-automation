@@ -145,6 +145,7 @@ export default function DecideActions({
   videoUrl = null,
   caption = null,
   defaultSchedule = '',
+  formId,
 }: {
   id: string;
   title: string;
@@ -152,6 +153,8 @@ export default function DecideActions({
   videoUrl?: string | null;
   caption?: string | null;
   defaultSchedule?: string;
+  /** id gắn cho <form> để nút ở nơi khác (vd thanh đáy modal xem bài) submit cùng form qua thuộc tính form="...". */
+  formId?: string;
 }) {
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
   // 4/9: Lịch đăng cố định điền sẵn giờ ô (payload.plan_time) khi còn ≥ 15 phút; người duyệt
@@ -161,6 +164,7 @@ export default function DecideActions({
 
   return (
     <form
+      id={formId}
       className="decide-wrap"
       action={decideForm}
       onSubmit={(e) => {
