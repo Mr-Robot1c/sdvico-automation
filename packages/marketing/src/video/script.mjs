@@ -361,7 +361,13 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   // MỘT câu chuyện liền mạch bám đúng bộ hình. Chỉ nhánh content; không đủ tư liệu (sb null) thì chạy đường cũ.
   // Video BÁN HÀNG không đổi một dòng.
   const sbMustAsset = opts.mustUseAssetId ? assets.find((a) => a.id === opts.mustUseAssetId) || null : null;
-  const sb = opts.contentVideo ? pickStoryboard(assets, { mustAsset: sbMustAsset, recentUse: opts.recentUse || new Map(), productGroup: null }) : null;
+  // 2/10 đêm (Thanh nghe 3 bản storyboard + 2 bước đều chê "chả ăn nhập, không ra 1 bài như
+  // trước kia"): video CONTENT QUAY VỀ ĐƯỜNG CŨ viết bài trước ghép hình sau — đường cũ cho bài
+  // hay (các bài Tốt tháng 9), còn khớp hình đã có hookPin + imagery + invented + model veto lo,
+  // và kho giờ có clip khoang máy thật. Storyboard/2-bước GIỮ NGUYÊN CODE sau công tắc
+  // VIDEO_STORYBOARD=on để thử lại sau, mặc định TẮT.
+  const sbEnabled = String(process.env.VIDEO_STORYBOARD || 'off').toLowerCase() === 'on';
+  const sb = (opts.contentVideo && sbEnabled) ? pickStoryboard(assets, { mustAsset: sbMustAsset, recentUse: opts.recentUse || new Map(), productGroup: null }) : null;
   const sbMode = !!(sb && sb.length);
   const sbDesc = (a) => String(a.description || a.title || '').replace(/\s+/g, ' ').trim().slice(0, 400);
   if (sbMode) {
