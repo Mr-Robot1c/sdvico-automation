@@ -4,7 +4,7 @@
 import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
   stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
-  breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences,
+  breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences,
 } from './video/rules.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
@@ -360,6 +360,21 @@ ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXG
   ok('storyboardDrift: chi tiết người không có trong mô tả (anh thợ máy) bị bắt cảnh 1', d3.some((m) => m.scene === 1 && (m.reason === 'invented' || m.reason === 'drift')), d3);
   eq('storyboardDrift: số cảnh ít hơn bộ hình chỉ soát phần có, không lỗi', storyboardDrift([clean[0]], sbSet), []);
   eq('storyboardDrift: đầu vào rỗng không lỗi', [storyboardDrift([], sbSet), storyboardDrift(null, null)], [[], []]);
+}
+
+// 2/10: sbChatterSentences — câu hỏi giao lưu kiểu "...phải không?" ở cảnh giữa storyboard-first bị bắt.
+{
+  eq('sbChatter: bắt "phải không"', sbChatterSentences('Thợ máy đang lắp thiết bị phải không?'), ['Thợ máy đang lắp thiết bị phải không?']);
+  eq('sbChatter: bắt "có thấy vậy không"', sbChatterSentences('Bà con có thấy vậy không?'), ['Bà con có thấy vậy không?']);
+  eq('sbChatter: bắt "đúng không nào"', sbChatterSentences('Đúng không nào anh em?'), ['Đúng không nào anh em?']);
+  eq('sbChatter: bắt biến thể không dấu, hoa thường', sbChatterSentences('MAY NAY TOT DUNG KHONG ban?'), ['MAY NAY TOT DUNG KHONG ban?']);
+  eq('sbChatter: bắt "thấy hông" và "phải hông"', sbChatterSentences('Bà con thấy hông? Chuyến này khó phải hông?').length, 2);
+  eq('sbChatter: chỉ trả câu dính, giữ câu sạch', sbChatterSentences('Tiếng máy nổ đều. Anh em nghe đúng không? Ngủ ngon rồi.'), ['Anh em nghe đúng không?']);
+  eq('sbChatter: không bắt câu cảm "Nhẹ cả người!"', sbChatterSentences('Nhẹ cả người!'), []);
+  eq('sbChatter: không bắt câu kể "Tiếng máy nổ đều, mình mới ngủ ngon."', sbChatterSentences('Tiếng máy nổ đều, mình mới ngủ ngon.'), []);
+  eq('sbChatter: không bắt câu hỏi tu từ "Sao dầu xuống nhanh vậy?"', sbChatterSentences('Sao dầu xuống nhanh vậy?'), []);
+  eq('sbChatter: câu kể thường không có cụm hỏi thì không bắt', sbChatterSentences('Kho máy luôn thông thoáng.'), []);
+  eq('sbChatter: chuỗi rỗng và null không lỗi', [sbChatterSentences(''), sbChatterSentences(null)], [[], []]);
 }
 
 const failed = cases.filter((c) => !c.ok);

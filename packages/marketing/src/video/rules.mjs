@@ -350,6 +350,18 @@ export function selfProductFaultPhrases(narration) {
   return SELF_FAULT_PHRASES.filter((p) => t.includes(p));
 }
 
+// 2/10: storyboard-first ra lời thuyết minh "...phải không?" ở cảnh giữa — câu hỏi giao lưu chỉ được ở cảnh cuối.
+// Chỉ bắt đúng các cụm hỏi giao lưu trong danh sách; câu cảm và câu hỏi tu từ khác không bị bắt.
+const SB_CHATTER_TERMS = ['phai khong', 'dung khong', 'phai hong', 'dung hong', 'thay khong', 'thay hong', 'co thay vay khong'];
+export function sbChatterSentences(narration) {
+  const out = [];
+  for (const sent of sentencesOf(narration)) {
+    const fs = foldText(sent);
+    if (SB_CHATTER_TERMS.some((t) => new RegExp(`(^|[^a-z0-9])${t}($|[^a-z0-9])`).test(fs))) out.push(sent);
+  }
+  return out;
+}
+
 // Cắt các câu trôi khỏi hình; cắt hết thì trả '' (người gọi tự quyết giữ bản gốc, như luật cắt cụm cấm).
 export function cutImageryDrift(narration, assetText) {
   const bad = new Set(imageryDriftSentences(narration, assetText));
