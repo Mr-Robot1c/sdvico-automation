@@ -28,7 +28,8 @@
     "kho:doi-drive": "node packages/marketing/src/doi-kho-sang-drive.mjs",
     "drive:oauth": "node packages/marketing/src/google-oauth-drive.mjs",
     "gsc:kiem": "node packages/marketing/src/kiem-search-console.mjs",
-    "gsc:keo": "node packages/marketing/src/gsc-keo-so.mjs"
+    "gsc:keo": "node packages/marketing/src/gsc-keo-so.mjs",
+    "test:gsc": "node packages/marketing/src/test-gsc-utils.mjs"
   },
   "workspaces": [
     "packages/*",

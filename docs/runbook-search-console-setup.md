@@ -12,6 +12,15 @@
   `sdvico.vn/blog/<slug>`), thêm 1 dòng `__gsc_site__` là tổng cả site. Nhật ký ở `run_log` task `mkt.gsc_pull`.
 - Trang SEO đọc snapshot mới nhất. Bài chưa từng hiện trên Google thì cột để "—".
 
+### Nhật ký chẩn đoán một lượt kéo
+
+`run_log.detail` của task `mkt.gsc_pull` ghi `rowsFetched`, `blogRowsFetched`, `pagesFetched`,
+`postsPublished`, `matched`, `unmatchedUrls`, `pulled` và `errors`. Nếu GSC có URL blog nhưng không
+URL nào khớp bài hiện tại, lượt chạy mang trạng thái `warn`, không còn báo `ok` giả.
+
+URL được so theo hostname bỏ `www`, bỏ khác biệt http/https, query, hash và dấu gạch cuối. Không
+được map URL blog cũ sang bài mới theo tiêu đề hoặc chủ đề, vì đó là hai tài nguyên khác nhau.
+
 ## Bước 1. Tài khoản dịch vụ
 
 Dùng chung tài khoản dịch vụ của runbook Google Drive (`docs/runbook-google-drive-setup.md`, bước 1).
@@ -52,3 +61,20 @@ Với property URL prefix thì ghi đúng `https://sdvico.vn/` (có dấu gạch
   - `Search Console 404`: `GSC_SITE_URL` viết sai dạng (Domain property phải là `sc-domain:sdvico.vn`).
   - Có số site nhưng bài toàn "—": URL bài trên sdvico.vn/blog không giữ đuôi `-<8 ký tự id>` trong slug;
     kiểm tra với anh Thành (SPA bên IIS đọc `/api/public/posts`, slug phải giữ nguyên).
+  - `matched = 0` và `unmatchedUrls` chỉ có URL blog cũ không mang hậu tố ID: không backfill chéo.
+    Kiểm URL hiện tại trong Search Console URL Inspection. `URL is unknown to Google` hoặc
+    `Discovered - currently not indexed` nghĩa là GSC chưa có row cho bài, không phải số 0.
+  - So sánh `https://sdvico.vn/sitemap.xml` với
+    `https://sdvico-mktit.vercel.app/api/public/sitemap.xml`. Sitemap domain công khai phải proxy
+    bản động và HTML từng bài phải có canonical/metadata riêng; nếu SPA chỉ trả shell HTML chung thì
+    sửa ở repo/deployment `sdvico-home-page`, không sửa số liệu trong database để che lỗi index.
+
+## Kiểm thử sau khi sửa sync
+
+```sh
+npm run test:gsc
+npm run gsc:kiem
+```
+
+Test đầu kiểm URL normalization, 0 so với null, CTR từ tổng, position có trọng số, pagination và
+khung ngày Việt Nam. Lệnh sau kiểm quyền thật nhưng không in token hoặc private key.
