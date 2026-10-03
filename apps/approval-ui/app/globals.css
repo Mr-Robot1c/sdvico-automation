@@ -1990,3 +1990,10 @@ button.topbar-back { font: inherit; cursor: pointer; }
   .sx-thumbs { max-height: 200px; }
   .sx-studio { order: 10; }
 }
+
+/* 3/10 (đợt 2 việc 3): khung chờ của từng khối trang SEO (Suspense). Tắt chuyển động khi người dùng chọn giảm. */
+.seo-skeleton { display: grid; gap: 8px; }
+.seo-skeleton span { display: block; height: 14px; border-radius: 6px; background: var(--surface-2); animation: seo-pulse 1.2s ease-in-out infinite; }
+.seo-skeleton span:nth-child(2n) { width: 80%; }
+@keyframes seo-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .seo-skeleton span { animation: none; } }
