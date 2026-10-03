@@ -5,7 +5,7 @@ import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
   stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
   breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences,
-  absoluteClaims, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, keepOneQuestion,
+  absoluteClaims, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, paybackClaimSentences, keepOneQuestion,
 } from './video/rules.mjs';
 import { FORMATS, LOUDNORM_FILTER, parseLoudnormStats, loudnormFilterFor, badgeFontSize } from './video/assemble.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
@@ -481,6 +481,21 @@ ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXG
   eq('camera: không dấu và viết hoa cũng bắt', cameraTalkSentences('GOC RONG LO DIEN CA KHU VUC.'), ['GOC RONG LO DIEN CA KHU VUC.']);
   eq('camera: rỗng và null không lỗi', [cameraTalkSentences(''), cameraTalkSentences(null)], [[], []]);
   eq('camera: nối stripSentencesWith chỉ cắt đúng câu', stripSentencesWith('Mình ra khơi từ sớm. Góc rộng lộ diện cả cảng. Tiền dầu cứ vơi.', cameraTalkSentences('Mình ra khơi từ sớm. Góc rộng lộ diện cả cảng. Tiền dầu cứ vơi.')), 'Mình ra khơi từ sớm. Tiền dầu cứ vơi.');
+}
+
+// 3/10 vòng 4 (H1): câu thu hồi vốn không được đôn mốc nhanh hơn bài nguồn (bài e3acd98f nói "sau một năm").
+{
+  const SRC_YEAR = 'Bài toán thu hồi vốn đầu tư máy lọc nước biển sau một năm. Tính ra sau một năm là thu hồi vốn.';
+  const bad = 'Chỉ độ vài chuyến là thu hồi vốn.';
+  eq('payback: "chỉ độ vài chuyến là thu hồi vốn" + nguồn "sau một năm" dính', paybackClaimSentences(bad, SRC_YEAR), [bad]);
+  eq('payback: nguồn có "vài chuyến" thì KHÔNG dính', paybackClaimSentences(bad, 'Nhiều chủ tàu nói vài chuyến biển là thu hồi vốn.'), []);
+  eq('payback: "sau một năm thu hồi vốn" KHÔNG dính', paybackClaimSentences('Sau một năm thu hồi vốn.', SRC_YEAR), []);
+  eq('payback: câu không nhắc vốn KHÔNG dính', paybackClaimSentences('Đi vài chuyến là thấy khác liền.', SRC_YEAR), []);
+  eq('payback: nguồn rỗng/null thì dính', [paybackClaimSentences(bad, ''), paybackClaimSentences(bad, null)], [[bad], [bad]]);
+  eq('payback: "hoàn vốn trong mấy tháng" dính', paybackClaimSentences('Hoàn vốn trong mấy tháng.', SRC_YEAR), ['Hoàn vốn trong mấy tháng.']);
+  eq('payback: không dấu và "lấy lại vốn", "gỡ vốn" dính', paybackClaimSentences('LAY LAI VON TRONG VAI TUAN. Go von sau dam chuyen.', SRC_YEAR).length, 2);
+  eq('payback: chỉ trả đúng câu dính, giữ câu kể', paybackClaimSentences('Mình tính kỹ chi phí. Chỉ vài chuyến là gỡ vốn. Tiền dầu cứ vơi.', SRC_YEAR), ['Chỉ vài chuyến là gỡ vốn.']);
+  eq('payback: nối stripSentencesWith chỉ cắt đúng câu', stripSentencesWith('Mình tính kỹ chi phí. Chỉ vài chuyến là gỡ vốn. Tiền dầu cứ vơi.', paybackClaimSentences('Mình tính kỹ chi phí. Chỉ vài chuyến là gỡ vốn. Tiền dầu cứ vơi.', SRC_YEAR)), 'Mình tính kỹ chi phí. Tiền dầu cứ vơi.');
 }
 
 // 3/10 vòng 3 (G3): không quy kết nguồn dầu ("dầu mua ngoài bẩn thế này").

@@ -540,6 +540,31 @@ export function cameraTalkSentences(narration) {
   return out;
 }
 
+// 3/10 vòng 4 (ChatGPT chấm bài e3acd98f "Bài toán thu hồi vốn...": bài nguồn nói thu hồi vốn SAU MỘT NĂM, lời đọc
+// viết "chỉ độ vài chuyến là thu hồi vốn" — làm quá so với nguồn, Điều cấm 5): câu nhắc thu hồi vốn ("thu hồi vốn /
+// hoàn vốn / lấy lại vốn / gỡ vốn") mà kèm MỐC NHANH ("vài/mấy/ít/dăm/đôi chuyến", "vài/mấy tuần", "vài/mấy tháng",
+// "độ vài", "chỉ vài") không có trong bài nguồn thì bị bắt. So khớp không dấu. sourceText rỗng/null thì mọi câu thu
+// hồi vốn kèm mốc nhanh đều dính. Câu thu hồi vốn KHÔNG kèm mốc nhanh ("sau một năm là thu hồi vốn") được tha.
+// Mốc cụ thể (vài chuyến...) xét trước; "độ vài" / "chỉ vài" chỉ xét khi câu không có mốc cụ thể nào (để bài nguồn
+// có "vài chuyến" thì câu "chỉ độ vài chuyến" không bị bắt oan vì cụm "độ vài").
+// Trả về các CÂU dính (log, nhắc sinh lại, rồi cắt câu).
+const PAYBACK_RE = /(^|[^a-z0-9])(thu hoi von|hoan von|lay lai von|go von)($|[^a-z0-9])/;
+const FAST_SPECIFIC = ['vai chuyen', 'may chuyen', 'it chuyen', 'dam chuyen', 'doi chuyen', 'vai tuan', 'may tuan', 'vai thang', 'may thang'];
+const FAST_VAGUE = ['do vai', 'chi vai'];
+const hasPhrase = (folded, phrase) => new RegExp(`(^|[^a-z0-9])${phrase}($|[^a-z0-9])`).test(folded);
+export function paybackClaimSentences(text, sourceText) {
+  const src = foldText(sourceText);
+  const out = [];
+  for (const sent of sentencesOf(String(text || '').normalize('NFC'))) {
+    const fs = foldText(sent);
+    if (!PAYBACK_RE.test(fs)) continue;
+    const specific = FAST_SPECIFIC.filter((m) => hasPhrase(fs, m));
+    const hits = specific.length ? specific : FAST_VAGUE.filter((m) => hasPhrase(fs, m));
+    if (hits.some((m) => !hasPhrase(src, m))) out.push(sent);
+  }
+  return out;
+}
+
 // 3/10 vòng 2 (ChatGPT chấm cảng cá 7,5: cảnh kết có 2 câu hỏi cạnh tranh nhau): cảnh closing của video CONTENT
 // chỉ giữ MỘT câu hỏi giao lưu. Nhiều hơn một câu hỏi thì giữ câu hỏi ĐẦU TIÊN, bỏ các câu hỏi sau; câu trần
 // thuật giữ nguyên. Có tối đa một câu hỏi thì trả lại đúng chuỗi cũ.
