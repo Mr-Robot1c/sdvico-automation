@@ -14,6 +14,7 @@ import { fetchWithRetry } from '../lib/retry';
 import { pullFacebookMetrics, fbPageTokens } from '../lib/fb-metrics';
 import { generateAndStorePlan } from '../lib/plan';
 import { assetPublicUrl, isDrivePath, deleteDriveFile } from '../lib/asset-url';
+import { getCurrentApprover } from '../lib/current-user';
 
 // Chờ Facebook xử lý xong video mới thả được ảnh vào bình luận (comment ngay lúc video còn
 // đang xử lý sẽ lỗi → ảnh bị bỏ). Hỏi trạng thái qua /{videoId}?fields=status. Trả true khi sẵn sàng.
@@ -539,9 +540,11 @@ export async function decideForm(formData: FormData) {
   const newPayload = decision === 'approved' && scheduledAt
     ? { ...basePayload, scheduled_at: scheduledAt }
     : basePayload;
+  // 3/10: ghi người quyết — trước đây decided_by null hàng loạt dù run_log có actor decideForm.
+  const decidedBy = await getCurrentApprover();
   const { data: updated, error } = await client
     .from('approval_queue')
-    .update({ status: decision, decided_at: new Date().toISOString(), note: note || null, payload: newPayload })
+    .update({ status: decision, decided_by: decidedBy, decided_at: new Date().toISOString(), note: note || null, payload: newPayload })
     .eq('id', id)
     .eq('status', 'pending')
     .select('id');
