@@ -117,6 +117,9 @@ export const EXTRA_WORN = [
   // cáo tuyệt đối hóa thì kém đáng tin. "triệt để" là từ trơn nên vào danh sách này; "hoàn toàn",
   // "nhỏ nhất", "100%" chỉ bắt khi dính hiệu quả kỹ thuật, xem absoluteClaims bên dưới.
   'triệt để',
+  // 3/10 vòng 3 (ChatGPT chấm lọc dầu: hook "Dầu mua ngoài bẩn thế này" quy kết chất lượng dầu nguồn khác, chạm luật
+  // "không so sánh hạ thấp" của CLAUDE.md mục 4): nói trung tính về hiện tượng (dầu lẫn nước và cặn), không quy nguồn.
+  'dầu mua ngoài', 'dầu ngoài chợ', 'dầu trôi nổi',
 ];
 
 // 3/10: LỜI ĐỌC KHÔNG TUYỆT ĐỐI HÓA hiệu quả. "hoàn toàn" / "nhỏ nhất" / "100%" có nhiều nghĩa khác (anh em
@@ -449,31 +452,44 @@ export function trimEarlyScenes(scenes, maxWords = 58) {
 // kịch bản chốt. Câu có "tiết kiệm" hoặc "giảm" đi trước một số phần trăm mà chưa có "tùy" / "có thể" thì được
 // viết lại: chèn "có thể" ngay trước động từ (đứng đầu câu thì "Có thể" + hạ chữ hoa; "giúp tiết kiệm" thì chèn
 // trước "giúp") và nối ", tùy tình trạng máy" trước dấu kết câu. Câu có số tiền (triệu, đồng) bị bỏ qua vì
-// "giảm 10% giá" không phụ thuộc tình trạng máy. Chạy lại lần 2 không đổi gì (câu đã có "có thể" / "tùy").
+// "giảm 10% giá" không phụ thuộc tình trạng máy. Chạy lại lần 2 không đổi gì (câu đã đủ "có thể" và "tùy").
+// Vòng 3: đòi ĐỦ CẢ HAI vế, thiếu vế nào chèn vế đó (xem conditionSavingsSentence).
 const SAVINGS_RE = /(?<!\p{L})(?:tiết kiệm|giảm)(?!\p{L})[^.!?…]*?\d+(?:[.,]\d+)?\s*(?:%|phần trăm)/iu;
 const SAVINGS_KEYWORD_RE = /(?<!\p{L})(?:tiết kiệm|giảm)(?!\p{L})/iu;
-const SAVINGS_COND_RE = /(?<!\p{L})(?:tùy|có thể)(?!\p{L})/iu;
+const SAVINGS_SOFT_RE = /(?<!\p{L})có thể(?!\p{L})/iu;
+const SAVINGS_TUY_RE = /(?<!\p{L})tùy(?!\p{L})/iu;
 const SAVINGS_MONEY_RE = /(?<!\p{L})(?:triệu|đồng)(?!\p{L})/iu;
 const SAVINGS_SUFFIX = ', tùy tình trạng máy';
+// 3/10 vòng 3 (ChatGPT chấm: câu "có thể giảm từ 5% đến 10%..." VẪN thiếu "tùy tình trạng máy" vì bản trước coi
+// câu đã có "có thể" là đủ): chuẩn nghiệm thu đòi CẢ HAI vế, "có thể" (mềm hóa) VÀ "tùy..." (điều kiện).
+// Thiếu vế nào chèn vế đó; đủ cả hai giữ nguyên.
 function conditionSavingsSentence(sent) {
-  if (!SAVINGS_RE.test(sent) || SAVINGS_COND_RE.test(sent) || SAVINGS_MONEY_RE.test(sent)) return sent;
-  const kw = sent.match(SAVINGS_KEYWORD_RE);
-  if (!kw) return sent;
-  let at = kw.index;
-  const giup = sent.slice(0, at).match(/(?<!\p{L})giúp\s+$/iu);
-  if (giup) at = giup.index;
-  const head = sent.slice(0, at);
-  const tail = sent.slice(at);
-  const startsSentence = !/\p{L}/u.test(head);
-  let out = startsSentence
-    ? `${head}Có thể ${tail.charAt(0).toLowerCase()}${tail.slice(1)}`
-    : `${head}có thể ${tail}`;
-  const end = out.match(/([.!?…]+["”’»)]*)$/u);
-  if (end) {
-    const body = out.slice(0, end.index).replace(/[,\s]+$/, '');
-    out = `${body}${SAVINGS_SUFFIX}${end[1]}`;
-  } else {
-    out = `${out.replace(/[,\s]+$/, '')}${SAVINGS_SUFFIX}`;
+  if (!SAVINGS_RE.test(sent) || SAVINGS_MONEY_RE.test(sent)) return sent;
+  const needSoft = !SAVINGS_SOFT_RE.test(sent);
+  const needTuy = !SAVINGS_TUY_RE.test(sent);
+  if (!needSoft && !needTuy) return sent;
+  let out = sent;
+  if (needSoft) {
+    const kw = out.match(SAVINGS_KEYWORD_RE);
+    if (!kw) return sent;
+    let at = kw.index;
+    const giup = out.slice(0, at).match(/(?<!\p{L})giúp\s+$/iu);
+    if (giup) at = giup.index;
+    const head = out.slice(0, at);
+    const tail = out.slice(at);
+    const startsSentence = !/\p{L}/u.test(head);
+    out = startsSentence
+      ? `${head}Có thể ${tail.charAt(0).toLowerCase()}${tail.slice(1)}`
+      : `${head}có thể ${tail}`;
+  }
+  if (needTuy) {
+    const end = out.match(/([.!?…]+["”’»)]*)$/u);
+    if (end) {
+      const body = out.slice(0, end.index).replace(/[,\s]+$/, '');
+      out = `${body}${SAVINGS_SUFFIX}${end[1]}`;
+    } else {
+      out = `${out.replace(/[,\s]+$/, '')}${SAVINGS_SUFFIX}`;
+    }
   }
   return out;
 }
@@ -502,6 +518,24 @@ export function hookRepairSentences(narration) {
     if (!HOOK_REPAIR_RE.test(foldText(sent))) continue;
     if (/(?<!\p{L})cũ(?!\p{L})/iu.test(sent)) continue;
     out.push(sent);
+  }
+  return out;
+}
+
+// 3/10 vòng 3 (ChatGPT chấm cảng cá 5,5: lời đọc lọt "Cảnh nhộn nhịp tại cảng cá Long Hải lúc này", "Góc rộng lộ
+// diện cả khu vực của cảng" — model đọc lại MÔ TẢ tư liệu dựng như thuyết minh thước phim; guard sbDescriptiveSentences
+// chỉ chạy nhánh storyboard đang tắt, đường thường không ai gác). Bắt câu chứa từ vựng dựng phim: "góc rộng / góc
+// quay / góc máy / cận cảnh / khung hình / ống kính / lia máy / thước phim / lộ diện", và câu BẮT ĐẦU bằng "Cảnh "
+// (so khớp không dấu). "Khung cảnh bình yên" KHÔNG dính ("khung canh" khác "khung hinh"); câu mở "Cảnh báo / cảnh
+// giác / cảnh sát / cảnh cáo / cảnh ngộ" là nghĩa khác, được tha. Trả về các CÂU dính (log, nhắc sinh lại, rồi cắt câu).
+const CAMERA_TERMS = ['goc rong', 'goc quay', 'goc may', 'can canh', 'khung hinh', 'ong kinh', 'lia may', 'thuoc phim', 'lo dien'];
+const CAMERA_TERM_RES = CAMERA_TERMS.map((t) => new RegExp(`(^|[^a-z0-9])${t}($|[^a-z0-9])`));
+const CAMERA_OPEN_RE = /^canh(?!\s+(?:bao|giac|sat|cao|ngo)(?:$|[^a-z0-9]))\s/;
+export function cameraTalkSentences(narration) {
+  const out = [];
+  for (const sent of sentencesOf(String(narration || '').normalize('NFC'))) {
+    const fs = foldText(sent).trim().replace(/^["“‘'(«\s]+/, '');
+    if (CAMERA_OPEN_RE.test(fs) || CAMERA_TERM_RES.some((re) => re.test(fs))) out.push(sent);
   }
   return out;
 }

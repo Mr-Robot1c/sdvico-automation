@@ -5,7 +5,7 @@ import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
   stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
   breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences,
-  absoluteClaims, ensureSavingsCondition, hookRepairSentences, keepOneQuestion,
+  absoluteClaims, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, keepOneQuestion,
 } from './video/rules.mjs';
 import { FORMATS, LOUDNORM_FILTER, parseLoudnormStats, loudnormFilterFor, badgeFontSize } from './video/assemble.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
@@ -428,8 +428,13 @@ ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXG
   eq('savings: "từ 5% đến 10%" đứng đầu câu -> "Có thể" + hạ chữ hoa', ensureSavingsCondition('Tiết kiệm từ 5% đến 10% nhiên liệu mỗi chuyến.'), 'Có thể tiết kiệm từ 5% đến 10% nhiên liệu mỗi chuyến, tùy tình trạng máy.');
   eq('savings: "giúp tiết kiệm" -> chèn trước "giúp"', ensureSavingsCondition('Máy giúp tiết kiệm từ 5% đến 10% nhiên liệu.'), 'Máy có thể giúp tiết kiệm từ 5% đến 10% nhiên liệu, tùy tình trạng máy.');
   eq('savings: "giảm ... 10 phần trăm" cũng bắt', ensureSavingsCondition('Dầu về sạch hơn. Giảm 10 phần trăm hao phí nhiên liệu! Lắp xong anh em yên tâm.'), 'Dầu về sạch hơn. Có thể giảm 10 phần trăm hao phí nhiên liệu, tùy tình trạng máy! Lắp xong anh em yên tâm.');
-  eq('savings: câu ĐÃ có "có thể" giữ nguyên', ensureSavingsCondition('Máy có thể tiết kiệm tới 10% nhiên liệu.'), 'Máy có thể tiết kiệm tới 10% nhiên liệu.');
-  eq('savings: câu ĐÃ có "tùy" giữ nguyên', ensureSavingsCondition('Tiết kiệm tới 10% nhiên liệu, tùy tàu và tùy dầu!'), 'Tiết kiệm tới 10% nhiên liệu, tùy tàu và tùy dầu!');
+  // 3/10 vòng 3: đòi ĐỦ CẢ HAI vế ("có thể" VÀ "tùy..."), thiếu vế nào chèn vế đó.
+  eq('savings: đã có "có thể" nhưng thiếu "tùy" -> thêm ", tùy tình trạng máy"', ensureSavingsCondition('Máy có thể tiết kiệm tới 10% nhiên liệu.'), 'Máy có thể tiết kiệm tới 10% nhiên liệu, tùy tình trạng máy.');
+  eq('savings: câu thật vòng 3 "có thể giảm từ 5% đến 10%" thiếu "tùy" -> thêm vế tùy', ensureSavingsCondition('Máy có thể giảm từ 5% đến 10% nhiên liệu mỗi chuyến.'), 'Máy có thể giảm từ 5% đến 10% nhiên liệu mỗi chuyến, tùy tình trạng máy.');
+  eq('savings: đã có "tùy" nhưng thiếu "có thể" -> chỉ chèn "có thể"', ensureSavingsCondition('Tiết kiệm tới 10% nhiên liệu, tùy tàu và tùy dầu!'), 'Có thể tiết kiệm tới 10% nhiên liệu, tùy tàu và tùy dầu!');
+  eq('savings: đủ cả "có thể" và "tùy" giữ nguyên', ensureSavingsCondition('Máy có thể giảm tới 10% nhiên liệu, tùy tình trạng máy.'), 'Máy có thể giảm tới 10% nhiên liệu, tùy tình trạng máy.');
+  eq('savings: câu kết "!" đã có "có thể" -> vế tùy nằm trước "!"', ensureSavingsCondition('Máy có thể giảm tới 10% nhiên liệu mỗi chuyến!'), 'Máy có thể giảm tới 10% nhiên liệu mỗi chuyến, tùy tình trạng máy!');
+  eq('savings: cảnh nhiều câu chỉ sửa câu thiếu vế, câu đủ giữ nguyên', ensureSavingsCondition('Máy có thể giảm tới 10% nhiên liệu, tùy tàu. Lắp xong yên tâm. Tiết kiệm từ 5% đến 10% dầu.'), 'Máy có thể giảm tới 10% nhiên liệu, tùy tàu. Lắp xong yên tâm. Có thể tiết kiệm từ 5% đến 10% dầu, tùy tình trạng máy.');
   eq('savings: "99,6%" tách muối (không phải tiết kiệm) giữ nguyên', ensureSavingsCondition('Màng lọc tách muối tới 99,6%.'), 'Màng lọc tách muối tới 99,6%.');
   eq('savings: tiết kiệm KHÔNG có số phần trăm giữ nguyên', ensureSavingsCondition('Chạy êm, tiết kiệm nhiên liệu mỗi chuyến!'), 'Chạy êm, tiết kiệm nhiên liệu mỗi chuyến!');
   eq('savings: câu giá có "triệu" không bị đụng', ensureSavingsCondition('Giảm 10% còn 4X triệu.'), 'Giảm 10% còn 4X triệu.');
@@ -461,6 +466,31 @@ ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXG
   eq('hookRepair: THA "sửa chữa" (không phải cụm bị cấm)', hookRepairSentences('Bộ lọc mới dễ sửa chữa hơn.'), []);
   eq('hookRepair: rỗng và null', [hookRepairSentences(''), hookRepairSentences(null)], [[], []]);
   eq('hookRepair: nối stripSentencesWith chỉ cắt đúng câu', stripSentencesWith('Nước đục ngầu. Sửa tới lần thứ ba rồi! Can nước trống không.', hookRepairSentences('Nước đục ngầu. Sửa tới lần thứ ba rồi! Can nước trống không.')), 'Nước đục ngầu. Can nước trống không.');
+}
+
+// 3/10 vòng 3 (G2): lời tả góc quay / tư liệu dựng bị chặn ở mọi nhánh.
+{
+  eq('camera: bắt câu thật "Cảnh nhộn nhịp tại cảng cá Long Hải lúc này"', cameraTalkSentences('Cảnh nhộn nhịp tại cảng cá Long Hải lúc này.'), ['Cảnh nhộn nhịp tại cảng cá Long Hải lúc này.']);
+  eq('camera: bắt câu thật "Góc rộng lộ diện cả khu vực của cảng"', cameraTalkSentences('Góc rộng lộ diện cả khu vực của cảng.'), ['Góc rộng lộ diện cả khu vực của cảng.']);
+  eq('camera: bắt "khung hình" (khác "khung cảnh")', cameraTalkSentences('Trong khung hình, tàu nối đuôi nhau cập bến.'), ['Trong khung hình, tàu nối đuôi nhau cập bến.']);
+  eq('camera: bắt "cận cảnh", "góc quay", "ống kính", "lia máy", "thước phim", "góc máy"', cameraTalkSentences('Cận cảnh con ốc. Góc quay từ trên cao. Ống kính lướt qua. Lia máy sang trái. Thước phim chậm lại. Góc máy thấp.').length, 6);
+  eq('camera: THA "Khung cảnh bình yên trên biển"', cameraTalkSentences('Khung cảnh bình yên trên biển.'), []);
+  eq('camera: THA "cảnh báo bão" đứng đầu câu', cameraTalkSentences('Cảnh báo bão đang vào, anh em nhớ neo tàu.'), []);
+  eq('camera: THA "cảnh" giữa câu', cameraTalkSentences('Mình nhớ cảnh anh em kéo lưới đêm qua.'), []);
+  eq('camera: chỉ trả đúng câu dính, giữ câu kể', cameraTalkSentences('Mình ra khơi từ sớm. Cảnh cảng cá lúc này đông lắm. Tiền dầu mỗi chuyến cứ vơi.'), ['Cảnh cảng cá lúc này đông lắm.']);
+  eq('camera: không dấu và viết hoa cũng bắt', cameraTalkSentences('GOC RONG LO DIEN CA KHU VUC.'), ['GOC RONG LO DIEN CA KHU VUC.']);
+  eq('camera: rỗng và null không lỗi', [cameraTalkSentences(''), cameraTalkSentences(null)], [[], []]);
+  eq('camera: nối stripSentencesWith chỉ cắt đúng câu', stripSentencesWith('Mình ra khơi từ sớm. Góc rộng lộ diện cả cảng. Tiền dầu cứ vơi.', cameraTalkSentences('Mình ra khơi từ sớm. Góc rộng lộ diện cả cảng. Tiền dầu cứ vơi.')), 'Mình ra khơi từ sớm. Tiền dầu cứ vơi.');
+}
+
+// 3/10 vòng 3 (G3): không quy kết nguồn dầu ("dầu mua ngoài bẩn thế này").
+{
+  const worn = (t) => EXTRA_WORN.filter((p) => t.toLowerCase().includes(p));
+  eq('worn: "Dầu mua ngoài bẩn thế này" dính EXTRA_WORN', worn('Dầu mua ngoài bẩn thế này'), ['dầu mua ngoài']);
+  eq('worn: "dầu ngoài chợ" dính', worn('Dầu ngoài chợ hay lẫn nước.'), ['dầu ngoài chợ']);
+  eq('worn: "dầu trôi nổi" dính', worn('Dầu trôi nổi rất dễ lẫn cặn.'), ['dầu trôi nổi']);
+  eq('worn: câu trung tính "dầu lẫn nước và cặn" KHÔNG dính', worn('Dầu lẫn nước và cặn có thể làm hại kim phun, bơm cao áp.'), []);
+  eq('worn: nối stripSentencesWith cắt đúng câu quy kết', stripSentencesWith('Kim phun hỏng. Dầu mua ngoài bẩn thế này. Tiền cứ vơi.', worn('Dầu mua ngoài bẩn thế này')), 'Kim phun hỏng. Tiền cứ vơi.');
 }
 
 // 3/10 vòng 2 (F6): cảnh kết video content chỉ giữ MỘT câu hỏi.
