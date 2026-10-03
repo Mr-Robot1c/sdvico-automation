@@ -70,8 +70,8 @@ export default async function ProductListPage() {
             </span>
             <span className="pub-card-body">
               <span className="pub-card-meta">
-                <span className={`pub-badge ${p.role === 'san-xuat' ? 'make' : 'dist'}`}>{p.role === 'san-xuat' ? 'Sản xuất' : 'Phân phối'}</span>
-                {p.role === 'phan-phoi' && p.hangGoc ? <span>Hãng {p.hangGoc}</span> : <span>Bởi SDVICO</span>}
+                <span className={`pub-badge ${p.role === 'san-xuat' ? 'make' : 'dist'}`}>{p.role === 'san-xuat' ? 'Sản phẩm SDVICO' : 'Phân phối'}</span>
+                {p.role === 'phan-phoi' && p.hangGoc ? <span>Hãng {p.hangGoc}</span> : null}
               </span>
               <span className="pub-card-title">{p.name}</span>
               <span className="pub-card-excerpt">{p.short}</span>

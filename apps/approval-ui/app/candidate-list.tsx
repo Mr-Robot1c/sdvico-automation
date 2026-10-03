@@ -9,7 +9,6 @@ export type CandView = {
   email: string;
   phone: string;
   source: string | null;
-  dedupKey: string;
   subject: string;
   attachments: string;
   consent: string;
@@ -35,7 +34,7 @@ export default function CandidateList({ candidates }: { candidates: CandView[] }
     const t = q.trim().toLowerCase();
     return candidates.filter((c) => {
       const okStage = !stage || c.stages.includes(stage);
-      const okText = !t || [c.name, c.email, c.phone, c.dedupKey, c.subject].some((v) => (v || '').toLowerCase().includes(t));
+      const okText = !t || [c.name, c.email, c.phone, c.subject].some((v) => (v || '').toLowerCase().includes(t));
       return okStage && okText;
     });
   }, [candidates, q, stage]);
@@ -92,7 +91,6 @@ export default function CandidateList({ candidates }: { candidates: CandView[] }
             <dl className="fields">
               <div className="field"><dt>Email</dt><dd>{c.email || '—'}</dd></div>
               <div className="field"><dt>Điện thoại</dt><dd>{c.phone || '—'}</dd></div>
-              <div className="field"><dt>Khóa khử trùng</dt><dd>{c.dedupKey || '—'}</dd></div>
               {c.subject ? <div className="field"><dt>Thư nguồn</dt><dd>{c.subject}</dd></div> : null}
               <div className="field"><dt>Đính kèm</dt><dd>{c.attachments || '—'}</dd></div>
               <div className="field"><dt>Đồng ý / lưu tới</dt><dd>{c.consent}</dd></div>

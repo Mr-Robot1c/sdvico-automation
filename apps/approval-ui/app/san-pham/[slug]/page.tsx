@@ -121,8 +121,8 @@ export default async function ProductDetailPage({ params }: Props) {
           </div>
           <div>
             <div className="pub-card-meta">
-              <span className={`pub-badge ${isMake ? 'make' : 'dist'}`}>{isMake ? 'Sản xuất' : 'Phân phối'}</span>
-              <span>{isMake ? 'SDVICO nghiên cứu và sản xuất' : `SDVICO phân phối và lắp đặt, hãng ${p.hangGoc}`}</span>
+              <span className={`pub-badge ${isMake ? 'make' : 'dist'}`}>{isMake ? 'Sản phẩm SDVICO' : 'Phân phối'}</span>
+              <span>{isMake ? (p.vaiTro || 'Sản phẩm SDVICO') :`SDVICO phân phối và lắp đặt, hãng ${p.hangGoc}`}</span>
             </div>
             <h1>{p.name}</h1>
             <p>{p.intro}</p>

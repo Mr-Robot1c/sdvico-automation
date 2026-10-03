@@ -182,7 +182,8 @@ export function formatRelative(iso: string): string {
   if (hours < 24) return `${hours} giờ trước`;
   const days = Math.round(hours / 24);
   if (days < 7) return `${days} ngày trước`;
-  return new Date(iso).toLocaleString('vi-VN');
+  // 3/10 (kiểm UI): nhánh cũ không ép múi giờ nên server Vercel (UTC) in lệch 7 tiếng so với máy local.
+  return formatDateTimeVN(iso);
 }
 
 export type PayloadRow = { key: string; label: string; value: string; long: boolean };

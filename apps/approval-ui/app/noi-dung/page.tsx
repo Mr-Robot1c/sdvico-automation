@@ -163,11 +163,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
             <Link className="btn ok" href="/san-xuat">Tạo bài</Link>
           </div>
         </header>
-        <nav
-          className="filters"
-          aria-label="Mở danh sách bài theo trạng thái"
-          title={`Danh sách gồm ${cAll.toLocaleString('vi-VN')} bài chữ mới nhất, không tính video và Thùng rác. Bài đã có lượt đăng thật tính Đã đăng.`}
-        >
+        <nav className="filters" aria-label="Mở danh sách bài theo trạng thái">
           <span className="filters-label">Danh sách bài:</span>
           <Link className="chip" href="/noi-dung?loai=bai-viet">
             Tất cả <span className="n">{cAll}</span>
@@ -181,6 +177,15 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
             Thùng rác <span className="n">{cTrash ?? 0}</span>
           </Link>
         </nav>
+        {/* 3/10 (kiểm UI sau đợt 1): phạm vi đếm phải đọc được bằng chạm và bàn phím, không chỉ tooltip rê chuột. */}
+        <details className="bang-more bang-scope">
+          <summary>Cách đếm số</summary>
+          <ul>
+            <li>Hàng Danh sách bài: {cAll.toLocaleString('vi-VN')} bài chữ mới nhất, không tính video và Thùng rác. Bài đã có lượt đăng thật tính Đã đăng.</li>
+            <li>Số trên đầu cột bảng: tính trong 300 phiếu duyệt gần nhất, mỗi bài một thẻ, có thể gồm cả video.</li>
+            <li>Cột Trạng thái chỉ hiện vài bài đã đăng và từ chối mới nhất; bấm Xem tất cả để mở danh sách đủ.</li>
+          </ul>
+        </details>
         <BangSection />
       </main>
     );

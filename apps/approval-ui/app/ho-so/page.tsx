@@ -21,7 +21,6 @@ type Cand = {
   source: string | null;
   cv_storage_path: string | null;
   cv_json: CvJson | null;
-  dedup_key: string | null;
   consent_at: string | null;
   retention_until: string | null;
   created_at: string;
@@ -33,7 +32,7 @@ export default async function Page() {
   const { data, error } = await client
     .from('hr_candidates')
     .select(
-      'id, full_name, email, phone, source, cv_storage_path, cv_json, dedup_key, consent_at, retention_until, created_at, hr_applications(id, stage, created_at)'
+      'id, full_name, email, phone, source, cv_storage_path, cv_json, consent_at, retention_until, created_at, hr_applications(id, stage, created_at)'
     )
     .order('created_at', { ascending: false })
     .limit(100);
@@ -60,8 +59,8 @@ export default async function Page() {
       name: c.full_name || 'Chưa rõ tên',
       email: c.email || '',
       phone: c.phone || '',
+      // 3/10 (kiểm UI): không đưa dedup_key (khóa kỹ thuật khử trùng) xuống trình duyệt và giao diện.
       source: c.source,
-      dedupKey: c.dedup_key || '',
       subject: c.cv_json?.source_message?.subject || '',
       attachments: (c.cv_json?.attachments || []).map((a) => a.filename).filter(Boolean).join(', '),
       consent:

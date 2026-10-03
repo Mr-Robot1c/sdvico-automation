@@ -60,7 +60,7 @@ export default async function Page() {
               <b>Trang</b>
               <div className="metaline">Tên Page: {c.me?.name || c.me?.error || '—'}</div>
               <div className="metaline">Loại token: {c.type || '—'} {c.type === 'PAGE' ? '✅ đúng Page token' : c.type ? '⚠️ nên là PAGE' : ''}</div>
-              <div className="metaline">Vĩnh viễn: {yn(c.isPermanent)} {c.isPermanent ? '(không hết hạn)' : c.expiresAt ? `(hết hạn ${new Date(c.expiresAt * 1000).toLocaleString('vi-VN')})` : ''}</div>
+              <div className="metaline">Vĩnh viễn: {yn(c.isPermanent)} {c.isPermanent ? '(không hết hạn)' : c.expiresAt ? `(hết hạn ${new Date(c.expiresAt * 1000).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })})` : ''}</div>
             </div>
             <div>
               <b>Quyền</b>

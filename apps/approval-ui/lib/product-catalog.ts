@@ -23,6 +23,9 @@ export type ProductItem = {
   intro: string;           // Đoạn giới thiệu dưới hero
   loiIch: string[];        // Bulletlist lợi ích cho ngư dân (chỉ nêu công dụng chung, không thông số)
   luuY: string;            // Ghi chú vai trò SDVICO (phân phối vs sản xuất) — tuân điều cấm 4
+  // 3/10: dòng Vai trò ở trang chi tiết, khai RIÊNG từng sản phẩm tự làm. Trước in chung "nghiên cứu và
+  // sản xuất" cho cả SF-50, trong khi chốt 21/9 của sếp Hòa + sếp Tiến chỉ là nhãn "Sản phẩm SDVICO".
+  vaiTro?: string;
 };
 
 export const PRODUCT_CATALOG: ProductItem[] = [
@@ -40,7 +43,8 @@ export const PRODUCT_CATALOG: ProductItem[] = [
       'Giảm số can nước phải chở theo, dành khoang tàu cho việc chính là đánh bắt.',
       'Lắp đặt tận bến, hướng dẫn sử dụng và bảo hành trực tiếp bởi thợ SDVICO.'
     ],
-    luuY: 'Sản phẩm do SDVICO nghiên cứu và sản xuất, không phải phân phối từ hãng khác.'
+    luuY: 'Sản phẩm do SDVICO nghiên cứu và sản xuất, không phải phân phối từ hãng khác.',
+    vaiTro: 'SDVICO nghiên cứu và sản xuất'
   },
   {
     slug: 'thiet-bi-loc-dau-sf-50',
@@ -56,7 +60,8 @@ export const PRODUCT_CATALOG: ProductItem[] = [
       'Máy chạy êm hơn nhờ dầu sạch, kéo dài tuổi thọ động cơ.',
       'Thợ SDVICO lắp đặt và hướng dẫn tận bến, bảo hành trực tiếp.'
     ],
-    luuY: 'Sản phẩm thuộc nhóm xử lý dầu do SDVICO cung cấp và lắp đặt cho tàu cá.'
+    luuY: 'Sản phẩm SDVICO thuộc nhóm xử lý dầu, do SDVICO cung cấp, lắp đặt và bảo hành cho tàu cá.',
+    vaiTro: 'Sản phẩm SDVICO, cung cấp và lắp đặt'
   },
   {
     slug: 'thiet-bi-giam-sat-hanh-trinh-viettel-s-tracking',

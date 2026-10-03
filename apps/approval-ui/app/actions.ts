@@ -2263,7 +2263,18 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
   if (qErr) {
     // 3/10 (kiểm thử B07): phiếu lỗi thì gỡ bài vừa tạo, không để bài 'review' mồ côi không phiếu
     // (bấm thử lại sẽ thành hai bài). Chỉ xóa đúng bản ghi vừa insert ở trên.
-    await client.from('mkt_content').delete().eq('id', contentId);
+    // 3/10 (kiểm thử S02): xóa bù cũng có thể lỗi — không giả định đã gỡ được. Lỗi thì ghi run_log để còn
+    // dọn tay (bài review mồ côi, id trong detail) và báo rõ cho người bấm.
+    const { error: delErr } = await client.from('mkt_content').delete().eq('id', contentId);
+    if (delErr) {
+      try {
+        await client.from('run_log').insert({
+          task: 'mkt.create_content_orphan', actor: 'nguoi-bam', status: 'error',
+          detail: { contentId, queueError: qErr.message, deleteError: delErr.message },
+        });
+      } catch { /* log lỗi không che lỗi chính */ }
+      throw new Error(`Chưa tạo được phiếu duyệt và chưa gỡ được bài nháp ${contentId} (đã ghi nhật ký để dọn tay): ${qErr.message}`);
+    }
     throw new Error(qErr.message);
   }
 
@@ -2329,8 +2340,46 @@ export async function editDraft(formData: FormData) {
   const draft = String(formData.get('draft') || '');
   if (!contentId) return;
   const client = getServerClient();
-  const { error } = await client.from('mkt_content').update({ draft }).eq('id', contentId);
+  // 3/10 (kiểm thử S03): sửa nháp từng không rà lại tuân thủ — bài sạch sửa thành nội dung IUU vẫn
+  // needs_gov_review=false, phiếu vẫn amber. Rà lại bản sửa và CHỈ NÂNG cờ (không tự hạ: bài đã bị gắn
+  // cờ quản lý thì sửa xong vẫn giữ, người quản lý gỡ bằng cách duyệt). Đồng bộ các phiếu còn pending.
+  const { data: cur, error: curErr } = await client.from('mkt_content').select('title, brief, needs_gov_review').eq('id', contentId).maybeSingle();
+  if (curErr) throw new Error(curErr.message);
+  // @ts-ignore — module JS thuần
+  const { assessDraft } = await import('../lib/gen/compliance.mjs');
+  // @ts-ignore — module JS thuần
+  const { PRODUCT_FACTS, knownFactValues, testFactValues } = await import('../lib/gen/product-facts.mjs');
+  const assessment = assessDraft(`${(cur as any)?.title || ''}\n${draft}`, {
+    knownFactValues: knownFactValues(PRODUCT_FACTS),
+    testFactValues: testFactValues(PRODUCT_FACTS),
+  });
+  const RANK: Record<string, number> = { none: 0, amber: 1, red: 2 };
+  const brief = (((cur as any)?.brief || {}) as Record<string, unknown>);
+  const oldRisk = String(brief.risk || 'none');
+  const newRisk = (RANK[assessment.risk] ?? 0) > (RANK[oldRisk] ?? 0) ? assessment.risk : oldRisk;
+  const needsGov = !!(cur as any)?.needs_gov_review || assessment.risk === 'red';
+  const patch: Record<string, unknown> = { draft };
+  if (newRisk !== oldRisk) patch.brief = { ...brief, risk: newRisk, compliance: assessment.flags };
+  if (needsGov && !(cur as any)?.needs_gov_review) patch.needs_gov_review = true;
+  const { error } = await client.from('mkt_content').update(patch).eq('id', contentId);
   if (error) throw new Error(error.message);
+  if (assessment.risk === 'red' || assessment.risk === 'amber') {
+    const { data: qs } = await client
+      .from('approval_queue')
+      .select('id, payload')
+      .eq('kind', 'mkt_publish_content')
+      .eq('status', 'pending')
+      .eq('payload->>content_id', contentId);
+    for (const q of qs || []) {
+      const p = (((q as any).payload || {}) as Record<string, unknown>);
+      const pRisk = String(p.risk || 'none');
+      if ((RANK[assessment.risk] ?? 0) <= (RANK[pRisk] ?? 0) && !(assessment.risk === 'red' && p.needs_manager_approval !== true)) continue;
+      const nextP = { ...p, risk: (RANK[assessment.risk] ?? 0) > (RANK[pRisk] ?? 0) ? assessment.risk : pRisk, compliance: assessment.flags };
+      if (assessment.risk === 'red') (nextP as any).needs_manager_approval = true;
+      const { error: qErr } = await client.from('approval_queue').update({ payload: nextP }).eq('id', (q as any).id).eq('status', 'pending');
+      if (qErr) throw new Error(`Đã lưu nháp nhưng chưa cập nhật được cờ duyệt: ${qErr.message}`);
+    }
+  }
   revalidatePath('/hang-doi');
   revalidatePath('/noi-dung');
 }
