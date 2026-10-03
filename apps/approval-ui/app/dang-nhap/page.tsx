@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { safeNext } from '../../lib/safe-next';
 
 // Trang ĐĂNG NHẬP giao diện duyệt (28/8, sếp yêu cầu thay popup basic-auth của trình duyệt).
 // Form POST sang /api/login — khớp APPROVAL_UI_USER/APPROVAL_UI_PASSWORD thì đặt cookie
@@ -11,13 +12,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = 'force-dynamic';
-
-function safeNext(raw: string | undefined): string {
-  const n = String(raw || '/');
-  // Chỉ nhận đường dẫn nội bộ, chặn //host và http... để không thành cửa chuyển hướng mở.
-  if (!n.startsWith('/') || n.startsWith('//')) return '/';
-  return n;
-}
 
 // loi=1: sai tài khoản/mật khẩu. loi=khoa: quá 10 lần sai trong 15 phút (chặn dò mật khẩu).
 // loi=cfg: máy chủ thiếu AUTH_SECRET nên không phát hành được phiên (29/8, token HMAC v2).

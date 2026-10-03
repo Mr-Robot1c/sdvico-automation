@@ -3,6 +3,7 @@
 // Bật đăng Facebook khi Duyệt: đã cấu hình FACEBOOK_PAGE_ID + FACEBOOK_PAGE_ACCESS_TOKEN (2026-08-12).
 // Cron xoay vòng: CRON_SECRET đã đặt (2026-08-12).
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { waitUntil } from '@vercel/functions';
 import { getServerClient } from '../lib/supabase-server';
 import { publishContentToWebsite } from '../lib/gen/publish-website';
@@ -709,7 +710,10 @@ export async function updateLeadStatus(formData: FormData) {
   const patch: Record<string, unknown> = { status, note, updated_at: new Date().toISOString() };
   if (formData.has('lost_reason')) patch.lost_reason = String(formData.get('lost_reason') || '').slice(0, 500) || null;
   const client = getServerClient();
-  await client.from('mkt_leads').update(patch).eq('id', id);
+  // 3/10 (kiểm thử B13): lỗi ghi DB từng bị nuốt, LeadStepper vẫn đổi nhãn như đã lưu. Giờ ném
+  // lỗi để client báo thật (các form thường rơi vào app/error.tsx).
+  const { error } = await client.from('mkt_leads').update(patch).eq('id', id);
+  if (error) throw new Error(`Lưu trạng thái khách lỗi: ${error.message}`);
   revalidatePath('/khach-hang');
   revalidatePath('/noi-dung');
 }
@@ -813,15 +817,25 @@ export async function markReplySentAction(formData: FormData) {
   if (!queueId || !leadId) return;
   const client = getServerClient();
   const nowIso = new Date().toISOString();
-  await client
+  // 3/10 (kiểm thử B15): phiếu và khách từng được tin độc lập, form lệch id thì duyệt phiếu của
+  // khách A mà cập nhật khách B. Đối chiếu phiếu đúng loại nháp trả lời và đúng khách trước khi ghi.
+  const { data: q, error: qErr } = await client.from('approval_queue').select('kind, status, payload').eq('id', queueId).maybeSingle();
+  if (qErr) throw new Error(qErr.message);
+  const qp = ((q as any)?.payload || {}) as Record<string, unknown>;
+  if (!q || (q as any).kind !== 'mkt_send_message' || String(qp.lead_id || '') !== leadId) {
+    throw new Error('Phiếu nháp không khớp với khách này. Tải lại trang rồi thử lại.');
+  }
+  const { error: upErr } = await client
     .from('approval_queue')
     .update({ status: 'approved', decided_at: nowIso, note: 'Người gửi tay trong Messenger' })
     .eq('id', queueId)
     .eq('status', 'pending');
+  if (upErr) throw new Error(upErr.message);
   const { data: lead } = await client.from('mkt_leads').select('status').eq('id', leadId).maybeSingle();
   const patch: Record<string, unknown> = { updated_at: nowIso };
   if ((lead as any)?.status === 'new') patch.status = 'contacted';
-  await client.from('mkt_leads').update(patch).eq('id', leadId);
+  const { error: leadErr } = await client.from('mkt_leads').update(patch).eq('id', leadId);
+  if (leadErr) throw new Error(leadErr.message);
   revalidatePath('/khach-hang');
 }
 
@@ -838,7 +852,9 @@ export async function addProductQa(formData: FormData) {
   const verified = ['1', 'on', 'true'].includes(String(formData.get('verified') || ''));
   const leadId = String(formData.get('lead_id') || '').trim() || null;
   const client = getServerClient();
-  await client.from('mkt_product_qa').insert({ product_group, question, answer, source, confirmed_by, verified, lead_id: leadId });
+  // 3/10 (kiểm thử B17): lỗi ghi từng bị nuốt, nút vẫn báo "Đã vào kho".
+  const { error } = await client.from('mkt_product_qa').insert({ product_group, question, answer, source, confirmed_by, verified, lead_id: leadId });
+  if (error) throw new Error(`Lưu hỏi đáp lỗi: ${error.message}`);
   revalidatePath('/hoi-dap');
   revalidatePath('/khach-hang');
 }
@@ -1587,6 +1603,9 @@ export async function addFact(formData: FormData) {
     confirmed_by: String(formData.get('confirmed_by') || '').trim() || null,
     verified: formData.get('verified') === 'on'
   };
+  // 3/10 (kiểm thử B22): nhãn "Đã xác nhận thật" phải trả lời được lấy từ đâu và ai xác nhận
+  // (điều cấm 5). Thiếu một trong hai thì không lưu, quay lại trang kèm lời nhắc.
+  if (row.verified && (!row.source || !row.confirmed_by)) redirect('/du-kien?loi=thieu-nguon');
   const client = getServerClient();
   const { error } = await client.from('product_facts').insert(row);
   if (error) throw new Error(error.message);
@@ -2196,9 +2215,23 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
     brief.video_requested = true;
     brief.video_requested_at = new Date().toISOString();
   }
+  // 3/10 (kiểm thử B08): bài người tự soạn chưa qua bộ rà tuân thủ nên nội dung chạm IUU/Cục Thủy
+  // sản không được gắn needs_gov_review (điều cấm 3). Rà giống draftReplyAction; bài người soạn
+  // tối thiểu vẫn amber như cũ, chạm quy định thì red + cần cấp quản lý.
+  // @ts-ignore — module JS thuần
+  const { assessDraft } = await import('../lib/gen/compliance.mjs');
+  // @ts-ignore — module JS thuần
+  const { PRODUCT_FACTS, knownFactValues, testFactValues } = await import('../lib/gen/product-facts.mjs');
+  const assessment = assessDraft(`${title}\n${draft}`, {
+    knownFactValues: knownFactValues(PRODUCT_FACTS),
+    testFactValues: testFactValues(PRODUCT_FACTS),
+  });
+  const needsGov = assessment.risk === 'red';
+  brief.risk = needsGov ? 'red' : 'amber';
+  brief.compliance = assessment.flags;
   const { data: inserted, error } = await client
     .from('mkt_content')
-    .insert({ kind, title, brief, draft, status: 'review' })
+    .insert({ kind, title, brief, draft, status: 'review', needs_gov_review: needsGov })
     .select('id')
     .single();
   if (error) throw new Error(error.message);
@@ -2218,14 +2251,21 @@ export async function createContent(formData: FormData): Promise<{ contentId: st
       keyword,
       intent,
       landing_url: landingUrl,
-      risk: 'amber',
+      risk: needsGov ? 'red' : 'amber',
+      needs_manager_approval: needsGov,
+      compliance: assessment.flags,
       channels,
       authored: 'human', // người tự soạn -> cờ đỏ, phân biệt với AI tự sinh
       assets: { image: imageAssetId, video: videoAssetId, images: imageAssetIds, videos: videoAssetIds }
     },
     status: 'pending'
   });
-  if (qErr) throw new Error(qErr.message);
+  if (qErr) {
+    // 3/10 (kiểm thử B07): phiếu lỗi thì gỡ bài vừa tạo, không để bài 'review' mồ côi không phiếu
+    // (bấm thử lại sẽ thành hai bài). Chỉ xóa đúng bản ghi vừa insert ở trên.
+    await client.from('mkt_content').delete().eq('id', contentId);
+    throw new Error(qErr.message);
+  }
 
   // Chỉ revalidate 2 trang HIỂN THỊ bài vừa tạo. KHÔNG revalidate /san-xuat: trang đó chỉ đọc
   // brand_assets (không đổi ở đây), revalidate làm serverless phải render lại nặng -> nút "Xong"
@@ -2327,7 +2367,11 @@ export async function applyPlanWeights(formData: FormData) {
   // weights + products, KHONG co content_suggestions -> ap thang -> mat het huong di.
   // FIX: neu ban duoc chon la learn-weekly, MERGE weights + products + narrative vao ban
   // dang ap (giu content_suggestions cua ban tuan/cap nhat). Giong applyLiveEvening.
-  const { data: incoming } = await client.from('mkt_plans').select('id, data').eq('id', planId).maybeSingle();
+  const { data: incoming, error: inErr } = await client.from('mkt_plans').select('id, data').eq('id', planId).maybeSingle();
+  // 3/10 (kiểm thử B20): id không tồn tại (trang cũ, bản đã xóa) từng gỡ áp bản đang dùng rồi mới
+  // phát hiện không có gì để áp -> tuần đó mất kế hoạch. Không thấy bản đích thì dừng, không đụng gì.
+  if (inErr) throw new Error(inErr.message);
+  if (!incoming) throw new Error('Không tìm thấy bản kế hoạch này (có thể đã bị xóa). Tải lại trang Kế hoạch.');
   const inData = ((incoming as any)?.data || {}) as any;
   const isLearn = inData.origin === 'learn-weekly';
   if (isLearn) {
@@ -2356,13 +2400,15 @@ export async function applyPlanWeights(formData: FormData) {
       return;
     }
   }
-  // Bản có content_suggestions (kế hoạch tuần / cập nhật): áp thay như cũ.
-  await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
+  // Bản có content_suggestions (kế hoạch tuần / cập nhật): áp thay như cũ. Áp bản mới TRƯỚC rồi
+  // mới gỡ các bản khác, để lỗi giữa chừng không bao giờ để lại tình trạng không bản nào được áp.
   const { error } = await client
     .from('mkt_plans')
     .update({ applied: true, applied_at: new Date().toISOString() })
     .eq('id', planId);
   if (error) throw new Error(error.message);
+  const { error: offErr } = await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true).neq('id', planId);
+  if (offErr) throw new Error(offErr.message);
   revalidatePath('/ke-hoach');
 }
 

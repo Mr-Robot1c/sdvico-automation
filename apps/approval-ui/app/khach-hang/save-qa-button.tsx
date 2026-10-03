@@ -9,6 +9,7 @@ export default function SaveQaButton({
 }: { leadId: string; question: string; groups: string[]; defaultGroup: string; action: (formData: FormData) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState(false);
+  const [err, setErr] = useState('');
   if (done) return <span className="sub">✓ Đã vào kho</span>;
   return (
     <div>
@@ -17,7 +18,11 @@ export default function SaveQaButton({
       </button>
       {open ? (
         <form
-          action={async (fd) => { await action(fd); setDone(true); }}
+          action={async (fd) => {
+            setErr('');
+            try { await action(fd); setDone(true); }
+            catch { setErr('Chưa lưu được vào kho, thử lại sau ít phút.'); }
+          }}
           style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, minWidth: 260 }}
         >
           <input type="hidden" name="lead_id" value={leadId} />
@@ -27,6 +32,7 @@ export default function SaveQaButton({
           <input name="question" className="note" defaultValue={question} placeholder="Câu hỏi" required />
           <textarea name="answer" className="note" rows={3} placeholder="Câu trả lời đã dùng" required />
           <input name="source" className="note" placeholder="Nguồn (ai cấp info)" />
+          {err ? <div role="alert" style={{ color: '#c0392b', fontSize: '.78rem' }}>{err}</div> : null}
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn ok sm" type="submit">Lưu</button>
             <button className="btn ghost sm" type="button" onClick={() => setOpen(false)}>Đóng</button>

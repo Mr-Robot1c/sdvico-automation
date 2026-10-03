@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createSessionToken, SESSION_MAX_AGE_SECONDS } from '../../../lib/session-auth';
+import { safeNext } from '../../../lib/safe-next';
 
 // Nhận form từ /dang-nhap, so với APPROVAL_UI_USER/APPROVAL_UI_PASSWORD rồi đặt cookie phiên.
 // 29/8 (audit bảo mật): token đổi sang HMAC v2 có hạn dùng (lib/session-auth.ts) — token cũ
@@ -10,11 +11,6 @@ import { createSessionToken, SESSION_MAX_AGE_SECONDS } from '../../../lib/sessio
 //     đếm riêng nên chỉ chặn dò kiểu thô, không phải chống chịu tuyệt đối, nhưng trước đây
 //     là KHÔNG giới hạn gì).
 export const dynamic = 'force-dynamic';
-
-function safeNext(raw: string): string {
-  if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
-  return raw;
-}
 
 // So hằng thời gian: băm hai bên cho cùng độ dài rồi timingSafeEqual.
 function safeEq(a: string, b: string): boolean {

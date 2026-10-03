@@ -38,7 +38,11 @@ export default function DraftReplyButton({ leadId, fbUrl, pending }: { leadId: s
     if (busy || !draft) return;
     const fd = new FormData();
     fd.set('queue_id', draft.queueId); fd.set('lead_id', leadId);
-    start(async () => { await markReplySentAction(fd); setSent(true); });
+    setErr('');
+    start(async () => {
+      try { await markReplySentAction(fd); setSent(true); }
+      catch { setErr('Chưa ghi nhận được. Tải lại trang rồi bấm lại Đã gửi tay.'); }
+    });
   };
 
   if (sent) return <div className="sub" style={{ fontSize: '.78rem', marginTop: 4 }}>✓ Đã ghi nhận đã gửi tay</div>;

@@ -17,19 +17,26 @@ export default function LeadStepper({ leadId, status, note, lostReason }: { lead
   const [askLost, setAskLost] = useState(false);
   const [reason, setReason] = useState(lostReason || '');
   const [more, setMore] = useState(false);
+  const [err, setErr] = useState('');
 
   const go = (next: string, extra?: Record<string, string>) => {
     if (pending) return;
     const fd = new FormData();
     fd.set('lead_id', leadId); fd.set('status', next); fd.set('note', note || '');
     for (const [k, v] of Object.entries(extra || {})) fd.set(k, v);
-    start(async () => { await updateLeadStatus(fd); setCur(next); setAskLost(false); setMore(false); });
+    setErr('');
+    // 3/10: chỉ đổi nhãn khi máy chủ lưu được, lỗi thì giữ bước cũ và báo.
+    start(async () => {
+      try { await updateLeadStatus(fd); setCur(next); setAskLost(false); setMore(false); }
+      catch { setErr('Chưa lưu được, thử lại sau ít phút.'); }
+    });
   };
 
   return (
     <div className="lead-step">
       <span className={`lead-step-badge ${cur}`}>{STEP_LABEL[cur] || cur}</span>
       {pending ? <span className="sub">⏳</span> : null}
+      {err ? <span role="alert" style={{ color: '#c0392b', fontSize: '.78rem', flexBasis: '100%' }}>{err}</span> : null}
       {!pending && cur === 'new' ? (
         <button type="button" className="btn ok sm" onClick={() => go('contacted')} title="Đã nhắn / gọi cho khách">→ Đã liên hệ</button>
       ) : null}

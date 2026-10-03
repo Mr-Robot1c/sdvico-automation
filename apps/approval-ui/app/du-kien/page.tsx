@@ -15,7 +15,7 @@ type Fact = {
   verified: boolean;
 };
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams?: { loi?: string } }) {
   const client = getServerClient();
   const { data, error } = await client
     .from('product_facts')
@@ -36,6 +36,9 @@ export default async function Page() {
       </header>
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
+      {searchParams?.loi === 'thieu-nguon' ? (
+        <p className="err" role="alert">Chưa lưu: dòng đánh dấu Đã xác nhận thật phải ghi cả Nguồn tài liệu và Người xác nhận.</p>
+      ) : null}
 
       <p className="err" role="status">
         Có {verified} dòng đã xác nhận, {rows.length - verified} dòng test. Dòng test chưa xác nhận sẽ khiến bài bị gắn cảnh báo, không được coi là sạch.
