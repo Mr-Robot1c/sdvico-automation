@@ -29,6 +29,10 @@ const MOBILE_MAX = 767;
 export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: { children: ReactNode; marketingOnly: boolean; pixelId?: string | null; ga4Id?: string | null }) {
   const path = usePathname() || '/';
   const [navOpen, setNavOpen] = useState(false);
+  // 3/10 chế độ demo (lib/demo-mode.ts): đọc cookie phía client để hiện dải báo + nút bật/tắt; việc CHE dữ liệu làm ở server.
+  const [demoOn, setDemoOn] = useState(false);
+  useEffect(() => { try { setDemoOn(/(?:^|;s*)sdvico_demo=1(?:;|$)/.test(document.cookie)); } catch { /* bỏ qua */ } }, [path]);
+  const demoHref = `/api/che-do-demo?bat=${demoOn ? '0' : '1'}&next=${encodeURIComponent(path)}`;
 
   // Đổi trang thì đóng menu trượt (chọn mục menu = đổi pathname).
   useEffect(() => { setNavOpen(false); }, [path]);
@@ -149,6 +153,8 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
           <Nav marketingOnly={marketingOnly} />
           <div className="sidebar-foot">
             <p className="foot-note">Máy soạn, người bấm gửi.</p>
+            {/* a thường: route handler đặt/xoá cookie rồi quay lại đúng trang. */}
+            <a className="foot-note foot-logout" href={demoHref} title="Chế độ demo che tên, số điện thoại, link Facebook của khách và tài liệu nội bộ, dùng khi trình bày cho đối tác.">{demoOn ? 'Tắt chế độ demo' : 'Bật chế độ demo'}</a>
             {/* a thường (không Link) để đi thẳng route handler xoá cookie, khỏi bị prefetch. */}
             <a className="foot-note foot-logout" href="/api/logout">Đăng xuất</a>
           </div>
@@ -172,6 +178,12 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
             <ThemeToggle />
           </div>
           <TopHeader marketingOnly={marketingOnly} />
+          {demoOn ? (
+            <div className="demo-bar" role="status">
+              Đang ở chế độ demo: tên, số điện thoại, link Facebook của khách và tài liệu nội bộ đã được che.
+              {' '}<a href={demoHref}>Tắt</a>
+            </div>
+          ) : null}
           <div className="content">{children}</div>
         </div>
       </div>

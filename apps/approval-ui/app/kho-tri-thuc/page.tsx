@@ -7,6 +7,7 @@ import AgentHeadCard from '../agent/agent-head-card';
 import { type AgentDef } from '../../lib/agent-defs';
 import { cachedAgentDefs, cachedTokenStats, cachedWeekReport } from '../../lib/cached';
 import { type TokenStats } from '../../lib/token-stats';
+import { isDemoMode } from '../../lib/demo-mode';
 
 // NGUỒN (23/8, user: "sắp xếp lại, ghi rõ 5 AI đã học gì, nguồn nào, Evaluator so sánh thế nào"):
 // một tab mỗi AI, mỗi tab = đúng những gì AI đó đã đọc / đã kết luận, đọc thẳng từ bảng dữ liệu.
@@ -49,6 +50,7 @@ function vn(n: number | null | undefined): string { return Math.round(Number(n) 
 function vnDec(n: number | null | undefined): string { return (Math.round((Number(n) || 0) * 10) / 10).toLocaleString('vi-VN'); }
 
 export default async function Page({ searchParams }: { searchParams: { ai?: string } }) {
+  const demo = isDemoMode();
   const tab: Tab = (TABS.some((t) => t.key === searchParams?.ai) ? searchParams!.ai : 'tong-quan') as Tab;
   const client = getServerClient();
   const since7 = new Date(Date.now() - 7 * 86400000).toISOString();
@@ -173,8 +175,11 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
               {internal.map((r) => (
                 <li key={r.id} className="kt-item">
                   <div className="kt-item-head"><b>{r.title || '(không tiêu đề)'}</b>{r.needs_gov_review ? <span className="badge tone-no">Cần duyệt QL</span> : null}<span className="muted" style={{ fontSize: '.8rem' }}>{fmtDT(r.created_at)}</span></div>
+                  {/* 3/10 chế độ demo: tài liệu nội bộ (tin Zalo Phòng Kinh doanh) chỉ hiện tiêu đề, ẩn đường dẫn + tóm tắt. */}
+                  {demo ? <p className="sub">Nội dung nội bộ, ẩn khi demo.</p> : (<>
                   <div className="sub">Nguồn: <code>{r.source_path}</code></div>
                   <p>{r.summary || '(chưa có tóm tắt)'}</p>
+                  </>)}
                 </li>
               ))}
             </ul>

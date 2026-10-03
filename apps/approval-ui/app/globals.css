@@ -1997,3 +1997,36 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .seo-skeleton span:nth-child(2n) { width: 80%; }
 @keyframes seo-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .seo-skeleton span { animation: none; } }
+
+/* 3/10 chế độ demo: dải báo đầu nội dung để người trình bày biết dữ liệu khách đang được che. */
+.demo-bar { margin: 0 0 12px; padding: 8px 14px; border-radius: 10px; font-size: .85rem; background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent); }
+.demo-bar a { color: inherit; font-weight: 700; }
+
+/* 3/10 (đợt 2 việc 4): Kho hỏi đáp trên điện thoại = thẻ dọc, mỗi ô có nhãn (data-label), hết kéo ngang ~1.300px. */
+@media (max-width: 767px) {
+  .qa-table, .qa-table tbody, .qa-table tr, .qa-table td { display: block; width: 100%; box-sizing: border-box; }
+  .qa-table thead { display: none; }
+  .qa-table { min-width: 0 !important; }
+  .qa-table tr { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; background: var(--surface); }
+  .qa-table td { max-width: none !important; border: 0 !important; padding: 4px 0 !important; text-align: left !important; white-space: normal !important; }
+  .qa-table td[data-label]::before { content: attr(data-label); display: block; font-size: .74rem; font-weight: 700; color: var(--ink-2); margin-bottom: 2px; }
+  .qa-table td[data-label='Sản phẩm'], .qa-table td[data-label='Trạng thái'], .qa-table td[data-label='Đã dùng'] { display: inline-block; width: auto; margin-right: 14px; }
+  .qa-table td.qa-actions { padding-top: 8px !important; }
+}
+
+/* 3/10 (đợt 2 việc 4): bảng kế hoạch tuần trên điện thoại = thẻ theo dòng bài; ô ngày (rowSpan) thành tiêu đề ngày. */
+@media (max-width: 767px) {
+  .week-table, .week-table tbody, .week-table tr, .week-table td { display: block; width: 100%; box-sizing: border-box; }
+  .week-table thead { display: none; }
+  .week-table { min-width: 0 !important; }
+  .week-table tr { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; background: var(--surface); }
+  .week-table tr.row-today { border-color: var(--accent); }
+  .week-table td { border: 0 !important; padding: 3px 0 !important; text-align: left !important; white-space: normal !important; }
+  .week-table td.wk-day { font-size: 1rem; padding-bottom: 6px !important; margin-bottom: 4px; border-bottom: 1px dashed var(--line) !important; }
+  .week-table td[data-label]::before { content: attr(data-label); display: block; font-size: .72rem; font-weight: 700; color: var(--ink-2); }
+  .week-table td[data-label='Giờ'], .week-table td[data-label='Loại'], .week-table td[data-label='Trạng thái'] { display: inline-block; width: auto; margin-right: 14px; }
+}
+/* Bảng đã thành thẻ dọc vừa màn thì khung bọc không cần cuộn ngang nữa (còn dư ~10px do đệm khung). */
+@media (max-width: 767px) {
+  .tablewrap:has(> .qa-table), .tablewrap:has(> .week-table), .table-scroll:has(> .week-table) { overflow-x: visible; }
+}

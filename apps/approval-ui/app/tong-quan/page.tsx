@@ -7,6 +7,7 @@ import { buildTodayView, TODAY_STAGE_LABEL } from '../../lib/today-plan';
 import { CHANNEL_LABEL, DOW_LONG } from '../../lib/posting-plan';
 import { computeShareLot, planShareLots } from '../../lib/share-lot';
 import ShareLotToday from './share-lot-today';
+import { isDemoMode, maskName, maskTextFor } from '../../lib/demo-mode';
 
 // 27/8 REDESIGN theo file "redesign web.docx" cua sep — trang TONG QUAN kieu ForLife Ops.
 // v2 (feedback sep cung ngay): (1) icon kenh trong bang bam duoc -> mo bai tren nen tang do;
@@ -137,7 +138,9 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const posts = (postsRes.data || []) as PostRow[];
   const failedFb = (failedRes.data || []) as PostRow[];
   const contents = (contentRes.data || []) as ContentRow[];
-  const leads = (leadsRes.data || []) as any[];
+  // 3/10 chế độ demo: che tên khách + số điện thoại/email trong câu hỏi trước khi render (lib/demo-mode.ts).
+  const demo = isDemoMode();
+  const leads = ((leadsRes.data || []) as any[]).map((l) => (demo ? { ...l, fb_user_name: maskName(l.fb_user_name), fb_profile_url: null, message: maskTextFor(l.message, l.fb_user_name) } : l));
 
   // ---- Trang thai theo content id (tu queue + posts) ----
   const publishedCids = new Set(posts.map((p) => p.content_id).filter(Boolean) as string[]);

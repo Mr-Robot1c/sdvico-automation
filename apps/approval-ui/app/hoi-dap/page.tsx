@@ -110,24 +110,24 @@ export default async function Page({ searchParams }: { searchParams?: { group?: 
         </div>
       ) : (
         <div className="tablewrap">
-          <table className="datatable">
+          <table className="datatable qa-table">
             <thead>
               <tr><th>Sản phẩm</th><th>Hỏi</th><th>Đáp</th><th>Nguồn</th><th style={{ width: 90 }}>Trạng thái</th><th style={{ width: 60 }}>Dùng</th><th style={{ width: 160 }}></th></tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td className="sub" style={{ whiteSpace: 'nowrap' }}>{shortGroup(r.product_group)}</td>
-                  <td style={{ maxWidth: 220, fontWeight: 600 }}>{r.question}</td>
-                  <td style={{ maxWidth: 420, whiteSpace: 'pre-wrap' }}>{r.answer}</td>
-                  <td className="sub" style={{ maxWidth: 180 }}>
+                  <td data-label="Sản phẩm" className="sub" style={{ whiteSpace: 'nowrap' }}>{shortGroup(r.product_group)}</td>
+                  <td data-label="Hỏi" style={{ maxWidth: 220, fontWeight: 600 }}>{r.question}</td>
+                  <td data-label="Đáp" style={{ maxWidth: 420, whiteSpace: 'pre-wrap' }}>{r.answer}</td>
+                  <td data-label="Nguồn" className="sub" style={{ maxWidth: 180 }}>
                     {r.source || '—'}
                     {r.confirmed_by ? <div>xác nhận: {r.confirmed_by}</div> : null}
                     <div>{fmtDT(r.created_at)}</div>
                   </td>
-                  <td><span className={`badge ${r.verified ? 'tone-ok' : 'tone-demo'}`}>{r.verified ? '✔ Đã xác nhận' : '? Chờ'}</span></td>
-                  <td className="sub" style={{ textAlign: 'center' }}>{r.used_count || 0}</td>
-                  <td>
+                  <td data-label="Trạng thái"><span className={`badge ${r.verified ? 'tone-ok' : 'tone-demo'}`}>{r.verified ? '✔ Đã xác nhận' : '? Chờ'}</span></td>
+                  <td data-label="Đã dùng" className="sub" style={{ textAlign: 'center' }}>{r.used_count || 0}</td>
+                  <td className="qa-actions">
                     <QaRowActions id={r.id} verified={r.verified} question={r.question} answer={r.answer} source={r.source || ''} confirmedBy={r.confirmed_by || ''} />
                   </td>
                 </tr>

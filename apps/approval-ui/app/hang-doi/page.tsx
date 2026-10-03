@@ -6,6 +6,7 @@ import { editDraft } from '../actions';
 import { kindMeta, formatRelative, formatDateTimeVN, payloadRows, intentLabel, planChannelLabel, purposeLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
 import { assetPublicUrl } from '../../lib/asset-url';
 import { publishTargetLines } from '../../lib/publish-targets';
+import { isDemoMode, maskTextFor } from '../../lib/demo-mode';
 
 // Luôn lấy dữ liệu mới, không dùng bản lưu tạm.
 // (Hàng đợi duyệt hiện ảnh/video đã gắn từ payload.assets — build 2026-08-12.)
@@ -114,7 +115,29 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   const selected = searchParams?.kind || null;
   const filtered = selected ? all.filter((it) => it.kind === selected) : all;
   // Cờ đỏ (chạm quy định, cần cấp quản lý) xếp lên đầu. Sort ổn định nên phần còn lại giữ thứ tự cũ.
-  const items = [...filtered].sort((a, b) => Number(isRedFlag(b.payload)) - Number(isRedFlag(a.payload)));
+  // 3/10 chế độ demo: phiếu nháp trả lời khách (mkt_send_message) mang tên khách ở tiêu đề "Trả lời <tên>: ..."
+  // và trong nội dung nháp. Che tên + số điện thoại/email ở tiêu đề và mọi trường chữ của payload trước khi render.
+  const demo = isDemoMode();
+  // Tên khách tra theo payload.lead_id (tiêu đề có nhiều dạng: "Trả lời <tên>: ...", "Chạm 2: <tên>").
+  const leadName = new Map<string, string>();
+  if (demo) {
+    const ids = [...new Set(filtered.map((it) => String(((it.payload || {}) as any).lead_id || '')).filter(Boolean))];
+    if (ids.length) {
+      const { data: ls } = await client.from('mkt_leads').select('id, fb_user_name').in('id', ids);
+      for (const l of ls || []) leadName.set(String((l as any).id), String((l as any).fb_user_name || ''));
+    }
+  }
+  const maskItem = <T extends { kind: string; title: string; payload: unknown }>(it: T): T => {
+    if (!demo) return it;
+    const lid = String(((it.payload || {}) as any).lead_id || '');
+    const who = leadName.get(lid) || (String(it.title || '').match(/^(?:Trả lời|Chạm \d+:)\s*(.+?)(?::|$)/)?.[1] || '');
+    const p = it.payload && typeof it.payload === 'object' ? (it.payload as Record<string, unknown>) : null;
+    const payload = p
+      ? Object.fromEntries(Object.entries(p).map(([k, v]) => [k, typeof v === 'string' ? maskTextFor(v, who) : v]))
+      : it.payload;
+    return { ...it, title: maskTextFor(it.title, who), payload };
+  };
+  const items = [...filtered].sort((a, b) => Number(isRedFlag(b.payload)) - Number(isRedFlag(a.payload))).map(maskItem);
   const redCount = filtered.filter((it) => isRedFlag(it.payload)).length;
 
   // Nạp bản nháp cho các bài marketing, để nút Chỉnh sửa preload đúng nội dung.

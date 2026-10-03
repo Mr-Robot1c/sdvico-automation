@@ -9,6 +9,7 @@ import DedupLeadsBar from './dedup-leads-bar';
 import DraftReplyButton, { type PendingDraft } from './draft-reply-button';
 import AutoRefresh from '../auto-refresh';
 import { QA_GROUPS } from '../../lib/hoi-dap-bot';
+import { isDemoMode, maskName, maskTextFor } from '../../lib/demo-mode';
 // @ts-ignore — module JS thuần
 import { guessGroup, publicName } from '../../lib/gen/products.mjs';
 // @ts-ignore — module JS thuần
@@ -95,7 +96,20 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
 
   let leadsRes = await build(`${BASE_COLS}, forwarded_to, forwarded_at`);
   if (leadsRes.error) leadsRes = await build(BASE_COLS);
-  const leads = ((leadsRes.data || []) as unknown) as Lead[];
+  const rawLeads = ((leadsRes.data || []) as unknown) as Lead[];
+  // 3/10 chế độ demo (lib/demo-mode.ts): che tên, link Facebook, số điện thoại/email của khách trước khi render.
+  const demo = isDemoMode();
+  const nameByLead = new Map(rawLeads.map((l) => [l.id, l.fb_user_name]));
+  const leads: Lead[] = demo
+    ? rawLeads.map((l) => ({
+        ...l,
+        fb_user_name: maskName(l.fb_user_name),
+        fb_profile_url: null,
+        message: maskTextFor(l.message, l.fb_user_name),
+        note: l.note ? maskTextFor(l.note, l.fb_user_name) : l.note,
+        lost_reason: l.lost_reason ? maskTextFor(l.lost_reason, l.fb_user_name) : l.lost_reason,
+      }))
+    : rawLeads;
 
   // 24/9 (sếp Long: dữ liệu hoá chuỗi khách hỏi): kéo lead 14 ngày để dựng khối phễu. Cột intent có từ migration
   // 20260924180000; chưa áp thì rơi về bộ cột cũ, trang không vỡ (khối phễu hiện "Chưa phân loại").
@@ -127,8 +141,12 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
   for (const r of (pendingRes.data || []) as any[]) {
     const p = r.payload || {};
     if (!p.lead_id || !p.body) continue;
+    const who = nameByLead.get(String(p.lead_id));
     pendingByLead.set(String(p.lead_id), {
-      queueId: String(r.id), body: String(p.body), note: String(p.note || ''), risk: String(p.risk || 'none'),
+      queueId: String(r.id),
+      body: demo ? maskTextFor(String(p.body), who) : String(p.body),
+      note: demo ? maskTextFor(String(p.note || ''), who) : String(p.note || ''),
+      risk: String(p.risk || 'none'),
       needsManager: !!p.needs_manager_approval, touch: Number(p.touch) || 0,
     });
   }

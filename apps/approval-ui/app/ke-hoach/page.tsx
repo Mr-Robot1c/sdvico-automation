@@ -330,11 +330,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 );
                 const lotCellFor = (r: ReturnType<typeof weekRowsOf>[number]) => {
                   const sl = r.lot;
-                  if (!sl || sl.channel !== 'facebook') return <td className="wk-lot"><span className="sub">— (không chia group: {r.channel && r.channel !== 'facebook' ? CHANNEL_LABEL[r.channel] : 'không phải Facebook'})</span></td>;
-                  if (!sl.items.length) return <td className="wk-lot"><span className="sub">—</span></td>;
+                  if (!sl || sl.channel !== 'facebook') return <td data-label="Lô nhóm chia sẻ" className="wk-lot"><span className="sub">— (không chia group: {r.channel && r.channel !== 'facebook' ? CHANNEL_LABEL[r.channel] : 'không phải Facebook'})</span></td>;
+                  if (!sl.items.length) return <td data-label="Lô nhóm chia sẻ" className="wk-lot"><span className="sub">—</span></td>;
                   if (d.isToday) {
                     return (
-                      <td className="wk-lot">
+                      <td data-label="Lô nhóm chia sẻ" className="wk-lot">
                         <ShareLotToday
                           compact
                           lot={sl.items.map((g) => ({ id: g.id, label: g.label, url: g.url, sharedToday: g.done ? { id: 'da-ghi', content_id: r.contentId || null, shared_at: '' } : null }))}
@@ -346,7 +346,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                     );
                   }
                   return (
-                    <td className="wk-lot">
+                    <td data-label="Lô nhóm chia sẻ" className="wk-lot">
                       <div className="wk-lot-list">
                         <span className="sub" style={{ fontSize: '.74rem' }}>{d.isPast ? `đã chia ${sl.done}/${sl.lotSize}` : `dự kiến ${sl.lotSize} nhóm cho buổi này`}</span>
                         {sl.items.map((g) => (
@@ -370,19 +370,19 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 return rows.map((r, k) => (
                   <tr key={`${d.date}-${k}`} className={d.isToday ? 'row-today' : undefined}>
                     {k === 0 ? dayCell : null}
-                    <td style={{ whiteSpace: 'nowrap' }}>{r.time || (r.window === 'sang' ? 'sáng' : 'chiều')}</td>
-                    <td>{r.kind === 'sale' ? 'Bài bán' : r.kind === 'bantin' ? 'Bản tin' : <span title={d.contentPurpose || ''}>Content</span>}</td>
-                    <td>
+                    <td data-label="Giờ" style={{ whiteSpace: 'nowrap' }}>{r.time || (r.window === 'sang' ? 'sáng' : 'chiều')}</td>
+                    <td data-label="Loại">{r.kind === 'sale' ? 'Bài bán' : r.kind === 'bantin' ? 'Bản tin' : <span title={d.contentPurpose || ''}>Content</span>}</td>
+                    <td data-label="Nền tảng">
                       <span className={`ch-chip ${r.channel || 'facebook'}`}>{r.channel ? CHANNEL_LABEL[r.channel] : 'Facebook Page'}</span>
                       {r.group ? <div className="sub" style={{ fontSize: '.74rem', marginTop: 2 }}>📌 {r.group}</div> : null}
                     </td>
-                    <td>
+                    <td data-label="Bài / hướng đi">
                       <span className="wk-t">{r.state === 'fallback' ? 'Bài theo trọng số sản phẩm' : r.label}</span>
                       {r.kind === 'content' && r.state !== 'done' ? <span className="wk-sub"> · máy viết theo playbook {d.contentLabel}</span> : null}
                       {r.kind === 'content' && r.state === 'done' ? <span className="wk-sub"> · {d.contentLabel}</span> : null}
                     </td>
-                    <td className="sub">{r.product || (r.kind === 'content' ? 'Bài content' : '—')}</td>
-                    <td><span className={`wk-state ${r.state}`}>{r.state === 'done' ? '✅ đã sinh' : r.state === 'fallback' ? 'hướng cạn' : '▫️ dự kiến'}</span></td>
+                    <td data-label="Sản phẩm" className="sub">{r.product || (r.kind === 'content' ? 'Bài content' : '—')}</td>
+                    <td data-label="Trạng thái"><span className={`wk-state ${r.state}`}>{r.state === 'done' ? '✅ đã sinh' : r.state === 'fallback' ? 'hướng cạn' : '▫️ dự kiến'}</span></td>
                     {lotCellFor(r)}
                   </tr>
                 ));
