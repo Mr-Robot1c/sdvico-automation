@@ -1944,3 +1944,28 @@ button.topbar-back { font: inherit; cursor: pointer; }
 .bang-card .decide-wrap .note { flex: 1 1 100%; max-width: 100%; min-width: 0; }
 .bang-card .schedule-lbl { flex-wrap: wrap; max-width: 100%; }
 .bang-scope { margin: -8px 0 14px; }
+
+/* 3/10 (đợt 2): Bảng bài viết trên điện thoại = tab theo cột, mỗi lần một cột rộng hết màn, hết kéo ngang. */
+.kanban-tabs { display: none; }
+@media (max-width: 767px) {
+  .kanban-wrap { overflow-x: visible; }
+  .kanban { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+  .kanban-tabs { display: flex; gap: 6px; margin-bottom: 10px; position: sticky; top: 52px; z-index: 5; background: var(--bg); padding: 6px 0; }
+  .kanban-tab { flex: 1 1 0; min-width: 0; }
+  .kanban-tab input { position: absolute; opacity: 0; pointer-events: none; }
+  .kanban-tab > span {
+    display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 8px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2);
+    font-size: .85rem; font-weight: 600; white-space: nowrap; cursor: pointer;
+  }
+  .kanban-tab > span .n { font-weight: 600; opacity: .8; }
+  .kanban-tab input:checked + span { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+  .kanban-tab input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .kanban-wrap:has(input[value='pending']:checked) .kanban-col:not([data-col='pending']),
+  .kanban-wrap:has(input[value='scheduled']:checked) .kanban-col:not([data-col='scheduled']),
+  .kanban-wrap:has(input[value='status']:checked) .kanban-col:not([data-col='status']) { display: none; }
+  .kanban-col > .kanban-head { display: none; }
+}
+/* 3/10: khối Tình hình học của bot ở trang Agent chỉ cho điện thoại (desktop đã có nút tròn góc dưới). */
+.bot-status-mobile { display: none; }
+@media (max-width: 767px) { .bot-status-mobile { display: block; } }

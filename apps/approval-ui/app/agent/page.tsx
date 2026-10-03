@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import AgentRoster from './agent-roster';
 import BotChat from '../hoi-dap/bot-chat';
+import { BotStatusSection } from '../bot-chip';
 
 // 27/8 REDESIGN (docx "redesign web" cua sep) — trang AGENT: theo doi qua trinh hoc va
 // chay cua cac AI trong he thong. 9 AI: BOSS (trung tam) + lam video + tao kich ban +
@@ -100,6 +101,8 @@ export default async function Page() {
           <Link href="/hoi-dap" className="btn ghost">🗂 Kho hỏi đáp</Link>
         </div>
       </header>
+
+      <BotStatusSection />
 
       {/* ===== HOI BOT (10/9, Thanh: "cho vao chung voi trang agent cung voi may con kia") =====
           Khung chat cua bot noi bo nam ngay dau trang Agent; bot tra loi ca cau hoi ngoai (co tim

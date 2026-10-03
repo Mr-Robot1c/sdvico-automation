@@ -215,9 +215,19 @@ export default async function BangSection() {
 
       {/* Board 4 cột theo dòng chảy bài viết, chiếm trọn chiều ngang. */}
       <div className="kanban-wrap">
+        {/* 3/10 (đợt 2, kiểm UI: kanban mobile phải kéo ngang 900px): dưới 768px hiện hàng tab, mỗi lần một cột
+            rộng hết màn. Radio thuần + CSS :has(), không cần JS; desktop ẩn hàng tab, giữ 3 cột. */}
+        <div className="kanban-tabs" role="radiogroup" aria-label="Chọn cột bảng bài viết">
+          {columns.map((col, i) => (
+            <label key={col.key} className="kanban-tab">
+              <input type="radio" name="kanban-cot" value={col.key} defaultChecked={i === 0} />
+              <span>{col.label} <span className="n">{col.countOverride ?? col.items.length}</span></span>
+            </label>
+          ))}
+        </div>
         <div className="kanban">
           {columns.map((col) => (
-            <div key={col.key} className="kanban-col">
+            <div key={col.key} className="kanban-col" data-col={col.key}>
               {/* 3/10: bỏ emoji đầu cột; phạm vi số đếm (trước là đoạn chữ dưới cột) chuyển vào tooltip của số. */}
               <div className={`kanban-head tone-${col.tone}`}>
                 <span>{col.label}</span>

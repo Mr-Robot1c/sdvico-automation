@@ -38,11 +38,9 @@ function BotIcon() {
   );
 }
 
-export default function BotChip() {
+// Đọc /api/bot-status ngay khi mount rồi mỗi 5 phút (15/9 web chậm: route chạy ~6 truy vấn).
+function useBotStatus(): BotStatus | null {
   const [status, setStatus] = useState<BotStatus | null>(null);
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
-
   useEffect(() => {
     let alive = true;
     const load = () => {
@@ -52,10 +50,58 @@ export default function BotChip() {
         .catch(() => {});
     };
     load();
-    // 15/9 (web chậm): /api/bot-status chạy ~6 truy vấn; hỏi mỗi 5 phút.
     const id = setInterval(load, 5 * 60000);
     return () => { alive = false; clearInterval(id); };
   }, []);
+  return status;
+}
+
+// Thân bảng tình hình học — dùng chung cho nút nổi (desktop) và khối trên trang Agent (điện thoại).
+function BotStatusBody({ status }: { status: BotStatus }) {
+  const alerts = status.alerts || [];
+  return (
+    <>
+      {alerts.length ? (
+        <div className="bot-alerts">
+          {alerts.map((a, i) => (
+            <p key={i} className="bot-alert"><b>{a.who}:</b> {a.msg}</p>
+          ))}
+        </div>
+      ) : null}
+      <p>Đã học <b>{status.internal}</b> bản ghi nội bộ và <b>{status.publicSrc}</b> nguồn public trong 7 ngày qua.</p>
+      {status.suggestions > 0 ? (
+        <p>Còn <b>{status.suggestions}</b> hướng đi tuần chưa dùng{status.suggestionsUsed > 0 ? ` (đã dùng ${status.suggestionsUsed})` : ''}. Bài tự sinh sẽ bám các hướng này.</p>
+      ) : status.suggestionsUsed > 0 ? (
+        <p>Đã dùng hết <b>{status.suggestionsUsed}</b> hướng đi tuần. Chủ nhật hệ thống đề xuất bản mới.</p>
+      ) : (
+        <p className="sub">Chưa có hướng đi tuần. Chủ nhật hệ thống sẽ đề xuất.</p>
+      )}
+      {status.planDate ? <p className="sub">Kế hoạch mới nhất: {fmtTime(status.planDate)}</p> : null}
+      <div className="bot-panel-links">
+        <a href="/kho-tri-thuc" className="btn ghost sm">Mở Kho tri thức</a>
+        <a href="/ke-hoach" className="btn ghost sm">Mở Kế hoạch</a>
+      </div>
+    </>
+  );
+}
+
+// 3/10 (kiểm UI sau đợt 1): điện thoại ẩn nút nổi, nên tình hình học hiện thành một khối ở đầu trang Agent
+// (CSS .bot-status-mobile chỉ hiện dưới 768px). Không thêm nút nổi nào nữa.
+export function BotStatusSection() {
+  const status = useBotStatus();
+  if (!status) return null;
+  return (
+    <section className="blk bot-status-mobile" aria-label="Tình hình học của bot">
+      <h2>Tình hình học của bot</h2>
+      <div className="bot-panel-body"><BotStatusBody status={status} /></div>
+    </section>
+  );
+}
+
+export default function BotChip() {
+  const status = useBotStatus();
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   // Esc đóng bảng và trả focus về nút.
   useEffect(() => {
@@ -82,28 +128,7 @@ export default function BotChip() {
             <b>Tình hình học của bot</b>
             <button className="bot-x" aria-label="Đóng" onClick={() => { setOpen(false); btnRef.current?.focus(); }}>×</button>
           </div>
-          <div className="bot-panel-body">
-            {hasAlert ? (
-              <div className="bot-alerts">
-                {alerts.map((a, i) => (
-                  <p key={i} className="bot-alert"><b>{a.who}:</b> {a.msg}</p>
-                ))}
-              </div>
-            ) : null}
-            <p>Đã học <b>{status.internal}</b> bản ghi nội bộ và <b>{status.publicSrc}</b> nguồn public trong 7 ngày qua.</p>
-            {status.suggestions > 0 ? (
-              <p>Còn <b>{status.suggestions}</b> hướng đi tuần chưa dùng{status.suggestionsUsed > 0 ? ` (đã dùng ${status.suggestionsUsed})` : ''}. Bài tự sinh sẽ bám các hướng này.</p>
-            ) : status.suggestionsUsed > 0 ? (
-              <p>Đã dùng hết <b>{status.suggestionsUsed}</b> hướng đi tuần. Chủ nhật hệ thống đề xuất bản mới.</p>
-            ) : (
-              <p className="sub">Chưa có hướng đi tuần. Chủ nhật hệ thống sẽ đề xuất.</p>
-            )}
-            {status.planDate ? <p className="sub">Kế hoạch mới nhất: {fmtTime(status.planDate)}</p> : null}
-            <div className="bot-panel-links">
-              <a href="/kho-tri-thuc" className="btn ghost sm">Mở Kho tri thức</a>
-              <a href="/ke-hoach" className="btn ghost sm">Mở Kế hoạch</a>
-            </div>
-          </div>
+          <div className="bot-panel-body"><BotStatusBody status={status} /></div>
         </div>
       ) : null}
       <button
