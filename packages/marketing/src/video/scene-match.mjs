@@ -133,7 +133,9 @@ function hasWorker(assetText) { return count(assetText, [...WORKER_WORDS, 'ngư�
 // 3/10 (ChatGPT chấm video lọc nước 7,3/10: "thiếu cảnh chứng minh nước ngọt chảy ra"): video máy lọc nước
 // (SEA-40), cảnh giải pháp / phần thưởng cộng +6 cho tư liệu mô tả cảnh nước chảy ra, ly nước, thử nước.
 // So nguyên từ trên chữ không dấu: "uống" => "uong" nếu so chuỗi con sẽ dính tường, xương, đường, kiên cường...
-const WATER_FLOW_WORDS = ['nước chảy', 'vòi', 'ly nước', 'uống', 'thử nước', 'nước ngọt chảy', 'đầu ra'];
+// 3/10 (3) — kiểm bản dựng thật: từ ĐƠN bỏ dấu dính oan ("vòi" -> "voi" trúng "với" nên clip khảo sát
+// thuyền cũng tính là nước chảy). Chỉ giữ CỤM >= 2 từ an toàn khi bỏ dấu.
+const WATER_FLOW_WORDS = ['nước chảy', 'ly nước', 'thử nước', 'nếm thử', 'nước ngọt chảy', 'hứng nước', 'rót nước', 'uống thử'];
 const WATER_FLOW_BONUS = 6;
 export function isWaterGroup(group) {
   return /loc nuoc|(^|[^a-z])sea-?\d/.test(fold(group));
