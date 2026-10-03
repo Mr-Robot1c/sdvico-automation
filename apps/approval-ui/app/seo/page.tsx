@@ -111,7 +111,7 @@ export default async function Page() {
           <p className="sub">Bài viết công khai trên web (Google đọc được), kho từ khóa và sức khỏe SEO. Bài blog sinh từ dây chuyền nội dung.</p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <a href={`${base}/blog`} target="_blank" rel="noreferrer" className="btn ghost">🌐 Mở trang Bài viết ↗</a>
+          <a href={publicBlogUrl()} target="_blank" rel="noreferrer" className="btn ghost">🌐 Mở trang Bài viết ↗</a>
           <Link href="/tu-khoa" className="btn ghost">🔑 Kho từ khóa</Link>
           <Link href="/quang-cao" className="btn ghost">📣 Quảng cáo / đo lường</Link>
         </div>
@@ -122,7 +122,7 @@ export default async function Page() {
       <div className="pl-tiles">
         <Link href="/seo/bai-viet" className="pl-tile" title="Xem tất cả bài công khai kèm số Google"><b>{fmt(posts.length)}</b><span>Bài SEO đã đăng →</span></Link>
         <Link href="/tu-khoa" className="pl-tile" title="Mở kho từ khóa"><b>{fmt(keywords.length)}</b><span>Từ khóa trong kho →</span></Link>
-        <a href={sorted[0] ? publicBlogUrl(sorted[0].slug) : `${base}/blog`} target="_blank" rel="noreferrer" className="pl-tile" title="Mở bài mới nhất"><b>{lastPostAt ? fmtDT(lastPostAt) : '—'}</b><span>Bài mới nhất ↗</span></a>
+        <a href={sorted[0] ? publicBlogUrl(sorted[0].slug) : publicBlogUrl()} target="_blank" rel="noreferrer" className="pl-tile" title="Mở bài mới nhất"><b>{lastPostAt ? fmtDT(lastPostAt) : '—'}</b><span>Bài mới nhất ↗</span></a>
         <a href="#suc-khoe" className="pl-tile" title="Xem chi tiết audit">
           <b>{audit ? (audit.status === 'ok' ? '✅' : '⚠️') : '—'}</b>
           <span>Audit SEO {audit ? fmtDT(audit.created_at) : '(chưa chạy)'} ↓</span>
