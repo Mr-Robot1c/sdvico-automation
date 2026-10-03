@@ -330,7 +330,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
             {leadNew.length ? (
               <div className="need-item">
                 <span className="need-n">{fmt(leadNew.length)}</span>
-                <span style={{ flex: 1 }}>người hỏi mua <b>chưa được trả lời</b> (trong 7 ngày qua). Người trực kênh online tự trả lời và tự chốt, không chuyển Kinh doanh (lệnh sếp 9/9); máy chỉ đọc, lưu và soạn nháp, không tự gửi. Thiếu thông tin thì hỏi bot. <Link href="/khach-hang">Mở Khách hàng →</Link></span>
+                <span style={{ flex: 1 }}>người hỏi mua <b>chưa được trả lời</b> (trong 7 ngày qua). Người trực kênh online tự trả lời và tự chốt; máy chỉ soạn nháp, không tự gửi. <Link href="/khach-hang">Mở Khách hàng →</Link></span>
               </div>
             ) : null}
           </div>

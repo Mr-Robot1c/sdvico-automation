@@ -7,7 +7,7 @@ import { safeNext } from '../../lib/safe-next';
 // sidebar nội bộ, không header public). Middleware luôn cho qua đường dẫn này.
 
 export const metadata: Metadata = {
-  title: 'Đăng nhập — SDVICO',
+  title: 'Đăng nhập | SDVICO',
   robots: { index: false, follow: false },
 };
 

@@ -1,6 +1,6 @@
 import { PUBLIC_HOTLINE_DISPLAY } from '../../lib/public-contact';
 
-export const metadata = { title: 'Chính sách quyền riêng tư — SDVICO Marketing' };
+export const metadata = { title: 'Chính sách quyền riêng tư | SDVICO Marketing' };
 
 // Cap nhat 25/8/2026: bo sung muc "Du lieu khach hang qua Facebook webhook" — tinh
 // nang bat lead tu comment/inbox them tu 24/8, phai khai bao dung. Truoc do noi "khong

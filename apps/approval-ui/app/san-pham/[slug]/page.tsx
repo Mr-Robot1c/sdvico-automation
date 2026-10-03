@@ -23,9 +23,9 @@ type Props = { params: { slug: string } };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const p = findProductBySlug(params.slug);
-  if (!p) return { title: 'Không tìm thấy sản phẩm — SDVICO' };
+  if (!p) return { title: 'Không tìm thấy sản phẩm | SDVICO' };
   const url = `${siteUrl()}/san-pham/${p.slug}`;
-  const title = `${p.name} — SDVICO`;
+  const title = `${p.name} | SDVICO`;
   // og:image = ảnh sản phẩm đầu tiên (URL tuyệt đối). Lỗi đọc ảnh thì bỏ ảnh, meta vẫn đủ.
   let ogImage: string | null = null;
   try {

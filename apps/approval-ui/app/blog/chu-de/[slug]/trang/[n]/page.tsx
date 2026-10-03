@@ -26,7 +26,7 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const p = topicOf(params.slug);
   const page = parsePageParam(params.n);
-  if (!p || !page || page < 2) return { title: 'Không tìm thấy chủ đề — SDVICO' };
+  if (!p || !page || page < 2) return { title: 'Không tìm thấy chủ đề | SDVICO' };
   const title = `${p.name}, trang ${page} | SDVICO`;
   const url = `${siteUrl()}/blog/chu-de/${p.slug}/trang/${page}`;
   return {

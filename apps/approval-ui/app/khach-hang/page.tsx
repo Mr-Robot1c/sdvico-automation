@@ -166,7 +166,7 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
         <div>
           <h1>Khách hàng</h1>
           <p className="sub" style={{ margin: '4px 0 0' }}>
-            Người hỏi mua từ comment, tin nhắn Facebook, quảng cáo và nhập tay. Mỗi khách đi một đường: <b>Mới → Đã liên hệ → Đã mua</b> hoặc <b>Không chốt</b> (ghi lý do). Máy chỉ đọc, lưu và soạn nháp, không tự gửi gì cho khách. Người trực kênh online tự trả lời và tự chốt, không chuyển Kinh doanh (lệnh sếp 9/9); thiếu thông tin thì hỏi bot.
+            Người hỏi mua từ comment, tin nhắn Facebook, quảng cáo và nhập tay. Mỗi khách đi một đường: <b>Mới → Đã liên hệ → Đã mua</b> hoặc <b>Không chốt</b> (ghi lý do). Máy chỉ đọc, lưu và soạn nháp, không tự gửi gì cho khách. Người trực kênh online tự trả lời và tự chốt; thiếu thông tin thì hỏi bot.
           </p>
         </div>
         <div className="head-actions lead-toolbar">

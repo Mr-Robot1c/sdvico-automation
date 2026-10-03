@@ -12,7 +12,7 @@ import { assetPublicUrl } from '../../lib/asset-url';
 // cookies/headers/searchParams. H1, the san pham, anh nam san trong HTML may chu.
 export const revalidate = 600; // 10 phut
 
-const TITLE = 'Sản phẩm SDVICO — Thiết bị tàu cá và ngành biển';
+const TITLE = 'Sản phẩm SDVICO | Thiết bị tàu cá và ngành biển';
 const DESC = 'Danh mục thiết bị tàu cá SDVICO phân phối và lắp đặt: giám sát hành trình, điện thoại vệ tinh, máy lọc nước biển, thiết bị lọc dầu, dầu nhớt.';
 
 export const metadata: Metadata = {

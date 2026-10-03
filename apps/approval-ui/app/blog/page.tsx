@@ -6,7 +6,7 @@ import BlogListView from './blog-list-view';
 // cold-start (do that 12,9 giay). Trang khong dung cookies/headers/searchParams nen cho ISR.
 export const revalidate = 300; // 5 phut — bai moi hien nhanh, khong go tay
 
-const SITE_TITLE = 'Bài viết SDVICO — Công nghệ số cho tàu cá';
+const SITE_TITLE = 'Bài viết SDVICO | Công nghệ số cho tàu cá';
 const SITE_DESC = 'Kinh nghiệm sử dụng thiết bị tàu cá, mẹo tiết kiệm dầu, nước ngọt ngoài khơi và câu chuyện thực tế của ngư dân do SDVICO chia sẻ.';
 
 export const metadata: Metadata = {

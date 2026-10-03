@@ -31,10 +31,10 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const client = getPublicClient();
   const post = await loadPublicPost(client, params.slug);
-  if (!post) return { title: 'Không tìm thấy bài viết — SDVICO' };
+  if (!post) return { title: 'Không tìm thấy bài viết | SDVICO' };
   const url = `${siteUrl()}/blog/${post.slug}`;
   return {
-    title: `${post.title} — SDVICO`,
+    title: `${post.title} | SDVICO`,
     description: post.excerpt,
     openGraph: {
       title: post.title,

@@ -13,7 +13,7 @@ type Props = { params: { slug: string } };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const p = topicOf(params.slug);
-  if (!p) return { title: 'Không tìm thấy chủ đề — SDVICO' };
+  if (!p) return { title: 'Không tìm thấy chủ đề | SDVICO' };
   const url = `${siteUrl()}/blog/chu-de/${p.slug}`;
   const title = `${p.name} — bài viết và kinh nghiệm | SDVICO`;
   return {

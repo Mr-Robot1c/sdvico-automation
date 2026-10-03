@@ -1,6 +1,6 @@
 import { PUBLIC_HOTLINE_DISPLAY } from '../../lib/public-contact';
 
-export const metadata = { title: 'Điều khoản sử dụng — SDVICO Marketing' };
+export const metadata = { title: 'Điều khoản sử dụng | SDVICO Marketing' };
 
 export default function Page() {
   return (

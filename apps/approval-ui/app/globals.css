@@ -893,20 +893,19 @@ a.chip:hover { filter: brightness(0.98); }
 .row-today td { background: var(--surface-2); }
 .row-today td:first-child { border-left: 3px solid #d97706; }
 
-/* BOT chip - noi bat goc duoi phai, hien thi trang thai AI da hoc. */
+/* BOT trạng thái học, góc dưới phải. 3/10 (đánh giá UI trước demo): thu thành MỘT nút tròn 44px,
+   cảnh báo chỉ là chấm đỏ tĩnh, bấm mới mở bảng; bảng mở PHÍA TRÊN cả nút Hỏi bot (bottom 104px) để không bị đè. */
 .bot-chip-wrap { position: fixed; right: 20px; bottom: 20px; z-index: 9998; }
-.bot-chip {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 10px 14px; border-radius: 999px;
-  background: linear-gradient(135deg, #1f5fbf 0%, #2a78d6 100%);
-  color: #fff; border: 0; box-shadow: 0 4px 14px rgba(31,95,191,.35);
-  cursor: pointer; font-size: 0.9rem; font-family: inherit;
-  transition: transform .12s ease, box-shadow .12s ease;
+.bot-dot-btn {
+  position: relative; width: 44px; height: 44px; border-radius: 999px;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--surface); color: var(--ink-2); border: 1px solid var(--line);
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
-.bot-chip:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(31,95,191,.45); }
-/* Bot dang DOI / cron dung: chip do + nhap nhay nhe de nguoi quan ly thay ngay tren moi trang. */
-.bot-chip-alert { background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%); box-shadow: 0 4px 14px rgba(220,38,38,.4); animation: bot-alert-pulse 1.6s ease-in-out infinite; }
-@keyframes bot-alert-pulse { 0%, 100% { box-shadow: 0 4px 14px rgba(220,38,38,.35); } 50% { box-shadow: 0 4px 22px rgba(220,38,38,.7); } }
+.bot-dot-btn:hover { color: var(--ink); }
+.bot-dot-btn[aria-expanded='true'] { color: var(--ink); border-color: var(--ink-2); }
+.bot-dot { position: absolute; top: 6px; right: 6px; width: 10px; height: 10px; border-radius: 999px; background: #dc2626; border: 2px solid var(--surface); }
+.bot-chip-wrap .bot-panel { position: absolute; right: 0; bottom: 104px; max-width: calc(100vw - 40px); }
 .bot-alerts { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
 .bot-alert { margin: 4px 0; font-size: .88rem; line-height: 1.45; color: #7f1d1d; }
 /* 30/8: rule cũ trộn @media vào selector list — CSS invalid, dark mode bot-alerts chưa từng ăn. Tách đúng cú pháp. */
@@ -916,25 +915,6 @@ a.chip:hover { filter: brightness(0.98); }
   :root:not([data-theme='light']) .bot-alerts { background: #3f1515; border-color: #7f1d1d; }
   :root:not([data-theme='light']) .bot-alert { color: #fecaca; }
 }
-.bot-chip-icon { font-size: 1.2rem; line-height: 1; }
-.bot-chip-text { line-height: 1.2; }
-.bot-chip-text b { font-weight: 700; }
-.bot-reopen {
-  position: fixed; right: 20px; bottom: 20px; z-index: 9998;
-  width: 44px; height: 44px; border-radius: 999px; border: 0;
-  background: var(--surface-2); box-shadow: 0 2px 8px rgba(0,0,0,.2);
-  cursor: pointer; font-size: 1.4rem;
-}
-/* 30/8 (audit H4): đã thu gọn nhưng có cảnh báo -> icon nhỏ viền đỏ nhấp nháy, không ép chip to. */
-.bot-reopen-alert { border: 2px solid #dc2626; animation: bot-alert-pulse 1.6s ease-in-out infinite; }
-/* Hàng chip + nút thu gọn cạnh nhau. */
-.bot-chip-row { display: inline-flex; align-items: center; gap: 6px; }
-.bot-chip-min {
-  width: 26px; height: 26px; border-radius: 999px; border: 1px solid var(--line);
-  background: var(--surface-2); color: var(--ink-2); cursor: pointer;
-  font-size: 15px; line-height: 1; display: grid; place-items: center;
-}
-.bot-chip-min:hover { color: var(--ink); }
 .bot-panel {
   width: 320px; padding: 14px 16px;
   background: var(--surface); color: var(--ink);
@@ -946,7 +926,6 @@ a.chip:hover { filter: brightness(0.98); }
 .bot-panel-links { display: flex; gap: 8px; margin-top: 10px; }
 .bot-x { background: transparent; border: 0; color: var(--ink-2); font-size: 1.4rem; cursor: pointer; padding: 0 6px; }
 .bot-x:hover { color: var(--ink); }
-.bot-dismiss { display: block; margin-top: 10px; padding: 4px 8px; background: transparent; border: 0; color: var(--ink-2); font-size: 0.8rem; text-decoration: underline; cursor: pointer; }
 .btn.sm { padding: 4px 10px; font-size: 0.85rem; }
 
 /* Trang Kế hoạch: khối "Hướng đi tuần tới" - list bài đăng gợi ý sinh từ tri thức. */
@@ -1790,7 +1769,7 @@ button.topbar-back { font: inherit; cursor: pointer; }
   .head-actions { justify-content: flex-start; width: 100%; }
 
   /* W4: bot gọn. Ẩn hẳn chip "Bot đã học"; nút Hỏi bot thu thành nút tròn 48px góc phải dưới. */
-  .bot-chip-wrap, .bot-reopen { display: none !important; }
+  .bot-chip-wrap { display: none !important; }
   .askbot-fab {
     width: 48px; height: 48px; padding: 0; justify-content: center; gap: 0; font-size: 22px;
     right: 12px !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;

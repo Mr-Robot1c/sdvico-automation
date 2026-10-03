@@ -242,7 +242,7 @@ export default async function Page() {
               chi co ban page phu KHONG liet ke (user: bang kenh chinh khong duoc dinh bai
               page test); muon do thi bam Ghep FB chinh o /noi-dung. */}
           <BangSoLieu
-            title={<><PlatformLogo platform="facebook" size={20} /><span>Facebook — SDVICO VN (kênh chính)</span></>}
+            title={<><PlatformLogo platform="facebook" size={20} /><span>Facebook: SDVICO VN (kênh chính)</span></>}
             titleNote="Chỉ hiện và đo bài trên Page chính. Bài máy đăng ở kênh phụ không nằm ở đây — bấm Ghép FB chính ở Duyệt bài (dán link bài đã đăng tay) thì bài mới vào bảng."
             headers={['Bài', 'React', 'Comment', 'Share', 'Lượt xem', 'Người xem', 'Link']}
             rows={fbRows}

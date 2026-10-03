@@ -23,7 +23,7 @@ export default function CopyReport({ text }: { text: string }) {
       type="button"
       onClick={onCopy}
       className="btn ghost"
-      title="Sao chép báo cáo dưới dạng chữ để dán vào Zalo cho sếp"
+      title="Sao chép báo cáo dưới dạng chữ để dán vào Zalo hoặc email"
     >
       {state === 'ok' ? '✓ Đã chép' : state === 'err' ? '⛔ Lỗi copy' : '📋 Sao chép báo cáo'}
     </button>

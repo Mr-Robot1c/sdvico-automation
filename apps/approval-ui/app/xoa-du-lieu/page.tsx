@@ -1,6 +1,6 @@
 import { PUBLIC_HOTLINE_DISPLAY, PUBLIC_HOTLINE_TEL } from '../../lib/public-contact';
 
-export const metadata = { title: 'Yêu cầu xoá dữ liệu — SDVICO Marketing' };
+export const metadata = { title: 'Yêu cầu xoá dữ liệu | SDVICO Marketing' };
 
 // Trang Data Deletion Instructions — Facebook BAT BUOC co URL rieng cho viec user request
 // xoa du lieu (bat buoc khi Publish app tren Facebook Developer Console). URL: /xoa-du-lieu

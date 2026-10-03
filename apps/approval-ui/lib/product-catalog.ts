@@ -33,7 +33,7 @@ export const PRODUCT_CATALOG: ProductItem[] = [
     productGroup: 'Máy lọc nước biển SEA-40',
     role: 'san-xuat',
     hangGoc: null,
-    short: 'Máy lọc nước biển thành nước ngọt cho tàu cá, do SDVICO nghiên cứu và sản xuất từ 2014.',
+    short: 'Máy lọc nước biển thành nước ngọt cho tàu cá, do SDVICO nghiên cứu và sản xuất.',
     intro: 'SEA-40 là máy lọc nước biển thành nước ngọt gắn trên tàu cá, thuộc dòng sản phẩm chủ lực do SDVICO nghiên cứu và sản xuất. Máy giúp bà con chủ động nguồn nước ngọt sinh hoạt và nấu ăn ngoài khơi, giảm bớt gánh nặng chở nước theo tàu.',
     loiIch: [
       'Chủ động nước ngọt cho anh em thợ trên tàu, không phải lo hết nước giữa chuyến biển dài.',
@@ -65,8 +65,8 @@ export const PRODUCT_CATALOG: ProductItem[] = [
     productGroup: 'Viettel S-Tracking',
     role: 'phan-phoi',
     hangGoc: 'Viettel',
-    short: 'Thiết bị giám sát hành trình tàu cá Viettel S-Tracking — SDVICO phân phối và lắp đặt.',
-    intro: 'Viettel S-Tracking là thiết bị giám sát hành trình bắt buộc cho tàu cá theo quy định của Bộ Nông nghiệp và Phát triển nông thôn. SDVICO là đơn vị phân phối, lắp đặt và hỗ trợ bảo hành thiết bị này tại khu vực Bà Rịa Vũng Tàu và các cảng cá lân cận.',
+    short: 'Thiết bị giám sát hành trình tàu cá Viettel S-Tracking, do SDVICO phân phối và lắp đặt.',
+    intro: 'Viettel S-Tracking là thiết bị giám sát hành trình cho tàu cá của Viettel. SDVICO là đơn vị phân phối, lắp đặt và hỗ trợ bảo hành thiết bị này tại khu vực Bà Rịa Vũng Tàu và các cảng cá lân cận.',
     loiIch: [
       'Đáp ứng yêu cầu giám sát hành trình theo quy định, tàu ra khơi hợp lệ.',
       'Kết nối hạ tầng của Viettel, phủ sóng tốt ở vùng biển Việt Nam.',
@@ -82,10 +82,10 @@ export const PRODUCT_CATALOG: ProductItem[] = [
     productGroup: 'Thuraya MarineStar MNB-01',
     role: 'phan-phoi',
     hangGoc: 'Thuraya',
-    short: 'Thiết bị giám sát hành trình vệ tinh Thuraya MarineStar, hỗ trợ nghe gọi — SDVICO phân phối.',
+    short: 'Thiết bị giám sát hành trình vệ tinh Thuraya MarineStar, hỗ trợ nghe gọi, do SDVICO phân phối.',
     intro: 'Thuraya MarineStar MNB-01 là thiết bị giám sát hành trình tàu cá qua vệ tinh, có hỗ trợ nghe gọi ngoài khơi. SDVICO là đơn vị phân phối và lắp đặt cho tàu cá tại Việt Nam.',
     loiIch: [
-      'Giám sát hành trình + gọi điện qua vệ tinh, phù hợp tàu đi xa bờ.',
+      'Giám sát hành trình và gọi điện qua vệ tinh, phù hợp tàu đi xa bờ.',
       'Bà con và gia đình ở nhà liên lạc được kể cả khi ngoài vùng phủ sóng di động.',
       'SDVICO lắp đặt, hướng dẫn sử dụng và hỗ trợ bảo hành.'
     ],
@@ -98,7 +98,7 @@ export const PRODUCT_CATALOG: ProductItem[] = [
     productGroup: 'XT-Pro',
     role: 'phan-phoi',
     hangGoc: 'Thuraya',
-    short: 'Điện thoại vệ tinh Thuraya XT-Pro cho tàu cá đi xa bờ — SDVICO phân phối.',
+    short: 'Điện thoại vệ tinh Thuraya XT-Pro cho tàu cá đi xa bờ, do SDVICO phân phối.',
     intro: 'XT-Pro là điện thoại vệ tinh Thuraya dành cho tàu cá và ngư dân đi xa bờ, giữ liên lạc kể cả khi ngoài vùng phủ sóng di động. SDVICO phân phối và hỗ trợ dịch vụ trong nước.',
     loiIch: [
       'Liên lạc với gia đình và cơ quan chức năng ở vùng biển xa.',
@@ -115,7 +115,7 @@ export const PRODUCT_CATALOG: ProductItem[] = [
     productGroup: 'PVOIL Nano Graphene',
     role: 'phan-phoi',
     hangGoc: 'PVOIL',
-    short: 'Dầu nhớt PVOIL Nano Graphene cho động cơ diesel tàu cá — SDVICO là nhà phân phối ủy quyền.',
+    short: 'Dầu nhớt PVOIL Nano Graphene cho động cơ diesel tàu cá. SDVICO là nhà phân phối ủy quyền.',
     intro: 'SDVICO là nhà phân phối ủy quyền dòng dầu nhớt PVOIL, trong đó có PVOIL Nano Graphene và PV Engine RMI Nano Graphene cho động cơ diesel tàu cá. Bà con đặt trực tiếp qua SDVICO để được giao và tư vấn.',
     loiIch: [
       'Dòng dầu nhớt chuyên cho động cơ diesel tàu cá, được PVOIL công bố công nghệ Nano Graphene.',

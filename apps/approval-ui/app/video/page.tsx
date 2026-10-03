@@ -127,7 +127,7 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Video</h1>
-          <p className="sub">Dây chuyền làm video bằng AI của SDVICO — từ kịch bản đến video dọc có giọng đọc và phụ đề, sẵn sàng đăng TikTok/Reel/Shorts.</p>
+          <p className="sub">Dây chuyền làm video bằng AI của SDVICO, từ kịch bản đến video dọc có giọng đọc và phụ đề, sẵn sàng đăng TikTok/Reel/Shorts.</p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link href="/san-xuat" className="btn ghost">🎬 Xưởng sản xuất</Link>
