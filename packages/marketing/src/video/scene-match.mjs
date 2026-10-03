@@ -374,8 +374,16 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
           // 1/10: cảnh cần người thợ mà model chọn hình không có ai làm việc, kho còn hình có người -> chọn lại.
           log.warn(`[scene-match] cảnh ${i + 1} (${role}): lời cần NGƯỜI THỢ nhưng "${byId.get(mid).title}" không có ai làm việc -> chọn lại theo luật`);
         } else if ((role === 'solution' || role === 'reward') && isWaterGroup(productGroup) && !showsWaterFlow(byId.get(mid)) && pool.some((a) => a.id !== prevId && (usedCount.get(a.id) || 0) === 0 && showsWaterFlow(a))) {
-          // 3/10: video lọc nước, kho còn clip nước ngọt chảy ra chưa dùng mà model chọn hình khác -> để luật (+6 điểm) chọn.
-          log.warn(`[scene-match] cảnh ${i + 1} (${role}): video lọc nước, kho có clip nước chảy ra chưa dùng, "${byId.get(mid).title}" không có -> chọn lại theo luật`);
+          // 3/10: video lọc nước, kho còn clip nước ngọt chảy ra chưa dùng mà model chọn hình khác.
+          // 3/10 (2) — kiểm bản dựng thật: thả xuống vòng chọn-lại chung thì clip nước bị
+          // visualOverlap loại ("không còn hình hợp") rồi rớt về clip tệ hơn + cắt câu. Vậy GÁN
+          // THẲNG clip nước tốt nhất (ruleScore cao nhất trong các clip nước chưa dùng) tại đây;
+          // không bao giờ để cảnh này rơi xuống fallback vì lý do nước chảy.
+          const nuoc = pool
+            .filter((a) => a.id !== prevId && (usedCount.get(a.id) || 0) === 0 && showsWaterFlow(a))
+            .sort((x, y) => ruleScore(y, role, { visual: scenes[i].visual, productGroup }) - ruleScore(x, role, { visual: scenes[i].visual, productGroup }))[0];
+          log.warn(`[scene-match] cảnh ${i + 1} (${role}): video lọc nước -> thay "${byId.get(mid).title}" bằng clip nước chảy "${nuoc.title}"`);
+          pick = { assetId: nuoc.id, fit: 8, why: 'video lọc nước: cảnh giải pháp phải thấy nước ngọt chảy ra (ChatGPT chấm 3/10)', by: 'rule' };
         } else if ((recentUse.get(mid) || 0) >= 2 && pool.some((a) => a.id !== mid && (recentUse.get(a.id) || 0) < 2)) {
           // 29/9: model chọn tư liệu đã lên >= 2 video gần đây trong khi kho còn cái ít dùng — ép xoay
           // bằng máy (pickByRole phạt recentUse), người xem hết cảnh "video nào cũng đúng bộ clip đó".
