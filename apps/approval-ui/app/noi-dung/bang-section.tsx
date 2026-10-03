@@ -14,7 +14,7 @@ import PostFbButton from './post-fb-button';
 import CopyCaptionButton from './copy-caption-button';
 import LinkTikTokButton from './link-tiktok-button';
 import PexelsScenesButton from './pexels-scenes-button';
-import { isFutureVNLocal, CHANNEL_LABEL } from '../../lib/posting-plan';
+import { isFutureVNLocal } from '../../lib/posting-plan';
 import { assetPublicUrl } from '../../lib/asset-url';
 import { publishTargetLines } from '../../lib/publish-targets';
 
@@ -201,10 +201,10 @@ export default async function BangSection() {
   // dem tong that o countOverride). Card trong cot Trang thai render theo it.status.
   const statusItems = [...published.slice(0, PUB_CAP), ...rejected.slice(0, REJ_CAP)];
   const statusTotal = published.length + rejected.length;
-  const columns: { key: string; label: string; icon: string; tone: string; items: QItem[]; cap: number; moreHref?: string; countOverride?: number }[] = [
-    { key: 'pending', label: 'Chờ duyệt', icon: '📥', tone: 'pending', items: pending, cap: 50 },
-    { key: 'scheduled', label: 'Lên lịch', icon: '⏰', tone: 'pending', items: approvedWaiting, cap: 10 },
-    { key: 'status', label: 'Trạng thái', icon: '🗂️', tone: 'published', items: statusItems, cap: PUB_CAP + REJ_CAP, moreHref: '/noi-dung?loai=bai-viet', countOverride: statusTotal }
+  const columns: { key: string; label: string; tone: string; items: QItem[]; cap: number; moreHref?: string; countOverride?: number }[] = [
+    { key: 'pending', label: 'Chờ duyệt', tone: 'pending', items: pending, cap: 50 },
+    { key: 'scheduled', label: 'Lên lịch', tone: 'pending', items: approvedWaiting, cap: 10 },
+    { key: 'status', label: 'Trạng thái', tone: 'published', items: statusItems, cap: PUB_CAP + REJ_CAP, moreHref: '/noi-dung?loai=bai-viet', countOverride: statusTotal }
   ];
 
   return (
@@ -218,10 +218,15 @@ export default async function BangSection() {
         <div className="kanban">
           {columns.map((col) => (
             <div key={col.key} className="kanban-col">
+              {/* 3/10: bỏ emoji đầu cột; phạm vi số đếm (trước là đoạn chữ dưới cột) chuyển vào tooltip của số. */}
               <div className={`kanban-head tone-${col.tone}`}>
-                <span aria-hidden="true">{col.icon}</span>
                 <span>{col.label}</span>
-                <span className="n">{col.countOverride ?? col.items.length}</span>
+                <span
+                  className="n"
+                  title={col.key === 'status'
+                    ? `${published.length} đã đăng và ${rejected.length} từ chối, tính trong 300 phiếu duyệt gần nhất. Cột chỉ hiện ${PUB_CAP} bài đã đăng và ${REJ_CAP} bài từ chối mới nhất.`
+                    : 'Tính trong 300 phiếu duyệt gần nhất, mỗi bài một thẻ.'}
+                >{col.countOverride ?? col.items.length}</span>
               </div>
 
               {col.items.length === 0 ? (
@@ -240,52 +245,48 @@ export default async function BangSection() {
                 const brief = c?.brief || {};
 
                 if (col.key === 'pending') {
+                  // 3/10 (đánh giá UI trước demo): thẻ chỉ giữ thứ người duyệt cần để QUYẾT — tiêu đề, một dòng
+                  // tóm tắt (kênh, khung giờ, loại bài, lúc tạo), cờ cần quản lý/cần rà, đích đăng, Xem bài, Duyệt.
+                  // Người viết/máy viết, insight, nguồn ảnh máy chọn, nhóm chia sẻ... gom vào "Chi tiết".
+                  // Ảnh/video xem trong modal Xem bài (thumb trên thẻ bỏ, hay ra ô trống khi ảnh link ngoài lỗi).
+                  const needsManager = p.risk === 'red' || p.needs_manager_approval === true;
+                  const purpose = purposeLabel(p.post_kind || brief.post_kind, p.format || c?.brief?.format);
+                  const metaParts = [
+                    planChannelLabel(p.plan_channel, chans, p.post_reel === true),
+                    p.plan_time ? `khung ${String(p.plan_time).slice(11, 16)}` : '',
+                    purpose,
+                    formatRelative(it.createdAt),
+                  ].filter(Boolean);
+                  const imgWarn = (brief as any).image_warn ? String((brief as any).image_warn) : '';
+                  const imgNote = (brief as any).image_note || (brief as any).image_via
+                    ? `${String((brief as any).image_via || '')}${(brief as any).image_note ? ` · ${String((brief as any).image_note).replace(' (link, khong luu)', '')}` : ''}`
+                    : '';
                   return (
-                    <div key={it.qid} className="card tone-mkt" style={{ display: 'grid', gap: 8, padding: 12 }}>
-                      <time className="muted" style={{ fontSize: '.78rem' }} dateTime={it.createdAt}>{formatRelative(it.createdAt)} · {formatDateTimeVN(it.createdAt)}</time>
+                    <div key={it.qid} className="card tone-mkt bang-card">
                       <b>{title}</b>
-                      <div className="badges">
-                        {p.authored === 'human' ? <span className="badge tone-no">🚩 Người viết</span> : <span className="badge">🤖 Máy viết</span>}
-                        <span className="badge badge-format" title="Kênh bài sẽ đăng (theo ô Lịch đăng cố định)">📍 {planChannelLabel(p.plan_channel, chans, p.post_reel === true)}</span>
-                        {p.ab_variant ? <span className="badge badge-ab">🧪 Thử {p.ab_variant}</span> : null}
-                        {brief.video_requested === true ? <span className="badge badge-video-pending">🎬 Đang làm video AI</span> : null}
-                        {/* 17/9 (Thanh): bỏ chữ "Sạch" — thay bằng LOẠI BÀI (Bán hàng / Content / Video / Blog);
-                            nhãn rủi ro chỉ hiện khi bài THẬT SỰ cần rà (amber/red), giữ điều cấm 3 nhìn thấy được. */}
-                        {(() => { const t = purposeLabel(p.post_kind || brief.post_kind, p.format || c?.brief?.format); return t ? <span className="badge" title="Loại bài: bán hàng / content nuôi trang / video / blog">{t === 'Bán hàng' ? '🛒' : t === 'Content' ? '📖' : t === 'Video' ? '🎬' : '📰'} {t}</span> : null; })()}
-                        {p.risk === 'amber' || p.risk === 'red' ? <span className={`badge tone-${rk.tone}`}>{rk.label}</span> : null}
-                        {p.plan_time ? <span className="badge tone-default" title="Ô giờ trong Lịch đăng cố định">🗓 {String(p.plan_time).slice(11, 16)} · {CHANNEL_LABEL[(p.plan_channel === 'youtube' ? 'youtube' : p.plan_channel === 'tiktok' ? 'tiktok' : 'facebook') as 'facebook' | 'youtube' | 'tiktok']}{p.plan_group ? ` · 👥 ${p.plan_group}` : ''}</span> : null}
-                      </div>
-                      {(brief as any).insight_line ? (
-                        <p className="insight-line" title={(brief as any).insight_situation || 'Insight/painpoint bài này xoáy vào'}>
-                          <span aria-hidden="true">🎯</span> {(brief as any).insight_line}
-                        </p>
+                      <div className="bang-meta" title={formatDateTimeVN(it.createdAt)}>{metaParts.join(' · ')}</div>
+                      {needsManager || p.risk === 'amber' || imgWarn ? (
+                        <div className="badges">
+                          {needsManager ? <span className="badge tone-no" title="Nội dung chạm quy định nhà nước (IUU, Cục Thủy sản, Kiểm ngư). Cấp quản lý duyệt trước khi đăng (điều cấm 3).">Cần cấp quản lý duyệt</span> : null}
+                          {!needsManager && p.risk === 'amber' ? <span className={`badge tone-${rk.tone}`}>{rk.label}</span> : null}
+                          {imgWarn ? <span className="badge tone-no" title="Ảnh máy chọn chưa qua thẩm định, mở Xem bài để kiểm.">Ảnh cần kiểm</span> : null}
+                        </div>
                       ) : null}
-                      {/* 2/10 (audit đợt A): nói rõ Duyệt xong bài đi đâu, đúng sự thật từng kênh. */}
+                      {/* 2/10 (audit đợt A): nói rõ Duyệt xong bài đi đâu, đúng sự thật từng kênh. Không ẩn vào Chi tiết. */}
                       <ul className="pub-target" aria-label="Đích đăng sau khi duyệt">
                         {publishTargetLines(p.plan_channel, chans).map((l) => <li key={l}>{l}</li>)}
                       </ul>
-                      {imgUrl || vidUrl ? (
-                        <div className="card-media">
-                          {imgUrl ? <img src={imgUrl} alt="" loading="lazy" decoding="async" /> : null}
-                          {vidUrl ? (
-                            <span className="card-media-vid">
-                              <video src={vidUrl} muted preload="none" />
-                              <span className="card-media-badge" aria-hidden="true">▶</span>
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {/* 5/9 (user bắt bài chân dung lấy ảnh không thấy mặt): người duyệt thấy máy chọn ảnh
-                          theo từ khóa nào, mắt AI chấm bao nhiêu, lý do; cảnh báo khi ảnh chưa qua thẩm định.
-                          Chỉ bài content mới có các trường này, bài bán tự ẩn. */}
-                      {(brief as any).image_note || (brief as any).image_warn ? (
-                        <p className="sub" style={{ margin: 0, fontSize: '.76rem' }} title="Máy chọn ảnh theo từ khóa này, mắt AI chấm điểm khớp bài">
-                          {(brief as any).image_warn
-                            ? <span className="badge tone-no" style={{ marginRight: 6 }}>⚠️ {String((brief as any).image_warn)}</span>
-                            : null}
-                          🖼 {String((brief as any).image_via || '')}{(brief as any).image_note ? ` · ${String((brief as any).image_note).replace(' (link, khong luu)', '')}` : ''}
-                        </p>
-                      ) : null}
+                      <details className="bang-more">
+                        <summary>Chi tiết</summary>
+                        <ul>
+                          <li>Tạo lúc {formatDateTimeVN(it.createdAt)}, {p.authored === 'human' ? 'người tự soạn' : 'máy soạn'}.</li>
+                          {p.plan_group ? <li>Nhóm chia sẻ dự kiến: {String(p.plan_group)}</li> : null}
+                          {brief.video_requested === true ? <li>Đang làm video AI cho bài này.</li> : null}
+                          {(brief as any).insight_line ? <li>Thông điệp: {String((brief as any).insight_line)}{(brief as any).insight_situation ? ` (${String((brief as any).insight_situation)})` : ''}</li> : null}
+                          {imgWarn ? <li>Cảnh báo ảnh: {imgWarn}</li> : null}
+                          {imgNote ? <li>Nguồn ảnh máy chọn: {imgNote}</li> : null}
+                        </ul>
+                      </details>
                       <div className="card-actions">
                         {/* 2/10 (audit đợt A): thanh Duyệt / Từ chối dính đáy modal, cùng cơ chế với /hang-doi (submit qua form="decide-..."). */}
                         <ViewModal
@@ -293,12 +294,19 @@ export default async function BangSection() {
                           label="Xem bài viết"
                           footer={
                             <>
-                              <span className="modal-foot-hint">Giờ hẹn và ghi chú đặt ở khung dưới thẻ bài. Để trống giờ hẹn thì đăng ngay. Đích đăng ghi ngay dưới huy hiệu của thẻ bài.</span>
+                              <span className="modal-foot-hint">Dùng giờ hẹn đang đặt ở thẻ bài; để trống thì đăng ngay khi bấm Duyệt.</span>
                               <button type="submit" form={`decide-${it.qid}`} name="action" value="reject" className="btn ghost">Từ chối</button>
                               <button type="submit" form={`decide-${it.qid}`} name="action" value="approve" className="btn ok">Duyệt</button>
                             </>
                           }
                         >
+                          {/* 3/10: trước khi bấm Duyệt trong modal phải thấy đăng ở đâu và có cần quản lý duyệt không. */}
+                          <div className="bang-decide-summary">
+                            {needsManager ? <p className="err" role="note" style={{ margin: '0 0 6px' }}>Cần cấp quản lý duyệt: nội dung chạm quy định nhà nước (điều cấm 3).</p> : null}
+                            <ul className="pub-target" aria-label="Đích đăng sau khi duyệt">
+                              {publishTargetLines(p.plan_channel, chans).map((l) => <li key={l}>{l}</li>)}
+                            </ul>
+                          </div>
                           {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                           {c ? (
                             <details className="raw editbox">
@@ -409,7 +417,7 @@ export default async function BangSection() {
                       </div>
                       {/* 29/8 (user: "bấm xem bài như bên chờ duyệt"): mở MODAL lớn ViewModal
                           thay vì xổ inline trong card. */}
-                      <ViewModal title={title} label="👁 Xem bài">
+                      <ViewModal title={title} label="Xem bài">
                         {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                         {schImg || schVid ? (
                           <div className="modal-media">
@@ -453,10 +461,9 @@ export default async function BangSection() {
                   const pubImg = (typeof p.assets?.image_url === 'string' && p.assets.image_url) || (typeof p.assets?.image === 'string' ? assetUrl.get(p.assets.image) : undefined);
                   const pubVid = typeof p.assets?.video === 'string' ? assetUrl.get(p.assets.video) : undefined;
                   return (
-                    <div key={it.qid} className="card tone-web" style={{ display: 'grid', gap: 6, padding: 12 }}>
-                      <b>{title}{ab ? <span className="badge badge-ab" style={{ marginLeft: 6 }} title="Bài thử của cặp A/B theo hướng đi kế hoạch.">🧪 Thử {ab}</span> : null}</b>
-                      {(brief as any).insight_line ? <span className="insight-line" title={(brief as any).insight_situation || ''}><span aria-hidden="true">🎯</span> {(brief as any).insight_line}</span> : null}
-                      {lastAt ? <span className="muted" style={{ fontSize: '.8rem' }}>Đăng {formatRelative(lastAt)}</span> : null}
+                    <div key={it.qid} className="card tone-web bang-card">
+                      <b title={ab ? `Bài thử ${ab} của cặp A/B cũ` : undefined}>{title}</b>
+                      {lastAt ? <span className="bang-meta">Đăng {formatRelative(lastAt)}</span> : null}
                       {it.status === 'rejected' ? (
                         <span className="muted" style={{ fontSize: '.74rem' }} title="Bài đã có lượt đăng thật. Phiếu duyệt gần nhất là Từ chối (có thể bấm nhầm sau khi đã đăng); dữ liệu giữ nguyên.">phiếu gần nhất: Từ chối</span>
                       ) : null}
@@ -502,7 +509,7 @@ export default async function BangSection() {
                       {leadsByContent.get(it.cid) ? (
                         <span style={{ fontSize: '.85rem', fontWeight: 600, color: 'var(--ok)' }} title="Khách hỏi mua từ bài này (Zalo/inbox/gọi/gặp). BOSS ưu tiên bài ra nhiều Zalo hơn bài chỉ nhiều like.">🎯 {leadsByContent.get(it.cid)} khách hỏi</span>
                       ) : null}
-                      <ViewModal title={title} label="👁 Xem bài">
+                      <ViewModal title={title} label="Xem bài">
                         {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                         {pubImg || pubVid ? (
                           <div className="modal-media">
@@ -553,7 +560,15 @@ export default async function BangSection() {
                         const fbLinked = !!fbRealUrl;
                         const showFb = target.length === 0 || target.includes('facebook') || fbLinked;
                         const showTt = (target.length === 0 ? hasVideo : target.includes('tiktok')) || !!linkedUrl;
+                        if (!showFb && !showTt) return null;
+                        // 3/10 (đánh giá UI trước demo): cụm đăng tay/ghép link/chia sẻ gom vào một mục gập.
+                        // Còn việc tay (Facebook chưa ghép link, TikTok chưa ghép) thì MỞ sẵn; xong hết thì gập.
+                        const todo: string[] = [];
+                        if (showFb && !fbLinked) todo.push('ghép link Facebook');
+                        if (showTt && !linkedUrl) todo.push('ghép TikTok');
                         return (
+                          <details className="bang-more bang-manual" open={todo.length > 0}>
+                            <summary>{todo.length ? `Việc tay còn lại: ${todo.join(', ')}` : 'Đăng tay và chia sẻ'}</summary>
                           <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
                             {showFb ? (
                               <div style={rowStyle}>
@@ -576,6 +591,7 @@ export default async function BangSection() {
                               </div>
                             ) : null}
                           </div>
+                          </details>
                         );
                       })() : null}
                       {!posts.some((x) => x.channel === 'facebook') && fbFailed.has(it.cid) ? (
@@ -607,12 +623,6 @@ export default async function BangSection() {
               {col.moreHref ? (
                 <Link className="src" href={col.moreHref} style={{ fontSize: '.85rem' }}>Xem tất cả {col.countOverride ?? col.items.length} bài</Link>
               ) : null}
-              {/* 2/10 (audit đợt A): phạm vi số đếm của từng cột. */}
-              <p className="muted" style={{ fontSize: '.72rem', margin: '6px 0 0', lineHeight: 1.4 }}>
-                {col.key === 'status'
-                  ? `Số ${statusTotal} = ${published.length} đã đăng + ${rejected.length} từ chối thật, tính trong 300 phiếu duyệt gần nhất. Thẻ chỉ hiện ${PUB_CAP} bài đã đăng và ${REJ_CAP} bài từ chối mới nhất.`
-                  : 'Tính trong 300 phiếu duyệt gần nhất, mỗi bài một thẻ (phiếu mới nhất của bài).'}
-              </p>
             </div>
           ))}
         </div>

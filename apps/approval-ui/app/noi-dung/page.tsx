@@ -152,37 +152,35 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     }
     return (
       <main>
+        {/* 3/10 (đánh giá UI trước demo): một hành động chính (Tạo bài), MỘT hàng lối tắt. Bỏ chip "Bảng bài viết"
+            (đang đứng ở đây) và đoạn giải thích phạm vi dài; phạm vi chuyển vào tooltip của hàng lối tắt. */}
         <header className="head-row">
           <div>
             <h1>Bảng bài viết</h1>
           </div>
           <div className="head-actions">
             <AutoRefresh seconds={60} />
+            <Link className="btn ok" href="/san-xuat">Tạo bài</Link>
           </div>
         </header>
-        {typeChips}
-        <nav className="filters" aria-label="Lối tắt sang danh sách theo trạng thái">
-          <Link className="chip" href="/noi-dung?loai=bai-viet" title="Xem toàn bộ bài viết ở danh sách chi tiết">
+        <nav
+          className="filters"
+          aria-label="Mở danh sách bài theo trạng thái"
+          title={`Danh sách gồm ${cAll.toLocaleString('vi-VN')} bài chữ mới nhất, không tính video và Thùng rác. Bài đã có lượt đăng thật tính Đã đăng.`}
+        >
+          <span className="filters-label">Danh sách bài:</span>
+          <Link className="chip" href="/noi-dung?loai=bai-viet">
             Tất cả <span className="n">{cAll}</span>
           </Link>
           {STATUS_TABS.map((s) => (
-            <Link
-              key={s.key}
-              className="chip"
-              href={`/noi-dung?loai=bai-viet&trangthai=${s.key}`}
-              title={`Mở danh sách bài ${s.label.toLowerCase()}`}
-            >
+            <Link key={s.key} className="chip" href={`/noi-dung?loai=bai-viet&trangthai=${s.key}`}>
               {s.label} <span className="n">{cByStatus[s.key] || 0}</span>
             </Link>
           ))}
+          <Link className="chip chip-quiet" href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn, giữ 7 ngày rồi máy tự xoá hẳn.">
+            Thùng rác <span className="n">{cTrash ?? 0}</span>
+          </Link>
         </nav>
-        {/* 2/10 (audit đợt A): ghi rõ phạm vi để số khớp được. Bốn chip trạng thái cộng với bài Nháp bằng đúng số Tất cả. */}
-        <p className="sub scope-note">
-          Phạm vi: {cAll.toLocaleString('vi-VN')} bài chữ (Bài dài và Bài ngắn, không tính video) mới nhất, không tính Thùng rác.
-          {' '}Chờ duyệt, Đã duyệt, Đã đăng, Đã từ chối và {Math.max(0, cAll - cByStatus.review - cByStatus.approved - cByStatus.published - cByStatus.rejected).toLocaleString('vi-VN')} bài Nháp cộng lại bằng Tất cả.
-          {' '}Bài đã có lượt đăng thật luôn tính Đã đăng, kể cả khi phiếu duyệt gần nhất là Từ chối.
-          {' '}Bảng bên dưới đếm theo phiếu duyệt (300 phiếu gần nhất, mỗi bài một thẻ) nên có thể gồm cả video.
-        </p>
         <BangSection />
       </main>
     );

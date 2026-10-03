@@ -207,7 +207,8 @@ export default function DecideActions({
             onChange={(e) => setSchedule(e.target.value)}
             aria-label="Hẹn giờ đăng (không bắt buộc). AM = sáng, PM = chiều tối"
           />
-          {preview ? <span className="schedule-preview">→ {preview}</span> : null}
+          {/* 3/10: luôn nói rõ đăng ngay hay hẹn giờ trước khi bấm Duyệt. */}
+          {preview ? <span className="schedule-preview">Hẹn {preview}</span> : <span className="schedule-preview">Để trống: đăng ngay</span>}
         </label>
         <button className="btn ok" name="action" value="approve" disabled={busy !== null}>
           {busy === 'approve' ? (schedule ? 'Đang hẹn...' : 'Đang duyệt...') : (schedule ? 'Duyệt + Hẹn giờ' : 'Duyệt')}
