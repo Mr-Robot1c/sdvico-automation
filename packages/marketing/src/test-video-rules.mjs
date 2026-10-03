@@ -5,7 +5,7 @@ import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
   stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
   breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences,
-  absoluteClaims,
+  absoluteClaims, ensureSavingsCondition, hookRepairSentences, keepOneQuestion,
 } from './video/rules.mjs';
 import { FORMATS, LOUDNORM_FILTER, parseLoudnormStats, loudnormFilterFor, badgeFontSize } from './video/assemble.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
@@ -422,16 +422,67 @@ ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXG
   ok('abs: văn cố định (outro) không dính bộ quét', absoluteClaims(outroText('lọc dầu')).length === 0 && absoluteClaims(outroText('SDVICO')).length === 0);
 }
 
+// 3/10 vòng 2 (F1): câu "tiết kiệm / giảm ... X%" tự thêm điều kiện, tất định, không nhờ model.
+{
+  eq('savings: "tiết kiệm tới 10%" giữa câu -> chèn "có thể" + ", tùy tình trạng máy"', ensureSavingsCondition('Máy nổ êm hơn và tiết kiệm tới 10% nhiên liệu mỗi chuyến!'), 'Máy nổ êm hơn và có thể tiết kiệm tới 10% nhiên liệu mỗi chuyến, tùy tình trạng máy!');
+  eq('savings: "từ 5% đến 10%" đứng đầu câu -> "Có thể" + hạ chữ hoa', ensureSavingsCondition('Tiết kiệm từ 5% đến 10% nhiên liệu mỗi chuyến.'), 'Có thể tiết kiệm từ 5% đến 10% nhiên liệu mỗi chuyến, tùy tình trạng máy.');
+  eq('savings: "giúp tiết kiệm" -> chèn trước "giúp"', ensureSavingsCondition('Máy giúp tiết kiệm từ 5% đến 10% nhiên liệu.'), 'Máy có thể giúp tiết kiệm từ 5% đến 10% nhiên liệu, tùy tình trạng máy.');
+  eq('savings: "giảm ... 10 phần trăm" cũng bắt', ensureSavingsCondition('Dầu về sạch hơn. Giảm 10 phần trăm hao phí nhiên liệu! Lắp xong anh em yên tâm.'), 'Dầu về sạch hơn. Có thể giảm 10 phần trăm hao phí nhiên liệu, tùy tình trạng máy! Lắp xong anh em yên tâm.');
+  eq('savings: câu ĐÃ có "có thể" giữ nguyên', ensureSavingsCondition('Máy có thể tiết kiệm tới 10% nhiên liệu.'), 'Máy có thể tiết kiệm tới 10% nhiên liệu.');
+  eq('savings: câu ĐÃ có "tùy" giữ nguyên', ensureSavingsCondition('Tiết kiệm tới 10% nhiên liệu, tùy tàu và tùy dầu!'), 'Tiết kiệm tới 10% nhiên liệu, tùy tàu và tùy dầu!');
+  eq('savings: "99,6%" tách muối (không phải tiết kiệm) giữ nguyên', ensureSavingsCondition('Màng lọc tách muối tới 99,6%.'), 'Màng lọc tách muối tới 99,6%.');
+  eq('savings: tiết kiệm KHÔNG có số phần trăm giữ nguyên', ensureSavingsCondition('Chạy êm, tiết kiệm nhiên liệu mỗi chuyến!'), 'Chạy êm, tiết kiệm nhiên liệu mỗi chuyến!');
+  eq('savings: câu giá có "triệu" không bị đụng', ensureSavingsCondition('Giảm 10% còn 4X triệu.'), 'Giảm 10% còn 4X triệu.');
+  eq('savings: câu không có dấu kết vẫn thêm điều kiện', ensureSavingsCondition('Tiết kiệm tới 10% nhiên liệu'), 'Có thể tiết kiệm tới 10% nhiên liệu, tùy tình trạng máy');
+  eq('savings: chạy lần 2 không đổi (idempotent)', ensureSavingsCondition(ensureSavingsCondition('Máy tiết kiệm tới 10% nhiên liệu!')), 'Máy có thể tiết kiệm tới 10% nhiên liệu, tùy tình trạng máy!');
+  eq('savings: chuỗi rỗng và null', [ensureSavingsCondition(''), ensureSavingsCondition(null)], ['', '']);
+  ok('savings: câu đã sửa không bị bộ quét tuyệt đối hóa bắt (có "có thể")', absoluteClaims(ensureSavingsCondition('Máy giảm tới 100 phần trăm hao phí.')).length === 0);
+}
+
+// 3/10 vòng 2 (F2): absoluteClaims bắt thêm "hạn chế tối đa" / "giảm tối đa" và "chủ động hoàn toàn".
+{
+  eq('abs2: bắt "hạn chế tối đa"', absoluteClaims('Máy hạn chế tối đa hao phí nhiên liệu.'), ['hạn chế tối đa']);
+  eq('abs2: bắt "giảm tối đa"', absoluteClaims('Giảm tối đa rủi ro cho chuyến biển.'), ['giảm tối đa']);
+  eq('abs2: bắt "hạn chế hao phí tối đa" (danh từ xen giữa)', absoluteClaims('Hạn chế hao phí tối đa mỗi chuyến.'), ['hạn chế hao phí tối đa']);
+  eq('abs2: bắt "chủ động hoàn toàn"', absoluteClaims('Anh em chủ động hoàn toàn khi ra khơi.'), ['chủ động hoàn toàn']);
+  eq('abs2: bắt "hoàn toàn chủ động"', absoluteClaims('Giờ anh em hoàn toàn chủ động nguồn nước.'), ['hoàn toàn chủ động']);
+  eq('abs2: THA "tốc độ tối đa 60 hải lý" (không cạnh hạn chế/giảm)', absoluteClaims('Tàu chạy tốc độ tối đa 60 hải lý.'), []);
+  eq('abs2: THA "giảm tốc độ tối đa" (không phải hiệu quả máy)', absoluteClaims('Vào cảng thì giảm tốc độ tối đa cho an toàn.'), []);
+  eq('abs2: THA "chủ động" trần', absoluteClaims('Anh em chủ động nguồn nước ngọt trên tàu.'), []);
+}
+
+// 3/10 vòng 2 (F5): hook video bán không mở bằng chuyện sửa máy chung chung.
+{
+  eq('hookRepair: bắt "sửa tới lần thứ ba" (câu reviewer)', hookRepairSentences('Hôm nay sửa tới lần thứ ba rồi đấy!'), ['Hôm nay sửa tới lần thứ ba rồi đấy!']);
+  eq('hookRepair: bắt "sửa máy hoài" và chỉ trả đúng câu dính', hookRepairSentences('Chuyến này ra khơi xa. Cả tuần sửa máy hoài. Tiền cứ vơi.'), ['Cả tuần sửa máy hoài.']);
+  eq('hookRepair: bắt "sửa mãi"', hookRepairSentences('Bộ lọc sửa mãi vẫn nghẹt.'), ['Bộ lọc sửa mãi vẫn nghẹt.']);
+  eq('hookRepair: THA câu có "cũ" (máy cũ trên tàu)', hookRepairSentences('Máy lọc cũ trên tàu sửa hoài, tốn tiền.'), []);
+  eq('hookRepair: THA nỗi đau NƯỚC', hookRepairSentences('Can nước chật chỗ, thiếu nước giữa chuyến.'), []);
+  eq('hookRepair: THA "sửa chữa" (không phải cụm bị cấm)', hookRepairSentences('Bộ lọc mới dễ sửa chữa hơn.'), []);
+  eq('hookRepair: rỗng và null', [hookRepairSentences(''), hookRepairSentences(null)], [[], []]);
+  eq('hookRepair: nối stripSentencesWith chỉ cắt đúng câu', stripSentencesWith('Nước đục ngầu. Sửa tới lần thứ ba rồi! Can nước trống không.', hookRepairSentences('Nước đục ngầu. Sửa tới lần thứ ba rồi! Can nước trống không.')), 'Nước đục ngầu. Can nước trống không.');
+}
+
+// 3/10 vòng 2 (F6): cảnh kết video content chỉ giữ MỘT câu hỏi.
+{
+  eq('oneQ: 2 câu hỏi giữ câu hỏi đầu', keepOneQuestion('Bà con thấy chuyến này sao? Ai từng gặp chuyện tương tự?'), 'Bà con thấy chuyến này sao?');
+  eq('oneQ: 1 câu hỏi giữ nguyên', keepOneQuestion('Cảng cá sáng nay nhộn nhịp. Bà con nghĩ sao?'), 'Cảng cá sáng nay nhộn nhịp. Bà con nghĩ sao?');
+  eq('oneQ: 2 hỏi + trần thuật -> giữ hỏi đầu và câu trần thuật', keepOneQuestion('Bà con thấy sao? Mình cùng bàn nha. Ai từng gặp chuyện này?'), 'Bà con thấy sao? Mình cùng bàn nha.');
+  eq('oneQ: 3 câu hỏi giữ câu đầu', keepOneQuestion('A có không? B có không? C có không?'), 'A có không?');
+  eq('oneQ: không có câu hỏi giữ nguyên', keepOneQuestion('Chuyến biển bình an nha anh em!'), 'Chuyến biển bình an nha anh em!');
+  eq('oneQ: rỗng và null', [keepOneQuestion(''), keepOneQuestion(null)], ['', '']);
+}
+
 // 3/10 (V1): âm lượng master -15 LUFS, 2-pass loudnorm.
 {
-  eq('loudnorm đích -15 LUFS / TP -1.5 / LRA 11', LOUDNORM_FILTER, 'loudnorm=I=-15:TP=-1.5:LRA=11');
+  eq('loudnorm đích -15 LUFS / TP -1.7 (biên 0,2 dB dưới trần -1,5) / LRA 11', LOUDNORM_FILTER, 'loudnorm=I=-15:TP=-1.7:LRA=11');
   const stderr = 'xx\n{\n\t"input_i" : "-27.65",\n\t"input_tp" : "-15.67",\n\t"input_lra" : "18.70",\n\t"input_thresh" : "-43.61",\n\t"output_i" : "-17.84",\n\t"output_tp" : "-1.50",\n\t"output_lra" : "15.60",\n\t"output_thresh" : "-29.01",\n\t"normalization_type" : "dynamic",\n\t"target_offset" : "2.84"\n}\n';
   eq('parseLoudnormStats đọc khối JSON stderr', parseLoudnormStats(stderr), { i: -27.65, tp: -15.67, lra: 18.7, thresh: -43.61, offset: 2.84 });
   eq('parseLoudnormStats: không có JSON -> null', parseLoudnormStats('ffmpeg lỗi'), null);
   eq('parseLoudnormStats: video không tiếng "-inf" -> null', parseLoudnormStats('{"input_i":"-inf","input_tp":"-inf","input_lra":"0.00","input_thresh":"-70.00","target_offset":"inf"}'), null);
   eq('loudnormFilterFor: không số đo -> 1-pass', loudnormFilterFor(null), LOUDNORM_FILTER);
   const f2 = loudnormFilterFor({ i: -27.65, tp: -15.67, lra: 18.7, thresh: -43.61, offset: 2.84 });
-  ok('loudnormFilterFor: pass 2 linear, đích I=-15 TP=-1.5, LRA nâng theo LRA đo (19)', f2.startsWith('loudnorm=I=-15:TP=-1.5:LRA=19:measured_I=-27.65:') && f2.endsWith(':linear=true'), f2);
+  ok('loudnormFilterFor: pass 2 linear, đích I=-15 TP=-1.7, LRA nâng theo LRA đo (19)', f2.startsWith('loudnorm=I=-15:TP=-1.7:LRA=19:measured_I=-27.65:') && f2.endsWith(':linear=true'), f2);
   ok('loudnormFilterFor: LRA đo thấp thì giữ LRA=11', loudnormFilterFor({ i: -20, tp: -3, lra: 6, thresh: -30, offset: 0.5 }).includes(':LRA=11:'));
 }
 

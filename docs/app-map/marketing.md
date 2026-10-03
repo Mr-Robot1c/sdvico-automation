@@ -2,6 +2,7 @@
 
 > Đọc khi làm phần Marketing. Phụ trách Bạn B. Nền chung ở [README.md](README.md), điều cấm và giọng văn ở CLAUDE.md.
 covers: packages/marketing
+<!-- re-verified: 2026-10-03 (4) - VONG CHAM 2: ensureSavingsCondition tat dinh them "co the ... tuy tinh trang may" cho cau tiet kiem/giam X% (moi nhanh video, rules.mjs + script.mjs), absoluteClaims them "han che/giam toi da" va "chu dong hoan toan", loudnorm TP -1.7, watermark bo dau cham tron, hook video ban cam mo bang chuyen sua may (hookRepairSentences), content canh ket giu 1 cau hoi (keepOneQuestion). test:video 268/268, test:scene va test:price xanh. -->
 <!-- re-verified: 2026-10-03 (3) - WATER_FLOW_WORDS bo tu don ('voi' bo dau trung 'voi(with)' lam clip khao sat thanh clip nuoc chay — kiem ban dung that), chi giu cum >=2 tu + them 'nem thu'. -->
 <!-- re-verified: 2026-10-03 (2) - CLIP NUOC CHAY GAN THANG (kiem ban dung that: swap tha xuong vong chon-lai bi visualOverlap loai, rot ve clip te hon + cat cau): nhanh swap video loc nuoc gan truc tiep clip nuoc tot nhat (ruleScore) lam pick, khong qua fallback. -->
 <!-- re-verified: 2026-10-02 (12) - TAT STORYBOARD MAC DINH (Thanh nghe ca storyboard lan 2-buoc deu che 'cha an nhap, khong ra 1 bai nhu truoc'): video CONTENT quay ve duong cu viet bai truoc ghep hinh sau; sbMode/2-buoc giu nguyen code sau cong tac env VIDEO_STORYBOARD=on, mac dinh off. test:video 199/199, test:scene OK. -->

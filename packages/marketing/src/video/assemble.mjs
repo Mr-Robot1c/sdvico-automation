@@ -13,7 +13,7 @@ export const FORMATS = {
   // 3/10 (vòng chấm ChatGPT: phụ đề thấp dễ bị caption/nút tương tác của TikTok và Reels che): đo bằng
   // libass thật, MarginV là đơn vị PlayRes 288 (tỉ lệ 1920/288 = 6,67 px mỗi đơn vị), nên 48 = đáy chữ
   // cách mép dưới ~330px, 56 = ~385px (vùng an toàn tối thiểu 280px, nới thêm cho Reels/Shorts).
-  // brandY: lề trên của dải "SDVICO • Hotline": 30 -> 116 (mép trên của hộp nền ~100px, tránh thanh trạng thái).
+  // brandY: lề trên của dải "SDVICO - Hotline": 30 -> 116 (mép trên của hộp nền ~100px, tránh thanh trạng thái).
   vertical: { w: 1080, h: 1920, subFont: 13.5, subMargin: 56, brandY: 116 },
   horizontal: { w: 1920, h: 1080, subFont: 13, subMargin: 55, brandY: 40 },
 };
@@ -23,7 +23,9 @@ export const FORMATS = {
 // Đo thật (video thử 11s): 1-pass loudnorm chỉ lên -18,1 LUFS vì khúc khởi động của bộ lọc (khối 3 giây
 // đầu) kéo tụt, nên làm 2-pass: pass 1 đo, pass 2 áp tham số đo với linear=true (đạt sát -15). Hỏng bước đo
 // thì lùi về 1-pass.
-export const LOUDNORM_FILTER = 'loudnorm=I=-15:TP=-1.5:LRA=11';
+// 3/10 vòng 2: TP đích -1.7 (không phải -1.5): đo 2 file ra -1,48 / -1,49 dBTP, lố nhẹ trần -1,5 đã hứa vì bộ
+// lọc để lệch cỡ 0,02 dB; chừa biên 0,2 dB để kết quả thực luôn <= -1,5.
+export const LOUDNORM_FILTER = 'loudnorm=I=-15:TP=-1.7:LRA=11';
 
 // Lấy khối JSON loudnorm in cuối stderr của pass 1. Trả null nếu thiếu/đọc không được.
 export function parseLoudnormStats(stderr) {
@@ -41,11 +43,11 @@ export function parseLoudnormStats(stderr) {
 // Filter loudnorm cho pass 2 (dùng số đo) hoặc 1-pass khi không có số đo.
 // linear=true chỉ chạy khi LRA đo được <= LRA đích; video có đoạn lặng/nhạc intro hay vượt 11 (đo thử
 // 18,7 => bộ lọc rơi về dynamic, ra -16,1 thay vì -15). Nên pass 2 nâng LRA đích lên bằng LRA đo (làm tròn
-// lên), khi đó chỉ tăng/giảm gain thuần, không nén dải động, I=-15 và TP=-1.5 giữ nguyên.
+// lên), khi đó chỉ tăng/giảm gain thuần, không nén dải động, I=-15 và TP=-1.7 giữ nguyên.
 export function loudnormFilterFor(stats) {
   if (!stats) return LOUDNORM_FILTER;
   const lraTarget = Math.max(11, Math.ceil(stats.lra));
-  return `loudnorm=I=-15:TP=-1.5:LRA=${lraTarget}:measured_I=${stats.i}:measured_TP=${stats.tp}:measured_LRA=${stats.lra}:measured_thresh=${stats.thresh}:offset=${stats.offset}:linear=true`;
+  return `loudnorm=I=-15:TP=-1.7:LRA=${lraTarget}:measured_I=${stats.i}:measured_TP=${stats.tp}:measured_LRA=${stats.lra}:measured_thresh=${stats.thresh}:offset=${stats.offset}:linear=true`;
 }
 
 // 3/10: cỡ chữ thẻ giá 36 -> 42 (một nấc), thẻ tối đa 2 dòng. Dòng nào quá dài (>32 ký tự) thì lùi về 38
@@ -120,7 +122,7 @@ async function buildSceneSegment(scene, fmt, workDir, index, { noSub = false } =
 }
 
 // Ghép toàn bộ. scenes: [{videoPath, audioPath, durationSec, text, kind}].
-// brandLine: dòng nhận diện phủ trên đầu video (vd "SDVICO • Hotline 1900 23 23 49").
+// brandLine: dòng nhận diện phủ trên đầu video (vd "SDVICO - Hotline 1900 23 23 49").
 // priceBadge (8/9, Thanh: giá vào video dạng úp mở): chữ tem giá (có thể 2 dòng), null = không tem.
 // badgeFromScene: tem hiện từ cảnh nội dung thứ N (0-based); badgeOffsetSec: lệch thêm bao nhiêu giây
 // trong cảnh đó (8/9 tối, Thanh: "gần tới lúc đọc phần giảm giá thì mới hiện tem", kẻo bà con thấy
@@ -146,7 +148,7 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
     const b = await buildBumpers({ workDir, fmt, outroAudioPath, outroKeyword });
     introSeg = b.introSeg;
     outroSeg = b.outroSeg;
-    // Thời lượng thật để banner "SDVICO • Hotline" CHỈ hiện ở cảnh nội dung, không đè lên
+    // Thời lượng thật để banner "SDVICO - Hotline" CHỈ hiện ở cảnh nội dung, không đè lên
     // intro/outro (đã có logo + số điện thoại to, thêm banner là trùng — sếp góp ý 18/8).
     try { introDur = introSeg ? await probeDuration(join(workDir, introSeg)) : 0; } catch { introDur = 0; }
     try { outroDur = outroSeg ? await probeDuration(join(workDir, outroSeg)) : 0; } catch { outroDur = 0; }

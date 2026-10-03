@@ -132,10 +132,15 @@ const ABS_HOAN_TOAN_BEFORE = /(?:tách|lọc|khử|loại bỏ|xử lý|sạch)(
 const ABS_HOAN_TOAN_AFTER = /hoàn toàn\s+(?:tách|lọc|khử|loại bỏ|sạch|tinh khiết|không còn (?:cặn|nước|bẩn|tạp))/giu;
 const ABS_NHO_NHAT = /(?:cặn|bẩn|hạt|bụi|tạp chất|lọc|tách|giữ lại)[^.!?…\n;,]{0,30}nhỏ nhất/giu;
 const ABS_100 = /\b100\s*(?:%|phần trăm)/iu;
+// 3/10 vòng 2 (ChatGPT chấm: "hạn chế tối đa" và "chủ động hoàn toàn" lọt qua bộ quét): "tối đa" chỉ bắt khi
+// đứng sát "hạn chế" / "giảm" (kể cả có một danh từ hao hụt xen giữa), nên "tốc độ tối đa 60 hải lý" không dính;
+// "hoàn toàn" đứng cạnh "chủ động" ở cả hai thứ tự.
+const ABS_TOI_DA = /(?<!\p{L})(?:hạn chế|giảm)\s+(?:(?:hao phí|rủi ro|thất thoát|chi phí|hư hỏng|cặn bẩn|tạp chất|nhiên liệu|dầu hao)\s+)?tối đa(?!\p{L})/giu;
+const ABS_CHU_DONG = /(?<!\p{L})(?:chủ động\s+hoàn toàn|hoàn toàn\s+chủ động)(?!\p{L})/giu;
 export function absoluteClaims(text) {
   const out = [];
   const s = String(text || '');
-  for (const re of [ABS_HOAN_TOAN_BEFORE, ABS_HOAN_TOAN_AFTER, ABS_NHO_NHAT]) {
+  for (const re of [ABS_HOAN_TOAN_BEFORE, ABS_HOAN_TOAN_AFTER, ABS_NHO_NHAT, ABS_TOI_DA, ABS_CHU_DONG]) {
     for (const m of s.matchAll(re)) out.push(m[0].toLowerCase());
   }
   for (const sent of s.split(SENT_SPLIT_NL)) {
@@ -437,4 +442,82 @@ export function trimEarlyScenes(scenes, maxWords = 58) {
     trimmed = true;
   }
   return { scenes: list, trimmed };
+}
+
+// 3/10 vòng 2 (ChatGPT chấm lọc dầu 6,0: phụ đề vẫn "tiết kiệm từ 5% đến 10% nhiên liệu" KHÔNG điều kiện dù
+// prompt vòng 1 đã dặn kèm điều kiện, model bỏ qua): lời dặn prompt không đủ, đây là bước TẤT ĐỊNH sau khi
+// kịch bản chốt. Câu có "tiết kiệm" hoặc "giảm" đi trước một số phần trăm mà chưa có "tùy" / "có thể" thì được
+// viết lại: chèn "có thể" ngay trước động từ (đứng đầu câu thì "Có thể" + hạ chữ hoa; "giúp tiết kiệm" thì chèn
+// trước "giúp") và nối ", tùy tình trạng máy" trước dấu kết câu. Câu có số tiền (triệu, đồng) bị bỏ qua vì
+// "giảm 10% giá" không phụ thuộc tình trạng máy. Chạy lại lần 2 không đổi gì (câu đã có "có thể" / "tùy").
+const SAVINGS_RE = /(?<!\p{L})(?:tiết kiệm|giảm)(?!\p{L})[^.!?…]*?\d+(?:[.,]\d+)?\s*(?:%|phần trăm)/iu;
+const SAVINGS_KEYWORD_RE = /(?<!\p{L})(?:tiết kiệm|giảm)(?!\p{L})/iu;
+const SAVINGS_COND_RE = /(?<!\p{L})(?:tùy|có thể)(?!\p{L})/iu;
+const SAVINGS_MONEY_RE = /(?<!\p{L})(?:triệu|đồng)(?!\p{L})/iu;
+const SAVINGS_SUFFIX = ', tùy tình trạng máy';
+function conditionSavingsSentence(sent) {
+  if (!SAVINGS_RE.test(sent) || SAVINGS_COND_RE.test(sent) || SAVINGS_MONEY_RE.test(sent)) return sent;
+  const kw = sent.match(SAVINGS_KEYWORD_RE);
+  if (!kw) return sent;
+  let at = kw.index;
+  const giup = sent.slice(0, at).match(/(?<!\p{L})giúp\s+$/iu);
+  if (giup) at = giup.index;
+  const head = sent.slice(0, at);
+  const tail = sent.slice(at);
+  const startsSentence = !/\p{L}/u.test(head);
+  let out = startsSentence
+    ? `${head}Có thể ${tail.charAt(0).toLowerCase()}${tail.slice(1)}`
+    : `${head}có thể ${tail}`;
+  const end = out.match(/([.!?…]+["”’»)]*)$/u);
+  if (end) {
+    const body = out.slice(0, end.index).replace(/[,\s]+$/, '');
+    out = `${body}${SAVINGS_SUFFIX}${end[1]}`;
+  } else {
+    out = `${out.replace(/[,\s]+$/, '')}${SAVINGS_SUFFIX}`;
+  }
+  return out;
+}
+export function ensureSavingsCondition(narration) {
+  const text = String(narration || '');
+  if (!text.trim()) return text;
+  // Tách giữ nguyên khoảng trắng: phần chẵn là câu, phần lẻ là dấu ngăn.
+  const parts = text.split(/((?<=[.!?…]["”’»)]?)\s+)/u);
+  return parts.map((p, i) => {
+    if (i % 2 === 1) return p;
+    const lead = p.match(/^\s*/)[0];
+    const trail = p.match(/\s*$/)[0];
+    const core = p.trim();
+    return core ? `${lead}${conditionSavingsSentence(core)}${trail}` : p;
+  }).join('');
+}
+
+// 3/10 vòng 2 (ChatGPT chấm lọc nước 6,5: hook "Hôm nay sửa tới lần thứ ba rồi đấy!" khiến người xem tưởng máy
+// đang bán hay hỏng): câu trong CẢNH 1 của video BÁN HÀNG nói chuyện sửa máy chung chung ("sửa tới / sửa lần /
+// sửa hoài / sửa mãi / sửa máy") mà không kèm "cũ" (máy cũ trên tàu) thì bị bắt. Nỗi đau mở màn phải bám đúng
+// thứ sản phẩm giải quyết (nước, dầu, cặn). Trả về các CÂU dính (log, nhắc model sinh lại, rồi cắt câu).
+const HOOK_REPAIR_RE = /(^|[^a-z0-9])(sua (toi|lan|hoai|mai)|sua may)($|[^a-z0-9])/;
+export function hookRepairSentences(narration) {
+  const out = [];
+  for (const sent of sentencesOf(String(narration || '').normalize('NFC'))) {
+    if (!HOOK_REPAIR_RE.test(foldText(sent))) continue;
+    if (/(?<!\p{L})cũ(?!\p{L})/iu.test(sent)) continue;
+    out.push(sent);
+  }
+  return out;
+}
+
+// 3/10 vòng 2 (ChatGPT chấm cảng cá 7,5: cảnh kết có 2 câu hỏi cạnh tranh nhau): cảnh closing của video CONTENT
+// chỉ giữ MỘT câu hỏi giao lưu. Nhiều hơn một câu hỏi thì giữ câu hỏi ĐẦU TIÊN, bỏ các câu hỏi sau; câu trần
+// thuật giữ nguyên. Có tối đa một câu hỏi thì trả lại đúng chuỗi cũ.
+export function keepOneQuestion(narration) {
+  const text = String(narration || '');
+  const sents = sentencesOf(text);
+  if (sents.filter((s) => s.includes('?')).length <= 1) return text;
+  let seen = false;
+  return sents.filter((s) => {
+    if (!s.includes('?')) return true;
+    if (seen) return false;
+    seen = true;
+    return true;
+  }).join(' ').trim();
 }

@@ -6,7 +6,7 @@ import { guardLines, guardViolations, stripViolatingSentences } from '../product
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
 import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen } from './scene-match.mjs';
-import { EXTRA_WORN, absoluteClaims, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences } from './rules.mjs';
+import { EXTRA_WORN, absoluteClaims, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences, ensureSavingsCondition, hookRepairSentences, keepOneQuestion } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -337,6 +337,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'CẢNH GIỮA PHẢI CÓ NGƯỜI LÀM VIỆC SỚM (17/9 vòng 6, ChatGPT: "bằng chứng làm thật bị dồn về cuối"): cảnh story ĐẦU TIÊN ưu tiên hình NGƯỜI SDVICO đang thao tác (kỹ thuật viên kiểm tra, lắp, sửa) — hình tàu, cảng, biển chỉ làm nền SAU đó.',
     'CẢNH GIỮA: kể chuyện có người: ai đang làm gì, vất vả chỗ nào, bà con nói gì. Chạm 1 chữ cảm xúc NGHỀ / TIỀN / RỦI RO / TỰ HÀO như bài nguồn. Không bịa tên người, con số không có trong bài nguồn. Địa điểm (tên cảng, tỉnh) chỉ nói nếu bài nguồn có. KỂ LẠI BẰNG LỜI CỦA MÌNH: giữ ý của bài nguồn nhưng KHÔNG chép nguyên câu, không lặp lại cụm từ của bài nguồn quá 5 chữ liền nhau.',
     `CẢNH CUỐI: ${STYLE.close}. Không lời kêu gọi bán hàng.`,
+    'Tả vừa phải, không tô vẽ vượt những gì hình cho thấy rõ.',
     `CỤM ĐÃ MÒN, CẤM DÙNG (đã lặp ở nhiều video trước, kể cả khi bài nguồn có): ${WORN_PHRASES.map((p) => `"${p}"`).join(', ')}. Muốn nói ý đó thì tìm cách nói khác.`,
   ];
   const SALES_STRUCTURE = [
@@ -348,6 +349,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       : '',
     hookTerm ? `CẢNH 1 PHẢI LỘ SẢN PHẨM SỚM (17/9 vòng 2): trong 2 câu đầu tiên phải có chữ "${hookTerm}" để người xem biết ngay video nói về chuyện ${hookTerm} trên tàu, không mở màn mơ hồ.` : '',
     !opts.contentVideo ? 'HÌNH SẢN PHẨM PHẢI RA TRƯỚC GIÂY 15 (17/9 vòng 6, luật cứng): tổng lời cảnh hook + empathy TỐI ĐA 55 từ (~15 giây đọc) để cảnh giải pháp chiếu máy thật vào sớm. Gọi tên máy trong phụ đề KHÔNG thay được hình máy.' : '',
+    'CẢNH ĐẦU KHÔNG MỞ BẰNG CHUYỆN SỬA MÁY (3/10 vòng 2, ChatGPT chấm: hook "Hôm nay sửa tới lần thứ ba rồi đấy!" làm người xem tưởng máy đang bán hay hỏng): CẢNH ĐẦU không mở bằng chuyện SỬA MÁY / máy hỏng chung chung. Nỗi đau mở màn bám đúng thứ sản phẩm giải quyết: video lọc nước là chuyện NƯỚC (can nước chật chỗ, thiếu nước, nước đục), video lọc dầu là chuyện DẦU / CẶN. Muốn nhắc sửa chữa thì phải nói rõ là máy CŨ trên tàu.',
     'CÂU KẾT QUẢ PHẢI CÓ HÌNH CHỨNG MINH (17/9 vòng 6): không nói "tuyệt đối", "đảm bảo 100%", "sạch bong" hay kết quả vận hành (máy nổ êm, dầu sạch) nếu tư liệu không quay được điều đó; thay bằng lợi ích MÔ TẢ ("nước sau lọc dùng cho sinh hoạt", "giữ dầu sạch hơn trước khi vào máy").',
     'LỜI ĐỌC KHÔNG TUYỆT ĐỐI HÓA (3/10, ChatGPT chấm: "tách nước hoàn toàn", "lọc sạch cặn bẩn nhỏ nhất", "tiết kiệm tới 10% nhiên liệu mỗi chuyến" nghe như quảng cáo quá tay): CẤM "hoàn toàn", "100%", "sạch bong", "nhỏ nhất", "tuyệt đối", "triệt để" khi nói về hiệu quả của máy. Diễn đạt mềm: "giúp tách nước và cặn bẩn trước khi nhiên liệu vào động cơ", "hạn chế hao phí". Số phần trăm lấy từ THÔNG SỐ ĐƯỢC PHÉP vẫn dùng được nhưng PHẢI kèm điều kiện: "có thể giảm tới X% tùy tình trạng máy và dầu trên từng tàu".',
     'TỶ LỆ PHẦN TRĂM (17/9, Điều cấm 5): CẤM mọi con số phần trăm ("40%", "gần 40 phần trăm chi phí") không có nguyên văn trong BÀI NGUỒN hoặc THÔNG SỐ ĐƯỢC PHÉP bên dưới. Không có thì nói "một phần lớn", "cả đống tiền".',
@@ -599,6 +601,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   let hookPinMiss = false; // 17/9 vòng 3: lời cảnh 1 không ăn nhập tư liệu cảnh 1 đã chọn trước
   let solutionLate = false; // 17/9 vòng 6: lời trước cảnh giải pháp quá dài, hình máy ra muộn
   let painSelf = []; // 18/9 vòng 10: cảnh nỗi đau trỏ "máy lọc ... này" vào sự cố (tưởng máy đang bán hỏng)
+  let hookRepair = []; // 3/10 vòng 2: hook video bán mở bằng chuyện sửa máy chung chung (câu dính)
   // 17/9: clip bắt buộc cảnh 1 — kịch bản mở màn không ăn nhập nội dung clip thì sinh lại 1 lần.
   const mustAsset = opts.mustUseAssetId ? assets.find((a) => a.id === opts.mustUseAssetId) : null;
   let mustMiss = false;
@@ -633,7 +636,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       + (!solutionLate ? '' :
       '\n\nLẦN TRƯỚC LỜI TRƯỚC CẢNH GIẢI PHÁP QUÁ DÀI — hình máy ra sau giây 15. Rút hook + empathy xuống TỐI ĐA 55 từ tổng cộng, mỗi cảnh 2 câu ngắn.')
       + (!painSelf.length ? '' :
-      `\n\nLẦN TRƯỚC CẢNH NỖI ĐAU VIẾT ${painSelf.map((p) => `"${p}"`).join(', ')} — người xem tưởng chiếc máy đang bán chính là chiếc hỏng. Viết lại, gọi là "máy lọc cũ" / "bộ lọc cũ trên tàu", không dùng chữ "này".`);
+      `\n\nLẦN TRƯỚC CẢNH NỖI ĐAU VIẾT ${painSelf.map((p) => `"${p}"`).join(', ')} — người xem tưởng chiếc máy đang bán chính là chiếc hỏng. Viết lại, gọi là "máy lọc cũ" / "bộ lọc cũ trên tàu", không dùng chữ "này".`)
+      + (!hookRepair.length ? '' :
+      `\n\nLẦN TRƯỚC CẢNH ĐẦU MỞ BẰNG CHUYỆN SỬA MÁY: ${hookRepair.map((p) => `"${p.slice(0, 80)}"`).join(', ')} — người xem tưởng máy đang bán hay hỏng. Viết lại cảnh đầu bằng nỗi đau đúng thứ sản phẩm giải quyết (${hookTerm === 'nước' ? 'chuyện NƯỚC: can nước chật chỗ, thiếu nước, nước đục' : 'chuyện DẦU / CẶN'}), không nói chuyện sửa máy.`);
     const res = await generateWithRetry(ai, {
       model: MKT_MODEL,
       contents: user + extra,
@@ -677,6 +682,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       }
       if (painSelf.length) console.warn(`[script] canh noi dau tro "may ... nay" vao su co (lan ${attempt + 1}): ${painSelf.join(' | ')} — nguoi xem tuong may dang ban hong.`);
     }
+    // 3/10 vòng 2: cảnh 1 video BÁN không mở bằng chuyện sửa máy chung chung.
+    hookRepair = !opts.contentVideo ? hookRepairSentences((parsed.vertical?.scenes || [])[0]?.narration || '') : [];
+    if (hookRepair.length) console.warn(`[script] canh 1 mo bang chuyen sua may chung chung (lan ${attempt + 1}): ${hookRepair.join(' | ')} — nguoi xem tuong may dang ban hong.`);
     hookPinMiss = false;
     if (hookPin) {
       const first = (parsed.vertical?.scenes || [])[0];
@@ -731,7 +739,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       if (storyboardCountMiss) console.warn(`[script] storyboard: model tra ${scs.length} canh, can DUNG ${sb.length} (lan ${attempt + 1}) — sinh lai.`);
       for (const m of storyboardMiss) console.warn(`[script] storyboard: canh ${m.scene} khong an nhap hinh chot truoc "${String(m.asset?.title || '').slice(0, 50)}" (${m.reason}, lan ${attempt + 1})${m.sentences.length ? ` — cau: "${m.sentences[0].slice(0, 60)}"` : ''} — sinh lai theo mo ta hinh.`);
     }
-    if (!viol.length && !worn.length && !mustMiss && !storyboardMiss.length && !sbChatter.length && !sbDescMiss.length && !storyboardCountMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate && !painSelf.length) break;
+    if (!viol.length && !worn.length && !mustMiss && !storyboardMiss.length && !sbChatter.length && !sbDescMiss.length && !storyboardCountMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate && !painSelf.length && !hookRepair.length) break;
   }
   // 17/9 vòng 9: bẻ câu 30-40 từ nối bằng dấu phẩy thành câu ngắn TRƯỚC mọi đường cắt — câu khổng lồ
   // làm cắt-cụm-cấm rỗng cả cảnh (bị khôi phục nguyên cụm cấm) và làm tách-cảnh-dài bất lực (ảnh đứng
@@ -777,6 +785,15 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       if (cut && cut !== sc.narration) sc.narration = cut;
     }
     console.warn('[script] da cat cau "may ... nay" khoi canh noi dau:', painSelf.join(', '));
+  }
+  // 3/10 vòng 2: sinh lại vẫn mở bằng chuyện sửa máy -> cắt câu đó khỏi cảnh 1 (cảnh rỗng thì khối khôi phục trả lời gốc).
+  if (hookRepair.length) {
+    const sc0 = (parsed.vertical?.scenes || [])[0];
+    if (sc0) {
+      const cut = stripSentencesWith(sc0.narration || '', hookRepair);
+      if (cut && cut !== sc0.narration) sc0.narration = cut;
+    }
+    console.warn('[script] da cat cau mo bang chuyen sua may khoi canh 1:', hookRepair.join(' | '));
   }
   // Khôi phục cảnh bị cắt rỗng (mọi đường cắt ở trên).
   (parsed.vertical?.scenes || []).forEach((sc, i) => {
@@ -920,6 +937,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         ...unsourcedPercents(text, percentSources),
         ...absoluteClaims(text),
         ...(!opts.contentVideo && (si === 0 || ['hook', 'empathy', 'story'].includes(scene?.role)) ? selfProductFaultPhrases(text) : []),
+        ...(!opts.contentVideo && si === 0 ? hookRepairSentences(text) : []),
       ],
     });
   }
@@ -932,6 +950,24 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   // 17/9 vòng 3: cảnh 1 dùng đúng tư liệu đã chọn trước (lời đã viết theo mô tả hình này).
   if (hookPin && vertical.length && vertical[0].matchBy !== 'must') {
     vertical[0] = { ...vertical[0], assetId: hookPin.id, matchBy: 'hook-pin', why: 'tư liệu cảnh 1 chọn trước, lời viết theo hình (17/9 vòng 3)' };
+  }
+  // 3/10 vòng 2 (F1, tất định, MỌI nhánh video): câu "tiết kiệm / giảm ... X%" chưa có điều kiện thì tự thêm
+  // "có thể" + ", tùy tình trạng máy". Đặt SAU mọi bước sinh/viết lại lời, nên phụ đề (lấy từ narration) tự khớp.
+  for (const [i, s] of vertical.entries()) {
+    const cond = ensureSavingsCondition(s.narration);
+    if (cond !== s.narration) {
+      console.warn(`[script] canh ${i + 1}: cau tiet kiem % thieu dieu kien — da them "co the ... tuy tinh trang may": "${cond.slice(0, 90)}"`);
+      s.narration = cond;
+    }
+  }
+  // 3/10 vòng 2 (F6, chỉ video CONTENT đường thường): cảnh kết chỉ giữ MỘT câu hỏi giao lưu (giữ câu hỏi đầu).
+  if (opts.contentVideo && !sbMode && vertical.length) {
+    const last = vertical[vertical.length - 1];
+    const one = keepOneQuestion(last.narration);
+    if (one && one !== last.narration) {
+      console.warn(`[script] canh ket co nhieu hon 1 cau hoi — chi giu cau hoi dau: "${one.slice(0, 90)}"`);
+      last.narration = one;
+    }
   }
   // 17/9 vòng 9 (ChatGPT: "nút thắt là đồng bộ lời với đúng cảnh" — "mâm cơm trên boong" đọc trên clip
   // văn phòng, "thùng inox trên boong" trên ảnh hội thảo): sau khi biết cảnh nào mang tư liệu nào, cắt

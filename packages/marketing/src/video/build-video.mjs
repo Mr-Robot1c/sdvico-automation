@@ -28,7 +28,8 @@ let _tokenLogClient = null;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // So lien he doi 21/8 theo sep: 0939 243 222 (du phong 0974 669 649 — doi tay o day + bumpers.mjs).
-const BRAND_LINE = 'SDVICO • Hotline 0939 243 222';
+// 3/10 vòng 2: bỏ dấu chấm tròn giữa câu (CLAUDE.md mục 4), dùng gạch ngang ngắn.
+const BRAND_LINE = 'SDVICO - Hotline 0939 243 222';
 
 function arg(name, def) {
   const i = process.argv.indexOf(`--${name}`);

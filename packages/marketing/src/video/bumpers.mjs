@@ -210,7 +210,7 @@ async function drawIntroFrame(W, H, t, dur) {
 // Vẽ 1 frame OUTRO tại t. Timeline: 0-0.7s logo pop + fade; 0.6-1.4s "Bình luận ngay" slide;
 // 1.3-2.0s TỪ KHÓA scale-in + PULSE nhẹ liên tục; 1.8-2.5s slogan fade.
 // 17/9 (user theo ChatGPT: outro 1 hành động): màn hình outro hiện TỪ KHÓA BÌNH LUẬN (LỌC DẦU / LỌC
-// NƯỚC) thay cho số điện thoại; số vẫn ở dải "SDVICO • Hotline" trên các cảnh nội dung.
+// NƯỚC) thay cho số điện thoại; số vẫn ở dải "SDVICO - Hotline" trên các cảnh nội dung.
 // 18/9 (user coi bản vòng 10: "outro bị thiếu sdt để người khác thấy rồi kìa"): dải hotline trên đầu
 // KHÔNG hiện trong outro nên khúc cuối không còn số nào — thêm lại dòng "Hotline 0939 243 222" nhỏ
 // dưới từ khóa; hành động chính vẫn là MỘT lệnh bình luận (giữ luật 17/9).
