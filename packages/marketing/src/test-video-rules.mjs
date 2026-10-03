@@ -5,7 +5,9 @@ import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
   stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
   breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences,
+  absoluteClaims,
 } from './video/rules.mjs';
+import { FORMATS, LOUDNORM_FILTER, parseLoudnormStats, loudnormFilterFor, badgeFontSize } from './video/assemble.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
 import { PRICE_TEASER, outroKeyword, CONTENT_GROUP } from './products.mjs';
 import { scanStyle } from './brand-voice-check.mjs';
@@ -393,6 +395,58 @@ ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXG
   eq('sbDesc: không bắt câu không có "đang" (chấp nhận lọt)', sbDescriptiveSentences('Sửa chữa ngay trong khoang tàu cá.'), []);
   eq('sbDesc: ngôi kể "bà con" cũng loại trừ', sbDescriptiveSentences('Bà con đang chờ tàu cập bến.'), []);
   eq('sbDesc: chuỗi rỗng và null không lỗi', [sbDescriptiveSentences(''), sbDescriptiveSentences(null)], [[], []]);
+}
+
+// 3/10 (V3): lời đọc không tuyệt đối hóa hiệu quả — absoluteClaims bắt "hoàn toàn / nhỏ nhất / 100%" khi dính
+// hiệu quả kỹ thuật, tha "hoàn toàn yên tâm" và câu 100% có điều kiện.
+{
+  ok('EXTRA_WORN có "triệt để"', EXTRA_WORN.includes('triệt để'));
+  ok('EXTRA_WORN giữ "tuyệt đối" và "sạch bong"', EXTRA_WORN.includes('tuyệt đối') && EXTRA_WORN.includes('sạch bong'));
+  eq('abs: bắt "tách nước hoàn toàn" (câu reviewer)', absoluteClaims('Máy tách nước hoàn toàn khỏi dầu trước khi vào máy.'), ['tách nước hoàn toàn']);
+  eq('abs: bắt "loại bỏ cặn hoàn toàn"', absoluteClaims('Loại bỏ cặn hoàn toàn.'), ['loại bỏ cặn hoàn toàn']);
+  eq('abs: bắt "sạch hoàn toàn"', absoluteClaims('Dầu sạch hoàn toàn rồi mới vào máy.'), ['sạch hoàn toàn']);
+  eq('abs: bắt "hoàn toàn tách" (đứng trước động từ)', absoluteClaims('Hoàn toàn tách được nước ra khỏi dầu.'), ['hoàn toàn tách']);
+  eq('abs: bắt "hoàn toàn không còn cặn"', absoluteClaims('Dầu hoàn toàn không còn cặn.'), ['hoàn toàn không còn cặn']);
+  eq('abs: bắt "lọc sạch cặn bẩn nhỏ nhất" (câu reviewer)', absoluteClaims('Máy lọc sạch cặn bẩn nhỏ nhất.'), ['lọc sạch cặn bẩn nhỏ nhất']);
+  eq('abs: bắt "100%" không điều kiện, trả cả câu', absoluteClaims('Tách nước 100%.'), ['tách nước 100%.']);
+  eq('abs: bắt "100 phần trăm" không điều kiện', absoluteClaims('Cặn được giữ lại 100 phần trăm!'), ['cặn được giữ lại 100 phần trăm!']);
+  eq('abs: THA "Anh em hoàn toàn yên tâm" (cảm xúc, ngoài phạm vi)', absoluteClaims('Anh em hoàn toàn yên tâm.'), []);
+  eq('abs: THA "lọc dầu hoàn toàn mới"', absoluteClaims('Bộ lọc dầu hoàn toàn mới.'), []);
+  eq('abs: THA 100% có điều kiện "có thể ... tùy"', absoluteClaims('Có thể tách nước tới mức cao tùy tình trạng dầu, theo tài liệu là 100%.'), []);
+  eq('abs: THA "cỡ nhỏ nhất trong dòng" (không dính hiệu quả)', absoluteClaims('Đây là cỡ nhỏ nhất trong dòng máy.'), []);
+  eq('abs: THA số 1100% không phải 100%', absoluteClaims('Giá trị 1100% là nhầm.'), []);
+  eq('abs: THA tiết kiệm có điều kiện "có thể giảm tới 10% tùy tình trạng"', absoluteClaims('Có thể giảm tới 10% nhiên liệu tùy tình trạng máy và dầu trên từng tàu.'), []);
+  eq('abs: rỗng và null không lỗi', [absoluteClaims(''), absoluteClaims(null)], [[], []]);
+  eq('abs: nối stripSentencesWith chỉ cắt đúng câu vi phạm', stripSentencesWith('Dầu về sạch hơn. Máy tách nước hoàn toàn khỏi dầu. Lắp xong anh em yên tâm.', absoluteClaims('Dầu về sạch hơn. Máy tách nước hoàn toàn khỏi dầu. Lắp xong anh em yên tâm.')), 'Dầu về sạch hơn. Lắp xong anh em yên tâm.');
+  eq('abs: câu 100% có điều kiện sống sót khi cắt câu 100% khác', stripSentencesWith('Tách nước 100%. Có thể tới 100% tùy dầu.', absoluteClaims('Tách nước 100%. Có thể tới 100% tùy dầu.')), 'Có thể tới 100% tùy dầu.');
+  ok('abs: văn cố định (outro) không dính bộ quét', absoluteClaims(outroText('lọc dầu')).length === 0 && absoluteClaims(outroText('SDVICO')).length === 0);
+}
+
+// 3/10 (V1): âm lượng master -15 LUFS, 2-pass loudnorm.
+{
+  eq('loudnorm đích -15 LUFS / TP -1.5 / LRA 11', LOUDNORM_FILTER, 'loudnorm=I=-15:TP=-1.5:LRA=11');
+  const stderr = 'xx\n{\n\t"input_i" : "-27.65",\n\t"input_tp" : "-15.67",\n\t"input_lra" : "18.70",\n\t"input_thresh" : "-43.61",\n\t"output_i" : "-17.84",\n\t"output_tp" : "-1.50",\n\t"output_lra" : "15.60",\n\t"output_thresh" : "-29.01",\n\t"normalization_type" : "dynamic",\n\t"target_offset" : "2.84"\n}\n';
+  eq('parseLoudnormStats đọc khối JSON stderr', parseLoudnormStats(stderr), { i: -27.65, tp: -15.67, lra: 18.7, thresh: -43.61, offset: 2.84 });
+  eq('parseLoudnormStats: không có JSON -> null', parseLoudnormStats('ffmpeg lỗi'), null);
+  eq('parseLoudnormStats: video không tiếng "-inf" -> null', parseLoudnormStats('{"input_i":"-inf","input_tp":"-inf","input_lra":"0.00","input_thresh":"-70.00","target_offset":"inf"}'), null);
+  eq('loudnormFilterFor: không số đo -> 1-pass', loudnormFilterFor(null), LOUDNORM_FILTER);
+  const f2 = loudnormFilterFor({ i: -27.65, tp: -15.67, lra: 18.7, thresh: -43.61, offset: 2.84 });
+  ok('loudnormFilterFor: pass 2 linear, đích I=-15 TP=-1.5, LRA nâng theo LRA đo (19)', f2.startsWith('loudnorm=I=-15:TP=-1.5:LRA=19:measured_I=-27.65:') && f2.endsWith(':linear=true'), f2);
+  ok('loudnormFilterFor: LRA đo thấp thì giữ LRA=11', loudnormFilterFor({ i: -20, tp: -3, lra: 6, thresh: -30, offset: 0.5 }).includes(':LRA=11:'));
+}
+
+// 3/10 (V2): vùng an toàn chữ khung 1080x1920 cho TikTok/Reels.
+{
+  const v = FORMATS.vertical;
+  // libass nội suy SRT ở PlayRes 288 dọc: 1 đơn vị MarginV = 1920/288 px.
+  const subBottomClearance = v.subMargin * (1920 / 288);
+  ok('phụ đề: đáy cách mép dưới >= 280px', subBottomClearance >= 280, subBottomClearance);
+  ok('phụ đề: không đẩy quá cao (<= 460px) để khỏi chạm thẻ giá', subBottomClearance <= 460, subBottomClearance);
+  ok('watermark: hộp nền cách mép trên >= 100px (brandY - boxborderw 16)', v.brandY - 16 >= 100, v.brandY);
+  ok('khung ngang không bị đụng (brandY 40)', FORMATS.horizontal.brandY === 40 && FORMATS.horizontal.subMargin === 55);
+  eq('thẻ giá dọc to hơn một nấc (36 -> 42)', badgeFontSize('Máy cơ 45 triệu còn 3X triệu\nMáy điện 56 triệu còn 4X triệu', 1080), 42);
+  eq('thẻ giá dọc dòng quá dài lùi về 38', badgeFontSize('Máy lọc dầu giảm sâu đặc biệt còn 9,X triệu thôi\nB', 1080), 38);
+  eq('thẻ giá ngang giữ 30', badgeFontSize('A\nB', 1920), 30);
 }
 
 const failed = cases.filter((c) => !c.ok);

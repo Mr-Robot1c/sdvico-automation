@@ -112,7 +112,37 @@ export const EXTRA_WORN = [
   // "tinh mơ" là mốc thời gian hình không xác nhận được; "hoàn thiện từng con máy" gợi SDVICO
   // là bên CHẾ TẠO máy (sai vai nhà phân phối, Điều cấm 4).
   'ruột gan', 'gan ruột', 'cười trừ', 'tinh mơ', 'hoàn thiện từng con máy',
+  // 3/10 (ChatGPT chấm 3 video mẫu, bắt "tách nước hoàn toàn", "lọc sạch cặn bẩn nhỏ nhất", "tiết kiệm tới
+  // 10% nhiên liệu mỗi chuyến"): thông số 100% / 5 tới 10% có trong tài liệu công ty nhưng lời đọc quảng
+  // cáo tuyệt đối hóa thì kém đáng tin. "triệt để" là từ trơn nên vào danh sách này; "hoàn toàn",
+  // "nhỏ nhất", "100%" chỉ bắt khi dính hiệu quả kỹ thuật, xem absoluteClaims bên dưới.
+  'triệt để',
 ];
+
+// 3/10: LỜI ĐỌC KHÔNG TUYỆT ĐỐI HÓA hiệu quả. "hoàn toàn" / "nhỏ nhất" / "100%" có nhiều nghĩa khác (anh em
+// hoàn toàn yên tâm, cỡ nhỏ nhất) nên không đưa vào EXTRA_WORN (khớp chuỗi trơn) mà bắt bằng regex hẹp:
+//  - "hoàn toàn" đứng cạnh động từ hiệu quả: tách/lọc/khử/loại bỏ/xử lý/sạch, vế trước cách tối đa 2 chữ
+//    ("tách nước hoàn toàn", "loại bỏ cặn hoàn toàn"), hoặc vế sau ("hoàn toàn không còn cặn");
+//    "hoàn toàn yên tâm / an tâm" là cảm xúc, cho qua.
+//  - "nhỏ nhất" sau từ cặn/bẩn/hạt/bụi/tạp chất/lọc/tách/giữ lại trong cùng vế ("lọc sạch cặn bẩn nhỏ nhất").
+//  - "100%" / "100 phần trăm": chỉ bắt khi cả câu không có điều kiện "tùy" hoặc "có thể".
+// Trả về mảng chuỗi chữ thường để nối vào danh sách cụm cấm (stripSentencesWith cắt đúng câu chứa chuỗi đó;
+// riêng "100%" trả CẢ CÂU để câu khác có điều kiện không bị cắt oan).
+const ABS_HOAN_TOAN_BEFORE = /(?:tách|lọc|khử|loại bỏ|xử lý|sạch)(?:\s+[\p{L}]+){0,2}\s+hoàn toàn(?!\s+(?:yên tâm|an tâm|miễn phí|tự do|mới|khác))/giu;
+const ABS_HOAN_TOAN_AFTER = /hoàn toàn\s+(?:tách|lọc|khử|loại bỏ|sạch|tinh khiết|không còn (?:cặn|nước|bẩn|tạp))/giu;
+const ABS_NHO_NHAT = /(?:cặn|bẩn|hạt|bụi|tạp chất|lọc|tách|giữ lại)[^.!?…\n;,]{0,30}nhỏ nhất/giu;
+const ABS_100 = /\b100\s*(?:%|phần trăm)/iu;
+export function absoluteClaims(text) {
+  const out = [];
+  const s = String(text || '');
+  for (const re of [ABS_HOAN_TOAN_BEFORE, ABS_HOAN_TOAN_AFTER, ABS_NHO_NHAT]) {
+    for (const m of s.matchAll(re)) out.push(m[0].toLowerCase());
+  }
+  for (const sent of s.split(SENT_SPLIT_NL)) {
+    if (ABS_100.test(sent) && !/(?<!\p{L})(?:tùy|có thể)(?!\p{L})/iu.test(sent)) out.push(sent.trim().toLowerCase());
+  }
+  return [...new Set(out)];
+}
 
 // Outro = MỘT câu, MỘT hành động (user 17/9 theo ChatGPT: "không nên vừa bảo gọi, vừa bảo comment,
 // vừa bảo nhắn Page trong một đoạn cuối ngắn"). Một "nha" ở cuối, một lần gọi VieNeu (luật 11/9).

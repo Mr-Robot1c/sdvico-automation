@@ -130,7 +130,21 @@ const WORKER_WORDS = ['thợ', 'kỹ thuật', 'kĩ thuật', 'lắp', 'sửa', 
 function needsWorker(visual, narration = '') { return count(`${String(visual || '')} ${String(narration || '')}`.toLowerCase(), WORKER_WORDS) > 0; }
 function hasWorker(assetText) { return count(assetText, [...WORKER_WORDS, 'người đàn ông', 'ngư dân đang', 'đang làm']) > 0; }
 
+// 3/10 (ChatGPT chấm video lọc nước 7,3/10: "thiếu cảnh chứng minh nước ngọt chảy ra"): video máy lọc nước
+// (SEA-40), cảnh giải pháp / phần thưởng cộng +6 cho tư liệu mô tả cảnh nước chảy ra, ly nước, thử nước.
+// So nguyên từ trên chữ không dấu: "uống" => "uong" nếu so chuỗi con sẽ dính tường, xương, đường, kiên cường...
+const WATER_FLOW_WORDS = ['nước chảy', 'vòi', 'ly nước', 'uống', 'thử nước', 'nước ngọt chảy', 'đầu ra'];
+const WATER_FLOW_BONUS = 6;
+export function isWaterGroup(group) {
+  return /loc nuoc|(^|[^a-z])sea-?\d/.test(fold(group));
+}
+export function showsWaterFlow(asset) {
+  const t = fold(textOf(asset || {}));
+  return WATER_FLOW_WORDS.some((w) => new RegExp(`(^|[^a-z0-9])${fold(w)}($|[^a-z0-9])`).test(t));
+}
+
 // Điểm luật cho 1 tư liệu với 1 vai cảnh (càng cao càng hợp). Dùng cho fallback và để kiểm model.
+// opts.productGroup (3/10): nhóm sản phẩm video bán hàng, để cộng điểm cảnh nước chảy cho video lọc nước.
 export function ruleScore(asset, role, opts = {}) {
   const t = textOf(asset);
   const overlap = opts.visual ? visualOverlap(opts.visual, asset) : 0;
@@ -154,6 +168,8 @@ export function ruleScore(asset, role, opts = {}) {
     if (!isContentFolder) s += 3;           // đúng folder sản phẩm
     if (isVideoAsset(asset)) s += 1;
     s -= count(t, ['hư', 'hỏng', 'cặn', 'đục', 'khói']) * 1; // giải pháp không nên khoe máy hỏng
+    // 3/10: video lọc nước, cảnh giải pháp / phần thưởng ưu tiên clip nước ngọt chảy ra (kho chưa có thì không đổi gì).
+    if ((role === 'solution' || role === 'reward') && isWaterGroup(opts.productGroup) && showsWaterFlow(asset)) s += WATER_FLOW_BONUS;
   }
   if (!asset.description) s -= 1;          // chưa có mô tả: kém tin cậy hơn
   s += Math.min(overlap, 4) * 2;           // 15/9: hình cần của cảnh trùng từ với tư liệu -> ưu tiên rõ
@@ -165,11 +181,11 @@ export function ruleScore(asset, role, opts = {}) {
 // video 14 ngày gần nhất đã dùng tư liệu đó). Từ khi trọng tâm dồn về một sản phẩm, mọi video cùng
 // nhóm nên bộ "điểm cao nhất" thắng y hệt mỗi ngày (5 video 23-29/9 chung đúng 4 clip) — phạt điểm
 // theo số lần vừa lên video để kho được xoay đều; kho ít tư liệu thì phạt chỉ đổi thứ tự, không làm rỗng.
-export function pickByRole(assets, role, { prevId = null, usedCount = new Map(), visual = '', speech = '', recentUse = new Map() } = {}) {
+export function pickByRole(assets, role, { prevId = null, usedCount = new Map(), visual = '', speech = '', recentUse = new Map(), productGroup = null } = {}) {
   let best = null;
   let bestScore = -Infinity;
   for (const a of assets) {
-    let s = ruleScore(a, role, { visual, speech });
+    let s = ruleScore(a, role, { visual, speech, productGroup });
     if (a.id === prevId) s -= 6;
     s -= (usedCount.get(a.id) || 0) * 2;
     s -= Math.min(recentUse.get(a.id) || 0, 3) * 2;
@@ -357,6 +373,9 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
         } else if (PROBLEM_ROLES.has(role) && needsWorker(scenes[i].visual, scenes[i].narration) && !hasWorker(textOf(byId.get(mid))) && pool.some((a) => hasWorker(textOf(a)))) {
           // 1/10: cảnh cần người thợ mà model chọn hình không có ai làm việc, kho còn hình có người -> chọn lại.
           log.warn(`[scene-match] cảnh ${i + 1} (${role}): lời cần NGƯỜI THỢ nhưng "${byId.get(mid).title}" không có ai làm việc -> chọn lại theo luật`);
+        } else if ((role === 'solution' || role === 'reward') && isWaterGroup(productGroup) && !showsWaterFlow(byId.get(mid)) && pool.some((a) => a.id !== prevId && (usedCount.get(a.id) || 0) === 0 && showsWaterFlow(a))) {
+          // 3/10: video lọc nước, kho còn clip nước ngọt chảy ra chưa dùng mà model chọn hình khác -> để luật (+6 điểm) chọn.
+          log.warn(`[scene-match] cảnh ${i + 1} (${role}): video lọc nước, kho có clip nước chảy ra chưa dùng, "${byId.get(mid).title}" không có -> chọn lại theo luật`);
         } else if ((recentUse.get(mid) || 0) >= 2 && pool.some((a) => a.id !== mid && (recentUse.get(a.id) || 0) < 2)) {
           // 29/9: model chọn tư liệu đã lên >= 2 video gần đây trong khi kho còn cái ít dùng — ép xoay
           // bằng máy (pickByRole phạt recentUse), người xem hết cảnh "video nào cũng đúng bộ clip đó".
@@ -368,8 +387,8 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
         log.warn(`[scene-match] cảnh ${i + 1} (${role}): model chấm fit=${fit} thấp ("${String(mp?.why || '').slice(0, 80)}") -> chọn theo luật vai cảnh`);
       }
       if (!pick) {
-        const a = pickByRole(pool, role, { prevId, usedCount, visual: scenes[i].visual, speech: scenes[i].narration, recentUse });
-        if (a) pick = { assetId: a.id, fit: Math.max(0, Math.min(10, 4 + ruleScore(a, role, { visual: scenes[i].visual }) / 2)), why: 'chọn theo luật vai cảnh (mô tả tư liệu + hình cần)', by: 'rule' };
+        const a = pickByRole(pool, role, { prevId, usedCount, visual: scenes[i].visual, speech: scenes[i].narration, recentUse, productGroup });
+        if (a) pick = { assetId: a.id, fit: Math.max(0, Math.min(10, 4 + ruleScore(a, role, { visual: scenes[i].visual, productGroup }) / 2)), why: 'chọn theo luật vai cảnh (mô tả tư liệu + hình cần)', by: 'rule' };
       }
     }
     if (pick) usedCount.set(pick.assetId, (usedCount.get(pick.assetId) || 0) + 1);
@@ -408,10 +427,10 @@ export function refinePicksByImagery({ scenes, picks, assets, mustIdx = 0, skip 
       && !imageryDriftSentences(narrations[i] || '', textOf(a)).length);
     if (fit.length) {
       usedCount.set(pick.assetId, Math.max(0, (usedCount.get(pick.assetId) || 0) - 1));
-      const a = pickByRole(fit, role, { prevId, usedCount, visual: scenes[i].visual, speech: narrations[i], recentUse });
+      const a = pickByRole(fit, role, { prevId, usedCount, visual: scenes[i].visual, speech: narrations[i], recentUse, productGroup });
       usedCount.set(a.id, (usedCount.get(a.id) || 0) + 1);
       log.warn(`[scene-match] cảnh ${i + 1} (${role}): lời lệch hình "${String(cur?.title || '').slice(0, 40)}" ("${drift[0].slice(0, 50)}") -> đổi sang "${String(a.title || '').slice(0, 40)}"`);
-      picks[i] = { assetId: a.id, fit: Math.max(0, Math.min(10, 4 + ruleScore(a, role, { visual: scenes[i].visual }) / 2)), why: 'đổi hình cho khớp lời (soát sau ghép 1/10)', by: 'imagery' };
+      picks[i] = { assetId: a.id, fit: Math.max(0, Math.min(10, 4 + ruleScore(a, role, { visual: scenes[i].visual, productGroup }) / 2)), why: 'đổi hình cho khớp lời (soát sau ghép 1/10)', by: 'imagery' };
       continue;
     }
     const cut = cutImageryDrift(narrations[i] || '', textOf(cur || {}));

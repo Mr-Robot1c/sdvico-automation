@@ -6,7 +6,7 @@ import { guardLines, guardViolations, stripViolatingSentences } from '../product
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
 import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen } from './scene-match.mjs';
-import { EXTRA_WORN, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences } from './rules.mjs';
+import { EXTRA_WORN, absoluteClaims, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -349,6 +349,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     hookTerm ? `CẢNH 1 PHẢI LỘ SẢN PHẨM SỚM (17/9 vòng 2): trong 2 câu đầu tiên phải có chữ "${hookTerm}" để người xem biết ngay video nói về chuyện ${hookTerm} trên tàu, không mở màn mơ hồ.` : '',
     !opts.contentVideo ? 'HÌNH SẢN PHẨM PHẢI RA TRƯỚC GIÂY 15 (17/9 vòng 6, luật cứng): tổng lời cảnh hook + empathy TỐI ĐA 55 từ (~15 giây đọc) để cảnh giải pháp chiếu máy thật vào sớm. Gọi tên máy trong phụ đề KHÔNG thay được hình máy.' : '',
     'CÂU KẾT QUẢ PHẢI CÓ HÌNH CHỨNG MINH (17/9 vòng 6): không nói "tuyệt đối", "đảm bảo 100%", "sạch bong" hay kết quả vận hành (máy nổ êm, dầu sạch) nếu tư liệu không quay được điều đó; thay bằng lợi ích MÔ TẢ ("nước sau lọc dùng cho sinh hoạt", "giữ dầu sạch hơn trước khi vào máy").',
+    'LỜI ĐỌC KHÔNG TUYỆT ĐỐI HÓA (3/10, ChatGPT chấm: "tách nước hoàn toàn", "lọc sạch cặn bẩn nhỏ nhất", "tiết kiệm tới 10% nhiên liệu mỗi chuyến" nghe như quảng cáo quá tay): CẤM "hoàn toàn", "100%", "sạch bong", "nhỏ nhất", "tuyệt đối", "triệt để" khi nói về hiệu quả của máy. Diễn đạt mềm: "giúp tách nước và cặn bẩn trước khi nhiên liệu vào động cơ", "hạn chế hao phí". Số phần trăm lấy từ THÔNG SỐ ĐƯỢC PHÉP vẫn dùng được nhưng PHẢI kèm điều kiện: "có thể giảm tới X% tùy tình trạng máy và dầu trên từng tàu".',
     'TỶ LỆ PHẦN TRĂM (17/9, Điều cấm 5): CẤM mọi con số phần trăm ("40%", "gần 40 phần trăm chi phí") không có nguyên văn trong BÀI NGUỒN hoặc THÔNG SỐ ĐƯỢC PHÉP bên dưới. Không có thì nói "một phần lớn", "cả đống tiền".',
     'NỖI ĐAU LÀ CỦA TÀU CHƯA LẮP MÁY SDVICO (17/9 chiều): máy hỏng, sửa hoài, cặn, nước đục, cạn nước trong cảnh đầu và cảnh đồng cảm là chuyện của tàu CHƯA có thiết bị SDVICO. TUYỆT ĐỐI KHÔNG viết như thể máy SDVICO hỏng hay phải sửa; không đặt tên máy SDVICO vào câu tả sự cố. Cũng KHÔNG viết "máy lọc nước này", "máy lọc dầu này", "máy này sửa/hỏng" trong cảnh nỗi đau (18/9 vòng 10: người xem tưởng chiếc máy đang bán chính là chiếc vừa bị chê hỏng) — gọi là "máy lọc cũ", "bộ lọc cũ trên tàu".',
     'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển bị bỏ dở, tàu nằm bờ). Không lan man.',
@@ -548,7 +549,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       // Quét tất định trên story (không gọi lại model): sai nghề / cụm mòn thì cắt câu, đoạn rỗng thì bỏ.
       const storyAll = paras.join('\n');
       const aViol = guardViolations(storyAll, topic);
-      const aWorn = WORN_PHRASES.filter((p) => storyAll.toLowerCase().includes(p));
+      const aWorn = [...WORN_PHRASES.filter((p) => storyAll.toLowerCase().includes(p)), ...absoluteClaims(storyAll)];
       if (aViol.length || aWorn.length) {
         console.warn(`[script] story (luot A) dinh ${aViol.length ? 'sai nghe: ' + aViol.map((v) => v.phrase).join(', ') : ''}${aWorn.length ? ' cum mon: ' + aWorn.join(', ') : ''} — cat cau (khong goi lai).`);
         paras = paras.map((p) => stripSentencesWith(stripViolatingSentences(p, topic), aWorn)).filter(Boolean);
@@ -653,7 +654,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     }
     const all = [...(parsed.vertical?.scenes || []), ...(parsed.horizontal?.scenes || [])].map((x) => x?.narration || '').join('\n');
     viol = guardViolations(all, topic);
-    worn = (opts.contentVideo ? WORN_PHRASES : SALES_WORN).filter((p) => all.toLowerCase().includes(p));
+    // 3/10: nối thêm bộ quét tuyệt đối hóa hiệu quả (absoluteClaims) cùng khuôn với cụm đã mòn: dính thì sinh
+    // lại, sinh lại vẫn dính thì cắt câu (khối "cắt câu" bên dưới dùng chung mảng worn).
+    worn = [...(opts.contentVideo ? WORN_PHRASES : SALES_WORN).filter((p) => all.toLowerCase().includes(p)), ...absoluteClaims(all)];
     if (worn.length) console.warn(`[script] loi thoai dung cum da mon (lan ${attempt + 1}): ${worn.join(' | ')}`);
     cross = crossTerms.length ? crossProductViolations(all, opts.productGroup) : [];
     if (cross.length) console.warn(`[script] loi thoai nhac san pham KHAC (lan ${attempt + 1}): ${cross.join(' | ')}`);
@@ -915,6 +918,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       extraBad: (text, scene, si) => [
         ...(crossTerms.length ? crossProductViolations(text, opts.productGroup) : []),
         ...unsourcedPercents(text, percentSources),
+        ...absoluteClaims(text),
         ...(!opts.contentVideo && (si === 0 || ['hook', 'empathy', 'story'].includes(scene?.role)) ? selfProductFaultPhrases(text) : []),
       ],
     });

@@ -10,9 +10,51 @@ import { buildBumpers } from './bumpers.mjs';
 export const FORMATS = {
   // 5/9 (sếp): phụ đề nhỏ đi 10% (15 -> 13.5) và hạ thấp hơn một chút (MarginV 90 -> 70).
   // 8/9 tối (Thanh xem video thử): phụ đề hạ thấp thêm chút nữa (MarginV 70 -> 48).
-  vertical: { w: 1080, h: 1920, subFont: 13.5, subMargin: 48 },
-  horizontal: { w: 1920, h: 1080, subFont: 13, subMargin: 55 },
+  // 3/10 (vòng chấm ChatGPT: phụ đề thấp dễ bị caption/nút tương tác của TikTok và Reels che): đo bằng
+  // libass thật, MarginV là đơn vị PlayRes 288 (tỉ lệ 1920/288 = 6,67 px mỗi đơn vị), nên 48 = đáy chữ
+  // cách mép dưới ~330px, 56 = ~385px (vùng an toàn tối thiểu 280px, nới thêm cho Reels/Shorts).
+  // brandY: lề trên của dải "SDVICO • Hotline": 30 -> 116 (mép trên của hộp nền ~100px, tránh thanh trạng thái).
+  vertical: { w: 1080, h: 1920, subFont: 13.5, subMargin: 56, brandY: 116 },
+  horizontal: { w: 1920, h: 1080, subFont: 13, subMargin: 55, brandY: 40 },
 };
+
+// 3/10: loudnorm 1-pass trên master cuối. Đo 3 video mẫu ra ~-19,5 LUFS, chuẩn mạng xã hội -16 tới -14.
+// Trước đó bước cuối chép nguyên tiếng (-c:a copy), tiếng từng cảnh chỉ qua apad, KHÔNG có loudnorm.
+// Đo thật (video thử 11s): 1-pass loudnorm chỉ lên -18,1 LUFS vì khúc khởi động của bộ lọc (khối 3 giây
+// đầu) kéo tụt, nên làm 2-pass: pass 1 đo, pass 2 áp tham số đo với linear=true (đạt sát -15). Hỏng bước đo
+// thì lùi về 1-pass.
+export const LOUDNORM_FILTER = 'loudnorm=I=-15:TP=-1.5:LRA=11';
+
+// Lấy khối JSON loudnorm in cuối stderr của pass 1. Trả null nếu thiếu/đọc không được.
+export function parseLoudnormStats(stderr) {
+  const m = String(stderr || '').match(/\{[^{}]*"input_i"[^{}]*\}/);
+  if (!m) return null;
+  try {
+    const j = JSON.parse(m[0]);
+    const f = (k) => Number(j[k]);
+    const s = { i: f('input_i'), tp: f('input_tp'), lra: f('input_lra'), thresh: f('input_thresh'), offset: f('target_offset') };
+    // Âm lượng "-inf" (video không có tiếng) hoặc thiếu số => không dùng được.
+    return Object.values(s).every(Number.isFinite) ? s : null;
+  } catch { return null; }
+}
+
+// Filter loudnorm cho pass 2 (dùng số đo) hoặc 1-pass khi không có số đo.
+// linear=true chỉ chạy khi LRA đo được <= LRA đích; video có đoạn lặng/nhạc intro hay vượt 11 (đo thử
+// 18,7 => bộ lọc rơi về dynamic, ra -16,1 thay vì -15). Nên pass 2 nâng LRA đích lên bằng LRA đo (làm tròn
+// lên), khi đó chỉ tăng/giảm gain thuần, không nén dải động, I=-15 và TP=-1.5 giữ nguyên.
+export function loudnormFilterFor(stats) {
+  if (!stats) return LOUDNORM_FILTER;
+  const lraTarget = Math.max(11, Math.ceil(stats.lra));
+  return `loudnorm=I=-15:TP=-1.5:LRA=${lraTarget}:measured_I=${stats.i}:measured_TP=${stats.tp}:measured_LRA=${stats.lra}:measured_thresh=${stats.thresh}:offset=${stats.offset}:linear=true`;
+}
+
+// 3/10: cỡ chữ thẻ giá 36 -> 42 (một nấc), thẻ tối đa 2 dòng. Dòng nào quá dài (>32 ký tự) thì lùi về 38
+// để thẻ không loang sang vùng nút tương tác bên phải (đo: 42 => rộng ~700px, canh giữa 190..890).
+export function badgeFontSize(priceBadge, fmtW) {
+  if (fmtW >= 1920) return 30;
+  const longest = String(priceBadge || '').split('\n').reduce((m, l) => Math.max(m, l.length), 0);
+  return longest > 32 ? 38 : 42;
+}
 
 // 17/9 vòng 3 (ChatGPT chấm lại: "nền blur hai đầu làm hình chính nhỏ lại, B2B cần nhìn máy và thao
 // tác; không cần nền blur, crop mạnh hơn sẽ tốt hơn"): mặc định CROP LẤP KHUNG (cover). Ảnh tĩnh
@@ -122,7 +164,7 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
   // Phủ nhận diện: dải chữ trên đầu (dùng textfile để né escape).
   await writeFile(join(workDir, 'brand.txt'), brandLine || 'SDVICO', 'utf8');
   const brandFont = fmt.w >= 1920 ? 26 : 30;
-  const pad = fmt.w >= 1920 ? 40 : 30;
+  const pad = fmt.brandY;
   // enable=between(t, introDur, total-outroDur): banner chỉ ở phần nội dung chính.
   let totalDur = 0;
   try { totalDur = await probeDuration(join(workDir, baseName)); } catch { totalDur = 0; }
@@ -145,7 +187,9 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
     start += Math.max(0, Number(badgeOffsetSec) || 0);
     const end = totalDur > 0 ? totalDur - outroDur : 0;
     // 17/9 vòng 4 (ChatGPT: box giá phủ lên cảnh lắp đặt khá nặng): 46 -> 36, vẫn đọc được trên điện thoại.
-    const badgeFont = fmt.w >= 1920 ? 30 : 36;
+    // 3/10 (ChatGPT: thẻ giá nhỏ khó đọc trên điện thoại): 36 -> 42, vị trí y giữ nguyên h*0.57 (đáy thẻ
+    // ~ y 1216, cách đầu phụ đề ~180px, nằm trong vùng an toàn). Chỉ đổi cỡ, KHÔNG đổi nội dung chữ giá.
+    const badgeFont = badgeFontSize(priceBadge, fmt.w);
     const en = end > start ? `:enable='between(t,${start.toFixed(2)},${end.toFixed(2)})'` : '';
     badgeFilter =
       `,drawtext=fontfile=BeVietnamPro-Black.ttf:textfile=badge.txt:` +
@@ -156,11 +200,22 @@ export async function assembleVideo({ scenes, format, workDir, brandLine, outPat
     // nền xanh dương logo 0x113B64 chữ trắng thay cho vàng.
   }
 
+  // 3/10: pass 1 đo âm lượng master (chỉ tiếng, nhanh), lỗi thì 1-pass.
+  let loudStats = null;
+  try {
+    const r = await ffmpeg(['-y', '-i', baseName, '-vn', '-af', `${LOUDNORM_FILTER}:print_format=json`, '-f', 'null', '-'], { cwd: workDir });
+    loudStats = parseLoudnormStats(r.stderr);
+  } catch (e) {
+    console.warn('Đo loudnorm lỗi, dùng 1-pass:', String(e?.message || e).slice(0, 80));
+  }
+
   await ffmpeg([
     '-y', '-i', baseName,
     '-vf', drawtext + badgeFilter,
     '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
-    '-c:a', 'copy', '-movflags', '+faststart',
+    // 3/10: chuẩn hóa âm lượng master cuối về -15 LUFS (xem LOUDNORM_FILTER); trước đây '-c:a copy'.
+    '-af', loudnormFilterFor(loudStats),
+    '-c:a', 'aac', '-b:a', '160k', '-ar', '44100', '-ac', '2', '-movflags', '+faststart',
     outPath,
   ], { cwd: workDir });
 

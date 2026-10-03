@@ -275,5 +275,40 @@ console.log('16. pickStoryboard: chọn trọn bộ hình trước khi viết l�
   check(storyboardDriftKeChuyen([], sbSet).length === 0 && storyboardDriftKeChuyen(null, null).length === 0, 'bản bọc: đầu vào rỗng không lỗi');
 }
 
+// 3/10 (ChatGPT chấm video lọc nước: thiếu cảnh nước ngọt chảy ra): cảnh solution/reward của video lọc nước
+// cộng +6 cho tư liệu mô tả nước chảy / vòi / ly nước / thử nước / đầu ra. Kho không có clip như vậy thì không đổi.
+{
+  console.log('Video lọc nước: ưu tiên clip nước chảy ra ở cảnh giải pháp');
+  const G2 = '2. Máy lọc nước biển SEA-40';
+  const silent = { warn() {}, log() {} };
+  const waterFlow = { id: 'w-flow', kind: 'video', title: 'Nước ngọt chảy ra từ vòi', folder: G2, description: 'Cận cảnh nước chảy ra từ vòi máy lọc nước SEA-40, ly nước trong' };
+  const installOnly = { id: 'w-inst', kind: 'video', title: 'Lắp máy lọc nước SEA-40', folder: G2, description: 'Kỹ thuật SDVICO đang lắp đặt máy lọc nước trên tàu, máy chạy ổn định' };
+  const tuong = { id: 'w-tuong', kind: 'video', title: 'Cường độ làm việc', folder: G2, description: 'Kiên cường làm việc, đường dài, xương cá' };
+  check(ruleScore(waterFlow, 'solution', { productGroup: G2 }) === ruleScore(waterFlow, 'solution', {}) + 6, 'solution + lọc nước: clip nước chảy cộng đúng +6');
+  check(ruleScore(waterFlow, 'reward', { productGroup: G2 }) === ruleScore(waterFlow, 'reward', {}) + 6, 'reward + lọc nước: clip nước chảy cộng đúng +6');
+  check(ruleScore(installOnly, 'solution', { productGroup: G2 }) === ruleScore(installOnly, 'solution', {}), 'clip lắp đặt không có nước chảy: điểm không đổi');
+  check(ruleScore(waterFlow, 'solution', { productGroup: '9. Máy Lọc Dầu Diesel SD12-300' }) === ruleScore(waterFlow, 'solution', {}), 'video lọc dầu: không cộng điểm nước chảy');
+  check(ruleScore(waterFlow, 'solution', {}) === ruleScore(waterFlow, 'solution', { productGroup: null }), 'không có productGroup: không cộng');
+  check(ruleScore(waterFlow, 'hook', { productGroup: G2 }) === ruleScore(waterFlow, 'hook', {}), 'cảnh hook (vấn đề) không cộng điểm nước chảy');
+  check(ruleScore(tuong, 'solution', { productGroup: G2 }) === ruleScore(tuong, 'solution', {}), '"cường/đường/xương" không bị nhầm thành "uống" (so nguyên từ)');
+  const uongLy = { id: 'w-uong', kind: 'image', title: 'Thử nước', folder: G2, description: 'Ngư dân uống thử ly nước ngọt vừa lọc' };
+  check(ruleScore(uongLy, 'reward', { productGroup: G2 }) === ruleScore(uongLy, 'reward', {}) + 6, '"uống thử ly nước" nhận +6 (một lần, không cộng dồn theo từ)');
+  const pool = [installOnly, waterFlow];
+  check(pickByRole(pool, 'solution', { productGroup: G2 }).id === 'w-flow', 'pickByRole(solution, lọc nước) chọn clip nước chảy');
+  const sceneSol = [{ role: 'solution', narration: 'Máy cho nước ngọt dùng ngay.', visual: 'máy lọc nước đang chạy' }];
+  const failing2 = async () => { throw new Error('429 giả lập'); };
+  const pRule = await matchScenesToAssets({ ai: null, generate: failing2, model: 'x', scenes: sceneSol, assets: pool, productGroup: G2, log: silent });
+  check(pRule[0].assetId === 'w-flow' && pRule[0].by === 'rule', 'matchScenesToAssets (model lỗi): cảnh solution lọc nước lấy clip nước chảy');
+  const modelInst = async () => ({ text: JSON.stringify({ picks: [{ scene: 1, asset_id: 'w-inst', fit: 9, why: 'lắp đặt' }] }) });
+  const pModel = await matchScenesToAssets({ ai: null, generate: modelInst, model: 'x', scenes: sceneSol, assets: pool, productGroup: G2, log: silent });
+  check(pModel[0].assetId === 'w-flow', 'model chọn clip lắp đặt, kho còn clip nước chảy chưa dùng -> luật chọn lại clip nước chảy');
+  const pModelDau = await matchScenesToAssets({ ai: null, generate: modelInst, model: 'x', scenes: sceneSol, assets: pool, productGroup: '9. Máy Lọc Dầu Diesel SD12-300', log: silent });
+  check(pModelDau[0].assetId === 'w-inst' && pModelDau[0].by === 'model', 'video lọc dầu: lựa chọn của model được giữ nguyên');
+  // Kho không có clip nước chảy: hành vi không đổi.
+  const khoThieu = [installOnly, { ...installOnly, id: 'w-inst2', title: 'Máy chạy tại bến' }];
+  const pThieu = await matchScenesToAssets({ ai: null, generate: modelInst, model: 'x', scenes: sceneSol, assets: khoThieu, productGroup: G2, log: silent });
+  check(pThieu[0].assetId === 'w-inst' && pThieu[0].by === 'model', 'kho chưa có clip nước chảy: giữ nguyên lựa chọn của model (hành vi không đổi)');
+}
+
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
 process.exit(fails ? 1 : 0);
