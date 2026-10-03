@@ -36,20 +36,20 @@ export default async function Page() {
     <main>
       <header className="head-row">
         <div>
-          <h1>Xưởng sản xuất — Hôm nay</h1>
+          <h1>Xưởng sản xuất hôm nay</h1>
           <p className="sub">
             Gắn 1 ảnh và 1 video, gõ tiêu đề, bấm Sinh text, sửa lại rồi Xong để đẩy vào hàng đợi duyệt.
-            Máy soạn, người bấm gửi — nội dung ở đây chưa lên trang, phải qua duyệt trước.
+            Máy soạn, người bấm gửi: nội dung ở đây chưa lên trang, phải qua duyệt trước.
           </p>
         </div>
       </header>
 
-      <div className="pipeline">
+      <div className="pipeline sx-pipeline">
         <span className="pipe-step">1. Gắn ảnh và video</span>
         <span className="pipe-step">2. Gõ tiêu đề</span>
         <span className="pipe-step">3. Sinh text bằng AI</span>
         <span className="pipe-step">4. Sửa nội dung</span>
-        <span className="pipe-step">5. Xong — đẩy hàng đợi duyệt</span>
+        <span className="pipe-step">5. Xong, đẩy vào hàng đợi duyệt</span>
         <span className="pipe-step">6. Người bấm Duyệt mới đăng</span>
       </div>
 

@@ -1942,7 +1942,9 @@ button.topbar-back { font: inherit; cursor: pointer; }
 /* Cột kanban hẹp: ghi chú chiếm trọn một hàng, không tràn khỏi thẻ (lỗi cũ: min-width 140px + flex không xuống dòng). */
 .bang-card .decide-wrap > .row { flex-wrap: wrap; }
 .bang-card .decide-wrap .note { flex: 1 1 100%; max-width: 100%; min-width: 0; }
-.bang-card .schedule-lbl { flex-wrap: wrap; max-width: 100%; }
+/* 3/10: dòng "Để trống: đăng ngay" (decide-actions) làm cụm hẹn giờ rộng hơn màn điện thoại ở MỌI nơi dùng
+   (hàng đợi duyệt bị main cắt mép) — cho xuống dòng ở mọi chỗ, không chỉ thẻ Bảng bài viết. */
+.schedule-lbl { flex-wrap: wrap; max-width: 100%; }
 .bang-scope { margin: -8px 0 14px; }
 
 /* 3/10 (đợt 2): Bảng bài viết trên điện thoại = tab theo cột, mỗi lần một cột rộng hết màn, hết kéo ngang. */
@@ -1969,3 +1971,22 @@ button.topbar-back { font: inherit; cursor: pointer; }
 /* 3/10: khối Tình hình học của bot ở trang Agent chỉ cho điện thoại (desktop đã có nút tròn góc dưới). */
 .bot-status-mobile { display: none; }
 @media (max-width: 767px) { .bot-status-mobile { display: block; } }
+
+/* 3/10 (đợt 2): Xưởng sản xuất trên điện thoại — bắt tay vào việc ngay, không cuộn qua hướng dẫn và hàng folder.
+   Folder thành ô chọn, dải 6 bước ẩn (dòng mô tả đầu trang đã nói), ô xem trước trống thu nhỏ, lưới thumb thấp hơn,
+   Xưởng ảnh (công cụ phụ) xuống sau phần Soạn bài. Desktop giữ nguyên. */
+.sx-folder-select { display: none; }
+@media (max-width: 767px) {
+  .sx-pipeline { display: none; }
+  .sx-folders { display: none !important; }
+  .sx-folder-select { display: flex; align-items: center; gap: 8px; grid-column: 1 / -1; }
+  .sx-folder-select select { flex: 1; min-width: 0; min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+  /* Cột 1fr cũ tự giãn theo nội dung rộng nhất (422px trên màn 375px) rồi bị body overflow-x:hidden cắt mất mép phải. */
+  .sx-grid { grid-template-columns: minmax(0, 1fr); }
+  .sx-slot, .sx-compose { min-width: 0; }
+  .sx-preview:has(.sx-preview-empty) { aspect-ratio: auto; }
+  .sx-preview-empty { padding: 10px; flex-direction: row; }
+  .sx-preview-empty span { font-size: 22px; }
+  .sx-thumbs { max-height: 200px; }
+  .sx-studio { order: 10; }
+}

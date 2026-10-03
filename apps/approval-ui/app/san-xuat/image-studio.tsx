@@ -87,9 +87,9 @@ export default function ImageStudio({
   };
 
   return (
-    <section className="sx-compose">
+    <section className="sx-compose sx-studio">
       <header className="sx-slot-head">
-        <span className="sx-slot-title">Xưởng ảnh — tìm nền & ghép sản phẩm</span>
+        <span className="sx-slot-title">Xưởng ảnh: tìm nền và ghép sản phẩm</span>
       </header>
 
       <div className="studio-row">

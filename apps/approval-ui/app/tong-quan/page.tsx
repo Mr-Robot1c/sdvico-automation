@@ -477,7 +477,8 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
               <Link href="/khach-hang" className="btn ghost sm" style={{ justifySelf: 'start' }}>🛒 Kiểm tra người mua</Link>
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: 8 }}>
+            // 3/10: minmax(0,1fr) để dòng khách nowrap cắt "…" trong khung, không giãn lưới rồi bị main cắt mép phải trên điện thoại.
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
               {leads.slice(0, 4).map((l) => (
                 <div key={l.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: '.88rem', borderBottom: '1px dashed var(--line)', paddingBottom: 6 }}>
                   <span className={`badge ${['new', 'lost'].includes(String(l.status || 'new')) ? 'tone-no' : 'tone-ok'}`} style={{ flexShrink: 0 }}>

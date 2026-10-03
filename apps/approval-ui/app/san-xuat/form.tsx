@@ -232,8 +232,21 @@ export default function SanXuatForm({
   return (
     <div className="sx-grid">
       {/* Bộ lọc CHUNG theo folder sản phẩm — gọn khung ảnh/video, tránh rối. */}
+      {/* 3/10 (đợt 2): trên điện thoại hàng chip folder chiếm ~560px đầu màn, thay bằng MỘT ô chọn (CSS ẩn/hiện theo 768px). */}
       {folderList.length > 1 ? (
-        <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', padding: '8px 0' }}>
+        <label className="sx-folder-select">
+          <span className="muted">Folder</span>
+          <select value={folder} onChange={(e) => pickFolder(e.target.value)} aria-label="Lọc tư liệu theo folder">
+            <option value="">Tất cả ({images.length + videos.length})</option>
+            {folderList.map((g) => {
+              const n = images.filter((a) => a.product_group === g).length + videos.filter((a) => a.product_group === g).length;
+              return <option key={g} value={g}>{g.replace(/^\s*\d+\.\s*/, '')} ({n})</option>;
+            })}
+          </select>
+        </label>
+      ) : null}
+      {folderList.length > 1 ? (
+        <div className="sx-folders" style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', padding: '8px 0' }}>
           <span className="muted" style={{ marginRight: 6 }}>📁 Lọc theo folder:</span>
           <button type="button" className={`chip ${folder === '' ? 'on' : ''}`} onClick={() => pickFolder('')}>
             Tất cả <span className="n">{images.length + videos.length}</span>
