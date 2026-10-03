@@ -32,10 +32,13 @@ export async function GET() {
     metricsAlert(client),
   ]);
 
-  // TỰ PHÁT HIỆN ĐÓI (user 18/8: "AI tự học chứ không phải đợi tôi nhắc"): AI Data 1 quá 30h
+  // TỰ PHÁT HIỆN ĐÓI (user 18/8: "AI tự học chứ không phải đợi tôi nhắc"): AI Data 1 quá INTERNAL_STALE_H
   // không có bản ghi mới, Data 2 quá 30h, hoặc số liệu FB chưa bao giờ/quá 26h không kéo về ->
   // trả cờ để BOT chip + trang Dữ liệu cảnh báo đỏ. Phần Đo lường đọc run_log lượt kéo gần nhất
   // để nói ĐÚNG lỗi (lib/metrics-alert.ts), không đoán "cron chưa chạy".
+  // 3/10: phiên đọc Zalo + task đẩy bucket chạy CÁCH 2 NGÀY (user đặt), ngưỡng 30h báo đỏ oan
+  // giữa hai lượt -> 48h + 6h dư phòng chạy trễ. Data 2 vẫn chạy hằng ngày nên giữ 30h.
+  const INTERNAL_STALE_H = 54;
   const hoursSince = (iso?: string | null) => (iso ? (Date.now() - new Date(iso).getTime()) / 3600000 : Infinity);
   const hInternal = hoursSince((lastInternal || [])[0]?.created_at as string | undefined);
   const hPublic = hoursSince((lastPublic || [])[0]?.created_at as string | undefined);
@@ -46,7 +49,7 @@ export async function GET() {
   // không tìm được ngày hợp lệ thì là dữ liệu thiếu created_at, báo đúng bệnh để người sửa cột.
   if (errInternal) alerts.push({ who: 'Data 1', msg: `Không kiểm tra được lần học nội bộ gần nhất (lỗi truy vấn: ${errInternal.message}).` });
   else if (hInternal === Infinity && (internal || 0) > 0) alerts.push({ who: 'Data 1', msg: `Có ${internal} bản ghi nội bộ 7 ngày qua nhưng không bản ghi nào có ngày tạo hợp lệ (created_at rỗng). Kiểm tra cột created_at trong mkt_knowledge_internal.` });
-  else if (hInternal > 30) alerts.push({ who: 'Data 1', msg: hInternal === Infinity ? 'Chưa học nội bộ bao giờ. Kiểm tra phiên đọc Zalo và task đẩy bucket (SDVICO-DayKhoZalo).' : `Đã ${Math.floor(hInternal)} giờ không có bản ghi nội bộ mới. Có thể phiên đọc Zalo hôm nay không chạy hoặc file chưa được đẩy lên bucket.` });
+  else if (hInternal > INTERNAL_STALE_H) alerts.push({ who: 'Data 1', msg: hInternal === Infinity ? 'Chưa học nội bộ bao giờ. Kiểm tra phiên đọc Zalo và task đẩy bucket (SDVICO-DayKhoZalo).' : `Đã ${Math.floor(hInternal)} giờ không có bản ghi nội bộ mới. Phiên đọc Zalo chạy cách 2 ngày, có thể lượt gần nhất không chạy hoặc file chưa được đẩy lên bucket.` });
   if (errPublic) alerts.push({ who: 'Data 2', msg: `Không kiểm tra được lần học public gần nhất (lỗi truy vấn: ${errPublic.message}).` });
   else if (hPublic === Infinity && (publicSrc || 0) > 0) alerts.push({ who: 'Data 2', msg: `Có ${publicSrc} nguồn public 7 ngày qua nhưng không nguồn nào có ngày tạo hợp lệ (created_at rỗng).` });
   else if (hPublic > 30) alerts.push({ who: 'Data 2', msg: hPublic === Infinity ? 'Chưa học public bao giờ.' : `Đã ${Math.floor(hPublic)} giờ không có nguồn public mới. Cron mkt-metrics-pull (chạy học public) có thể đang không chạy.` });
