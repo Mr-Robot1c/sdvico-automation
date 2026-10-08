@@ -4,6 +4,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { loadRealEnv } from './video/env.mjs';
 import { pickFreshClips } from './video/fresh-clip.mjs';
+import { dropInternalRnDClips, buildClipContentTopic } from './clip-guard.mjs';
 
 const N = Number(process.argv[2]) || 1;
 const env = loadRealEnv();
@@ -15,7 +16,8 @@ const rnd = (a) => a[Math.floor(Math.random() * a.length)];
 const shuffle = (a) => [...a].sort(() => Math.random() - 0.5);
 
 // 1. Gom folder.
-const { data: assetsRaw } = await client.from('brand_assets').select('id, kind, title, product_group, source, created_at').not('product_group', 'is', null);
+// description: mô tả clip (8/10) để bài content bám đúng điều clip thể hiện + lọc clip R&D nội bộ.
+const { data: assetsRaw } = await client.from('brand_assets').select('id, kind, title, product_group, source, created_at, description').not('product_group', 'is', null);
 const folders = new Map();
 for (const a of assetsRaw || []) {
   if (!folders.has(a.product_group)) folders.set(a.product_group, { images: [], videos: [] });
@@ -23,7 +25,7 @@ for (const a of assetsRaw || []) {
   if (a.kind === 'image') f.images.push(a); else if ((a.kind === 'video' || a.kind === 'clip') && a.source !== 'video-pipeline') f.videos.push(a);
 }
 // Folder 'Content' KHÔNG phải sản phẩm, loại khỏi vòng xoay sinh bài bán.
-const eligible = [...folders.keys()].filter((g) => g !== 'Content' && (folders.get(g).images.length || folders.get(g).videos.length));
+const eligible = [...folders.keys()].filter((g) => g !== 'Content' && g !== 'R&D nội bộ' && (folders.get(g).images.length || folders.get(g).videos.length));
 if (!eligible.length) { console.log('Chua folder nao co tu lieu.'); process.exit(0); }
 
 // 2. Vòng + folder đã dùng.
@@ -96,8 +98,10 @@ if (process.env.ROTATE_CONTENT !== '0') {
       const topicsOfKind = CONTENT_TOPICS.filter((t) => t.type === chosenKind);
       let chosenTopic = topicsOfKind.length ? rnd(topicsOfKind) : undefined;
       const contentClip = ['viral', 'seeding', 'engage', 'tip', 'qa'].includes(chosenKind)
-        ? (pickFreshClips(folders.get('Content')?.videos || [], usedClipIds)[0] || null) : null;
-      if (contentClip) chosenTopic = { type: chosenKind, topic: `Kể chuyện từ clip thật đội SDVICO vừa quay tại hiện trường: "${contentClip.title}". Mở bài bằng kết quả nhìn thấy trong clip, kể người thật việc thật, không bán hàng, kết bằng câu hỏi mở.` };
+        ? (pickFreshClips(dropInternalRnDClips(folders.get('Content')?.videos || []), usedClipIds)[0] || null) : null;
+      // 8/10 (bài afd3d0ec): chủ đề bám MÔ TẢ clip, giọng Page, cấm xưng người chứng kiến/ký ức bịa.
+      // GIỮ KHỚP với app/api/rotate/route.ts (cùng buildClipContentTopic).
+      if (contentClip) chosenTopic = { type: chosenKind, topic: buildClipContentTopic(contentClip.title, contentClip.description) };
 
       const gen = await generateContentPost({ topic: chosenTopic });
       const kind = gen.contentType || chosenKind;

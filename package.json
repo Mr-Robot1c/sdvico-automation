@@ -17,6 +17,7 @@
     "test:inbox": "node packages/marketing/src/test-fb-inbox-time.mjs",
     "test:pheu": "node apps/approval-ui/lib/gen/test-pheu.mjs",
     "test:clip": "node packages/marketing/src/test-fresh-clip.mjs",
+    "test:clipguard": "node packages/marketing/src/test-clip-guard.mjs",
     "test:video": "node packages/marketing/src/test-video-rules.mjs",
     "zalo:tai-bu": "node packages/marketing/src/tai-bu-media-zalo.mjs",
     "content:run": "node packages/marketing/src/run-content.mjs",

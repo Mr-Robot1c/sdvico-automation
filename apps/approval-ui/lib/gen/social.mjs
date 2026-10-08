@@ -7,6 +7,7 @@ import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPric
 import { insightBrief } from './insights.mjs';
 import { logTokenUsage } from './token-log.mjs';
 import { sampleHooks } from './hook-library.mjs';
+import { fabricatedWitnessSentences, witnessRetryNote, resolveWitnessBody } from './clip-guard.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -316,13 +317,15 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
   let body = '';
   let headline = '';
   let playbookLast = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  let witnessLast = [];
+  for (let attempt = 0; attempt < 3; attempt++) {
     let extra = '';
-    if (playbookLast?.violations?.length) {
+    if (playbookLast?.violations?.length || witnessLast.length) {
       const errs = [];
-      if (playbookLast.violations.includes(`hook_too_long_${playbookLast.hookLen}w`))
+      if (witnessLast.length) errs.push(witnessRetryNote(witnessLast));
+      if (playbookLast?.violations?.includes(`hook_too_long_${playbookLast.hookLen}w`))
         errs.push(`Hook câu đầu body LẦN TRƯỚC ${playbookLast.hookLen} chữ - PHẢI viết lại ≤15 chữ. Hook lần trước: "${playbookLast.hook}"`);
-      if (playbookLast.violations.includes('no_question_cta'))
+      if (playbookLast?.violations?.includes('no_question_cta'))
         errs.push('Bài LẦN TRƯỚC thiếu câu hỏi cuối - PHẢI kết bằng 1 câu hỏi mở (dấu ?) mời bà con comment.');
       extra = '\n\nLẦN TRƯỚC LỖI PLAYBOOK:\n' + errs.map((e) => '- ' + e).join('\n');
     }
@@ -337,8 +340,13 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
     headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
     if (!body) throw new Error('Gemini trả rỗng.');
     playbookLast = scanPlaybook(body, { kind: playbookKind });
-    if (!playbookLast.violations.length) break;
+    // 8/10 (bài afd3d0ec): bài bám clip thật tự xưng người chứng kiến, dựng ký ức, hỏi ép chọn phe.
+    witnessLast = fabricatedWitnessSentences(body);
+    if (!playbookLast.violations.length && !witnessLast.length) break;
   }
+  // Hết lượt vẫn dính: cắt câu dính (giữ hashtag); cắt hết thân bài thì giữ nguyên và báo người duyệt.
+  const witnessFix = resolveWitnessBody(body);
+  body = witnessFix.body;
 
   const tags = hashtagBlock(null); // chỉ hashtag mặc định, không thẻ sản phẩm
   const text = `${body}\n\n${tags}`;
@@ -347,5 +355,9 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
     testFactValues: testFactValues(facts),
     kind: playbookKind,
   });
+  if (witnessFix.warn.length) {
+    assessment.flags = { ...assessment.flags, witness: witnessFix.warn };
+    if (assessment.risk === 'none') assessment.risk = 'amber';
+  }
   return { text, body, headline, topic: topicText, contentType: type, hashtags: tags, assessment };
 }

@@ -1,6 +1,7 @@
 // Sinh text bài mạng xã hội cho một sản phẩm: thân bài có emoji + khối hashtag.
 // Giọng brand-voice, hàng rào product-boundary (không bịa thông số, không nhận vơ phần mềm đối tác).
 import { assessDraft } from './compliance.mjs';
+import { fabricatedWitnessSentences, witnessRetryNote, resolveWitnessBody } from './clip-guard.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
 import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, audienceLines, benefitLines } from './products.mjs';
@@ -210,15 +211,26 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {})
     '{"headline": "tiêu đề ngắn 6 tới 12 từ, cuốn, có thể kèm 1 emoji", "body": "thân bài (chưa gồm hashtag), theo đúng cấu trúc đã dặn"}',
   ].join('\n');
 
-  const res = await genWithRetry(ai, {
-    model: MKT_MODEL,
-    contents: user,
-    config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
-  });
-  const parsed = parseJson(res.text || '');
-  const body = String(parsed.body || '').trim();
-  const headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
-  if (!body) throw new Error('Gemini trả rỗng.');
+  // 8/10 (bài afd3d0ec): bài bám clip thật tự xưng người chứng kiến, dựng ký ức, hỏi ép chọn phe.
+  // Sinh lại tối đa 2 lần kèm lời nhắc; hết lượt vẫn dính thì cắt câu dính (giữ hashtag).
+  let body = '';
+  let headline = '';
+  let witnessLast = [];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await genWithRetry(ai, {
+      model: MKT_MODEL,
+      contents: witnessLast.length ? `${user}\n\n${witnessRetryNote(witnessLast)}` : user,
+      config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
+    });
+    const parsed = parseJson(res.text || '');
+    body = String(parsed.body || '').trim();
+    headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();
+    if (!body) throw new Error('Gemini trả rỗng.');
+    witnessLast = fabricatedWitnessSentences(body);
+    if (!witnessLast.length) break;
+  }
+  const witnessFix = resolveWitnessBody(body);
+  body = witnessFix.body;
 
   const tags = hashtagBlock(null); // chỉ hashtag mặc định, không thẻ sản phẩm
   const text = `${body}\n\n${tags}`;
@@ -226,5 +238,9 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {})
     knownFactValues: knownFactValues(facts),
     testFactValues: testFactValues(facts),
   });
+  if (witnessFix.warn.length) {
+    assessment.flags = { ...assessment.flags, witness: witnessFix.warn };
+    if (assessment.risk === 'none') assessment.risk = 'amber';
+  }
   return { text, body, headline, topic: topicText, contentType: type, hashtags: tags, assessment };
 }

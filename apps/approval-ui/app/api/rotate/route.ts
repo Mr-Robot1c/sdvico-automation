@@ -149,11 +149,20 @@ export async function GET(req: Request) {
   //    videos = CLIP GỐC do người upload (loại video-pipeline đã dựng ra) — dùng để quyết
   //    có yêu cầu dựng video AI cho bài không: folder có clip thì dựng, chỉ ảnh thì thôi
   //    (user chốt 18/8: "folder sản phẩm có video thì ghép video AI, không thì thôi").
-  const { data: assetsRaw } = await client
+  // 8/10: lấy thêm description (mô tả clip) để bài content bám đúng điều clip thể hiện và lọc clip R&D.
+  // Cột description do migration 20260915130000; chưa có thì quay về select cũ (bài content chỉ còn tên clip).
+  const assetsFirst = await client
     .from('brand_assets')
-    .select('id, kind, title, product_group, source, created_at')
+    .select('id, kind, title, product_group, source, created_at, description')
     .not('product_group', 'is', null);
-  type A = { id: string; kind: string; title: string; product_group: string; source?: string | null; created_at?: string | null };
+  let assetsRaw: any[] | null = assetsFirst.data;
+  if (assetsFirst.error) {
+    assetsRaw = (await client
+      .from('brand_assets')
+      .select('id, kind, title, product_group, source, created_at')
+      .not('product_group', 'is', null)).data;
+  }
+  type A = { id: string; kind: string; title: string; product_group: string; source?: string | null; created_at?: string | null; description?: string | null };
   const folders = new Map<string, { images: A[]; videos: A[] }>();
   for (const a of (assetsRaw || []) as A[]) {
     if (!folders.has(a.product_group)) folders.set(a.product_group, { images: [], videos: [] });
@@ -165,6 +174,8 @@ export async function GET(req: Request) {
   // xoay sinh bài bán. Bài content sẽ dùng ảnh trong folder này ở bước dưới.
   let eligible = [...folders.keys()].filter((g) => {
     if (g === 'Content') return false;
+    // 8/10: 'R&D nội bộ' (clip quay màn hình/mô phỏng) cũng KHÔNG phải sản phẩm để bán.
+    if (g === 'R&D nội bộ') return false;
     const f = folders.get(g)!;
     return f.images.length || f.videos.length;
   });
@@ -598,6 +609,8 @@ export async function GET(req: Request) {
   // khác video_requested bị hạ về false khi dựng xong).
   // @ts-ignore — module JS thuần
   const { pickFreshClips } = await import('../../../lib/gen/fresh-clip.mjs');
+  // @ts-ignore — module JS thuần
+  const { dropInternalRnDClips, buildClipContentTopic } = await import('../../../lib/gen/clip-guard.mjs');
   const usedClipIds = new Set<string>();
   const collectUsed = (rows: any[]) => {
     for (const r of rows) {
@@ -674,13 +687,15 @@ export async function GET(req: Request) {
     // 9/9: có clip thật mới + loại bài hợp + hôm nay chưa có video content -> chủ đề bám clip,
     // yêu cầu dựng video (cảnh 1 bắt buộc dùng clip, xem packages/marketing/src/video/script.mjs).
     const freshClips = CONTENT_VIDEO_KINDS.has(chosenKind) && contentVideoToday < 1
-      ? pickFreshClips(folders.get('Content')?.videos || [], usedClipIds)
+      ? pickFreshClips(dropInternalRnDClips(folders.get('Content')?.videos || []), usedClipIds)
       : [];
     const contentClip = freshClips[0] || null;
     if (contentClip) {
+      // 8/10 (bài afd3d0ec): chủ đề bám MÔ TẢ clip, giọng Page, cấm xưng người chứng kiến và ký ức bịa.
+      // GIỮ KHỚP với packages/marketing/src/rotate-run.mjs (cùng buildClipContentTopic).
       chosenTopic = {
         type: chosenKind,
-        topic: `Kể chuyện từ clip thật đội SDVICO vừa quay tại hiện trường: "${contentClip.title}". Mở bài bằng kết quả nhìn thấy trong clip, kể người thật việc thật, không bán hàng, kết bằng câu hỏi mở.`,
+        topic: buildClipContentTopic(contentClip.title, contentClip.description),
       };
     }
 

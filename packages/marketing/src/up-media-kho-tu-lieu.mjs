@@ -17,6 +17,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { loadRealEnv } from './video/env.mjs';
 import { driveEnabled, uploadToDrive } from './gdrive.mjs';
+import { looksLikeInternalRnD, RND_FOLDER } from './clip-guard.mjs';
 import { spawnSync } from 'node:child_process';
 import { writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -208,7 +209,7 @@ for (const m of media) {
   if (cls.loai === 'man_hinh_app') { chan += 1; console.log(`  ⛔ ${m.folder}/${m.name}: screenshot man hinh — khong phai tu lieu, bo qua.`); continue; }
   if (cls.loai === 'khong_dung_duoc') { skip += 1; console.log(`  - ${m.folder}/${m.name}: khong dung duoc (${cls.tieu_de || ''})`); continue; }
 
-  const folder = FOLDERS.includes(cls.folder) ? cls.folder : 'Content';
+  let folder = FOLDERS.includes(cls.folder) ? cls.folder : 'Content';
   const title = String(cls.tieu_de || m.name).slice(0, 120);
   const ext = m.name.split('.').pop().toLowerCase();
   const mime = isVideo ? 'video/mp4' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
@@ -230,6 +231,13 @@ for (const m of media) {
   const description = moTaChinh
     ? `${moTaChinh}${Array.isArray(cls.hop_canh) && cls.hop_canh.length ? ` | Hợp cảnh: ${cls.hop_canh.map(String).join(', ')}` : ''}${Array.isArray(cls.tu_khoa) && cls.tu_khoa.length ? ` | Từ khoá: ${cls.tu_khoa.map(String).join(', ')}` : ''}`.slice(0, 1000)
     : null;
+  // 8/10 (bài afd3d0ec): clip R&D nội bộ (quay màn hình máy tính, phần mềm mô phỏng, SDNavi...) lọt vào
+  // 'Content' rồi bị bài content kể như chuyện hiện trường. Khớp dấu hiệu R&D thì gán 'R&D nội bộ'.
+  // Chỉ chuyển từ 'Content'; folder sản phẩm do Gemini chọn giữ nguyên. Tách khỏi pickFreshClips hai đường (rotate).
+  if (folder === 'Content' && looksLikeInternalRnD(`${title} ${description || ''} ${isVideo ? (summary || '') : ''}`)) {
+    folder = RND_FOLDER;
+    console.log(`  (R&D nội bộ) ${m.name}: dấu hiệu quay màn hình/mô phỏng, gán folder "${RND_FOLDER}" thay vì Content`);
+  }
 
   // 15/9 (sếp: media Zalo lên Google Drive cho khỏi đầy Supabase): có GOOGLE_SA_JSON + GDRIVE_FOLDER_ID
   // thì up Drive, storage_path = "gdrive:<id>/<tên>"; không có thì Supabase như cũ.
