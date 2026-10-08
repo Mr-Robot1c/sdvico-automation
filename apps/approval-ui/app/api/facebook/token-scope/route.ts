@@ -8,6 +8,8 @@ import { NextResponse } from 'next/server';
 // Không lộ token, chỉ hiện tên/scope. Bảo vệ ?secret=CRON_SECRET.
 //
 // Dùng: /api/facebook/token-scope?secret=<CRON_SECRET>
+import { FB_MAIN_PAGE_ID, postsToMainPage } from '../../../../lib/fb-main-page';
+
 export const dynamic = 'force-dynamic';
 
 const V = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
@@ -48,6 +50,13 @@ async function inspectOne(pageId: string, token: string, label: string) {
     const me: any = await meRes.json();
     if (me.error) return { label, page_id_env: pageId, error: `token loi: ${me.error?.message || 'unknown'}`, likely_expired: true };
 
+    // 8/10: debug_token (token tự soi chính nó) trả scopes + hạn dùng — cách duy nhất biết pages_manage_posts
+    // (quyền ĐĂNG bài) mà không phải đăng thử. Không lộ token, chỉ trả tên scope.
+    let scopes: string[] = []; let expiresAt: number | null = null; let tokenType = '';
+    try {
+      const dj: any = await (await fetch(`https://graph.facebook.com/${V}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(token)}`)).json();
+      scopes = Array.isArray(dj?.data?.scopes) ? dj.data.scopes : []; expiresAt = typeof dj?.data?.expires_at === 'number' ? dj.data.expires_at : null; tokenType = String(dj?.data?.type || '');
+    } catch { /* bỏ qua, phần probe bên dưới vẫn chạy */ }
     // 2. Vẫn thử /me/permissions nhưng CHỈ để log — Page Token thường trả rỗng.
     const permRes = await fetch(`https://graph.facebook.com/${V}/me/permissions`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -90,6 +99,11 @@ async function inspectOne(pageId: string, token: string, label: string) {
       page_id_actual: me.id,
       page_id_env: pageId,
       page_id_matches: me.id === pageId,
+      is_main_page: me.id === FB_MAIN_PAGE_ID,
+      can_post: scopes.includes('pages_manage_posts'),
+      token_type: tokenType || undefined,
+      expires: expiresAt === 0 ? 'khong het han' : expiresAt ? new Date(expiresAt * 1000).toISOString() : undefined,
+      scopes,
       real_probe: realCheck,
       missing_from_probe: missing,
       me_permissions_api_returned: [...grantedFromPermsApi],
@@ -123,6 +137,8 @@ export async function GET(req: Request) {
   return NextResponse.json({
     ok: true,
     note: 'Xem cot "missing_required" - neu co scope nao thi phai regen token voi scope day du.',
+    main_page_id: FB_MAIN_PAGE_ID,
+    posts_to_main_page: postsToMainPage(),
     how_to_regen: [
       '1. Vao https://developers.facebook.com/tools/explorer',
       '2. Ben phai chon App = SDVICO Marketing',

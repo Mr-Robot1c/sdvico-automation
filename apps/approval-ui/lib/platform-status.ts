@@ -1,4 +1,5 @@
 import { getServerClient } from './supabase-server';
+import { FB_MAIN_PAGE_ID } from './fb-main-page';
 
 // Trạng thái kết nối Facebook + TikTok, tách từ app/ket-noi/page.tsx (21/8) để trang
 // Tổng quan kênh (/tong-quan) dùng chung, khỏi nhân đôi logic gọi Graph/token.
@@ -48,7 +49,9 @@ export async function fbStatus(): Promise<FbStatus> {
 
   // 2/10 (sổ QA): Page chính (token REAL) đứng đầu; page test chỉ là kênh phụ.
   pages.sort((a, b) => (a.label === b.label ? 0 : a.label === 'real' ? -1 : 1));
-  const labels = pages.map((p) => `${p.name}${p.label === 'real' ? ' (Page chính)' : ' (kênh phụ, test)'}`).join(', ');
+  // 8/10: token đăng bài đã trỏ Page chính (lib/fb-main-page.ts) thì nó là Page chính, không còn là kênh phụ.
+  const isMain = (p: FbStatus['pages'][number]) => p.label === 'real' || (!!p.pageId && p.pageId === FB_MAIN_PAGE_ID);
+  const labels = pages.map((p) => `${p.name}${isMain(p) ? ' (Page chính)' : ' (kênh phụ, test)'}`).join(', ');
   return {
     ok: true,
     text: `Đã kết nối ${pages.length} Page: ${labels}. Máy tự đăng khi bấm Duyệt.`,

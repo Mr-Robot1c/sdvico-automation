@@ -8,12 +8,17 @@
 //  - TikTok: API đăng đã bỏ (app chưa qua audit), duyệt xong xuất tay.
 // Tên Page và kênh đổi được qua env phía server; mặc định theo trang Kết nối.
 
+import { postsToMainPage } from './fb-main-page';
+
 export const FB_AUTO_PAGE_NAME = process.env.FACEBOOK_AUTO_PAGE_NAME || 'SDViCo - Thiết bị tàu cá';
 export const FB_MAIN_PAGE_NAME = process.env.FACEBOOK_MAIN_PAGE_NAME || 'SDVICO VN';
 export const YT_CHANNEL_NAME = process.env.YOUTUBE_CHANNEL_NAME || 'SDVICO - Thiết bị tàu cá';
 
 const LINES: Record<string, string> = {
-  facebook: `Facebook: máy tự đăng lên Page phụ (${FB_AUTO_PAGE_NAME}). Page chính ${FB_MAIN_PAGE_NAME} người đăng tay rồi bấm Ghép link FB chính.`,
+  // 8/10: máy đăng thẳng Page chính khi FACEBOOK_PAGE_ID là id Page chính (lib/fb-main-page.ts).
+  facebook: postsToMainPage()
+    ? `Facebook: máy tự đăng lên Page chính ${FB_MAIN_PAGE_NAME}, tự ghép link để chia sẻ group.`
+    : `Facebook: máy tự đăng lên Page phụ (${FB_AUTO_PAGE_NAME}). Page chính ${FB_MAIN_PAGE_NAME} người đăng tay rồi bấm Ghép link FB chính.`,
   youtube: `YouTube: máy tự đăng lên kênh ${YT_CHANNEL_NAME}.`,
   tiktok: 'TikTok: không tự đăng, duyệt xong xuất tay.',
   website: 'Website: hiện ở trang blog công khai khi duyệt.',

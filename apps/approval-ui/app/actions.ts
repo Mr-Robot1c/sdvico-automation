@@ -10,6 +10,7 @@ import { publishContentToWebsite } from '../lib/gen/publish-website';
 import { hasPublishedWebsitePost, requestPublicSiteRefresh } from '../lib/public-site-refresh';
 import { postVideoToTikTok } from '../lib/tiktok';
 import { isEmergencyStopped } from '../lib/safety';
+import { postsToMainPage } from '../lib/fb-main-page';
 import { fetchWithRetry } from '../lib/retry';
 import { pullFacebookMetrics, fbPageTokens } from '../lib/fb-metrics';
 import { generateAndStorePlan } from '../lib/plan';
@@ -281,7 +282,14 @@ async function publishContentToFacebook(
       // GIỜ HẸN (tương lai) — bảng bài viết dựa vào đây để giữ bài ở cột Lên lịch tới giờ.
       published_at: scheduledUnix ? new Date(scheduledUnix * 1000).toISOString() : new Date().toISOString()
     });
-    await client.from('mkt_content').update({ status: 'published' }).eq('id', contentId);
+    // 8/10: máy đăng THẲNG Page chính (lib/fb-main-page.ts) thì link bài chính là link Page chính:
+    // ghi luôn brief.fb_real_url để khỏi bước đăng tay + Ghép link. Không đè link người đã ghép tay.
+    const briefNow = ((c as any).brief || {}) as Record<string, unknown>;
+    if (postsToMainPage() && externalUrl && !briefNow.fb_real_url) {
+      await client.from('mkt_content').update({ status: 'published', brief: { ...briefNow, fb_real_url: externalUrl } }).eq('id', contentId);
+    } else {
+      await client.from('mkt_content').update({ status: 'published' }).eq('id', contentId);
+    }
 
     // REEL: bài bán hàng có video AI gộp (brief.post_reel) -> đăng thêm bản DỌC lên Reel.
     // MẶC ĐỊNH TẮT từ 21/8 (user: "đăng FB cả 16:9 lẫn bản dọc là lỗi" — trùng lặp trên cùng
