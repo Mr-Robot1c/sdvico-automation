@@ -234,7 +234,8 @@ for (const m of media) {
   // 8/10 (bài afd3d0ec): clip R&D nội bộ (quay màn hình máy tính, phần mềm mô phỏng, SDNavi...) lọt vào
   // 'Content' rồi bị bài content kể như chuyện hiện trường. Khớp dấu hiệu R&D thì gán 'R&D nội bộ'.
   // Chỉ chuyển từ 'Content'; folder sản phẩm do Gemini chọn giữ nguyên. Tách khỏi pickFreshClips hai đường (rotate).
-  if (folder === 'Content' && looksLikeInternalRnD(`${title} ${description || ''} ${isVideo ? (summary || '') : ''}`)) {
+  // Chỉ VIDEO: ảnh đội ngũ làm việc ở văn phòng là tư liệu hợp lệ cho bài content, dấu hiệu "màn hình máy tính" bắt oan.
+  if (isVideo && folder === 'Content' && looksLikeInternalRnD(`${title} ${description || ''} ${summary || ''}`)) {
     folder = RND_FOLDER;
     console.log(`  (R&D nội bộ) ${m.name}: dấu hiệu quay màn hình/mô phỏng, gán folder "${RND_FOLDER}" thay vì Content`);
   }
