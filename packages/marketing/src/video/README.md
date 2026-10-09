@@ -28,6 +28,18 @@ Mặc định còn ĐẨY vào Hàng đợi duyệt: upload CẢ HAI bản (ngan
 
 Số tổng đài/điện thoại được đọc TỪNG chữ số trong lời thoại (1900 23 23 49 = "một chín không không, hai ba, hai ba, bốn chín"), phụ đề vẫn hiện số gốc. Một cảnh TTS lỗi sẽ dùng tiếng lặng dự phòng, không kéo sập cả dây chuyền.
 
+### Đoạn trong clip và cụm tư liệu (đợt A, 9/10)
+Clip trong kho có thể mang `segments` (các đoạn 2 tới 12 giây, mỗi đoạn ghi hành động thấy thật) và `shoot_cluster` (cụm buổi quay). Có chúng thì video giữ MỘT cụm chính xuyên suốt, mỗi cảnh cắt đúng đoạn (`-ss start -t dur`), hết đoạn thì nối đoạn cùng việc, vẫn thiếu thì giữ khung cuối và ghi cờ `brief.video_segment_short`, KHÔNG lặp clip. Clip chưa có đoạn dựng như cũ. `VIDEO_SEGMENTS=off` tắt hẳn đường mới.
+```
+# Mô tả đoạn + xét cụm cho một cụm ứng viên (ngày Zalo + nhóm sản phẩm); --dry-run chỉ in, --redo làm lại
+node packages/marketing/src/video/segment-clips.mjs --cluster 2026-09-19 "6. Thiết bị lọc dầu SF-50" [--dry-run] [--redo]
+# Dựng so sánh cùng một lời: lần 1 ghi <out>/<id8>_script.json, các lần sau đọc lại lời đó
+node packages/marketing/src/video/build-video.mjs <contentId> --out DIR --no-queue --assembly new
+node packages/marketing/src/video/build-video.mjs <contentId> --out DIR --no-queue --assembly old --reuse-script DIR/sdvico_<id8>_script.json
+# Chỉ chọn hình + đoạn, dừng trước TTS và dựng
+node packages/marketing/src/video/build-video.mjs <contentId> --out DIR --script-only
+```
+
 ### Chạy hàng loạt (tự động cho nhiều bài)
 ```
 node packages/marketing/src/video/build-video-all.mjs [--limit N] [--requested] [--watch] [--interval 60] [--no-queue]

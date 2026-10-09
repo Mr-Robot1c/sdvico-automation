@@ -13,6 +13,7 @@ import { join, dirname } from 'node:path';
 import { loadRealEnv } from './env.mjs';
 import { downloadAsset, probeDuration, ffmpeg, splitAtSilence } from './ffmpeg.mjs';
 import { assembleVideo } from './assemble.mjs';
+import { planSceneSegments, segmentsEnabled } from './segments.mjs';
 import { generateVideoScript, stripGreeting } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
@@ -696,6 +697,23 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
     : engineUsed === 'local' ? 'Giọng local (VieNeu — server 8199)' : 'edge-tts';
   console.log(`  Giọng bản ${format}: ${engineLabel}`);
   const wa = await whisperArtifact(sceneAudios, fdir, format);
+  // 9/10 ĐỢT A: cảnh có đoạn → kế hoạch cắt theo độ dài tiếng THẬT: lấy đúng đoạn (+ đoạn nối cùng việc), KHÔNG lặp
+  // clip. Thiếu hình thì assemble giữ khung cuối cho phần thiếu; ghi lại để người duyệt biết thiếu tư liệu.
+  const segmentShort = [];
+  built.forEach((b, i) => {
+    const sc = scenes[i];
+    if (!sc?.segment || b.kind === 'image') return;
+    const plan = planSceneSegments(b.durationSec, sc);
+    const pieces = plan.pieces.map((p) => ({ path: assetPaths.get(p.assetId)?.local, start: p.start, dur: p.dur, assetId: p.assetId })).filter((p) => p.path);
+    if (!pieces.length) return;
+    b.pieces = pieces;
+    b.holdSec = Math.max(0, b.durationSec - pieces.reduce((a, p) => a + p.dur, 0)); // phần thiếu hình = giữ khung cuối
+    b.segPlan = plan.pieces.map((p) => [p.assetId.slice(0, 8), p.start, Number((p.start + p.dur).toFixed(2))]);
+    if (plan.shortSec > 0) {
+      segmentShort.push({ scene: i + 1, shortSec: plan.shortSec });
+      console.warn(`  thiếu tư liệu cảnh ${i + 1}: thiếu ${plan.shortSec} giây hình (hết đoạn cùng việc), giữ khung cuối, KHÔNG lặp đoạn${plan.shortSec > 1.5 ? ' — thiếu quá 1,5 giây, người duyệt nên soi cảnh này' : ''}.`);
+    }
+  });
   const out = join(outDir, `sdvico_${contentId.slice(0, 8)}_${format}.mp4`);
   // 8/9 tối (Thanh): tem giá chỉ hiện khi giọng đọc SẮP tới câu giá ở cảnh cuối, không hiện sớm.
   // Ước lượng thời điểm câu giá bắt đầu theo vị trí ký tự trong lời thoại cảnh cuối (cùng cách
@@ -717,15 +735,20 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
   let t = 0;
   const timeline = built.map((b) => {
     const start = t; t += Number(b.durationSec) || 0;
-    return { assetId: b.assetId || null, role: b.role || null, kind: b.kind, start: Number(start.toFixed(1)), end: Number(t.toFixed(1)), text: String(b.text || '').slice(0, 90) };
+    return { assetId: b.assetId || null, role: b.role || null, kind: b.kind, start: Number(start.toFixed(1)), end: Number(t.toFixed(1)), text: String(b.text || '').slice(0, 90), ...(b.segPlan ? { seg: b.segPlan } : {}) };
   });
-  return { out, totalDur, scenes: built.length, whisper: wa?.info || null, timeline };
+  return { out, totalDur, scenes: built.length, whisper: wa?.info || null, timeline, segmentShort };
 }
 
 // Đẩy video (CẢ 2 bản ngang 16:9 + dọc 9:16) vào Hàng đợi duyệt: upload Storage + brand_assets +
 // mkt_content + approval_queue (pending, kênh Facebook + TikTok). Người bấm Duyệt (điều cấm 1).
 // Lúc đăng: FB dùng video_h (ngang), TikTok dùng video_v (dọc).
-async function pushToApprovalQueue(client, { content, script, horizontalPath, verticalPath, teaser = null, mustUseAssetId = null, timeline = null }) {
+async function pushToApprovalQueue(client, { content, script, horizontalPath, verticalPath, teaser = null, mustUseAssetId = null, timeline = null, segmentShort = [] }) {
+  // 9/10 ĐỢT A: cụm tư liệu chính + cờ thiếu tư liệu (hết đoạn cùng việc, giữ khung cuối) cho người duyệt soi cảnh đó.
+  const segBrief = {
+    video_cluster: script.cluster || null,
+    video_segment_short: segmentShort.length ? segmentShort : null,
+  };
   const title = redactExactPrices((script.titles && script.titles[0]) || content.title || 'Video SDVICO');
 
   // Helper upload 1 file mp4 -> brand_assets, trả về id.
@@ -797,6 +820,7 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
       video_compliance: script.assessment?.flags || {},
       video_scene_assets: script.sceneAssets || [],   // 9/9: id tư liệu từng cảnh, để đo clip nào đã lên video
       video_must_use: mustUseAssetId,
+      ...segBrief,                                    // 9/10: video_cluster + video_segment_short (thiếu tư liệu cảnh nào, mấy giây)
       video_timeline: timeline || [],                 // 15/9: cảnh nào dùng tư liệu nào, từ giây mấy tới giây mấy
       video_scene_match: script.sceneMatch || [],     // 15/9: vai cảnh, hình cần, điểm khớp, ai chọn (model/luật)
       video_built_at: new Date().toISOString(),
@@ -823,7 +847,7 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
 
   const { data: ins, error: ce } = await client.from('mkt_content').insert({
     kind: 'social', title,
-    brief: { keyword: title, intent: 'giao_dich', assets, channels, generator: 'video-pipeline', post_kind: 'video', source_content: content.id, risk, compliance: script.assessment?.flags || {}, ...abMeta, video_scene_assets: script.sceneAssets || [], video_must_use: mustUseAssetId, video_timeline: timeline || [], video_scene_match: script.sceneMatch || [], video_built_at: new Date().toISOString() },
+    brief: { keyword: title, intent: 'giao_dich', assets, channels, generator: 'video-pipeline', post_kind: 'video', source_content: content.id, risk, compliance: script.assessment?.flags || {}, ...abMeta, video_scene_assets: script.sceneAssets || [], video_must_use: mustUseAssetId, ...segBrief, video_timeline: timeline || [], video_scene_match: script.sceneMatch || [], video_built_at: new Date().toISOString() },
     draft: caption, status: 'review', needs_gov_review: risk === 'red',
   }).select('id').single();
   if (ce || !ins) throw new Error('mkt_content: ' + (ce?.message || ''));
@@ -847,6 +871,14 @@ async function main() {
   const voice = arg('voice', process.env.TTS_VOICE || 'vi-VN-HoaiMyNeural');
   const outDir = arg('out', join(HERE, '..', '..', '..', '..', 'out', 'video'));
   await mkdir(outDir, { recursive: true });
+
+  // 9/10 ĐỢT A: --assembly old|new để dựng so sánh. old = ép VIDEO_SEGMENTS=off (không cụm, không cắt đoạn, lặp clip
+  // từ giây 0 như cũ); new = ép bật. Không đặt cờ thì theo biến môi trường VIDEO_SEGMENTS (mặc định on).
+  const assembly = arg('assembly', null);
+  if (assembly && !['old', 'new'].includes(assembly)) throw new Error('--assembly chỉ nhận old hoặc new');
+  if (assembly === 'old') process.env.VIDEO_SEGMENTS = 'off';
+  else if (assembly === 'new') process.env.VIDEO_SEGMENTS = 'on';
+  console.log(`Cách ghép hình: ${segmentsEnabled() ? 'MỚI (cụm + cắt đoạn, chỉ tác dụng với clip có đoạn)' : 'CŨ (VIDEO_SEGMENTS=off)'}`);
 
   // Nội dung nguồn.
   let contentId = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
@@ -900,8 +932,14 @@ async function main() {
   if (productGroup === 'Bài content' || brief.post_kind === 'content') productGroup = CONTENT_GROUP;
   if (!productGroup) throw new Error('Bài chưa gán sản phẩm (không đoán được từ tiêu đề/nội dung). Gán product_group ở /tu-lieu hoặc đặt tiêu đề rõ hơn.');
   // Cột description có từ migration 20260915130000; chưa áp thì rơi về cột cũ (không có mô tả, khớp theo luật vai cảnh).
-  let ASSET_COLS = 'id, kind, title, storage_path, source, created_at, product_group, description';
+  // 9/10: cột segments + shoot_cluster có từ migration 20261009120000; chưa áp thì bỏ 2 cột đó (đường cũ).
+  let ASSET_COLS = 'id, kind, title, storage_path, source, created_at, product_group, description, segments, shoot_cluster';
   let productRes = await client.from('brand_assets').select(ASSET_COLS).eq('product_group', productGroup).order('created_at', { ascending: false });
+  if (productRes.error && /segments|shoot_cluster/i.test(productRes.error.message || '')) {
+    console.warn('brand_assets chưa có cột segments/shoot_cluster (migration 20261009120000 chưa áp) — dựng như cũ, không cắt đoạn.');
+    ASSET_COLS = 'id, kind, title, storage_path, source, created_at, product_group, description';
+    productRes = await client.from('brand_assets').select(ASSET_COLS).eq('product_group', productGroup).order('created_at', { ascending: false });
+  }
   if (productRes.error && /description/i.test(productRes.error.message || '')) {
     console.warn('brand_assets chưa có cột description (migration 20260915130000 chưa áp) — chọn cảnh theo tiêu đề + luật vai cảnh.');
     ASSET_COLS = 'id, kind, title, storage_path, source, created_at, product_group';
@@ -923,6 +961,13 @@ async function main() {
       .limit(40);
     const seen = new Set(assets.map((a) => a.id));
     for (const a of lifeAssets || []) if (!seen.has(a.id)) assets.push(a);
+    // 9/10 ĐỢT A: 40 tư liệu Content mới nhất có thể bỏ sót clip đã mô tả đoạn (cụm buổi quay cũ hơn); lấy thêm
+    // mọi clip Content có đoạn để cụm không bị cắt cụt.
+    if (segmentsEnabled() && /segments/.test(ASSET_COLS)) {
+      const { data: segLife } = await client.from('brand_assets')
+        .select(ASSET_COLS).eq('product_group', CONTENT_GROUP).neq('source', 'video-pipeline').not('segments', 'is', null);
+      for (const a of segLife || []) if (!seen.has(a.id) && !assets.some((x) => x.id === a.id)) assets.push(a);
+    }
   }
   // 17/9 tối (user: "SF58B là gì kệ nó, cứ dùng bình thường, sản phẩm chỉ có trong catalog"): ĐÃ GỠ
   // luật modelMismatch từng loại 2 ảnh dán nhãn SF58B — nhãn trên máy trong ảnh không quyết định model.
@@ -973,24 +1018,49 @@ async function main() {
   const salesVideo = brief.post_kind !== 'content' && productGroup !== CONTENT_GROUP && !content.needs_gov_review;
   const teaser = salesVideo ? getPriceTeaser(productGroup) : null;
   if (teaser) console.log('Mốc giá úp mở:', teaser.text);
-  console.log(`Sinh kịch bản (Gemini)${isShort ? ' - che do SHORTS 10-20s' : ''}...`);
+  if (!arg('reuse-script', null)) console.log(`Sinh kịch bản (Gemini)${isShort ? ' - che do SHORTS 10-20s' : ''}...`);
+  // 9/10 ĐỢT A: --reuse-script <file.json> dựng lại từ kịch bản đã ghi (cùng một lời), chỉ chọn hình + cắt đoạn chạy lại.
+  const reusePath = arg('reuse-script', null);
+  let reuseScript = null;
+  if (reusePath) {
+    reuseScript = JSON.parse(await readFile(reusePath, 'utf8'));
+    if (!Array.isArray(reuseScript?.rawScenes) || !reuseScript.rawScenes.length) throw new Error(`--reuse-script: file ${reusePath} không có rawScenes (không phải kịch bản do build-video ghi).`);
+    console.log(`Dùng lại kịch bản đã ghi: ${reusePath} (${reuseScript.rawScenes.length} cảnh, ghi lúc ${reuseScript.savedAt || '?'}).`);
+  }
   const script = await generateVideoScript(
     content,
-    assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, label: clipLabel(a), description: a.description || '', folder: a.product_group || '', fresh: /MỚI/.test(clipLabel(a)) })),
+    assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, label: clipLabel(a), description: a.description || '', folder: a.product_group || '', fresh: /MỚI/.test(clipLabel(a)), segments: Array.isArray(a.segments) && a.segments.length ? a.segments : null, shoot_cluster: a.shoot_cluster || null })),
     PRODUCT_FACTS,
-    { short: isShort, productGroup, salesVideo, mustUseAssetId, mustUseRole, contentVideo, recentUse },
+    { short: isShort, productGroup, salesVideo, mustUseAssetId, mustUseRole, contentVideo, recentUse, reuseScript },
     _tokenLogClient
   );
   console.log('Tư liệu dùng trong cảnh:', (script.sceneAssets || []).map((id) => id.slice(0, 8)).join(', '));
+  if (script.cluster) console.log(`Cụm chính của video: ${script.cluster.id} (${script.cluster.confidence}), phủ ${script.cluster.covered} cảnh.`);
   console.log('Tiêu đề:', script.titles);
   console.log('Rủi ro tuân thủ:', script.assessment.risk, JSON.stringify(script.assessment.flags));
   console.log('Cảnh: dọc', script.vertical.length);
 
+  // 9/10: ghi kịch bản ra <out>/<id8>_script.json MỖI LẦN dựng (lời cuối + hình + đoạn). File này dùng lại được
+  // bằng --reuse-script để dựng cũ/mới cùng một lời. Không chứa khóa hay dữ liệu cá nhân (chỉ lời đọc và id tư liệu).
+  const scriptFile = join(outDir, `sdvico_${contentId.slice(0, 8)}_script.json`);
+  await writeFile(scriptFile, JSON.stringify({
+    contentId, savedAt: new Date().toISOString(), assembly: segmentsEnabled() ? 'new' : 'old',
+    titles: script.titles, rawScenes: script.rawScenes, cluster: script.cluster, segmentReport: script.segmentReport,
+    vertical: script.vertical.map((s) => ({ role: s.role, narration: s.narration, assetId: s.assetId, matchBy: s.matchBy, why: s.why, segment: s.segment || null, extraSegments: s.extraSegments || [], segmentShortSec: s.segmentShortSec || 0 })),
+    sceneMatch: script.sceneMatch, assessment: script.assessment,
+  }, null, 2), 'utf8');
+  console.log('Đã ghi kịch bản:', scriptFile);
+  // --script-only (hay --dry-run): dừng sau khi chọn hình + đoạn, KHÔNG đọc TTS, KHÔNG dựng, KHÔNG đẩy hàng đợi.
+  if (process.argv.includes('--script-only') || process.argv.includes('--dry-run')) {
+    console.log(`\n--script-only: dừng trước TTS/dựng. Cảnh: ${script.vertical.length}, cụm: ${script.cluster?.id || 'không'}, đoạn thiếu: ${(script.segmentReport?.short || []).length} cảnh.`);
+    return;
+  }
+
   const workDir = join(HERE, '..', '..', '..', '..', 'out', 'video', `work_${contentId.slice(0, 8)}`);
   await mkdir(workDir, { recursive: true });
 
-  // Tải các asset dùng cho CẢ 2 bản (ngang cho FB + dọc cho TikTok).
-  const usedIds = new Set([...script.horizontal, ...script.vertical].map((s) => s.assetId));
+  // Tải các asset dùng cho CẢ 2 bản (ngang cho FB + dọc cho TikTok). 9/10: kể cả clip của các đoạn nối thêm.
+  const usedIds = new Set([...script.horizontal, ...script.vertical].flatMap((s) => [s.assetId, ...(s.extraSegments || []).map((r) => r.assetId)]));
   const assetPaths = new Map();
   for (const id of usedIds) {
     const a = assets.find((x) => x.id === id);
@@ -1030,7 +1100,7 @@ async function main() {
   // Đẩy vào Hàng đợi duyệt (một file dọc dùng cho cả FB lẫn TikTok).
   if (!process.argv.includes('--no-queue')) {
     try {
-      await pushToApprovalQueue(client, { timeline: vertical.timeline, content, script, horizontalPath: null, verticalPath: vertical.out, teaser, mustUseAssetId });
+      await pushToApprovalQueue(client, { timeline: vertical.timeline, segmentShort: vertical.segmentShort || [], content, script, horizontalPath: null, verticalPath: vertical.out, teaser, mustUseAssetId });
     } catch (e) {
       console.warn('Không đẩy được vào Hàng đợi duyệt:', e.message, '(video vẫn có ở out/video/).');
     }

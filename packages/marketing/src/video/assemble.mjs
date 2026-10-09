@@ -63,6 +63,27 @@ export function badgeFontSize(priceBadge, fmtW) {
 // thêm zoom chậm ~8% cho đỡ đứng hình (ChatGPT: máy SF300B đứng nguyên 6 giây). FIT_MODE=blur về kiểu cũ.
 const FIT_MODE = process.env.FIT_MODE || 'cover';
 
+// 9/10 ĐỢT A: filter_complex cho cảnh cắt đoạn. n đầu vào video (mỗi đoạn một input), chuẩn hóa từng đoạn về
+// đúng khung (crop lấp khung), nối bằng concat, nếu thiếu hình thì tpad giữ khung cuối holdSec giây (KHÔNG lặp
+// đoạn), rồi phụ đề (subFilter có dấu phẩy đứng đầu, hoặc rỗng) -> nhãn [v].
+export function buildPiecesFilter(n, fmt, holdSec, subFilter) {
+  const parts = [];
+  for (let i = 0; i < n; i++) {
+    parts.push(`[${i}:v]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=increase,crop=${fmt.w}:${fmt.h},setsar=1,fps=30,format=yuv420p,setpts=PTS-STARTPTS[p${i}]`);
+  }
+  let last = 'p0';
+  if (n > 1) {
+    parts.push(`${Array.from({ length: n }, (_, i) => `[p${i}]`).join('')}concat=n=${n}:v=1:a=0[vc]`);
+    last = 'vc';
+  }
+  if (holdSec > 0.02) {
+    parts.push(`[${last}]tpad=stop_mode=clone:stop_duration=${holdSec.toFixed(3)}[vh]`);
+    last = 'vh';
+  }
+  parts.push(`[${last}]${subFilter ? subFilter.replace(/^,/, '') : 'null'}[v]`);
+  return parts.join(';');
+}
+
 // Chuẩn hóa một cảnh -> sceneN.mp4 (đồng nhất codec để nối bằng -c copy).
 // noSub (17/9 vòng 3): cảnh giá đã có tem giá to giữa hình, phụ đề đọc lại y chang = 1 thông tin hiện
 // 2 chỗ (ChatGPT) -> cảnh giá tắt phụ đề, tem lo phần chữ, giọng vẫn đọc đủ.
@@ -101,15 +122,27 @@ async function buildSceneSegment(scene, fmt, workDir, index, { noSub = false } =
     vf = `[0:v]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=increase,crop=${fmt.w}:${fmt.h},fps=30,format=yuv420p${subFilter}[v]`;
   }
 
-  const inputArgs = scene.kind === 'image'
-    ? (coverImage ? ['-i', scene.videoPath] : ['-loop', '1', '-framerate', '30', '-i', scene.videoPath])
-    : ['-stream_loop', '-1', '-i', scene.videoPath];
+  // 9/10 ĐỢT A: cảnh có kế hoạch cắt đoạn (scene.pieces từ planSceneSegments) thì lấy ĐÚNG các đoạn
+  // `-ss start -t dur` rồi nối, KHÔNG lặp clip từ giây 0. Hết đoạn mà lời còn dài (scene.holdSec) thì giữ khung
+  // cuối cho phần thiếu. Chỉ áp ở kiểu crop lấp khung (mặc định); cảnh không có pieces giữ nguyên đường cũ.
+  const usePieces = FIT_MODE !== 'blur' && scene.kind !== 'image' && Array.isArray(scene.pieces) && scene.pieces.length > 0;
+  let audioIdx = 1;
+  let inputArgs;
+  if (usePieces) {
+    inputArgs = scene.pieces.flatMap((p) => ['-ss', Number(p.start).toFixed(3), '-t', Number(p.dur).toFixed(3), '-i', p.path]);
+    audioIdx = scene.pieces.length;
+    vf = buildPiecesFilter(scene.pieces.length, fmt, Number(scene.holdSec) || 0, subFilter);
+  } else {
+    inputArgs = scene.kind === 'image'
+      ? (coverImage ? ['-i', scene.videoPath] : ['-loop', '1', '-framerate', '30', '-i', scene.videoPath])
+      : ['-stream_loop', '-1', '-i', scene.videoPath];
+  }
 
   await ffmpeg([
     '-y', ...inputArgs, '-i', scene.audioPath,
     '-t', scene.durationSec.toFixed(3),
     '-filter_complex', vf,
-    '-map', '[v]', '-map', '1:a',
+    '-map', '[v]', '-map', `${audioIdx}:a`,
     // 18/9 (đo bản e335de29: tiếng AAC mỗi đoạn ngắn hơn hình 12-59ms, nối 5 đoạn thành hụt tiếng
     // ở mép cảnh): apad đắp lặng cho tiếng đầy đúng -t như hình, hết khe hụt khi concat -c copy.
     '-af', 'apad',

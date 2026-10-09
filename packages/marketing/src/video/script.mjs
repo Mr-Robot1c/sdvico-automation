@@ -5,7 +5,8 @@ import { knownFactValues, testFactValues } from '../product-facts.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
-import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen } from './scene-match.mjs';
+import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen, hasSegments, pickPrimaryCluster, pickInCluster, allocateSceneSegments } from './scene-match.mjs';
+import { segmentsEnabled, segKey } from './segments.mjs';
 import { EXTRA_WORN, absoluteClaims, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, paybackClaimSentences, keepOneQuestion } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
@@ -80,6 +81,12 @@ function parseJson(text) {
 export const SEMANTIC_FIT_MAX = 4;
 
 const assetTextOf = (a) => `${a?.title || ''} ${a?.description || ''} ${a?.label || ''}`.replace(/\s+/g, ' ').trim();
+// 9/10: pick mang đoạn thì model soát nghĩa phải thấy ĐOẠN SẼ CHIẾU (hành động thật của đoạn) trước, rồi mới tới mô tả cả clip.
+const pickTextOf = (a, pick) => (pick?.segment?.text
+  ? `${a?.title || ''} | ĐOẠN SẼ CHIẾU: ${pick.segment.text} | CẢ CLIP: ${String(a?.description || '').slice(0, 160)}`.replace(/\s+/g, ' ').trim()
+  : assetTextOf(a));
+// Chữ để soát câu tả trôi hình: tiêu đề + mô tả cả clip + chữ đoạn (hợp, chỉ bắt thứ nằm ngoài cả ba).
+const pickDriftTextOf = (a, pick) => `${assetTextOf(a)} ${pick?.segment?.text || ''}`.trim();
 const wordsOf = (t) => String(t || '').trim().split(/\s+/).filter(Boolean).length;
 
 // Chấm độ khớp nghĩa lời và hình cho mọi cảnh (trừ skip) bằng 1 lời gọi. Trả [{scene (1-based), fit, vi_sao}].
@@ -91,7 +98,7 @@ export async function semanticFitCheck(ai, scenes, picks, assetById, { generate 
     if (skipSet.has(i)) return;
     const a = assetById.get(picks[i]?.assetId);
     if (!a) return;
-    lines.push(`CẢNH ${i + 1} [${s.role}] | LỜI: ${s.narration} | HÌNH ĐÃ CHỌN: ${String(assetTextOf(a)).slice(0, 320) || '(chưa có mô tả)'}`);
+    lines.push(`CẢNH ${i + 1} [${s.role}] | LỜI: ${s.narration} | HÌNH ĐÃ CHỌN: ${String(pickTextOf(a, picks[i])).slice(0, 380) || '(chưa có mô tả)'}`);
   });
   if (!lines.length) return [];
   const system = 'Bạn là người duyệt video. Với từng cảnh, chấm hình đã chọn có KHỚP NGHĨA với lời đọc không khi hai thứ phát cùng lúc: 10 = đúng bối cảnh; 5 = không chướng; từ 4 trở xuống = người xem thấy sai (lời tả trong hầm máy mà hình ngoài trời, lời tả trên biển mà hình trên bờ, lời tả người đang làm việc mà hình không có ai...). Chỉ chấm theo MÔ TẢ hình, không suy diễn thêm.';
@@ -121,7 +128,7 @@ export async function semanticRewriteScenes(ai, scenes, picks, assetById, badIdx
     return [
       `CẢNH ${i + 1} [${scenes[i].role}]`,
       `LỜI CŨ (lệch hình): ${old}`,
-      `MÔ TẢ HÌNH: ${assetTextOf(a).slice(0, 320)}`,
+      `MÔ TẢ HÌNH: ${pickTextOf(a, picks[i]).slice(0, 380)}`,
       `Số câu tối đa: ${nSent}. Độ dài khoảng ${Math.round(nWords * 0.7)} tới ${Math.round(nWords * 1.3)} chữ.`,
       `Ngữ cảnh (KHÔNG viết lại): cảnh trước: ${i > 0 ? scenes[i - 1].narration : '(không có)'} | cảnh sau: ${i + 1 < scenes.length ? scenes[i + 1].narration : '(không có)'}`,
     ].join('\n');
@@ -167,7 +174,7 @@ export function applySemanticRewrites(rawScenes, picks, rewrites, { skip = [], a
       kept.push(i);
       continue;
     }
-    const at = assetTextOf(a);
+    const at = pickDriftTextOf(a, pick);
     const drift = [...imageryDriftSentences(text, at), ...inventedDetailSentences(text, at)];
     if (drift.length) {
       log.warn(`[script] cảnh ${i + 1}: lời viết lại vẫn trôi khỏi hình ("${drift[0].slice(0, 60)}") — giữ lời cũ.`);
@@ -598,7 +605,13 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       ].join('\n');
     }
   }
-  let parsed = {};
+  // 9/10 ĐỢT A (so sánh cùng một kịch bản): opts.reuseScript = file kịch bản đã ghi (rawScenes + titles). Có thì
+  // BỎ vòng gọi model viết lời, dùng lại lời y nguyên; chỉ chọn hình + cắt đoạn chạy lại (old/new so được).
+  const reuse = opts.reuseScript && Array.isArray(opts.reuseScript.rawScenes) && opts.reuseScript.rawScenes.length ? opts.reuseScript : null;
+  let parsed = reuse
+    ? { titles: Array.isArray(reuse.titles) ? reuse.titles : [], vertical: { scenes: reuse.rawScenes.map((s) => ({ role: s.role, narration: s.narration, visual: s.visual })) } }
+    : {};
+  if (reuse) console.log(`[script] DUNG LAI kich ban da ghi (${reuse.rawScenes.length} canh) — khong goi model viet loi; chi chon hinh + cat doan lai.`);
   let viol = [];
   let worn = [];
   let cross = [];   // 17/9: cụm sản phẩm kia lọt vào video bán hàng
@@ -618,7 +631,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   let sbChatter = []; // 2/10: cảnh giữa bài có câu hỏi giao lưu kiểu "...phải không?" (chỉ cảnh cuối được hỏi)
   let sbDescMiss = []; // 2/10: cảnh có từ 2 câu tả hình thuần trở lên (chỉ được tối đa 1 câu tả làm neo)
   const sbScenesOf = () => (parsed.vertical?.scenes || []).filter((s) => String(s?.narration || '').trim());
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < (reuse ? 0 : 2); attempt++) {
     const extra = (!viol.length ? '' :
       `\n\nLẦN TRƯỚC LỜI THOẠI SAI NGHỀ, phải bỏ hẳn các ý: ${viol.map((v) => `"${v.phrase}"`).join(', ')}. ${viol[0].why}`)
       + (!worn.length ? '' :
@@ -940,6 +953,17 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       s.hint = null;
     });
   }
+  // 9/10 ĐỢT A: chọn MỘT cụm tư liệu chính cho cả video (chỉ khi bật VIDEO_SEGMENTS và kho có clip mang đoạn +
+  // cụm). Không cụm nào phủ >= 2 cảnh -> null, hình chọn như cũ (clip có đoạn vẫn được cắt đúng đoạn).
+  const segGroup = opts.contentVideo ? null : opts.productGroup || null;
+  const segOn = segmentsEnabled() && !sbMode && assets.some(hasSegments);
+  const mustForCluster = opts.mustUseAssetId && assets.some((a) => a.id === opts.mustUseAssetId) ? opts.mustUseAssetId : null;
+  const cluster = segOn ? pickPrimaryCluster(rawScenes, assets, { productGroup: segGroup, mustAssetId: mustForCluster, mustIdx: mustIdxScene }) : null;
+  if (segOn) {
+    console.log(cluster
+      ? `Cụm tư liệu chính (9/10): ${cluster.id} | ${cluster.confidence} | ${cluster.clipIds.length} clip | phủ ${cluster.covered}/${rawScenes.length} cảnh`
+      : 'Không cụm nào phủ >= 2 cảnh (9/10): chọn hình như cũ, clip có đoạn vẫn được cắt đúng đoạn.');
+  }
   const picks = sbMode
     ? sbUse.map((a) => ({ assetId: a.id, fit: 10, why: 'storyboard: hình chốt trước, lời viết theo hình', by: 'storyboard' }))
     : assets.length
@@ -950,6 +974,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         recentUse: opts.recentUse || new Map(),
         // 17/9 chiều: clip máy đang chạy ép vào cảnh giải pháp (không có role solution thì cảnh cuối).
         mustUseIndex: mustIdxScene,
+        cluster: segOn ? cluster : null, useSegments: segOn,
       })
     : rawScenes.map(() => null);
   // 1/10 (Thanh, bài 22452d7f: lời "chòng chành sóng nước" trên hình CẢNG CÁ TRÊN BỜ): soát lời từng cảnh với
@@ -957,15 +982,16 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   if (assets.length && !sbMode) {
     const refined = refinePicksByImagery({
       scenes: rawScenes, picks, assets, mustIdx: mustIdxScene, skip: hookPin ? [0] : [],
-      productGroup: opts.contentVideo ? null : opts.productGroup || null, recentUse: opts.recentUse || new Map(), log: console,
+      productGroup: opts.contentVideo ? null : opts.productGroup || null, recentUse: opts.recentUse || new Map(), cluster: segOn ? cluster : null, log: console,
     });
-    refined.narrations.forEach((n, i) => { if (n && n !== rawScenes[i].narration) rawScenes[i].narration = n; });
+    // Dựng lại từ kịch bản đã ghi: lời GIỮ NGUYÊN (chỉ hình đổi) để so sánh cũ/mới cùng một lời.
+    if (!reuse) refined.narrations.forEach((n, i) => { if (n && n !== rawScenes[i].narration) rawScenes[i].narration = n; });
   }
   // 1/10 vòng 2 (Thanh: bản dựng lần 4 đủ cả 3 bản vá từ khóa vẫn lệch 2 cảnh — "hầm máy siết vòng gen" trên
   // hình bơm ngoài trời, "chòng chành sóng nước" trên hình cảng): từ khóa không đo được NGHĨA. Nhờ model chấm
   // nghĩa lời với hình đã chọn, cảnh lệch thì VIẾT LẠI LỜI theo mô tả hình (semanticRecheck, +2 lời gọi,
   // model lỗi/429 thì bỏ qua). Miễn: cảnh clip bắt buộc và cảnh 1 khi hookPin ghi đè hình.
-  if (assets.length && !sbMode) {
+  if (assets.length && !sbMode && !reuse) {
     const semSkip = [...(picks[mustIdxScene]?.by === 'must' ? [mustIdxScene] : []), ...(hookPin ? [0] : [])];
     const semBanned = opts.contentVideo ? WORN_PHRASES : SALES_WORN;
     await semanticRecheck({
@@ -984,7 +1010,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   let vertical = rawScenes
     .map((s, i) => {
       const assetId = picks[i]?.assetId || s.hint || null;
-      return { narration: s.narration, assetId, role: s.role, visual: s.visual, fit: picks[i]?.fit ?? null, matchBy: picks[i]?.by || (s.hint ? 'hint' : 'none'), why: picks[i]?.why || '' };
+      return { narration: s.narration, assetId, role: s.role, visual: s.visual, fit: picks[i]?.fit ?? null, matchBy: picks[i]?.by || (s.hint ? 'hint' : 'none'), why: picks[i]?.why || '', segment: picks[i]?.segment || null };
     })
     .filter((s) => s.assetId);
   // 17/9 vòng 3: cảnh 1 dùng đúng tư liệu đã chọn trước (lời đã viết theo mô tả hình này).
@@ -1014,7 +1040,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   // câu tả cảnh vật KHÔNG có trong mô tả tư liệu (chỉ cảnh vấn đề / đời sống; cắt hết thì giữ nguyên
   // như luật cắt cụm cấm, có log để soi).
   for (const [i, s] of vertical.entries()) {
-    if (sbMode) break; // 2/10 đêm: storyboard đã soát/cắt riêng (câu kể được tha); cutImageryDrift sẽ cắt luôn câu kể
+    if (sbMode || reuse) break; // 2/10 đêm: storyboard đã soát/cắt riêng (câu kể được tha); cutImageryDrift sẽ cắt luôn câu kể. 9/10: dựng lại từ kịch bản đã ghi thì lời giữ nguyên
     if (!['hook', 'empathy', 'story'].includes(s.role)) continue;
     const a = assets.find((x) => x.id === s.assetId);
     if (!a) continue;
@@ -1055,13 +1081,26 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     const before = last.narration;
     last.narration = ensureSpokenTeaser(last.narration, teaser);
     if (last.narration !== before) console.warn('[script] da noi cau gia up mo vao canh cuoi (model quen luat 8/9)');
+  }
+  // 9/10: lời từng cảnh đã chốt (trước khi tách cảnh) — ghi vào kịch bản để dựng lại CÙNG MỘT LỜI (--reuse-script).
+  const rawScenesFinal = vertical.map((s) => ({ role: s.role, narration: s.narration, visual: s.visual }));
+  if (teaser && vertical.length) {
     // 17/9 (ChatGPT chấm 7e9cab1a: ảnh sản phẩm nền trắng đứng 20 giây vì cảnh cuối gánh cả câu chốt
     // lẫn câu giá ~30 từ): tách câu giá thành cảnh riêng, chọn tư liệu KHÁC cảnh cuối (ưu tiên clip
     // máy đang lắp/đang chạy) để hình đổi, mỗi cảnh ngắn lại.
     const usedCount = new Map();
     for (const s of vertical) usedCount.set(s.assetId, (usedCount.get(s.assetId) || 0) + 1);
+    const priceVisual = 'máy đang lắp trên tàu, đang chạy, kỹ thuật bàn giao';
     const r = splitPriceScene(vertical, teaser, {
-      pickAsset: (prevId) => pickByRole(assets, 'closing', { prevId, usedCount, visual: 'máy đang lắp trên tàu, đang chạy, kỹ thuật bàn giao' })?.id || null,
+      pickAsset: (prevId) => {
+        // 9/10: có cụm chính thì cảnh giá ưu tiên đoạn TRONG cụm (cảnh này chưa có đoạn, allocate gán sau).
+        if (cluster) {
+          const used = new Set(vertical.filter((s) => s.segment).map((s) => segKey(s.segment.assetId, s.segment.idx)));
+          const c = pickInCluster(cluster, assets, { role: 'closing', visual: priceVisual, narration: '' }, 'closing', { prevId, usedSegKeys: used, usedCount, recentUse: opts.recentUse || new Map(), productGroup: segGroup });
+          if (c) return c.assetId;
+        }
+        return pickByRole(assets, 'closing', { prevId, usedCount, visual: priceVisual })?.id || null;
+      },
     });
     if (r.split) { vertical = r.scenes; console.log('[script] tach cau gia thanh canh rieng (17/9) de anh san pham khong dung qua lau'); }
   }
@@ -1078,15 +1117,39 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     const r = splitLongImageScenes(vertical, {
       isImage,
       videoToo: true, // 17/9 vòng 2: cảnh clip 12s đứng nguyên cũng tách (trừ clip bắt buộc và cảnh giá)
-      pickAsset: (prevId, role, visual) => pickByRole(problemPool(assets, role, groupForPool), role, { prevId, usedCount, visual })?.id || null,
+      pickAsset: (prevId, role, visual) => {
+        // 9/10: có cụm chính thì nửa sau của cảnh tách cũng lấy TRONG cụm trước, không nhảy ra ngoài cụm.
+        if (cluster) {
+          const used = new Set(vertical.filter((x) => x.segment).map((x) => segKey(x.segment.assetId, x.segment.idx)));
+          const c = pickInCluster(cluster, assets, { role, visual, narration: '' }, role, { prevId, usedSegKeys: used, usedCount, recentUse: opts.recentUse || new Map(), productGroup: segGroup });
+          if (c && c.assetId !== prevId) return c.assetId;
+        }
+        return pickByRole(problemPool(assets, role, groupForPool), role, { prevId, usedCount, visual })?.id || null;
+      },
     });
     if (r.split) { vertical = r.scenes; console.log('[script] tach canh anh dai thanh 2 canh doi hinh (17/9)'); }
   }
+  // 9/10 ĐỢT A: gán đoạn chính + đoạn nối thêm cho từng cảnh khi danh sách cảnh đã chốt hẳn (sau ghim cảnh 1, tách cảnh).
+  let segmentReport = null;
+  if (segOn) {
+    segmentReport = allocateSceneSegments(vertical, assets, { cluster, productGroup: segGroup, log: console });
+  }
   for (const [i, s] of vertical.entries()) {
     const a = assets.find((x) => x.id === s.assetId);
-    console.log(`  cảnh ${i + 1} [${s.role}] ${s.matchBy} fit=${s.fit ?? '?'} -> ${a?.kind || '?'} "${String(a?.title || s.assetId).slice(0, 60)}"${s.visual ? ` | cần: ${s.visual.slice(0, 70)}` : ''}`);
+    const segInfo = s.segment ? ` | đoạn ${Number(s.segment.start).toFixed(1)}-${Number(s.segment.end).toFixed(1)}s${s.extraSegments?.length ? ` +${s.extraSegments.length} đoạn nối` : ''}` : '';
+    console.log(`  cảnh ${i + 1} [${s.role}] ${s.matchBy} fit=${s.fit ?? '?'} -> ${a?.kind || '?'} "${String(a?.title || s.assetId).slice(0, 60)}"${segInfo}${s.visual ? ` | cần: ${s.visual.slice(0, 70)}` : ''}`);
   }
-  const sceneAssets = [...new Set(vertical.map((s) => s.assetId))];
+  // 9/10: cảnh nào lấy hình ngoài cụm chính thì ghi RÕ lý do vào why (người duyệt thấy ở cột "Ghép từ").
+  if (cluster) {
+    const inC = new Set(cluster.clipIds);
+    vertical.forEach((s) => {
+      if (!inC.has(s.assetId) && !/ngoài cụm/.test(s.why || '')) {
+        const reason = s.matchBy === 'must' ? 'clip bắt buộc' : s.matchBy === 'hook-pin' ? 'cảnh 1 ghim tư liệu nỗi đau đã chọn trước' : 'không đoạn nào trong cụm hợp cảnh này';
+        s.why = `ngoài cụm ${cluster.id}: ${reason} | ${s.why || ''}`.slice(0, 220);
+      }
+    });
+  }
+  const sceneAssets = [...new Set(vertical.flatMap((s) => [s.assetId, ...(s.extraSegments || []).map((r) => r.assetId)]))];
   // 5/9 (sếp): chỉ dựng BẢN DỌC. Giữ key horizontal trỏ cùng mảng để code gọi không đổi.
   const horizontal = vertical;
   const titles = Array.isArray(parsed.titles) ? parsed.titles.filter(Boolean).slice(0, 3).map((t) => redactExactPrices(String(t))) : [];
@@ -1099,6 +1162,14 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   });
 
   // 15/9: khớp cảnh ↔ tư liệu (id, vai, hình cần, điểm khớp) để ghi vào brief.video_scene_match + trang Video.
-  const sceneMatch = vertical.map((s, i) => ({ scene: i + 1, role: s.role, assetId: s.assetId, visual: s.visual, fit: s.fit, by: s.matchBy, why: s.why }));
-  return { titles, vertical, horizontal, assessment, sceneAssets, sceneMatch };
+  const sceneMatch = vertical.map((s, i) => ({
+    scene: i + 1, role: s.role, assetId: s.assetId, visual: s.visual, fit: s.fit, by: s.matchBy, why: s.why,
+    ...(s.segment ? { segment: [s.segment.idx, s.segment.start, s.segment.end], extra: (s.extraSegments || []).map((r) => [r.assetId.slice(0, 8), r.start, r.end]) } : {}),
+  }));
+  return {
+    titles, vertical, horizontal, assessment, sceneAssets, sceneMatch,
+    rawScenes: rawScenesFinal,
+    cluster: cluster ? { id: cluster.id, confidence: cluster.confidence, clipIds: cluster.clipIds, covered: cluster.covered } : null,
+    segmentReport,
+  };
 }

@@ -245,7 +245,9 @@ export function splitLongImageScenes(scenes, { maxWords = 36, imageMaxWords = 24
     const isImg = typeof isImage === 'function' && isImage(s.assetId);
     const splittable = typeof isImage === 'function' && (isImg || videoToo);
     const limit = isImg ? imageMaxWords : maxWords;
-    if (s.role === 'price' || s.matchBy === 'must' || !splittable || wordCount(s.narration) < limit) { out.push(s); continue; }
+    // 9/10 ĐỢT A: cảnh đã có ĐOẠN riêng (s.segment) không tách: hình đổi nhịp bằng các đoạn nối, tách thêm chỉ làm lời lệch đoạn.
+    const hasOwnSegment = !!(s.segment && s.segment.assetId && s.segment.assetId === s.assetId);
+    if (s.role === 'price' || s.matchBy === 'must' || hasOwnSegment || !splittable || wordCount(s.narration) < limit) { out.push(s); continue; }
     const parts = splitNarrationMiddle(s.narration);
     const second = parts && typeof pickAsset === 'function' ? pickAsset(s.assetId, s.role, s.visual) : null;
     if (!parts || !second || second === s.assetId) { out.push(s); continue; }

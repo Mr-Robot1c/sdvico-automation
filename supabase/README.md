@@ -10,6 +10,8 @@ Thư mục này chứa lược đồ cơ sở dữ liệu và chính sách bảo
 - `migrations/20260824150000_mkt_metrics_source_tiktok.sql`: nới CHECK `mkt_metrics.source` thêm `'tiktok'`. Cần từ 24/8 khi cron bắt đầu kéo view/like/comment TikTok vào `mkt_metrics` (source='tiktok').
 - `migrations/20260814120000_mkt_plans.sql`: bảng `mkt_plans` cho con bot định hướng. Mỗi bản kế hoạch (cron thứ 4 và chủ nhật, hoặc bấm tạo tay) lưu ở đây kèm trọng số sản phẩm. RLS bật, policy staff như các bảng mkt khác. Trang `/ke-hoach` và cron `/api/plan` cần bảng này, phải áp trước khi deploy.
 
+- `migrations/20261009120000_brand_assets_segments_cluster.sql`: thêm `brand_assets.segments` (các đoạn 2 tới 12 giây trong clip, mỗi đoạn ghi hành động thấy thật) và `brand_assets.shoot_cluster` (cụm buổi quay, `confidence` chac hoặc co_the), cả hai jsonb null mặc định. Dây chuyền video chọn đoạn và giữ một cụm tư liệu xuyên suốt video (đợt A, 9/10). Ghi bằng `packages/marketing/src/video/segment-clips.mjs`.
+
 ## Cách áp dụng
 
 Máy phát triển hiện chưa cài Supabase CLI và Docker, nên chưa chạy migration cục bộ. Chọn một trong hai cách sau, chạy bằng tài khoản của bạn. Không đưa khóa cho ai và không commit khóa vào Git (điều cấm 7).
