@@ -83,7 +83,7 @@ export default function SanXuatForm({
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
-  // Panel tiến trình sau khi "Xong + Làm video". Polling checkVideoDone mỗi 20s.
+  // Panel tiến trình sau khi "Gửi duyệt và làm video". Polling checkVideoDone mỗi 20s.
   const [videoJob, setVideoJob] = useState<{
     sourceId: string; status: 'waiting' | 'done' | 'timeout';
     startedAt: number; videoUrl?: string; queueUrl?: string; title?: string;
@@ -147,7 +147,7 @@ export default function SanXuatForm({
     try {
       const t = await generateTextForTitle(kw, intent, landingUrl, assetHint, format, contentType);
       setDraft(t);
-      setMsg(t ? 'Đã sinh xong. Sửa lại rồi bấm Xong để đẩy vào hàng đợi.' : 'Sinh xong nhưng không có text — thử từ khóa khác.');
+      setMsg(t ? 'Đã sinh xong. Sửa lại rồi bấm Gửi duyệt.' : 'Sinh xong nhưng không có text, thử từ khóa khác.');
     } catch (e: any) {
       setMsg('Lỗi sinh text: ' + (e?.message || e));
     } finally {
@@ -185,7 +185,7 @@ export default function SanXuatForm({
           setVideoJob({ sourceId: res.contentId, status: 'waiting', startedAt: Date.now() });
           setMsg('');
         } else {
-          setMsg('Xong. Nội dung đã ở Hàng đợi duyệt, chờ người bấm Duyệt để đăng.');
+          setMsg('Đã gửi duyệt. Bài nằm ở Hàng đợi duyệt, chờ người bấm Duyệt mới đăng.');
         }
         setTitle('');
         setTitleAuto(true);
@@ -545,7 +545,7 @@ export default function SanXuatForm({
               className="btn ok"
               disabled={pending || !title.trim() || !draft.trim()}
             >
-              {pending ? 'Đang đẩy...' : '✅ Xong — đẩy vào hàng đợi duyệt'}
+              {pending ? 'Đang gửi...' : 'Gửi duyệt'}
             </button>
             <button
               type="button"
@@ -554,7 +554,7 @@ export default function SanXuatForm({
               disabled={pending || !title.trim() || !draft.trim()}
               title="Lưu bài + yêu cầu GitHub Actions dựng video (FB 16:9 + TikTok dọc). Mất ~8 phút, không cần bật máy."
             >
-              {pending ? 'Đang đẩy...' : '🎬 Xong + Làm video (~8 phút)'}
+              {pending ? 'Đang gửi...' : 'Gửi duyệt và làm video (khoảng 8 phút)'}
             </button>
             {msg ? <span className="muted">{msg}</span> : null}
           </div>
@@ -611,7 +611,7 @@ export default function SanXuatForm({
           ) : null}
 
           <p className="sx-note">
-            Nút <b>Xong</b> chỉ tạo khung sườn và đưa vào hàng đợi duyệt. Nội dung chưa lên trang mạng xã hội —
+            Nút <b>Gửi duyệt</b> chỉ tạo bài và đưa vào hàng đợi duyệt. Nội dung chưa lên trang mạng xã hội:
             người duyệt phải bấm <b>Duyệt</b> ở tab Hàng đợi duyệt thì mới thực sự đăng. Điều cấm 1: máy soạn, người bấm.
           </p>
         </form>

@@ -2181,7 +2181,7 @@ export async function generateTextForTitle(
     );
     return (r?.draft as string) || '';
   } catch (e: any) {
-    return `Không sinh được bằng AI: ${e?.message || e}. Bấm Xong để tự soạn tay và đẩy vào hàng đợi.`;
+    return `Không sinh được bằng AI: ${e?.message || e}. Tự soạn tay rồi bấm Gửi duyệt.`;
   }
 }
 

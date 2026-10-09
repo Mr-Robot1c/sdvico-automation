@@ -12,7 +12,7 @@ import { crumbFor, parentFor, routeNodeFor, ROUTES } from '../lib/routes';
 // Thanh trên cùng: nhãn vai trò + đường dẫn cha › con + hành động phải (theme, user).
 export default function TopHeader({ marketingOnly = false }: { marketingOnly?: boolean }) {
   const path = usePathname() || '/';
-  const role = marketingOnly ? 'Marketing SDVICO' : 'Duyệt và Hồ sơ SDVICO';
+  const role = marketingOnly ? 'Marketing SDVICO' : 'Marketing và Tuyển dụng SDVICO';
   const crumb = crumbFor(path);
   const parent = parentFor(path);
   const parentLabel = parent ? (ROUTES[parent]?.label || routeNodeFor(parent)?.node.label || '') : '';

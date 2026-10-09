@@ -8,8 +8,8 @@ export const maxDuration = 60;
 type Asset = { id: string; kind: string; title: string; storage_path: string; product_group: string | null };
 
 // Trang xưởng sản xuất: chọn 1 ảnh + 1 video (từ kho hoặc tải mới), gõ tiêu đề, bấm Sinh text để
-// máy viết theo tiêu đề/ảnh, sửa lại rồi Xong để đẩy vào hàng đợi duyệt.
-// Máy soạn, người bấm — nút Xong chỉ tạo khung sườn (mkt_content + approval_queue), KHÔNG tự đăng.
+// máy viết theo tiêu đề/ảnh, sửa lại rồi bấm Gửi duyệt.
+// Máy soạn, người bấm: nút Gửi duyệt chỉ tạo khung sườn (mkt_content + approval_queue), KHÔNG tự đăng.
 export default async function Page() {
   const client = getServerClient();
   // 26/8: user "loc theo folder bi bug mat tieu het roi" — truoc limit 40 -> chip filter chi
@@ -38,7 +38,7 @@ export default async function Page() {
         <div>
           <h1>Xưởng sản xuất hôm nay</h1>
           <p className="sub">
-            Gắn 1 ảnh và 1 video, gõ tiêu đề, bấm Sinh text, sửa lại rồi Xong để đẩy vào hàng đợi duyệt.
+            Gắn 1 ảnh và 1 video, gõ tiêu đề, bấm Sinh text, sửa lại rồi bấm Gửi duyệt.
             Máy soạn, người bấm gửi: nội dung ở đây chưa lên trang, phải qua duyệt trước.
           </p>
         </div>
@@ -49,7 +49,7 @@ export default async function Page() {
         <span className="pipe-step">2. Gõ tiêu đề</span>
         <span className="pipe-step">3. Sinh text bằng AI</span>
         <span className="pipe-step">4. Sửa nội dung</span>
-        <span className="pipe-step">5. Xong, đẩy vào hàng đợi duyệt</span>
+        <span className="pipe-step">5. Gửi duyệt</span>
         <span className="pipe-step">6. Người bấm Duyệt mới đăng</span>
       </div>
 

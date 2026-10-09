@@ -595,7 +595,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
                           {p.channel === 'facebook' && !/\/reel\//.test(p.url) && c.brief?.fb_real_url ? <ShareGroups postUrl={String(c.brief.fb_real_url)} /> : null}
                         </Fragment>
                       ))}
-                      {/* Nút "Làm video" đã chuyển sang trang /san-xuat (nút "Xong + Làm video"). */}
+                      {/* Nút "Làm video" đã chuyển sang trang /san-xuat (nút "Gửi duyệt và làm video"). */}
                       {c.brief?.video_requested ? (
                         <span className="badge tone-demo" title="Đã bấm dựng video — máy đang dựng, xong sẽ tự tắt nhãn này">🎬 Đang dựng video</span>
                       ) : null}
