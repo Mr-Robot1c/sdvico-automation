@@ -10,7 +10,7 @@ import { publishContentToWebsite } from '../lib/gen/publish-website';
 import { hasPublishedWebsitePost, requestPublicSiteRefresh } from '../lib/public-site-refresh';
 import { postVideoToTikTok } from '../lib/tiktok';
 import { isEmergencyStopped } from '../lib/safety';
-import { postsToMainPage } from '../lib/fb-main-page';
+import { postsToMainPage, FB_MAIN_PAGE_ID } from '../lib/fb-main-page';
 import { fetchWithRetry } from '../lib/retry';
 import { pullFacebookMetrics, fbPageTokens } from '../lib/fb-metrics';
 import { generateAndStorePlan } from '../lib/plan';
@@ -982,6 +982,8 @@ async function facebookObjectOwner(objId: string): Promise<{ ownerId: string | n
 
 // Id của các page PHỤ (page máy đăng nháp): gom cả FACEBOOK_PAGE_ID lẫn id thật từ /me của
 // từng token không phải 'real' (env có thể ghi id cũ/lệch với page token đang giữ).
+// 9/10: máy đăng THẲNG Page chính (FACEBOOK_PAGE_ID = id SDVICO VN, lib/fb-main-page.ts) thì
+// token ô 'test' chính là Page chính -> KHÔNG được coi là page phụ, kẻo nhập tay bài SDVICO VN bị chặn oan.
 async function fbSubPageIds(): Promise<Set<string>> {
   const VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v21.0';
   const out = new Set<string>();
@@ -993,6 +995,7 @@ async function fbSubPageIds(): Promise<Set<string>> {
       if (j?.id) out.add(String(j.id));
     } catch { /* bỏ qua */ }
   }
+  out.delete(FB_MAIN_PAGE_ID);
   return out;
 }
 
