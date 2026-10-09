@@ -12,6 +12,32 @@ export function isLivePost(p: { published_at?: string | null }, nowIso: string =
   return !!p.published_at && String(p.published_at) <= nowIso;
 }
 
+/** Lượt đăng hẹn giờ chưa tới giờ (published_at ở tương lai, vd Facebook scheduled_publish_time). */
+export function isScheduledPost(p: { published_at?: string | null }, nowIso: string = new Date().toISOString()): boolean {
+  return !!p.published_at && String(p.published_at) > nowIso;
+}
+
+/**
+ * Bài nào tính là "Đã đăng": có ít nhất 1 lượt đã tới giờ VÀ không còn lượt hẹn giờ nào chưa tới giờ.
+ * 9/10 (Thanh: "cái nào hẹn giờ thì ở tab hẹn giờ"): bản tin lên YouTube ngay nhưng Facebook hẹn 17:00
+ * từng bị xếp "Đã đăng" vì YouTube đã lên. Còn kênh đang hẹn thì bài vẫn là Lên lịch tới giờ hẹn.
+ */
+export function liveContentIds(
+  posts: Array<{ content_id?: string | null; published_at?: string | null }> | null | undefined,
+  nowIso: string = new Date().toISOString(),
+): Set<string> {
+  const live = new Set<string>();
+  const waiting = new Set<string>();
+  for (const p of posts || []) {
+    const cid = p?.content_id ? String(p.content_id) : '';
+    if (!cid) continue;
+    if (isScheduledPost(p, nowIso)) waiting.add(cid);
+    else if (isLivePost(p, nowIso)) live.add(cid);
+  }
+  for (const cid of waiting) live.delete(cid);
+  return live;
+}
+
 export function effContentStatus(
   queueStatus: string | undefined,
   hasLivePost: boolean,

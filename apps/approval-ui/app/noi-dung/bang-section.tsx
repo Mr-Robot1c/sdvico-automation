@@ -17,6 +17,7 @@ import LinkTikTokButton from './link-tiktok-button';
 import PexelsScenesButton from './pexels-scenes-button';
 import { isFutureVNLocal } from '../../lib/posting-plan';
 import { assetPublicUrl } from '../../lib/asset-url';
+import { liveContentIds, isScheduledPost } from '../../lib/content-status';
 import { publishTargetLines } from '../../lib/publish-targets';
 
 // BẢNG BÀI VIẾT kiểu board (user 21/8: "duyệt + vận hành + quản lý bài viết gộp lại, dùng
@@ -168,8 +169,16 @@ export default async function BangSection() {
   // 29/8 (user: "lên lịch mà nhảy sang đã đăng"): bài hẹn giờ có mkt_posts với published_at
   // TƯƠNG LAI (giờ hẹn) — chưa tới giờ thì vẫn là "Lên lịch", có ít nhất 1 bài đã tới giờ mới
   // sang "Trạng thái".
+  // 9/10: còn kênh hẹn giờ chưa tới giờ (vd bản tin: YouTube lên ngay, Facebook hẹn 17:00) thì vẫn
+  // "Lên lịch", kể cả khi kênh khác đã lên (lib/content-status.ts liveContentIds).
   const nowIso = new Date().toISOString();
-  const hasLivePost = (cid: string) => (postsByContent.get(cid) || []).some((p) => p.at && p.at <= nowIso);
+  const liveCids = liveContentIds([...postsByContent.entries()].flatMap(([cid, ps]) => ps.map((p) => ({ content_id: cid, published_at: p.at }))), nowIso);
+  const hasLivePost = (cid: string) => liveCids.has(cid);
+  // Giờ hẹn sớm nhất còn ở tương lai của bài, đổi sang "YYYY-MM-DDTHH:mm" giờ VN cho fmtSchedule.
+  const nextScheduledVN = (cid: string): string => {
+    const at = (postsByContent.get(cid) || []).filter((p) => isScheduledPost({ published_at: p.at }, nowIso)).map((p) => p.at).sort()[0];
+    return at ? new Date(new Date(at).getTime() + 7 * 3600 * 1000).toISOString().slice(0, 16) : '';
+  };
   const approvedWaiting = items.filter((it) => it.status === 'approved' && !hasLivePost(it.cid));
   // 2/10 (audit đợt A): bài đã có lượt đăng thật là "Đã đăng" dù phiếu gần nhất là Từ chối (vd bấm nhầm sau khi đã đăng).
   // Trước đây bài như vậy nằm CẢ ở Đã đăng LẪN Từ chối (đếm 2 lần, còn có link FB/TikTok ở thẻ Từ chối). Giờ hai nhóm tách bạch.
@@ -403,8 +412,12 @@ export default async function BangSection() {
 
                 // 27/8: cot "Len lich" — bai duyet roi, cho hen gio hoac dang dang len kenh.
                 if (col.key === 'scheduled') {
-                  const hasSched = !!it.scheduledAt;
-                  const future = hasSched && isFutureVN(it.scheduledAt);
+                  // Giờ hẹn: phiếu duyệt ghi sẵn; không có (vd bản tin nạp từ xưởng) thì lấy từ lượt đăng hẹn giờ.
+                  const schedAt = it.scheduledAt || nextScheduledVN(it.cid);
+                  const hasSched = !!schedAt;
+                  const future = hasSched && isFutureVN(schedAt);
+                  // Kênh đã lên trước giờ hẹn (vd YouTube của bản tin) để người xem biết phần nào đã xong.
+                  const liveChans = [...new Set((postsByContent.get(it.cid) || []).filter((x) => x.at && x.at <= nowIso).map((x) => x.channel))];
                   // 29/8 (user: "bài lên lịch t muốn coi được chứ không đứng yên"): thêm mục
                   // Xem bài — ảnh/video + nguyên văn nội dung sẽ đăng.
                   const schImg = (typeof p.assets?.image_url === 'string' && p.assets.image_url) || (typeof p.assets?.image === 'string' ? assetUrl.get(p.assets.image) : undefined);
@@ -422,12 +435,15 @@ export default async function BangSection() {
                           <span className="badge tone-demo" title="TikTok không cho đăng qua API. Bấm Xuất TikTok để tải video dọc + copy caption, đăng trên app/web TikTok, rồi Ghép TikTok để hệ thống tính là đã đăng.">🎵 Chờ bạn xuất TikTok tay</span>
                         ) : hasSched ? (
                           <span className={`badge ${future ? 'tone-demo' : 'tone-ok'}`} title="Giờ hẹn đăng người duyệt đã chọn. Tới giờ máy tự đăng.">
-                            ⏰ Hẹn {fmtSchedule(it.scheduledAt)}{future ? '' : ' (đang đăng)'}
+                            ⏰ Hẹn {fmtSchedule(schedAt)}{future ? '' : ' (đang đăng)'}
                           </span>
                         ) : (
                           <span className="badge tone-demo" title="Đã duyệt, máy đang đăng lên kênh (1 tới 2 phút với video).">⏳ Đang đăng lên kênh</span>
                         )}
                         <span className="badge badge-format" title="Kênh bài sẽ đăng (theo ô Lịch đăng cố định)">📍 {planChannelLabel(p.plan_channel, chans, p.post_reel === true)}</span>
+                        {liveChans.length ? (
+                          <span className="badge tone-ok" title="Kênh này đã lên. Các kênh còn lại tự đăng đúng giờ hẹn.">Đã lên: {liveChans.map((x) => CH_LABEL[x] || x).join(', ')}</span>
+                        ) : null}
                       </div>
                       {/* 29/8 (user: "bấm xem bài như bên chờ duyệt"): mở MODAL lớn ViewModal
                           thay vì xổ inline trong card. */}

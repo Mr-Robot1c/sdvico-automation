@@ -8,6 +8,7 @@ import { CHANNEL_LABEL, DOW_LONG } from '../../lib/posting-plan';
 import { computeShareLot, planShareLots } from '../../lib/share-lot';
 import ShareLotToday from './share-lot-today';
 import { isDemoMode, maskName, maskTextFor } from '../../lib/demo-mode';
+import { liveContentIds } from '../../lib/content-status';
 
 // 27/8 REDESIGN theo file "redesign web.docx" cua sep — trang TONG QUAN kieu ForLife Ops.
 // v2 (feedback sep cung ngay): (1) icon kenh trong bang bam duoc -> mo bai tren nen tang do;
@@ -143,7 +144,8 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
   const leads = ((leadsRes.data || []) as any[]).map((l) => (demo ? { ...l, fb_user_name: maskName(l.fb_user_name), fb_profile_url: null, message: maskTextFor(l.message, l.fb_user_name) } : l));
 
   // ---- Trang thai theo content id (tu queue + posts) ----
-  const publishedCids = new Set(posts.map((p) => p.content_id).filter(Boolean) as string[]);
+  // 9/10: bài còn kênh hẹn giờ chưa tới giờ là Lên lịch, chưa phải Đã đăng (lib/content-status.ts).
+  const publishedCids = liveContentIds(posts);
   const channelsByCid = new Map<string, Set<string>>();
   const urlByCidChannel = new Map<string, Map<string, string>>(); // cid -> channel -> external_url
   const firstPostAt = new Map<string, string>();

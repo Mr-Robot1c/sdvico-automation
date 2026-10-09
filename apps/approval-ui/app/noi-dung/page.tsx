@@ -13,7 +13,7 @@ import BangSection from './bang-section';
 import TikTokPrivateChip from './tiktok-private-chip';
 import { lengthLabel, channelsLabel, postedChannelsLabel, intentLabel, riskMeta, COMPLIANCE_LABELS, formatDateTimeVN } from '../labels';
 import { assetPublicUrl } from '../../lib/asset-url';
-import { effContentStatus, isLivePost, latestQueueStatusByCid } from '../../lib/content-status';
+import { effContentStatus, liveContentIds, latestQueueStatusByCid } from '../../lib/content-status';
 export const dynamic = 'force-dynamic';
 
 const STATUS: Record<string, { label: string; tone: string }> = {
@@ -136,11 +136,10 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     const qStatusByCid = latestQueueStatusByCid(qRowsAll as any[]);
     // Lượt đăng thật của 200 bài này: có lượt đăng thì tính "Đã đăng" dù phiếu gần nhất là Từ chối.
     const recentIds = (recentRows || []).map((r: any) => String(r.id));
-    const liveCids = new Set<string>();
+    let liveCids = new Set<string>();
     if (recentIds.length) {
-      const nowIso = new Date().toISOString();
       const { data: pRows } = await client.from('mkt_posts').select('content_id, published_at').eq('status', 'published').in('content_id', recentIds);
-      for (const p of pRows || []) if ((p as any).content_id && isLivePost(p as any, nowIso)) liveCids.add(String((p as any).content_id));
+      liveCids = liveContentIds(pRows as any[]);
     }
     const effOf = (row: { id: string; status: string | null }) => effContentStatus(qStatusByCid.get(row.id), liveCids.has(row.id), row.status);
     let cAll = 0;
@@ -234,11 +233,10 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
     }
   }
   // Lượt đăng thật của các bài đang xem (tối đa 200): có lượt đăng thì hiển thị Đã đăng, kể cả khi phiếu gần nhất là Từ chối.
-  const liveCids = new Set<string>();
+  let liveCids = new Set<string>();
   if (rawItems.length) {
-    const nowIso = new Date().toISOString();
     const { data: lp } = await client.from('mkt_posts').select('content_id, published_at').eq('status', 'published').in('content_id', rawItems.map((c) => c.id));
-    for (const p of lp || []) if ((p as any).content_id && isLivePost(p as any, nowIso)) liveCids.add(String((p as any).content_id));
+    liveCids = liveContentIds(lp as any[]);
   }
   // "YYYY-MM-DDTHH:mm" (giờ máy người duyệt = giờ VN) -> "HH:mm dd/mm/yyyy". Không đổi múi giờ.
   const fmtSchedule = (s: string): string => {
