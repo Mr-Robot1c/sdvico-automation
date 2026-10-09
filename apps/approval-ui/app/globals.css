@@ -491,6 +491,16 @@ a.btn, a.btn:hover, a.btn:focus-visible { text-decoration: none; }
   background: color-mix(in srgb, var(--no) 12%, transparent); color: var(--no);
 }
 
+/* 9/10: khối cảnh báo câu có thể tự bịa trong bài content (payload.gen_flags). */
+.gen-flags-notice {
+  margin: 8px 0; padding: 10px 12px; border-radius: 8px;
+  background: var(--no-bg); border: 1px solid var(--no); border-left-width: 4px;
+  color: var(--ink); font-size: .85rem; line-height: 1.5;
+}
+.gen-flags-notice b { color: var(--no); }
+.gen-flags-notice ul { margin: 4px 0 6px; padding-left: 18px; }
+.gen-flags-notice p { margin: 4px 0 0; font-weight: 600; }
+
 .draftbox {
   white-space: pre-wrap; line-height: 1.65; color: var(--ink);
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px;

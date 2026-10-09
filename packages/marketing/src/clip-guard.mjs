@@ -49,12 +49,29 @@ export function cleanClipDescription(description, max = 600) {
 
 const CLIP_TOPIC_BAN = 'KHÔNG xưng người chứng kiến ("hôm nay đứng trên boong..."), KHÔNG dựng ký ức hay kinh nghiệm cá nhân ("nhớ lại mấy chục năm trước..."), KHÔNG đóng vai ngư dân; Page nói chuyện với bà con. Không bán hàng. Kết bằng MỘT câu hỏi cụ thể về trải nghiệm hoặc điều bà con quan tâm, không hỏi kiểu chọn phe, không dùng "tuyệt đối", "có dám".';
 
+// 9/10 (review Codex): không mặc định người trong clip là đội SDVICO; chỉ nói vậy khi mô tả hoặc tên clip ghi rõ.
+const CLIP_WHO_RULE = "Chỉ nói người trong clip là đội SDVICO khi mô tả hoặc tên clip ghi rõ điều đó; không rõ thì gọi chung là 'trong clip', không khẳng định người trong hình là ai, không tự thêm địa điểm, khách hàng hay kết quả.";
+
+// 9/10 (review Codex, C3): clip thiếu mô tả (chỉ có tên) thì model phải đoán cảnh, dễ bịa. Chỉ clip có
+// phần mô tả chính (sau cleanClipDescription) từ 60 ký tự trở lên mới được dùng làm chủ đề bài content.
+export const MIN_CLIP_DESC_CHARS = 60;
+export function hasUsableClipDescription(description) {
+  return cleanClipDescription(description).length >= MIN_CLIP_DESC_CHARS;
+}
+// Lọc ứng viên clip content: bỏ clip R&D nội bộ VÀ clip thiếu mô tả. Gọi TRƯỚC pickFreshClips.
+export function dropClipsWithoutDescription(clips) {
+  return (clips || []).filter((a) => hasUsableClipDescription(a?.description));
+}
+export function filterContentClips(clips) {
+  return dropClipsWithoutDescription(dropInternalRnDClips(clips));
+}
+
 export function buildClipContentTopic(title, description) {
   const desc = cleanClipDescription(description);
   if (!desc) {
-    return `Viết bài Page SDVICO dựa trên clip đội SDVICO quay: "${title}". Chỉ kể trong phạm vi tên clip, không thêm cảnh, người hay sự kiện không có trong tên clip; nói rõ SDVICO đang làm gì. ${CLIP_TOPIC_BAN}`;
+    return `Viết bài Page SDVICO dựa trên clip đội SDVICO quay: "${title}". Chỉ kể trong phạm vi tên clip, không thêm cảnh, người hay sự kiện không có trong tên clip. ${CLIP_WHO_RULE} ${CLIP_TOPIC_BAN}`;
   }
-  return `Viết bài Page SDVICO dựa trên clip đội SDVICO quay: "${title}". NHỮNG GÌ CLIP CHO THẤY (chỉ được kể trong phạm vi này): ${desc} Kể đúng điều clip thể hiện; nói rõ SDVICO đang làm gì trong clip. ${CLIP_TOPIC_BAN}`;
+  return `Viết bài Page SDVICO dựa trên clip đội SDVICO quay: "${title}". NHỮNG GÌ CLIP CHO THẤY (chỉ được kể trong phạm vi này): ${desc} Kể đúng điều clip thể hiện. ${CLIP_WHO_RULE} ${CLIP_TOPIC_BAN}`;
 }
 
 // ---- Rao cung sau khi sinh: cau tu xung chung kien / ky uc bia / cau hoi ep chon ----
@@ -118,12 +135,64 @@ export function witnessRetryNote(sentences) {
   return `LẦN TRƯỚC VIẾT ${quoted} — đây là chuyện tự thêm, tư liệu không có. Page không xưng người chứng kiến, không dựng ký ức, câu hỏi không ép chọn phe.`;
 }
 
-// Dung chung cho hai ban generateContentPost: nhan body da sinh, tra {body, warn}.
-//   - con cau dinh -> cat; cat het than bai thi giu nguyen va tra warn (nguoi duyet thay).
+// Câu hỏi kết: có dấu ? trong 3 dòng cuối (bỏ hashtag). Cùng luật với scanPlaybook (compliance.mjs).
+export function hasClosingQuestion(text) {
+  const body = String(text || '').replace(/#\S+/g, '').trim();
+  const last3 = body.split(/\r?\n/).filter((s) => s.trim()).slice(-3).join(' ');
+  return /\?/.test(last3);
+}
+
+// Dung chung cho hai ban generateContentPost: nhan body da sinh, tra {body, warn, cut, lostClosingQuestion}.
+//   - con cau dinh -> cat (cut = cac cau da cat); cat het than bai thi giu nguyen va tra warn (nguoi duyet thay).
+//   - lostClosingQuestion: da cat cau ma bai khong con cau hoi ket (can viet lai cau ket).
 export function resolveWitnessBody(body) {
   const bad = fabricatedWitnessSentences(body);
-  if (!bad.length) return { body, warn: [] };
+  if (!bad.length) return { body, warn: [], cut: [], lostClosingQuestion: false };
   const cut = stripFabricatedSentences(body);
-  if (cut.bodyLeft >= 40) return { body: cut.text, warn: [] };
-  return { body, warn: bad };
+  if (cut.bodyLeft >= 40) {
+    return { body: cut.text, warn: [], cut: cut.removed, lostClosingQuestion: !hasClosingQuestion(cut.text) };
+  }
+  return { body, warn: bad, cut: [], lostClosingQuestion: false };
+}
+
+// ---- Canh bao di toi nguoi duyet (9/10, review Codex C1) ----
+// genFlags di kem phieu: brief.gen_flags (mkt_content) va payload.gen_flags (approval_queue).
+export function buildGenFlags(fix) {
+  return {
+    witness_kept: Array.isArray(fix?.warn) ? fix.warn : [],
+    witness_cut: Array.isArray(fix?.cut) ? fix.cut : [],
+    lost_closing_question: fix?.lostClosingQuestion === true,
+  };
+}
+// Co it nhat 1 muc khong rong/true thi moi ghi vao phieu.
+export function hasGenFlags(g) {
+  return !!g && ((g.witness_kept?.length || 0) > 0 || (g.witness_cut?.length || 0) > 0 || g.lost_closing_question === true);
+}
+// Cau con giu (khong cat duoc) hoac mat cau hoi ket = bai CAN SUA.
+export function genFlagsNeedFix(g) {
+  return !!g && ((g.witness_kept?.length || 0) > 0 || g.lost_closing_question === true);
+}
+export const GEN_FLAG_TITLE_PREFIX = '⚠️ Cần sửa: ';
+// Ap len phieu: tieu de them tien to, risk toi thieu amber. Khong doi gi neu bai khong can sua.
+export function applyGenFlagsToTicket({ title, risk, genFlags }) {
+  if (!genFlagsNeedFix(genFlags)) return { title, risk, needsFix: false };
+  return { title: `${GEN_FLAG_TITLE_PREFIX}${title}`, risk: risk === 'none' || !risk ? 'amber' : risk, needsFix: true };
+}
+
+// ---- Chan nhanh chan dung tu dung nguoi (9/10, review Codex C2, Dieu cam 5) ----
+// Prompt 'portrait' bat model tu dien ten, tuoi, que, loi noi nhan vat = bia nguoi. Chan o ham sinh.
+export const SAFE_ENGAGE_TOPIC = 'một chuyện nghề biển mà bà con ai cũng từng gặp, mời bà con kể lại trải nghiệm của mình';
+export function safeContentType(type) {
+  return type === 'portrait' ? 'engage' : type;
+}
+// Doi loai kem chu de: portrait -> engage thi bo chu de chan dung (tru chu de bam clip).
+export function safeContentChoice(type, topicText, fromClip = false) {
+  const safe = safeContentType(type);
+  const swapped = safe !== type;
+  return { type: safe, topicText: swapped && !fromClip ? SAFE_ENGAGE_TOPIC : topicText, swapped };
+}
+
+// Bai theo clip bam tu lieu that nen giam do sang tao (9/10, C4c).
+export function contentTemperature(topic) {
+  return topic && typeof topic === 'object' && topic.fromClip === true ? 0.7 : 1.05;
 }

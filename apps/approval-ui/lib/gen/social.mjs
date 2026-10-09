@@ -7,7 +7,7 @@ import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPric
 import { insightBrief } from './insights.mjs';
 import { logTokenUsage } from './token-log.mjs';
 import { sampleHooks } from './hook-library.mjs';
-import { fabricatedWitnessSentences, witnessRetryNote, resolveWitnessBody } from './clip-guard.mjs';
+import { fabricatedWitnessSentences, witnessRetryNote, resolveWitnessBody, buildGenFlags, safeContentChoice, contentTemperature } from './clip-guard.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -284,14 +284,18 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
     const match = CONTENT_TOPICS.find((t) => (typeof t === 'object' ? t.topic === chosen : t === chosen));
     chosen = typeof match === 'object' ? match : { type: 'tip', topic: chosen };
   }
-  const type = chosen.type || 'tip';
-  const topicText = chosen.topic || String(chosen);
+  // 9/10 (review Codex C2, điều cấm 5): loại 'portrait' bắt model tự điền tên, tuổi, quê, lời nói nhân vật
+  // = bịa người. Chặn ở hàm sinh để mọi đường gọi đều an toàn: đổi sang 'engage'.
+  const safe = safeContentChoice(chosen.type || 'tip', chosen.topic || String(chosen), chosen.fromClip === true);
+  if (safe.swapped) console.warn(`[generateContentPost] loai '${chosen.type}' bi chan (bia nguoi, dieu cam 5) -> doi sang '${safe.type}'.`);
+  const type = safe.type;
+  const topicText = safe.topicText;
   const structure = CONTENT_TYPE_INSTRUCTION[type] || CONTENT_TYPE_INSTRUCTION.tip;
   const emotionAngle = emotionOverride ? pickContentAngleForEmotion(emotionOverride) : null;
   const contentAngle = emotionAngle || CONTENT_ANGLES[Math.floor(Math.random() * CONTENT_ANGLES.length)];
 
   const system = [
-    'Bạn viết bài cộng đồng cho trang của Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
+    'Bạn viết bài cộng đồng cho trang của Công ty SDVICO, cung cấp sản phẩm và giải pháp công nghệ cho ngành biển và thủy sản: tự phát triển một số sản phẩm (như máy lọc nước biển), đồng thời phân phối và lắp đặt thiết bị của các hãng.',
     'Đây KHÔNG phải bài bán hàng. Mục tiêu là hữu ích thật cho bà con ngư dân đọc là học được điều gì đó, hoặc để lại bình luận.',
     `BỘ LỌC VÀNG playbook 24/8 (bắt buộc): bài PHẢI chạm 1 trong 4 chữ cảm xúc NGHỀ/TIỀN/RỦI RO/TỰ HÀO. Chữ lần này: ${contentAngle}. Bài không chạm chữ nào = chắc chắn chìm.`,
     'KẾT BÀI (bất kể type) bằng 1 CÂU HỎI MỞ nhẹ nhàng kéo bà con comment (kỷ niệm, kinh nghiệm, con số họ hay gặp). KHÔNG mời gọi tổng đài, KHÔNG mời nhắn Page — đây là bài cộng đồng, đừng bán hàng.',
@@ -299,7 +303,7 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
     'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn. KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'KHÔNG bịa tin tức, số liệu, sự kiện, quy định cụ thể. Nói chung, đúng, không phịa chi tiết.',
     'KHÔNG mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO.',
-    'Chỉ nhắc SDVICO đồng hành nếu hợp cảnh, tối đa 1 lần cuối bài. Bài dạng ĐẶT CÂU HỎI thì tuyệt đối không nhắc thương hiệu.',
+    'Không biến bài thành lời bán hàng. Nhắc SDVICO tối đa 1 lần; nếu chủ đề đã nêu rõ vai trò của SDVICO thì được nói tự nhiên vai trò đó, không thì không gán vai trò.',
     'KHÔNG tự viết hashtag, hệ thống tự thêm.',
     '',
     structure,
@@ -332,7 +336,8 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
     const res = await genWithRetry(ai, {
       model: MKT_MODEL,
       contents: user + extra,
-      config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
+      // 9/10: bài theo clip (topic.fromClip) bám tư liệu thật nên giảm độ sáng tạo xuống 0.7.
+      config: { systemInstruction: system, responseMimeType: 'application/json', temperature: contentTemperature(chosen) },
     });
     logTokenUsage(client, 'creator_content', MKT_MODEL, res?.usageMetadata);
     const parsed = parseJson(res.text || '');
@@ -359,5 +364,11 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
     assessment.flags = { ...assessment.flags, witness: witnessFix.warn };
     if (assessment.risk === 'none') assessment.risk = 'amber';
   }
-  return { text, body, headline, topic: topicText, contentType: type, hashtags: tags, assessment };
+  // 9/10 (review Codex C1): câu còn giữ / đã cắt / mất câu hỏi kết đi kèm kết quả để rotate ghi vào phiếu.
+  // Cắt câu xong chạy lại scanPlaybook: body mới không còn câu hỏi kết thì báo người duyệt viết lại câu kết.
+  const genFlags = buildGenFlags(witnessFix);
+  if (witnessFix.cut.length && scanPlaybook(body, { kind: playbookKind }).violations.includes('no_question_cta')) {
+    genFlags.lost_closing_question = true;
+  }
+  return { text, body, headline, topic: topicText, contentType: type, hashtags: tags, assessment, genFlags };
 }

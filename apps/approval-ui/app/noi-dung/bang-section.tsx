@@ -4,6 +4,7 @@ import { TIKTOK_USERNAME } from '../../lib/tiktok-username';
 import { editDraft, retryFacebookPublish, requestVideoForContent } from '../actions';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
+import GenFlagsNotice from '../gen-flags-notice';
 import ShareGroups from './share-groups';
 import { channelsLabel, planChannelLabel, purposeLabel, riskMeta, formatRelative, formatDateTimeVN } from '../labels';
 import PlatformLogo, { type PlatformKey } from './platform-logo';
@@ -286,6 +287,8 @@ export default async function BangSection() {
                       <ul className="pub-target" aria-label="Đích đăng sau khi duyệt">
                         {publishTargetLines(p.plan_channel, chans).map((l) => <li key={l}>{l}</li>)}
                       </ul>
+                      {/* 9/10 (review Codex): cảnh báo câu có thể tự bịa / mất câu hỏi kết của bài content. */}
+                      <GenFlagsNotice payload={p} />
                       <details className="bang-more">
                         <summary>Chi tiết</summary>
                         <ul>
@@ -317,6 +320,7 @@ export default async function BangSection() {
                               {publishTargetLines(p.plan_channel, chans).map((l) => <li key={l}>{l}</li>)}
                             </ul>
                           </div>
+                          <GenFlagsNotice payload={p} />
                           {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                           {c ? (
                             <details className="raw editbox">

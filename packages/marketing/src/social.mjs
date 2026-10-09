@@ -1,7 +1,7 @@
 // Sinh text bài mạng xã hội cho một sản phẩm: thân bài có emoji + khối hashtag.
 // Giọng brand-voice, hàng rào product-boundary (không bịa thông số, không nhận vơ phần mềm đối tác).
 import { assessDraft } from './compliance.mjs';
-import { fabricatedWitnessSentences, witnessRetryNote, resolveWitnessBody } from './clip-guard.mjs';
+import { fabricatedWitnessSentences, witnessRetryNote, resolveWitnessBody, buildGenFlags, safeContentChoice, contentTemperature } from './clip-guard.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
 import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, audienceLines, benefitLines } from './products.mjs';
@@ -188,18 +188,22 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {})
     const match = CONTENT_TOPICS.find((t) => (typeof t === 'object' ? t.topic === chosen : t === chosen));
     chosen = typeof match === 'object' ? match : { type: 'tip', topic: chosen };
   }
-  const type = chosen.type || 'tip';
-  const topicText = chosen.topic || String(chosen);
+  // 9/10 (review Codex C2, điều cấm 5): loại 'portrait' bắt model tự điền tên, tuổi, quê, lời nói nhân vật
+  // = bịa người. Chặn ở hàm sinh để mọi đường gọi đều an toàn: đổi sang 'engage'.
+  const safe = safeContentChoice(chosen.type || 'tip', chosen.topic || String(chosen), chosen.fromClip === true);
+  if (safe.swapped) console.warn(`[generateContentPost] loai '${chosen.type}' bi chan (bia nguoi, dieu cam 5) -> doi sang '${safe.type}'.`);
+  const type = safe.type;
+  const topicText = safe.topicText;
   const structure = CONTENT_TYPE_INSTRUCTION[type] || CONTENT_TYPE_INSTRUCTION.tip;
 
   const system = [
-    'Bạn viết bài cộng đồng cho trang của Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
+    'Bạn viết bài cộng đồng cho trang của Công ty SDVICO, cung cấp sản phẩm và giải pháp công nghệ cho ngành biển và thủy sản: tự phát triển một số sản phẩm (như máy lọc nước biển), đồng thời phân phối và lắp đặt thiết bị của các hãng.',
     'Đây KHÔNG phải bài bán hàng. Mục tiêu là hữu ích thật cho bà con ngư dân đọc là học được điều gì đó, hoặc để lại bình luận.',
     'Giọng ấm áp, gần gũi, câu ngắn, đọc trên điện thoại. Chèn vài emoji hợp cảnh biển (⚓ 🚢 🌊 🐟 🎣), đừng lạm dụng.',
     'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn. KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'KHÔNG bịa tin tức, số liệu, sự kiện, quy định cụ thể. Nói chung, đúng, không phịa chi tiết.',
     'KHÔNG mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO.',
-    'Chỉ nhắc SDVICO đồng hành nếu hợp cảnh, tối đa 1 lần cuối bài. Bài dạng ĐẶT CÂU HỎI thì tuyệt đối không nhắc thương hiệu.',
+    'Không biến bài thành lời bán hàng. Nhắc SDVICO tối đa 1 lần; nếu chủ đề đã nêu rõ vai trò của SDVICO thì được nói tự nhiên vai trò đó, không thì không gán vai trò.',
     'KHÔNG tự viết hashtag, hệ thống tự thêm.',
     '',
     structure,
@@ -220,7 +224,8 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {})
     const res = await genWithRetry(ai, {
       model: MKT_MODEL,
       contents: witnessLast.length ? `${user}\n\n${witnessRetryNote(witnessLast)}` : user,
-      config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
+      // 9/10: bài theo clip (topic.fromClip) bám tư liệu thật nên giảm độ sáng tạo xuống 0.7.
+      config: { systemInstruction: system, responseMimeType: 'application/json', temperature: contentTemperature(chosen) },
     });
     const parsed = parseJson(res.text || '');
     body = String(parsed.body || '').trim();
@@ -242,5 +247,8 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS } = {})
     assessment.flags = { ...assessment.flags, witness: witnessFix.warn };
     if (assessment.risk === 'none') assessment.risk = 'amber';
   }
-  return { text, body, headline, topic: topicText, contentType: type, hashtags: tags, assessment };
+  // 9/10 (review Codex C1): câu còn giữ / đã cắt / mất câu hỏi kết đi kèm kết quả để rotate ghi vào phiếu.
+  // Bản local không có scanPlaybook; resolveWitnessBody dùng hasClosingQuestion (cùng luật 3 dòng cuối có dấu ?).
+  const genFlags = buildGenFlags(witnessFix);
+  return { text, body, headline, topic: topicText, contentType: type, hashtags: tags, assessment, genFlags };
 }

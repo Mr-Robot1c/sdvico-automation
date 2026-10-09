@@ -610,7 +610,7 @@ export async function GET(req: Request) {
   // @ts-ignore — module JS thuần
   const { pickFreshClips } = await import('../../../lib/gen/fresh-clip.mjs');
   // @ts-ignore — module JS thuần
-  const { dropInternalRnDClips, buildClipContentTopic } = await import('../../../lib/gen/clip-guard.mjs');
+  const { filterContentClips, buildClipContentTopic, hasGenFlags, applyGenFlagsToTicket } = await import('../../../lib/gen/clip-guard.mjs');
   const usedClipIds = new Set<string>();
   const collectUsed = (rows: any[]) => {
     for (const r of rows) {
@@ -687,16 +687,19 @@ export async function GET(req: Request) {
     // 9/9: có clip thật mới + loại bài hợp + hôm nay chưa có video content -> chủ đề bám clip,
     // yêu cầu dựng video (cảnh 1 bắt buộc dùng clip, xem packages/marketing/src/video/script.mjs).
     const freshClips = CONTENT_VIDEO_KINDS.has(chosenKind) && contentVideoToday < 1
-      ? pickFreshClips(dropInternalRnDClips(folders.get('Content')?.videos || []), usedClipIds)
+      // 9/10 (review Codex C3): filterContentClips = bỏ clip R&D nội bộ VÀ clip thiếu mô tả (không viết từ TÊN clip).
+      ? pickFreshClips(filterContentClips(folders.get('Content')?.videos || []), usedClipIds)
       : [];
     const contentClip = freshClips[0] || null;
     if (contentClip) {
       // 8/10 (bài afd3d0ec): chủ đề bám MÔ TẢ clip, giọng Page, cấm xưng người chứng kiến và ký ức bịa.
       // GIỮ KHỚP với packages/marketing/src/rotate-run.mjs (cùng buildClipContentTopic).
+      // fromClip: generateContentPost sinh với temperature thấp (0.7) cho bài bám tư liệu thật.
       chosenTopic = {
         type: chosenKind,
+        fromClip: true,
         topic: buildClipContentTopic(contentClip.title, contentClip.description),
-      };
+      } as any;
     }
 
     let gen: any;
@@ -708,9 +711,6 @@ export async function GET(req: Request) {
       break;
     }
     const kind = gen.contentType || chosenKind;
-    const risk = gen.assessment?.risk || 'none';
-    // news + portrait CẦN người duyệt tay (news chạm quy định điều cấm 3; portrait cần điền tên thật).
-    const needsGov = risk === 'red' || kind === 'news';
     // Nhãn queue theo loại cho người duyệt biết ngay đây là bài gì.
     const KIND_LABEL: Record<string, string> = {
       qa: '❓ Hỏi-Đáp', checklist: '📋 Checklist', glossary: '📖 Thuật ngữ', tip: '💡 Mẹo',
@@ -718,6 +718,13 @@ export async function GET(req: Request) {
     };
     const kindTag = KIND_LABEL[kind] || '📰';
     const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';
+    // 9/10 (review Codex C1): câu có thể tự bịa còn giữ / đã cắt / mất câu hỏi kết phải tới tay người duyệt.
+    // Còn câu bịa hoặc mất câu hỏi kết: tiêu đề phiếu thêm "⚠️ Cần sửa: ", risk tối thiểu amber.
+    const genFlags = hasGenFlags(gen.genFlags) ? gen.genFlags : null;
+    const ticket = applyGenFlagsToTicket({ title: `${kindTag} ${displayTitle}`, risk: gen.assessment?.risk || 'none', genFlags });
+    const risk: string = ticket.risk;
+    // news cần cấp quản lý duyệt (chạm quy định điều cấm 3).
+    const needsGov = risk === 'red' || kind === 'news';
 
     // Chọn ảnh KHỚP chủ đề (sau khi đã biết chủ đề + tiêu đề).
     // 26/8 (sếp: "ảnh không liên quan"): truyền cả BODY bài để Gemini sinh keyword bám sự việc
@@ -763,6 +770,7 @@ export async function GET(req: Request) {
           post_kind: 'content',
           topic: gen.topic,
           content_type: kind,
+          ...(genFlags ? { gen_flags: genFlags } : {}),
           image_via: picked.via,
           ...(picked.credit ? { image_credit: picked.credit } : {}),
           ...(picked.note ? { image_note: picked.note } : {}),
@@ -780,8 +788,8 @@ export async function GET(req: Request) {
     if (contentClip) { usedClipIds.add(contentClip.id); contentVideoToday += 1; }
     await client.from('approval_queue').insert({
       kind: 'mkt_publish_content',
-      title: `${kindTag} ${displayTitle}`,
-      payload: { content_id: (ins as { id: string }).id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels, authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov, ...(planSlotC ? { plan_time: planTimeLocal(todayDate, planSlotC.time), plan_channel: 'facebook', plan_group: planSlotC.group_label, plan_slot_index: planSlotC.index } : {}) },
+      title: ticket.title,
+      payload: { content_id: (ins as { id: string }).id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels, authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov, ...(genFlags ? { gen_flags: genFlags } : {}), ...(planSlotC ? { plan_time: planTimeLocal(todayDate, planSlotC.time), plan_channel: 'facebook', plan_group: planSlotC.group_label, plan_slot_index: planSlotC.index } : {}) },
       status: 'pending',
     });
     results.push({ group: 'Bài content', kind, channels, contentId: (ins as { id: string }).id, risk, needsGov, image_via: picked.via, image_note: picked.note, video_requested: !!contentClip, content_clip: contentClip ? contentClip.title : null });

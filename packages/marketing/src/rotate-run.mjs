@@ -4,7 +4,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { loadRealEnv } from './video/env.mjs';
 import { pickFreshClips } from './video/fresh-clip.mjs';
-import { dropInternalRnDClips, buildClipContentTopic } from './clip-guard.mjs';
+import { filterContentClips, buildClipContentTopic, hasGenFlags, applyGenFlagsToTicket } from './clip-guard.mjs';
 
 const N = Number(process.argv[2]) || 1;
 const env = loadRealEnv();
@@ -90,36 +90,55 @@ if (process.env.ROTATE_CONTENT !== '0') {
       // portrait=1 (sếp chốt 19/8): bài chân dung viết HOÀN CHỈNH với nhân vật ĐIỂN HÌNH (tên gọi
       // thân mật + tuổi + địa phương + câu nói), đăng ngay, không để ô trống điền tay.
       // news=0: giữ tắt, dễ chạm quy định (điều cấm 3). ĐỒNG BỘ với app/api/rotate/route.ts.
-      const KIND_WEIGHT = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 1, news: 0 };
+      // 9/10 (review Codex C2): portrait=0 khớp route.ts. Chân dung bắt model tự điền tên, tuổi, lời nói
+      // nhân vật = bịa người (điều cấm 5); generateContentPost cũng tự đổi portrait sang engage.
+      const KIND_WEIGHT = { qa: 2, checklist: 2, glossary: 1, tip: 1, engage: 1, portrait: 0, news: 0 };
       const kindTotal = Object.values(KIND_WEIGHT).reduce((a, b) => a + b, 0);
       let r = Math.random() * kindTotal;
       let chosenKind = 'qa';
       for (const [k, w] of Object.entries(KIND_WEIGHT)) { r -= w; if (r <= 0) { chosenKind = k; break; } }
       const topicsOfKind = CONTENT_TOPICS.filter((t) => t.type === chosenKind);
       let chosenTopic = topicsOfKind.length ? rnd(topicsOfKind) : undefined;
-      const contentClip = ['viral', 'seeding', 'engage', 'tip', 'qa'].includes(chosenKind)
-        ? (pickFreshClips(dropInternalRnDClips(folders.get('Content')?.videos || []), usedClipIds)[0] || null) : null;
+      // 9/10 (review Codex C2): tối đa 1 video content mỗi ngày (khớp route.ts: cờ content_video, ngày VN).
+      // Không đếm được thì coi như đã có, không chọn clip.
+      let contentVideoToday = 1;
+      try {
+        const vn = new Date(Date.now() + 7 * 3600 * 1000);
+        const dayStartIso = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - 7 * 3600 * 1000).toISOString();
+        const { count, error: cntErr } = await client
+          .from('mkt_content').select('id', { count: 'exact', head: true })
+          .gte('created_at', dayStartIso).eq('brief->>content_video', 'true');
+        if (cntErr) throw cntErr;
+        contentVideoToday = count || 0;
+      } catch { /* giữ 1 */ }
+      // 9/10 (review Codex C3): chỉ clip có mô tả đủ dài mới được viết bài (không viết từ TÊN clip).
+      const contentClip = ['viral', 'seeding', 'engage', 'tip', 'qa'].includes(chosenKind) && contentVideoToday < 1
+        ? (pickFreshClips(filterContentClips(folders.get('Content')?.videos || []), usedClipIds)[0] || null) : null;
       // 8/10 (bài afd3d0ec): chủ đề bám MÔ TẢ clip, giọng Page, cấm xưng người chứng kiến/ký ức bịa.
-      // GIỮ KHỚP với app/api/rotate/route.ts (cùng buildClipContentTopic).
-      if (contentClip) chosenTopic = { type: chosenKind, topic: buildClipContentTopic(contentClip.title, contentClip.description) };
+      // GIỮ KHỚP với app/api/rotate/route.ts (cùng buildClipContentTopic). fromClip: sinh với temperature thấp.
+      if (contentClip) chosenTopic = { type: chosenKind, fromClip: true, topic: buildClipContentTopic(contentClip.title, contentClip.description) };
 
       const gen = await generateContentPost({ topic: chosenTopic });
       const kind = gen.contentType || chosenKind;
-      const risk = gen.assessment?.risk || 'none';
-      const needsGov = risk === 'red' || kind === 'news';
+      // 9/10 (review Codex C1): cảnh báo câu bịa/mất câu hỏi kết đi tới người duyệt (phiếu + bài).
+      const genFlags = hasGenFlags(gen.genFlags) ? gen.genFlags : null;
       const KIND_LABEL = { qa: '❓ Hỏi-Đáp', checklist: '📋 Checklist', glossary: '📖 Thuật ngữ', tip: '💡 Mẹo', engage: '💬 Hỏi bà con', portrait: '👤 Chân dung', news: '⚠️ Thời sự (chờ duyệt QL)' };
       const kindTag = KIND_LABEL[kind] || '📰';
       const displayTitle = (gen.headline && gen.headline.length >= 4) ? gen.headline : 'Bài content';
+      // Câu bịa còn giữ hoặc mất câu hỏi kết: tiêu đề phiếu thêm "⚠️ Cần sửa: ", risk tối thiểu amber.
+      const ticket = applyGenFlagsToTicket({ title: `${kindTag} ${displayTitle}`, risk: gen.assessment?.risk || 'none', genFlags });
+      const risk = ticket.risk;
+      const needsGov = risk === 'red' || kind === 'news';
       const assets = { image: media.id, video: null };
       const { data: ins } = await client.from('mkt_content').insert({
         kind: 'social', title: displayTitle,
-        brief: { keyword: 'Bài content', intent: 'thong_tin', assets, channels: ['facebook'], generator: 'rotation', rotation: true, rotation_group: 'Bài content', post_kind: 'content', topic: gen.topic, content_type: kind, ...(contentClip ? { video_requested: true, video_short: true, content_video: true, content_clip_id: contentClip.id, content_clip_title: contentClip.title } : {}) },
+        brief: { keyword: 'Bài content', intent: 'thong_tin', assets, channels: ['facebook'], generator: 'rotation', rotation: true, rotation_group: 'Bài content', post_kind: 'content', topic: gen.topic, content_type: kind, ...(genFlags ? { gen_flags: genFlags } : {}), ...(contentClip ? { video_requested: true, video_short: true, content_video: true, content_clip_id: contentClip.id, content_clip_title: contentClip.title } : {}) },
         draft: gen.text, status: 'review', needs_gov_review: needsGov,
       }).select('id').single();
       if (ins) {
         await client.from('approval_queue').insert({
-          kind: 'mkt_publish_content', title: `${kindTag} ${displayTitle}`,
-          payload: { content_id: ins.id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels: ['facebook'], authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov }, status: 'pending',
+          kind: 'mkt_publish_content', title: ticket.title,
+          payload: { content_id: ins.id, format: 'social', keyword: 'Bài content', intent: 'thong_tin', risk, assets, channels: ['facebook'], authored: 'ai', post_kind: 'content', content_type: kind, needs_manager_approval: needsGov, ...(genFlags ? { gen_flags: genFlags } : {}) }, status: 'pending',
         });
         console.log(`Cycle ${cycle} | [Facebook] ${kindTag} ${displayTitle} | ${ins.id.slice(0, 8)} | risk=${risk}${needsGov ? ' | NEEDS_GOV_REVIEW' : ''} | chu de: ${gen.topic}${contentClip ? ' | VIDEO clip: ' + contentClip.title : ''}`);
       }

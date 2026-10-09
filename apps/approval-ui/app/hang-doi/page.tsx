@@ -2,6 +2,7 @@ import { getServerClient } from '../../lib/supabase-server';
 import AutoRefresh from '../auto-refresh';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
+import GenFlagsNotice from '../gen-flags-notice';
 import { editDraft } from '../actions';
 import { kindMeta, formatRelative, formatDateTimeVN, payloadRows, intentLabel, planChannelLabel, purposeLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
 import { assetPublicUrl } from '../../lib/asset-url';
@@ -369,6 +370,9 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   {publishTargetLines(info.planChannel, info.channels).map((l) => <li key={l}>{l}</li>)}
                 </ul>
 
+                {/* 9/10 (review Codex): cảnh báo câu có thể tự bịa / mất câu hỏi kết của bài content. */}
+                <GenFlagsNotice payload={item.payload} />
+
                 <div className="card-actions">
                   <ViewModal
                     title={cleanTitle}
@@ -388,6 +392,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                         ))}
                       </div>
                     ) : null}
+                    <GenFlagsNotice payload={item.payload} />
                     {info.landingUrl ? <div className="metaline">Trang đích: {info.landingUrl}</div> : null}
                     {draft ? <div className="draftbox">{draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                     {cid && draft !== undefined ? (
