@@ -140,6 +140,11 @@ const ABS_100 = /\b100\s*(?:%|phần trăm)/iu;
 // "hoàn toàn" đứng cạnh "chủ động" ở cả hai thứ tự.
 const ABS_TOI_DA = /(?<!\p{L})(?:hạn chế|giảm)\s+(?:(?:hao phí|rủi ro|thất thoát|chi phí|hư hỏng|cặn bẩn|tạp chất|nhiên liệu|dầu hao)\s+)?tối đa(?!\p{L})/giu;
 const ABS_CHU_DONG = /(?<!\p{L})(?:chủ động\s+hoàn toàn|hoàn toàn\s+chủ động)(?!\p{L})/giu;
+// 9/10 ĐỢT A2.5 (reviewer bài 66b894f8: "cho dầu diesel luôn sạch tinh" đòi hình chứng minh mạnh hơn thiết bị đang lắp):
+// "luôn sạch" / "sạch tinh" / "sạch bong" / "sạch bóng" là kết quả tuyệt đối. Chỉ bắt trong câu nói về dầu / nước / nhiên liệu
+// ("boong tàu luôn sạch sẽ" cho qua). Thay bằng "giúp dầu sạch hơn trước khi vào máy".
+const ABS_SACH = /(?<!\p{L})(?:luôn\s+(?:giữ\s+)?(?:cho\s+)?(?:[\p{L}]+\s+){0,2}?sạch(?!\s+sẽ)(?:\s+(?:tinh|bong|bóng))?|sạch\s+(?:tinh|bong|bóng))(?!\p{L})/giu;
+const ABS_SACH_SUBJECT = /(?<!\p{L})(?:dầu|nước|nhiên liệu|diesel|nhớt)(?!\p{L})/iu;
 export function absoluteClaims(text) {
   const out = [];
   const s = String(text || '');
@@ -148,6 +153,7 @@ export function absoluteClaims(text) {
   }
   for (const sent of s.split(SENT_SPLIT_NL)) {
     if (ABS_100.test(sent) && !/(?<!\p{L})(?:tùy|có thể)(?!\p{L})/iu.test(sent)) out.push(sent.trim().toLowerCase());
+    if (ABS_SACH_SUBJECT.test(sent)) for (const m of sent.matchAll(ABS_SACH)) out.push(m[0].toLowerCase());
   }
   return [...new Set(out)];
 }

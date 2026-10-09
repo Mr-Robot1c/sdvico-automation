@@ -19,7 +19,7 @@
 //   - Không dùng cùng một tư liệu ở 2 cảnh liền nhau nếu còn lựa chọn khác.
 
 import { crossProductTerms, imageryDriftSentences, cutImageryDrift, inventedDetailSentences, sbDescriptiveSentences } from './rules.mjs';
-import { segmentsEnabled, segKey, segLen, estimateSpeechSec, COVER_SLACK } from './segments.mjs';
+import { segmentsEnabled, segKey, segLen, estimateSpeechSec, COVER_SLACK, sceneNeed, segFitLevel, segProductState, progressAdjust, overlapFraction, sameStage } from './segments.mjs';
 
 const PROBLEM_ROLES = new Set(['hook', 'empathy', 'story']);
 const PROBLEM_WORDS = ['cũ', 'hư', 'hỏng', 'bẩn', 'cặn', 'đục', 'sửa', 'tháo', 'khói', 'rỉ', 'gỉ', 'nằm bờ', 'lợ', 'mặn', 'lọc thô bẩn', 'đen', 'nghẹt', 'kẹt', 'chết máy', 'biển', 'tàu', 'ngư dân', 'bà con', 'cảng', 'khoang máy', 'thợ máy', 'lưới', 'khơi', 'sóng', 'ra khơi', 'cập bến'];
@@ -236,24 +236,35 @@ export function segmentRelevance(asset, seg, role, { visual = '', speech = '' } 
   return roleHits + visualOverlap(`${visual} ${speech}`, sa);
 }
 // Tham chiếu một đoạn gắn vào cảnh (gọn, ghi được vào brief).
-export function segmentRef(asset, idx) {
+// ĐỢT A2: cutFrom = giây bắt đầu cắt khi đoạn "ro_sau" (máy chỉ hiện rõ từ giây đó); ref mang nhãn để cảnh sau xét diễn tiến.
+export function segmentRef(asset, idx, cutFrom = null) {
   const seg = asset.segments[idx];
-  return { assetId: asset.id, idx, start: Number(seg.start), end: Number(seg.end), text: segmentText(seg).slice(0, 200) };
+  const cut = cutFrom !== null && cutFrom !== undefined && Number.isFinite(Number(cutFrom)) && Number(cutFrom) > Number(seg.start) ? Number(cutFrom) : null;
+  return {
+    assetId: asset.id, idx, start: cut ?? Number(seg.start), end: Number(seg.end), text: segmentText(seg).slice(0, 200),
+    action: String(seg.action || '').slice(0, 120), stage: seg.stage ?? null, subject: seg.subject ?? null, product_visible: seg.product_visible ?? null,
+    ...(cut !== null ? { cut: true } : {}),
+  };
 }
 function sceneRole(scenes, i) {
   return scenes[i]?.role || (i === 0 ? 'hook' : i === scenes.length - 1 ? 'closing' : 'solution');
 }
 
 // Chọn đoạn tốt nhất của MỘT clip cho một cảnh (đoạn chưa dùng); không đoạn nào thì null.
-export function chooseSegment(asset, scene, role, { usedSegKeys = new Set(), productGroup = null } = {}) {
+// ĐỢT A2: need = sceneNeed của cảnh. Xếp theo (mức hợp nhu cầu, điểm): đoạn đúng chủ thể / thấy rõ máy thắng đoạn chỉ có điểm chữ cao;
+// đoạn "ro_sau" được cắt bắt đầu từ product_clear_from. Không có need thì y như đợt A.
+export function chooseSegment(asset, scene, role, { usedSegKeys = new Set(), productGroup = null, need = null } = {}) {
   if (!hasSegments(asset)) return null;
   let best = null;
   asset.segments.forEach((seg, idx) => {
     if (usedSegKeys.has(segKey(asset.id, idx)) || segLen(seg) <= 0) return;
+    const fit = segFitLevel(seg, need, asset);
     const s = scoreSegment(asset, seg, role, { visual: scene?.visual, speech: scene?.narration, productGroup });
-    if (!best || s > best.s) best = { s, idx };
+    if (!best || fit.level > best.level || (fit.level === best.level && s > best.s)) best = { s, idx, level: fit.level, cutFrom: fit.cutFrom, unmet: fit.unmet };
   });
-  return best ? segmentRef(asset, best.idx) : null;
+  if (!best) return null;
+  const ref = segmentRef(asset, best.idx, best.cutFrom);
+  return best.level < 3 && best.unmet?.length ? { ...ref, unmet: best.unmet } : ref;
 }
 
 // Gom clip theo cụm buổi quay. Chỉ tính clip video CÓ đoạn và có shoot_cluster.id.
@@ -274,13 +285,14 @@ export function clusterGroups(assets) {
 // ít nhất một đoạn (của clip được phép cho vai cảnh đó theo problemPool) đủ liên quan. Cảnh mang clip bắt buộc
 // (mustAssetId ở mustIdx) tính là phủ nếu clip đó nằm trong cụm. Không cụm nào phủ >= 2 cảnh thì trả null
 // (đường cũ chạy nguyên). Hòa: cụm chứa clip bắt buộc, cụm chắc, tổng điểm, số clip, id (tất định).
-export function pickPrimaryCluster(scenes, assets, { productGroup = null, mustAssetId = null, mustIdx = 0, minRelevance = CLUSTER_MIN_RELEVANCE } = {}) {
+export function pickPrimaryCluster(scenes, assets, { productGroup = null, mustAssetId = null, mustIdx = 0, minRelevance = CLUSTER_MIN_RELEVANCE, onlyClusters = null } = {}) {
   const list = Array.isArray(scenes) ? scenes : [];
   if (!list.length) return null;
   const pools = list.map((_, i) => new Set(problemPool(assets, sceneRole(list, i), productGroup).map((a) => a.id)));
   let best = null;
   for (const g of clusterGroups(assets).values()) {
     if (g.clips.length < 2) continue;
+    if (onlyClusters && !onlyClusters.has(g.id)) continue;
     let covered = 0;
     let total = 0;
     const hasMust = !!mustAssetId && g.clips.some((c) => c.id === mustAssetId);
@@ -313,18 +325,46 @@ export function pickPrimaryCluster(scenes, assets, { productGroup = null, mustAs
   return best && best.covered >= 2 ? best : null;
 }
 
-// 9/10 (2) SỬA NÓNG: chế độ cụm chính CHỈ cho video content. Video bán hàng bị chọn cụm Content (thợ, động cơ)
-// nên cảnh giải pháp và giá mất hình máy (bài 66b894f8), vi phạm luật "hình sản phẩm ra trước giây 15".
-// Nhánh bán trả null mà KHÔNG gọi pickPrimaryCluster; cắt đoạn (allocateSceneSegments) vẫn chạy bình thường.
-export function pickClusterForVideo(scenes, assets, { contentVideo = false, productGroup = null, mustAssetId = null, mustIdx = 0 } = {}) {
-  if (!contentVideo) return null;
-  return pickPrimaryCluster(scenes, assets, { productGroup, mustAssetId, mustIdx });
+// 9/10 (2) SỬA NÓNG: video bán hàng bị chọn cụm Content (thợ, động cơ) nên cảnh giải pháp và giá mất hình máy
+// (bài 66b894f8), vi phạm luật "hình sản phẩm ra trước giây 15". Hot-fix dbce022 trả null cho mọi video bán.
+// ĐỢT A2 (9/10) mở lại có điều kiện: video bán được dùng cụm (nay gom theo NGÀY, có thể chứa cả clip Content lẫn
+// clip thư mục sản phẩm) CHỈ KHI cụm có đủ đoạn "thấy rõ máy" cho MỌI cảnh solution + cảnh giá (hasPriceScene).
+// Đoạn đếm là đoạn của tư liệu THƯ MỤC SẢN PHẨM (đúng máy; Content không đảm bảo đúng model), nhãn product_visible
+// ro_tu_dau, hoặc ro_sau mà phần rõ còn >= 1,5 s. Thiếu -> null (đường cũ, y dbce022).
+export function countProductSegments(clips, usedSegKeys = new Set()) {
+  let n = 0;
+  for (const c of clips) {
+    if (String(c.folder || c.product_group || '') === 'Content') continue;
+    (c.segments || []).forEach((seg, idx) => {
+      if (segLen(seg) <= 0 || usedSegKeys.has(segKey(c.id, idx))) return;
+      if (segProductState(seg).level >= 2) n += 1;
+    });
+  }
+  return n;
+}
+export function pickClusterForVideo(scenes, assets, { contentVideo = false, productGroup = null, mustAssetId = null, mustIdx = 0, hasPriceScene = false } = {}) {
+  if (contentVideo) return pickPrimaryCluster(scenes, assets, { productGroup, mustAssetId, mustIdx });
+  const list = Array.isArray(scenes) ? scenes : [];
+  const needScenes = list.filter((_, i) => sceneRole(list, i) === 'solution').length + (hasPriceScene ? 1 : 0);
+  if (needScenes < 1) return null;
+  const eligible = new Set();
+  for (const g of clusterGroups(assets).values()) {
+    if (g.clips.length >= 2 && countProductSegments(g.clips) >= needScenes) eligible.add(g.id);
+  }
+  if (!eligible.size) return null;
+  return pickPrimaryCluster(list, assets, { productGroup, mustAssetId, mustIdx, onlyClusters: eligible });
 }
 
 // Chọn (clip, đoạn) tốt nhất TRONG cụm cho một cảnh; null khi không còn đoạn nào hợp (caller mới được lấy ngoài cụm).
 // Chống lặp / recentUse chỉ phạt điểm để xếp thứ tự trong cụm: không bao giờ làm đoạn rơi ra ngoài cụm.
 // Đoạn đã dùng ở cảnh khác bị loại hẳn (không chiếu lại cùng một đoạn). accept(asset, seg): lọc thêm (vd. không trôi lời).
-export function pickInCluster(cluster, assets, scene, role, { prevId = null, usedSegKeys = new Set(), usedCount = new Map(), recentUse = new Map(), productGroup = null, modelAssetId = null, minRelevance = CLUSTER_MIN_RELEVANCE, accept = null } = {}) {
+// ĐỢT A2 (9/10):
+//   - need = sceneNeed của cảnh: xếp theo (mức hợp nhu cầu, điểm), nên câu nói về người lấy đoạn có người, cảnh sản phẩm
+//     lấy đoạn thấy rõ máy (ro_sau thì cắt từ product_clear_from). Đoạn cũ chưa gán nhãn = mức 1 (không biết).
+//   - progress (CHỈ video content trong chế độ cụm): prevRefs = đoạn các cảnh trước; stage lùi bị trừ, dùng lại cùng clip
+//     cùng stage và việc gần giống bị trừ nặng. closing + openRef: cảnh kết không dùng lại khoảng giây của cảnh mở (> 50%).
+//   - kết quả có `level` và `unmet` (nhu cầu không đáp ứng được) để ghi lý do.
+export function pickInCluster(cluster, assets, scene, role, { prevId = null, usedSegKeys = new Set(), usedCount = new Map(), recentUse = new Map(), productGroup = null, modelAssetId = null, minRelevance = CLUSTER_MIN_RELEVANCE, accept = null, need = null, prevRefs = [], progress = false, closing = false, openRef = null } = {}) {
   if (!cluster) return null;
   const inCluster = new Set(cluster.clipIds);
   const allowed = new Set(problemPool(assets, role, productGroup).map((a) => a.id));
@@ -335,17 +375,43 @@ export function pickInCluster(cluster, assets, scene, role, { prevId = null, use
       if (segLen(seg) <= 0 || usedSegKeys.has(segKey(a.id, idx))) return;
       if (segmentRelevance(a, seg, role, { visual: scene?.visual, speech: scene?.narration }) < minRelevance) return;
       if (typeof accept === 'function' && !accept(a, seg)) return;
+      const fit = segFitLevel(seg, need, a);
+      const from = fit.cutFrom ?? Number(seg.start);
+      if (closing && openRef && openRef.assetId === a.id && overlapFraction(from, Number(seg.end), Number(openRef.start), Number(openRef.end)) > 0.5) return;
       const base = scoreSegment(a, seg, role, { visual: scene?.visual, speech: scene?.narration, productGroup });
       let s = base;
       if (a.id === prevId) s -= 3;
       s -= (usedCount.get(a.id) || 0);
       s -= Math.min(recentUse.get(a.id) || 0, 3);
       if (modelAssetId && a.id === modelAssetId) s += 3;
-      if (!best || s > best.s) best = { s, base, a, idx };
+      if (progress && prevRefs.length) s += progressAdjust({ assetId: a.id, stage: seg.stage, action: seg.action }, prevRefs).adj;
+      if (!best || fit.level > best.level || (fit.level === best.level && s > best.s)) best = { s, base, a, idx, level: fit.level, cutFrom: fit.cutFrom, unmet: fit.unmet };
     });
   }
   if (!best) return null;
-  return { assetId: best.a.id, score: best.s, base: best.base, segment: segmentRef(best.a, best.idx) };
+  return { assetId: best.a.id, score: best.s, base: best.base, level: best.level, unmet: best.unmet || [], segment: segmentRef(best.a, best.idx, best.cutFrom) };
+}
+
+// ĐỢT A2: tìm (clip, đoạn) THẤY RÕ MÁY tốt nhất trong cả kho (không cần cụm) cho cảnh sản phẩm / cảnh giá của video bán.
+// Chỉ tư liệu thư mục sản phẩm; chỉ đoạn ro_tu_dau (mức 3) hoặc ro_sau còn >= 1,5 s (mức 2, cắt từ product_clear_from).
+// Xếp (mức, điểm); đoạn đã dùng bị loại; clip cảnh liền trước bị trừ nhẹ. Không có -> null (caller dùng ảnh / đường cũ).
+export function findProductSegment(assets, scene, role, { prevId = null, usedSegKeys = new Set(), usedCount = new Map(), recentUse = new Map(), productGroup = null, minLevel = 2 } = {}) {
+  const need = { product: true, productFolderOnly: true, nguoi: false };
+  let best = null;
+  for (const a of assets || []) {
+    if (!hasSegments(a) || String(a.folder || a.product_group || '') === 'Content') continue;
+    a.segments.forEach((seg, idx) => {
+      if (segLen(seg) <= 0 || usedSegKeys.has(segKey(a.id, idx))) return;
+      const fit = segFitLevel(seg, need, a);
+      if (fit.level < minLevel) return;
+      let s = scoreSegment(a, seg, role, { visual: scene?.visual, speech: scene?.narration, productGroup });
+      if (a.id === prevId) s -= 2;
+      s -= (usedCount.get(a.id) || 0);
+      s -= Math.min(recentUse.get(a.id) || 0, 3);
+      if (!best || fit.level > best.level || (fit.level === best.level && s > best.s)) best = { s, a, idx, level: fit.level, cutFrom: fit.cutFrom };
+    });
+  }
+  return best ? { assetId: best.a.id, level: best.level, score: best.s, segment: segmentRef(best.a, best.idx, best.cutFrom) } : null;
 }
 
 // Gán đoạn chính + đoạn nối thêm cho từng cảnh SAU KHI danh sách cảnh đã chốt (đã tách cảnh, ghim cảnh 1...).
@@ -354,11 +420,16 @@ export function pickInCluster(cluster, assets, scene, role, { prevId = null, use
 // thời gian, rồi đoạn đủ liên quan của clip khác CÙNG CỤM); scene.segmentShortSec = phần ước lượng còn thiếu hình
 // sau khi hết đoạn (không lặp; assemble giữ khung cuối cho phần thiếu). Cảnh không có segment: scene.segment = null.
 // Mọi đoạn chỉ dùng một lần trong cả video. Trả { short: [{scene, shortSec}], noSegment: [scene...] } (scene 1-based).
-export function allocateSceneSegments(scenes, assets, { cluster = null, productGroup = null, log = console } = {}) {
+// ĐỢT A2 (9/10): đoạn chính và đoạn nối chọn theo nhu cầu của câu (sceneNeed: người / thấy rõ máy, ro_sau cắt từ
+// product_clear_from); đoạn nối KHÔNG được trái nhu cầu khi còn lựa chọn. contentVideo + cụm: không nối hai đoạn cùng clip
+// cùng stage liền nhau nếu cụm còn đoạn khác hợp.
+export function allocateSceneSegments(scenes, assets, { cluster = null, productGroup = null, salesVideo = false, contentVideo = false, productTerms = [], log = console } = {}) {
   const byId = new Map((assets || []).map((a) => [a.id, a]));
   const used = new Set();
   const report = { short: [], noSegment: [] };
   const list = Array.isArray(scenes) ? scenes : [];
+  const needOf = (s, role) => sceneNeed(s, role, { salesVideo, productTerms });
+  const played = []; // đoạn đã xếp cho các cảnh trước (chính + nối), để đoạn nối của cảnh sau xét diễn tiến
   // Lượt 0: giữ đoạn đã gán nếu còn hợp lệ (đúng clip hiện tại, chỉ số tồn tại, chưa trùng cảnh khác).
   for (const s of list) {
     const a = byId.get(s.assetId);
@@ -373,7 +444,8 @@ export function allocateSceneSegments(scenes, assets, { cluster = null, productG
     const a = byId.get(s.assetId);
     if (!hasSegments(a)) { s.segment = null; return; }
     if (!s.segment) {
-      s.segment = chooseSegment(a, s, s.role || sceneRole(list, i), { usedSegKeys: used, productGroup });
+      const role = s.role || sceneRole(list, i);
+      s.segment = chooseSegment(a, s, role, { usedSegKeys: used, productGroup, need: needOf(s, role) });
       if (s.segment) used.add(segKey(s.segment.assetId, s.segment.idx));
     }
     if (!s.segment) { report.noSegment.push(i + 1); log?.warn?.(`[segments] canh ${i + 1}: clip co doan nhung het doan chua dung — canh nay dung kieu cu (lap clip tu giay 0).`); }
@@ -383,11 +455,20 @@ export function allocateSceneSegments(scenes, assets, { cluster = null, productG
     if (!s.segment) return;
     const a = byId.get(s.assetId);
     const role = s.role || sceneRole(list, i);
-    const need = estimateSpeechSec(s.narration);
-    const target = need * COVER_SLACK;
+    const need0 = needOf(s, role);
+    const need = need0.product || need0.nguoi ? need0 : null;
+    const need_ = estimateSpeechSec(s.narration);
+    const target = need_ * COVER_SLACK;
     let have = segLen(s.segment);
+    // Đoạn nối phải không trái nhu cầu (mức >= 1); mức cao hơn xếp trước.
+    const mk = (c, idx) => { const f = segFitLevel(c.segments[idx], need, c); return { level: f.level, ref: segmentRef(c, idx, f.cutFrom) }; };
     const same = [];
-    a.segments.forEach((seg, idx) => { if (idx !== s.segment.idx && segLen(seg) > 0 && !used.has(segKey(a.id, idx))) same.push(segmentRef(a, idx)); });
+    a.segments.forEach((seg, idx) => {
+      if (idx === s.segment.idx || segLen(seg) <= 0 || used.has(segKey(a.id, idx))) return;
+      const m = mk(a, idx);
+      if (need && m.level < 1) return;
+      same.push(m.ref);
+    });
     same.sort((x, y) => x.start - y.start);
     const others = [];
     if (cluster) {
@@ -398,20 +479,36 @@ export function allocateSceneSegments(scenes, assets, { cluster = null, productG
         c.segments.forEach((seg, idx) => {
           if (segLen(seg) <= 0 || used.has(segKey(c.id, idx))) return;
           if (segmentRelevance(c, seg, role, { visual: s.visual, speech: s.narration }) < CLUSTER_MIN_RELEVANCE) return;
-          others.push({ ref: segmentRef(c, idx), score: scoreSegment(c, seg, role, { visual: s.visual, speech: s.narration, productGroup }) });
+          const m = mk(c, idx);
+          if (need && m.level < 1) return;
+          let sc = scoreSegment(c, seg, role, { visual: s.visual, speech: s.narration, productGroup });
+          // Content + cụm: đoạn nối cũng không lùi stage / không lặp việc đã chiếu ở cảnh trước.
+          if (contentVideo) sc += progressAdjust({ assetId: c.id, stage: seg.stage, action: seg.action }, [...played, s.segment]).adj;
+          others.push({ ref: m.ref, level: m.level, score: sc });
         });
       }
-      others.sort((x, y) => y.score - x.score || x.ref.start - y.ref.start);
+      others.sort((x, y) => y.level - x.level || y.score - x.score || x.ref.start - y.ref.start);
     }
+    const diversify = !!contentVideo && !!cluster;
     const take = [];
-    for (const r of same) { if (have >= target) break; take.push(r); have += segLen(r); used.add(segKey(r.assetId, r.idx)); }
+    const skipped = [];
+    const chain = [s.segment];
+    const knownStage = (r) => r && r.stage && r.stage !== 'khac';
+    for (const r of same) {
+      if (have >= target) break;
+      if (diversify && others.length && knownStage(r) && chain.some((x) => knownStage(x) && sameStage(x.stage, r.stage))) { skipped.push(r); continue; }
+      take.push(r); chain.push(r); have += segLen(r); used.add(segKey(r.assetId, r.idx));
+    }
     const takeOther = [];
     for (const o of others) { if (have >= target) break; takeOther.push(o.ref); have += segLen(o.ref); used.add(segKey(o.ref.assetId, o.ref.idx)); }
+    // Cụm không còn đoạn khác hợp: đành nối đoạn cùng stage còn lại (hơn là giữ khung cuối).
+    for (const r of skipped) { if (have >= target) break; take.push(r); have += segLen(r); used.add(segKey(r.assetId, r.idx)); }
     // Thứ tự phát: các đoạn CÙNG CLIP (gồm đoạn chính) theo thời gian, rồi đoạn clip khác cùng cụm.
     const playlist = [...[s.segment, ...take].sort((x, y) => x.start - y.start), ...takeOther];
     s.segment = playlist[0];
     s.extraSegments = playlist.slice(1);
-    const lack = need - have;
+    played.push(...playlist);
+    const lack = need_ - have;
     s.segmentShortSec = lack > 0.3 ? Math.round(lack * 10) / 10 : 0;
     if (s.segmentShortSec) { report.short.push({ scene: i + 1, shortSec: s.segmentShortSec }); log?.warn?.(`[segments] thieu tu lieu canh ${i + 1}: uoc thieu ${s.segmentShortSec}s hinh (het doan cung viec/cung cum) — se giu khung cuoi, KHONG lap.`); }
   });
@@ -516,7 +613,9 @@ export function assetListForPrompt(assets) {
 // productGroup (17/9 chiều (3)): nhóm sản phẩm của video bán hàng, để cảnh nỗi đau loại tư liệu của sản phẩm kia.
 // ĐỢT A (9/10): cluster = cụm chính (pickPrimaryCluster) do caller tính sẵn; undefined thì tự tính khi bật
 // VIDEO_SEGMENTS (useSegments) và kho có clip mang đoạn; null = đường cũ. Pick có thêm `segment` khi clip mang đoạn.
-export async function matchScenesToAssets({ ai, generate, model, scenes, assets, mustUseAssetId = null, mustUseIndex = 0, productGroup = null, recentUse = new Map(), cluster = undefined, useSegments = segmentsEnabled(), log = console }) {
+// ĐỢT A2: salesVideo (video bán: cảnh solution/price/reward bắt buộc đoạn thấy rõ máy), contentVideo (bật chống quẩn / diễn tiến
+// stage trong chế độ cụm), productTerms (tên công khai / mã máy để nhận câu nói về sản phẩm).
+export async function matchScenesToAssets({ ai, generate, model, scenes, assets, mustUseAssetId = null, mustUseIndex = 0, productGroup = null, recentUse = new Map(), cluster = undefined, useSegments = segmentsEnabled(), salesVideo = false, contentVideo = false, productTerms = [], log = console }) {
   const ids = new Set(assets.map((a) => a.id));
   const mustIdx = Math.max(0, Math.min(scenes.length - 1, Number.isInteger(mustUseIndex) ? mustUseIndex : 0));
   const byId = new Map(assets.map((a) => [a.id, a]));
@@ -576,14 +675,26 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
     // ĐỢT A: có cụm chính thì chọn đoạn TRONG cụm trước; chỉ khi không còn đoạn hợp mới rơi về đường cũ (ghi lý do).
     let cpick = null;
     let outsideWhy = null;
+    // ĐỢT A2: nhu cầu của câu (người / thấy rõ máy) và các đoạn đã xếp cho cảnh trước (diễn tiến, chống quẩn).
+    const need = segOn ? sceneNeed(scenes[i], role, { salesVideo, productTerms }) : null;
+    const prevRefs = out.slice(0, i).map((p) => p?.segment).filter(Boolean);
     if (clusterSel && !(i === mustIdx && mustUseAssetId && ids.has(mustUseAssetId))) {
       const mpC = modelPicks.find((p) => Number(p?.scene) === i + 1);
-      cpick = pickInCluster(clusterSel, assets, scenes[i], role, { prevId, usedSegKeys, usedCount, recentUse, productGroup, modelAssetId: mpC ? String(mpC.asset_id || '') : null });
-      if (!cpick) outsideWhy = `ngoài cụm ${clusterSel.id}: không còn đoạn nào trong cụm hợp cảnh ${i + 1} (${role})`;
+      cpick = pickInCluster(clusterSel, assets, scenes[i], role, {
+        prevId, usedSegKeys, usedCount, recentUse, productGroup, modelAssetId: mpC ? String(mpC.asset_id || '') : null,
+        need, prevRefs, progress: !!contentVideo, closing: i > 0 && i === scenes.length - 1, openRef: i > 0 ? (out[0]?.segment || null) : null,
+      });
+      // Video bán: cảnh sản phẩm mà trong cụm không còn đoạn nào thấy máy thì KHÔNG lấy đoạn khác trong cụm (mất hình sản phẩm).
+      if (cpick && salesVideo && need?.product && cpick.level < 1) {
+        outsideWhy = `ngoài cụm ${clusterSel.id}: cảnh ${i + 1} (${role}) cần thấy rõ máy mà cụm hết đoạn như vậy`;
+        cpick = null;
+      } else if (!cpick) outsideWhy = `ngoài cụm ${clusterSel.id}: không còn đoạn nào trong cụm hợp cảnh ${i + 1} (${role})`;
     }
     if (cpick) {
-      const act = String(cpick.segment.text || '').split('. ')[0].slice(0, 70);
-      pick = { assetId: cpick.assetId, fit: Math.max(0, Math.min(10, 4 + cpick.base / 2)), why: `trong cụm ${clusterSel.id} (${clusterSel.confidence}): ${act}`.slice(0, 200), by: 'cluster', segment: cpick.segment };
+      const act = String(cpick.segment.text || '').split('. ')[0].slice(0, 60);
+      const lab = [cpick.segment.subject, cpick.segment.product_visible, cpick.segment.stage].map((x) => x || '?').join('/');
+      const miss = cpick.unmet?.length ? ` | CHƯA ĐÁP ỨNG: ${cpick.unmet.join(', ')}` : '';
+      pick = { assetId: cpick.assetId, fit: Math.max(0, Math.min(10, 4 + cpick.base / 2)), why: `trong cụm ${clusterSel.id} (${clusterSel.confidence}): ${act} [${lab}]${miss}`.slice(0, 220), by: 'cluster', segment: cpick.segment };
     } else if (i === mustIdx && mustUseAssetId && ids.has(mustUseAssetId)) {
       // 17/9 (bài 8c8347a4 lời "cảng cá sương mờ" nhưng clip là văn phòng): vẫn ÉP clip thật
       // (luật 9/9) nhưng điểm khớp phải là điểm THẬT — model chấm nếu có, không thì đo trùng
@@ -645,10 +756,25 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
       pick.why = `${outsideWhy} | ${pick.why || ''}`.slice(0, 220);
       log.warn(`[scene-match] cảnh ${i + 1} (${role}): ${outsideWhy} -> lấy ngoài cụm "${String(byId.get(pick.assetId)?.title || '').slice(0, 40)}"`);
     }
+    // ĐỢT A2: video bán, cảnh sản phẩm chọn trúng clip có đoạn mà MỌI đoạn đã biết là chưa thấy rõ máy, trong khi kho còn đoạn
+    // thấy rõ -> đổi sang đoạn thấy rõ. Ảnh sản phẩm và clip chưa mô tả đoạn giữ nguyên như trước; clip bắt buộc không đổi.
+    if (pick && segOn && salesVideo && need?.product && pick.by !== 'must' && !pick.segment) {
+      const a0 = byId.get(pick.assetId);
+      if (hasSegments(a0)) {
+        const ownBest = a0.segments.reduce((m, seg, idx) => (usedSegKeys.has(segKey(a0.id, idx)) || segLen(seg) <= 0 ? m : Math.max(m, segFitLevel(seg, need, a0).level)), -1);
+        if (ownBest < 1) {
+          const alt = findProductSegment(assets, scenes[i], role, { prevId, usedSegKeys, usedCount, recentUse, productGroup });
+          if (alt) {
+            log.warn(`[scene-match] cảnh ${i + 1} (${role}): "${String(a0.title || '').slice(0, 40)}" chưa có đoạn thấy rõ máy -> đổi sang đoạn thấy rõ máy "${String(byId.get(alt.assetId)?.title || '').slice(0, 40)}"`);
+            pick = { assetId: alt.assetId, fit: Math.max(0, Math.min(10, 4 + alt.score / 2)), why: `đoạn thấy rõ máy (${alt.segment.product_visible}${alt.segment.cut ? `, cắt từ ${alt.segment.start}s` : ''}): ${String(alt.segment.action || '').slice(0, 70)}`, by: 'product-seg', segment: alt.segment };
+          }
+        }
+      }
+    }
     // ĐỢT A: pick (kể cả clip bắt buộc, hoặc ngoài cụm) mà clip mang đoạn thì chọn luôn đoạn hợp nhất chưa dùng.
     if (pick && segOn && !pick.segment) {
       const a = byId.get(pick.assetId);
-      const seg = hasSegments(a) ? chooseSegment(a, scenes[i], role, { usedSegKeys, productGroup }) : null;
+      const seg = hasSegments(a) ? chooseSegment(a, scenes[i], role, { usedSegKeys, productGroup, need }) : null;
       if (seg) pick = { ...pick, segment: seg };
     }
     if (pick?.segment) usedSegKeys.add(segKey(pick.segment.assetId, pick.segment.idx));
@@ -668,7 +794,7 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
 // Trả về { picks, narrations } — narrations là lời từng cảnh SAU khi có thể bị cắt.
 // ĐỢT A: cluster = cụm chính. Pick trong cụm (by 'cluster') KHÔNG bao giờ bị đổi sang tư liệu ngoài cụm: lệch lời
 // thì thử đoạn khác trong cụm không lệch, hết thì cắt câu lệch như cũ. Chữ so lệch = tiêu đề + mô tả clip + chữ đoạn.
-export function refinePicksByImagery({ scenes, picks, assets, mustIdx = 0, skip = [], productGroup = null, recentUse = new Map(), cluster = null, log = console }) {
+export function refinePicksByImagery({ scenes, picks, assets, mustIdx = 0, skip = [], productGroup = null, recentUse = new Map(), cluster = null, salesVideo = false, contentVideo = false, productTerms = [], log = console }) {
   const byId = new Map(assets.map((a) => [a.id, a]));
   const usedCount = new Map();
   for (const p of picks) if (p?.assetId) usedCount.set(p.assetId, (usedCount.get(p.assetId) || 0) + 1);
@@ -691,9 +817,15 @@ export function refinePicksByImagery({ scenes, picks, assets, mustIdx = 0, skip 
     if (cluster && pick.by === 'cluster') {
       // Thử đoạn khác TRONG cụm mà lời không trôi; nhả đoạn cũ trước để khỏi tự chặn mình.
       if (pick.segment) usedSegKeys.delete(segKey(pick.segment.assetId, pick.segment.idx));
-      const alt = pickInCluster(cluster, assets, { ...scenes[i], narration: narrations[i] }, role, {
+      const sc = { ...scenes[i], narration: narrations[i] };
+      const nd = sceneNeed(sc, role, { salesVideo, productTerms });
+      const alt = pickInCluster(cluster, assets, sc, role, {
         prevId, usedSegKeys, usedCount, recentUse, productGroup,
-        accept: (a, seg) => !imageryDriftSentences(narrations[i] || '', `${textOf(a)} ${segmentText(seg)}`).length,
+        accept: (a, seg) => !imageryDriftSentences(narrations[i] || '', `${textOf(a)} ${segmentText(seg)}`).length
+          && !(salesVideo && nd.product && segFitLevel(seg, nd, a).level < 1), // video bán: không đổi sang đoạn không thấy máy
+        need: nd,
+        prevRefs: picks.slice(0, i).map((p) => p?.segment).filter(Boolean), progress: !!contentVideo,
+        closing: i > 0 && i === scenes.length - 1, openRef: i > 0 ? (picks[0]?.segment || null) : null,
       });
       if (alt) {
         usedCount.set(pick.assetId, Math.max(0, (usedCount.get(pick.assetId) || 0) - 1));

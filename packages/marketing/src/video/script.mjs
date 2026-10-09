@@ -5,7 +5,8 @@ import { knownFactValues, testFactValues } from '../product-facts.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
-import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen, hasSegments, pickClusterForVideo, pickInCluster, allocateSceneSegments } from './scene-match.mjs';
+import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen, hasSegments, pickClusterForVideo, pickInCluster, findProductSegment, allocateSceneSegments } from './scene-match.mjs';
+import { sceneNeed } from './segments.mjs';
 import { segmentsEnabled, segKey } from './segments.mjs';
 import { EXTRA_WORN, absoluteClaims, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, paybackClaimSentences, keepOneQuestion } from './rules.mjs';
 
@@ -363,7 +364,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     !opts.contentVideo ? 'KHÔNG QUY KẾT NGUỒN DẦU (3/10 vòng 3): không nói "dầu mua ngoài bẩn", "dầu chợ kém" hay quy chất lượng xấu cho dầu mua từ nguồn khác. Nói trung tính về hiện tượng: "dầu lẫn nước và cặn có thể làm hại kim phun, bơm cao áp".' : '',
     'CẢNH ĐẦU KHÔNG MỞ BẰNG CHUYỆN SỬA MÁY (3/10 vòng 2, ChatGPT chấm: hook "Hôm nay sửa tới lần thứ ba rồi đấy!" làm người xem tưởng máy đang bán hay hỏng): CẢNH ĐẦU không mở bằng chuyện SỬA MÁY / máy hỏng chung chung. Nỗi đau mở màn bám đúng thứ sản phẩm giải quyết: video lọc nước là chuyện NƯỚC (can nước chật chỗ, thiếu nước, nước đục), video lọc dầu là chuyện DẦU / CẶN. Muốn nhắc sửa chữa thì phải nói rõ là máy CŨ trên tàu.',
     'CÂU KẾT QUẢ PHẢI CÓ HÌNH CHỨNG MINH (17/9 vòng 6): không nói "tuyệt đối", "đảm bảo 100%", "sạch bong" hay kết quả vận hành (máy nổ êm, dầu sạch) nếu tư liệu không quay được điều đó; thay bằng lợi ích MÔ TẢ ("nước sau lọc dùng cho sinh hoạt", "giữ dầu sạch hơn trước khi vào máy").',
-    'LỜI ĐỌC KHÔNG TUYỆT ĐỐI HÓA (3/10, ChatGPT chấm: "tách nước hoàn toàn", "lọc sạch cặn bẩn nhỏ nhất", "tiết kiệm tới 10% nhiên liệu mỗi chuyến" nghe như quảng cáo quá tay): CẤM "hoàn toàn", "100%", "sạch bong", "nhỏ nhất", "tuyệt đối", "triệt để" khi nói về hiệu quả của máy. Diễn đạt mềm: "giúp tách nước và cặn bẩn trước khi nhiên liệu vào động cơ", "hạn chế hao phí". Số phần trăm lấy từ THÔNG SỐ ĐƯỢC PHÉP vẫn dùng được nhưng PHẢI kèm điều kiện: "có thể giảm tới X% tùy tình trạng máy và dầu trên từng tàu".',
+    'LỜI ĐỌC KHÔNG TUYỆT ĐỐI HÓA (3/10, ChatGPT chấm: "tách nước hoàn toàn", "lọc sạch cặn bẩn nhỏ nhất", "tiết kiệm tới 10% nhiên liệu mỗi chuyến" nghe như quảng cáo quá tay): CẤM "hoàn toàn", "100%", "sạch bong", "sạch tinh", "luôn sạch", "nhỏ nhất", "tuyệt đối", "triệt để" khi nói về hiệu quả của máy. Diễn đạt mềm: "giúp tách nước và cặn bẩn trước khi nhiên liệu vào động cơ", "giúp dầu sạch hơn trước khi vào máy", "hạn chế hao phí". Số phần trăm lấy từ THÔNG SỐ ĐƯỢC PHÉP vẫn dùng được nhưng PHẢI kèm điều kiện: "có thể giảm tới X% tùy tình trạng máy và dầu trên từng tàu".',
     'TỶ LỆ PHẦN TRĂM (17/9, Điều cấm 5): CẤM mọi con số phần trăm ("40%", "gần 40 phần trăm chi phí") không có nguyên văn trong BÀI NGUỒN hoặc THÔNG SỐ ĐƯỢC PHÉP bên dưới. Không có thì nói "một phần lớn", "cả đống tiền".',
     'NỖI ĐAU LÀ CỦA TÀU CHƯA LẮP MÁY SDVICO (17/9 chiều): máy hỏng, sửa hoài, cặn, nước đục, cạn nước trong cảnh đầu và cảnh đồng cảm là chuyện của tàu CHƯA có thiết bị SDVICO. TUYỆT ĐỐI KHÔNG viết như thể máy SDVICO hỏng hay phải sửa; không đặt tên máy SDVICO vào câu tả sự cố. Cũng KHÔNG viết "máy lọc nước này", "máy lọc dầu này", "máy này sửa/hỏng" trong cảnh nỗi đau (18/9 vòng 10: người xem tưởng chiếc máy đang bán chính là chiếc vừa bị chê hỏng) — gọi là "máy lọc cũ", "bộ lọc cũ trên tàu".',
     'CẢNH 2 (đồng cảm) BẮT BUỘC — không được bỏ để nhảy thẳng vào lối thoát: tả đúng khoảnh khắc đau bà con thấy "ủa mình rồi", tạo cảm xúc TIẾC + UẤT + LO (playbook chốt: cảm xúc mạnh nhất ở nhịp này). Kể ra HẬU QUẢ cụ thể (kim phun hỏng mất bao nhiêu tiền, chuyến biển bị bỏ dở, tàu nằm bờ). Không lan man.',
@@ -960,9 +961,13 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   const mustForCluster = opts.mustUseAssetId && assets.some((a) => a.id === opts.mustUseAssetId) ? opts.mustUseAssetId : null;
   // 9/10 (2) SỬA NÓNG: cụm chính CHỈ cho video content; video bán hàng chọn hình như đường cũ (cảnh giải pháp/giá
   // phải lấy hình sản phẩm), cắt đoạn theo segments vẫn áp cho mọi video.
-  const cluster = segOn ? pickClusterForVideo(rawScenes, assets, { contentVideo: !!opts.contentVideo, productGroup: segGroup, mustAssetId: mustForCluster, mustIdx: mustIdxScene }) : null;
-  if (segOn && !opts.contentVideo) {
-    console.log('Video bán: bỏ chế độ cụm (cảnh giải pháp/giá phải lấy hình sản phẩm)');
+  // ĐỢT A2 (9/10): video bán dùng cụm (gom theo ngày) CHỈ khi cụm có đủ đoạn thấy rõ máy cho mọi cảnh solution + cảnh giá.
+  const salesSeg = !opts.contentVideo && !!opts.salesVideo;
+  const modelCode = shownName ? (shownName.match(/[A-Za-z]{2,}-?\d+\w*/) || [])[0] : null;
+  const productTerms = [shownName, modelCode].filter(Boolean);
+  const cluster = segOn ? pickClusterForVideo(rawScenes, assets, { contentVideo: !!opts.contentVideo, productGroup: segGroup, mustAssetId: mustForCluster, mustIdx: mustIdxScene, hasPriceScene: !!teaser }) : null;
+  if (segOn && !opts.contentVideo && !cluster) {
+    console.log('Video bán: không cụm nào đủ đoạn thấy rõ máy cho cảnh giải pháp + giá (A2.4), hình chọn như cũ (cảnh giải pháp/giá lấy hình sản phẩm)');
   } else if (segOn) {
     console.log(cluster
       ? `Cụm tư liệu chính (9/10): ${cluster.id} | ${cluster.confidence} | ${cluster.clipIds.length} clip | phủ ${cluster.covered}/${rawScenes.length} cảnh`
@@ -979,6 +984,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
         // 17/9 chiều: clip máy đang chạy ép vào cảnh giải pháp (không có role solution thì cảnh cuối).
         mustUseIndex: mustIdxScene,
         cluster: segOn ? cluster : null, useSegments: segOn,
+        salesVideo: salesSeg, contentVideo: !!opts.contentVideo, productTerms,
       })
     : rawScenes.map(() => null);
   // 1/10 (Thanh, bài 22452d7f: lời "chòng chành sóng nước" trên hình CẢNG CÁ TRÊN BỜ): soát lời từng cảnh với
@@ -986,7 +992,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   if (assets.length && !sbMode) {
     const refined = refinePicksByImagery({
       scenes: rawScenes, picks, assets, mustIdx: mustIdxScene, skip: hookPin ? [0] : [],
-      productGroup: opts.contentVideo ? null : opts.productGroup || null, recentUse: opts.recentUse || new Map(), cluster: segOn ? cluster : null, log: console,
+      productGroup: opts.contentVideo ? null : opts.productGroup || null, recentUse: opts.recentUse || new Map(), cluster: segOn ? cluster : null,
+      salesVideo: salesSeg, contentVideo: !!opts.contentVideo, productTerms, log: console,
     });
     // Dựng lại từ kịch bản đã ghi: lời GIỮ NGUYÊN (chỉ hình đổi) để so sánh cũ/mới cùng một lời.
     if (!reuse) refined.narrations.forEach((n, i) => { if (n && n !== rawScenes[i].narration) rawScenes[i].narration = n; });
@@ -1098,10 +1105,17 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     const r = splitPriceScene(vertical, teaser, {
       pickAsset: (prevId) => {
         // 9/10: có cụm chính thì cảnh giá ưu tiên đoạn TRONG cụm (cảnh này chưa có đoạn, allocate gán sau).
+        // ĐỢT A2: cảnh giá phải cho nhận ra món đang báo giá NGAY KHI CẢNH BẮT ĐẦU -> ưu tiên tuyệt đối đoạn ro_tu_dau
+        // (rồi ro_sau cắt từ product_clear_from) của tư liệu thư mục sản phẩm, trong cụm trước rồi cả kho; không có mới tới ảnh sản phẩm.
+        const priceScene = { role: 'price', visual: priceVisual, narration: '' };
+        const used = new Set(vertical.filter((s) => s.segment).map((s) => segKey(s.segment.assetId, s.segment.idx)));
         if (cluster) {
-          const used = new Set(vertical.filter((s) => s.segment).map((s) => segKey(s.segment.assetId, s.segment.idx)));
-          const c = pickInCluster(cluster, assets, { role: 'closing', visual: priceVisual, narration: '' }, 'closing', { prevId, usedSegKeys: used, usedCount, recentUse: opts.recentUse || new Map(), productGroup: segGroup });
-          if (c) return c.assetId;
+          const c = pickInCluster(cluster, assets, priceScene, 'price', { prevId, usedSegKeys: used, usedCount, recentUse: opts.recentUse || new Map(), productGroup: segGroup, need: sceneNeed(priceScene, 'price', { salesVideo: salesSeg, productTerms }) });
+          if (c && (!salesSeg || c.level >= 1)) return c.assetId;
+        }
+        if (segOn && salesSeg) {
+          const pp = findProductSegment(assets, priceScene, 'price', { prevId, usedSegKeys: used, usedCount, recentUse: opts.recentUse || new Map(), productGroup: segGroup });
+          if (pp) { console.log(`[script] canh gia: dung doan thay ro may (${pp.segment.product_visible}${pp.segment.cut ? ', cat tu ' + pp.segment.start + 's' : ''}) cua "${String(assets.find((x) => x.id === pp.assetId)?.title || '').slice(0, 40)}"`); return pp.assetId; }
         }
         return pickByRole(assets, 'closing', { prevId, usedCount, visual: priceVisual })?.id || null;
       },
@@ -1136,7 +1150,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   // 9/10 ĐỢT A: gán đoạn chính + đoạn nối thêm cho từng cảnh khi danh sách cảnh đã chốt hẳn (sau ghim cảnh 1, tách cảnh).
   let segmentReport = null;
   if (segOn) {
-    segmentReport = allocateSceneSegments(vertical, assets, { cluster, productGroup: segGroup, log: console });
+    segmentReport = allocateSceneSegments(vertical, assets, { cluster, productGroup: segGroup, salesVideo: salesSeg, contentVideo: !!opts.contentVideo, productTerms, log: console });
   }
   for (const [i, s] of vertical.entries()) {
     const a = assets.find((x) => x.id === s.assetId);

@@ -8,11 +8,18 @@
 // Ngày Zalo + nhóm sản phẩm chỉ là ỨNG VIÊN cụm, chưa chứng minh cùng buổi quay. Bước 2 đối chiếu thiết bị,
 // người, khoang tàu, hoạt động; chưa chắc thì confidence = "co_the".
 //
+// ĐỢT A2 (9/10): mỗi đoạn thêm 4 nhãn phục vụ chọn đoạn theo câu đang nói: subject (người / thiết bị / cả hai / cảnh chung
+// trong khung dọc), product_visible + product_clear_from (thiết bị chính có hiện rõ ngay từ đầu đoạn không), stage (chuẩn bị,
+// thao tác, hoàn tất, vận hành). Thêm chế độ --date: lấy ứng viên MỌI nhóm cùng ngày Zalo (Content lẫn thư mục sản phẩm) rồi
+// gom cụm cùng buổi như cũ, vì đợt A thấy SD12-300 và Content ngày 19/9 là CÙNG buổi nhưng bị tách khi gom theo nhóm.
+//
 // Chạy:
+//   node packages/marketing/src/video/segment-clips.mjs --date 2026-09-19 [--dry-run] [--redo]
 //   node packages/marketing/src/video/segment-clips.mjs --cluster 2026-09-19 "6. Thiết bị lọc dầu SF-50" [--dry-run] [--redo]
 //   node packages/marketing/src/video/segment-clips.mjs --ids 839e1acd,fb72cad5 [--dry-run] [--redo]
 //   --dry-run: gọi Gemini và in kết quả, KHÔNG ghi DB.   --redo: mô tả lại cả clip đã có segments.
-// CHỈ thử trên cụm chỉ định (chưa mô tả cả kho). Khoá API đọc từ .env thật, không in ra.
+//   Clip có đoạn từ đợt A mà chưa có nhãn A2 (thiếu stage / subject / product_visible) tự được mô tả lại, khỏi cần --redo.
+// CHỈ thử trên ngày / cụm chỉ định (chưa mô tả cả kho). Khoá API đọc từ .env thật, không in ra.
 import { mkdir, readFile, stat, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -53,6 +60,12 @@ export function assignClusters(raw, clipIds, { date, group, checkedAt = new Date
   return out;
 }
 
+// Clip đã có đoạn nhưng đoạn CHƯA mang nhãn A2 (đoạn đợt A) -> cần mô tả lại để lấy nhãn mới.
+export function needsRelabel(segments) {
+  if (!Array.isArray(segments) || !segments.length) return true;
+  return segments.some((x) => !x || !('stage' in x) || !('subject' in x) || !('product_visible' in x));
+}
+
 // Cắt giây về dạng "m:ss" cho bảng in.
 export function fmtT(sec) {
   const s = Math.max(0, Number(sec) || 0);
@@ -75,15 +88,19 @@ const SEG_PROMPT = (duration) => [
   '- setting: bối cảnh (khoang máy chật hẹp, hầm tàu, boong, xưởng, bến cảng...).',
   '- vertical_ok: true nếu cắt khung dọc 9:16 ở GIỮA hình vẫn thấy rõ chủ thể chính; false nếu chủ thể nằm sát mép trái hoặc phải, hoặc là cảnh rộng ngang.',
   '- note: ghi chú ngắn về chất lượng hình hoặc chi tiết đáng chú ý, hoặc chuỗi rỗng.',
-  'TUYỆT ĐỐI KHÔNG BỊA: không thấy thì không ghi, đoạn nào không chắc thì bỏ đoạn đó. Không ghi số điện thoại, biển số, tên người.',
+  '- subject: chủ thể NỔI BẬT NHẤT trong khung DỌC 9:16 cắt ở giữa. "nguoi" = thấy người (thợ, ngư dân) là chủ thể; "thiet_bi" = máy / thiết bị / đường ống là chủ thể, không thấy người rõ; "ca_hai" = thấy rõ cả người lẫn thiết bị; "canh_chung" = cảnh rộng, tàu, cảng, biển, không có chủ thể nào nổi. Không chắc thì "canh_chung".',
+  '- product_visible: THIẾT BỊ CHÍNH của clip (máy lọc dầu, máy lọc nước, thiết bị định vị, thiết bị đang được lắp hay vận hành, KHÔNG phải động cơ hay ống chung chung) có thấy rõ không. "ro_tu_dau" = thấy rõ, không bị che, ngay từ giây đầu đoạn; "ro_sau" = ban đầu bị che hoặc chưa vào khung (tay thợ che, người đứng chắn, máy chưa lộ ra) và chỉ thấy rõ từ một giây nào đó trong đoạn; "mo" = có thấy nhưng nhỏ, mờ, góc khuất, bị che một phần suốt đoạn; "khong" = không có thiết bị chính. Không chắc thì "mo".',
+  '- product_clear_from: CHỈ khi product_visible = "ro_sau": giây (số thực, nằm trong đoạn, tính từ đầu CLIP như start và end) mà thiết bị chính bắt đầu hiện rõ không bị che. Các trường hợp khác ghi null.',
+  '- stage: công đoạn việc đang diễn ra. "chuan_bi" = chuẩn bị, mang thiết bị tới, đo đạc, tháo đồ cũ, dọn chỗ; "thao_tac" = đang lắp, siết, đấu nối, thao tác chính; "hoan_tat" = xong việc, kiểm tra lại, bàn giao; "van_hanh" = thiết bị đang chạy, nước hay dầu chảy ra; "khac" = không thuộc công đoạn nào hoặc không chắc.',
+  'TUYỆT ĐỐI KHÔNG BỊA: không thấy thì không ghi, đoạn nào không chắc thì bỏ đoạn đó, nhãn nào không chắc thì ghi giá trị trung tính ("canh_chung", "mo", "khac"). Không ghi số điện thoại, biển số, tên người.',
   'Chỉ trả JSON, không thêm chữ ngoài JSON:',
-  '{"segments":[{"start":0.0,"end":4.5,"action":"...","people":"...","equipment":"...","setting":"...","vertical_ok":true,"note":""}]}',
+  '{"segments":[{"start":0.0,"end":4.5,"action":"...","people":"...","equipment":"...","setting":"...","vertical_ok":true,"note":"","subject":"nguoi|thiet_bi|ca_hai|canh_chung","product_visible":"ro_tu_dau|ro_sau|mo|khong","product_clear_from":null,"stage":"chuan_bi|thao_tac|hoan_tat|van_hanh|khac"}]}',
 ].join('\n');
 
 const CLUSTER_PROMPT = [
   'Bạn là người dựng video của SDVICO. Dưới đây là các clip tư liệu cùng ngày nhóm Zalo, kèm các ĐOẠN đã mô tả (hành động, người, thiết bị, bối cảnh).',
   'Nhiệm vụ: xác định clip nào CÙNG MỘT BUỔI QUAY, tức cùng một tàu / khoang / thiết bị cụ thể / người / chuỗi việc liên tiếp, để dựng chung một video mà người xem thấy là một việc xuyên suốt.',
-  'Cùng ngày và cùng nhóm sản phẩm CHƯA chứng minh cùng buổi quay. Phải đối chiếu chi tiết:',
+  'Cùng ngày và cùng nhóm sản phẩm CHƯA chứng minh cùng buổi quay. Các clip có thể nằm ở NHIỀU thư mục (Content và thư mục sản phẩm): clip Content và clip thư mục sản phẩm CÙNG NGÀY vẫn có thể là cùng một buổi lắp đặt, hãy so cả hai bên, đừng tách theo thư mục. Phải đối chiếu chi tiết:',
   '- confidence "chac": có ÍT NHẤT 2 chi tiết ĐỊNH DANH RIÊNG khớp giữa các clip: cùng một người nhận ra được (áo, mũ, dáng, giới tính), cùng một vị trí máy trên vách hoặc cùng khoang nhận ra được, cùng một chi tiết lạ (loại dây điện, bình, khay, giá đỡ riêng), hoặc công đoạn nối tiếp nhau đúng thứ tự. Nói rõ từng chi tiết trong basis.',
   '- Chi tiết CHUNG của mọi lần lắp đặt của SDVICO (máy lọc dầu inox, ống nhựa trong suốt, khoang máy chật, thợ cúi thao tác) KHÔNG đủ cho "chac". Chỉ khớp những thứ chung đó thì là "co_the".',
   '- confidence "co_the": chỉ khớp loại việc hoặc bối cảnh chung (đều là thợ lắp máy trong khoang), chưa đủ chi tiết định danh để chắc.',
@@ -101,8 +118,9 @@ async function main() {
   const redo = args.includes('--redo');
   const ci = args.indexOf('--cluster');
   const ii = args.indexOf('--ids');
-  if (ci < 0 && ii < 0) {
-    console.error('Cú pháp: segment-clips.mjs --cluster <YYYY-MM-DD> "<nhóm>" | --ids id1,id2 [--dry-run] [--redo]');
+  const di = args.indexOf('--date');
+  if (ci < 0 && ii < 0 && di < 0) {
+    console.error('Cú pháp: segment-clips.mjs --date <YYYY-MM-DD> | --cluster <YYYY-MM-DD> "<nhóm>" | --ids id1,id2 [--dry-run] [--redo]');
     process.exit(1);
   }
   const { createClient } = await import('@supabase/supabase-js');
@@ -140,7 +158,15 @@ async function main() {
   let clips = [];
   let date = null;
   let group = null;
-  if (ci >= 0) {
+  if (di >= 0) {
+    // ĐỢT A2: mọi nhóm cùng NGÀY Zalo (Content + thư mục sản phẩm), gom cụm chung một lượt.
+    date = args[di + 1];
+    group = 'ca-ngay';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) { console.error('--date cần <YYYY-MM-DD>'); process.exit(1); }
+    const { data, error } = await client.from('brand_assets').select(COLS).in('kind', ['video', 'clip']).neq('source', 'video-pipeline');
+    if (error) throw new Error('đọc brand_assets: ' + error.message);
+    clips = (data || []).filter((a) => zaloDateOf(a.license_note) === date);
+  } else if (ci >= 0) {
     date = args[ci + 1];
     group = args[ci + 2];
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !group) { console.error('--cluster cần <YYYY-MM-DD> "<nhóm sản phẩm>"'); process.exit(1); }
@@ -166,7 +192,7 @@ async function main() {
 
   // 2) Mô tả đoạn từng clip
   for (const a of clips) {
-    if (Array.isArray(a.segments) && a.segments.length && !redo) { console.log(`  = ${a.id.slice(0, 8)} đã có ${a.segments.length} đoạn, bỏ qua (--redo để làm lại)`); continue; }
+    if (Array.isArray(a.segments) && a.segments.length && !redo && !needsRelabel(a.segments)) { console.log(`  = ${a.id.slice(0, 8)} đã có ${a.segments.length} đoạn kèm nhãn A2, bỏ qua (--redo để làm lại)`); continue; }
     const ext = (String(a.storage_path).split('.').pop() || 'mp4').replace(/[^a-z0-9]/gi, '').slice(0, 4) || 'mp4';
     const local = join(tmp, `${a.id.slice(0, 8)}.${ext}`);
     let sendPath = local;
@@ -208,11 +234,12 @@ async function main() {
   let clusterModel = null;
   if (usable.length >= 2) {
     const blocks = usable.map((a, i) => [
-      `CLIP ${i + 1} [${a.id.slice(0, 8)}] | tên: ${a.title || ''} | mô tả cũ: ${String(a.description || '').replace(/\s+/g, ' ').slice(0, 260)}`,
-      ...a._use.map((s) => `   - ${s.start.toFixed(1)}-${s.end.toFixed(1)}s | việc: ${s.action} | người: ${s.people} | thiết bị: ${s.equipment} | bối cảnh: ${s.setting}${s.note ? ` | ghi chú: ${s.note}` : ''}`),
+      `CLIP ${i + 1} [${a.id.slice(0, 8)}] | thư mục: ${a.product_group || '?'} | tên: ${a.title || ''} | mô tả cũ: ${String(a.description || '').replace(/\s+/g, ' ').slice(0, 260)}`,
+      ...a._use.map((s) => `   - ${s.start.toFixed(1)}-${s.end.toFixed(1)}s | việc: ${s.action} | người: ${s.people} | thiết bị: ${s.equipment} | bối cảnh: ${s.setting}${s.stage ? ` | công đoạn: ${s.stage}` : ''}${s.note ? ` | ghi chú: ${s.note}` : ''}`),
     ].join('\n')).join('\n\n');
     try {
-      const { j, model } = await gen([{ text: `${CLUSTER_PROMPT}\n\nNGÀY NHÓM ZALO: ${date}. NHÓM SẢN PHẨM: ${group}.\n\n${blocks}` }], (x) => Array.isArray(x?.clusters));
+      const scope = group === 'ca-ngay' ? 'NHIỀU THƯ MỤC (mọi nhóm cùng ngày)' : group;
+      const { j, model } = await gen([{ text: `${CLUSTER_PROMPT}\n\nNGÀY NHÓM ZALO: ${date}. NHÓM SẢN PHẨM: ${scope}.\n\n${blocks}` }], (x) => Array.isArray(x?.clusters));
       clusterModel = model;
       assignment = assignClusters(j, usable.map((a) => a.id), { date, group });
       for (const a of clips) if (!assignment.has(a.id)) assignment.set(a.id, null);
@@ -247,9 +274,9 @@ async function main() {
 
   console.log(`\n===== KẾT QUẢ ${date} | ${group} (${dry ? 'dry-run' : 'đã ghi DB'}) =====`);
   for (const { a, segs, cl } of rows) {
-    console.log(`\n${a.id.slice(0, 8)} | ${a.title} | ${segs.length} đoạn${a._error ? ` | LỖI: ${a._error.slice(0, 80)}` : ''}`);
+    console.log(`\n${a.id.slice(0, 8)} | [${a.product_group || '?'}] ${a.title} | ${segs.length} đoạn${a._error ? ` | LỖI: ${a._error.slice(0, 80)}` : ''}`);
     console.log(`   cụm: ${cl ? `${cl.id} (${cl.confidence}) — ${cl.basis}` : 'KHÔNG (lạc cụm hoặc chưa đủ dữ liệu)'}`);
-    for (const s of segs.slice(0, 3)) console.log(`   ${fmtT(s.start)}-${fmtT(s.end)} | ${s.action.slice(0, 90)} | vertical_ok=${s.vertical_ok}`);
+    for (const s of segs) console.log(`   ${fmtT(s.start)}-${fmtT(s.end)} | ${s.action.slice(0, 70)} | chủ thể=${s.subject ?? '?'} | máy=${s.product_visible ?? '?'}${s.product_clear_from != null ? `@${Number(s.product_clear_from).toFixed(1)}s` : ''} | stage=${s.stage ?? '?'} | dọc=${s.vertical_ok}`);
   }
 }
 

@@ -420,6 +420,10 @@ ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXG
   eq('abs: nối stripSentencesWith chỉ cắt đúng câu vi phạm', stripSentencesWith('Dầu về sạch hơn. Máy tách nước hoàn toàn khỏi dầu. Lắp xong anh em yên tâm.', absoluteClaims('Dầu về sạch hơn. Máy tách nước hoàn toàn khỏi dầu. Lắp xong anh em yên tâm.')), 'Dầu về sạch hơn. Lắp xong anh em yên tâm.');
   eq('abs: câu 100% có điều kiện sống sót khi cắt câu 100% khác', stripSentencesWith('Tách nước 100%. Có thể tới 100% tùy dầu.', absoluteClaims('Tách nước 100%. Có thể tới 100% tùy dầu.')), 'Có thể tới 100% tùy dầu.');
   ok('abs: văn cố định (outro) không dính bộ quét', absoluteClaims(outroText('lọc dầu')).length === 0 && absoluteClaims(outroText('SDVICO')).length === 0);
+  // 9/10 A2.5 (reviewer bài 66b894f8: "giúp giữ cho dầu diesel luôn sạch tinh"): kết quả tuyệt đối về dầu / nước / nhiên liệu.
+  eq('abs A2.5: bắt "luôn sạch tinh" (câu reviewer)', absoluteClaims('Giúp giữ cho dầu diesel luôn sạch tinh.'), ['luôn sạch tinh']);
+  eq('abs A2.5: bắt "luôn sạch" và "sạch bong" cạnh dầu / nước', [absoluteClaims('Dầu luôn sạch trước khi vào máy.'), absoluteClaims('Nước sạch bong sau khi lọc.')], [['luôn sạch'], ['sạch bong']]);
+  eq('abs A2.5: THA "giúp dầu sạch hơn trước khi vào máy" (cách nói mềm) và "boong tàu luôn sạch sẽ" (không về dầu / nước)', [absoluteClaims('Giúp dầu sạch hơn trước khi vào máy.'), absoluteClaims('Boong tàu luôn sạch sẽ.')], [[], []]);
 }
 
 // 3/10 vòng 2 (F1): câu "tiết kiệm / giảm ... X%" tự thêm điều kiện, tất định, không nhờ model.

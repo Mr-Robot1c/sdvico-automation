@@ -2,11 +2,14 @@
 // Không gọi mạng. Chạy: npm run test:cluster
 import {
   matchScenesToAssets, pickPrimaryCluster, pickClusterForVideo, pickInCluster, allocateSceneSegments, refinePicksByImagery,
-  hasSegments, chooseSegment, clusterGroups,
+  hasSegments, chooseSegment, clusterGroups, findProductSegment, countProductSegments,
 } from './video/scene-match.mjs';
-import { normalizeSegments, parseTime, planSceneSegments, segmentsEnabled, estimateSpeechSec, segKey } from './video/segments.mjs';
+import {
+  normalizeSegments, parseTime, planSceneSegments, segmentsEnabled, estimateSpeechSec, segKey,
+  sentenceSubject, sceneNeed, segProductState, segFitLevel, progressAdjust, actionSimilarity, overlapFraction,
+} from './video/segments.mjs';
 import { splitLongImageScenes } from './video/rules.mjs';
-import { assignClusters, zaloDateOf, clusterIdOf } from './video/segment-clips.mjs';
+import { assignClusters, zaloDateOf, clusterIdOf, needsRelabel } from './video/segment-clips.mjs';
 
 let fails = 0;
 const check = (cond, msg) => { if (!cond) { fails += 1; console.error('  ✗', msg); } else console.log('  ✓', msg); };
@@ -241,6 +244,176 @@ console.log('17. SỬA NÓNG 9/10 (2): chế độ cụm CHỈ cho video content
   allocateSceneSegments(scsBan, khoBan, { cluster: null, productGroup: G, log: silent });
   check(scsBan[0].segment && scsBan[0].segment.assetId === 'C1', 'bán: allocateSceneSegments với cluster null vẫn gán đoạn chính');
   check(planSceneSegments(4, scsBan[0]).pieces.length >= 1, 'bán: có kế hoạch cắt đoạn (planSceneSegments) cho cảnh');
+}
+
+// ======================================================================================================
+// ĐỢT A2 (9/10): chọn đoạn phục vụ ĐÚNG CÂU đang nói.
+// ======================================================================================================
+const lseg = (start, end, action, lab = {}, extra = {}) => seg(start, end, action, { ...lab, ...extra });
+const mkCl = (id, clipIds) => ({ id, confidence: 'chac', basis: 'x', clipIds });
+const CG2 = 'Content';
+
+console.log('18. A2.1 nhãn đoạn: chuẩn hóa + tương thích đoạn cũ');
+{
+  const n = normalizeSegments([
+    { start: 0, end: 6, action: 'a', subject: 'Nguoi', product_visible: 'ro_sau', product_clear_from: 3, stage: 'thao-tac' },
+    { start: 6, end: 12, action: 'b', subject: 'lạ', product_visible: 'ro_sau', stage: 'lạ' },            // ro_sau mà không có giây -> mo
+    { start: 12, end: 18, action: 'c' },                                                                 // thiếu nhãn = không biết
+    { start: 18, end: 40, action: 'd', product_visible: 'ro_sau', product_clear_from: 33 },              // đoạn dài tách 2 khúc
+  ], 40);
+  check(n[0].subject === 'nguoi' && n[0].stage === 'thao_tac' && n[0].product_visible === 'ro_sau' && n[0].product_clear_from === 3, 'nhãn hợp lệ được chuẩn hóa (hoa/thường, gạch nối)');
+  check(n[1].subject === 'canh_chung' && n[1].stage === 'khac' && n[1].product_visible === 'mo' && n[1].product_clear_from === null, 'nhãn lạ -> giá trị trung tính; ro_sau thiếu giây hiện rõ -> mo');
+  check(n[2].subject === null && n[2].product_visible === null && n[2].stage === null, 'đoạn model không gán nhãn = null (không biết)');
+  const dd = n.filter((x) => x.action === 'd');
+  check(dd.length === 2 && dd[0].product_visible === 'mo' && dd[1].product_visible === 'ro_sau' && dd[1].product_clear_from === 33, 'đoạn dài bị tách: khúc trước giây hiện rõ -> mo, khúc chứa giây đó giữ ro_sau');
+  check(needsRelabel([seg(0, 5, 'x')]) === true && needsRelabel(n) === false && needsRelabel([]) === true, 'needsRelabel: đoạn đợt A cần mô tả lại, đoạn có nhãn thì không');
+}
+
+console.log('19. A2.2 sentenceSubject + sceneNeed');
+{
+  check(sentenceSubject('Nhìn người thợ ướt đẫm mồ hôi mới thấm thía hết nỗi vất vả.') === 'nguoi', 'câu thợ đẫm mồ hôi -> nguoi');
+  check(sentenceSubject('Lắp ngay Máy lọc dầu SF300B với độ lọc từ 1 tới 10 micromet.') === 'san_pham', 'câu lắp Máy lọc dầu SF300B -> san_pham');
+  check(sentenceSubject('Sóng biển dập dềnh suốt đêm.') === 'chung' && sentenceSubject('Miền Tây chú ý thời tiết xấu.') === 'chung', 'câu chung; "tây", "chú ý" không bị nhầm là người');
+  check(sentenceSubject('Máy SDVICO-X lắp xong.', { productTerms: ['SDVICO-X'] }) === 'san_pham' && sentenceSubject('Tay bám từng con ốc dưới hầm tàu!') === 'nguoi', 'tên riêng truyền vào nhận ra sản phẩm; "Tay bám..." -> nguoi');
+  const n1 = sceneNeed({ narration: 'Anh em thợ kiên nhẫn căn chỉnh. Nhìn người thợ ướt đẫm mồ hôi.' }, 'story');
+  check(n1.nguoi === true && n1.product === false && n1.subject === 'nguoi', 'sceneNeed: cảnh toàn câu về người -> cần người');
+  const n2 = sceneNeed({ narration: 'Lắp ngay Máy lọc dầu SF300B.' }, 'solution', { salesVideo: true });
+  const n3 = sceneNeed({ narration: 'Thợ lắp xong.' }, 'solution', { salesVideo: true });
+  check(n2.product && n2.productFolderOnly && n3.product && !n3.nguoi, 'video bán: cảnh solution luôn cần thấy máy, ưu tiên máy hơn người');
+}
+
+console.log('20. A2.2 câu về người phải lấy đoạn có người, dù đoạn kia điểm chữ cao hơn');
+{
+  const NA = { id: 'NA', kind: 'video', title: 'Hầm máy A', folder: CG2, description: 'Hầm máy tàu cá', segments: [
+    lseg(0, 5, 'động cơ và đường ống cũ rỉ sét cặn bẩn trong khoang máy tàu', { subject: 'thiet_bi', stage: 'khac', product_visible: 'khong' }, { people: '0', equipment: 'động cơ, ống rỉ, cặn', setting: 'khoang máy tàu cá' }),
+    lseg(5, 10, 'thợ lau mồ hôi, tay giữ cờ lê trong khoang máy', { subject: 'nguoi', stage: 'thao_tac', product_visible: 'khong' }, { people: '1 thợ', equipment: 'cờ lê', setting: 'khoang máy' }),
+  ] };
+  const NB = { id: 'NB', kind: 'video', title: 'Hầm máy B', folder: CG2, description: 'Hầm máy tàu cá', segments: [lseg(0, 5, 'thợ siết ốc dưới khoang máy', { subject: 'ca_hai', stage: 'thao_tac', product_visible: 'mo' }, { setting: 'khoang máy' })] };
+  const cl3 = mkCl('cl-N', ['NA', 'NB']);
+  const sc = { role: 'story', narration: 'Nhìn người thợ ướt đẫm mồ hôi mới thấm thía nỗi vất vả.', visual: 'đường ống động cơ rỉ cặn trong khoang máy tàu cá' };
+  const ctrl = pickInCluster(cl3, [NA, NB], sc, 'story', { usedSegKeys: new Set([segKey('NB', 0)]) });
+  check(ctrl.assetId === 'NA' && ctrl.segment.idx === 0, 'đối chứng: không khai nhu cầu thì đoạn động cơ/ống (điểm chữ cao) thắng');
+  const need = sceneNeed(sc, 'story');
+  const got = pickInCluster(cl3, [NA, NB], sc, 'story', { usedSegKeys: new Set([segKey('NB', 0)]), need });
+  check(got.assetId === 'NA' && got.segment.idx === 1 && got.segment.subject === 'nguoi' && got.level === 3, 'có nhu cầu "người": lấy đoạn thợ lau mồ hôi (subject nguoi), không lấy đoạn động cơ');
+  const noMan = pickInCluster(cl3, [NA], sc, 'story', { usedSegKeys: new Set([segKey('NA', 1)]), need });
+  check(noMan && noMan.segment.idx === 0 && noMan.level === 0 && noMan.unmet.length > 0, 'cụm hết đoạn có người: vẫn trả đoạn còn lại (đường cũ) nhưng ghi nhu cầu chưa đáp ứng để log');
+  const picks = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: [sc], assets: [NA, NB], useSegments: true, cluster: cl3, log: silent });
+  check(picks[0].by === 'cluster' && picks[0].segment.subject !== 'thiet_bi', 'matchScenesToAssets: cảnh nói về người không rơi vào đoạn thiết bị');
+}
+
+console.log('21. A2.2 cảnh giá / cảnh sản phẩm: đoạn thấy rõ máy, ro_sau cắt từ product_clear_from');
+{
+  const PG = 'SF-50';
+  const mkP = (id, segs) => ({ id, kind: 'video', title: `Máy ${id}`, folder: PG, description: 'Máy lọc dầu', segments: segs });
+  const needPrice = sceneNeed({ narration: 'Giá chỉ từ bốn mươi triệu.' }, 'price', { salesVideo: true });
+  const sRoSau = lseg(0, 6, 'thợ vươn tay che máy lọc dầu rồi lùi ra', { product_visible: 'ro_sau', product_clear_from: 3, subject: 'ca_hai' });
+  const sMo = lseg(6, 12, 'máy lọc dầu trong góc tối', { product_visible: 'mo', subject: 'thiet_bi' });
+  const sRo = lseg(12, 18, 'máy lọc dầu inox đang chạy', { product_visible: 'ro_tu_dau', subject: 'thiet_bi' });
+  const P1 = mkP('P1', [sRoSau, sMo]);
+  const cut = chooseSegment(P1, { role: 'price', visual: 'máy đang lắp trên tàu', narration: '' }, 'price', { need: needPrice });
+  check(cut && cut.idx === 0 && cut.start === 3 && cut.end === 6 && cut.cut === true, 'cảnh giá: ro_sau được cắt BẮT ĐẦU từ product_clear_from (3s), không phải từ đầu đoạn');
+  const P2 = mkP('P2', [lseg(0, 6, 'thợ che máy lọc dầu', { product_visible: 'ro_sau', product_clear_from: 5, subject: 'ca_hai' }), sMo]);
+  check(segProductState(P2.segments[0]).level === 0, 'ro_sau mà phần rõ còn < 1,5s (5s trên đoạn 6s) bị loại (mức 0)');
+  check(findProductSegment([P2], { role: 'price', visual: 'máy', narration: '' }, 'price', {}) === null, 'findProductSegment: đoạn ro_sau còn < 1,5s không được chọn');
+  const P3 = mkP('P3', [sRoSau, sRo]);
+  const pr = chooseSegment(P3, { role: 'price', visual: 'máy đang lắp trên tàu, đang chạy', narration: '' }, 'price', { need: needPrice });
+  check(pr.idx === 1 && !pr.cut, 'cảnh giá: ro_tu_dau thắng ro_sau (ưu tiên tuyệt đối đoạn rõ từ đầu)');
+  const legacy = mkP('P4', [seg(0, 6, 'máy lọc dầu đang chạy, kỹ thuật bàn giao thiết bị sạch trong'), lseg(6, 12, 'máy', { product_visible: 'ro_tu_dau' })]);
+  const lg = chooseSegment(legacy, { role: 'price', visual: 'máy đang chạy, kỹ thuật bàn giao', narration: '' }, 'price', { need: needPrice });
+  check(lg.idx === 1, 'đoạn cũ chưa gán nhãn không được ưu tiên cho cảnh sản phẩm khi đã có đoạn biết là rõ');
+  const lgOnly = chooseSegment(mkP('P5', [seg(0, 6, 'máy lọc dầu đang chạy, kỹ thuật bàn giao thiết bị')]), { role: 'price', visual: 'máy đang chạy', narration: '' }, 'price', { need: needPrice });
+  check(lgOnly && lgOnly.idx === 0, 'clip chỉ có đoạn cũ: vẫn chọn được như trước (tương thích)');
+  const cOnly = { id: 'C9', kind: 'video', title: 'Thợ', folder: CG2, segments: [lseg(0, 6, 'máy lọc dầu', { product_visible: 'ro_tu_dau' })] };
+  check(segFitLevel(cOnly.segments[0], needPrice, cOnly).level === 0, 'video bán: đoạn "rõ máy" của tư liệu Content không tính (không đảm bảo đúng model)');
+}
+
+console.log('22. A2.3 diễn tiến: stage không lùi, không lặp việc cùng clip, cảnh kết không lấy lại cảnh mở');
+{
+  const mk = (id, segs) => ({ id, kind: 'video', title: id, folder: CG2, description: 'thợ tàu', segments: segs });
+  const base = { setting: 'khoang máy tàu', people: '1 thợ', equipment: 'máy lọc dầu' };
+  const Q1 = mk('Q1', [lseg(0, 6, 'thợ siết đầu nối vào thân máy lọc dầu', { stage: 'thao_tac', subject: 'nguoi' }, base), lseg(6, 12, 'thợ siết đầu nối vào thân máy lọc dầu lần nữa', { stage: 'thao_tac', subject: 'nguoi' }, base)]);
+  const Q2 = mk('Q2', [lseg(0, 6, 'thợ bê máy lọc dầu vào khoang máy tàu chuẩn bị lắp', { stage: 'chuan_bi', subject: 'nguoi' }, base), lseg(6, 12, 'thợ kiểm tra van sau khi lắp xong máy lọc dầu', { stage: 'hoan_tat', subject: 'nguoi' }, base)]);
+  const clQ = mkCl('cl-Q', ['Q1', 'Q2']);
+  const scn = { role: 'story', narration: 'Thợ làm tiếp.', visual: 'thợ lắp máy lọc dầu trong khoang máy tàu' };
+  const prev = [{ assetId: 'Q1', idx: 0, start: 0, end: 6, stage: 'thao_tac', action: 'thợ siết đầu nối vào thân máy lọc dầu' }];
+  check(progressAdjust({ assetId: 'Q2', stage: 'chuan_bi', action: 'bê máy' }, prev).adj < 0 && progressAdjust({ assetId: 'Q2', stage: 'hoan_tat', action: 'kiểm tra van' }, prev).adj > 0, 'progressAdjust: stage lùi (thao_tac -> chuan_bi) bị trừ, tiến (-> hoan_tat) được cộng');
+  const ctrl = pickInCluster(clQ, [Q1, Q2], scn, 'story', { usedSegKeys: new Set([segKey('Q1', 0)]), prevId: 'Q2' });
+  const adv = pickInCluster(clQ, [Q1, Q2], scn, 'story', { usedSegKeys: new Set([segKey('Q1', 0)]), prevRefs: prev, progress: true });
+  check(adv.segment.stage !== 'chuan_bi', `progress: sau thao_tac không quay lại chuan_bi (được ${adv.segment.stage}; đối chứng không progress: ${ctrl.segment.stage})`);
+  check(actionSimilarity('thợ siết đầu nối vào thân máy lọc dầu', 'thợ siết đầu nối vào thân máy lọc dầu lần nữa') >= 0.5 && actionSimilarity('thợ siết đầu nối', 'kiểm tra van xong') < 0.5, 'actionSimilarity: việc gần giống >= 0,5; việc khác < 0,5');
+  const pen = progressAdjust({ assetId: 'Q1', stage: 'thao_tac', action: 'thợ siết đầu nối vào thân máy lọc dầu lần nữa' }, prev);
+  const freeA = progressAdjust({ assetId: 'Q1', stage: 'hoan_tat', action: 'thợ siết đầu nối vào thân máy lọc dầu lần nữa' }, prev);
+  const freeB = progressAdjust({ assetId: 'Q1', stage: 'thao_tac', action: 'đấu nối dây điện phía trên bảng điều khiển' }, prev);
+  check(pen.adj <= -8 && freeA.adj > -8 && freeB.adj > -8, 'dùng lại cùng clip: cùng stage + việc giống bị phạt nặng; đổi stage hoặc việc mới thì cho qua');
+  const rep = pickInCluster(clQ, [Q1, Q2], scn, 'story', { usedSegKeys: new Set([segKey('Q1', 0), segKey('Q2', 0), segKey('Q2', 1)]), prevRefs: prev, progress: true });
+  check(rep && rep.assetId === 'Q1', 'phạt là mềm: hết đoạn khác thì vẫn dùng lại được (không làm rỗng)');
+  // cảnh kết không trùng khoảng giây của cảnh mở (>50%): dựng đoạn chồng nhau cùng clip
+  const R1 = mk('R1', [lseg(0, 6, 'thợ lắp máy lọc dầu', { stage: 'thao_tac', subject: 'nguoi' }, base), lseg(2, 8, 'thợ lắp máy lọc dầu', { stage: 'thao_tac', subject: 'nguoi' }, base), lseg(10, 16, 'thợ bàn giao máy lọc dầu', { stage: 'hoan_tat', subject: 'nguoi' }, base)]);
+  const clR = mkCl('cl-R', ['R1']);
+  const open = { assetId: 'R1', idx: 0, start: 0, end: 6, stage: 'thao_tac', action: 'thợ lắp máy lọc dầu' };
+  const cEnd = pickInCluster(clR, [R1], { role: 'closing', narration: 'Thợ bàn giao.', visual: 'thợ lắp máy lọc dầu' }, 'closing', { usedSegKeys: new Set([segKey('R1', 0)]), closing: true, openRef: open });
+  check(cEnd.segment.idx === 2, 'cảnh kết bỏ đoạn chồng > 50% giây với đoạn cảnh mở (đoạn 2-8s vs 0-6s), lấy đoạn bàn giao');
+  check(Math.abs(overlapFraction(0, 6, 2, 8) - 4 / 6) < 1e-9 && overlapFraction(0, 6, 7, 9) === 0, 'overlapFraction đo đúng');
+}
+
+console.log('23. A2.3 đoạn nối: không nối hai đoạn cùng clip cùng stage liền nhau nếu cụm còn đoạn khác');
+{
+  const mk = (id, segs) => ({ id, kind: 'video', title: id, folder: CG2, description: 'thợ', segments: segs });
+  const base = { setting: 'khoang máy tàu', people: '1 thợ', equipment: 'máy lọc dầu' };
+  const T1 = mk('T1', [lseg(0, 4, 'thợ siết ốc máy lọc dầu', { stage: 'thao_tac' }, base), lseg(4, 8, 'thợ siết ốc máy lọc dầu góc khác', { stage: 'thao_tac' }, base)]);
+  const T2 = mk('T2', [lseg(0, 4, 'thợ kiểm tra máy lọc dầu sau lắp', { stage: 'hoan_tat' }, base)]);
+  const clT = mkCl('cl-T', ['T1', 'T2']);
+  const longN = 'Thợ siết từng con ốc cho chắc tay rồi kiểm tra từng chỗ nối máy lọc dầu.';
+  const sc1 = [{ role: 'story', narration: longN, visual: 'thợ siết ốc máy lọc dầu', assetId: 'T1', segment: null }];
+  allocateSceneSegments(sc1, [T1, T2], { cluster: clT, contentVideo: true, log: silent });
+  const ids1 = [sc1[0].segment, ...sc1[0].extraSegments].map((r) => `${r.assetId}#${r.idx}`);
+  check(ids1.includes('T2#0') && !(ids1.includes('T1#0') && ids1.includes('T1#1')), `content + cụm: đoạn nối lấy clip khác thay vì hai đoạn thao_tac liền nhau (${ids1.join(', ')})`);
+  const sc2 = [{ role: 'story', narration: longN, visual: 'thợ siết ốc máy lọc dầu', assetId: 'T1', segment: null }];
+  allocateSceneSegments(sc2, [T1], { cluster: mkCl('cl-T1', ['T1']), contentVideo: true, log: silent });
+  check(sc2[0].extraSegments.length === 1 && sc2[0].extraSegments[0].assetId === 'T1', 'cụm không còn đoạn khác: đành nối đoạn cùng stage còn lại (hơn giữ khung cuối)');
+}
+
+console.log('24. A2.4 video bán dùng cụm theo NGÀY khi đủ đoạn thấy rõ máy');
+{
+  const PG = '6. Thiết bị lọc dầu SF-50';
+  const clD = { id: '2026-09-19|ca-ngay|1', confidence: 'chac', basis: 'cùng buổi' };
+  const base = { setting: 'khoang máy tàu cá', people: '1 thợ', equipment: 'máy lọc dầu inox' };
+  const CC1 = { id: 'CC1', kind: 'video', title: 'Thợ trong hầm', folder: CG2, description: 'thợ sửa máy', shoot_cluster: clD, segments: [lseg(0, 6, 'thợ ngồi thao tác với dây dẫn trong khoang máy', { subject: 'nguoi', product_visible: 'khong', stage: 'chuan_bi' }, base)] };
+  const CC2 = { id: 'CC2', kind: 'video', title: 'Dầu cặn', folder: CG2, description: 'ống dầu cặn', shoot_cluster: clD, segments: [lseg(0, 6, 'đường ống dầu bám cặn đen trong khoang máy', { subject: 'thiet_bi', product_visible: 'mo', stage: 'khac' }, base)] };
+  const PP1 = { id: 'PP1', kind: 'video', title: 'Máy SF50 lắp', folder: PG, description: 'Máy lọc dầu SF-50', shoot_cluster: clD, segments: [lseg(0, 6, 'kỹ thuật viên lắp máy lọc dầu inox lên vách', { subject: 'ca_hai', product_visible: 'ro_tu_dau', stage: 'thao_tac' }, base), lseg(6, 12, 'máy lọc dầu inox chạy êm, đồng hồ áp suất', { subject: 'thiet_bi', product_visible: 'ro_sau', product_clear_from: 8, stage: 'van_hanh' }, base)] };
+  const scs = [
+    { role: 'hook', narration: 'Cứ đổ dầu là nghĩ máy chạy bon bon.', visual: 'thợ trong khoang máy tàu cá' },
+    { role: 'empathy', narration: 'Dầu lẫn cặn làm hỏng kim phun.', visual: 'đường ống dầu bám cặn' },
+    { role: 'solution', narration: 'Lắp ngay máy lọc dầu giúp dầu sạch hơn.', visual: 'lắp máy lọc dầu trong khoang máy' },
+  ];
+  const all2 = [CC1, CC2, PP1];
+  check(countProductSegments([CC1, CC2, PP1]) === 2 && countProductSegments([{ ...PP1, folder: CG2 }]) === 0, 'đếm đoạn thấy rõ máy: chỉ tư liệu thư mục sản phẩm, ro_tu_dau + ro_sau còn đủ dài');
+  const c1 = pickClusterForVideo(scs, all2, { contentVideo: false, productGroup: PG, hasPriceScene: false });
+  check(c1 && c1.id === clD.id, 'bán, 1 cảnh solution, cụm có 2 đoạn thấy rõ máy -> dùng cụm');
+  const c2 = pickClusterForVideo(scs, all2, { contentVideo: false, productGroup: PG, hasPriceScene: true });
+  check(c2 && c2.id === clD.id, 'bán, solution + cảnh giá = 2 đoạn cần, cụm có đủ 2 -> dùng cụm');
+  const only1 = [CC1, CC2, { ...PP1, segments: [PP1.segments[0], lseg(6, 12, 'máy', { product_visible: 'ro_sau', product_clear_from: 11, stage: 'van_hanh' }, base)] }];
+  check(pickClusterForVideo(scs, only1, { contentVideo: false, productGroup: PG, hasPriceScene: true }) === null, 'bán, cần solution + giá nhưng cụm chỉ còn 1 đoạn đủ dài (ro_sau còn 1s) -> null (đường cũ, như dbce022)');
+  check(pickClusterForVideo(scs, [CC1, CC2, { ...PP1, segments: [seg(0, 6, 'máy lọc dầu'), seg(6, 12, 'máy lọc dầu')] }], { contentVideo: false, productGroup: PG }) === null, 'bán, đoạn sản phẩm cũ chưa gán nhãn -> không tính là thấy rõ -> null');
+  const picksD = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: scs, assets: all2, productGroup: PG, cluster: c1, useSegments: true, salesVideo: true, log: silent });
+  check(picksD[2].assetId === 'PP1' && picksD[2].segment.idx === 0 && picksD[2].segment.product_visible === 'ro_tu_dau', 'cụm bán: cảnh solution lấy đoạn thấy rõ máy trong cụm (ro_tu_dau)');
+  check(picksD.slice(0, 2).every((p) => p.by === 'cluster' && ['CC1', 'CC2'].includes(p.assetId)), 'cụm bán: hook / empathy lấy tư liệu đời sống TRONG cụm (cùng buổi quay)');
+}
+
+console.log('25. A2.2 video bán không cụm: cảnh sản phẩm đổi sang đoạn thấy rõ máy khi clip đã chọn chỉ có đoạn mờ');
+{
+  const PG = '6. Thiết bị lọc dầu SF-50';
+  const base = { setting: 'khoang máy tàu cá', people: '1 thợ', equipment: 'máy lọc dầu inox' };
+  const M1 = { id: 'M1', kind: 'video', title: 'Máy lọc dầu đang chạy bàn giao thiết bị', folder: PG, description: 'Máy lọc dầu đang chạy, kỹ thuật bàn giao thiết bị sạch trong', segments: [lseg(0, 6, 'thợ che máy lọc dầu đang chạy', { product_visible: 'mo', subject: 'nguoi', stage: 'van_hanh' }, base)] };
+  const M2 = { id: 'M2', kind: 'video', title: 'Máy lọc dầu lắp', folder: PG, description: 'lắp máy lọc dầu', segments: [lseg(0, 6, 'máy lọc dầu inox lắp trên vách', { product_visible: 'ro_tu_dau', subject: 'thiet_bi', stage: 'thao_tac' }, base)] };
+  const scs = [{ role: 'solution', narration: 'Lắp ngay máy lọc dầu, kỹ thuật bàn giao thiết bị.', visual: 'máy lọc dầu đang chạy, kỹ thuật bàn giao thiết bị' }];
+  const pk = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: scs, assets: [M1, M2], productGroup: PG, cluster: null, useSegments: true, salesVideo: true, log: silent });
+  check(pk[0].assetId === 'M2' && pk[0].by === 'product-seg' && pk[0].segment.product_visible === 'ro_tu_dau', 'bán: M1 điểm chữ cao nhưng mọi đoạn đều mờ -> đổi sang M2 có đoạn ro_tu_dau');
+  const pkNoAlt = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: scs, assets: [M1], productGroup: PG, cluster: null, useSegments: true, salesVideo: true, log: silent });
+  check(pkNoAlt[0].assetId === 'M1' && pkNoAlt[0].segment, 'kho không có đoạn thấy rõ máy nào khác: giữ clip đã chọn (không để trống cảnh)');
+  const pkContent = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: scs, assets: [M1, M2], productGroup: PG, cluster: null, useSegments: true, salesVideo: false, log: silent });
+  check(pkContent[0].by !== 'product-seg', 'không phải video bán: không áp luật đổi sang đoạn thấy rõ máy');
 }
 
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
