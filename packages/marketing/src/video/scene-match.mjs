@@ -313,6 +313,14 @@ export function pickPrimaryCluster(scenes, assets, { productGroup = null, mustAs
   return best && best.covered >= 2 ? best : null;
 }
 
+// 9/10 (2) SỬA NÓNG: chế độ cụm chính CHỈ cho video content. Video bán hàng bị chọn cụm Content (thợ, động cơ)
+// nên cảnh giải pháp và giá mất hình máy (bài 66b894f8), vi phạm luật "hình sản phẩm ra trước giây 15".
+// Nhánh bán trả null mà KHÔNG gọi pickPrimaryCluster; cắt đoạn (allocateSceneSegments) vẫn chạy bình thường.
+export function pickClusterForVideo(scenes, assets, { contentVideo = false, productGroup = null, mustAssetId = null, mustIdx = 0 } = {}) {
+  if (!contentVideo) return null;
+  return pickPrimaryCluster(scenes, assets, { productGroup, mustAssetId, mustIdx });
+}
+
 // Chọn (clip, đoạn) tốt nhất TRONG cụm cho một cảnh; null khi không còn đoạn nào hợp (caller mới được lấy ngoài cụm).
 // Chống lặp / recentUse chỉ phạt điểm để xếp thứ tự trong cụm: không bao giờ làm đoạn rơi ra ngoài cụm.
 // Đoạn đã dùng ở cảnh khác bị loại hẳn (không chiếu lại cùng một đoạn). accept(asset, seg): lọc thêm (vd. không trôi lời).

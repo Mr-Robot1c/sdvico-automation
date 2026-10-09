@@ -5,7 +5,7 @@ import { knownFactValues, testFactValues } from '../product-facts.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
-import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen, hasSegments, pickPrimaryCluster, pickInCluster, allocateSceneSegments } from './scene-match.mjs';
+import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen, hasSegments, pickClusterForVideo, pickInCluster, allocateSceneSegments } from './scene-match.mjs';
 import { segmentsEnabled, segKey } from './segments.mjs';
 import { EXTRA_WORN, absoluteClaims, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, paybackClaimSentences, keepOneQuestion } from './rules.mjs';
 
@@ -958,8 +958,12 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   const segGroup = opts.contentVideo ? null : opts.productGroup || null;
   const segOn = segmentsEnabled() && !sbMode && assets.some(hasSegments);
   const mustForCluster = opts.mustUseAssetId && assets.some((a) => a.id === opts.mustUseAssetId) ? opts.mustUseAssetId : null;
-  const cluster = segOn ? pickPrimaryCluster(rawScenes, assets, { productGroup: segGroup, mustAssetId: mustForCluster, mustIdx: mustIdxScene }) : null;
-  if (segOn) {
+  // 9/10 (2) SỬA NÓNG: cụm chính CHỈ cho video content; video bán hàng chọn hình như đường cũ (cảnh giải pháp/giá
+  // phải lấy hình sản phẩm), cắt đoạn theo segments vẫn áp cho mọi video.
+  const cluster = segOn ? pickClusterForVideo(rawScenes, assets, { contentVideo: !!opts.contentVideo, productGroup: segGroup, mustAssetId: mustForCluster, mustIdx: mustIdxScene }) : null;
+  if (segOn && !opts.contentVideo) {
+    console.log('Video bán: bỏ chế độ cụm (cảnh giải pháp/giá phải lấy hình sản phẩm)');
+  } else if (segOn) {
     console.log(cluster
       ? `Cụm tư liệu chính (9/10): ${cluster.id} | ${cluster.confidence} | ${cluster.clipIds.length} clip | phủ ${cluster.covered}/${rawScenes.length} cảnh`
       : 'Không cụm nào phủ >= 2 cảnh (9/10): chọn hình như cũ, clip có đoạn vẫn được cắt đúng đoạn.');

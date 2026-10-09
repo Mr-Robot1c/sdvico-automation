@@ -1,7 +1,7 @@
 // test-cluster-segments.mjs — kiểm ĐỢT A (9/10): chọn đoạn trong clip + giữ một cụm tư liệu xuyên suốt video.
 // Không gọi mạng. Chạy: npm run test:cluster
 import {
-  matchScenesToAssets, pickPrimaryCluster, pickInCluster, allocateSceneSegments, refinePicksByImagery,
+  matchScenesToAssets, pickPrimaryCluster, pickClusterForVideo, pickInCluster, allocateSceneSegments, refinePicksByImagery,
   hasSegments, chooseSegment, clusterGroups,
 } from './video/scene-match.mjs';
 import { normalizeSegments, parseTime, planSceneSegments, segmentsEnabled, estimateSpeechSec, segKey } from './video/segments.mjs';
@@ -205,6 +205,42 @@ console.log('16. Bộ lọc ffmpeg cho cảnh cắt đoạn');
   check(!/loop/.test(two) && !/stream_loop/.test(two), 'bộ lọc không có vòng lặp');
   const noSub = buildPiecesFilter(2, fmt, 0, '');
   check(/\[vc\]null\[v\]$/.test(noSub), 'cảnh giá (không phụ đề): đi qua filter null');
+}
+
+console.log('17. SỬA NÓNG 9/10 (2): chế độ cụm CHỈ cho video content, video bán giữ hình sản phẩm');
+{
+  // Kho giống bài 66b894f8: cụm Content (thợ, động cơ) mang đoạn + clip thư mục sản phẩm không mang cụm.
+  const CG = 'Content';
+  const clC = { id: '2026-09-19|Content|1', confidence: 'chac', basis: 'cùng buổi quay' };
+  const cc = (id, act) => ({ id, kind: 'video', title: `Thợ máy ${id}`, folder: CG, description: 'Thợ sửa động cơ tàu', shoot_cluster: clC, segments: [seg(0, 6, act, { equipment: 'động cơ, máy lọc dầu', setting: 'khoang máy' })] });
+  const C1 = cc('C1', 'kỹ thuật viên lắp máy lọc dầu vào khoang máy');
+  const C2 = cc('C2', 'đấu nối kiểm tra van máy lọc dầu');
+  const C3 = cc('C3', 'kỹ thuật viên kiểm tra thiết bị lọc dầu đã lắp');
+  const P1 = { id: 'P1', kind: 'video', title: 'Máy lọc dầu đang chạy, kỹ thuật bàn giao thiết bị', folder: G, description: 'Máy lọc dầu đang chạy, kỹ thuật bàn giao sản phẩm sạch trong' };
+  const khoBan = [C1, C2, C3, P1, O2];
+
+  // (a) nhánh bán: không chọn cụm dù kho có cụm Content phủ đủ cảnh
+  check(pickPrimaryCluster(solScenes, khoBan, { productGroup: G }) !== null, 'đối chứng: pickPrimaryCluster thuần vẫn thấy cụm Content phủ cảnh (nguồn lỗi)');
+  check(pickClusterForVideo(solScenes, khoBan, { contentVideo: false, productGroup: G }) === null, 'video bán: pickClusterForVideo trả null, không chọn cụm Content');
+  check(pickClusterForVideo(solScenes, khoBan, { productGroup: G }) === null, 'không khai contentVideo: mặc định coi là bán, null');
+
+  // (b) nhánh content: vẫn chọn cụm
+  const cContent = pickClusterForVideo(solScenes, khoBan, { contentVideo: true, productGroup: null });
+  check(cContent && cContent.id === clC.id, `video content vẫn chọn cụm (được ${cContent?.id})`);
+
+  // (c) video bán, cluster null: hình chọn đường cũ (ưu tiên hình sản phẩm), KHÔNG by 'cluster'
+  const pBan = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: solScenes, assets: khoBan, productGroup: G, cluster: null, useSegments: true, log: silent });
+  check(pBan.every((p) => p && p.by !== 'cluster'), `bán, cluster null: không cảnh nào đi đường cụm (${pBan.map((p) => p?.by).join(',')})`);
+  check(pBan.some((p) => p.assetId === 'P1'), 'bán, cluster null: hình máy lọc dầu (thư mục sản phẩm) có mặt, không toàn clip Content');
+
+  // (d) cắt đoạn vẫn chạy cho video bán khi clip được chọn mang segments
+  const pCat = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: solScenes, assets: [C1, C2, C3], productGroup: G, cluster: null, useSegments: true, log: silent });
+  const withSeg = pCat.filter((p) => p?.segment);
+  check(withSeg.length >= 1 && withSeg.every((p) => p.by !== 'cluster' && p.segment.assetId === p.assetId), `bán: clip mang đoạn vẫn được gán đoạn để cắt -ss/-t (${withSeg.length} cảnh có đoạn)`);
+  const scsBan = [{ role: 'solution', narration: 'Lắp máy lọc dầu trong khoang máy.', visual: 'lắp máy lọc dầu', assetId: 'C1', segment: null }];
+  allocateSceneSegments(scsBan, khoBan, { cluster: null, productGroup: G, log: silent });
+  check(scsBan[0].segment && scsBan[0].segment.assetId === 'C1', 'bán: allocateSceneSegments với cluster null vẫn gán đoạn chính');
+  check(planSceneSegments(4, scsBan[0]).pieces.length >= 1, 'bán: có kế hoạch cắt đoạn (planSceneSegments) cho cảnh');
 }
 
 console.log(fails ? `\nTHẤT BẠI: ${fails} kiểm tra` : '\nOK: mọi kiểm tra đạt');
