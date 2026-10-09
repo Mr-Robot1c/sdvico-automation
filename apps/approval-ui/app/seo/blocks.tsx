@@ -84,14 +84,20 @@ export async function SeoPostsBlock() {
             <b>{audit ? (audit.status === 'ok' ? '✅' : '⚠️') : '—'}</b>
             <span>Audit SEO {audit ? fmtDT(audit.created_at) : '(chưa chạy)'} ↓</span>
           </a>
-          <Link href="/seo/bai-viet?sap=click" className="pl-tile" title="Số Google Search Console 28 ngày">
+          {/* 9/10 (review UI): số Google là số ĐÃ LƯU của lần kéo gần nhất. Máy chưa nối Search Console (thường là
+              chạy local) vẫn hiện số cũ, nên ô phải ghi mốc đồng bộ để không bị hiểu là số đang cập nhật. */}
+          <Link href="/seo/bai-viet?sap=click" className="pl-tile" title={`Số Google Search Console 28 ngày${gsc.at ? `, đồng bộ lần cuối ${fmtDT(gsc.at)}` : ''}`}>
             <b>{gsc.site ? fmt(Number(gsc.site.clicks) || 0) : '—'}</b>
-            <span>{gsc.site ? `Click Google · ${fmt(Number(gsc.site.impressions) || 0)} hiển thị` : gscOn ? 'Click Google (chờ kéo)' : 'Click Google (chưa nối)'}</span>
+            <span>{gsc.site
+              ? `Click Google · ${fmt(Number(gsc.site.impressions) || 0)} hiển thị${gsc.at ? ` · đồng bộ ${fmtDT(gsc.at)}` : ''}`
+              : gscOn ? 'Click Google (chờ kéo)' : 'Click Google (chưa nối)'}</span>
           </Link>
         </div>
         {!gscOn ? (
           <p className="sub" style={{ margin: '-6px 0 12px', fontSize: '.85rem' }}>
-            🔗 Chưa nối Google Search Console: đặt <code>GOOGLE_SA_JSON</code> + <code>GSC_SITE_URL</code> trên Vercel theo <code>docs/runbook-search-console-setup.md</code>, số click/hiển thị sẽ tự về mỗi ngày.
+            {gsc.site
+              ? <>Số Google ở đây là số đã lưu của lần đồng bộ {gsc.at ? fmtDT(gsc.at) : 'trước'}, không tự cập nhật vì bản đang chạy này chưa nối Search Console. Cần đặt <code>GOOGLE_SA_JSON</code> và <code>GSC_SITE_URL</code> theo <code>docs/runbook-search-console-setup.md</code>.</>
+              : <>Chưa nối Google Search Console: đặt <code>GOOGLE_SA_JSON</code> và <code>GSC_SITE_URL</code> trên Vercel theo <code>docs/runbook-search-console-setup.md</code>, số click và hiển thị sẽ tự về mỗi ngày.</>}
           </p>
         ) : null}
 

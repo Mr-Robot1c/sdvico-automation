@@ -168,7 +168,7 @@ export default async function BangSection() {
   const pending = items.filter((it) => it.status === 'pending');
   // 29/8 (user: "lên lịch mà nhảy sang đã đăng"): bài hẹn giờ có mkt_posts với published_at
   // TƯƠNG LAI (giờ hẹn) — chưa tới giờ thì vẫn là "Lên lịch", có ít nhất 1 bài đã tới giờ mới
-  // sang "Trạng thái".
+  // sang cột "Đã đăng, từ chối gần đây" (key status).
   // 9/10: còn kênh hẹn giờ chưa tới giờ (vd bản tin: YouTube lên ngay, Facebook hẹn 17:00) thì vẫn
   // "Lên lịch", kể cả khi kênh khác đã lên (lib/content-status.ts liveContentIds).
   const nowIso = new Date().toISOString();
@@ -214,7 +214,7 @@ export default async function BangSection() {
   const columns: { key: string; label: string; tone: string; items: QItem[]; cap: number; moreHref?: string; countOverride?: number }[] = [
     { key: 'pending', label: 'Chờ duyệt', tone: 'pending', items: pending, cap: 50 },
     { key: 'scheduled', label: 'Lên lịch', tone: 'pending', items: approvedWaiting, cap: 10 },
-    { key: 'status', label: 'Trạng thái', tone: 'published', items: statusItems, cap: PUB_CAP + REJ_CAP, moreHref: '/noi-dung?loai=bai-viet', countOverride: statusTotal }
+    { key: 'status', label: 'Đã đăng, từ chối gần đây', tone: 'published', items: statusItems, cap: PUB_CAP + REJ_CAP, moreHref: '/noi-dung?loai=bai-viet', countOverride: statusTotal }
   ];
 
   return (
@@ -249,8 +249,20 @@ export default async function BangSection() {
                 >{col.countOverride ?? col.items.length}</span>
               </div>
 
+              {/* 9/10 (review UI): cột Chờ duyệt trống (trên điện thoại là tab mở mặc định) từng bị hiểu là trang chưa có
+                  dữ liệu. Nói rõ là đã duyệt hết và đưa sẵn hai lối đi tiếp ngay trong ô trống. */}
               {col.items.length === 0 ? (
-                <div className="kanban-empty">Chưa có bài nào ở bước này.</div>
+                col.key === 'pending' ? (
+                  <div className="kanban-empty">
+                    Không còn bài nào chờ duyệt.
+                    <div className="kanban-empty-actions">
+                      <Link className="btn ghost" href="/noi-dung?loai=bai-viet">Xem tất cả bài</Link>
+                      <Link className="btn ghost" href="/san-xuat">Tạo bài</Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="kanban-empty">Chưa có bài nào ở bước này.</div>
+                )
               ) : null}
 
               {col.items.slice(0, col.cap).map((it) => {

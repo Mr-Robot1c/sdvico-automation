@@ -182,7 +182,7 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
           <ul>
             <li>Hàng Danh sách bài: {cAll.toLocaleString('vi-VN')} bài chữ mới nhất, không tính video và Thùng rác. Bài đã có lượt đăng thật tính Đã đăng.</li>
             <li>Số trên đầu cột bảng: tính trong 300 phiếu duyệt gần nhất, mỗi bài một thẻ, có thể gồm cả video.</li>
-            <li>Cột Trạng thái chỉ hiện vài bài đã đăng và từ chối mới nhất; bấm Xem tất cả để mở danh sách đủ.</li>
+            <li>Cột Đã đăng, từ chối gần đây chỉ hiện vài bài mới nhất của hai nhóm này, số trên đầu cột là tổng của cả hai nhóm. Bấm Xem tất cả để mở danh sách đủ.</li>
           </ul>
         </details>
         <BangSection />

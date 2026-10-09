@@ -302,7 +302,15 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
           <p className="sub">Hôm nay đăng gì, giờ nào, kênh nào. Máy soạn, người bấm Duyệt mới đăng.</p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Link href="/noi-dung" className="btn ok">📥 Duyệt bài ({fmt(pending.length)})</Link>
+          {/* 9/10 (review UI): không còn bài chờ duyệt mà vẫn có khách chưa trả lời thì việc khách là nút chính. */}
+          {pending.length === 0 && leadNew.length > 0 ? (
+            <>
+              <Link href="/khach-hang" className="btn ok">Trả lời khách ({fmt(leadNew.length)})</Link>
+              <Link href="/noi-dung" className="btn ghost">📥 Duyệt bài (0)</Link>
+            </>
+          ) : (
+            <Link href="/noi-dung" className="btn ok">📥 Duyệt bài ({fmt(pending.length)})</Link>
+          )}
           <Link href="/ke-hoach#lich-dang" className="btn ghost">🗓 Sửa lịch đăng</Link>
         </div>
       </header>
@@ -440,24 +448,22 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       {/* ===== 3. TIẾN ĐỘ | NGƯỜI HỎI MUA (2 cột) ===== */}
       <div className="blk-cols">
         <section className="blk">
-          <h2><span aria-hidden="true">📶</span> Tiến độ theo giai đoạn <span className="sub">ô đỏ = cần người động tay</span></h2>
+          {/* 9/10 (review UI): các ô đếm trên những tập khác nhau, nên KHÔNG trình bày như dây chuyền có mũi tên nối;
+              tên khối nói rõ đây là số bài ở từng bước, không phải số chuyển từ bước trước sang. */}
+          <h2><span aria-hidden="true">📶</span> Số bài ở từng bước <span className="sub">mỗi ô đếm trên một tập riêng, ô đỏ là việc cần người làm</span></h2>
           <div className="stage-flow">
             <Link href="/ke-hoach#huong-di" className="stage-node" title="Hướng đi bài viết BOSS đề xuất trong bản kế hoạch đang áp — bấm để xem">
               <b>{fmt(ideaCount)}</b><span>Ý tưởng</span><small className="stage-scope">kế hoạch đang áp</small>
             </Link>
-            <span className="stage-sep" aria-hidden="true">→</span>
             <Link href="/tong-quan?gd=draft#tat-ca-noi-dung" className="stage-node" title="Bài đã viết xong còn ở bước nháp / đang sinh (trong 200 bài mới nhất)">
               <b>{fmt(writtenCount)}</b><span>Đã viết</span><small className="stage-scope">200 bài mới nhất</small>
             </Link>
-            <span className="stage-sep" aria-hidden="true">→</span>
             <Link href="/tong-quan?gd=pending#tat-ca-noi-dung" className={`stage-node ${pending.length ? 'act' : ''}`} title="Bài chờ người bấm Duyệt — bấm để xem danh sách">
               <b>{fmt(pending.length)}</b><span>Chờ duyệt</span><small className="stage-scope">phiếu 60 ngày qua</small>
             </Link>
-            <span className="stage-sep" aria-hidden="true">→</span>
             <Link href="/tong-quan?gd=scheduled#tat-ca-noi-dung" className="stage-node" title="Bài đã duyệt kèm giờ hẹn, tới giờ máy tự đăng — bấm để xem danh sách">
               <b>{fmt(scheduled.length)}</b><span>Đã lên lịch</span><small className="stage-scope">phiếu 60 ngày qua</small>
             </Link>
-            <span className="stage-sep" aria-hidden="true">→</span>
             <Link href="/tong-quan?gd=published#tat-ca-noi-dung" className="stage-node done" title="Bài đã đăng thật lên các kênh — bấm để xem danh sách">
               <b>{fmt(publishedCids.size)}</b><span>Đã đăng</span><small className="stage-scope">mọi bài, mọi kênh, 1.000 lượt đăng mới nhất</small>
             </Link>

@@ -88,7 +88,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       .select('id, period_start, period_end, generated_by, data, applied, applied_at, created_at')
       .order('created_at', { ascending: false })
       .limit(12),
-    client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
+    client.from('app_config').select('value, updated_at').eq('key', 'mkt_weekly_goal').maybeSingle(),
     client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle(),
     loadPostingPlan(client),
   ]);
@@ -97,6 +97,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   const focusGroups = Array.isArray(focusVal.groups) ? focusVal.groups : [];
   const focusUntil = focusVal.until ? String(focusVal.until).slice(0, 10) : '';
   const focusActive = focusGroups.length > 0 && (!focusVal.until || new Date(focusVal.until).getTime() > Date.now());
+  // 9/10 (review UI): cảnh báo hết hạn CHỈ dựa trên trường ngày có cấu trúc (mkt_focus.until, app_config.updated_at),
+  // không đoán hiệu lực từ chữ trong ô mục tiêu. Hết hạn tập trung thì /api/rotate tự quay về đủ sản phẩm.
+  const focusExpired = focusGroups.length > 0 && !!focusVal.until && new Date(focusVal.until).getTime() <= Date.now();
+  const goalUpdatedAt = ((goalRow as any)?.updated_at as string) || null;
+  const goalAgeDays = goalUpdatedAt ? Math.floor((Date.now() - new Date(goalUpdatedAt).getTime()) / 86400000) : null;
   // Nhóm chia sẻ: nguồn CHUNG với popover 📣 ở Quản lý bài viết (app_config qua /api/share-groups).
   const shareGroups: string[] = pp.shareGroups.map((g) => g.label);
 
@@ -495,6 +500,12 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             <label>
               <b title="Câu ngắn bạn giao cho BOSS — được đưa vào prompt sinh hướng đi bài viết.">🎯 Mục tiêu tuần</b>
               <textarea name="goal_text" defaultValue={goalText} rows={12} placeholder="Ví dụ: tuần này ưu tiên lọc dầu SF-50, cần 20 cuộc gọi." />
+              {goalUpdatedAt ? (
+                <span className={goalAgeDays !== null && goalAgeDays > 7 ? 'err-note' : 'sub'} style={{ display: 'block', fontSize: '.85rem', marginTop: 4 }}>
+                  Sửa lần cuối {fmtDateTime(goalUpdatedAt)}
+                  {goalAgeDays !== null && goalAgeDays > 7 ? `, đã ${vnInt(goalAgeDays)} ngày chưa sửa. Rà lại nếu tuần này đã đổi mục tiêu.` : '.'}
+                </span>
+              ) : null}
             </label>
             <label>
               <b title="Máy chỉ đăng các sản phẩm liệt kê ở đây, sản phẩm khác bị chặn hoàn toàn.">🎯 Chỉ đăng sản phẩm này</b>
@@ -504,6 +515,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               <span className="sub">đến hết</span>
               <input type="date" name="focus_until" defaultValue={focusUntil} style={{ maxWidth: 160 }} />
             </label>
+            {focusExpired ? (
+              <p className="err-note" role="note" style={{ margin: '4px 0 0', fontSize: '.85rem' }}>
+                Hạn chỉ đăng {focusGroups.join(', ')} đã hết ngày {fmtDate(focusUntil)}. Máy đang đăng đủ mọi sản phẩm. Muốn giữ giới hạn thì đặt ngày mới rồi lưu, không cần nữa thì xoá ô sản phẩm.
+              </p>
+            ) : null}
             <div className="settings-cta">
               <SaveGenerateButton />
             </div>

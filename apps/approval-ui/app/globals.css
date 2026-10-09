@@ -1245,6 +1245,7 @@ button.board-stat:hover { border-color: var(--accent, #1f5fbf); }
 .kanban-head.tone-published { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
 .kanban-head.tone-rejected { background: color-mix(in srgb, var(--no) 14%, transparent); color: var(--no); }
 .kanban-empty { border: 1px dashed var(--line); border-radius: 10px; padding: 20px 10px; text-align: center; color: var(--ink-2); font-size: .85rem; }
+.kanban-empty-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
 .chan-panel { flex: 0 1 235px; min-width: 210px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
 .chan-item { display: flex; gap: 10px; align-items: center; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; text-decoration: none; color: inherit; transition: border-color .12s ease; }
 .chan-item:hover { border-color: var(--accent); }
