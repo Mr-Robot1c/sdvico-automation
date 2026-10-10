@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { thumbUrl } from '../../lib/thumb-url';
 
 // Ảnh/clip/âm thanh trong Kho tư liệu: bấm vào để xem/nghe bản lớn trong hộp thoại.
 // Media (video/audio) CHỈ được gắn vào DOM khi mở modal, nên không tự phát tiếng lúc tải trang.
@@ -30,7 +31,7 @@ export default function AssetViewer({ url, kind, title }: { url: string; kind: s
         title="Bấm để xem lớn"
       >
         {isImg ? (
-          <img src={url} alt={title} loading="lazy" decoding="async" />
+          <img src={thumbUrl(url, 400)} alt={title} loading="lazy" decoding="async" />
         ) : isVid ? (
           <>
             <video src={url} muted preload="none" />
