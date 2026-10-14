@@ -13,7 +13,7 @@ import { join, dirname } from 'node:path';
 import { loadRealEnv } from './env.mjs';
 import { downloadAsset, probeDuration, ffmpeg, splitAtSilence } from './ffmpeg.mjs';
 import { assembleVideo } from './assemble.mjs';
-import { planSceneSegments, segmentsEnabled } from './segments.mjs';
+import { planSceneSegments, fillShortPieces, segmentsEnabled } from './segments.mjs';
 import { generateVideoScript, stripGreeting } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
 import { PRODUCT_FACTS } from '../product-facts.mjs';
@@ -700,20 +700,40 @@ async function buildFormat(format, scenes, assetPaths, voice, workDir, outDir, c
   // 9/10 ĐỢT A: cảnh có đoạn → kế hoạch cắt theo độ dài tiếng THẬT: lấy đúng đoạn (+ đoạn nối cùng việc), KHÔNG lặp
   // clip. Thiếu hình thì assemble giữ khung cuối cho phần thiếu; ghi lại để người duyệt biết thiếu tư liệu.
   const segmentShort = [];
-  built.forEach((b, i) => {
+  const plans = built.map((b, i) => {
     const sc = scenes[i];
-    if (!sc?.segment || b.kind === 'image') return;
-    const plan = planSceneSegments(b.durationSec, sc);
-    const pieces = plan.pieces.map((p) => ({ path: assetPaths.get(p.assetId)?.local, start: p.start, dur: p.dur, assetId: p.assetId })).filter((p) => p.path);
-    if (!pieces.length) return;
-    b.pieces = pieces;
-    b.holdSec = Math.max(0, b.durationSec - pieces.reduce((a, p) => a + p.dur, 0)); // phần thiếu hình = giữ khung cuối
-    b.segPlan = plan.pieces.map((p) => [p.assetId.slice(0, 8), p.start, Number((p.start + p.dur).toFixed(2))]);
-    if (plan.shortSec > 0) {
-      segmentShort.push({ scene: i + 1, shortSec: plan.shortSec });
-      console.warn(`  thiếu tư liệu cảnh ${i + 1}: thiếu ${plan.shortSec} giây hình (hết đoạn cùng việc), giữ khung cuối, KHÔNG lặp đoạn${plan.shortSec > 1.5 ? ' — thiếu quá 1,5 giây, người duyệt nên soi cảnh này' : ''}.`);
-    }
+    if (!sc?.segment || b.kind === 'image') return null;
+    return planSceneSegments(b.durationSec, sc);
   });
+  // 14/10: khúc clip mà từng cảnh đang dùng, để cảnh thiếu hình kéo dài clip mà không chiếu lại khúc của cảnh khác.
+  const usedRanges = (skip) => {
+    const m = new Map();
+    plans.forEach((pl, j) => {
+      if (!pl || j === skip) return;
+      for (const p of pl.pieces) { if (!m.has(p.assetId)) m.set(p.assetId, []); m.get(p.assetId).push([p.start, p.start + p.dur]); }
+    });
+    return m;
+  };
+  for (const [i, b] of built.entries()) {
+    const plan = plans[i];
+    if (!plan) continue;
+    let pieces = plan.pieces.map((p) => ({ path: assetPaths.get(p.assetId)?.local, start: p.start, dur: p.dur, assetId: p.assetId })).filter((p) => p.path);
+    if (!pieces.length) continue;
+    let slow = 1;
+    let holdSec = Math.max(0, b.durationSec - pieces.reduce((a, p) => a + p.dur, 0));
+    if (plan.shortSec > 0) {
+      const clipDur = new Map();
+      for (const p of pieces) if (!clipDur.has(p.assetId)) { try { clipDur.set(p.assetId, await probeDuration(p.path)); } catch { clipDur.set(p.assetId, null); } }
+      const fill = fillShortPieces(pieces, b.durationSec, clipDur, usedRanges(i));
+      pieces = fill.pieces; slow = fill.slow; holdSec = fill.holdSec;
+      segmentShort.push({ scene: i + 1, shortSec: plan.shortSec, ...(slow > 1 ? { slow } : {}), holdSec });
+      console.warn(`  thiếu tư liệu cảnh ${i + 1}: hết đoạn gắn nhãn, thiếu ${plan.shortSec} giây. Bù: clip chạy tiếp, quay chậm x${slow}, còn đứng khung ${holdSec} giây${holdSec > 1 ? ' — vẫn đứng khung quá 1 giây, người duyệt nên soi cảnh này' : ''}.`);
+    }
+    b.pieces = pieces;
+    b.slow = slow;
+    b.holdSec = holdSec;
+    b.segPlan = pieces.map((p) => [p.assetId.slice(0, 8), p.start, Number((p.start + p.dur).toFixed(2))]);
+  }
   const out = join(outDir, `sdvico_${contentId.slice(0, 8)}_${format}.mp4`);
   // 8/9 tối (Thanh): tem giá chỉ hiện khi giọng đọc SẮP tới câu giá ở cảnh cuối, không hiện sớm.
   // Ước lượng thời điểm câu giá bắt đầu theo vị trí ký tự trong lời thoại cảnh cuối (cùng cách

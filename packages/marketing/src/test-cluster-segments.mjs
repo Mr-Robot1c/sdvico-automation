@@ -5,7 +5,7 @@ import {
   hasSegments, chooseSegment, clusterGroups, findProductSegment, countProductSegments,
 } from './video/scene-match.mjs';
 import {
-  normalizeSegments, parseTime, planSceneSegments, segmentsEnabled, estimateSpeechSec, segKey,
+  normalizeSegments, parseTime, planSceneSegments, fillShortPieces, segmentsEnabled, estimateSpeechSec, segKey,
   sentenceSubject, sceneNeed, segProductState, segFitLevel, progressAdjust, actionSimilarity, overlapFraction,
 } from './video/segments.mjs';
 import { splitLongImageScenes } from './video/rules.mjs';
@@ -152,6 +152,22 @@ check(pl2.pieces.length === 2 && pl2.pieces[1].start === 10 && pl2.pieces[1].dur
 const pl3 = planSceneSegments(15, scene);
 check(pl3.pieces.length === 2 && pl3.shortSec === 5 && pl3.pieces.reduce((a, p) => a + p.dur, 0) === 10, 'hết đoạn vẫn thiếu 5s: báo shortSec = 5, tổng hình = 10s (không lặp)');
 check(planSceneSegments(5, { segment: null }).pieces.length === 0, 'cảnh không có đoạn: không kế hoạch cắt (assemble dùng cách cũ)');
+console.log('11b. fillShortPieces (14/10): thiếu hình thì clip chạy tiếp, rồi quay chậm, đứng khung phần lẻ');
+{
+  // Ca thật 14/10 cảnh 2: cần 13,2s, có 1ab6252a 0-4 + ae840a0b 0-4,5; cảnh 3 dùng ae840a0b 9-11,69.
+  const pcs = [{ assetId: 'X', start: 0, dur: 4 }, { assetId: 'Y', start: 0, dur: 4.5 }];
+  const used = new Map([['Y', [[9, 11.69]]]]);
+  const f1 = fillShortPieces(pcs, 13.2, new Map([['X', 20], ['Y', 15]]), used);
+  check(f1.slow === 1 && f1.holdSec === 0 && f1.pieces[1].dur === 9 && f1.pieces[0].dur === 4.2, 'clip Y chạy tiếp tới đúng giây 9 (khúc cảnh khác dùng), phần còn lại kéo clip X, không đứng khung');
+  const f2 = fillShortPieces(pcs, 13.2, new Map([['X', 4], ['Y', 4.5]]), new Map());
+  check(f2.slow === 1.5 && Math.abs(f2.holdSec - 0.45) < 0.01, 'clip hết, quay chậm tối đa 1,5 lần, chỉ đứng khung 0,45s');
+  const f3 = fillShortPieces(pcs, 10, new Map(), new Map());
+  check(Math.abs(f3.slow - 10 / 8.5) < 0.001 && f3.holdSec === 0, 'không đo được độ dài clip: quay chậm vừa đủ, không đứng khung');
+  check(pcs[1].dur === 4.5, 'không sửa mảng đầu vào');
+  const { buildPiecesFilter: bpf } = await import('./video/assemble.mjs');
+  const slowF = bpf(2, { w: 1080, h: 1920 }, 0, '', 1.2);
+  check(slowF.includes('setpts=1.200*(PTS-STARTPTS)') && !/tpad/.test(slowF), 'filter quay chậm có setpts nhân hệ số, không tpad');
+}
 check(Math.abs(estimateSpeechSec('một hai ba bốn năm sáu bảy tám chín mười') - (10 / 3.6 + 0.4)) < 1e-9, 'ước lượng giây đọc theo số từ');
 
 console.log('12. Soát lệch lời sau ghép: không đá pick trong cụm ra ngoài cụm');

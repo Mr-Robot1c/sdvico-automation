@@ -144,6 +144,37 @@ export function planSceneSegments(durationSec, scene) {
   return { pieces, shortSec, covered: r2(need - shortSec) };
 }
 
+// 14/10 (Thanh: video "Chở thùng hàng ra đảo Phú Quý" treo 4,7 giây ở cảnh 2): đứng khung > 1 giây nhìn như
+// video bị đơ. Hết đoạn đã gắn nhãn thì BÙ theo thứ tự, vẫn không lặp đoạn:
+//   1. cho clip CHẠY TIẾP quá cuối đoạn (nhãn đoạn chỉ là mô tả, clip thật thường còn dài), tới hết clip
+//      hoặc tới đầu vùng mà cảnh khác trong video đang dùng, để không chiếu một khúc hai lần;
+//   2. còn thiếu thì quay chậm đều các đoạn, tối đa MAX_SLOW lần (1,5 lần vẫn nhìn tự nhiên với cảnh cầm tay);
+//   3. phần lẻ còn lại mới giữ khung cuối.
+// clipDur: Map assetId -> giây (null = không đo được thì không kéo dài clip đó).
+// usedByOthers: Map assetId -> [[start, end], ...] các khúc cảnh khác đang dùng.
+// Trả { pieces (dur là giây NGUỒN), slow (hệ số >= 1), holdSec (giây đứng khung sau khi quay chậm) }.
+export const MAX_SLOW = 1.5;
+export function fillShortPieces(pieces, needSec, clipDur = new Map(), usedByOthers = new Map()) {
+  const out = pieces.map((p) => ({ ...p }));
+  let covered = out.reduce((a, p) => a + p.dur, 0);
+  let missing = needSec - covered;
+  for (let i = out.length - 1; i >= 0 && missing > 0.04; i--) {
+    const p = out[i];
+    const total = Number(clipDur.get(p.assetId));
+    if (!Number.isFinite(total) || total <= 0) continue;
+    const end = p.start + p.dur;
+    let limit = total - 0.05;
+    for (const [s] of usedByOthers.get(p.assetId) || []) if (s >= end - 0.01 && s < limit) limit = s;
+    for (const q of out) if (q !== p && q.assetId === p.assetId && q.start >= end - 0.01 && q.start < limit) limit = q.start;
+    const add = Math.min(missing, Math.max(0, limit - end));
+    if (add > 0.04) { p.dur = r2(p.dur + add); covered += add; missing -= add; }
+  }
+  let slow = 1;
+  if (missing > 0.04 && covered > 0) slow = Math.min(MAX_SLOW, needSec / covered);
+  const holdSec = Math.max(0, r2(needSec - covered * slow));
+  return { pieces: out, slow: Math.round(slow * 1000) / 1000, holdSec: holdSec > 0.04 ? holdSec : 0 };
+}
+
 // ======================================================================================================
 // ĐỢT A2 (9/10): CHỌN ĐOẠN PHỤC VỤ ĐÚNG CÂU ĐANG NÓI. Hàm thuần, không mạng.
 // Review đợt A: "cắt đoạn có hành động chưa đủ; phải cắt đoạn phục vụ đúng câu đang nói". Câu nói về người thì hình

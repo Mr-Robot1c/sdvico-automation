@@ -66,10 +66,12 @@ const FIT_MODE = process.env.FIT_MODE || 'cover';
 // 9/10 ĐỢT A: filter_complex cho cảnh cắt đoạn. n đầu vào video (mỗi đoạn một input), chuẩn hóa từng đoạn về
 // đúng khung (crop lấp khung), nối bằng concat, nếu thiếu hình thì tpad giữ khung cuối holdSec giây (KHÔNG lặp
 // đoạn), rồi phụ đề (subFilter có dấu phẩy đứng đầu, hoặc rỗng) -> nhãn [v].
-export function buildPiecesFilter(n, fmt, holdSec, subFilter) {
+// slow > 1 (14/10): quay chậm đều các đoạn để phủ lời thay vì đứng khung lâu (xem fillShortPieces).
+export function buildPiecesFilter(n, fmt, holdSec, subFilter, slow = 1) {
   const parts = [];
+  const pts = slow > 1.001 ? `setpts=${slow.toFixed(3)}*(PTS-STARTPTS)` : 'setpts=PTS-STARTPTS';
   for (let i = 0; i < n; i++) {
-    parts.push(`[${i}:v]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=increase,crop=${fmt.w}:${fmt.h},setsar=1,fps=30,format=yuv420p,setpts=PTS-STARTPTS[p${i}]`);
+    parts.push(`[${i}:v]scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=increase,crop=${fmt.w}:${fmt.h},setsar=1,${pts},fps=30,format=yuv420p[p${i}]`);
   }
   let last = 'p0';
   if (n > 1) {
@@ -131,7 +133,7 @@ async function buildSceneSegment(scene, fmt, workDir, index, { noSub = false } =
   if (usePieces) {
     inputArgs = scene.pieces.flatMap((p) => ['-ss', Number(p.start).toFixed(3), '-t', Number(p.dur).toFixed(3), '-i', p.path]);
     audioIdx = scene.pieces.length;
-    vf = buildPiecesFilter(scene.pieces.length, fmt, Number(scene.holdSec) || 0, subFilter);
+    vf = buildPiecesFilter(scene.pieces.length, fmt, Number(scene.holdSec) || 0, subFilter, Number(scene.slow) || 1);
   } else {
     inputArgs = scene.kind === 'image'
       ? (coverImage ? ['-i', scene.videoPath] : ['-loop', '1', '-framerate', '30', '-i', scene.videoPath])
