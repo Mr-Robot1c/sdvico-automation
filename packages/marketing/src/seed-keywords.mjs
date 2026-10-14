@@ -62,7 +62,7 @@ const toInsert = rows
     intent: INTENT_MAP[r.intent],
     landing_url: r.target_page,
     source: r.source,
-    priority: PRIORITY_MAP[r.intent] ?? 0,
+    priority: r.priority ?? PRIORITY_MAP[r.intent] ?? 0,
   }));
 
 if (toInsert.length === 0) {

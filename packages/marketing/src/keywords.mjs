@@ -124,6 +124,69 @@ const SERVICE_LOCAL = [
   'thay thiết bị giám sát hành trình tàu cá {t}',
 ];
 
+// 14/10: CỤM SẢN PHẨM NGOÀI GIÁM SÁT. Kho cũ ~150 từ là biến thể giám sát theo tỉnh, bộ lọc
+// trùng chủ đề của cron blog chặn cả cụm nên có ngày ra 0 bài. Mỗi cụm dưới đây ứng với một
+// nhóm sản phẩm trong lib/gen/products.mjs, hoặc kinh nghiệm đi biển dẫn về sản phẩm. Từ
+// khóa là câu người dùng gõ tìm, không chứa thông số hay giá tự đặt (Điều cấm số 5). Cố ý
+// tránh từ khóa chạm quy định nhà nước để cron tự viết được, không dồn hàng duyệt quản lý.
+// Bỏ SF-50 (ngừng bán) và SDFish (chưa có tài liệu tính năng chốt).
+const PRODUCT_TOPICS = {
+  'máy lọc nước biển': [
+    ['máy lọc nước biển thành nước ngọt cho tàu cá loại nào tốt', 'compare'],
+    ['nước ngọt trên tàu đi biển dài ngày lấy ở đâu', 'info'],
+    ['máy lọc nước biển chạy điện hay chạy cơ', 'compare'],
+    ['bảo dưỡng máy lọc nước biển trên tàu', 'service'],
+    ['uống nước biển đã lọc có an toàn không', 'info'],
+    ['lắp máy lọc nước biển cho ghe câu mực', 'transaction'],
+    ['máy lọc nước biển SEA-40 mua ở đâu', 'transaction'],
+  ],
+  'lọc dầu diesel': [
+    ['máy lọc dầu diesel cho tàu cá có tác dụng gì', 'info'],
+    ['dầu diesel lẫn nước làm hỏng kim phun máy tàu', 'info'],
+    ['cách lọc cặn dầu diesel trên tàu đánh cá', 'service'],
+    ['vì sao máy tàu hao dầu bất thường', 'info'],
+    ['máy lọc dầu diesel lắp ở vị trí nào trên tàu', 'service'],
+    ['mua máy lọc dầu SF300B ở đâu', 'transaction'],
+  ],
+  'dầu nhớt': [
+    ['dầu nhớt Nano Graphene có tốt không', 'compare'],
+    ['dầu nhớt cho máy thủy diesel loại nào bền', 'compare'],
+    ['bao lâu thay nhớt máy tàu một lần', 'info'],
+    ['nhớt PV Engine RMI dùng cho máy tàu', 'transaction'],
+    ['đại lý dầu nhớt PVOIL cho ngư dân', 'transaction'],
+    ['nhớt 15W-40 và 20W-50 khác nhau thế nào', 'compare'],
+  ],
+  'liên lạc vệ tinh': [
+    ['điện thoại vệ tinh cho ngư dân đi biển xa', 'compare'],
+    ['gọi điện về bờ khi đánh bắt xa bờ bằng cách nào', 'info'],
+    ['điện thoại vệ tinh XT-Pro dùng thế nào', 'service'],
+    ['Thuraya MarineStar có nghe gọi được không', 'info'],
+    ['liên lạc khẩn cấp giữa khơi khi mất sóng điện thoại', 'info'],
+    ['mua điện thoại vệ tinh Thuraya ở đâu', 'transaction'],
+  ],
+  'ắc quy': [
+    ['ắc quy cho tàu cá loại nào bền', 'compare'],
+    ['cách bảo quản ắc quy trên tàu đi biển', 'service'],
+    ['ắc quy nhanh hết điện nguyên nhân do đâu', 'info'],
+    ['ắc quy Nano cho tàu thuyền', 'transaction'],
+  ],
+  'sơn tàu': [
+    ['sơn chống hà cho vỏ tàu cá', 'compare'],
+    ['bao lâu nên sơn lại vỏ tàu một lần', 'info'],
+    ['sơn vỏ tàu sắt chống gỉ nước mặn', 'compare'],
+  ],
+  'kinh nghiệm đi biển': [
+    ['chuẩn bị gì trước chuyến biển dài ngày', 'info'],
+    ['kinh nghiệm tiết kiệm dầu cho tàu đánh cá', 'info'],
+    ['bảo dưỡng máy tàu sau chuyến biển', 'service'],
+    ['máy tàu chết máy giữa biển xử lý thế nào', 'service'],
+    ['mùa bão ngư dân cần chuẩn bị thiết bị gì', 'info'],
+    ['chi phí một chuyến biển gồm những khoản nào', 'info'],
+  ],
+};
+// Ưu tiên cụm sản phẩm ngang nhóm giao dịch giám sát để cron đi đều các cụm.
+const PRODUCT_TOPIC_PRIORITY = 2;
+
 // Trang đích mặc định cho từng nhóm. Local có slug tỉnh để phục vụ SEO địa phương.
 function targetPage(intent, province) {
   const p = province ? '-' + slugify(province) : '';
@@ -164,6 +227,20 @@ export function buildKeywords() {
   for (const t of PROVINCES) {
     for (const tpl of TRANSACTION_LOCAL) push(tpl.replace('{t}', t), 'transaction', t);
     for (const tpl of SERVICE_LOCAL) push(tpl.replace('{t}', t), 'service', t);
+  }
+
+  // Cụm sản phẩm: không có trang đích riêng, không cờ duyệt quy định, ưu tiên cố định.
+  for (const [topic, list] of Object.entries(PRODUCT_TOPICS)) {
+    for (const [keyword, intent] of list) {
+      rows.push({
+        keyword,
+        intent,
+        target_page: null,
+        source: 'cụm sản phẩm: ' + topic,
+        needsReview: false,
+        priority: PRODUCT_TOPIC_PRIORITY,
+      });
+    }
   }
 
   return rows;
