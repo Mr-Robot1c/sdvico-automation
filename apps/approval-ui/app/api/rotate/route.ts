@@ -848,6 +848,9 @@ export async function GET(req: Request) {
     focus: focusNote,
     videoTriggered,
     ...(videoTriggerError ? { videoTriggerError } : {}),
+    // 14/10: lượt 8h chọn Thuraya mà ra 0 bài, run_log không có lý do nên chỉ đoán được (Gemini
+    // lỗi). Ghi luôn lý do bỏ qua, cắt ngắn để dòng log không phình.
+    ...(skipped.length ? { skipped: skipped.slice(0, 10).map((s) => ({ ...s, reason: String(s.reason || '').slice(0, 240) })) } : {}),
     slots: winSlots.map((s) => `${s.time} ${s.kind} ${s.channel}${s.group_label ? ' 👥' + s.group_label : ''}`), planSaved: postingPlan.saved,
   });
   return NextResponse.json({

@@ -154,6 +154,23 @@ export async function GET(req: Request) {
       chosen.push(k);
       chosenTopics.push(tk);
     }
+    // 14/10: kho gần như chỉ một cụm (giám sát hành trình theo tỉnh), một bài trong 14 ngày là chặn
+    // cả cụm, ngày 14/10 ra 0 bài dù còn 201 từ chưa viết. Không từ nào qua lọc thì vẫn lấy 1 từ
+    // ít trùng nhất (hòa thì theo thứ tự ưu tiên), để mỗi ngày có ít nhất 1 bài.
+    let fallback: { keyword: string; overlap: number } | null = null;
+    if (!chosen.length && eligible.length) {
+      let best: any = null;
+      let bestScore = Infinity;
+      for (const k of eligible) {
+        const tk = topicTokens(k.keyword);
+        const score = recentTopics.reduce((m, rt) => Math.max(m, topicOverlap(tk, rt)), 0);
+        if (score < bestScore) { best = k; bestScore = score; }
+      }
+      if (best) {
+        chosen.push(best);
+        fallback = { keyword: best.keyword, overlap: Math.round(bestScore * 100) / 100 };
+      }
+    }
     picked = chosen.length;
 
     for (const kw of chosen) {
@@ -182,7 +199,7 @@ export async function GET(req: Request) {
       task: 'mkt.blog_keyword',
       actor: 'cron',
       status,
-      detail: { picked, published, review, ms: Date.now() - startedAt, errors: errors.slice(0, 5), results, skipped: skipped.slice(0, 10) }
+      detail: { picked, published, review, ms: Date.now() - startedAt, errors: errors.slice(0, 5), results, skipped: skipped.slice(0, 10), ...(fallback ? { fallback } : {}) }
     });
 
     try {

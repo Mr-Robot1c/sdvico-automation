@@ -11,6 +11,11 @@ on:
         default: "chieu"
         type: choice
         options: [sang, chieu]
+      force:
+        description: "Chay bu khi luot truoc da giu ve slot nhung ra 0 bai (them ?force=1)"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   goi:
@@ -21,8 +26,11 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           SLOT: ${{ inputs.slot }}
+          FORCE: ${{ inputs.force }}
         run: |
           if [ -z "$CRON_SECRET" ]; then echo "Thieu CRON_SECRET"; exit 1; fi
+          EXTRA=""
+          if [ "$FORCE" = "true" ]; then EXTRA="&force=1"; fi
           curl -sS --fail-with-body --max-time 240 \
             -H "Authorization: Bearer $CRON_SECRET" \
-            "https://sdvico-mktit.vercel.app/api/rotate?slot=$SLOT"
+            "https://sdvico-mktit.vercel.app/api/rotate?slot=$SLOT$EXTRA"
