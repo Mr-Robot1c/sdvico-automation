@@ -10,6 +10,8 @@ export function kindMeta(kind: string): KindMeta {
   switch (kind) {
     case 'hr_email':
       return { label: 'Thư tuyển dụng', icon: '✉️', tone: 'hr' };
+    case 'hr_job_post':
+      return { label: 'Tin tuyển dụng', icon: '📋', tone: 'hr' };
     case 'mkt_post':
       return { label: 'Bài marketing', icon: '📣', tone: 'mkt' };
     case 'mkt_publish':

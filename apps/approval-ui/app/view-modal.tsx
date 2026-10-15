@@ -7,10 +7,13 @@ export default function ViewModal({
   title,
   label = 'Xem chi tiết',
   footer,
+  buttonText,
   children
 }: {
   title: string;
   label?: string;
+  /** 15/10: có chữ thì nút mở là nút chữ (vd "Xem bài và video") thay cho con mắt trơ, người duyệt thấy rõ việc phải mở bài. */
+  buttonText?: string;
   /** Thanh hành động dính đáy modal (2/10): nằm ngoài vùng cuộn nên luôn thấy, vd nút Duyệt / Từ chối. */
   footer?: ReactNode;
   children: ReactNode;
@@ -72,15 +75,21 @@ export default function ViewModal({
 
   return (
     <>
-      <button
-        type="button"
-        className="icon-btn"
-        aria-label={label}
-        title={label}
-        onClick={open}
-      >
-        <span aria-hidden="true">👁</span>
-      </button>
+      {buttonText ? (
+        <button type="button" className="btn ghost sm" title={label} onClick={open}>
+          <span aria-hidden="true">👁</span> {buttonText}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={label}
+          title={label}
+          onClick={open}
+        >
+          <span aria-hidden="true">👁</span>
+        </button>
+      )}
       <dialog
         ref={ref}
         className="modal"

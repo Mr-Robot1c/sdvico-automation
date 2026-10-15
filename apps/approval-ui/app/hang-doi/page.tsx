@@ -3,8 +3,9 @@ import AutoRefresh from '../auto-refresh';
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import GenFlagsNotice from '../gen-flags-notice';
+import { CardFlags, ModalFlags, VideoScript, videoScenes, videoSeconds } from '../review-signals';
 import { editDraft } from '../actions';
-import { kindMeta, formatRelative, formatDateTimeVN, payloadRows, intentLabel, planChannelLabel, purposeLabel, riskMeta, COMPLIANCE_LABELS } from '../labels';
+import { kindMeta, formatRelative, formatDateTimeVN, payloadRows, intentLabel, planChannelLabel, purposeLabel, riskMeta } from '../labels';
 import { assetPublicUrl } from '../../lib/asset-url';
 import { publishTargetLines } from '../../lib/publish-targets';
 import { isDemoMode, maskTextFor } from '../../lib/demo-mode';
@@ -51,10 +52,6 @@ function assetIdsOf(payload: unknown): { image?: string; video?: string } {
 // Trích thông tin bài marketing từ payload để hiển thị gọn gàng.
 function mktInfo(payload: unknown) {
   const p = (payload && typeof payload === 'object' ? payload : {}) as Record<string, any>;
-  const compliance = (p.compliance || {}) as Record<string, string[]>;
-  const flags = Object.entries(COMPLIANCE_LABELS)
-    .map(([k, label]) => ({ label, items: Array.isArray(compliance[k]) ? compliance[k] : [] }))
-    .filter((f) => f.items.length > 0);
   return {
     format: p.format as string | undefined,
     intent: p.intent as string | undefined,
@@ -72,7 +69,7 @@ function mktInfo(payload: unknown) {
     fromPlan: p.from_plan_direction === true,
     // Bài bán hàng có video AI GỘP vào chính bài -> Facebook đăng cả Post lẫn Reel.
     postReel: p.post_reel === true,
-    flags
+    compliance: p.compliance as unknown
   };
 }
 
@@ -84,6 +81,21 @@ function stripInternalPrefix(t: string): string {
     .replace(/^\s*(🎯[AB]?\s*|⚡[AB]?\s*Shorts\s*)/u, '')
     .replace(/^(\s*\[[^\]]+\]\s*)+/u, '')
     .trim();
+}
+
+// 15/10: formatRelative trả luôn ngày giờ đầy đủ khi đã quá 7 ngày, ghép thêm formatDateTimeVN thì in lặp
+// "11:01 01/10/2026 · 11:01 01/10/2026". Chỉ ghép khi phần tương đối khác phần đầy đủ.
+function timeLabel(iso: string): string {
+  const rel = formatRelative(iso);
+  const full = formatDateTimeVN(iso);
+  return rel === full ? full : `${rel} · ${full}`;
+}
+
+// Nội dung soạn sẵn (tin nhắn chăm sóc, tin tuyển dụng) để người duyệt đọc ngay trên thẻ.
+function bodyOf(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return '';
+  const b = (payload as Record<string, unknown>).body;
+  return typeof b === 'string' ? b.trim() : '';
 }
 
 export default async function Page({ searchParams }: { searchParams: { kind?: string } }) {
@@ -147,6 +159,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   // chờ, không phải quên (user 18/8: "đợi 15 phút chưa thấy video"). Dựng xong cờ tự tắt.
   const contentIds = items.map((it) => contentIdOf(it.payload)).filter((x): x is string => !!x);
   const drafts = new Map<string, string>();
+  const briefs = new Map<string, any>();
   const videoPending = new Set<string>();
   // Video Shorts ĐI KÈM bài chữ: bài video-pipeline có brief.source_content = id bài chữ. Card bài
   // chữ hiện thumbnail video + dòng nối để người duyệt không tưởng "chưa có video" (user 18/8).
@@ -157,6 +170,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
     const { data: cs } = await client.from('mkt_content').select('id, title, draft, brief').in('id', contentIds);
     for (const c of cs || []) {
       drafts.set(c.id as string, (c.draft as string) || '');
+      briefs.set(c.id as string, (c as any).brief || {});
       if ((c as any).brief?.video_requested === true) videoPending.add(c.id as string);
     }
     // Bài video-pipeline sinh từ các bài chữ đang trong hàng đợi (bất kỳ trạng thái duyệt).
@@ -307,11 +321,16 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
             const ids = assetIdsOf(item.payload);
             const img = ids.image ? assetUrl.get(ids.image) : undefined;
             const vid = ids.video ? assetUrl.get(ids.video) : undefined;
+            // 15/10: bài có video lộ ra trên thẻ; lời đọc từng cảnh hiện trong cửa sổ xem bài.
+            const brief = cid ? briefs.get(cid) || {} : {};
+            const scenes = videoScenes(brief);
+            const secs = videoSeconds(scenes);
+            const hasVideo = !!vid || scenes.length > 0;
             return (
               <li key={item.id} className="card tone-mkt">
                 <div className="head">
                   <span className="kind"><span aria-hidden="true">{meta.icon}</span> {meta.label}</span>
-                  <time className="time" dateTime={item.created_at} title={`Tạo lúc ${formatDateTimeVN(item.created_at)}`}>{formatRelative(item.created_at)} · {formatDateTimeVN(item.created_at)}</time>
+                  <time className="time" dateTime={item.created_at} title={`Tạo lúc ${formatDateTimeVN(item.created_at)}`}>{timeLabel(item.created_at)}</time>
                 </div>
 
                 <div className="title">{cleanTitle}</div>
@@ -338,7 +357,11 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                     : null}
                   {/* 17/9 (Thanh): "Sạch" bỏ — loại bài đã có badge purposeLabel ở trên; rủi ro chỉ hiện khi cần rà. */}
                   {info.risk === 'amber' || info.risk === 'red' ? <span className={`badge tone-${rk.tone}`}>{rk.label}</span> : null}
+                  {hasVideo ? <span className="badge badge-has-video" title="Bài có video. Mở xem bài để xem video và đọc lời đọc từng cảnh trước khi duyệt.">🎬 Có video{secs ? ` ${secs} giây` : ''}</span> : null}
                 </div>
+
+                {/* 15/10: nói rõ máy quét bắt được gì (trước chỉ hiện trong cửa sổ xem bài). */}
+                <CardFlags compliance={info.compliance} videoCompliance={brief.video_compliance} risk={info.risk} generator={brief.generator} />
 
                 {img || vid || (cid && linkedVideo.get(cid)?.videoAssetId) ? (
                   <div className="card-media">
@@ -377,6 +400,7 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                   <ViewModal
                     title={cleanTitle}
                     label="Xem bài viết"
+                    buttonText={hasVideo ? 'Xem bài và video' : 'Xem bài'}
                     footer={
                       <>
                         <span className="modal-foot-hint">Giờ hẹn và ghi chú đặt ở khung dưới thẻ bài. Để trống giờ hẹn thì đăng ngay. Đích đăng ghi ngay dưới huy hiệu của thẻ bài.</span>
@@ -385,14 +409,10 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                       </>
                     }
                   >
-                    {info.flags.length ? (
-                      <div className="flagline">
-                        {info.flags.map((f) => (
-                          <span className="flagchip" key={f.label}>{f.label}: {f.items.join(', ')}</span>
-                        ))}
-                      </div>
-                    ) : null}
+                    <ModalFlags compliance={info.compliance} videoCompliance={brief.video_compliance} risk={info.risk} generator={brief.generator} />
                     <GenFlagsNotice payload={item.payload} />
+                    {/* 15/10: video và lời đọc lên trước caption. */}
+                    <VideoScript videoUrl={vid?.url} scenes={scenes} poster={img?.url} />
                     {info.landingUrl ? <div className="metaline">Trang đích: {info.landingUrl}</div> : null}
                     {draft ? <div className="draftbox">{draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                     {cid && draft !== undefined ? (
@@ -405,10 +425,9 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                         </form>
                       </details>
                     ) : null}
-                    {img || vid ? (
+                    {img ? (
                       <div className="modal-media">
-                        {img ? <img src={img.url} alt={img.title || 'Ảnh bài viết'} loading="lazy" decoding="async" /> : null}
-                        {vid ? <video src={`${vid.url}#t=2`} controls preload="metadata" playsInline /> : null}
+                        <img src={img.url} alt={img.title || 'Ảnh bài viết'} loading="lazy" decoding="async" />
                       </div>
                     ) : null}
                   </ViewModal>
@@ -434,10 +453,13 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                 <span className="kind">
                   <span aria-hidden="true">{meta.icon}</span> {meta.label}
                 </span>
-                <time className="time" dateTime={item.created_at} title={`Tạo lúc ${formatDateTimeVN(item.created_at)}`}>{formatRelative(item.created_at)} · {formatDateTimeVN(item.created_at)}</time>
+                <time className="time" dateTime={item.created_at} title={`Tạo lúc ${formatDateTimeVN(item.created_at)}`}>{timeLabel(item.created_at)}</time>
               </div>
 
               <div className="title">{item.title}</div>
+
+              {/* 15/10: đọc được nội dung tin ngay trên thẻ, không phải bấm Duyệt khi chưa thấy chữ nào. */}
+              {bodyOf(item.payload) ? <p className="queue-body-preview">{bodyOf(item.payload)}</p> : null}
 
               {isRedFlag(item.payload) ? (
                 <div className="stages">

@@ -5,6 +5,7 @@ import { editDraft, retryFacebookPublish, requestVideoForContent } from '../acti
 import DecideActions from '../decide-actions';
 import ViewModal from '../view-modal';
 import GenFlagsNotice from '../gen-flags-notice';
+import { CardFlags, ModalFlags, VideoScript, videoScenes, videoSeconds } from '../review-signals';
 import ShareGroups from './share-groups';
 import { channelsLabel, planChannelLabel, purposeLabel, riskMeta, formatRelative, formatDateTimeVN } from '../labels';
 import PlatformLogo, { type PlatformKey } from './platform-logo';
@@ -290,6 +291,12 @@ export default async function BangSection() {
                     formatRelative(it.createdAt),
                   ].filter(Boolean);
                   const imgWarn = (brief as any).image_warn ? String((brief as any).image_warn) : '';
+                  // 15/10: bài có video phải lộ ra ngay trên thẻ, kèm lời đọc trong cửa sổ xem bài.
+                  const bVid = (brief as any).assets?.video_h || (brief as any).assets?.video;
+                  const reviewVid = vidUrl || (typeof bVid === 'string' ? assetUrl.get(bVid) : undefined);
+                  const scenes = videoScenes(brief);
+                  const secs = videoSeconds(scenes);
+                  const hasVideo = !!reviewVid || scenes.length > 0;
                   const imgNote = (brief as any).image_note || (brief as any).image_via
                     ? `${String((brief as any).image_via || '')}${(brief as any).image_note ? ` · ${String((brief as any).image_note).replace(' (link, khong luu)', '')}` : ''}`
                     : '';
@@ -297,13 +304,16 @@ export default async function BangSection() {
                     <div key={it.qid} className="card tone-mkt bang-card">
                       <b>{title}</b>
                       <div className="bang-meta" title={formatDateTimeVN(it.createdAt)}>{metaParts.join(' · ')}</div>
-                      {needsManager || p.risk === 'amber' || imgWarn ? (
+                      {needsManager || p.risk === 'amber' || imgWarn || hasVideo ? (
                         <div className="badges">
                           {needsManager ? <span className="badge tone-no" title="Nội dung chạm quy định nhà nước (IUU, Cục Thủy sản, Kiểm ngư). Cấp quản lý duyệt trước khi đăng (điều cấm 3).">Cần cấp quản lý duyệt</span> : null}
                           {!needsManager && p.risk === 'amber' ? <span className={`badge tone-${rk.tone}`}>{rk.label}</span> : null}
+                          {hasVideo ? <span className="badge badge-has-video" title="Bài có video. Mở xem bài để xem video và đọc lời đọc từng cảnh trước khi duyệt.">🎬 Có video{secs ? ` ${secs} giây` : ''}</span> : null}
                           {imgWarn ? <span className="badge tone-no" title="Ảnh máy chọn chưa qua thẩm định, mở Xem bài để kiểm.">Ảnh cần kiểm</span> : null}
                         </div>
                       ) : null}
+                      {/* 15/10: nói rõ máy quét bắt được gì (trước chỉ có nhãn "Cần rà lại" trơ). */}
+                      <CardFlags compliance={p.compliance} videoCompliance={(brief as any).video_compliance} risk={p.risk} generator={(brief as any).generator} />
                       {/* 2/10 (audit đợt A): nói rõ Duyệt xong bài đi đâu, đúng sự thật từng kênh. Không ẩn vào Chi tiết. */}
                       <ul className="pub-target" aria-label="Đích đăng sau khi duyệt">
                         {publishTargetLines(p.plan_channel, chans).map((l) => <li key={l}>{l}</li>)}
@@ -326,6 +336,7 @@ export default async function BangSection() {
                         <ViewModal
                           title={title}
                           label="Xem bài viết"
+                          buttonText={hasVideo ? 'Xem bài và video' : 'Xem bài'}
                           footer={
                             <>
                               <span className="modal-foot-hint">Dùng giờ hẹn đang đặt ở thẻ bài; để trống thì đăng ngay khi bấm Duyệt.</span>
@@ -341,7 +352,10 @@ export default async function BangSection() {
                               {publishTargetLines(p.plan_channel, chans).map((l) => <li key={l}>{l}</li>)}
                             </ul>
                           </div>
+                          <ModalFlags compliance={p.compliance} videoCompliance={(brief as any).video_compliance} risk={p.risk} generator={(brief as any).generator} />
                           <GenFlagsNotice payload={p} />
+                          {/* 15/10: video và lời đọc lên TRƯỚC caption, trước đây nằm cuối phải cuộn qua cả bài mới thấy. */}
+                          <VideoScript videoUrl={reviewVid} scenes={scenes} poster={imgUrl} />
                           {c?.draft ? <div className="draftbox">{c.draft}</div> : <p className="muted">Chưa có bản nháp.</p>}
                           {c ? (
                             <details className="raw editbox">
@@ -353,17 +367,9 @@ export default async function BangSection() {
                               </form>
                             </details>
                           ) : null}
-                          {imgUrl || vidUrl ? (
+                          {imgUrl ? (
                             <div className="modal-media">
-                              {imgUrl ? <img src={imgUrl} alt="" loading="lazy" decoding="async" /> : null}
-                              {vidUrl ? (
-                                <>
-                                  {/* Không dùng #t=2 + preload metadata ở đây (22/8: video đứng 0:00 trên bảng
-                                      Chờ duyệt); ViewModal gọi load() khi mở, poster = ảnh bài cho đỡ ô đen. */}
-                                  <video src={vidUrl} controls preload="none" playsInline poster={imgUrl || undefined} />
-                                  <a className="src" href={vidUrl} target="_blank" rel="noreferrer" style={{ fontSize: '.82rem', alignSelf: 'flex-start' }}>↗ Mở video ở tab mới</a>
-                                </>
-                              ) : null}
+                              <img src={imgUrl} alt="" loading="lazy" decoding="async" />
                             </div>
                           ) : null}
                         </ViewModal>
