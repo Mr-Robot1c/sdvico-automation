@@ -13,7 +13,9 @@
 export const PRODUCT_GUARD = [
   {
     key: 'sea40',
-    match: /l[oọ]c\s*n[uư][oớ]c|sea[\s-]?40|n[uư][oớ]c\s*ng[oọ]t|m[aá]y\s*l[oọ]c/i,
+    // 15/10: "máy lọc" trần từng khớp cả "Máy lọc dầu" -> mọi bài lọc dầu bị gắn luật SEA-40 (cấm "tiết kiệm nhiên liệu"),
+    // prompt lọc dầu nhận dòng lợi ích của máy lọc nước và bài bị cờ "Sai nghề" oan. Nay loại "máy lọc dầu".
+    match: /l[oọ]c\s*n[uư][oớ]c|sea[\s-]?40|n[uư][oớ]c\s*ng[oọ]t|m[aá]y\s*l[oọ]c(?!\s*d[aầ]u)/i,
     product: 'Máy lọc nước biển SEA-40',
     allowed: [
       'chủ động nước ngọt sinh hoạt (uống, nấu ăn, tắm rửa) cho cả chuyến biển dài ngày',
@@ -25,6 +27,9 @@ export const PRODUCT_GUARD = [
       'bớt chở nước', 'đỡ chở nước', 'khỏi chở nước', 'không cần chở nước',
       'nhẹ tàu', 'giảm tải', 'tốn diện tích chở nước', 'đỡ tốn chỗ', 'tiết kiệm chỗ',
       'tiết kiệm dầu', 'tiết kiệm nhiên liệu', 'đỡ tốn dầu', 'giảm hao dầu',
+      // 15/10 (bài web 070278db đã đăng: "nước ngọt làm nặng tàu và tiêu tốn nhiều nhiên liệu", "giảm bớt trọng lượng
+      // chở hàng, tối ưu chi phí nhiên liệu"): các biến thể cùng ý sai nghề mà danh sách cũ không bắt.
+      'nặng tàu', 'trọng lượng chở', 'giảm trọng lượng', 'bớt trọng lượng', 'tốn nhiều nhiên liệu', 'chi phí nhiên liệu', 'tối ưu nhiên liệu',
       // 8/9 (luật giá úp mở, Thanh): số chính xác không được lọt ra kênh công khai.
       '42.000.000', '31.000.000', '49.000.000', '38.000.000', '42 triệu', '31 triệu', '49 triệu', '38 triệu', // 9/9 Thanh: 49/38 LÀ giá đã giảm (42/31 là số cũ ghi sai, vẫn chặn)
     ],
@@ -126,7 +131,7 @@ export function guardViolations(text, topicText) {
   const out = [];
   const entries = entriesFor(topicText);
   // Không khớp sản phẩm nào -> vẫn áp luật chung cho "nhẹ tàu/bớt chở nước" (sai với mọi tàu cá).
-  const generic = ['bớt chở nước', 'nhẹ tàu', 'giảm tải'];
+  const generic = ['bớt chở nước', 'nhẹ tàu', 'giảm tải', 'làm nặng tàu'];
   const check = (phrases, product, why) => {
     for (const p of phrases) if (t.includes(p.toLowerCase())) out.push({ phrase: p, product, why });
   };

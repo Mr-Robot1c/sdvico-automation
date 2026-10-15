@@ -3,7 +3,7 @@
 import { assessDraft, scanPlaybook, countWords, firstBodyLine } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
-import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, audienceLines, benefitLines } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, audienceLines, benefitLines, pickBenefitBlock, applyBenefitBlock, sanitizePostText } from './products.mjs';
 import { insightBrief } from './insights.mjs';
 import { logTokenUsage } from './token-log.mjs';
 import { sampleHooks } from './hook-library.mjs';
@@ -99,6 +99,8 @@ export async function generateSocialPost({
   // angleOverride cũ, cuối cùng random 4 chữ. Cách này giữ tương thích với chỗ gọi cũ.
   const emotionAngle = emotionOverride ? pickAngleForEmotion(emotionOverride) : null;
   const angle = emotionAngle || angleOverride || ANGLES[Math.floor(Math.random() * ANGLES.length)];
+  // 15/10: đoạn bài toán chọn TRƯỚC, viết sẵn thành lời; bài ảnh dùng câu số ngắn như TikTok (bài ảnh dưới 70 chữ).
+  const benefit = pickBenefitBlock(productGroup, photoOnly ? 'tiktok' : channel);
   const system = [
     'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
     `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${shownName}". Bắt buộc: nêu rõ tên sản phẩm này (gọi đúng tên "${shownName}", không gọi tên khác), 1 tới 2 lợi ích thật của nó. Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
@@ -118,9 +120,9 @@ export async function generateSocialPost({
     ...guardLines(shownName + ' ' + productName + ' ' + productGroup),
     // 11/9: bài bán viết cho đúng tệp khách (A ghe nhỏ, B tàu khơi xa), xem AUDIENCE ở products.mjs.
     ...audienceLines(productGroup),
-    // 11/9: phép tính lợi ích theo cỡ tàu, số có nguồn (BENEFIT_ASSUMPTIONS), model chỉ chép ví dụ.
-    // TikTok chỉ 1 câu số (chú thích ngắn), Facebook và YouTube đủ 2 tới 3 câu.
-    ...benefitLines(productGroup, channel),
+    // 11/9: phép tính lợi ích theo cỡ tàu, số có nguồn (BENEFIT_ASSUMPTIONS). 15/10: model chỉ đặt chỗ [BÀI TOÁN],
+    // máy chèn đoạn viết sẵn sau khi sinh (applyBenefitBlock). TikTok và bài ảnh 1 câu số.
+    ...benefitLines(productGroup, photoOnly ? 'tiktok' : channel, benefit),
     'Chèn vài emoji hợp cảnh biển và thiết bị cho sinh động (ví dụ ⚓ 🚢 🌊 📡 💧 🛟 📞), đừng lạm dụng.',
     'Tuổi, số năm, ngày tháng, số lượng viết bằng CHỮ SỐ (ví dụ 55 tuổi, 30 năm, ngày 20/8), TUYỆT ĐỐI KHÔNG viết bằng chữ ("năm mươi lăm tuổi", "ba mươi năm" là SAI). Số lớn dùng dấu chấm ngăn hàng nghìn (3.000.000 đồng). KHÔNG dùng gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung, không nêu số.',
@@ -217,6 +219,12 @@ export async function generateSocialPost({
   // 11/9 chiều (Thanh): BỎ dòng "Đặt trên Shopee..." từng chèn ở đây (9/9). Đứng giữa câu giá và câu
   // kêu cmt nó lạc nhịp; link sàn chỉ còn ở bot hỏi đáp và bình luận đầu (caption-group.md).
   body = ensureCommentCta(body, cta);
+  // 15/10 (Thanh soát bài b8f2a8dc, cc253c9d): TẤT ĐỊNH, không trông vào lời dặn. Chèn đoạn bài toán viết sẵn vào chỗ
+  // [BÀI TOÁN] (thiếu thì trước dòng giá), bỏ mọi câu model tự tính (công thức × =, giá dầu tự bịa, số lít kèm tiền,
+  // câu hoàn vốn tự viết), rồi đổi ký hiệu thay chữ và bỏ lời dặn lọt bài. Câu bị bỏ ghi vào cờ để người duyệt thấy.
+  const calc = applyBenefitBlock(body, benefit?.text || null, { teaserText: teaser?.text || '' });
+  body = sanitizePostText(calc.body).text;
+  headline = sanitizePostText(headline).text;
 
   const tags = hashtagBlock(productGroup);
   // 11/9: hashtag tĩnh trong products.mjs từng lọt cụm sai nghề ("khỏi_chở_nước") vì
@@ -238,6 +246,7 @@ export async function generateSocialPost({
     assessment.flags = { ...(assessment.flags || {}), domain: violations.map((v) => `${v.phrase} (${v.product})`) };
     if (assessment.risk === 'none') assessment.risk = 'amber';
   }
+  if (calc.removed.length) assessment.flags = { ...(assessment.flags || {}), calc_removed: calc.removed.map((s) => s.slice(0, 120)) };
   return { text, body, headline, hashtags: tags, assessment, insightId: insight?.id || null };
 }
 
@@ -351,7 +360,9 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
   }
   // Hết lượt vẫn dính: cắt câu dính (giữ hashtag); cắt hết thân bài thì giữ nguyên và báo người duyệt.
   const witnessFix = resolveWitnessBody(body);
-  body = witnessFix.body;
+  // 15/10: ký hiệu thay chữ và lời dặn lọt bài, tất định như bài bán.
+  body = sanitizePostText(witnessFix.body).text;
+  headline = sanitizePostText(headline).text;
 
   const tags = hashtagBlock(null); // chỉ hashtag mặc định, không thẻ sản phẩm
   const text = `${body}\n\n${tags}`;

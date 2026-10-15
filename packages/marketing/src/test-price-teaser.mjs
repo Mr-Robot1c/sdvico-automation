@@ -1,7 +1,7 @@
 // test-price-teaser.mjs — kiểm luật giá úp mở (Thanh chốt 8/9/2026): bài công khai không được có số
 // tiền chính xác, chỉ mốc "9,X triệu"; cảnh cuối video có câu giá đọc được. Chạy: npm run test:price
 // Không cần mạng, không cần GEMINI_API_KEY.
-import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta, SHOPEE_LINK, shopeeLink, ensureShopeeLink, outroKeyword, AUDIENCE, audienceOf, audienceLines, benefitLines, fuelBenefitLines, waterBenefitLines, BENEFIT_ASSUMPTIONS, BENEFIT_CASES, estimateBenefit, trieu } from './products.mjs';
+import { PRICE_TEASER, redactExactPrices, ensurePriceTeaser, ensureSpokenTeaser, publicName, isPhotoOnlyGroup, isDiscontinuedGroup, commentCta, ensureCommentCta, SHOPEE_LINK, shopeeLink, ensureShopeeLink, outroKeyword, AUDIENCE, audienceOf, audienceLines, benefitLines, fuelBenefitLines, waterBenefitLines, BENEFIT_ASSUMPTIONS, BENEFIT_CASES, estimateBenefit, trieu, pickBenefitBlock, applyBenefitBlock, sanitizePostText, isCalcSentence, BENEFIT_PLACEHOLDER, fuelBenefitText } from './products.mjs';
 import { scanStyle } from './brand-voice-check.mjs';
 import { guardViolations } from './product-guard.mjs';
 import { assessDraft } from './compliance.mjs';
@@ -142,20 +142,79 @@ ok('audienceLines lọc dầu không câu hỏi', !audienceLines(G9).some((l) =>
   ok('bài mẫu chuẩn kết bằng câu giá úp mở + CTA cmt', /4X triệu[\s\S]{0,200}cmt "lọc dầu" hay "lọc nước"/.test(block));
 }
 ok('AUDIENCE không chứa cụm SỰ THẬT NGHỀ cấm', Object.values(AUDIENCE).every((a) => !guardViolations(`${a.who} ${a.pain} ${a.compare} ${a.proof} ${a.question}`, a.key === 'A' ? G9 : G2).length));
-// 11/9: bài toán lợi ích có nguồn.
+// 11/9: bài toán lợi ích có nguồn. 15/10: đoạn viết sẵn thành lời, máy tự chèn (applyBenefitBlock).
 eq('benefit 8 kịch bản', BENEFIT_CASES.length, 8);
-ok('benefit lọc dầu 6 ví dụ máy vừa và lớn', fuelBenefitLines().filter((l) => l.startsWith('VÍ DỤ')).length === 6);
-ok('benefit lọc dầu tàu 15 m 20 ngày = 3.000 lít, 83 triệu', fuelBenefitLines().some((l) => l.includes('tàu 15 m, máy 400 cv, 10 người, chuyến 20 ngày') && l.includes('3.000 lít') && l.includes('83 triệu đồng') && l.includes('27.740 đ')));
+ok('benefit lọc dầu 5 đoạn (tàu 300 cv không tính dầu: nguồn là tàu 400 cv)', fuelBenefitLines().length === 5 && !fuelBenefitLines().some((l) => l.includes('300 cv')), fuelBenefitLines().length);
+ok('benefit lọc dầu tàu 15 m 20 ngày = 3.000 lít, 83 triệu', fuelBenefitLines().some((l) => l.includes('Tàu 15 m, máy 400 cv, chuyến 20 ngày') && l.includes('3.000 lít') && l.includes('83 triệu đồng')));
 ok('benefit lọc dầu tàu 20 m 30 ngày = 10.200 lít', fuelBenefitLines().some((l) => l.includes('chuyến 30 ngày') && l.includes('10.200 lít')));
-ok('benefit lọc dầu có hoàn vốn', fuelBenefitLines().every((l) => !l.startsWith('VÍ DỤ') || /hoàn vốn sau khoảng \d+ chuyến/.test(l)));
-ok('benefit lọc nước 6 ví dụ (bỏ 2 ghe đi dưới 10 ngày)', waterBenefitLines().filter((l) => l.startsWith('VÍ DỤ')).length === 6);
-ok('benefit lọc nước tàu 15 m 10 người 20 ngày = 3.000 lít, 150 can', waterBenefitLines().some((l) => l.includes('chuyến 20 ngày') && l.includes('3.000 lít') && l.includes('150 can')));
+ok('benefit lọc dầu có mốc bù tiền máy, ghi chưa tính vận chuyển công lắp', fuelBenefitLines().every((l) => /khoảng \d+ chuyến là bù lại/.test(l) && l.includes('chưa tính vận chuyển, công lắp')));
+eq('benefit tàu 15 m 15 ngày đúng số (62 triệu, 3,1 tới 6,2 triệu, 19 tới 37 triệu, 4 chuyến)', fuelBenefitText(BENEFIT_CASES.find((c) => c.key === 'tau-15m-8n-15d')),
+  'Tàu 15 m, máy 400 cv, chuyến 15 ngày, mỗi ngày đốt khoảng 150 lít, cả chuyến chừng 2.250 lít dầu. Tính theo giá dầu Petrolimex kỳ 3/9/2026 là khoảng 62 triệu đồng tiền dầu một chuyến. Lọc dầu sạch có thể giúp bớt 5 tới 10% tùy tình trạng máy (theo tài liệu SF300B), tức khoảng 3,1 triệu đồng tới 6,2 triệu đồng mỗi chuyến, 6 chuyến một năm là 19 triệu đồng tới 37 triệu đồng. Riêng tiền máy 9,X triệu (chưa tính vận chuyển, công lắp) thì khoảng 4 chuyến là bù lại.');
+ok('benefit mức 5 tới 10% có điều kiện "có thể ... tùy tình trạng máy"', [...fuelBenefitLines(), pickBenefitBlock(G9, 'tiktok').text].every((l) => !/5 tới 10%/.test(l) || /có thể giúp bớt 5 tới 10% tùy tình trạng máy/.test(l)));
+ok('benefit lọc nước 6 đoạn (bỏ 2 ghe đi dưới 10 ngày)', waterBenefitLines().length === 6);
+ok('benefit lọc nước tàu 15 m 10 người 20 ngày = 3.000 lít, 150 can', waterBenefitLines().some((l) => l.includes('đi 20 ngày') && l.includes('3.000 lít') && l.includes('150 can')));
 ok('benefit lọc nước không dính SỰ THẬT NGHỀ', !guardViolations(waterBenefitLines().join(' '), G2).length);
 ok('benefit lọc dầu không dính SỰ THẬT NGHỀ', !guardViolations(fuelBenefitLines().join(' '), G9).length);
+ok('benefit KHÔNG ký hiệu × = / và không ngoặc nguồn báo (Dân trí, VnExpress, Tepbac)', [...fuelBenefitLines(), ...waterBenefitLines()].every((l) => !/[×=]|đ\/lít|Dân trí|VnExpress|Tepbac|Quỳnh Lập|VÍ DỤ/.test(l)));
+ok('benefit sạch văn phong (scanStyle)', [...fuelBenefitLines(), ...waterBenefitLines()].every((l) => !scanStyle(l).length), [...fuelBenefitLines(), ...waterBenefitLines()].map(scanStyle).flat());
+ok('benefit không lọt mốc giá bị guard cấm (9,9 / 42 / 31 / 49 / 38 triệu)', ![...fuelBenefitLines(), ...waterBenefitLines()].join(' ').match(/(?<![\d,])(?:9,9|42|31|49|38) triệu/));
 eq('benefit nhóm khác rỗng', benefitLines('8. Sơn RARE').length, 0);
+eq('pickBenefitBlock nhóm khác null', pickBenefitBlock('8. Sơn RARE'), null);
+ok('pickBenefitBlock lọc dầu chỉ bốc tàu 15 m (gần tệp ghe nhỏ nhất), không tàu hậu cần', [0, 0.49, 0.5, 0.99].every((r) => /^Tàu 15 m, máy 400 cv/.test(pickBenefitBlock(G9, 'facebook', () => r).text)));
+ok('pickBenefitBlock lọc nước bốc tàu 15 tới 20 m', [0, 0.3, 0.6, 0.99].every((r) => /^Tàu (?:15|17|20) m/.test(pickBenefitBlock(G2, 'youtube', () => r).text)));
 ok('benefit không nêu tiền nước đất liền', !/đ\/m³|đồng một khối|120\.000/.test(waterBenefitLines().join(' ')));
 ok('estimateBenefit tính tay', estimateBenefit({ crew: 10, days: 20, engine: 'vua' }).waterLiters === 3000 && estimateBenefit({ crew: 10, days: 20, engine: 'vua' }).fuelLiters === 3000);
-ok('benefit TikTok chỉ 1 câu số', benefitLines(G9, 'tiktok').length === 2 && benefitLines(G9, 'tiktok').join(' ').includes('3.000 lít') && !benefitLines(G9, 'tiktok').join(' ').includes('VÍ DỤ') && benefitLines(G2, 'tiktok').length === 2 && !guardViolations(benefitLines(G2, 'tiktok').join(' '), G2).length);
+ok('benefit TikTok 1 câu số cố định', pickBenefitBlock(G9, 'tiktok').text.includes('3.000 lít') && pickBenefitBlock(G2, 'tiktok').text.includes('3.000 lít nước ngọt') && !guardViolations(pickBenefitBlock(G2, 'tiktok').text, G2).length);
+ok('prompt benefit chỉ dặn đặt chỗ [BÀI TOÁN], không dòng VÍ DỤ', benefitLines(G9, 'facebook').join(' ').includes(BENEFIT_PLACEHOLDER) && !benefitLines(G9, 'facebook').some((l) => l.startsWith('VÍ DỤ')));
+{
+  // 15/10: chốt tất định sau khi sinh (bài b8f2a8dc dán công thức, bài cc253c9d bịa "Dầu 38.000đ mỗi lít").
+  const block = pickBenefitBlock(G9, 'facebook', () => 0).text;
+  const teaser = PRICE_TEASER[G9].text;
+  const cta = commentCta(G9);
+  const raw = `Đang chạy ngon mà máy lịm dần giữa sóng lớn?\n\nTàu 15 m, máy 400 cv: khoảng 150 lít dầu mỗi ngày (Dân trí 27/2/2022) × 15 ngày = 2.250 lít × 27.740 đ/lít = 62 triệu đồng tiền dầu. Dầu 38.000đ mỗi lít đắt quá! Máy SF300B kích thước 52 x 20 x 50 cm, lọc 300 lít/giờ.\n\n${BENEFIT_PLACEHOLDER}\n\n${teaser}, giá chính xác em gửi riêng.\n\n${cta}`;
+  const r = applyBenefitBlock(raw, block, { teaserText: teaser });
+  ok('apply: thay [BÀI TOÁN] bằng đoạn viết sẵn', r.placed === 'placeholder' && r.body.includes(block) && !r.body.includes(BENEFIT_PLACEHOLDER), r.body);
+  ok('apply: bỏ câu công thức × = và câu bịa giá dầu 38.000đ', r.removed.length === 2 && !/×|38\.000|27\.740/.test(r.body), r.removed);
+  ok('apply: giữ câu kích thước 52 x 20 x 50 cm và lưu lượng 300 lít/giờ', r.body.includes('52 x 20 x 50 cm') && r.body.includes('300 lít/giờ'));
+  ok('apply: CTA vẫn là dòng cuối, câu giá vẫn còn', r.body.trim().endsWith(cta) && r.body.includes(teaser));
+  const noPh = applyBenefitBlock(`Hook ngắn.\n\nTàu anh 6 chuyến một năm dư sức thu hồi vốn.\n\n${teaser}, giá chính xác em gửi riêng.\n\n${cta}`, block, { teaserText: teaser });
+  ok('apply: thiếu [BÀI TOÁN] thì chèn ngay trước dòng giá, bỏ câu thu hồi vốn tự viết', noPh.placed === 'inserted' && noPh.body.indexOf(block) < noPh.body.indexOf(teaser) && !/thu hồi vốn/.test(noPh.body), noPh.body);
+  const ttText = pickBenefitBlock(G9, 'tiktok').text;
+  const tt = applyBenefitBlock(`Hook.\nChỉ 1 câu số, tàu 400 cv đi 20 ngày đốt khoảng 3.000 lít dầu, lọc dầu sạch bớt 5 tới 10% (tài liệu SF300B).\n${cta}`, ttText, {});
+  ok('apply TikTok: câu số model tự chép bị thay bằng câu cố định', tt.body.includes(ttText) && (tt.body.match(/3\.000 lít/g) || []).length === 1, tt.body);
+  const twice = applyBenefitBlock(r.body, block, { teaserText: teaser });
+  ok('apply: chạy lại lần 2 không đổi', twice.body === r.body && !twice.removed.length);
+  eq('apply: không đoạn (nhóm khác) chỉ bỏ dòng [BÀI TOÁN]', applyBenefitBlock(`A.\n\n${BENEFIT_PLACEHOLDER}\n\nB.`, null).body, 'A.\n\nB.');
+  ok('isCalcSentence: câu lưu lượng "250 lít nước ngọt mỗi giờ ... cả chuyến" KHÔNG bị bỏ (bài dựng thử 15/10 bị bỏ oan)', !isCalcSentence('Máy chạy bằng điện tàu, làm ra khoảng 250 lít nước ngọt mỗi giờ để anh em dùng thoải mái cả chuyến.'));
+  const inv = applyBenefitBlock(`Hook.\n\nTàu anh khác cỡ thì nhắn số người, số ngày, em tính riêng.\n${BENEFIT_PLACEHOLDER}\n\n${teaser}.\n\n${cta}`, block, { teaserText: teaser });
+  ok('apply: câu mời "khác cỡ" đi liền SAU đoạn tính, model tự viết lên trước thì bị bỏ', (inv.body.match(/khác cỡ/g) || []).length === 1 && inv.body.indexOf('khác cỡ') > inv.body.indexOf('Petrolimex'), inv.body);
+  ok('isCalcSentence: lưu lượng máy và câu giá không bị coi là phép tính', !isCalcSentence('Máy lọc 250 lít mỗi giờ.') && !isCalcSentence('Bộ lọc dầu giảm từ 12 triệu còn 9,X triệu.') && isCalcSentence('Chạy 10 ngày tốn khoảng 1.500 lít dầu.'));
+}
+{
+  // 15/10: ký hiệu thay chữ và lời dặn lọt bài (sanitizePostText) chạy cho mọi bài máy sinh.
+  eq('sanitize: bỏ "Chỉ 1 câu số," và viết hoa lại', sanitizePostText('Chỉ 1 câu số, tàu 400 cv đi 20 ngày đốt khoảng 3.000 lít dầu.').text, 'Tàu 400 cv đi 20 ngày đốt khoảng 3.000 lít dầu.');
+  eq('sanitize: × = thành chữ', sanitizePostText('150 lít × 15 ngày = 2.250 lít.').text, '150 lít nhân 15 ngày là 2.250 lít.');
+  eq('sanitize: giữ kích thước, đổi × thành x', sanitizePostText('Kích thước 52×20×50 cm.').text, 'Kích thước 52 x 20 x 50 cm.');
+  eq('sanitize: gạch dài, mũi tên, &, khoảng số', sanitizePostText('Dầu sạch — máy khỏe → đỡ tốn. Nước & dầu. Bớt 5–10%.').text, 'Dầu sạch, máy khỏe, rồi đỡ tốn. Nước và dầu. Bớt 5 tới 10%.');
+  eq('sanitize: chấm tròn đầu dòng bị bỏ', sanitizePostText('Lợi ích:\n• Dầu sạch\n• Máy bền').text, 'Lợi ích:\nDầu sạch\nMáy bền');
+  eq('sanitize: câu sạch giữ nguyên', sanitizePostText('Tàu 15 m đi 15 ngày, 52 x 20 x 50 cm, gọi 1900 23 23 49 nhé! #SDVICO').text, 'Tàu 15 m đi 15 ngày, 52 x 20 x 50 cm, gọi 1900 23 23 49 nhé! #SDVICO');
+  eq('sanitize: "BẮT BUỘC" trong câu thường không bị bỏ', sanitizePostText('Tàu 15 m BẮT BUỘC lắp giám sát hành trình.').text, 'Tàu 15 m BẮT BUỘC lắp giám sát hành trình.');
+}
+{
+  // 15/10: luật SEA-40 từng khớp nhầm "Máy lọc dầu" (regex "máy lọc" trần) nên bài lọc dầu bị cờ "Sai nghề" oan;
+  // bài web 070278db viết "làm nặng tàu, tốn nhiều nhiên liệu" mà danh sách cũ không bắt.
+  eq('guard: bài lọc dầu nói tiết kiệm nhiên liệu KHÔNG bị luật SEA-40 bắt', guardViolations('Máy lọc dầu SF300B giúp tiết kiệm nhiên liệu.', 'Máy lọc dầu SF300B 9. Máy Lọc Dầu Diesel SD12-300').length, 0);
+  ok('guard: bài web lọc nước "làm nặng tàu, tốn nhiều nhiên liệu, giảm bớt trọng lượng chở hàng" bị bắt',
+    guardViolations('Nước ngọt làm nặng tàu và tiêu tốn nhiều nhiên liệu. Giúp tàu giảm bớt trọng lượng chở hàng.', 'So sánh chi phí vận hành máy lọc nước biển').length >= 3);
+  ok('guard: "máy lọc nước" vẫn khớp luật SEA-40', guardViolations('máy lọc nước giúp nhẹ tàu', 'máy lọc nước biển').length > 0);
+}
+{
+  // 15/10: hai bản products.mjs (app chạy Vercel, packages chạy máy nội bộ) phải cho cùng đoạn bài toán và cùng chốt.
+  const app = await import('../../../apps/approval-ui/lib/gen/products.mjs');
+  ok('2 bản products.mjs cùng đoạn bài toán', app.fuelBenefitLines().join('|') === fuelBenefitLines().join('|') && app.waterBenefitLines().join('|') === waterBenefitLines().join('|'));
+  const probe = 'Chỉ 1 câu số, 150 lít × 15 ngày — 52×20×50 cm & dầu.';
+  ok('2 bản products.mjs cùng sanitizePostText', app.sanitizePostText(probe).text === sanitizePostText(probe).text);
+}
 eq('trieu() né mốc giá bị guard cấm', [41610000, 49932000, 42000000, 83220000, 9900000, 4161000].map(trieu).join(' | '), '41,6 triệu đồng | 50 triệu đồng | 42,0 triệu đồng | 83 triệu đồng | 10 triệu đồng | 4,2 triệu đồng');
 let fail = 0;
 for (const c of cases) {

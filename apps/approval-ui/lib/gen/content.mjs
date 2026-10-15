@@ -9,7 +9,8 @@
 // hình như phần chấm CV của HR (packages/hr/src/screen/score.js dùng gemini-3.6-flash).
 // Dù sinh bằng mô hình hay bản mẫu, bản nháp vẫn qua compliance và hàng đợi duyệt.
 
-import { DEFAULT_HASHTAGS, productHashtags, guessGroup } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, guessGroup, sanitizePostText } from './products.mjs';
+import { guardLines, guardViolations, stripViolatingSentences } from './product-guard.mjs';
 import { logTokenUsage } from './token-log.mjs';
 
 const TONGDAI = '1900 23 23 49';
@@ -353,11 +354,14 @@ function hashStr(s, seed = 0) {
 // Sinh CẢ BA định dạng trong một lần gọi Gemini, trả JSON { article, social, video }.
 // avoid: các bài article đã đăng gần đây / cùng cụm từ khóa ({ title, opening }) — đưa vào
 // prompt để cấm lặp mở bài, khung bài, câu chữ (chống bài SEO na ná nhau, 23/9).
-export async function generateFormatsLLM(brief, facts = [], avoid = []) {
+export async function generateFormatsLLM(brief, facts = [], avoid = [], fixNote = '') {
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+  // 15/10 (bài web 070278db đã đăng viết "nước ngọt làm nặng tàu, tốn nhiên liệu"): đường blog chưa từng nhận luật SỰ
+  // THẬT NGHỀ như bài Facebook. Nay chèn guardLines theo từ khóa vào prompt, và quét sau khi sinh (generateAllFormats).
   const system = boundarySystem(facts) + '\n\n' + [
+    ...guardLines(brief.keyword),
     'Tạo ba phiên bản nội dung cho cùng một từ khóa:',
     '- article: bài website 350 tới 500 chữ, văn bản thường không markdown, các đoạn cách nhau một dòng trống, trả lời ý chính ngay đoạn đầu, dẫn về tổng đài ở cuối.',
     '- social: bài Facebook ngắn, hai tới bốn câu, một hook và một lời kêu gọi liên hệ.',
@@ -378,6 +382,7 @@ export async function generateFormatsLLM(brief, facts = [], avoid = []) {
     );
     for (const a of avoid) userParts.push(`- "${a.title}": ${a.opening}...`);
   }
+  if (fixNote) userParts.push(fixNote);
   const user = userParts.join('\n');
 
   const res = await genOnce(ai, {
@@ -404,13 +409,36 @@ export async function generateAllFormats(kw, { facts = [], avoid = [] } = {}) {
   const brief = buildBrief(kw);
   if (process.env.GEMINI_API_KEY) {
     try {
-      const f = await generateFormatsLLM(brief, facts, avoid);
+      // 15/10: quét SỰ THẬT NGHỀ cả 3 định dạng; dính thì sinh lại 1 lần kèm lời nhắc, vẫn dính thì CẮT câu sai và
+      // trả guard (generateForKw gắn cờ "Sai nghề", bài không tự đăng). Rồi đổi ký hiệu thay chữ, bỏ lời dặn lọt bài.
+      const scan = (x) => Object.fromEntries(['article', 'social', 'video'].map((k) => [k, guardViolations(x[k], brief.keyword)]));
+      let f = await generateFormatsLLM(brief, facts, avoid);
+      let viol = scan(f);
+      const all = Object.values(viol).flat();
+      if (all.length) {
+        console.warn('[content] blog sai nghe, sinh lai:', [...new Set(all.map((v) => v.phrase))].join(', '));
+        const note = `LẦN TRƯỚC VIẾT SAI NGHỀ, phải bỏ hẳn các ý: ${[...new Set(all.map((v) => `"${v.phrase}"`))].join(', ')}. ${all[0].why}`;
+        f = await generateFormatsLLM(brief, facts, avoid, note).catch(() => f);
+        viol = scan(f);
+      }
+      const guard = {};
+      const clean = {};
+      for (const k of ['article', 'social', 'video']) {
+        let d = String(f[k] || '');
+        if (viol[k].length) {
+          guard[k] = [...new Set(viol[k].map((v) => `${v.phrase} (${v.product})`))];
+          // Cắt theo từng dòng để giữ đoạn văn của bài website.
+          d = d.split('\n').map((line) => (line.trim() ? stripViolatingSentences(line, brief.keyword) : line)).join('\n');
+        }
+        clean[k] = sanitizePostText(d).text;
+      }
       const title = draftTitle(brief);
       return {
         brief: { ...brief, generator: 'gemini' },
-        article: { title, draft: f.article },
-        social: { title, draft: f.social },
-        video: { title, draft: f.video },
+        article: { title, draft: clean.article },
+        social: { title, draft: clean.social },
+        video: { title, draft: clean.video },
+        guard,
       };
     } catch (e) {
       console.warn('Gemini lỗi, lùi về bản mẫu:', e.message);
@@ -501,7 +529,8 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '', format
   logTokenUsage(client, 'creator_content_old', MKT_MODEL, res?.usageMetadata);
   const text = (res.text || '').trim();
   if (!text) throw new Error('Gemini trả về rỗng.');
-  return text;
+  // 15/10: ký hiệu thay chữ và lời dặn lọt bài, tất định như các đường sinh khác.
+  return sanitizePostText(text).text;
 }
 
 // Sinh nội dung, ưu tiên Gemini khi có khóa, không thì lùi về bản mẫu. Luôn trả draft dùng được.

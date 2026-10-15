@@ -158,7 +158,9 @@ export const COMPLIANCE_LABELS: Record<string, string> = {
   unverifiedSpecs: 'Thông số chưa xác nhận',
   testSpecs: 'Thông số test',
   style: 'Lỗi giọng văn',
-  domain: 'Sai nghề'
+  domain: 'Sai nghề',
+  // 15/10: máy đã bỏ câu model tự tính (số lệch nguồn, công thức) và chèn đoạn bài toán viết sẵn.
+  calc_removed: 'Đã bỏ câu tự tính'
 };
 
 // Thời gian tương đối, dễ đọc hơn mốc tuyệt đối. Cập nhật mỗi lần trang làm mới.

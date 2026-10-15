@@ -138,9 +138,11 @@ export async function generateForKw(
     const text = `${piece.title}\n${piece.draft}`;
     const assess: any = (assessDraft as any)(text, { knownFactValues: known, testFactValues: testVals });
     const style: string[] = (scanStyle as any)(text);
-    let risk = assess.risk === 'red' ? 'red' : assess.risk === 'amber' || style.length > 0 ? 'amber' : 'none';
+    // 15/10: câu sai nghề đã bị cắt ở generateAllFormats vẫn gắn cờ "Sai nghề" để người duyệt soi lại, không tự đăng.
+    const domain: string[] = all.guard?.[fmt.key] || [];
+    let risk = assess.risk === 'red' ? 'red' : assess.risk === 'amber' || style.length > 0 || domain.length > 0 ? 'amber' : 'none';
     if (opts.forceReview && risk !== 'red') risk = 'red';
-    const flagsAll = { ...assess.flags, style };
+    const flagsAll = { ...assess.flags, style, ...(domain.length ? { domain } : {}) };
     const autoBlog = fmt.key === 'article' && risk === 'none' && blogAutoPublishEnabled();
 
     const { data: inserted } = await client
