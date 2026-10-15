@@ -767,6 +767,8 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
   // 9/10 ĐỢT A: cụm tư liệu chính + cờ thiếu tư liệu (hết đoạn cùng việc, giữ khung cuối) cho người duyệt soi cảnh đó.
   const segBrief = {
     video_cluster: script.cluster || null,
+    // 15/10: cụm đang nghỉ vì clip đã lên nhiều video gần đây (đếm lặp clip thì soi cột này cùng video_cluster).
+    video_cluster_rested: script.clusterRested?.length ? script.clusterRested : null,
     video_segment_short: segmentShort.length ? segmentShort : null,
   };
   const title = redactExactPrices((script.titles && script.titles[0]) || content.title || 'Video SDVICO');

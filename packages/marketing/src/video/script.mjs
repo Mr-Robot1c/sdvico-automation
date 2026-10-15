@@ -5,7 +5,7 @@ import { knownFactValues, testFactValues } from '../product-facts.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from '../product-guard.mjs';
 import { logTokenUsage } from '../token-log.mjs';
 import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outroKeyword as outroKeywordOf } from '../products.mjs';
-import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen, hasSegments, pickClusterForVideo, pickInCluster, findProductSegment, allocateSceneSegments } from './scene-match.mjs';
+import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen, hasSegments, pickClusterForVideo, restingClusters, pickInCluster, findProductSegment, allocateSceneSegments } from './scene-match.mjs';
 import { sceneNeed } from './segments.mjs';
 import { segmentsEnabled, segKey } from './segments.mjs';
 import { EXTRA_WORN, absoluteClaims, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, paybackClaimSentences, keepOneQuestion } from './rules.mjs';
@@ -281,7 +281,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   // hình phải chứng minh đúng ý đó"): khi cảnh 1 KHÔNG bị ghim clip bắt buộc, CHỌN TRƯỚC tư liệu cảnh 1
   // từ kho nỗi đau rồi bắt lời cảnh 1 viết theo mô tả tư liệu đó (cùng cơ chế với clip bắt buộc).
   const hookPin = !opts.contentVideo && (mustRole === 'solution' || !opts.mustUseAssetId)
-    ? pickByRole(problemPool(assets, 'hook', opts.productGroup || null), 'hook', {}) || null
+    // 15/10: thêm recentUse — thiếu nó nên cảnh 1 video bán luôn là 498656cb (mọi video bán từ 4/10).
+    ? pickByRole(problemPool(assets, 'hook', opts.productGroup || null), 'hook', { recentUse: opts.recentUse || new Map() }) || null
     : null;
   if (hookPin) console.log(`Tư liệu cảnh 1 chọn trước (17/9 vòng 3): "${String(hookPin.title || '').slice(0, 60)}" (${String(hookPin.id).slice(0, 8)})`);
   // 17/9: mọi tỷ lệ phần trăm phải có trong BÀI NGUỒN hoặc thông số được phép (492313ac đọc "ngốn gần
@@ -965,13 +966,16 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   const salesSeg = !opts.contentVideo && !!opts.salesVideo;
   const modelCode = shownName ? (shownName.match(/[A-Za-z]{2,}-?\d+\w*/) || [])[0] : null;
   const productTerms = [shownName, modelCode].filter(Boolean);
-  const cluster = segOn ? pickClusterForVideo(rawScenes, assets, { contentVideo: !!opts.contentVideo, productGroup: segGroup, mustAssetId: mustForCluster, mustIdx: mustIdxScene, hasPriceScene: !!teaser }) : null;
+  const cluster = segOn ? pickClusterForVideo(rawScenes, assets, { contentVideo: !!opts.contentVideo, productGroup: segGroup, mustAssetId: mustForCluster, mustIdx: mustIdxScene, hasPriceScene: !!teaser, recentUse: opts.recentUse || new Map() }) : null;
+  // 15/10: cụm có clip đã lên >= 2 video gần đây thì nghỉ (pickPrimaryCluster bỏ qua), ghi ra để biết vì sao về đường cũ.
+  const clusterRested = segOn ? restingClusters(assets, opts.recentUse || new Map(), { mustAssetId: mustForCluster }) : [];
+  for (const r of clusterRested) console.log(`Cụm ${r.id} đang nghỉ (15/10): clip ${String(r.clipId).slice(0, 8)} đã lên ${r.max} video gần đây, xoay kho theo đường cũ.`);
   if (segOn && !opts.contentVideo && !cluster) {
     console.log('Video bán: không cụm nào đủ đoạn thấy rõ máy cho cảnh giải pháp + giá (A2.4), hình chọn như cũ (cảnh giải pháp/giá lấy hình sản phẩm)');
   } else if (segOn) {
     console.log(cluster
       ? `Cụm tư liệu chính (9/10): ${cluster.id} | ${cluster.confidence} | ${cluster.clipIds.length} clip | phủ ${cluster.covered}/${rawScenes.length} cảnh`
-      : 'Không cụm nào phủ >= 2 cảnh (9/10): chọn hình như cũ, clip có đoạn vẫn được cắt đúng đoạn.');
+      : `Không ${clusterRested.length ? 'còn cụm nào (ngoài cụm đang nghỉ)' : 'cụm nào'} phủ >= 2 cảnh (9/10): chọn hình như cũ, clip có đoạn vẫn được cắt đúng đoạn.`);
   }
   const picks = sbMode
     ? sbUse.map((a) => ({ assetId: a.id, fit: 10, why: 'storyboard: hình chốt trước, lời viết theo hình', by: 'storyboard' }))
@@ -1117,7 +1121,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
           const pp = findProductSegment(assets, priceScene, 'price', { prevId, usedSegKeys: used, usedCount, recentUse: opts.recentUse || new Map(), productGroup: segGroup });
           if (pp) { console.log(`[script] canh gia: dung doan thay ro may (${pp.segment.product_visible}${pp.segment.cut ? ', cat tu ' + pp.segment.start + 's' : ''}) cua "${String(assets.find((x) => x.id === pp.assetId)?.title || '').slice(0, 40)}"`); return pp.assetId; }
         }
-        return pickByRole(assets, 'closing', { prevId, usedCount, visual: priceVisual })?.id || null;
+        return pickByRole(assets, 'closing', { prevId, usedCount, visual: priceVisual, recentUse: opts.recentUse || new Map() })?.id || null;
       },
     });
     if (r.split) { vertical = r.scenes; console.log('[script] tach cau gia thanh canh rieng (17/9) de anh san pham khong dung qua lau'); }
@@ -1142,7 +1146,8 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
           const c = pickInCluster(cluster, assets, { role, visual, narration: '' }, role, { prevId, usedSegKeys: used, usedCount, recentUse: opts.recentUse || new Map(), productGroup: segGroup });
           if (c && c.assetId !== prevId) return c.assetId;
         }
-        return pickByRole(problemPool(assets, role, groupForPool), role, { prevId, usedCount, visual })?.id || null;
+        // 15/10: thêm recentUse — thiếu nó nên nửa sau cảnh tách luôn rơi vào cùng clip (7043bd1f lên 7 video content từ 4/10).
+        return pickByRole(problemPool(assets, role, groupForPool), role, { prevId, usedCount, visual, recentUse: opts.recentUse || new Map() })?.id || null;
       },
     });
     if (r.split) { vertical = r.scenes; console.log('[script] tach canh anh dai thanh 2 canh doi hinh (17/9)'); }
@@ -1188,6 +1193,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     titles, vertical, horizontal, assessment, sceneAssets, sceneMatch,
     rawScenes: rawScenesFinal,
     cluster: cluster ? { id: cluster.id, confidence: cluster.confidence, clipIds: cluster.clipIds, covered: cluster.covered } : null,
+    clusterRested,
     segmentReport,
   };
 }

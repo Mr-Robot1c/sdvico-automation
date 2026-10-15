@@ -281,11 +281,38 @@ export function clusterGroups(assets) {
   return m;
 }
 
+// 15/10 (Thanh: "dùng mấy clip cũ nhiều quá"): kho chỉ có MỘT cụm mang đoạn (19/9) nên từ 9/10 mọi video dính
+// cụm đó, 1ab6252a lên 7 video liền; recentUse chỉ xếp thứ tự TRONG cụm nên không cứu được. Nay cụm có clip đã lên
+// >= CLUSTER_WORN_USES video gần đây (cùng ngưỡng ép chọn lại của matchScenesToAssets) thì NGHỈ: pickPrimaryCluster
+// bỏ qua, video về đường cũ xoay kho theo recentUse. Clip bắt buộc không tính (tươi theo thiết kế). Cụm nguội dần
+// theo cửa sổ recentUse (12 video / 14 ngày) rồi tự được chọn lại.
+export const CLUSTER_WORN_USES = 2;
+export function clusterWear(clipIds, recentUse, mustAssetId = null) {
+  let max = 0;
+  let clipId = null;
+  for (const id of clipIds || []) {
+    if (id === mustAssetId) continue;
+    const n = recentUse?.get?.(id) || 0;
+    if (n > max) { max = n; clipId = id; }
+  }
+  return { max, clipId };
+}
+// Các cụm đang nghỉ (để caller ghi log / brief): [{ id, max, clipId }].
+export function restingClusters(assets, recentUse, { mustAssetId = null, wornUses = CLUSTER_WORN_USES } = {}) {
+  const out = [];
+  for (const g of clusterGroups(assets).values()) {
+    const w = clusterWear(g.clips.map((c) => c.id), recentUse, mustAssetId);
+    if (w.max >= wornUses) out.push({ id: g.id, ...w });
+  }
+  return out;
+}
+
 // Chọn MỘT cụm chính cho cả video. scenes: [{role, narration, visual}]. Một cảnh được cụm "phủ" khi trong cụm có
 // ít nhất một đoạn (của clip được phép cho vai cảnh đó theo problemPool) đủ liên quan. Cảnh mang clip bắt buộc
 // (mustAssetId ở mustIdx) tính là phủ nếu clip đó nằm trong cụm. Không cụm nào phủ >= 2 cảnh thì trả null
 // (đường cũ chạy nguyên). Hòa: cụm chứa clip bắt buộc, cụm chắc, tổng điểm, số clip, id (tất định).
-export function pickPrimaryCluster(scenes, assets, { productGroup = null, mustAssetId = null, mustIdx = 0, minRelevance = CLUSTER_MIN_RELEVANCE, onlyClusters = null } = {}) {
+// 15/10: cụm đã mòn (clusterWear >= wornUses theo recentUse) bị bỏ qua.
+export function pickPrimaryCluster(scenes, assets, { productGroup = null, mustAssetId = null, mustIdx = 0, minRelevance = CLUSTER_MIN_RELEVANCE, onlyClusters = null, recentUse = new Map(), wornUses = CLUSTER_WORN_USES } = {}) {
   const list = Array.isArray(scenes) ? scenes : [];
   if (!list.length) return null;
   const pools = list.map((_, i) => new Set(problemPool(assets, sceneRole(list, i), productGroup).map((a) => a.id)));
@@ -293,6 +320,7 @@ export function pickPrimaryCluster(scenes, assets, { productGroup = null, mustAs
   for (const g of clusterGroups(assets).values()) {
     if (g.clips.length < 2) continue;
     if (onlyClusters && !onlyClusters.has(g.id)) continue;
+    if (clusterWear(g.clips.map((c) => c.id), recentUse, mustAssetId).max >= wornUses) continue;
     let covered = 0;
     let total = 0;
     const hasMust = !!mustAssetId && g.clips.some((c) => c.id === mustAssetId);
@@ -342,8 +370,8 @@ export function countProductSegments(clips, usedSegKeys = new Set()) {
   }
   return n;
 }
-export function pickClusterForVideo(scenes, assets, { contentVideo = false, productGroup = null, mustAssetId = null, mustIdx = 0, hasPriceScene = false } = {}) {
-  if (contentVideo) return pickPrimaryCluster(scenes, assets, { productGroup, mustAssetId, mustIdx });
+export function pickClusterForVideo(scenes, assets, { contentVideo = false, productGroup = null, mustAssetId = null, mustIdx = 0, hasPriceScene = false, recentUse = new Map() } = {}) {
+  if (contentVideo) return pickPrimaryCluster(scenes, assets, { productGroup, mustAssetId, mustIdx, recentUse });
   const list = Array.isArray(scenes) ? scenes : [];
   const needScenes = list.filter((_, i) => sceneRole(list, i) === 'solution').length + (hasPriceScene ? 1 : 0);
   if (needScenes < 1) return null;
@@ -352,7 +380,7 @@ export function pickClusterForVideo(scenes, assets, { contentVideo = false, prod
     if (g.clips.length >= 2 && countProductSegments(g.clips) >= needScenes) eligible.add(g.id);
   }
   if (!eligible.size) return null;
-  return pickPrimaryCluster(list, assets, { productGroup, mustAssetId, mustIdx, onlyClusters: eligible });
+  return pickPrimaryCluster(list, assets, { productGroup, mustAssetId, mustIdx, onlyClusters: eligible, recentUse });
 }
 
 // Chọn (clip, đoạn) tốt nhất TRONG cụm cho một cảnh; null khi không còn đoạn nào hợp (caller mới được lấy ngoài cụm).
@@ -623,7 +651,7 @@ export async function matchScenesToAssets({ ai, generate, model, scenes, assets,
   const segOn = !!useSegments && assets.some(hasSegments);
   const clusterSel = !segOn ? null
     : cluster !== undefined ? cluster
-      : pickPrimaryCluster(scenes, assets, { productGroup, mustAssetId: mustUseAssetId && ids.has(mustUseAssetId) ? mustUseAssetId : null, mustIdx });
+      : pickPrimaryCluster(scenes, assets, { productGroup, mustAssetId: mustUseAssetId && ids.has(mustUseAssetId) ? mustUseAssetId : null, mustIdx, recentUse });
   const usedSegKeys = new Set();
   let modelPicks = [];
   if (assets.length && scenes.length) {

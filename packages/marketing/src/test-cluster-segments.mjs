@@ -3,6 +3,7 @@
 import {
   matchScenesToAssets, pickPrimaryCluster, pickClusterForVideo, pickInCluster, allocateSceneSegments, refinePicksByImagery,
   hasSegments, chooseSegment, clusterGroups, findProductSegment, countProductSegments,
+  clusterWear, restingClusters, CLUSTER_WORN_USES,
 } from './video/scene-match.mjs';
 import {
   normalizeSegments, parseTime, planSceneSegments, fillShortPieces, segmentsEnabled, estimateSpeechSec, segKey,
@@ -78,12 +79,28 @@ const keys = picks.map((p) => segKey(p.segment.assetId, p.segment.idx));
 check(new Set(keys).size === 3, 'mỗi cảnh một đoạn riêng, không chiếu lại cùng một đoạn');
 
 console.log('5. Chống lặp / recentUse KHÔNG đá pick trong cụm ra ngoài cụm');
-const recent = new Map([['A1', 9], ['A2', 9], ['A3', 9]]);
+// 15/10: cụm có clip >= CLUSTER_WORN_USES video gần đây thì nghỉ (mục 5b); dưới ngưỡng recentUse vẫn chỉ xếp thứ tự trong cụm.
+const recent = new Map([['A1', 1], ['A2', 1], ['A3', 1]]);
 const pRecent = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: solScenes, assets: all, productGroup: G, recentUse: recent, useSegments: true, log: silent });
-check(pRecent.every((p) => p.by === 'cluster'), 'cả cụm đã lên nhiều video gần đây vẫn ở trong cụm (recentUse chỉ xếp thứ tự)');
+check(pRecent.every((p) => p.by === 'cluster'), 'cụm mới lên 1 video gần đây vẫn ở trong cụm (recentUse dưới ngưỡng chỉ xếp thứ tự)');
 const modelOut = async () => ({ text: JSON.stringify({ picks: solScenes.map((_, i) => ({ scene: i + 1, asset_id: 'O1', fit: 10, why: 'máy chạy' })) }) });
 const pModelOut = await matchScenesToAssets({ ai: null, generate: modelOut, model: 'x', scenes: solScenes, assets: all, productGroup: G, useSegments: true, log: silent });
 check(pModelOut.every((p) => p.by === 'cluster' && p.assetId !== 'O1'), 'model chọn clip ngoài cụm (fit 10) vẫn bị cụm thắng khi trong cụm còn đoạn hợp');
+console.log('5b. Cụm đã mòn thì nghỉ, về đường cũ xoay kho (15/10, kho chỉ có cụm 19/9 nên mọi video dính cụm)');
+const worn = new Map([['A1', 7], ['A2', 1]]);
+check(clusterWear(['A1', 'A2', 'A3'], worn).max === 7 && clusterWear(['A1', 'A2', 'A3'], worn).clipId === 'A1', 'clusterWear lấy clip lên nhiều video nhất trong cụm');
+const onlyA = [A1, A2, A3, O1, O2]; // kho chỉ có MỘT cụm, như kho thật 15/10
+check(pickPrimaryCluster(solScenes, onlyA, { productGroup: G, recentUse: worn }) === null, 'kho một cụm, cụm A có clip lên 7 video -> nghỉ -> null (đường cũ)');
+check(pickPrimaryCluster(solScenes, all, { productGroup: G, recentUse: worn })?.id === 'cl-B', 'còn cụm khác phủ được cảnh thì chuyển sang cụm đó, không quay lại cụm mòn');
+check(pickPrimaryCluster(solScenes, onlyA, { productGroup: G, recentUse: new Map([['A1', CLUSTER_WORN_USES - 1]]) })?.id === 'cl-A', 'dưới ngưỡng mòn: cụm A vẫn được chọn');
+check(pickPrimaryCluster(solScenes, onlyA, { productGroup: G, recentUse: worn, mustAssetId: 'A1', mustIdx: 0 })?.id === 'cl-A', 'clip bắt buộc không tính vào độ mòn của cụm');
+const restA = restingClusters(all, worn);
+check(restA.length === 1 && restA[0].id === 'cl-A' && restA[0].max === 7, 'restingClusters báo cụm A đang nghỉ kèm số video');
+const pWorn = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: solScenes, assets: onlyA, productGroup: G, recentUse: worn, useSegments: true, log: silent });
+check(pWorn.every((p) => p?.by !== 'cluster'), `cụm nghỉ: không cảnh nào chọn theo cụm (${pWorn.map((p) => p?.by).join(',')})`);
+check(pWorn.filter((p) => p?.assetId === 'A1').length === 0, 'clip mòn A1 không lên cảnh nào khi kho còn tư liệu khác');
+check(pickClusterForVideo(solScenes, onlyA, { contentVideo: true, productGroup: null, recentUse: worn }) === null, 'pickClusterForVideo (content) cũng nghỉ cụm mòn');
+
 const twoClip = [A1, A2, O1];
 const pPrev = await matchScenesToAssets({ ai: null, generate: failing, model: 'x', scenes: solScenes, assets: twoClip, productGroup: G, useSegments: true, log: silent });
 check(pPrev.filter((p) => p.by === 'cluster').length === 3 && pPrev.every((p) => p.assetId !== 'O1'), 'chỉ 2 clip trong cụm, 3 cảnh (4 đoạn): cảnh liền nhau cùng clip khác đoạn vẫn ở trong cụm');
