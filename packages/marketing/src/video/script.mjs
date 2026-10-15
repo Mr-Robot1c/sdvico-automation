@@ -8,7 +8,7 @@ import { getPriceTeaser, publicName, redactExactPrices, ensureSpokenTeaser, outr
 import { matchScenesToAssets, assetListForPrompt, visualOverlap, pickByRole, problemPool, refinePicksByImagery, extractFirstJson, pickStoryboard, storyboardDriftKeChuyen, hasSegments, pickClusterForVideo, restingClusters, pickInCluster, findProductSegment, allocateSceneSegments } from './scene-match.mjs';
 import { sceneNeed } from './segments.mjs';
 import { segmentsEnabled, segKey } from './segments.mjs';
-import { EXTRA_WORN, absoluteClaims, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, paybackClaimSentences, keepOneQuestion } from './rules.mjs';
+import { EXTRA_WORN, absoluteClaims, crossProductTerms, crossProductViolations, unsourcedPercents, stripSentencesWith, splitPriceScene, splitLongImageScenes, outroText, hookProductTerm, wordsBeforeSolution, trimEarlyScenes, breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, paybackClaimSentences, keepOneQuestion, timeClaimSentences, stripTimeClaims, mergeIntoMustScene } from './rules.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
 // 10/9 tối (2 lượt CI liên tiếp sinh kịch bản bài 3826e7f9 dính 500 INTERNAL từ flash-lite, cùng lúc
@@ -318,17 +318,18 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       open: 'mở bằng MỘT CÂU NÓI TRỰC TIẾP của người trong clip theo bài nguồn (đặt trong ngoặc kép, không bịa tên; không có tên thì gọi "chú", "anh thợ máy", "bác tài công"), rồi 1 câu ai vừa nói câu đó',
       close: 'kết bằng LỜI NHẮN của chính người đó gửi anh em đi biển, câu cảm, KHÔNG câu hỏi' },
     { key: 'con-so', label: 'Con số thật',
-      open: 'mở bằng MỘT CON SỐ có trong bài nguồn (ngày, chuyến, lít, năm nghề), 1 câu ngắn, rồi 1 câu con số đó đổi lấy cái gì; không có con số trong bài thì dùng mốc thời gian (bao nhiêu năm, mấy giờ sáng)',
+      open: 'mở bằng MỘT CON SỐ có trong bài nguồn (ngày, chuyến, lít, năm nghề), 1 câu ngắn, rồi 1 câu con số đó đổi lấy cái gì; không có con số trong bài thì dùng số năm nghề hoặc số chuyến có trong bài. KHÔNG tự đặt giờ giấc ("5 giờ sáng", "rạng sáng") khi bài nguồn và mô tả clip không ghi',
       close: 'kết bằng câu đố nhẹ: mời bà con bình luận con số của tàu mình (bao nhiêu ngày, bao nhiêu chuyến)' },
     { key: 'truoc-sau', label: 'Trước và sau',
-      open: 'mở bằng HAI THỜI ĐIỂM đối lập trong cùng 1 câu (lúc ra khơi / lúc về bến, sáng / chiều, ngày xưa / bây giờ), rồi 1 câu cái gì đổi khác giữa hai lúc đó',
+      open: 'mở bằng HAI THỜI ĐIỂM đối lập trong cùng 1 câu (lúc ra khơi / lúc về bến, ngày xưa / bây giờ; giờ hay buổi trong ngày chỉ dùng khi bài nguồn hoặc mô tả clip có ghi), rồi 1 câu cái gì đổi khác giữa hai lúc đó',
       close: 'kết bằng 1 câu hỏi "tàu bà con đang ở đoạn nào", hoặc câu cảm ngắn về đoạn sau' },
     { key: 'nhip-nhanh', label: 'Nhịp nhanh câu ngắn',
       open: 'mở bằng ĐỘNG TỪ, câu 4 tới 7 chữ, 3 câu liên tiếp như đếm nhịp (siết. kiểm. nổ máy.), không câu nào quá 8 chữ trong cảnh đầu',
       close: 'kết bằng 1 câu cảm ngắn có dấu chấm than về nghề, KHÔNG câu hỏi, KHÔNG lời chúc' },
     { key: 'tam-su', label: 'Tâm sự chậm',
       // 17/9 vòng 3: ví dụ cũ "sáng sớm sương chưa tan" đã vào danh sách cấm (model chép y nguyên) -> đổi ví dụ.
-      open: 'mở bằng THỜI ĐIỂM TRONG NGÀY và một hình ảnh tĩnh (chiều muộn ở cảng, sáng tinh mơ trên bến), giọng kể chậm, câu 8 tới 12 chữ',
+      // 15/10: kiểu này từng ép model đặt buổi trong ngày dù clip không ghi (Điều cấm 5) — buổi chỉ dùng khi nguồn có.
+      open: 'mở bằng MỘT HÌNH ẢNH TĨNH có trong clip (con tàu nằm yên ở bến, kiện hàng xếp sẵn), thời điểm trong ngày CHỈ nói khi bài nguồn hoặc mô tả clip có ghi, giọng kể chậm, câu 8 tới 12 chữ',
       // 17/9 (ChatGPT: "chúc thuận buồm xuôi gió, đầy ắp khoang" = lời chúc fanpage, không phải người kể):
       // bỏ kiểu kết lời chúc, kết bằng chi tiết thật của người trong clip.
       close: 'kết bằng 1 câu cảm ngắn về ĐIỀU NGƯỜI TRONG CLIP đang làm hoặc vừa làm xong (bàn tay, cái máy, con tàu), KHÔNG lời chúc chung chung, không câu hỏi, không kêu gọi' },
@@ -386,6 +387,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   const sbEnabled = String(process.env.VIDEO_STORYBOARD || 'off').toLowerCase() === 'on';
   const sb = (opts.contentVideo && sbEnabled) ? pickStoryboard(assets, { mustAsset: sbMustAsset, recentUse: opts.recentUse || new Map(), productGroup: null }) : null;
   const sbMode = !!(sb && sb.length);
+  // 15/10 (bài 492b8992): bài content viết từ chính clip bắt buộc (build-video: brief.content_clip_id = clip bắt buộc) thì
+  // mọi cảnh giữa đều kể tiếp clip đó — gộp vào cảnh clip bắt buộc sau khi sinh (mergeIntoMustScene), cảnh kết giữ riêng.
+  const mergeMust = !!(opts.contentVideo && opts.mustIsSource && sbMustAsset && mustRole === 'hook' && !sbMode);
   const sbDesc = (a) => String(a.description || a.title || '').replace(/\s+/g, ' ').trim().slice(0, 400);
   if (sbMode) {
     console.log(`Storyboard video content (1/10): ${sb.length} hình chốt trước: ${sb.map((a, i) => `${i + 1}) ${a.kind} "${String(a.title || '').slice(0, 40)}" (${String(a.id).slice(0, 8)})`).join(' | ')}`);
@@ -416,6 +420,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     'CẤM bịa model và thông số. Chỉ nêu thông số có trong danh sách được phép; không có thì nói chung chung.',
     'MỐC THU HỒI VỐN (3/10 vòng 4, Điều cấm 5): thời gian thu hồi vốn chỉ được nói ĐÚNG như bài nguồn. Bài nói "sau một năm" thì không được viết "vài chuyến là thu hồi vốn".',
     'CẤM mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO; chỉ nói phân phối, lắp đặt, tương thích.',
+    'MỐC GIỜ GIẤC (15/10, Điều cấm 5): KHÔNG tự đặt giờ hay buổi ("5 giờ sáng", "đúng 6 giờ", "rạng sáng", "nửa đêm", "chiều tà") khi bài nguồn và mô tả tư liệu không ghi đúng mốc đó. Hệ thống sẽ tự bỏ mốc bịa.',
     sbMode ? sbPinLine : 'MỖI CẢNH ghi field "visual" = HÌNH CẦN THẤY cho cảnh đó (1 câu cụ thể). Cảnh vấn đề (hook/empathy/story) hình phải là cảnh cũ/hư/cặn/nước đục/thợ đang sửa/tàu thật/khoang máy, KHÔNG phải sản phẩm mới bóng; cảnh giải pháp (solution/reward/closing) mới tới hình sản phẩm, lắp đặt, máy chạy. Field "asset_id" chỉ là GỢI Ý (tuỳ chọn) chọn từ danh sách theo MÔ TẢ tư liệu; máy sẽ khớp lại hình theo "visual" sau khi bạn viết xong.',
     // 17/9 (Thanh xem bài 8c8347a4: lời mở "cảng cá sương mờ" nhưng clip bắt buộc là nhân viên
     // văn phòng): kịch bản phải BIẾT clip quay gì và viết cảnh đầu THEO clip, không tả cảnh tự bịa.
@@ -472,7 +477,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       ? [
           'ĐÂY LÀ VIDEO CỘNG ĐỒNG 30-45 giây. CHÍNH XÁC 3 CẢNH, role LẦN LƯỢT: "hook", "story", "closing". KHÔNG thêm, KHÔNG bớt, KHÔNG lặp role.',
           `CẢNH 1 role="hook" (8-12s, ~25-35 từ): theo KIỂU KỂ "${STYLE.label}" ở trên (${STYLE.open}).`,
-          'CẢNH 2 role="story" (15-20s, ~45-60 từ): chuyện người thật, việc thật, cảm xúc thật theo bài nguồn.',
+          mergeMust
+            ? 'CẢNH 2 role="story" (8-10s, ~20-28 từ): kể tiếp ĐÚNG việc trong clip bắt buộc (cảnh này chiếu tiếp clip đó), cảm xúc thật theo bài nguồn.'
+            : 'CẢNH 2 role="story" (15-20s, ~45-60 từ): chuyện người thật, việc thật, cảm xúc thật theo bài nguồn.',
           `CẢNH 3 role="closing" (6-10s, ~20-30 từ): ${STYLE.close}. Không giá, không gọi, không nhắn Page.`,
         ]
       : short
@@ -625,9 +632,22 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   let hookRepair = []; // 3/10 vòng 2: hook video bán mở bằng chuyện sửa máy chung chung (câu dính)
   let cameraTalk = []; // 3/10 vòng 3: lời đọc tả góc quay / tư liệu dựng ("Góc rộng lộ diện...", "Cảnh nhộn nhịp...") ở MỌI nhánh trừ storyboard
   let paybackClaim = []; // 3/10 vòng 4: câu thu hồi vốn đôn mốc nhanh hơn bài nguồn ("vài chuyến là thu hồi vốn" khi bài nói sau một năm)
+  let timeClaim = []; // 15/10: câu có mốc giờ/buổi không có trong bài nguồn hay mô tả tư liệu đã ghim cho cảnh ("Mới 5 giờ sáng" bài 492b8992)
   // 17/9: clip bắt buộc cảnh 1 — kịch bản mở màn không ăn nhập nội dung clip thì sinh lại 1 lần.
   const mustAsset = opts.mustUseAssetId ? assets.find((a) => a.id === opts.mustUseAssetId) : null;
   let mustMiss = false;
+  // 15/10: nguồn được phép cho mốc giờ/buổi của cảnh si khi hình chưa ghép: bài nguồn + tư liệu đã ghim cho cảnh đó.
+  const timeSourceForScene = (si, scs) => {
+    let pinned = null;
+    if (sbMode) pinned = sb[si] || null;
+    else if (mustAsset) {
+      const k = scs.findIndex((s) => String(s?.role || '').toLowerCase() === 'solution');
+      const mi = mustRole === 'solution' ? (k >= 0 ? k : scs.length - 1) : 0;
+      if (si === mi || (mergeMust && si > 0 && si < scs.length - 1)) pinned = mustAsset;
+    }
+    if (!pinned && hookPin && si === 0) pinned = hookPin;
+    return `${sourceText}\n${pinned ? assetTextOf(pinned) : ''}`;
+  };
   let storyboardMiss = []; // 1/10: cảnh có lời lệch hình đã chốt trước (chỉ nhánh content storyboard-first)
   let storyboardCountMiss = false;
   let sbChatter = []; // 2/10: cảnh giữa bài có câu hỏi giao lưu kiểu "...phải không?" (chỉ cảnh cuối được hỏi)
@@ -665,7 +685,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       + (!cameraTalk.length ? '' :
       `\n\nLẦN TRƯỚC LỜI ĐỌC TẢ GÓC QUAY/TƯ LIỆU DỰNG: ${cameraTalk.map((p) => `"${p.slice(0, 80)}"`).join(', ')} — người xem không cần biết góc máy; kể chuyện cho ngư dân nghe, không thuyết minh thước phim. Viết lại các câu đó thành lời kể về nghề, tiền, rủi ro theo bài nguồn.`)
       + (!paybackClaim.length ? '' :
-      `\n\nLẦN TRƯỚC LỜI VIẾT ${paybackClaim.map((p) => `"${p.slice(0, 80)}"`).join(', ')} — bài nguồn không nói thu hồi vốn nhanh vậy. Mốc thời gian thu hồi vốn phải ĐÚNG như bài nguồn, không tự đôn nhanh lên.`);
+      `\n\nLẦN TRƯỚC LỜI VIẾT ${paybackClaim.map((p) => `"${p.slice(0, 80)}"`).join(', ')} — bài nguồn không nói thu hồi vốn nhanh vậy. Mốc thời gian thu hồi vốn phải ĐÚNG như bài nguồn, không tự đôn nhanh lên.`)
+      + (!timeClaim.length ? '' :
+      `\n\nLẦN TRƯỚC LỜI ĐỌC TỰ ĐẶT MỐC GIỜ/BUỔI: ${timeClaim.map((p) => `"${p.slice(0, 80)}"`).join(', ')} — bài nguồn và mô tả clip không ghi mốc đó. Viết lại câu đó KHÔNG có giờ hay buổi trong ngày, mở bằng chính việc trong clip.`);
     const res = await generateWithRetry(ai, {
       model: MKT_MODEL,
       contents: user + extra,
@@ -722,6 +744,12 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     paybackClaim = [];
     for (const sc of parsed.vertical?.scenes || []) paybackClaim.push(...paybackClaimSentences(sc?.narration || '', sourceText));
     if (paybackClaim.length) console.warn(`[script] cau thu hoi von don moc nhanh hon bai nguon (lan ${attempt + 1}): ${paybackClaim.map((p) => p.slice(0, 60)).join(' | ')} — sinh lai theo moc cua bai.`);
+    // 15/10: mốc giờ/buổi bịa, quét mọi cảnh, mọi nhánh. Lúc này hình chỉ biết chắc ở cảnh ghim (clip bắt buộc, hookPin,
+    // storyboard) nên nguồn = bài nguồn + mô tả tư liệu ghim của cảnh đó; cảnh tự do so với bài nguồn. Sinh lại vẫn sót
+    // thì bước tất định timeGuard (sau ghép hình) bỏ mốc theo đúng tư liệu của cảnh.
+    timeClaim = [];
+    for (const [si, sc] of (parsed.vertical?.scenes || []).entries()) timeClaim.push(...timeClaimSentences(sc?.narration || '', timeSourceForScene(si, parsed.vertical?.scenes || [])));
+    if (timeClaim.length) console.warn(`[script] loi doc tu dat moc gio/buoi khong co trong nguon (lan ${attempt + 1}): ${timeClaim.map((p) => p.slice(0, 60)).join(' | ')} — sinh lai khong co gio.`);
     hookPinMiss = false;
     if (hookPin) {
       const first = (parsed.vertical?.scenes || [])[0];
@@ -739,7 +767,9 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     if (mustAsset) {
       // 17/9 chiều: so với cảnh mang clip bắt buộc (cảnh 1, hoặc cảnh giải pháp khi clip là máy đang chạy).
       const scs = parsed.vertical?.scenes || [];
-      const target = mustRole === 'solution' ? (scs.find((s) => String(s?.role || '').toLowerCase() === 'solution') || scs[scs.length - 1]) : scs[0];
+      let target = mustRole === 'solution' ? (scs.find((s) => String(s?.role || '').toLowerCase() === 'solution') || scs[scs.length - 1]) : scs[0];
+      // 15/10: cảnh giữa sẽ gộp vào cảnh clip bắt buộc nên lời của chúng cũng phải bám mô tả clip.
+      if (target && mergeMust && scs.length >= 3) target = { visual: target.visual, narration: scs.slice(0, -1).map((s) => s?.narration || '').join(' ') };
       if (target) {
         const ov = visualOverlap(`${target.visual || ''} ${target.narration || ''}`, mustAsset);
         // 17/9 vòng 9: cảnh gắn clip bắt buộc cũng soát lời trôi khỏi hình (video cộng đồng 8c8347a4 đọc
@@ -776,7 +806,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       if (storyboardCountMiss) console.warn(`[script] storyboard: model tra ${scs.length} canh, can DUNG ${sb.length} (lan ${attempt + 1}) — sinh lai.`);
       for (const m of storyboardMiss) console.warn(`[script] storyboard: canh ${m.scene} khong an nhap hinh chot truoc "${String(m.asset?.title || '').slice(0, 50)}" (${m.reason}, lan ${attempt + 1})${m.sentences.length ? ` — cau: "${m.sentences[0].slice(0, 60)}"` : ''} — sinh lai theo mo ta hinh.`);
     }
-    if (!viol.length && !worn.length && !mustMiss && !storyboardMiss.length && !sbChatter.length && !sbDescMiss.length && !storyboardCountMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate && !painSelf.length && !hookRepair.length && !cameraTalk.length && !paybackClaim.length) break;
+    if (!viol.length && !worn.length && !mustMiss && !storyboardMiss.length && !sbChatter.length && !sbDescMiss.length && !storyboardCountMiss && !cross.length && !pct.length && !hookMiss && !hookPinMiss && !solutionLate && !painSelf.length && !hookRepair.length && !cameraTalk.length && !paybackClaim.length && !timeClaim.length) break;
   }
   // 17/9 vòng 9: bẻ câu 30-40 từ nối bằng dấu phẩy thành câu ngắn TRƯỚC mọi đường cắt — câu khổng lồ
   // làm cắt-cụm-cấm rỗng cả cảnh (bị khôi phục nguyên cụm cấm) và làm tách-cảnh-dài bất lực (ảnh đứng
@@ -936,6 +966,15 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
       return { role, narration, visual, hint };
     })
     .filter((s) => s.narration);
+  // 15/10 (bài 492b8992, cảnh story đọc "kiểm tra từng lớp nilon" trên clip ngư dân ở cảng): bài viết từ chính clip bắt
+  // buộc thì cảnh giữa gộp vào cảnh clip đó, clip gánh cả hook lẫn story. Chọn cách này thay vì bắt lời cảnh giữa viết lại
+  // theo hình riêng: điều kiện là dữ kiện tất định (content_clip_id = clip bắt buộc), không phải phán đoán nghĩa, và kho
+  // không có hình nào khác cùng việc nên viết theo hình riêng là ghép thuyết minh ảnh rời (lỗi 1-2/10).
+  if (mergeMust && rawScenes.length >= 3) {
+    const r = mergeIntoMustScene(rawScenes);
+    rawScenes.splice(0, rawScenes.length, ...r.scenes);
+    console.log(`[script] bai viet tu chinh clip bat buoc: gop ${r.merged} canh giua vao canh clip "${String(mustAsset.title || '').slice(0, 50)}" (15/10)${r.dropped.length ? `, bo ${r.dropped.length} cau vuot ~18 giay: "${r.dropped[0].slice(0, 60)}"` : ''}`);
+  }
   // 1/10: chỉ số cảnh mang clip bắt buộc — dùng chung cho matchScenesToAssets và bước soát sau ghép.
   const mustIdxScene = mustRole === 'solution' ? Math.max(0, (() => { const k = rawScenes.findIndex((s) => s.role === 'solution'); return k >= 0 ? k : rawScenes.length - 1; })()) : 0;
   // 1/10: storyboard-first — hình đã chốt TRƯỚC khi viết lời nên KHÔNG ghép lại (không matchScenesToAssets,
@@ -1032,6 +1071,27 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   if (hookPin && vertical.length && vertical[0].matchBy !== 'must') {
     vertical[0] = { ...vertical[0], assetId: hookPin.id, matchBy: 'hook-pin', why: 'tư liệu cảnh 1 chọn trước, lời viết theo hình (17/9 vòng 3)' };
   }
+  // 15/10 (bài 492b8992 đọc "Đúng 6 giờ sáng" / "Mới 5 giờ sáng", clip không có giờ — Điều cấm 5): chốt TẤT ĐỊNH, MỌI
+  // nhánh video. Đặt sau mọi bước sinh / viết lại lời (vòng sinh, soát hình cắt câu, soát nghĩa viết lại, storyboard, dựng
+  // lại từ kịch bản ghi sẵn) và khi tư liệu từng cảnh đã chốt: mốc giờ/buổi không có trong tiêu đề, bài nguồn hay mô tả
+  // tư liệu của CHÍNH cảnh đó thì bỏ mốc (stripTimeClaims). Gọi lại sau khi tách cảnh vì nửa sau đổi sang tư liệu khác.
+  const timeGuard = (list, when) => {
+    for (const [i, s] of list.entries()) {
+      const a = assets.find((x) => x.id === s.assetId);
+      const src = `${sourceText}\n${a ? assetTextOf(a) : ''} ${s.segment?.assetId === s.assetId ? s.segment.text || '' : ''}`;
+      const hits = timeClaimSentences(s.narration, src);
+      if (!hits.length) continue;
+      const next = stripTimeClaims(s.narration, src);
+      if (next.trim()) {
+        console.warn(`[script] canh ${i + 1}${when}: bo moc gio/buoi khong co trong nguon hay mo ta tu lieu: "${hits[0].slice(0, 60)}" -> "${next.slice(0, 80)}"`);
+        s.narration = next;
+      } else {
+        console.warn(`[script] canh ${i + 1}${when}: moc gio/buoi bia nhung bo di se rong canh — giu nguyen, can soi tay.`);
+        s.why = `${s.why || ''} | CẢNH BÁO: lời có mốc giờ/buổi không có trong nguồn ("${hits[0].slice(0, 60)}")`.slice(0, 220);
+      }
+    }
+  };
+  timeGuard(vertical, '');
   // 3/10 vòng 2 (F1, tất định, MỌI nhánh video): câu "tiết kiệm / giảm ... X%" chưa có điều kiện thì tự thêm
   // "có thể" + ", tùy tình trạng máy". Đặt SAU mọi bước sinh/viết lại lời, nên phụ đề (lấy từ narration) tự khớp.
   for (const [i, s] of vertical.entries()) {
@@ -1152,6 +1212,7 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
     });
     if (r.split) { vertical = r.scenes; console.log('[script] tach canh anh dai thanh 2 canh doi hinh (17/9)'); }
   }
+  timeGuard(vertical, ' (sau tach canh)');
   // 9/10 ĐỢT A: gán đoạn chính + đoạn nối thêm cho từng cảnh khi danh sách cảnh đã chốt hẳn (sau ghim cảnh 1, tách cảnh).
   let segmentReport = null;
   if (segOn) {

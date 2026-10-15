@@ -1053,7 +1053,8 @@ async function main() {
     content,
     assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, label: clipLabel(a), description: a.description || '', folder: a.product_group || '', fresh: /MỚI/.test(clipLabel(a)), segments: Array.isArray(a.segments) && a.segments.length ? a.segments : null, shoot_cluster: a.shoot_cluster || null })),
     PRODUCT_FACTS,
-    { short: isShort, productGroup, salesVideo, mustUseAssetId, mustUseRole, contentVideo, recentUse, reuseScript },
+    // 15/10: mustIsSource = bài viết từ chính clip bắt buộc (topic chỉ kể clip đó) -> script gộp cảnh giữa vào cảnh clip.
+    { short: isShort, productGroup, salesVideo, mustUseAssetId, mustUseRole, contentVideo, recentUse, reuseScript, mustIsSource: !!mustUseAssetId && mustUseAssetId === brief.content_clip_id },
     _tokenLogClient
   );
   console.log('Tư liệu dùng trong cảnh:', (script.sceneAssets || []).map((id) => id.slice(0, 8)).join(', '));

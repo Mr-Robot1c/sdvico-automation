@@ -573,6 +573,167 @@ export function paybackClaimSentences(text, sourceText) {
   return out;
 }
 
+// 15/10 (Thanh xem bài 492b8992 "Kiện hàng chuẩn bị lên đường ra khơi": bản CI đọc "Đúng 6 giờ sáng", bản dựng lại
+// đọc "Mới 5 giờ sáng", trong khi mô tả clip bắt buộc không có giờ nào, Điều cấm 5): lời đọc không được TỰ ĐẶT MỐC GIỜ
+// hay BUỔI. Kiểu kể "Con số thật" còn dặn model "dùng mốc thời gian (mấy giờ sáng)" và bài học 3/10 là model phớt lờ lời
+// dặn, nên đây là chốt máy. Bắt hai loại mốc:
+//  - GIỜ ĐỒNG HỒ: số (chữ số hoặc chữ "năm", "sáu"...) + "giờ"/"h"/"5:30", có buổi đi sau ("5 giờ sáng") hoặc có
+//    "lúc"/"đúng" đứng trước ("đúng 6 giờ"). "Chạy 2 giờ là đầy bồn" (khoảng thời gian) không bị bắt.
+//  - BUỔI CỤ THỂ: cụm chốt một lúc trong ngày (rạng sáng, sáng sớm, bình minh, buổi trưa, chiều tà, hoàng hôn, buổi tối,
+//    chập tối, nửa đêm, đêm khuya, sáng nay, tối qua...). Chữ trần "sáng", "tối", "chiều" KHÔNG bắt vì nhiều nghĩa khác
+//    (áo sáng màu, quần tối màu, chiều dài), "ban đêm" / "cả đêm" là chuyện chung của nghề, không phải mốc.
+// Mốc được tha khi NGUỒN có đúng mốc đó: giờ phải trùng số, buổi phải trùng buổi ("lúc tối" khớp mô tả "vào buổi tối").
+// Nguồn = tiêu đề + bài nguồn + mô tả tư liệu của chính cảnh đó (người gọi ghép). So có dấu (gấp không dấu thì "tối"
+// đụng "tới", "tôi"); nguồn viết hẳn không dấu (mô tả cũ) thì so bản không dấu.
+const HOUR_WORDS = { 'mười một': 11, 'mười hai': 12, 'mười': 10, 'một': 1, 'hai': 2, 'ba': 3, 'bốn': 4, 'tư': 4, 'năm': 5, 'sáu': 6, 'bảy': 7, 'tám': 8, 'chín': 9 };
+// "mấy giờ sáng" cũng chốt buổi: giờ không rõ thì chỉ so buổi.
+const HOUR_NUM = `(\\d{1,2}|${Object.keys(HOUR_WORDS).join('|')}|mấy)`;
+const DAY_PART = '(sáng|trưa|chiều|tối|đêm|khuya)';
+const TIME_PREFIX = '(?:(?:ngay\\s+)?(?:từ|lúc|vào|đúng|mới|tầm|khoảng|chừng|cỡ|hồi|tới|đến|ngay)\\s+)?';
+// Giờ đồng hồ: [tiền tố] số + giờ/h [phút | rưỡi | kém N] [buổi [sớm|muộn|nay|qua|mai]].
+const CLOCK_RE = new RegExp(`(?<![\\p{L}\\p{N}])${TIME_PREFIX}${HOUR_NUM}(?:\\s*(?:giờ|h)(?!\\p{L})|:(\\d{2}))(?:\\s*(?:\\d{1,2}|rưỡi|kém\\s+\\d{1,2})(?:\\s*phút)?)?(?:\\s+${DAY_PART}(?:\\s+(?:sớm|muộn|nay|qua|mai|hôm nay|hôm qua))?)?(?!\\p{L})`, 'giu');
+const CLOCK_ANCHOR_RE = /^(?:ngay\s+)?(?:lúc|đúng)\s/iu;
+// Cụm buổi -> nhóm buổi. Xếp cụm dài trước để "chiều tối" không bị "chiều" nuốt.
+const DAY_PART_PHRASES = [
+  ['sáng', ['rạng sáng', 'sáng sớm', 'sớm tinh mơ', 'tinh mơ', 'tờ mờ sáng', 'mờ sáng', 'tảng sáng', 'hừng đông', 'bình minh', 'sáng hôm nay', 'sáng nay', 'sáng mai', 'sớm mai', 'buổi sáng', 'ban sáng', 'lúc sáng', 'mỗi sáng', 'trời chưa sáng', 'trời vừa sáng', 'trời còn tối', 'mặt trời mọc', 'gà gáy', 'giờ sáng']],
+  ['trưa', ['giữa trưa', 'buổi trưa', 'ban trưa', 'trưa nay', 'trưa nắng', 'lúc trưa', 'đứng bóng', 'giờ trưa']],
+  ['chiều', ['chiều tối', 'chiều tà', 'chiều muộn', 'xế chiều', 'buổi chiều', 'chiều nay', 'lúc chiều', 'hoàng hôn', 'chạng vạng', 'mặt trời lặn', 'giờ chiều']],
+  ['tối', ['chập tối', 'sẩm tối', 'nhá nhem', 'buổi tối', 'tối nay', 'tối qua', 'tối muộn', 'lúc tối', 'trời tối', 'giờ tối']],
+  ['đêm', ['nửa đêm', 'giữa đêm', 'đêm khuya', 'đêm qua', 'đêm nay', 'khuya khoắt', 'nửa khuya', 'canh khuya', 'lúc khuya', 'giờ đêm', 'giờ khuya']],
+];
+// "chiều tối" chạm cả chiều lẫn tối: nguồn có một trong hai là đủ.
+const PART_ALIAS = { 'chiều tối': ['chiều', 'tối'], 'trời còn tối': ['sáng', 'tối'] };
+const PHRASE_LIST = DAY_PART_PHRASES.flatMap(([part, list]) => list.map((p) => ({ p, parts: PART_ALIAS[p] || [part] })))
+  .sort((a, b) => b.p.length - a.p.length);
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const PHRASE_RE = new RegExp(`(?<!\\p{L})${TIME_PREFIX}(${PHRASE_LIST.map((x) => escRe(x.p)).join('|')})(?!\\p{L})`, 'giu');
+const PHRASE_PARTS = new Map(PHRASE_LIST.map((x) => [x.p, x.parts]));
+const PART_OF_SUFFIX = { sáng: 'sáng', trưa: 'trưa', chiều: 'chiều', tối: 'tối', đêm: 'đêm', khuya: 'đêm' };
+const hourOf = (tok) => {
+  const t = String(tok || '').toLowerCase();
+  const n = /^\d+$/.test(t) ? Number(t) : HOUR_WORDS[t];
+  return Number.isFinite(n) ? n % 12 : null; // 17 giờ = 5 giờ chiều; buổi đi kèm được so riêng
+};
+const hasViDiacritics = (s) => /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(s);
+const foldPlain = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+// Mốc có trong NGUỒN: { hours: Set, parts: Set }. Nguồn có dấu so bản có dấu; nguồn viết không dấu thì so bản không dấu.
+function sourceTimeMarks(sourceText) {
+  const raw = String(sourceText || '').normalize('NFC').toLowerCase();
+  const hours = new Set();
+  const parts = new Set();
+  const plain = !hasViDiacritics(raw);
+  const scan = plain ? foldPlain(raw) : raw;
+  // Gấp không dấu cả mẫu nhưng giữ nguyên tên lớp \p{L} / \p{N} (toLowerCase làm hỏng).
+  // Gấp không dấu cả mẫu nhưng trả lại tên lớp \p{L} / \p{N} (toLowerCase biến thành \p{l}, sai cú pháp).
+  const clockRe = new RegExp(plain ? foldPlain(CLOCK_RE.source).replace(/\\p\{([ln])\}/g, (_, c) => `\\p{${c.toUpperCase()}}`) : CLOCK_RE.source, 'giu');
+  for (const m of scan.matchAll(clockRe)) {
+    const h = hourOf(plain ? Object.keys(HOUR_WORDS).find((w) => foldPlain(w) === m[1]) || m[1] : m[1]);
+    if (h !== null) hours.add(h);
+    if (m[3]) parts.add(PART_OF_SUFFIX[plain ? Object.keys(PART_OF_SUFFIX).find((w) => foldPlain(w) === m[3]) : m[3]]);
+  }
+  for (const x of PHRASE_LIST) {
+    const p = plain ? foldPlain(x.p) : x.p;
+    if (new RegExp(`(?<!\\p{L})${escRe(p)}(?!\\p{L})`, 'u').test(scan)) for (const part of x.parts) parts.add(part);
+  }
+  return { hours, parts };
+}
+// Các mốc giờ/buổi trong text mà NGUỒN không có. Trả [{ sentence, phrase }] — phrase là cụm đã bắt (kèm tiền tố
+// "lúc", "đúng", "mới"... nếu có) để người gọi bỏ đúng cụm đó.
+export function timeClaims(text, sourceText) {
+  const src = sourceTimeMarks(sourceText);
+  const out = [];
+  for (const sent of sentencesOf(String(text || '').normalize('NFC'))) {
+    const spans = [];
+    for (const m of sent.matchAll(CLOCK_RE)) {
+      const part = m[3] ? PART_OF_SUFFIX[m[3].toLowerCase()] : null;
+      // Không buổi đi sau thì chỉ coi là giờ đồng hồ khi có "lúc"/"đúng" đứng trước ("chạy 2 giờ" là khoảng thời gian).
+      if (!part && !m[2] && !CLOCK_ANCHOR_RE.test(m[0])) continue;
+      const h = hourOf(m[1]);
+      const ok = (h === null || src.hours.has(h)) && (!part || src.parts.has(part));
+      spans.push({ start: m.index, end: m.index + m[0].length, ok, phrase: m[0] });
+    }
+    for (const m of sent.matchAll(PHRASE_RE)) {
+      const start = m.index;
+      const end = m.index + m[0].length;
+      if (spans.some((s) => start < s.end && end > s.start)) continue; // "giờ sáng" nằm trong "5 giờ sáng" đã xét
+      const parts = PHRASE_PARTS.get(m[1].toLowerCase()) || [];
+      spans.push({ start, end, ok: parts.some((p) => src.parts.has(p)), phrase: m[0] });
+    }
+    for (const s of spans.filter((x) => !x.ok).sort((a, b) => a.start - b.start)) out.push({ sentence: sent, phrase: s.phrase });
+  }
+  return out;
+}
+export function timeClaimSentences(text, sourceText) {
+  return [...new Set(timeClaims(text, sourceText).map((c) => c.sentence))];
+}
+// Bỏ mốc giờ/buổi không nguồn, TẤT ĐỊNH, chạy lại lần 2 không đổi gì:
+//  - cụm đứng ĐẦU câu ("Mới 5 giờ sáng, góc xưởng..." / "Sáng sớm mà anh em đã...") thì bỏ cụm cùng dấu phẩy hay chữ nối
+//    mà/là/thì ngay sau, viết hoa lại chữ đầu;
+//  - cụm giữa câu có tiền tố "lúc/từ/vào/đúng..." ("dậy từ 4 giờ sáng để...") thì bỏ cả tiền tố lẫn cụm;
+//  - còn lại (cụm dính vào câu, bỏ ra là gãy câu) thì bỏ cả CÂU; bỏ hết câu sẽ rỗng thì bỏ cụm tại chỗ (thà câu hơi
+//    cụt còn hơn đọc mốc bịa).
+export function stripTimeClaims(text, sourceText) {
+  const input = String(text || '');
+  const claims = timeClaims(input, sourceText);
+  if (!claims.length) return input;
+  const bySent = new Map();
+  for (const c of claims) { if (!bySent.has(c.sentence)) bySent.set(c.sentence, []); bySent.get(c.sentence).push(c.phrase); }
+  const tidy = (s) => {
+    let t = s.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?…])/g, '$1').replace(/,\s*([.!?…])/g, '$1').replace(/^[\s,;:]+/, '').trim();
+    t = t.replace(/^(["“‘'(«]*)(\p{L})/u, (_, q, ch) => q + ch.toUpperCase());
+    return t;
+  };
+  const words = (s) => s.replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean).length;
+  const removeAt = (s, phrase, loose) => {
+    const i = s.indexOf(phrase);
+    if (i < 0) return s;
+    const before = s.slice(0, i);
+    const after = s.slice(i + phrase.length);
+    if (!/\p{L}/u.test(before)) return before + after.replace(/^\s*(?:,\s*|(?:mà|là|thì)\s+)?/iu, ' ');
+    if (/^(?:ngay\s+)?(?:từ|lúc|vào|đúng|mới|tầm|khoảng|chừng|cỡ|hồi|tới|đến|ngay)\s/iu.test(phrase) || loose) return before.replace(/,\s*$/, '') + after;
+    return null;
+  };
+  const sents = sentencesOf(input.normalize('NFC'));
+  const cleaned = sents.map((sent) => {
+    const phrases = bySent.get(sent);
+    if (!phrases) return sent;
+    let s = sent;
+    for (const p of phrases) { s = removeAt(s, p, false); if (s === null) return null; }
+    s = tidy(s);
+    return words(s) >= 2 ? s : null;
+  });
+  if (cleaned.some(Boolean)) return cleaned.filter(Boolean).join(' ').trim();
+  // Bỏ hết câu sẽ rỗng: bỏ cụm tại chỗ ở mọi câu.
+  return sents.map((sent) => {
+    let s = sent;
+    for (const p of bySent.get(sent) || []) s = removeAt(s, p, true) ?? s;
+    return tidy(s);
+  }).filter((s) => words(s) >= 1).join(' ').trim();
+}
+
+// 15/10 (bài 492b8992: bài content viết từ MỘT clip, topic chỉ kể những gì clip đó quay, nhưng video có 3 cảnh nên cảnh
+// story đọc "kiểm tra từng lớp nilon bọc kín" trên clip ngư dân ở cảng 7043bd1f): bài như vậy chỉ có một nguồn hình
+// thật, lời cảnh giữa nào cũng là kể tiếp clip đó. Gộp các cảnh giữa vào cảnh mang clip bắt buộc (cảnh 1) để clip gánh
+// cả hook lẫn story, cảnh kết giữ riêng. Clip không có đoạn thì chạy liền từ giây 0 (clip Zalo thường 15 tới 30 giây),
+// nên chặn tổng lời cảnh gộp ở maxWords (~18 giây đọc): lời hook giữ đủ, câu story vượt mốc bị bỏ từ cuối.
+// scenes: [{role, narration, visual, ...}] (không sửa mảng vào). Trả { scenes, merged: số cảnh đã gộp, dropped: [câu bỏ] }.
+export function mergeIntoMustScene(scenes, { maxWords = 60 } = {}) {
+  const list = Array.isArray(scenes) ? scenes.map((s) => ({ ...s })) : [];
+  if (list.length < 3) return { scenes: list, merged: 0, dropped: [] };
+  const head = list[0];
+  const middle = list.slice(1, -1);
+  const tail = list[list.length - 1];
+  let total = wordCount(head.narration);
+  const kept = [];
+  const dropped = [];
+  for (const sent of middle.flatMap((s) => sentencesOf(s.narration))) {
+    const n = wordCount(sent);
+    if (total + n <= maxWords && !dropped.length) { kept.push(sent); total += n; } else dropped.push(sent);
+  }
+  const narration = [String(head.narration || '').trim(), ...kept].filter(Boolean).join(' ');
+  return { scenes: [{ ...head, narration }, tail], merged: middle.length, dropped };
+}
+
 // 3/10 vòng 2 (ChatGPT chấm cảng cá 7,5: cảnh kết có 2 câu hỏi cạnh tranh nhau): cảnh closing của video CONTENT
 // chỉ giữ MỘT câu hỏi giao lưu. Nhiều hơn một câu hỏi thì giữ câu hỏi ĐẦU TIÊN, bỏ các câu hỏi sau; câu trần
 // thuật giữ nguyên. Có tối đa một câu hỏi thì trả lại đúng chuỗi cũ.

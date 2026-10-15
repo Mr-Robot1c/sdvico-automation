@@ -5,7 +5,7 @@ import {
   CROSS_PRODUCT_TERMS, crossProductTerms, crossProductViolations, percentNumbers, unsourcedPercents,
   stripSentencesWith, EXTRA_WORN, outroText, outroScreenKeyword, splitPriceScene, splitLongImageScenes, splitNarrationMiddle, mustUseRoleFor, hookProductTerm, wordsBeforeSolution, trimEarlyScenes,
   breakLongSentences, imageryDriftSentences, cutImageryDrift, selfProductFaultPhrases, inventedDetailSentences, sbChatterSentences, sbDescriptiveSentences,
-  absoluteClaims, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, paybackClaimSentences, keepOneQuestion,
+  absoluteClaims, ensureSavingsCondition, hookRepairSentences, cameraTalkSentences, paybackClaimSentences, keepOneQuestion, timeClaimSentences, stripTimeClaims, mergeIntoMustScene,
 } from './video/rules.mjs';
 import { FORMATS, LOUDNORM_FILTER, parseLoudnormStats, loudnormFilterFor, badgeFontSize } from './video/assemble.mjs';
 import { buildBlocks, MAX_CHARS } from './video/srt.mjs';
@@ -500,6 +500,56 @@ ok('tidyWav truyền --maxgap 0,55', /'--maxgap'/.test(bvSrc) && /TTS_PAUSE_MAXG
   eq('payback: không dấu và "lấy lại vốn", "gỡ vốn" dính', paybackClaimSentences('LAY LAI VON TRONG VAI TUAN. Go von sau dam chuyen.', SRC_YEAR).length, 2);
   eq('payback: chỉ trả đúng câu dính, giữ câu kể', paybackClaimSentences('Mình tính kỹ chi phí. Chỉ vài chuyến là gỡ vốn. Tiền dầu cứ vơi.', SRC_YEAR), ['Chỉ vài chuyến là gỡ vốn.']);
   eq('payback: nối stripSentencesWith chỉ cắt đúng câu', stripSentencesWith('Mình tính kỹ chi phí. Chỉ vài chuyến là gỡ vốn. Tiền dầu cứ vơi.', paybackClaimSentences('Mình tính kỹ chi phí. Chỉ vài chuyến là gỡ vốn. Tiền dầu cứ vơi.', SRC_YEAR)), 'Mình tính kỹ chi phí. Tiền dầu cứ vơi.');
+}
+
+// 15/10 (bài 492b8992): lời đọc tự đặt mốc giờ/buổi ("Đúng 6 giờ sáng", "Mới 5 giờ sáng") khi mô tả clip không có.
+{
+  // Mô tả clip bắt buộc d2465caf thật (rút gọn): có "sáng màu", "tối màu" nhưng KHÔNG có giờ hay buổi.
+  const MUST = 'Địa điểm: Kho hoặc xưởng của công ty, có xe tải đỗ sát cửa. Thấy một kiện hàng lớn bọc kín bằng nilon. Người nam 1: mặc áo sơ mi kẻ caro sáng màu, quần tối màu, đang kéo kiện hàng.';
+  const XE = 'Xe bán tải màu xanh đang chở hàng hóa được phủ bạt kín ở phía sau, đỗ trong một nhà xưởng vào buổi tối.';
+  const ci = 'Đúng 6 giờ sáng, góc xưởng bận rộn tấp nập kéo xe hàng ra cửa!';
+  const local = 'Mới 5 giờ sáng, góc xưởng đã tất bật đẩy kiện hàng lên xe!';
+  eq('giờ: bản CI "Đúng 6 giờ sáng" bị bắt', timeClaimSentences(ci, MUST), [ci]);
+  eq('giờ: bản CI bỏ mốc đầu câu, giữ câu', stripTimeClaims(ci, MUST), 'Góc xưởng bận rộn tấp nập kéo xe hàng ra cửa!');
+  eq('giờ: bản dựng lại "Mới 5 giờ sáng" bỏ mốc', stripTimeClaims(local, MUST), 'Góc xưởng đã tất bật đẩy kiện hàng lên xe!');
+  eq('giờ: "sáng màu"/"tối màu" trong mô tả KHÔNG tính là buổi sáng/tối', timeClaimSentences('Mới 5 giờ sáng. Trời tối rồi.', MUST).length, 2);
+  eq('giờ: "lúc tối" trên ảnh mô tả "vào buổi tối" được tha', timeClaimSentences('Xe bán tải chở hàng đậu trong nhà xưởng lúc tối.', XE), []);
+  eq('giờ: cùng câu trên clip không có buổi tối thì bỏ "lúc tối"', stripTimeClaims('Xe bán tải chở hàng đậu trong nhà xưởng lúc tối.', MUST), 'Xe bán tải chở hàng đậu trong nhà xưởng.');
+  eq('giờ: mốc có tiền tố giữa câu bỏ cả tiền tố', stripTimeClaims('Anh em dậy từ 4 giờ sáng để kiểm hàng. Ai cũng tất bật!', MUST), 'Anh em dậy để kiểm hàng. Ai cũng tất bật!');
+  eq('giờ: "Sáng sớm mà..." bỏ cả chữ nối', stripTimeClaims('Sáng sớm mà anh em đã có mặt ở xưởng.', MUST), 'Anh em đã có mặt ở xưởng.');
+  eq('giờ: cụm dính giữa câu thì bỏ cả câu', stripTimeClaims('Trời rạng sáng là xe đã lăn bánh. Hàng lên xe gọn gàng.', MUST), 'Hàng lên xe gọn gàng.');
+  eq('giờ: bỏ cả câu sẽ rỗng thì bỏ cụm tại chỗ', stripTimeClaims('Trời rạng sáng là xe đã lăn bánh.', MUST), 'Trời là xe đã lăn bánh.');
+  eq('giờ: "mấy giờ sáng" (lời dặn cũ của kiểu kể Con số) bị bỏ', stripTimeClaims('Mấy giờ sáng anh em đã dậy?', MUST), 'Anh em đã dậy?');
+  eq('giờ: "Lúc 5h30" bị bỏ', stripTimeClaims('Lúc 5h30 xe xuất phát.', MUST), 'Xe xuất phát.');
+  eq('giờ: nửa đêm, chiều tà, hoàng hôn bị bắt', timeClaimSentences('Nửa đêm vẫn chạy. Chiều tà về bến. Hoàng hôn trên cảng.', MUST).length, 3);
+  eq('giờ: khoảng thời gian "chạy 2 giờ", "200 giờ" KHÔNG bị bắt', timeClaimSentences('Máy chạy 2 giờ là đầy bồn. Chạy 200 giờ mới thay lọc.', MUST), []);
+  eq('giờ: chữ "sáng"/"tối"/"chiều" nghĩa khác KHÔNG bị bắt', timeClaimSentences('Đèn sáng suốt đêm, áo tối màu. Lúc tới cảng chiều khách kỹ lắm.', MUST), []);
+  eq('giờ: nguồn có "6 giờ sáng" thì "Đúng 6 giờ" được tha', timeClaimSentences('Đúng 6 giờ, xe lăn bánh.', 'Xe chạy lúc 6 giờ sáng.'), []);
+  eq('giờ: nguồn 6 giờ mà lời đọc 7 giờ thì bắt', timeClaimSentences('Đúng 7 giờ, xe lăn bánh.', 'Xe chạy lúc 6 giờ sáng.').length, 1);
+  eq('giờ: nguồn "5 giờ chiều" thì "5 giờ sáng" vẫn bắt (sai buổi)', timeClaimSentences('Mới 5 giờ sáng đã xong.', 'tàu về lúc 5 giờ chiều').length, 1);
+  eq('giờ: "17 giờ" khớp nguồn "5 giờ chiều"', timeClaimSentences('Đúng 17 giờ tàu cập bến.', 'tàu về lúc 5 giờ chiều'), []);
+  eq('giờ: nguồn viết không dấu vẫn so được', timeClaimSentences('Năm giờ chiều, tàu cập bến.', 'tau cap ben luc 5 gio chieu'), []);
+  eq('giờ: bài nguồn (draft) có buổi thì tha', timeClaimSentences('Sáng nay cả đội ra cảng.', 'Sáng nay đội SDVICO ra cảng Long Hải.'), []);
+  eq('giờ: chạy lại lần 2 không đổi gì', stripTimeClaims(stripTimeClaims(ci, MUST), MUST), stripTimeClaims(ci, MUST));
+  eq('giờ: câu sạch giữ nguyên chuỗi', stripTimeClaims('Góc xưởng tất bật!  Anh em kéo hàng.', MUST), 'Góc xưởng tất bật!  Anh em kéo hàng.');
+}
+
+// 15/10 (bài 492b8992): bài content viết từ MỘT clip mà video có 3 cảnh — cảnh story kể việc của clip bắt buộc trên
+// clip khác (ngư dân ở cảng). Gộp cảnh giữa vào cảnh clip bắt buộc, cảnh kết giữ riêng.
+{
+  const sc = [
+    { role: 'hook', narration: 'Góc xưởng đã tất bật đẩy kiện hàng lên xe!', visual: 'kiện hàng', hint: 'd2465caf' },
+    { role: 'story', narration: 'Đội ngũ cứ cúi đầu kiểm tra từng lớp nilon bọc kín. Nhìn anh em cẩn thận mà thấy ấm lòng làm sao!', visual: 'kiểm tra hàng' },
+    { role: 'closing', narration: 'Các bác chuẩn bị đồ đạc ra sao trước mỗi chuyến?', visual: 'xe' },
+  ];
+  const r = mergeIntoMustScene(sc);
+  eq('gộp: còn 2 cảnh hook + closing', r.scenes.map((s) => s.role), ['hook', 'closing']);
+  eq('gộp: lời story nối sau lời hook trên cảnh clip bắt buộc', r.scenes[0].narration, 'Góc xưởng đã tất bật đẩy kiện hàng lên xe! Đội ngũ cứ cúi đầu kiểm tra từng lớp nilon bọc kín. Nhìn anh em cẩn thận mà thấy ấm lòng làm sao!');
+  eq('gộp: cảnh 1 giữ visual + hint của cảnh hook, cảnh kết giữ nguyên', [r.scenes[0].visual, r.scenes[0].hint, r.scenes[1].narration], ['kiện hàng', 'd2465caf', sc[2].narration]);
+  eq('gộp: không sửa mảng vào', sc.length, 3);
+  const long = mergeIntoMustScene([sc[0], { role: 'story', narration: 'Một hai ba bốn năm sáu bảy tám. Chín mười một hai ba bốn năm sáu. Bảy tám chín mười một hai ba bốn.' }, sc[2]], { maxWords: 20 });
+  eq('gộp: vượt mốc từ thì bỏ câu story từ cuối, hook giữ đủ', [long.scenes[0].narration, long.dropped.length], ['Góc xưởng đã tất bật đẩy kiện hàng lên xe! Một hai ba bốn năm sáu bảy tám.', 2]);
+  eq('gộp: dưới 3 cảnh thì không gộp', mergeIntoMustScene([sc[0], sc[2]]).merged, 0);
 }
 
 // 3/10 vòng 3 (G3): không quy kết nguồn dầu ("dầu mua ngoài bẩn thế này").
