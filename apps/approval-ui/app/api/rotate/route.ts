@@ -17,7 +17,9 @@ import { guessGroup, isDiscontinuedGroup } from '../../../lib/gen/products.mjs';
 // vào generateSocialPost/generateContentPost để bài đăng bám đúng hướng đi tuần. Track
 // used_at trong plan.data.content_suggestions[i]. Hết suggestion mới fallback random như cũ.
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// 15/10: bài content chạy Gemma 4 26B (quỹ 100 giây + tới 2 x 30 giây flash-lite dự phòng, lib/gen/llm-client.mjs). 180 bằng
+// mức /api/blog-keyword đang chạy được trên project này.
+export const maxDuration = 180;
 
 // Tự đóng logo SDVICO lên ảnh của bài (kiểm tra ảnh đã có logo chưa rồi mới đóng). Tắt: ROTATE_AUTO_LOGO=0.
 const AUTO_LOGO = process.env.ROTATE_AUTO_LOGO !== '0';

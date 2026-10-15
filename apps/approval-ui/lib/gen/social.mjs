@@ -7,6 +7,7 @@ import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPric
 import { insightBrief } from './insights.mjs';
 import { logTokenUsage } from './token-log.mjs';
 import { sampleHooks } from './hook-library.mjs';
+import { wrapAi, modelFor } from './llm-client.mjs';
 import { fabricatedWitnessSentences, witnessRetryNote, resolveWitnessBody, buildGenFlags, safeContentChoice, contentTemperature } from './clip-guard.mjs';
 
 const MKT_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
@@ -284,7 +285,10 @@ function pickContentAngleForEmotion(e) {
 }
 export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client = null, emotionOverride = null } = {}) {
   const { GoogleGenAI } = await import('@google/genai');
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  // 15/10: bài content chạy Gemma 4 26B (chấm mù 6,4 so với flash-lite 5,7). Gemma có lượt nghĩ tới 62 giây và API không
+  // cho chỉnh mức nghĩ, nên mỗi lượt cho 80 giây, quỹ 100 giây cho cả bài; lỗi hoặc hết quỹ thì lùi flash-lite.
+  const CONTENT_MODEL = modelFor('content');
+  const ai = wrapAi(new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }), { budgetMs: Number(process.env.MKT_CONTENT_BUDGET_MS) || 100000, gemmaTimeoutMs: 80000 });
 
   let chosen = topic;
   if (!chosen) chosen = CONTENT_TOPICS[Math.floor(Math.random() * CONTENT_TOPICS.length)];
@@ -343,12 +347,12 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
       extra = '\n\nLẦN TRƯỚC LỖI PLAYBOOK:\n' + errs.map((e) => '- ' + e).join('\n');
     }
     const res = await genWithRetry(ai, {
-      model: MKT_MODEL,
+      model: CONTENT_MODEL,
       contents: user + extra,
       // 9/10: bài theo clip (topic.fromClip) bám tư liệu thật nên giảm độ sáng tạo xuống 0.7.
       config: { systemInstruction: system, responseMimeType: 'application/json', temperature: contentTemperature(chosen) },
     });
-    logTokenUsage(client, 'creator_content', MKT_MODEL, res?.usageMetadata);
+    logTokenUsage(client, 'creator_content', res?.usedModel || CONTENT_MODEL, res?.usageMetadata);
     const parsed = parseJson(res.text || '');
     body = String(parsed.body || '').trim();
     headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();

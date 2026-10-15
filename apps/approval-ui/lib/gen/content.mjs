@@ -12,6 +12,7 @@
 import { DEFAULT_HASHTAGS, productHashtags, guessGroup, sanitizePostText } from './products.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from './product-guard.mjs';
 import { logTokenUsage } from './token-log.mjs';
+import { wrapAi, modelFor } from './llm-client.mjs';
 
 const TONGDAI = '1900 23 23 49';
 
@@ -354,9 +355,11 @@ function hashStr(s, seed = 0) {
 // Sinh CẢ BA định dạng trong một lần gọi Gemini, trả JSON { article, social, video }.
 // avoid: các bài article đã đăng gần đây / cùng cụm từ khóa ({ title, opening }) — đưa vào
 // prompt để cấm lặp mở bài, khung bài, câu chữ (chống bài SEO na ná nhau, 23/9).
-export async function generateFormatsLLM(brief, facts = [], avoid = [], fixNote = '') {
+export async function generateFormatsLLM(brief, facts = [], avoid = [], fixNote = '', { budgetMs = BLOG_BUDGET_MS } = {}) {
   const { GoogleGenAI } = await import('@google/genai');
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  // 15/10: blog chạy Gemma 4 26B (chấm mù 6,6 so với flash-lite 6,1); Gemma lỗi hoặc hết quỹ thì lùi flash-lite
+  // (không lùi về bài mẫu). Quỹ do generateAllFormats chia cho cả lượt sinh lại, xem BLOG_BUDGET_MS.
+  const ai = wrapAi(new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }), { budgetMs, fallbackTimeoutMs: 25000 });
 
   // 15/10 (bài web 070278db đã đăng viết "nước ngọt làm nặng tàu, tốn nhiên liệu"): đường blog chưa từng nhận luật SỰ
   // THẬT NGHỀ như bài Facebook. Nay chèn guardLines theo từ khóa vào prompt, và quét sau khi sinh (generateAllFormats).
@@ -386,7 +389,7 @@ export async function generateFormatsLLM(brief, facts = [], avoid = [], fixNote 
   const user = userParts.join('\n');
 
   const res = await genOnce(ai, {
-    model: MKT_MODEL,
+    model: modelFor('blog'),
     contents: user,
     config: {
       systemInstruction: system,
@@ -405,8 +408,13 @@ export async function generateFormatsLLM(brief, facts = [], avoid = [], fixNote 
 }
 
 // Điều phối: sinh ba định dạng, ưu tiên Gemini khi có khóa, không thì bản mẫu.
+// 15/10: quỹ Gemma cho MỘT từ khóa, dùng chung cho lượt đầu và lượt sinh lại vì sai nghề. Mỗi từ khóa tối đa khoảng
+// 55 giây Gemma + 25 giây flash-lite dự phòng, 2 từ khóa vẫn dưới maxDuration 180 của /api/blog-keyword.
+const BLOG_BUDGET_MS = Number(process.env.MKT_BLOG_BUDGET_MS) || 55000;
+
 export async function generateAllFormats(kw, { facts = [], avoid = [] } = {}) {
   const brief = buildBrief(kw);
+  const blogDeadline = Date.now() + BLOG_BUDGET_MS;
   if (process.env.GEMINI_API_KEY) {
     try {
       // 15/10: quét SỰ THẬT NGHỀ cả 3 định dạng; dính thì sinh lại 1 lần kèm lời nhắc, vẫn dính thì CẮT câu sai và
@@ -418,7 +426,7 @@ export async function generateAllFormats(kw, { facts = [], avoid = [] } = {}) {
       if (all.length) {
         console.warn('[content] blog sai nghe, sinh lai:', [...new Set(all.map((v) => v.phrase))].join(', '));
         const note = `LẦN TRƯỚC VIẾT SAI NGHỀ, phải bỏ hẳn các ý: ${[...new Set(all.map((v) => `"${v.phrase}"`))].join(', ')}. ${all[0].why}`;
-        f = await generateFormatsLLM(brief, facts, avoid, note).catch(() => f);
+        f = await generateFormatsLLM(brief, facts, avoid, note, { budgetMs: Math.max(0, blogDeadline - Date.now()) }).catch(() => f);
         viol = scan(f);
       }
       const guard = {};
