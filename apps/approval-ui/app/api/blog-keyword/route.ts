@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { getServerClient } from '../../../lib/supabase-server';
 import { generateForKw, keywordNeedsGovReview } from '../../../lib/gen/generate-for-kw';
 import { bustCache, TAG } from '../../../lib/cached';
+import { isEmergencyStopped } from '../../../lib/safety';
 
 // /api/blog-keyword — vòng kín SEO việc A (plan-seo-vong-kin-tu-khoa-18-09.md): mỗi lần chạy bốc
 // tối đa 3 từ khóa CHƯA có bài trong kho mkt_keywords (191/192 từ đang trống), sinh bài bằng lõi
@@ -64,6 +65,14 @@ export async function GET(req: Request) {
 
   const client = getServerClient();
   const startedAt = Date.now();
+  // 15/10 (rà soát AI nội dung): route này từng bỏ qua công tắc dừng khẩn, bật dừng mà blog vẫn sinh và tự đăng.
+  if (await isEmergencyStopped(client)) {
+    await client.from('run_log').insert({
+      task: 'mkt.blog_keyword', actor: 'cron', status: 'ok',
+      detail: { picked: 0, published: 0, review: 0, ms: Date.now() - startedAt, skipped_reason: 'emergency_stop' }
+    });
+    return NextResponse.json({ ok: true, picked: 0, published: 0, review: 0, note: 'emergency_stop' });
+  }
   let picked = 0;
   let govPicked = 0;
   let published = 0;

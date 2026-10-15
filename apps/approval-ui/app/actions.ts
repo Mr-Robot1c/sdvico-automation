@@ -545,6 +545,18 @@ export async function decideForm(formData: FormData) {
   // Lưu giờ hẹn vào payload để trang Quản lý bài viết hiện "Đã duyệt, đợi hẹn giờ HH:mm dd/mm"
   // (user 18/8). Chỉ khi duyệt + có hẹn; từ chối hoặc đăng ngay thì không ghi.
   const basePayload = ((row as any)?.payload || {}) as Record<string, unknown>;
+  // 15/10 (rà soát AI nội dung): phiếu trend tạo TRƯỚC khi có nội dung, nháp là "⏳ Đang sinh...". Bấm Duyệt
+  // lúc đó sẽ đăng nguyên câu chờ lên Page. Phiếu còn cờ trend_generating thì không cho duyệt, giữ pending.
+  if (decision === 'approved' && basePayload.trend_generating === true) {
+    try {
+      await client.from('run_log').insert({
+        task: 'mkt.publish_blocked', actor: 'decideForm', status: 'skipped',
+        detail: { queueId: id, contentId: basePayload.content_id ?? null, reason: 'trend_generating' }
+      });
+    } catch { /* bỏ qua */ }
+    revalidatePath('/hang-doi');
+    return;
+  }
   const newPayload = decision === 'approved' && scheduledAt
     ? { ...basePayload, scheduled_at: scheduledAt }
     : basePayload;

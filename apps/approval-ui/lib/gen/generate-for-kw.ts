@@ -45,6 +45,14 @@ export { REGULATION_TERMS };
 
 export type GenerateForKwResult = { count: number; gen: string; blogUrl: string | null };
 
+// 15/10 (Thanh, rà soát AI nội dung): 3 bài blog tự đăng sai sự thật (070278db "nặng tàu", bb323693
+// SF50 thành máy lọc nước, bbd007ee điểm kỹ thuật Kiên Giang bịa) vì blog chỉ qua assessDraft + scanStyle,
+// không có lưới sản phẩm. TẠM TẮT tự đăng: mọi bài blog vào hàng đợi duyệt (payload.channels ['website'],
+// duyệt là đăng blog). Bật lại bằng env BLOG_AUTO_PUBLISH=on sau khi có lưới sự thật dùng chung.
+export function blogAutoPublishEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return String(env.BLOG_AUTO_PUBLISH || '').trim().toLowerCase() === 'on';
+}
+
 // 23/9 (Thanh: "các bài SEO cứ gần giống nhau quá"): kho từ khóa có nhiều cụm anh em chỉ khác
 // tên tỉnh (gia hạn cước giám sát... Hà Tĩnh / Kiên Giang...), bài sinh ra trùng nhau tới ~90%.
 // Gom các bài article đã có: ưu tiên bài TRÙNG CỤM từ khóa nhất (đo bằng tỉ lệ chữ chung) rồi
@@ -102,7 +110,7 @@ async function loadAvoidList(client: any, keyword: string): Promise<Array<{ titl
 // 3 định dạng cho MỘT từ khóa. 3/9 (user chốt): bản WEBSITE sạch (risk none, không chạm quy định)
 // TỰ ĐĂNG blog luôn — blog là web của mình; chỉ bài NỀN TẢNG (Facebook/video) mới qua hàng đợi
 // duyệt (điều cấm 1 giữ nguyên cho mọi kênh ngoài). Bài red/amber hoặc chạm quy định vẫn vào
-// duyệt như cũ (điều cấm 3 tuyệt đối).
+// duyệt như cũ (điều cấm 3 tuyệt đối). 15/10: tự đăng chỉ chạy khi BLOG_AUTO_PUBLISH=on (mặc định tắt).
 //
 // opts.forceReview (18/9): ép risk tối thiểu 'red' — dùng khi CHÍNH từ khóa đã gợi chủ đề nhạy
 // quy định (keywordNeedsGovReview), bất kể bản nháp sinh ra có sạch hay không.
@@ -133,7 +141,7 @@ export async function generateForKw(
     let risk = assess.risk === 'red' ? 'red' : assess.risk === 'amber' || style.length > 0 ? 'amber' : 'none';
     if (opts.forceReview && risk !== 'red') risk = 'red';
     const flagsAll = { ...assess.flags, style };
-    const autoBlog = fmt.key === 'article' && risk === 'none';
+    const autoBlog = fmt.key === 'article' && risk === 'none' && blogAutoPublishEnabled();
 
     const { data: inserted } = await client
       .from('mkt_content')
