@@ -385,7 +385,7 @@ export async function GET(req: Request) {
     }
   }
 
-  // CHỦ NHẬT 23:00+ VN — vòng HỌC TUẦN (item 1b, 20/8). Đọc số liệu tuần vừa kết thúc, đề xuất
+  // CHỦ NHẬT 20h+ VN, bù sáng thứ Hai trước 12h (15/10) — vòng HỌC TUẦN (item 1b, 20/8). Đọc số liệu tuần vừa kết thúc, đề xuất
   // trọng số sản phẩm cho tuần tới. Ghi mkt_plans applied=false; người quản lí bấm Áp dụng ở
   // /ke-hoach mới có hiệu lực (ba-spec NV4/R5). ?learn=1 ép chạy ngoài lịch (dùng khi test).
   const forceLearn = new URL(req.url).searchParams.get('learn') === '1';
@@ -395,6 +395,8 @@ export async function GET(req: Request) {
       const r = await learnWeekly(client, { force: forceLearn });
       learn = { planId: r.planId, ranked: r.ranked, skipped: r.skipped };
       if (!r.skipped) { try { await client.from('run_log').insert({ task: 'mkt.learn_weekly', actor: forceLearn ? 'manual' : 'cron', status: 'ok', detail: { planId: r.planId, ranked: r.ranked } }); } catch { /* bỏ qua */ } }
+      // 15/10: bỏ qua vì lý do khác chặn trùng 24 giờ (vd tuần không có bài) thì ghi skipped, để thẻ AI thấy được thay vì im lặng.
+      else if (!String(r.skipped).startsWith('da co ban')) { try { await client.from('run_log').insert({ task: 'mkt.learn_weekly', actor: forceLearn ? 'manual' : 'cron', status: 'skipped', detail: { reason: r.skipped } }); } catch { /* bỏ qua */ } }
     } catch (e: any) {
       console.error('[learn-weekly] that bai:', e?.message || e);
       learn = { error: String(e?.message || e) };

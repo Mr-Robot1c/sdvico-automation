@@ -1,6 +1,6 @@
 // lib/learn-weekly.ts — vòng HỌC TUẦN (item 1b, user 20/8).
 //
-// Mỗi Chủ Nhật 23:00 VN, chạy 1 lần: đọc số liệu tuần VỪA KẾT THÚC (T2-CN), chấm điểm mỗi
+// Mỗi Chủ Nhật từ 20h VN (bù sáng thứ Hai nếu CN không có lượt chạy), chạy 1 lần: đọc số liệu tuần VỪA KẾT THÚC (T2-CN), chấm điểm mỗi
 // bài (composite: engagement + views + reach + watchSec), gom theo sản phẩm, rồi ĐỀ XUẤT
 // trọng số mới cho vòng xoay tuần tới. Ghi vào mkt_plans với origin='learn-weekly',
 // applied=false. Người quản lí xem ở /ke-hoach, bấm "Áp dụng đề xuất" mới có hiệu lực
@@ -93,9 +93,10 @@ export async function learnWeekly(client: Client, opts: { force?: boolean } = {}
     return { planId: null, ranked: 0, skipped: 'da co ban learn-weekly trong 24 gio qua' };
   }
 
-  // Đọc số liệu tuần VỪA KẾT THÚC. Chủ Nhật 19h chạy thì offset=0 là tuần đang khép lại,
-  // dùng offset=0 (T2-CN tuần này, số liệu tới CN 19h).
-  const report = await buildWeekReport(client, 0, now);
+  // Đọc số liệu tuần VỪA KẾT THÚC. Chủ Nhật tối chạy thì offset=0 là tuần đang khép lại (T2-CN tuần
+  // này). 15/10: chạy bù sáng thứ Hai thì tuần vừa kết thúc là offset=1, offset=0 lúc đó là tuần mới.
+  const mondayCatchUp = isMondayVN(now);
+  const report = await buildWeekReport(client, mondayCatchUp ? 1 : 0, now);
 
   if (report.totals.posts === 0) {
     return { planId: null, ranked: 0, skipped: 'tuan nay chua co bai nao dang' };
@@ -161,8 +162,9 @@ export async function learnWeekly(client: Client, opts: { force?: boolean } = {}
     }
   };
 
-  // Ghi period là TUẦN TỚI (tuần bắt đầu Thứ 2 kế tiếp) — kế hoạch này áp cho tuần đó.
-  const nextMonday = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  // Ghi period là TUẦN TỚI (tuần bắt đầu Thứ 2 kế tiếp) — kế hoạch này áp cho tuần đó. Chạy bù sáng
+  // thứ Hai thì "tuần tới" chính là tuần vừa bắt đầu hôm nay.
+  const nextMonday = mondayCatchUp ? now : new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const nextWin = weekWindowVN(nextMonday);
 
   const { data, error } = await client
@@ -180,11 +182,18 @@ export async function learnWeekly(client: Client, opts: { force?: boolean } = {}
   return { planId: ((data as any)?.id as string) || null, ranked: plan.summary.ranked };
 }
 
-// Chỉ chạy vào Chủ Nhật giờ VN, từ 23:00 trở đi. Cron 30 phút/lần nên tự chặn trùng ở
-// alreadyRanThisWeek. Trước 19h hoặc ngày khác: trả false, không chạy.
+function isMondayVN(now: Date): boolean {
+  return new Date(now.getTime() + 7 * 60 * 60 * 1000).getUTCDay() === 1;
+}
+
+// Chạy Chủ Nhật giờ VN từ 20h (29/8 user đổi 19h -> 20h), HOẶC chạy bù sáng thứ Hai trước 12h.
+// 15/10 (Thanh hỏi các AI có chạy đúng plan): từ 22/9 cron GitHub kéo số liệu 6 tiếng một lần
+// (1h/7h/13h/19h VN) nên không lượt nào rơi vào CN >= 20h; task Windows mỗi giờ chỉ chạy khi máy bật,
+// CN máy thường tắt -> lần chạy cuối 27/9. Lượt 1h/7h sáng thứ Hai giờ bắt được. alreadyRanThisWeek
+// (24 giờ) chặn trùng khi CN tối đã chạy rồi.
 export function shouldRunLearnWeekly(now: Date = new Date()): boolean {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
   const dow = vn.getUTCDay(); // 0 = CN
   const hour = vn.getUTCHours();
-  return dow === 0 && hour >= 20; // 29/8 user doi 19h -> 20h
+  return (dow === 0 && hour >= 20) || (dow === 1 && hour < 12);
 }
