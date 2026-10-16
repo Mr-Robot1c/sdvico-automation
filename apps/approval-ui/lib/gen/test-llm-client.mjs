@@ -1,5 +1,5 @@
 // test-llm-client.mjs — kiểm bộ gọi model chung (Gemma 15/10). Không gọi mạng. Chạy: npm run test:llm
-import { wrapAi, modelFor, isGemma, extractJsonText } from './llm-client.mjs';
+import { wrapAi, modelFor, isGemma, extractJsonText, estimateTokens, gemmaWaitMs, setRunDeadline, _resetGemmaWindow } from './llm-client.mjs';
 
 let fails = 0;
 const check = (cond, msg) => { if (!cond) { fails += 1; console.error('  ✗', msg); } else console.log('  ✓', msg); };
@@ -22,9 +22,9 @@ function fakeAi(script) {
 const jsonParams = (model) => ({ model, contents: 'x', config: { systemInstruction: 's', responseMimeType: 'application/json', responseSchema: { type: 'OBJECT' }, temperature: 1 } });
 
 console.log('1. Chọn model theo việc');
-check(modelFor('blog', {}) === 'gemma-4-26b-a4b-it' && modelFor('content', {}) === 'gemma-4-26b-a4b-it', 'blog và content mặc định Gemma 4 26B');
+check(modelFor('blog', {}) === 'gemma-4-26b-a4b-it' && modelFor('content', {}) === 'gemma-4-26b-a4b-it' && modelFor('social', {}) === 'gemma-4-26b-a4b-it', 'blog, content, bài bán mặc định Gemma 4 26B');
 check(modelFor('blog', { MKT_MODEL_BLOG: 'gemini-flash-lite-latest' }) === 'gemini-flash-lite-latest', 'MKT_MODEL_BLOG đổi lại được không cần sửa code');
-check(modelFor('social', { MKT_MODEL: 'gemini-x' }) === 'gemini-x' && modelFor('social', {}) === 'gemini-flash-lite-latest', 'việc khác giữ MKT_MODEL / flash-lite');
+check(modelFor('video', { MKT_MODEL: 'gemini-x' }) === 'gemini-x' && modelFor('video', {}) === 'gemini-flash-lite-latest', 'việc khác giữ MKT_MODEL / flash-lite');
 check(isGemma('gemma-4-26b-a4b-it') && isGemma('models/gemma-4-31b-it') && !isGemma('gemini-flash-lite-latest'), 'isGemma nhận đúng tên');
 
 console.log('2. Lọc JSON');
@@ -90,6 +90,44 @@ console.log('5. Quỹ thời gian');
   p.config.abortSignal = expired;
   const res = await wrapAi(ai, { log: silent }).models.generateContent(p);
   check(ai.calls[0].config.abortSignal !== expired && !ai.calls[0].config.abortSignal.aborted && res.text === '{"body":"gemma"}', 'abortSignal đã hết hạn của nơi gọi (genOnce 20 giây) không chặn lượt Gemma');
+}
+
+console.log('5b. Hạn mức 16.000 token/phút và hạn chót cả lượt (16/10)');
+{
+  _resetGemmaWindow();
+  check(estimateTokens({ contents: 'a'.repeat(2500), config: { systemInstruction: 'b'.repeat(2500) } }) === 2000, 'ước token = số ký tự / 2,5');
+  check(gemmaWaitMs(14000, 0) === 0, 'cửa sổ trống: gửi ngay');
+}
+{
+  _resetGemmaWindow();
+  const big = { model: 'gemma-4-26b-a4b-it', contents: 'a'.repeat(30000), config: { responseMimeType: 'application/json' } };
+  const ai = fakeAi(['{"a":1}', '{"b":2}']);
+  const real = ai.models.generateContent;
+  // Gemma báo đúng số token thật của lượt lớn (12.000) để bộ đếm ghi đúng.
+  ai.models.generateContent = async (p) => ({ ...(await real(p)), usageMetadata: { promptTokenCount: 12000 } });
+  const r1 = await wrapAi(ai, { log: silent }).models.generateContent(big);
+  check(!r1.fellBack && r1.usedModel === 'gemma-4-26b-a4b-it', 'lượt 12.000 token đầu: Gemma trả lời');
+  const r2 = await wrapAi(ai, { log: silent, budgetMs: 50000 }).models.generateContent(big);
+  check(r2.fellBack && ai.calls.length === 2 && ai.calls[1].model !== 'gemma-4-26b-a4b-it', 'lượt 2 ngay sau sẽ vượt 15.000 token/phút, chờ không kịp quỹ: lùi flash-lite, không bắn Gemma');
+  check(gemmaWaitMs(12000, Date.now()) > 50000, 'cửa sổ còn tính lượt vừa gửi, phải chờ gần hết phút');
+}
+{
+  _resetGemmaWindow();
+  const ai = fakeAi([new Error('{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}'), '{"lite":1}']);
+  await wrapAi(ai, { log: silent, tries: 1 }).models.generateContent(jsonParams('gemma-4-26b-a4b-it'));
+  check(gemmaWaitMs(100, Date.now()) > 0, 'gặp 429 hạn mức: coi cửa sổ phút đã đầy');
+}
+{
+  _resetGemmaWindow();
+  setRunDeadline(Date.now() - 1000);
+  const ai = fakeAi(['{"ok":1}']);
+  const r = await wrapAi(ai, { log: silent }).models.generateContent(jsonParams('gemma-4-26b-a4b-it'));
+  check(!r.fellBack, 'hạn chót lượt đã qua (tiến trình Vercel dùng lại): bỏ qua, vẫn gọi Gemma');
+  setRunDeadline(Date.now() + 10000);
+  const ai2 = fakeAi(['{"lite":1}']);
+  const r2 = await wrapAi(ai2, { log: silent }).models.generateContent(jsonParams('gemma-4-26b-a4b-it'));
+  check(r2.fellBack && ai2.calls[0].model !== 'gemma-4-26b-a4b-it', 'hạn chót lượt còn 10 giây (dưới 30 giây): đi thẳng flash-lite');
+  _resetGemmaWindow();
 }
 
 console.log('6. Model không phải Gemma: đi thẳng, giữ nguyên params');

@@ -83,7 +83,11 @@ export async function generateSocialPost({
   client = null,
 }) {
   const { GoogleGenAI } = await import('@google/genai');
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  // 16/10 (Thanh: "con nào thông minh thì cho viết"): bài bán chạy Gemma 4 26B (chấm mù 6,3 so với flash-lite 5,5), quỹ
+  // 90 giây mỗi bài (đủ chờ hạn mức 16.000 token/phút khi 2 bài liền nhau), hạn chót chung của rotate vẫn chặn tổng;
+  // lỗi hoặc hết quỹ thì lùi flash-lite.
+  const SOCIAL_MODEL = modelFor('social');
+  const ai = wrapAi(new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }), { budgetMs: Number(process.env.MKT_SOCIAL_BUDGET_MS) || 90000 });
 
   const allowed = facts.filter((f) => f.value)
     .map((f) => `${f.brand || ''} ${f.model || ''} ${f.attribute}: ${f.value}${f.verified ? '' : ' (CHƯA XÁC NHẬN)'}`.trim());
@@ -196,11 +200,11 @@ export async function generateSocialPost({
       extra += '\n\n3 HOOK MẪU CHUẨN CẤU TRÚC (chỉ tham khảo cơ chế, KHÔNG copy nguyên chữ):\n' + hooks.map((h) => '- ' + h).join('\n');
     }
     const res = await genWithRetry(ai, {
-      model: MKT_MODEL,
+      model: SOCIAL_MODEL,
       contents: user + extra,
       config: { systemInstruction: system, responseMimeType: 'application/json', temperature: 1.05 },
     });
-    logTokenUsage(client, 'creator_social', MKT_MODEL, res?.usageMetadata);
+    logTokenUsage(client, 'creator_social', res?.usedModel || SOCIAL_MODEL, res?.usageMetadata);
     const parsed = parseJson(res.text || '');
     body = String(parsed.body || '').trim();
     headline = String(parsed.headline || '').replace(/#[^\s#]+/g, '').trim();

@@ -12,7 +12,9 @@
 // Model khác Gemma: đi thẳng, y như cũ.
 
 export const FALLBACK_MODEL = process.env.MKT_MODEL || 'gemini-flash-lite-latest';
-const TASK_DEFAULTS = { blog: 'gemma-4-26b-a4b-it', content: 'gemma-4-26b-a4b-it' };
+// 16/10: bài bán (social) cũng sang Gemma (chấm mù 6,3 so với flash-lite 5,5). Video, BOSS giữ model cũ: prompt
+// 17.000 tới 39.000 token mỗi lượt, vượt hạn mức miễn phí 16.000 token/phút của Gemma.
+const TASK_DEFAULTS = { blog: 'gemma-4-26b-a4b-it', content: 'gemma-4-26b-a4b-it', social: 'gemma-4-26b-a4b-it' };
 
 // Model cho một việc: env MKT_MODEL_<VIỆC> (vd MKT_MODEL_BLOG) > mặc định của việc > MKT_MODEL > flash-lite.
 // Quay về flash-lite cho blog: đặt MKT_MODEL_BLOG=gemini-flash-lite-latest, không cần sửa code.
@@ -48,6 +50,38 @@ export function extractJsonText(text) {
   return t.slice(start).trim();
 }
 
+// HẠN MỨC PHÚT (đo 15/10: 429 "GenerateContentInputTokensPerModelPerMinute-FreeTier", 16.000 token đầu vào/phút,
+// tính chung mọi việc dùng Gemma trong cùng project). Đếm token đã gửi trong 60 giây gần nhất của tiến trình này;
+// lượt sắp vượt thì chờ cửa sổ trôi, chờ không kịp trong quỹ thì lùi dự phòng. Ước token trước khi gọi bằng số ký tự
+// chia 2,5 (prompt bài bán 14.500 ký tự đo ra khoảng 5.600 token), gọi xong thay bằng số thật usageMetadata.
+const GEMMA_TPM = Number(process.env.MKT_GEMMA_TPM) || 15000;
+const WINDOW_MS = 60000;
+let gemmaWindow = [];
+export function _resetGemmaWindow() { gemmaWindow = []; runDeadline = 0; }
+export function estimateTokens(params) {
+  const sys = String(params?.config?.systemInstruction || '');
+  const c = params?.contents;
+  const body = typeof c === 'string' ? c : JSON.stringify(c || '');
+  return Math.ceil((sys.length + body.length) / 2.5);
+}
+// Số mili giây phải chờ để gửi thêm 'tokens' mà không vượt GEMMA_TPM trong cửa sổ 60 giây (0 = gửi ngay).
+export function gemmaWaitMs(tokens, t, tpm = GEMMA_TPM) {
+  gemmaWindow = gemmaWindow.filter((e) => t - e.at < WINDOW_MS);
+  let used = gemmaWindow.reduce((a, e) => a + e.tokens, 0);
+  if (used + tokens <= tpm) return 0;
+  for (const e of [...gemmaWindow].sort((a, b) => a.at - b.at)) {
+    used -= e.tokens;
+    if (used + tokens <= tpm) return e.at + WINDOW_MS - t + 500;
+  }
+  return WINDOW_MS;
+}
+
+// HẠN CHÓT CẢ LƯỢT (16/10): rotate sinh 2 bài bán hoặc 1 bán + 1 content trong một lần gọi, maxDuration 180 giây. Route
+// đặt hạn chót chung; mọi wrapAi trong lượt lấy hạn sớm hơn giữa quỹ riêng và hạn này. Hạn đã qua thì bỏ qua (tiến trình
+// Vercel dùng lại cho lượt sau, hạn cũ không được chặn Gemma oan).
+let runDeadline = 0;
+export function setRunDeadline(ts) { runDeadline = Number(ts) || 0; }
+
 const RETRIABLE = /429|500|503|INTERNAL|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|aborted|timeout|JSON/i;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -71,7 +105,8 @@ export function wrapAi(ai, opts = {}) {
     log = console,
     now = () => Date.now(),
   } = opts;
-  const deadline = now() + budgetMs;
+  const t0 = now();
+  const deadline = runDeadline > t0 ? Math.min(t0 + budgetMs, runDeadline) : t0 + budgetMs;
   return {
     models: {
       async generateContent(params) {
@@ -90,13 +125,23 @@ export function wrapAi(ai, opts = {}) {
           : cfg;
         let lastErr = null;
         for (let i = 0; i < tries; i++) {
+          const est = estimateTokens({ ...params, config: gemmaCfg });
+          const wait = gemmaWaitMs(est, now());
+          if (wait > 0) {
+            if (deadline - now() - wait < minGemmaMs) { lastErr = new Error(`han muc 16.000 token/phut, phai cho ${Math.round(wait / 1000)} giay, khong kip quy`); break; }
+            log?.warn?.(`[llm-client] ${model} cho ${Math.round(wait / 1000)} giay cho het han muc token/phut`);
+            await sleep(wait);
+          }
           const left = deadline - now();
           if (left < minGemmaMs) { lastErr = new Error(`het quy thoi gian (con ${Math.round(left / 1000)} giay)`); break; }
+          const entry = { at: now(), tokens: est };
+          gemmaWindow.push(entry);
           try {
             const res = await withTimeout(
               (signal) => ai.models.generateContent({ ...params, config: { ...gemmaCfg, abortSignal: signal } }),
               Math.min(gemmaTimeoutMs, left - 5000),
             );
+            if (Number(res?.usageMetadata?.promptTokenCount) > 0) entry.tokens = Number(res.usageMetadata.promptTokenCount);
             let text = res?.text || '';
             if (wantJson) {
               text = extractJsonText(text);
@@ -109,6 +154,8 @@ export function wrapAi(ai, opts = {}) {
             return { text, usageMetadata: res?.usageMetadata, modelVersion: res?.modelVersion, usedModel: model, fellBack: false };
           } catch (e) {
             lastErr = e;
+            // 429 hạn mức: coi như cửa sổ phút đã đầy để lượt sau chờ đúng, không bắn tiếp cho tốn hạn mức ngày.
+            if (/429|RESOURCE_EXHAUSTED/.test(String(e?.message || e))) entry.tokens = GEMMA_TPM;
             if (!RETRIABLE.test(String(e?.message || e?.name || e))) break;
             if (i < tries - 1) await sleep(2000);
           }

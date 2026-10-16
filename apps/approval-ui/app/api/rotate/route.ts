@@ -66,6 +66,8 @@ export async function GET(req: Request) {
 
   const client = getServerClient();
   const startedAt = Date.now();
+  // 16/10: hạn chót chung cho mọi lượt Gemma trong lượt rotate này (maxDuration 180, chừa 30 giây cho lưu bài, ảnh).
+  try { (await import('../../../lib/gen/llm-client.mjs') as any).setRunDeadline(startedAt + 150000); } catch { /* bỏ qua */ }
   const forced = new URL(req.url).searchParams.get('force') === '1';
   // Ghi run_log mỗi lần chạy (19/8: route này im lặng suốt, cron Vercel trượt 1 ngày mà không ai
   // biết vì không có nhật ký — y hệt bẫy metrics đã vá). Có log rồi thì trang Dữ liệu/BOT thấy được.
