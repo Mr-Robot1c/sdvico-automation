@@ -168,7 +168,8 @@ export async function loadAgentDefs(client: Client): Promise<AgentDef[]> {
     },
     {
       key: 'data1', icon: '🏠', name: 'AI DATA 1 — nội bộ',
-      model: 'Gemini Flash Lite (đọc ảnh + tóm tắt file)',
+      // 19/10: day-kho-zalo*.bat đặt MKT_MODEL_DATA1=ollama:sdvico-gemma; máy chưa có Ollama thì lùi flash-lite.
+      model: 'Gemma 4 trên máy nội bộ (Ollama), dự phòng Gemini Flash Lite (đọc ảnh + tóm tắt file)',
       // 4/9 (memory: đầu vào Zalo do phiên Claude desktop 16h tải, task Windows 20h đẩy kho).
       runsAt: 'Chạy trên máy nội bộ 20h, 2 ngày một lần (đẩy kho, tóm tắt)',
       role: 'Học tri thức nội bộ (file Zalo/tài liệu người phụ trách thả vào kho) thành insight cho BOSS.',

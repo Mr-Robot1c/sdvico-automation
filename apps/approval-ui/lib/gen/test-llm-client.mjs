@@ -172,5 +172,13 @@ check(modelFor('blog', { MKT_MODEL_BLOG: 'ollama:sdvico-gemma' }) === 'ollama:sd
   check(req.url === 'http://may-noi-bo:11434/v1/chat/completions' && !('reasoning_effort' in req.body) && !('response_format' in req.body), 'MKT_OLLAMA_URL đổi máy chủ, MKT_OLLAMA_REASONING rỗng thì không gửi');
 }
 
+{
+  let req = null;
+  const fetchImpl = async (url, init) => { req = JSON.parse(init.body); return { ok: true, json: async () => ({ choices: [{ message: { content: 'chữ' } }] }) }; };
+  await callLocal({ model: 'ollama:x', contents: [{ role: 'user', parts: [{ text: 'Đọc chữ' }, { inlineData: { mimeType: 'image/png', data: 'QUJD' } }] }], config: {} }, undefined, { fetchImpl, env: {} });
+  const c = req.messages[0].content;
+  check(Array.isArray(c) && c[0].text === 'Đọc chữ' && c[1].image_url.url === 'data:image/png;base64,QUJD', 'ảnh (DATA 1) gửi dạng image_url data URL kèm chữ');
+}
+
 console.log(fails ? `\n${fails} kiểm tra SAI` : '\nOK: mọi kiểm tra đạt');
 process.exit(fails ? 1 : 0);

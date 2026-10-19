@@ -111,3 +111,39 @@ So với Gemma 4 26B trên Gemini API (khoảng 16 tới 107 giây, chấm mù 6
 vừa sai luật nhiều hơn, KHÔNG thay được. Muốn chạy viết bài trên máy thì cần máy từ 32 GB để chạy
 `gemma4:26b`, đo lại bảng trên rồi mới đổi biến. Bot hỏi đáp (mục trên) thì chạy được trên máy 16 GB vì
 câu trả lời ngắn.
+
+## Bot hỏi đáp với kho thật (đo 19/10/2026)
+
+Kho thật 21 dòng hỏi đáp + 126 thông số, prompt khoảng 16.000 token, Gemma 4 12B trên máy, chỉ đọc. Câu đầu
+62 tới 78 giây (nạp kho), các câu sau 4 tới 19 giây. Đã sửa hai lỗi đo được:
+
+- Hỏi trả góp (kho không có), bot khẳng định "chưa có chính sách trả góp". Nay luật 2 cấm tự trả lời có hay
+  không cho chính sách kho không nhắc tới, và máy chèn câu "Kho SDVICO chưa có thông tin này" khi model báo
+  found = false mà không nói.
+- Bot bê giọng chốt đơn của mục E ("Anh cho em hỏi tàu mình...") vào câu trả lời cho nhân viên. Nay luật 8
+  (câu đầu là đáp án, như ô trả lời của Google) và luật 9 (người hỏi là nhân viên), máy cắt câu hỏi ngược cuối bài.
+
+Muốn bot tìm tin mới như Google thì vẫn cần `TAVILY_API_KEY` hoặc `SERPER_API_KEY` (Bước 1 ở trên).
+
+## AI DATA 1 trên máy nội bộ (đã bật 19/10/2026)
+
+`scripts/day-kho-zalo*.bat` đặt `MKT_MODEL_DATA1=ollama:sdvico-gemma` trước khi gọi
+`run-knowledge-now.mjs --only-internal`. Máy chưa cài Ollama hoặc chưa tạo `sdvico-gemma` thì lượt gọi lỗi
+ngay và lùi Gemini flash-lite như cũ. Muốn ép về Gemini: đặt `MKT_MODEL_DATA1=gemini-flash-lite-latest`
+trong `.env` của máy.
+
+Đo trên 3 file Zalo thật (1.300 tới 2.300 ký tự), so với tóm tắt flash-lite đã lưu: 8 tới 9 giây một file,
+ý chính tương đương, có 1 lỗi gõ ("kỹ gia thuật"). Nội dung Zalo nội bộ không còn gửi ra Google. Bucket
+hiện chỉ có văn bản (.md, .jsonl), chưa đo đường đọc ảnh chụp.
+
+## Agent nào chạy trên máy được (19/10/2026, máy 16 GB)
+
+| Agent | Kết luận |
+|---|---|
+| Trợ lý hỏi đáp | Được, khi chạy approval-ui trên máy. Bản Vercel vẫn Gemini |
+| DATA 1 (tóm tắt Zalo) | Đã bật, xem mục trên |
+| Blog, content, bài bán (SEO, tạo kịch bản) | Không: chậm 114 tới hơn 300 giây, sai luật bài bán |
+| BOSS (kế hoạch) | Không: prompt 17.000 tới 39.000 token vượt ngữ cảnh 32K, mỗi lượt nạp hơn 1 phút, quyết định quan trọng cần model mạnh |
+| DATA 2 (quét mạng) | Không: cần tìm Google (grounding), model trên máy không tự tìm web |
+| Kịch bản video | Không: prompt rất dài như BOSS |
+| Video, giọng nói | Đã chạy trên máy từ trước (ffmpeg, VieNeu) |

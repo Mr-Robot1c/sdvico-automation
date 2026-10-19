@@ -41,6 +41,16 @@ function contentsToText(contents) {
   return list.map((c) => (typeof c === 'string' ? c : (c?.parts || []).map((p) => p?.text || '').join(''))).join('\n');
 }
 
+// Có ảnh (inlineData, vd DATA 1 đọc ảnh chụp Zalo) thì gửi dạng nhiều phần chuẩn OpenAI, ảnh là data URL base64.
+function contentsToMessage(contents) {
+  const list = Array.isArray(contents) ? contents : [contents];
+  const parts = list.flatMap((c) => (c && typeof c === 'object' && Array.isArray(c.parts) ? c.parts : []));
+  if (!parts.some((p) => p?.inlineData)) return contentsToText(contents);
+  return parts.map((p) => (p?.inlineData
+    ? { type: 'image_url', image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } }
+    : { type: 'text', text: String(p?.text || '') }));
+}
+
 // Gọi Ollama, trả về cùng dạng phản hồi Gemini mà wrapAi đọc (text, usageMetadata).
 // MKT_OLLAMA_REASONING mặc định "none": Gemma 4 trên Ollama tự "suy nghĩ" trước khi trả lời, chậm gấp 4 tới 10 lần (đo 19/10).
 export async function callLocal(params, signal, { fetchImpl = globalThis.fetch, env = process.env } = {}) {
@@ -48,7 +58,7 @@ export async function callLocal(params, signal, { fetchImpl = globalThis.fetch, 
   const cfg = params?.config || {};
   const messages = [];
   if (cfg.systemInstruction) messages.push({ role: 'system', content: String(cfg.systemInstruction) });
-  messages.push({ role: 'user', content: contentsToText(params?.contents) });
+  messages.push({ role: 'user', content: contentsToMessage(params?.contents) });
   const effort = String(env.MKT_OLLAMA_REASONING ?? 'none').trim();
   const r = await fetchImpl(`${base}/chat/completions`, {
     method: 'POST',
