@@ -162,12 +162,16 @@ function buildPrompt(knowledge: string, history: BotTurn[], question: string, ca
     '',
     'CÁCH LÀM VIỆC:',
     '1. Trả lời được MỌI câu hỏi: kiến thức chung, kỹ thuật tàu cá và máy lọc, luật biển và IUU nói chung, soạn chữ, dịch, tính toán, tóm tắt, gợi ý cách bán hàng, tin tức mới. Với các câu này bạn dùng hiểu biết của mình' + (canSearch ? ' và công cụ tìm Google (nhất là khi cần thông tin mới hoặc số liệu bên ngoài).' : '.'),
-    '2. RIÊNG mọi thứ THUỘC VỀ SDVICO (giá bán, khuyến mãi, thông số máy SDVICO đang bán, bảo hành, khách hàng, đối tác, link sàn, luật đăng bài nội bộ) thì CHỈ được lấy từ KHO KIẾN THỨC bên dưới. Tuyệt đối không suy đoán, không lấy giá hay thông số từ internet gán cho SDVICO. Kho không có thì nói rõ "kho SDVICO chưa có thông tin này, hỏi Kinh doanh (Tiến, Hòa, Linh) rồi lưu vào kho", nhưng vẫn có thể trả lời phần kiến thức chung của câu hỏi và nói rõ đó là kiến thức chung.',
+    '2. RIÊNG mọi thứ THUỘC VỀ SDVICO (giá bán, khuyến mãi, thông số máy SDVICO đang bán, bảo hành, khách hàng, đối tác, link sàn, luật đăng bài nội bộ) thì CHỈ được lấy từ KHO KIẾN THỨC bên dưới. Tuyệt đối không suy đoán, không lấy giá hay thông số từ internet gán cho SDVICO. Kho không có thì nói rõ "kho SDVICO chưa có thông tin này, hỏi Kinh doanh (Tiến, Hòa, Linh) rồi lưu vào kho", nhưng vẫn có thể trả lời phần kiến thức chung của câu hỏi và nói rõ đó là kiến thức chung. Chính sách SDVICO mà kho KHÔNG nhắc tới (trả góp, giao hàng, đổi trả, khuyến mãi, chiết khấu...) thì KHÔNG được tự trả lời "có" hay "không có", chỉ nói kho chưa có (19/10: bot từng khẳng định "chưa có chính sách trả góp" khi kho không ghi gì).',
     '3. Dòng kho ghi CHƯA XÁC NHẬN thì ghi "(chưa xác nhận)" ngay sau ý đó.',
     '4. Thông tin lấy từ internet thì ghi rõ là "theo nguồn ngoài" và không được trộn lẫn với số liệu SDVICO.',
     '5. Không bịa số liệu, giải thưởng, khách hàng, đối tác. Không mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO.',
     '6. Nếu câu hỏi liên quan tới đăng bài công khai, nhắc luật giá úp mở và luật nội dung IUU phải qua duyệt (mục D).',
     '7. Viết tiếng Việt tự nhiên, thân thiện, đủ ý; câu hỏi khó thì giải thích từng bước. Không dùng gạch dài, mũi tên, dấu chấm tròn giữa câu, không markdown đậm nghiêng. Số theo kiểu Việt Nam (9.900.000 đ).',
+    // 19/10 (Thanh: "bot cần được hỏi và trả lời y như google"): đáp thẳng ở câu đầu như ô trả lời của Google; mục E là
+    // khung trả lời KHÁCH, bot từng bê nguyên giọng chốt đơn ("Anh cho em hỏi tàu mình...") sang câu trả lời cho nhân viên.
+    '8. Trả lời như Google: CÂU ĐẦU TIÊN là đáp án trực tiếp (con số, có hoặc không, tên, cách làm), sau đó mới giải thích ngắn nếu cần. Không chào hỏi, không mở bài, không lặp lại câu hỏi, không thêm lời quảng cáo kiểu "công nghệ tiên tiến".',
+    '9. Người hỏi là NHÂN VIÊN SDVICO, không phải khách. Không xưng "em" gọi "anh" như đang chốt đơn, không kết bằng câu hỏi ngược kiểu bán hàng. Mục E chỉ dùng khi nhân viên nhờ soạn tin trả lời khách.',
     '',
     'ĐẦU RA: trả về DUY NHẤT một JSON, không có chữ nào ngoài JSON:',
     '{"answer": string, "scope": "noi_bo" | "chung" | "hon_hop", "found": boolean, "used_ids": string[]}',
@@ -262,6 +266,12 @@ async function callModel(mkPrompt: (canSearch: boolean) => string, client: AnyCl
   throw new Error('Mọi model đều lỗi hoặc quá giờ. Lỗi cuối: ' + lastErr);
 }
 
+// Cắt câu hỏi ngược kiểu bán hàng ở CUỐI câu trả lời ("Anh cho em hỏi tàu mình chạy máy bao nhiêu CV ạ?").
+export function stripSalesQuestion(answer: string): string {
+  const out = answer.replace(/\s*[^.!?\n]*(cho em (hỏi|biết)|để em (tư vấn|báo|nhờ))[^.!?\n]*\?\s*$/i, '').trim();
+  return out || answer;
+}
+
 function parseJson(text: string): { answer?: string; found?: boolean; scope?: string; used_ids?: unknown } {
   const t = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
   try { return JSON.parse(t); } catch { /* rơi xuống */ }
@@ -291,8 +301,12 @@ export async function askBot(client: AnyClient, question: string, history: BotTu
     .slice(0, 8);
   const scope: BotScope = parsed.scope === 'chung' || parsed.scope === 'hon_hop' ? parsed.scope : 'noi_bo';
   const found = parsed.found !== false && !!String(parsed.answer || '').trim();
-  const answer = String(parsed.answer || '').trim()
+  let answer = String(parsed.answer || '').trim()
     || 'Kho SDVICO chưa có thông tin này. Hỏi Kinh doanh (Tiến, Hòa, Linh) rồi lưu câu trả lời vào kho.';
+  // 19/10: model tự báo found=false mà câu trả lời không nói kho thiếu (vẫn khẳng định như thật): máy chèn câu báo lên đầu.
+  if (!found && !/chưa có/i.test(answer)) answer = `Kho SDVICO chưa có thông tin này, cần hỏi Kinh doanh (Tiến, Hòa, Linh). ${answer}`;
+  // 19/10: model nhỏ (Gemma 12B trên máy) vẫn kết bằng câu hỏi ngược kiểu chốt đơn dù luật 9 cấm: máy cắt câu hỏi cuối đó.
+  answer = stripSalesQuestion(answer);
 
   // Đếm số lần dùng để biết dòng nào hay được hỏi (đầu vào chọn lọc cho bot live).
   await Promise.all(usedIds.map((id) => {
