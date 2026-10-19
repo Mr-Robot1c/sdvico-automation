@@ -60,12 +60,19 @@ export function openAiCompatConfigured(): { baseUrl: string; model: string; labe
   if (!base || !key || !model) return null;
   return { baseUrl: base, model, label: (process.env.OPENAI_LABEL || model).trim() };
 }
+// 19/10: Gemma chạy trên máy qua Ollama (OPENAI_BASE_URL=http://localhost:11434/v1, runbook-bot-tim-kiem-model.md)
+// đọc kho chậm hơn hãng ngoài nhiều, 25 giây không kịp. OPENAI_TIMEOUT_MS đè hạn chờ; chỉ nâng khi chạy approval-ui
+// trên máy, vì trên Vercel cả lượt bị cắt ở 60 giây.
+function openAiTimeoutMs(): number {
+  const ms = Number(process.env.OPENAI_TIMEOUT_MS);
+  return Number.isFinite(ms) && ms > 0 ? ms : 25_000;
+}
 function buildAttempts(hasWebHits: boolean): Attempt[] {
   const oa = openAiCompatConfigured();
   const forceGemini = (process.env.BOT_PROVIDER || '').trim().toLowerCase() === 'gemini';
   // Đã có kết quả tìm web trong prompt thì bỏ 2 lượt grounding (chậm, hay 429) — lượt JSON thẳng nhanh hơn.
   const gem = hasWebHits ? GEMINI_ATTEMPTS.filter((a) => !a.search) : GEMINI_ATTEMPTS;
-  if (oa && !forceGemini) return [{ provider: 'openai', model: oa.model, search: false, ms: 25_000 }, ...gem];
+  if (oa && !forceGemini) return [{ provider: 'openai', model: oa.model, search: false, ms: openAiTimeoutMs() }, ...gem];
   return gem;
 }
 const MAX_QUESTION = 2000;
@@ -195,14 +202,20 @@ function extractWebSources(res: any): WebSource[] {
 }
 
 // Gọi model theo chuẩn OpenAI chat/completions (DeepSeek, Qwen, Kimi, OpenAI...). JSON mode nếu máy chủ hỗ trợ.
+// 19/10: OPENAI_REASONING_EFFORT gửi kèm reasoning_effort khi được đặt. Gemma 4 trên Ollama mặc định "suy nghĩ" trước
+// khi trả lời (đo: 741 token cho câu hỏi 2 dòng, 44 giây); đặt "none" còn 170 token. Không đặt thì không gửi, hãng khác y cũ.
 async function callOpenAiCompat(prompt: string, a: Attempt): Promise<string> {
   const oa = openAiCompatConfigured();
   if (!oa) throw new Error('OPENAI_* chưa cấu hình');
+  const effort = (process.env.OPENAI_REASONING_EFFORT || '').trim();
   const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), a.ms);
   try {
     const r = await fetch(`${oa.baseUrl}/chat/completions`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: JSON.stringify({ model: a.model, temperature: 0.3, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } }),
+      body: JSON.stringify({
+        model: a.model, temperature: 0.3, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' },
+        ...(effort ? { reasoning_effort: effort } : {}),
+      }),
       signal: ctrl.signal, cache: 'no-store',
     });
     const j: any = await r.json().catch(() => ({}));
