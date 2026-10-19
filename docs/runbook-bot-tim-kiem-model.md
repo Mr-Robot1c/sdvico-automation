@@ -83,3 +83,31 @@ OPENAI_REASONING_EFFORT=none
 - Gemma hỏng hoặc quá giờ thì bot tự lùi về Gemini như cũ (cần `GEMINI_API_KEY`).
 
 Chưa đo với kho thật (500 dòng hỏi đáp + product_facts): prompt dài hơn nhiều nên sẽ chậm hơn con số trên.
+
+## Blog, content, bài bán bằng model trên máy (chưa dùng được trên máy 16 GB)
+
+`lib/gen/llm-client.mjs` nhận tên model dạng `ollama:<tên>`, đặt qua biến sẵn có:
+
+```
+MKT_MODEL_BLOG=ollama:sdvico-gemma
+MKT_MODEL_CONTENT=ollama:sdvico-gemma
+MKT_MODEL_SOCIAL=ollama:sdvico-gemma
+```
+
+Lượt gọi đi qua Ollama (`MKT_OLLAMA_URL`, mặc định `http://localhost:11434/v1`), dùng chung đường vá Gemma:
+lọc JSON, thử lại, lỗi thì lùi flash-lite. Ollama chưa bật thì lùi ngay, không thử lại. `MKT_OLLAMA_REASONING`
+mặc định `none` (tắt suy nghĩ); đặt rỗng để không gửi. Vẫn cần `GEMINI_API_KEY` thật: blog chỉ gọi model
+khi có khóa, và lượt dự phòng chạy trên Gemini. Chỉ dùng với `scripts/rotate-now.mjs` chạy trên máy;
+cron Vercel và GitHub Actions không thấy localhost.
+
+Đo 19/10/2026 trên MacBook M6 16 GB, `gemma4:12b-it-qat`, đã tắt suy nghĩ, quỹ thời gian nâng lên 400 giây:
+
+| Việc | Thời gian | Kết quả |
+|---|---|---|
+| Bài bán SEA-40 (Facebook) | 114 giây | Có bài, nhưng lẫn chữ Thái, dính chữ, câu kêu bình luận sai nguyên văn, thừa câu hỏi mở cuối bài (luật 11/9 cấm) |
+| Blog 3 định dạng | quá 300 giây | Chưa xong, bị cắt, lùi dự phòng |
+
+So với Gemma 4 26B trên Gemini API (khoảng 16 tới 107 giây, chấm mù 6,4): bản 12B trên máy 16 GB vừa chậm hơn
+vừa sai luật nhiều hơn, KHÔNG thay được. Muốn chạy viết bài trên máy thì cần máy từ 32 GB để chạy
+`gemma4:26b`, đo lại bảng trên rồi mới đổi biến. Bot hỏi đáp (mục trên) thì chạy được trên máy 16 GB vì
+câu trả lời ngắn.
