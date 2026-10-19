@@ -165,7 +165,7 @@ check(modelFor('blog', { MKT_MODEL_BLOG: 'ollama:sdvico-gemma' }) === 'ollama:sd
   const fetchImpl = async (url, init) => { req = { url, body: JSON.parse(init.body) }; return { ok: true, json: async () => ({ choices: [{ message: { content: '{"a":1}' } }], usage: { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 } }) }; };
   const out = await callLocal({ model: 'ollama:sdvico-gemma', contents: [{ role: 'user', parts: [{ text: 'hỏi' }] }], config: { systemInstruction: 'hệ', temperature: 1, responseMimeType: 'application/json' } }, undefined, { fetchImpl, env: {} });
   check(req.url === 'http://localhost:11434/v1/chat/completions' && req.body.model === 'sdvico-gemma', 'gọi localhost mặc định, bỏ tiền tố ollama:');
-  check(req.body.messages[0].role === 'system' && req.body.messages[1].content === 'hỏi' && req.body.response_format?.type === 'json_object', 'chỉ dẫn hệ thống thành tin system, contents thành tin user, giữ JSON mode');
+  check(req.body.messages[0].role === 'system' && req.body.messages[1].content === 'hỏi' && !('response_format' in req.body), 'chỉ dẫn hệ thống thành tin system, contents thành tin user, KHÔNG bật JSON mode (Gemma trả {"thought"})');
   check(req.body.reasoning_effort === 'none', 'mặc định tắt suy nghĩ của Gemma 4');
   check(out.text === '{"a":1}' && out.usageMetadata.promptTokenCount === 7 && out.usageMetadata.candidatesTokenCount === 3, 'trả về dạng Gemini (text, usageMetadata) cho token-log');
   await callLocal({ model: 'ollama:x', contents: 'y', config: {} }, undefined, { fetchImpl, env: { MKT_OLLAMA_URL: 'http://may-noi-bo:11434/v1/', MKT_OLLAMA_REASONING: '' } });

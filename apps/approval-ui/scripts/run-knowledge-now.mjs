@@ -123,11 +123,14 @@ async function summarizeForPlan(text) {
         'Nhiệm vụ: đọc kỹ, tóm tắt các điểm chính CÓ ÍCH cho lập kế hoạch marketing tuần tới.',
         'Ưu tiên: câu hỏi khách hay gặp, phản hồi Phòng Kinh doanh, sự cố sản phẩm, xu hướng đang nói tới.',
         'BỎ QUA: chào hỏi, tán gẫu, thông tin cá nhân.',
+        // 19/10: Gemma 12B trên máy đọc "Coming K19" (máy Cummins K19 của tàu khách) thành "sản phẩm K19 sắp ra mắt".
+        'CHỈ ghi điều có trong nội dung, không suy đoán thêm. Tên máy tàu (Cummins, K19, Yanmar...) là động cơ của tàu khách, không phải sản phẩm SDVICO.',
         'Văn phong: câu ngắn, gần gũi bà con ngư dân, KHÔNG dùng gạch dài, KHÔNG dùng mũi tên, số theo chuẩn Việt Nam.',
         'Trả JSON đúng dạng: {"title":"tiêu đề 5-10 chữ","summary":"tóm tắt 3-5 câu"}. Không thêm chữ ngoài JSON.',
         '', 'NỘI DUNG:', text.slice(0, 12000)
       ].join('\n') }] }],
-      config: { responseMimeType: 'application/json', temperature: 0.4 }
+      // 19/10: khai báo khoá để wrapAi ghi tên khoá cho Gemma và thử lại khi thiếu (Gemma từng trả khoá khác, tóm tắt rỗng).
+      config: { responseMimeType: 'application/json', temperature: 0.4, responseSchema: { type: 'OBJECT', properties: { title: { type: 'STRING' }, summary: { type: 'STRING' } }, required: ['title', 'summary'] } }
     });
     const t = (res.text || '').trim();
     const m = t.match(/\{[\s\S]*\}/);

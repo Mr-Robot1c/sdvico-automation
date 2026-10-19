@@ -51,6 +51,8 @@ function contentsToMessage(contents) {
     : { type: 'text', text: String(p?.text || '') }));
 }
 
+// KHÔNG gửi response_format json_object: đo 19/10, Gemma 4 ở chế độ JSON của Ollama trả {"thought": "..."} thay cho khoá
+// được yêu cầu (DATA 1: 4/11 tóm tắt hỏng); tắt đi thì đúng khoá. wrapAi đã tự lọc khối JSON và kiểm khoá bắt buộc.
 // Gọi Ollama, trả về cùng dạng phản hồi Gemini mà wrapAi đọc (text, usageMetadata).
 // MKT_OLLAMA_REASONING mặc định "none": Gemma 4 trên Ollama tự "suy nghĩ" trước khi trả lời, chậm gấp 4 tới 10 lần (đo 19/10).
 export async function callLocal(params, signal, { fetchImpl = globalThis.fetch, env = process.env } = {}) {
@@ -67,7 +69,6 @@ export async function callLocal(params, signal, { fetchImpl = globalThis.fetch, 
       model: String(params?.model).replace(/^ollama:/i, ''),
       messages,
       ...(cfg.temperature != null ? { temperature: cfg.temperature } : {}),
-      ...(cfg.responseMimeType === 'application/json' ? { response_format: { type: 'json_object' } } : {}),
       ...(effort ? { reasoning_effort: effort } : {}),
     }),
     signal,

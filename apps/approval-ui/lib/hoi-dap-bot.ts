@@ -325,7 +325,8 @@ export async function askBot(client: AnyClient, question: string, history: BotTu
     const r = byId.get(id)!;
     return { id, product_group: r.product_group, question: r.question, verified: r.verified, source: r.source };
   });
-  return { answer, found, scope, used_ids: usedIds, model, sources, web_sources: web, searched };
+  // 19/10: câu thuần SDVICO (noi_bo) trả lời từ kho, nguồn web tìm kèm thường lạc đề (hỏi giá máy lọc ra tin chứng khoán): không hiện.
+  return { answer, found, scope, used_ids: usedIds, model, sources, web_sources: scope === 'noi_bo' ? [] : web, searched };
 }
 
 // 24/9 (sếp Long: "câu trả lời đầu tiên của em chưa chuẩn... tăng attention từ 10 lên 20 lên 30",

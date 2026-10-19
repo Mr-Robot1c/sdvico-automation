@@ -1,0 +1,16 @@
+{
+  "_ghi_chu": "11 nhóm công ty mà phiên đọc Zalo cũ (laptop Windows, tới 08/10/2026) đã quét, lấy từ zalo-messages.jsonl trên bucket. Chỉ đọc nhóm bat=true; KHÔNG mở tin nhắn riêng. Thêm hay tắt nhóm thì sửa file này. tim = chữ gõ vào ô tìm kiếm Zalo. ten_cu = tên trước khi nhóm đổi tên, để mốc quét nối với dữ liệu cũ.",
+  "nhom": [
+    { "ten": "Triển Khai Kinh Doanh", "key": "trien-khai-kinh-doanh", "tim": "Triển Khai Kinh Doanh", "bat": true },
+    { "ten": "SDVico AI MKT", "ten_cu": ["SDVico AI MKT + Tuyển dụng"], "key": "sdvico-ai-mkt-tuyendung", "tim": "SDVico AI MKT", "bat": true },
+    { "ten": "SDViCo Công việc", "key": "sdvico-cong-viec", "tim": "SDViCo Công việc", "bat": true },
+    { "ten": "SDVICO CSKH", "key": "sdvico-cskh", "tim": "SDVICO CSKH", "bat": true },
+    { "ten": "Sdvico SMS- Hàng hải thông minh", "key": "sdvico-sms", "tim": "Hàng hải thông minh", "bat": true },
+    { "ten": "SDVICO Sản xuất-DV Kỹ thuật", "key": "sdvico-san-xuat-dv-ky-thuat", "tim": "Sản xuất-DV Kỹ thuật", "bat": true },
+    { "ten": "SDVico IT", "key": "sdvico-it", "tim": "SDVico IT", "bat": true },
+    { "ten": "SDVico SDFish", "key": "sdvico-sdfish", "tim": "SDVico SDFish", "bat": true },
+    { "ten": "SDViCo - Số Hóa Nội Bộ", "key": "sdvico-so-hoa-noi-bo", "tim": "Số Hóa Nội Bộ", "bat": true },
+    { "ten": "Sdvico Hcm", "key": "sdvico-hcm", "tim": "Sdvico Hcm", "bat": true },
+    { "ten": "SDVICO Family", "key": "sdvico-family", "tim": "SDVICO Family", "bat": true }
+  ]
+}
