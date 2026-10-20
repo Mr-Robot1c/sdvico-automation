@@ -1136,6 +1136,11 @@ a.chip:hover { filter: brightness(0.98); }
 .pub-footer-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 .pub-footer-links a { color: var(--ink-2); text-decoration: none; white-space: nowrap; }
 .pub-footer-links a:hover { color: var(--accent); text-decoration: underline; }
+.pub-footer-support { flex-basis: 100%; border-top: 1px solid var(--line); padding-top: 16px; }
+.pub-footer-support b { display: block; color: var(--ink); font-size: 14px; margin-bottom: 8px; }
+.pub-footer-support ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px 24px; }
+.pub-footer-support a { color: var(--ink); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.pub-footer-support a:hover { color: var(--accent); text-decoration: underline; }
 
 /* Đầu trang + đường dẫn */
 .pub-head { margin: 0 0 24px; }

@@ -17,6 +17,7 @@ Ghi chú: đây là dự án riêng cho SDVICO, tách khỏi thử nghiệm `aut
 - Khách hàng mục tiêu: ngư dân, chủ tàu cá, doanh nghiệp ngành biển và thủy sản.
 - Địa chỉ: 283 Nguyễn Hữu Cảnh, Vũng Tàu. `[CẦN XÁC NHẬN: tên phường và đơn vị hành chính hiện hành, vì các nguồn ghi khác nhau]`
 - Liên hệ: website sdvico.vn, hotline 1900 23 23 49, hộp thư tuyển dụng tuyendung@sdvico.vn.
+- Số hỗ trợ theo khu vực và dịch vụ (anh Tiến, Kinh doanh, xin công khai trên web và FB ngày 20/10/2026): Khánh Hòa, Bình Thuận 0911 638 672; Cà Mau, Bạc Liêu, Sóc Trăng 0911 248 872; Bến Tre 0911 381 872; kỹ thuật toàn quốc máy lọc nước và máy lọc dầu 0911 789 572; phản hồi dịch vụ kinh doanh 0911 439 672. Danh sách nằm ở `apps/approval-ui/lib/public-contact.ts`.
 - Vai trò trong chuỗi: SDVICO vừa phát triển một số sản phẩm, khởi đầu là máy lọc nước, vừa phân phối và lắp đặt thiết bị của các hãng. SDVICO không sở hữu phần mềm của các hãng đối tác, xem điều cấm 4.
 
 Nguyên tắc điền mục này: các dữ kiện lấy từ trang chính thức sdvico.vn, tra ngày 10/8/2026. Mục nào còn đánh dấu cần xác nhận thì Phòng Kinh doanh hoặc Phòng Nhân sự chốt lại. Không suy đoán, không lấy từ nguồn ngoài chưa kiểm chứng, điều cấm 5.
