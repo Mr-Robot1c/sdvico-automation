@@ -404,6 +404,10 @@ export async function GET(req: Request) {
   // @ts-ignore — module JS thuần
   const { generateSocialPost, generateContentPost } = await import('../../../lib/gen/social.mjs');
   // @ts-ignore — module JS thuần
+  const { loadProductFacts } = await import('../../../lib/gen/product-facts.mjs');
+  // 21/10: catalog thật ở bảng product_facts (trước bài Facebook chỉ thấy mảng tĩnh có dòng TEST). Đọc 1 lần mỗi lượt.
+  const facts = await loadProductFacts(client);
+  // @ts-ignore — module JS thuần
   const { pickInsights } = await import('../../../lib/gen/insights.mjs');
   // Insight/painpoint đã dùng gần đây theo nhóm sản phẩm (30 bài gần nhất) -> chọn insight MỚI
   // cho mỗi bài, chống lặp thông điệp; bản B của cặp tự khác bản A vì A vừa lưu insight_id.
@@ -508,6 +512,7 @@ export async function GET(req: Request) {
           insight: chosenInsight,
           photoOnly,
           client,
+          facts,
         });
       } catch (e) {
         skipped.push({ group, reason: 'gen loi: ' + (e as any)?.message });
@@ -709,7 +714,7 @@ export async function GET(req: Request) {
     let gen: any;
     try {
       // @ts-ignore — generateContentPost là module JS thuần, TS không biết param topic.
-      gen = await generateContentPost({ topic: chosenTopic, client, emotionOverride: contentEmotionOverride });
+      gen = await generateContentPost({ topic: chosenTopic, client, facts, emotionOverride: contentEmotionOverride });
     } catch (e) {
       skipped.push({ group: 'Bài content', reason: 'gen loi: ' + (e as any)?.message });
       break;

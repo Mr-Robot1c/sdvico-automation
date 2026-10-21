@@ -1,9 +1,9 @@
 // Sinh text bài mạng xã hội cho một sản phẩm: thân bài có emoji + khối hashtag.
 // Giọng brand-voice, hàng rào product-boundary (không bịa thông số, không nhận vơ phần mềm đối tác).
 import { assessDraft, scanPlaybook, countWords, firstBodyLine } from './compliance.mjs';
-import { knownFactValues, testFactValues, PRODUCT_FACTS } from './product-facts.mjs';
+import { knownFactValues, testFactValues, PRODUCT_FACTS, factsForGroup } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
-import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, audienceLines, benefitLines, pickBenefitBlock, applyBenefitBlock, sanitizePostText } from './products.mjs';
+import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, isDiscontinuedGroup, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, audienceLines, benefitLines, pickBenefitBlock, applyBenefitBlock, sanitizePostText } from './products.mjs';
 import { insightBrief } from './insights.mjs';
 import { logTokenUsage } from './token-log.mjs';
 import { sampleHooks } from './hook-library.mjs';
@@ -82,6 +82,8 @@ export async function generateSocialPost({
   photoOnly = false,
   client = null,
 }) {
+  // 21/10: sản phẩm ngừng bán không được sinh bài bán (rotate đã lọc, chặn thêm ở đây cho mọi đường gọi).
+  if (isDiscontinuedGroup(productGroup)) throw new Error(`${productGroup} đã ngừng bán, không sinh bài bán.`);
   const { GoogleGenAI } = await import('@google/genai');
   // 16/10 (Thanh: "con nào thông minh thì cho viết"): bài bán chạy Gemma 4 26B (chấm mù 6,3 so với flash-lite 5,5), quỹ
   // 90 giây mỗi bài (đủ chờ hạn mức 16.000 token/phút khi 2 bài liền nhau), hạn chót chung của rotate vẫn chặn tổng;
@@ -89,8 +91,11 @@ export async function generateSocialPost({
   const SOCIAL_MODEL = modelFor('social');
   const ai = wrapAi(new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }), { budgetMs: Number(process.env.MKT_SOCIAL_BUDGET_MS) || 90000 });
 
-  const allowed = facts.filter((f) => f.value)
-    .map((f) => `${f.brand || ''} ${f.model || ''} ${f.attribute}: ${f.value}${f.verified ? '' : ' (CHƯA XÁC NHẬN)'}`.trim());
+  // 21/10: chỉ thông số ĐÃ XÁC NHẬN của ĐÚNG sản phẩm này (trước mớm cả danh sách, gồm dòng TEST "IP67" bịa
+  // của thiết bị giả GS-TEST-01, nên bài S-Tracking, Thuraya hay chép IP67). facts nên là catalog đọc từ DB
+  // (loadProductFacts), mặc định vẫn là mảng tĩnh.
+  const allowed = factsForGroup(facts, productGroup)
+    .map((f) => `${f.model || ''} ${f.attribute}: ${f.value}`.trim());
 
   const features = getFeatures(productGroup);
   const isTikTok = channel === 'tiktok';

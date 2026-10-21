@@ -12,6 +12,8 @@
 // Lược đồ mỗi dòng:
 //   { category, brand, model, attribute, value, source, confirmedBy, confirmedAt, verified }
 
+import { scanSpecTokens } from './compliance.mjs';
+
 export const PRODUCT_FACTS = [
   // ==== DỮ LIỆU TEST, verified:false, KHÔNG PHẢI SỐ THẬT ====
   { category: 'giam_sat_hanh_trinh', brand: 'TEST-DEMO', model: 'GS-TEST-01',
@@ -53,14 +55,48 @@ function normalize(s) {
   return String(s).toLowerCase().replace(/\s+/g, '');
 }
 
+// 21/10 (user: "cái catalog t đưa cho đâu"): catalog thật (Catalog SDVICO 2026 + file tính năng, Thanh nạp qua
+// trang Kiến thức) nằm ở bảng product_facts, nhưng bài Facebook của rotate vẫn đọc mảng tĩnh ở trên (4 dòng TEST
+// + 5 dòng SF300B) nên model không thấy 250 lít/giờ của SEA-40, IP67 của S-Tracking..., còn được mớm IP67 TEST.
+// Đọc bảng (chỉ dòng verified); lỗi hoặc bảng rỗng thì lùi về mảng tĩnh để không tịt sinh bài.
+export async function loadProductFacts(client) {
+  if (!client) return PRODUCT_FACTS;
+  try {
+    const { data, error } = await client
+      .from('product_facts')
+      .select('category,brand,model,attribute,value,source,verified')
+      .eq('verified', true)
+      .limit(1000);
+    if (error || !data?.length) return PRODUCT_FACTS;
+    return data;
+  } catch {
+    return PRODUCT_FACTS;
+  }
+}
+
+// Dòng catalog của đúng một nhóm sản phẩm. category trong bảng có nơi giữ STT ("2. Máy lọc nước biển SEA-40"),
+// có nơi không, nên so sau khi bỏ STT. Chỉ dòng verified: dòng TEST không bao giờ được mớm cho model.
+const stripNo = (s) => String(s || '').replace(/^\s*\d+\.\s*/, '').trim().toLowerCase();
+export function factsForGroup(facts, group) {
+  const g = stripNo(group);
+  return (facts || []).filter((f) => f.verified && f.value && stripNo(f.category) === g);
+}
+
 // Tập giá trị đã duyệt (model và value) để đối chiếu allowlist. Gồm cả test lẫn thật.
 export function knownFactValues(facts = PRODUCT_FACTS) {
   const set = new Set();
-  for (const f of facts) {
-    if (f.model) set.add(normalize(f.model));
-    if (f.value) set.add(normalize(f.value));
-  }
+  for (const f of facts) addFactTokens(set, f);
   return set;
+}
+
+// 21/10: giá trị catalog là cả câu ("Khoảng 250 lít/giờ, màng lọc 4040") nên phải tách thêm từng token thông số
+// bên trong (250 lít/giờ, 4040) và mã trong tên nhóm (SEA-40), không thì bài nêu đúng catalog vẫn bị cờ "chưa xác minh".
+function addFactTokens(set, f) {
+  for (const field of [f.model, f.value, f.category]) {
+    if (!field) continue;
+    set.add(normalize(field));
+    for (const t of scanSpecTokens(field)) { set.add(t.norm); set.add(t.norm.replace(/-/g, '')); }
+  }
 }
 
 // Tập giá trị lấy từ dòng TEST (verified:false). Bài dùng các giá trị này sẽ bị gắn cảnh báo.
@@ -68,8 +104,7 @@ export function testFactValues(facts = PRODUCT_FACTS) {
   const set = new Set();
   for (const f of facts) {
     if (f.verified) continue;
-    if (f.model) set.add(normalize(f.model));
-    if (f.value) set.add(normalize(f.value));
+    addFactTokens(set, f);
   }
   return set;
 }

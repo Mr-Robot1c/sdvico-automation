@@ -10,6 +10,8 @@
 //     (product-facts). Chống bịa số (Điều cấm 5). Nguồn rỗng thì mọi thông số đều bị chặn
 //     để buộc người xác nhận, đúng nguyên tắc thà chặn nhầm còn hơn đăng bậy.
 
+import { PRODUCTS, PUBLIC_NAME } from './products.mjs';
+
 // Từ khóa quy định nhà nước. So khớp trên văn bản đã hạ chữ thường.
 export const REGULATION_TERMS = [
   'iuu',
@@ -79,7 +81,7 @@ export function scanPartner(text) {
 }
 
 // Quét mọi token giống model hoặc thông số trong văn bản. Trả về mảng { raw, norm }.
-function scanSpecTokens(text) {
+export function scanSpecTokens(text) {
   const found = new Map();
   for (const re of SPEC_PATTERNS) {
     const matches = (text || '').match(re) || [];
@@ -91,21 +93,33 @@ function scanSpecTokens(text) {
   return [...found.entries()].map(([norm, raw]) => ({ norm, raw }));
 }
 
+// 21/10: tên/mã sản phẩm trong danh mục (SEA-40, MNB-01, SD12-300, XT-Pro, SF300B...) là TÊN, không phải
+// thông số bịa. Trước bộ quét gắn cờ "chưa xác minh" cho chính tên sản phẩm của bài, gần như mọi bài bán đều
+// amber nên người duyệt quen bỏ qua cảnh báo thật.
+const PRODUCT_NAME_TOKENS = new Set(
+  [...PRODUCTS.map((p) => p.group), ...Object.values(PUBLIC_NAME)]
+    .flatMap((name) => scanSpecTokens(name).map((t) => t.norm.replace(/-/g, '')))
+);
+// So khớp bỏ dấu gạch: model viết "MNB01" hay "MNB-01" là một.
+const inSet = (set, norm) => set.has(norm) || set.has(norm.replace(/-/g, ''));
+
 // Thông số KHÔNG có trong nguồn đã duyệt (nghi bịa). knownValues gồm cả thật lẫn test.
 export function scanUnverifiedSpecs(text, knownValues = new Set()) {
-  return scanSpecTokens(text).filter((t) => !knownValues.has(t.norm)).map((t) => t.raw);
+  return scanSpecTokens(text)
+    .filter((t) => !inSet(knownValues, t.norm) && !PRODUCT_NAME_TOKENS.has(t.norm.replace(/-/g, '')))
+    .map((t) => t.raw);
 }
 
 // Thông số có trong nguồn nhưng là DỮ LIỆU TEST (verified:false). Không được coi là sạch.
 export function scanTestSpecs(text, testValues = new Set()) {
-  return scanSpecTokens(text).filter((t) => testValues.has(t.norm)).map((t) => t.raw);
+  return scanSpecTokens(text).filter((t) => inSet(testValues, t.norm)).map((t) => t.raw);
 }
 
 // Playbook SDVICO 26/8 PHẦN 11 — CHECKLIST 7 ĐIỂM trước khi đăng. Tự động 3 điểm quan trọng
 // nhất, còn lại (giọng bạn thuyền / bộ lọc 4 chữ) phụ thuộc người rà cuối.
 //
 //   scanPlaybook(text, { kind }) trả về { hookLen, hasNumber, hasQuestionCTA, violations[] }.
-//   - kind = 'sales' (bài bán): bắt buộc HOOK <=15 chữ, có con số, CTA có câu hỏi (?)
+//   - kind = 'sales' (bài bán): bắt buộc HOOK <=15 chữ, có con số, CTA có câu hỏi (?) hoặc câu mời cmt từ khóa
 //   - kind = 'content' (bài nuôi): chỉ bắt buộc CTA hỏi (bài content nào cũng kết bằng câu hỏi mở)
 //   - kind = 'viral' (nhịp viral trong CONTENT_KIND_BY_DOW): bắt buộc HOOK <=15 chữ + CTA hỏi
 //
@@ -132,7 +146,11 @@ export function scanPlaybook(text, { kind = 'sales' } = {}) {
   const hasNumber = NUMBER_PATTERN.test(body);
   // CTA hỏi: có dấu ? trong 3 dòng cuối (thường CTA nằm cuối bài).
   const last3 = body.split(/\r?\n/).filter((s) => s.trim()).slice(-3).join(' ');
-  const hasQuestionCTA = /\?/.test(last3);
+  // 21/10: bài BÁN kết bằng câu mời "cmt từ khóa" cố định (luật Thanh 9/9, ensureCommentCta chèn), prompt cấm chen
+  // câu hỏi trước nó. Trước đây vẫn đòi dấu ? nên bài bán nào cũng bị bắt viết lại 2 lượt và model chèn câu hỏi
+  // sau câu mời. Với bài bán, câu mời bình luận tính là CTA đạt.
+  const commentCta = kind === 'sales' && /\b(cmt|bình luận)\b/i.test(last3);
+  const hasQuestionCTA = /\?/.test(last3) || commentCta;
 
   const violations = [];
   if (kind === 'sales' || kind === 'viral') {
