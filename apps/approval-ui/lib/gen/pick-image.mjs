@@ -11,7 +11,8 @@
 //      publicdomain/attribute/sharealike/noncommercial/nonderived). Cần GOOGLE_CSE_API_KEY
 //      + GOOGLE_CSE_ID (Programmable Search Engine với "Search entire web" + "Image search" ON).
 //   3. Unsplash fallback với keyword TIẾNG ANH (Gemini sinh cùng lượt). Cần UNSPLASH_ACCESS_KEY.
-//   4. Cuối cùng mới rơi về ngẫu nhiên folder 'Content' như cũ.
+//   4. Cuối cùng mới tới ảnh kho (folder sản phẩm, rồi Content), chấm theo mô tả ảnh (21/10);
+//      không ảnh nào khớp thì để trống kèm cảnh báo, KHÔNG lấy ngẫu nhiên nữa.
 // Trả { id, via: 'product' | 'google-cse' | 'unsplash' | 'content-folder' | null, note }
 // hoặc (chế độ link trực tiếp 28/8) { id: null, url, via: 'google-cse-link' | 'unsplash-link', credit, note }.
 // Dùng chung cho app/api/rotate/route.ts và scripts/rotate-now.mjs (module JS thuần).
@@ -447,20 +448,101 @@ export async function pickImageForContent(client, folders, topicText, recentlyUs
     warn = 'khong co anh dat chuan chan dung (can thay mat, dung loai tau) - doi anh truoc khi duyet';
   }
 
-  // 3. TANG CHINH tu 28/8: folder sản phẩm SDVICO nếu chủ đề dính guessGroup.
+  // 21/10 (user gửi ảnh: bài "dầu diesel bẩn" mang ảnh tiệc kỷ niệm PV Paint, via content-folder):
+  // hai tầng ảnh nhà dưới đây từng lấy NGẪU NHIÊN, nhất là folder Content (hơn 200 ảnh Zalo đủ
+  // thứ: tiệc, họp, văn phòng) nên hễ Pexels/Unsplash trượt là bài dính ảnh lạc đề. Nay ảnh nhà
+  // cũng qua thẩm định như ảnh mạng, chấm trên MÔ TẢ ảnh (mo-ta-tu-lieu đã ghi sẵn). Không ảnh
+  // nào đạt -> KHÔNG gắn ảnh, cảnh báo người duyệt chọn tay (thà trống còn hơn sai).
+
+  // 3. Folder sản phẩm SDVICO nếu chủ đề dính guessGroup. Chấm lỗi kỹ thuật -> giữ hành vi cũ
+  // (ảnh sản phẩm đúng nhóm vẫn hợp bài hơn ảnh Content ngẫu nhiên).
   const grp = guessGroup(text);
-  if (grp) {
-    const key = [...folders.keys()].find((g) => productName(g).toLowerCase() === productName(grp).toLowerCase());
-    const imgs = key ? folders.get(key)?.images || [] : [];
-    const pick = pickFresh(imgs, recentlyUsed);
-    if (pick) return { id: pick.id, via: 'product', note: `folder ${key} (backup Google/Unsplash fail)${recentlyUsed?.has(pick.id) ? ' (het anh moi, lay anh dung lau nhat)' : ''}`, ...(warn ? { warn } : {}) };
+  const grpKey = grp ? [...folders.keys()].find((g) => productName(g).toLowerCase() === productName(grp).toLowerCase()) : null;
+  if (grpKey) {
+    const imgs = folders.get(grpKey)?.images || [];
+    let judged;
+    try { judged = await assessHouseImages(client, imgs, text, bodyHint, contentType, recentlyUsed); }
+    catch { judged = undefined; }
+    if (judged) return { id: judged.img.id, via: 'product', reason: judged.reason || null, note: `folder ${grpKey} cham ${judged.score}/10${judged.reason ? ' - ' + judged.reason : ''}`, ...(warn ? { warn } : {}) };
+    if (judged === undefined) {
+      const pick = pickFresh(imgs, recentlyUsed);
+      if (pick) return { id: pick.id, via: 'product', note: `folder ${grpKey} (cham loi - lay ngau nhien)${recentlyUsed?.has(pick.id) ? ' (het anh moi, lay anh dung lau nhat)' : ''}`, ...(warn ? { warn } : {}) };
+    }
   }
 
-  // 4. Fallback cuối: folder Content, rồi bất kỳ — né ảnh đã dùng 14 ngày.
-  const contentImgs = folders.get('Content')?.images || [];
-  const any = [...folders.values()].flatMap((f) => f.images);
-  const pool = contentImgs.length ? contentImgs : any;
-  const pick = pickFresh(pool, recentlyUsed);
-  if (pick) return { id: pick.id, via: 'content-folder', note: `${contentImgs.length ? 'Content' : 'any'}${recentlyUsed?.has(pick.id) ? ' (het anh moi, lay anh dung lau nhat)' : ''}`, ...(warn ? { warn } : {}) };
-  return { id: null, via: null, note: 'khong co anh' };
+  // 4. Ảnh nhà còn lại: folder Content + các folder sản phẩm khác (trừ R&D nội bộ), chấm theo mô tả.
+  const pool = [...folders.entries()]
+    .filter(([g]) => g !== grpKey && g !== 'R&D nội bộ')
+    .flatMap(([, f]) => f.images || []);
+  let judged = null;
+  try { judged = await assessHouseImages(client, pool, text, bodyHint, contentType, recentlyUsed); }
+  catch { judged = null; }
+  if (judged) return { id: judged.img.id, via: 'content-folder', reason: judged.reason || null, note: `${judged.img.product_group || 'kho'} cham ${judged.score}/10${judged.reason ? ' - ' + judged.reason : ''}`, ...(warn ? { warn } : {}) };
+  return { id: null, via: null, note: 'khong co anh khop bai', warn: warn || 'khong tim duoc anh khop bai (anh mang va kho deu lech) - chon anh tay truoc khi duyet' };
+}
+
+// Bỏ dấu + chữ thường, gom cặp âm tiết liền nhau ("dau diesel", "kim phun") làm đơn vị so khớp:
+// từng âm tiết tiếng Việt quá ngắn và nhập nhằng ("dau" = dầu/đau/đâu), cặp thì đủ nghĩa.
+function bigramsOf(s) {
+  const toks = String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd')
+    .split(/[^a-z0-9]+/).filter(Boolean);
+  const out = new Set();
+  for (let i = 0; i + 1 < toks.length; i++) out.add(`${toks[i]} ${toks[i + 1]}`);
+  return out;
+}
+const GENERIC_BIGRAMS = new Set(['ba con', 'anh em', 'chung ta', 'cua ban', 'co the', 'khong co', 'nhu the', 'mot so', 'cac ban', 'tau ca', 'ngu dan']);
+
+// Lọc thô ảnh nhà trước khi đưa model chấm: xếp theo số cặp âm tiết trùng giữa bài và
+// tiêu đề + mô tả ảnh, ảnh chưa dùng 14 ngày lên trước. Chỉ ảnh CÓ mô tả mới được xét (không
+// mô tả thì không biết ảnh có gì). Trả tối đa `limit` ảnh, chỉ lấy ảnh có ít nhất 1 cặp trùng.
+export function rankHouseImages(imgs, text, recentlyUsed = null, limit = 15) {
+  const want = [...bigramsOf(text)].filter((b) => !GENERIC_BIGRAMS.has(b));
+  if (!want.length) return [];
+  return (imgs || [])
+    .filter((img) => String(img?.description || '').trim())
+    .map((img) => {
+      const have = bigramsOf(`${img.title || ''} ${img.description || ''}`);
+      return { img, hits: want.filter((b) => have.has(b)).length, used: recentlyUsed?.has(img.id) ? 1 : 0 };
+    })
+    .filter((r) => r.hits > 0)
+    .sort((a, b) => b.hits - a.hits || a.used - b.used)
+    .slice(0, limit)
+    .map((r) => r.img);
+}
+
+// Thẩm định ảnh nhà bằng MÔ TẢ (text, không tải ảnh: ảnh gốc Zalo nặng, mô tả đã do mắt AI viết
+// lúc nhập kho). Trả { img, score, reason } ảnh tốt nhất đạt ngưỡng; null = không ảnh nào đạt
+// hoặc không có ứng viên; LỖI KỸ THUẬT -> throw để người gọi tự quyết.
+async function assessHouseImages(client, imgs, topicText, bodyHint, contentType, recentlyUsed) {
+  const cands = rankHouseImages(imgs, `${topicText} ${bodyHint}`, recentlyUsed);
+  if (!cands.length) return null;
+  const { GoogleGenAI } = await import('@google/genai');
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const res = await ai.models.generateContent({
+    model: MKT_MODEL,
+    contents: [
+      `Bài đăng cho ngư dân Việt Nam, tiêu đề: "${String(topicText).slice(0, 160)}".`,
+      bodyHint ? `Nội dung chính: ${String(bodyHint).slice(0, 500)}` : '',
+      contentType === 'portrait' ? 'ĐÂY LÀ BÀI CHÂN DUNG MỘT NGƯỜI: ảnh phải có một người là chủ thể, thấy rõ mặt; không thì tối đa 3 điểm.' : '',
+      `Dưới đây là MÔ TẢ của ${cands.length} ảnh trong kho công ty, theo THỨ TỰ. Chấm từng ảnh 0-10 mức hợp làm ảnh minh hoạ cho bài:`,
+      'ảnh phải cho thấy đúng SỰ VIỆC/ĐỒ VẬT bài nói (dầu, máy, thiết bị, hỏng hóc, tàu, nghề cá...).',
+      'Ảnh tiệc, hội nghị, sự kiện, văn phòng, chụp màn hình, người ngồi họp... mà bài không nói về chuyện đó -> dưới 3 điểm. Ảnh chỉ "cùng ngành biển" mà lệch sự việc -> dưới 5.',
+      ...cands.map((c, i) => `${i + 1}. ${String(c.title || '').slice(0, 80)} | ${String(c.description || '').slice(0, 300)}`),
+      `Chỉ trả JSON: {"scores":[${cands.map(() => '0').join(',')}],"reasons":[${cands.map(() => '""').join(',')}]}. reasons là lý do NGẮN tiếng Việt (dưới 12 chữ), đúng ${cands.length} phần tử mỗi mảng.`,
+    ].filter(Boolean).join('\n'),
+    config: { responseMimeType: 'application/json', temperature: 0 },
+  });
+  logTokenUsage(client, 'creator_pick_image', MKT_MODEL, res?.usageMetadata);
+  const j = JSON.parse((res.text || '').match(/\{[\s\S]*\}/)?.[0] || '{}');
+  if (!Array.isArray(j.scores)) throw new Error('model khong tra scores');
+  const reasons = Array.isArray(j.reasons) ? j.reasons.map((x) => String(x ?? '').slice(0, 80)) : [];
+  // Cùng điểm thì ưu tiên ảnh chưa dùng 14 ngày (cands đã xếp ảnh mới lên trước).
+  let best = -1, bestScore = -1;
+  for (let i = 0; i < cands.length; i++) {
+    const s = Number(j.scores[i]);
+    if (Number.isFinite(s) && s > bestScore) { bestScore = s; best = i; }
+  }
+  const min = KIND_IMAGE_RULE[contentType]?.minScore ?? 6;
+  if (best < 0 || bestScore < min) return null;
+  return { img: cands[best], score: bestScore, reason: reasons[best] || '' };
 }
