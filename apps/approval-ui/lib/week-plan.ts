@@ -14,7 +14,7 @@
 import type { getServerClient } from './supabase-server';
 import { weekWindowVN } from './plan';
 // @ts-ignore — module JS thuần
-import { guessGroup, isDiscontinuedGroup } from './gen/products.mjs';
+import { guessGroup, isDiscontinuedGroup, isVideoFitKind } from './gen/products.mjs';
 import { CONTENT_KIND_BY_DOW, CONTENT_PURPOSE } from './plan-live';
 import { loadPostingPlan, slotsForDate, groupsForDate, type EffectiveSlot } from './posting-plan';
 import { planShareLots, type DayLot, type SlotLot, type SlotLotInput } from './share-lot';
@@ -138,7 +138,7 @@ export async function buildWeekPlanView(
   const queue = suggestions
     .filter((s) => !s.used_at && !s.pending_variant && !isDiscontinued(String(s.product || '')))
     .sort((a, b) => wOf(b) - wOf(a))
-    .map((s) => ({ title: String(s.title || ''), product: productNameOf(String(s.product || '')) }));
+    .map((s) => ({ title: String(s.title || ''), product: productNameOf(String(s.product || '')), kind: s.kind ? String(s.kind) : undefined }));
 
   // Focus (sản phẩm tập trung còn hạn): hướng ngoài focus không được rút khi focus còn hiệu lực.
   const { data: focusRow } = await client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle();
@@ -190,7 +190,9 @@ export async function buildWeekPlanView(
     for (let k = 0; k < slots.length; k++) {
       const focusOn = focusActiveOn(date);
       const needsClip = slots[k]?.channel === 'youtube' || slots[k]?.channel === 'tiktok';
-      const okQ = (q: { product: string }) => !usedProducts.has(q.product) && hasImages(q.product) && (!focusOn || matchFocus(q.product));
+      // 21/10: ô video chỉ nhận hướng dạng hợp video (checklist, glossary... để dành ô Facebook), cùng luật /api/rotate.
+      const okQ = (q: { product: string; kind?: string }) => !usedProducts.has(q.product) && hasImages(q.product) && (!focusOn || matchFocus(q.product))
+        && (!needsClip || (isVideoFitKind as (k?: string) => boolean)(q.kind));
       // Sản phẩm chưa có bài tuần này đi trước (cùng luật rotate 11/9 chiều), hết mới tới theo trọng số.
       // Ô video: ưu tiên sản phẩm có clip (rotate sẽ thay folder không clip ở ô này).
       const isFresh = (q: { product: string }) => !postedThisWeek.has(q.product.toLowerCase());

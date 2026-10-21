@@ -36,7 +36,8 @@ const flawed = [
   { loai: 'giọng: khẳng định quá', text: 'SDVICO là đơn vị số 1 và tốt nhất về thiết bị hàng hải tại Việt Nam.' },
   { loai: 'sản phẩm: phần mềm đối tác', text: 'Phần mềm S-Tracking của SDVICO giúp theo dõi tàu mọi lúc mọi nơi.' },
   { loai: 'sản phẩm: nhận vơ Thuraya', text: 'Điện thoại vệ tinh Thuraya do SDVICO sản xuất, sóng khỏe khắp đại dương.' },
-  { loai: 'sản phẩm: bịa model', text: 'Máy lọc nước biển SEA-40 của SDVICO cho nước ngọt tức thì trên tàu.' },
+  // 21/10: SEA-40 giờ là sản phẩm thật trong danh mục và catalog, ca bịa model đổi sang mã không tồn tại.
+  { loai: 'sản phẩm: bịa model', text: 'Máy lọc nước biển SEA-90 của SDVICO cho nước ngọt tức thì trên tàu.' },
   { loai: 'sản phẩm: bịa thông số', text: 'Thiết bị đạt chuẩn kháng nước IP69, chịu được sóng lớn ngoài khơi xa.' },
   { loai: 'sản phẩm: nhận vơ VNPT', text: 'SDVICO tích hợp sẵn hệ thống VSS của VNPT vào thiết bị của mình.' },
   { loai: 'sản phẩm: nhận vơ Vishipel', text: 'Đài thông tin Vishipel là dịch vụ độc quyền của riêng SDVICO.' },

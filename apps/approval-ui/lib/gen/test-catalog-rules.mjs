@@ -4,6 +4,7 @@
 import { scanPlaybook, scanUnverifiedSpecs, assessDraft } from './compliance.mjs';
 import { knownFactValues, testFactValues, factsForGroup, loadProductFacts, PRODUCT_FACTS } from './product-facts.mjs';
 import { generateSocialPost } from './social.mjs';
+import { isVideoFitKind } from './products.mjs';
 
 const cases = [];
 const ok = (name, cond, got) => cases.push({ name, ok: !!cond, got });
@@ -48,6 +49,12 @@ let threw = '';
 try { await generateSocialPost({ productGroup: '6. Thiết bị lọc dầu SF-50', productName: 'SF-50', channel: 'facebook', hasVideo: false }); }
 catch (e) { threw = String(e?.message || e); }
 ok('SF-50 ngừng bán -> không sinh bài', /ngừng bán/.test(threw), threw);
+
+// 6. Dạng bài hợp ô video (YouTube/TikTok)
+ok('checklist không lên ô video', !isVideoFitKind('checklist'));
+ok('glossary, news, portrait không lên ô video', !isVideoFitKind('glossary') && !isVideoFitKind('news') && !isVideoFitKind('portrait'));
+ok('tip, qa, engage, viral lên ô video được', ['tip', 'qa', 'engage', 'viral', 'seeding'].every(isVideoFitKind));
+ok('hướng không ghi dạng thì cho qua', isVideoFitKind(undefined) && isVideoFitKind(''));
 
 const fail = cases.filter((c) => !c.ok);
 for (const c of fail) console.log(`FAIL  ${c.name}  got=${JSON.stringify(c.got)}`);

@@ -16,7 +16,7 @@ import { assembleVideo } from './assemble.mjs';
 import { planSceneSegments, fillShortPieces, segmentsEnabled } from './segments.mjs';
 import { generateVideoScript, stripGreeting } from './script.mjs';
 import { WHISPER_PROMPT } from './terms.mjs';
-import { PRODUCT_FACTS } from '../product-facts.mjs';
+import { loadProductFacts, factsForGroup } from '../product-facts.mjs';
 import { getPriceTeaser, redactExactPrices, outroKeyword } from '../products.mjs';
 import { outroText as outroTextFor, outroScreenKeyword, mustUseRoleFor } from './rules.mjs';
 import { pickFreshClips, clipLabel } from './fresh-clip.mjs';
@@ -847,13 +847,20 @@ async function pushToApprovalQueue(client, { content, script, horizontalPath, ve
       video_scene_match: script.sceneMatch || [],     // 15/9: vai cảnh, hình cần, điểm khớp, ai chọn (model/luật)
       video_built_at: new Date().toISOString(),
     };
-    const { error: ue } = await client.from('mkt_content').update({ brief: newBrief }).eq('id', content.id);
+    // 21/10 (rà soát): lời đọc nhắc quy định (IUU, Nghị định...) mà caption sạch thì trước đây thẻ vẫn xanh, duyệt
+    // được lên YouTube. Video cờ đỏ thì nâng cờ quản lý cho cả bài lẫn phiếu (điều cấm 3).
+    const videoRed = risk === 'red';
+    const { error: ue } = await client.from('mkt_content')
+      .update({ brief: newBrief, ...(videoRed ? { needs_gov_review: true } : {}) }).eq('id', content.id);
     if (ue) throw new Error('mkt_content update: ' + ue.message);
     // Cập nhật payload của mục hàng đợi tương ứng (còn pending) để card hiện video + kênh.
     const { data: qrows } = await client.from('approval_queue')
       .select('id, payload').eq('kind', 'mkt_publish_content').eq('payload->>content_id', content.id).eq('status', 'pending');
     for (const q of qrows || []) {
-      const p = { ...(q.payload || {}), assets: mergedAssets, channels: mergedChannels, post_reel: true, has_video: true };
+      const p = {
+        ...(q.payload || {}), assets: mergedAssets, channels: mergedChannels, post_reel: true, has_video: true,
+        ...(videoRed ? { risk: 'red', needs_manager_approval: true } : {}),
+      };
       await client.from('approval_queue').update({ payload: p }).eq('id', q.id);
     }
     console.log(`\nĐã GẮN video vào bài gốc (Post + Reel + TikTok): ${content.title}`);
@@ -953,6 +960,12 @@ async function main() {
   // content được) — đổi sang folder thật để lấy được ảnh/clip.
   if (productGroup === 'Bài content' || brief.post_kind === 'content') productGroup = CONTENT_GROUP;
   if (!productGroup) throw new Error('Bài chưa gán sản phẩm (không đoán được từ tiêu đề/nội dung). Gán product_group ở /tu-lieu hoặc đặt tiêu đề rõ hơn.');
+  // 21/10 (rà soát hệ thống): chặn ngay cả khi có người bấm "Làm video" tay. Sản phẩm ngừng bán (SF-50) không dựng
+  // video bán; bài dạng checklist, glossary, news, portrait chỉ là bài ảnh đọc trên Facebook (cùng luật /api/rotate).
+  const { isDiscontinuedGroup, isVideoFitKind } = await import('../products.mjs');
+  if (isDiscontinuedGroup(productGroup)) throw new Error(`${productGroup} đã ngừng bán, không dựng video.`);
+  const postKind = brief.suggestion_kind || brief.content_type || null;
+  if (!isVideoFitKind(postKind)) throw new Error(`Bài dạng "${postKind}" chỉ làm bài ảnh, không dựng video.`);
   // Cột description có từ migration 20260915130000; chưa áp thì rơi về cột cũ (không có mô tả, khớp theo luật vai cảnh).
   // 9/10: cột segments + shoot_cluster có từ migration 20261009120000; chưa áp thì bỏ 2 cột đó (đường cũ).
   let ASSET_COLS = 'id, kind, title, storage_path, source, created_at, product_group, description, segments, shoot_cluster';
@@ -1052,7 +1065,11 @@ async function main() {
   const script = await generateVideoScript(
     content,
     assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, label: clipLabel(a), description: a.description || '', folder: a.product_group || '', fresh: /MỚI/.test(clipLabel(a)), segments: Array.isArray(a.segments) && a.segments.length ? a.segments : null, shoot_cluster: a.shoot_cluster || null })),
-    PRODUCT_FACTS,
+    // 21/10: catalog thật ở bảng product_facts (trước là mảng tĩnh có dòng TEST "IP67" bịa). Video bán chỉ thấy dòng
+    // của đúng sản phẩm; video content không gắn sản phẩm thì thấy cả catalog đã xác nhận.
+    productGroup === CONTENT_GROUP
+      ? (await loadProductFacts(client)).filter((f) => f.verified)
+      : factsForGroup(await loadProductFacts(client), productGroup),
     // 15/10: mustIsSource = bài viết từ chính clip bắt buộc (topic chỉ kể clip đó) -> script gộp cảnh giữa vào cảnh clip.
     { short: isShort, productGroup, salesVideo, mustUseAssetId, mustUseRole, contentVideo, recentUse, reuseScript, mustIsSource: !!mustUseAssetId && mustUseAssetId === brief.content_clip_id },
     _tokenLogClient

@@ -146,6 +146,8 @@ export default function DecideActions({
   caption = null,
   defaultSchedule = '',
   formId,
+  approveBlocked = null,
+  needsManager = false,
 }: {
   id: string;
   title: string;
@@ -155,11 +157,16 @@ export default function DecideActions({
   defaultSchedule?: string;
   /** id gắn cho <form> để nút ở nơi khác (vd thanh đáy modal xem bài) submit cùng form qua thuộc tính form="...". */
   formId?: string;
+  /** 21/10: có lý do thì khóa nút Duyệt và hiện lý do (server decideForm cũng chặn cùng điều kiện). */
+  approveBlocked?: string | null;
+  /** 21/10: bài cờ đỏ (điều cấm 3) phải tick "Quản lý đã duyệt" mới bấm Duyệt được; server cũng kiểm ô này. */
+  needsManager?: boolean;
 }) {
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
   // 4/9: Lịch đăng cố định điền sẵn giờ ô (payload.plan_time) khi còn ≥ 15 phút; người duyệt
   // vẫn xóa/đổi được, để trống = đăng ngay. hang-doi/page.tsx không truyền prop → mặc định rỗng.
   const [schedule, setSchedule] = useState(defaultSchedule);
+  const [managerOk, setManagerOk] = useState(false);
   const preview = humanVN(schedule);
 
   return (
@@ -210,7 +217,14 @@ export default function DecideActions({
           {/* 3/10: luôn nói rõ đăng ngay hay hẹn giờ trước khi bấm Duyệt. */}
           {preview ? <span className="schedule-preview">Hẹn {preview}</span> : <span className="schedule-preview">Để trống: đăng ngay</span>}
         </label>
-        <button className="btn ok" name="action" value="approve" disabled={busy !== null}>
+        {approveBlocked ? <span className="schedule-preview" role="status">{approveBlocked}</span> : null}
+        {needsManager ? (
+          <label className="schedule-lbl" title="Bài chạm quy định nhà nước, IUU, Cục Thủy sản, Kiểm ngư (điều cấm 3): chỉ tick khi cấp quản lý đã đọc và đồng ý.">
+            <input type="checkbox" name="manager_ok" checked={managerOk} onChange={(e) => setManagerOk(e.target.checked)} />
+            <span>Quản lý đã duyệt bài này</span>
+          </label>
+        ) : null}
+        <button className="btn ok" name="action" value="approve" disabled={busy !== null || !!approveBlocked || (needsManager && !managerOk)} title={approveBlocked || (needsManager && !managerOk ? 'Bài cần cấp quản lý duyệt: tick ô Quản lý đã duyệt trước.' : undefined)}>
           {busy === 'approve' ? (schedule ? 'Đang hẹn...' : 'Đang duyệt...') : (schedule ? 'Duyệt + Hẹn giờ' : 'Duyệt')}
         </button>
         <button className="btn no" name="action" value="reject" disabled={busy !== null}>

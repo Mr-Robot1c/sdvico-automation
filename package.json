@@ -18,6 +18,7 @@
     "test:pheu": "node apps/approval-ui/lib/gen/test-pheu.mjs",
     "test:pickimg": "node apps/approval-ui/lib/gen/test-pick-image.mjs",
     "test:catalog": "node apps/approval-ui/lib/gen/test-catalog-rules.mjs",
+    "test:approve": "node apps/approval-ui/lib/test-approve-guard.mjs",
     "test:llm": "node apps/approval-ui/lib/gen/test-llm-client.mjs",
     "test:clip": "node packages/marketing/src/test-fresh-clip.mjs",
     "test:clipguard": "node packages/marketing/src/test-clip-guard.mjs",

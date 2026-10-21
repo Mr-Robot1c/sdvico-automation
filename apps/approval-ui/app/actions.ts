@@ -456,7 +456,8 @@ async function publishContentToTikTok(
 // YouTube sẽ hiển thị dạng video thường thay vì Shorts.
 async function publishContentToYoutube(
   client: ReturnType<typeof getServerClient>,
-  contentId: string
+  contentId: string,
+  scheduledAt: string | null = null
 ): Promise<{ ok: boolean; error?: string; videoId?: string }> {
   const { data: posted } = await client
     .from('mkt_posts')
@@ -492,8 +493,11 @@ async function publishContentToYoutube(
   const tags = ['SDVICO', 'tauca', 'thietbitauca', 'nguoi_di_bien'];
   if (productGroup) tags.push(productGroup.replace(/\s+/g, ''));
 
-  const { postVideoToYouTube } = await import('../lib/youtube-publish');
-  const result = await postVideoToYouTube({ videoUrl, title, caption, tags });
+  const { postVideoToYouTube, youtubePublishAt } = await import('../lib/youtube-publish');
+  // 21/10: thẻ ghi "Hẹn 19:30" mà Shorts lên ngay lúc bấm Duyệt. Giờ hẹn (giờ VN) còn ở tương lai thì đặt publishAt,
+  // YouTube giữ video riêng tư tới giờ đó rồi tự công khai.
+  const publishAt = youtubePublishAt(scheduledAt);
+  const result = await postVideoToYouTube({ videoUrl, title, caption, tags, publishAt });
   try {
     await client.from('run_log').insert({
       task: 'mkt.publish_youtube',
@@ -557,9 +561,29 @@ export async function decideForm(formData: FormData) {
     revalidatePath('/hang-doi');
     return;
   }
-  const newPayload = decision === 'approved' && scheduledAt
-    ? { ...basePayload, scheduled_at: scheduledAt }
-    : basePayload;
+  // 21/10 (rà soát hệ thống): chặn ở SERVER, không trông vào nút trên giao diện.
+  if (decision === 'approved' && (row as any)?.kind === 'mkt_publish_content') {
+    const { approveBlockReason } = await import('../lib/approve-guard');
+    const blocked = await approveBlockReason(client, basePayload, formData.get('manager_ok') === 'on');
+    if (blocked) {
+      try {
+        await client.from('run_log').insert({
+          task: 'mkt.publish_blocked', actor: 'decideForm', status: 'skipped',
+          detail: { queueId: id, contentId: basePayload.content_id ?? null, reason: blocked }
+        });
+      } catch { /* bỏ qua */ }
+      revalidatePath('/hang-doi');
+      revalidatePath('/noi-dung');
+      return;
+    }
+  }
+  const managerConfirmed = decision === 'approved' && formData.get('manager_ok') === 'on';
+  const newPayload = {
+    ...basePayload,
+    ...(decision === 'approved' && scheduledAt ? { scheduled_at: scheduledAt } : {}),
+    // 21/10: lưu lúc người duyệt xác nhận đã có quản lý duyệt (bài cờ đỏ), để tra lại sau.
+    ...(managerConfirmed ? { manager_confirmed_at: new Date().toISOString() } : {}),
+  };
   // 3/10: ghi người quyết — trước đây decided_by null hàng loạt dù run_log có actor decideForm.
   const decidedBy = await getCurrentApprover();
   const { data: updated, error } = await client
@@ -683,7 +707,7 @@ export async function decideForm(formData: FormData) {
           if (ch === 'tiktok') {
             try { await bgClient.from('run_log').insert({ task: 'mkt.publish_tiktok', actor: 'decideForm', status: 'skipped', detail: { contentId, reason: 'tiktok-api-disabled: dung nut Xuat TikTok o /noi-dung' } }); } catch { /* bỏ qua */ }
           }
-          if (ch === 'youtube') jobs.push(publishContentToYoutube(bgClient, contentId));
+          if (ch === 'youtube') jobs.push(publishContentToYoutube(bgClient, contentId, scheduledAt));
           if (ch === 'website') jobs.push(publishContentToWebsite(bgClient, contentId, { actor: 'nguoi-bam' }));
         }
         await Promise.allSettled(jobs);
@@ -2064,9 +2088,25 @@ export async function requestVideoForContent(formData: FormData) {
   const client = getServerClient();
   const { data: c } = await client.from('mkt_content').select('brief').eq('id', id).single();
   const brief = (((c as any)?.brief) || {}) as Record<string, unknown>;
+  // 21/10 (rà soát): nút này từng dựng được cả video cho bài checklist hay sản phẩm ngừng bán. Chặn cùng luật rotate;
+  // build-video cũng chặn lần nữa.
+  // @ts-ignore — module JS thuần
+  const { isDiscontinuedGroup, isVideoFitKind } = await import('../lib/gen/products.mjs');
+  const kind = (brief.suggestion_kind || brief.content_type || null) as string | null;
+  const blocked = brief.rotation_group && isDiscontinuedGroup(String(brief.rotation_group))
+    ? 'san pham ngung ban'
+    : !isVideoFitKind(kind) ? `dang bai ${kind} chi lam bai anh` : null;
+  if (blocked) {
+    try { await client.from('run_log').insert({ task: 'mkt.video_request_blocked', actor: 'requestVideoForContent', status: 'skipped', detail: { contentId: id, reason: blocked } }); } catch { /* bỏ qua */ }
+    revalidatePath('/noi-dung');
+    return;
+  }
+  // Bấm lại sau khi lỗi = thử lại từ đầu: xóa đếm lần thử, cờ lỗi và vé giữ chỗ cũ (trước đây bài lỗi 3 lần bị bỏ qua
+  // mãi mà thẻ vẫn ghi "Đang làm video AI").
+  const { video_failed: _f, video_attempts: _a, video_claimed_at: _c, ...rest } = brief;
   await client
     .from('mkt_content')
-    .update({ brief: { ...brief, video_requested: true, video_requested_at: new Date().toISOString() } })
+    .update({ brief: { ...rest, video_requested: true, video_requested_at: new Date().toISOString() } })
     .eq('id', id);
   revalidatePath('/noi-dung');
   // Kích hoạt GitHub Actions dựng ngay (khỏi chờ cron 10 phút). Gọi server-to-server không

@@ -228,9 +228,10 @@ export async function generateVideoScript(content, assets, facts = [], opts = {}
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+  // 21/10: chỉ dòng đã xác nhận; dòng TEST không bao giờ được mớm cho model.
   const allowed = facts
-    .filter((f) => f.value)
-    .map((f) => `${f.brand || ''} ${f.model || ''} ${f.attribute}: ${f.value}${f.verified ? '' : ' (CHƯA XÁC NHẬN)'}`.trim());
+    .filter((f) => f.value && f.verified)
+    .map((f) => `${f.model || ''} ${f.attribute}: ${f.value}`.trim());
 
   // 15/9 (sếp: kịch bản phải đi đôi với hình): danh sách tư liệu KÈM MÔ TẢ + folder (brand_assets.description).
   const assetList = assetListForPrompt(assets);

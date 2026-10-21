@@ -18,6 +18,7 @@
 // hoac description. Video pipeline hien tai da sinh ban vertical 9:16 60s => du dieu kien.
 
 import { fetchWithRetry } from './retry';
+export { youtubePublishAt } from './youtube-schedule';
 
 const OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const UPLOAD_URL = 'https://www.googleapis.com/upload/youtube/v3/videos';
@@ -130,7 +131,7 @@ function makeDescription(caption: string): string {
 // tra ve Location URL, (2) PUT binary vao URL do. Con 1 buoc metadata roi PUT truc tiep
 // binary (khong resumable) cung duoc voi file duoi 128MB — YouTube Shorts thuong ~5-15MB.
 // Dung MULTIPART upload cho don gian (1 request), phu hop file nho.
-export async function postVideoToYouTube(opts: { videoUrl: string; title: string; caption: string; tags?: string[] }): Promise<YouTubeUploadResult> {
+export async function postVideoToYouTube(opts: { videoUrl: string; title: string; caption: string; tags?: string[]; publishAt?: string | null }): Promise<YouTubeUploadResult> {
   const steps: Record<string, any> = {};
   try {
     // 1. Get access_token.
@@ -157,11 +158,16 @@ export async function postVideoToYouTube(opts: { videoUrl: string; title: string
       status: {
         privacyStatus: 'public',  // Muon dat 'unlisted' hoac 'private' de test thi doi bien env YOUTUBE_PRIVACY
         selfDeclaredMadeForKids: false
-      }
+      } as { privacyStatus: string; selfDeclaredMadeForKids: boolean; publishAt?: string }
     };
     const privacyOverride = (process.env.YOUTUBE_PRIVACY || '').trim().toLowerCase();
     if (privacyOverride === 'private' || privacyOverride === 'unlisted') {
       meta.status.privacyStatus = privacyOverride;
+    }
+    // 21/10: hẹn giờ. YouTube chỉ nhận publishAt khi video đang private; tới giờ tự chuyển public.
+    if (opts.publishAt) {
+      meta.status.privacyStatus = 'private';
+      meta.status.publishAt = opts.publishAt;
     }
 
     // 4. Multipart body: metadata + video, tach bang boundary chuan RFC 1341.

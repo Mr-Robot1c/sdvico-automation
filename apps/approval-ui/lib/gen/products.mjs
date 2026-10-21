@@ -13,7 +13,7 @@ export const PRODUCTS = [
     hashtags: ['#máy_lọc_nước_biển', '#nước_ngọt_trên_tàu', '#chủ_động_nước_ngọt', '#SEA40'] },
   { no: 3, group: '3. Thiết bị giám sát hành trình Viettel S-Tracking',
     match: ['giam sat hanh trinh', 's-tracking', 's tracking', 'stracking', 'gsht', 'viettel'],
-    hashtags: ['#giám_sát_hành_trình', '#thiết_bị_VMS', '#S_Tracking', '#chống_khai_thác_IUU'] },
+    hashtags: ['#giám_sát_hành_trình', '#thiết_bị_VMS', '#S_Tracking', '#an_tâm_ra_khơi'] }, // 21/10: bỏ #chống_khai_thác_IUU, chính thẻ này làm mọi bài S-Tracking dính cờ đỏ (scanRegulation).
   { no: 4, group: '4. Thuraya Marine Star MNB-01',
     match: ['thuraya', 'marine star', 'marinestar', 'mnb-01', 'mnb01', 'mnb 01'],
     hashtags: ['#Thuraya_MarineStar', '#điện_thoại_vệ_tinh', '#liên_lạc_trên_biển', '#MNB01'] },
@@ -179,6 +179,12 @@ export function isPhotoOnlyGroup(group) {
 }
 export function isDiscontinuedGroup(group) {
   return DISCONTINUED_GROUPS.has(group);
+}
+// 21/10: dạng bài KHÔNG làm video (ô YouTube/TikTok): liệt kê nhiều mục hay giải nghĩa chữ thì chỉ hợp bài ảnh đọc
+// trên Facebook. Cùng luật video bài content 9/9 (CONTENT_VIDEO_KINDS ở /api/rotate). Hướng không ghi dạng thì cho qua.
+export const PHOTO_ONLY_KINDS = new Set(['checklist', 'glossary', 'news', 'portrait']);
+export function isVideoFitKind(kind) {
+  return !kind || !PHOTO_ONLY_KINDS.has(String(kind));
 }
 
 // Chặn số tiền chính xác lọt ra kênh công khai (lưới sau prompt, phòng model quên luật).

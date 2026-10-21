@@ -153,6 +153,14 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   const items = [...filtered].sort((a, b) => Number(isRedFlag(b.payload)) - Number(isRedFlag(a.payload))).map(maskItem);
   const redCount = filtered.filter((it) => isRedFlag(it.payload)).length;
 
+  // 21/10: ô YouTube chưa có video thì khóa Duyệt (server decideForm chặn cùng điều kiện).
+  const youtubeApproveBlock = (channels: string[], brief: any): string | null => {
+    if (!channels.includes('youtube')) return null;
+    const a = brief?.assets || {};
+    if (a.video || a.video_v) return null;
+    return brief?.video_failed ? 'Video AI dựng lỗi: bấm Làm video lại hoặc Từ chối.' : 'Ô YouTube: chờ video AI dựng xong mới duyệt được.';
+  };
+
   // Nạp bản nháp cho các bài marketing, để nút Chỉnh sửa preload đúng nội dung.
   // Kèm cờ brief.video_requested: bài đã yêu cầu dây chuyền video AI dựng (cron GitHub 10 phút
   // quét, mỗi bản ~15-20 phút) -> card hiện "🎬 Đang làm video AI" để người duyệt biết là đang
@@ -161,16 +169,18 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   const drafts = new Map<string, string>();
   const briefs = new Map<string, any>();
   const videoPending = new Set<string>();
+  const govContent = new Set<string>(); // 21/10: mkt_content.needs_gov_review (phiếu có thể không ghi cờ)
   // Video Shorts ĐI KÈM bài chữ: bài video-pipeline có brief.source_content = id bài chữ. Card bài
   // chữ hiện thumbnail video + dòng nối để người duyệt không tưởng "chưa có video" (user 18/8).
   // Ngược lại card video hiện tên bài chữ nguồn. Hai bài vẫn duyệt/đăng RIÊNG (video còn đi TikTok).
   const linkedVideo = new Map<string, { contentId: string; videoAssetId: string | null; title: string; queueStatus: string }>();
   const videoSourceTitle = new Map<string, string>(); // contentId video -> tiêu đề bài chữ nguồn
   if (contentIds.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, title, draft, brief').in('id', contentIds);
+    const { data: cs } = await client.from('mkt_content').select('id, title, draft, brief, needs_gov_review').in('id', contentIds);
     for (const c of cs || []) {
       drafts.set(c.id as string, (c.draft as string) || '');
       briefs.set(c.id as string, (c as any).brief || {});
+      if ((c as any).needs_gov_review === true) govContent.add(c.id as string);
       if ((c as any).brief?.video_requested === true) videoPending.add(c.id as string);
     }
     // Bài video-pipeline sinh từ các bài chữ đang trong hàng đợi (bất kỳ trạng thái duyệt).
@@ -347,7 +357,10 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                     ? <span className="badge badge-ab" title="Cặp bài thử theo hướng đi kế hoạch. Đăng cả hai, bot đo bản nào bà con thích hơn rồi học cho vòng sau.">🧪 Thử {info.abVariant}</span>
                     : (info.fromPlan ? <span className="badge badge-ab" title="Bài theo hướng đi của kế hoạch tuần">🧭 Theo kế hoạch</span> : null)}
                   {cid && videoPending.has(cid)
-                    ? <span className="badge badge-video-pending" title="Dây chuyền video AI đang dựng bản Shorts từ bài này (10 tới 40 phút tuỳ hàng chờ máy). Xong sẽ có thêm một bài video riêng ở hàng đợi để duyệt. Bài chữ này vẫn duyệt đăng bình thường.">🎬 Đang làm video AI</span>
+                    ? <span className="badge badge-video-pending" title={info.channels.includes('youtube') ? 'Dây chuyền video AI đang dựng bản Shorts cho bài này (10 tới 40 phút tuỳ hàng chờ máy). Ô YouTube: chờ video xong mới duyệt được.' : 'Dây chuyền video AI đang dựng video cho bài này (10 tới 40 phút tuỳ hàng chờ máy). Duyệt trước khi video xong thì bài đăng dạng ảnh, video dựng sau không được đăng.'}>🎬 Đang làm video AI</span>
+                    : null}
+                  {cid && briefs.get(cid)?.video_failed === true
+                    ? <span className="badge tone-no" title="Video AI dựng lỗi nhiều lần, máy đã dừng thử.">🎬 Video AI lỗi</span>
                     : null}
                   {cid && linkedVideo.has(cid)
                     ? <span className="badge badge-video-linked" title="Video Shorts dựng từ bài này đã xong và là một bài riêng trong hàng đợi (đăng cả Facebook lẫn TikTok). Duyệt bài chữ này và bài video riêng.">🎬 Có video Shorts đi kèm</span>
@@ -438,6 +451,8 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
                     hasTiktok={info.channels.includes('tiktok')}
                     videoUrl={vid?.url ?? null}
                     caption={draft ?? null}
+                    approveBlocked={youtubeApproveBlock(info.channels, cid ? briefs.get(cid) : null)}
+                    needsManager={isRedFlag(item.payload) || (!!cid && govContent.has(cid))}
                   />
                 </div>
               </li>

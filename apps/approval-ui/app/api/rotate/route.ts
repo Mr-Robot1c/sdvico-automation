@@ -3,7 +3,7 @@ import { autoApplyWeeklyProposal, weekWindowVN } from '../../../lib/plan';
 import { getServerClient } from '../../../lib/supabase-server';
 import { isEmergencyStopped, todayVN } from '../../../lib/safety';
 // @ts-ignore
-import { guessGroup, isDiscontinuedGroup } from '../../../lib/gen/products.mjs';
+import { guessGroup, isDiscontinuedGroup, isVideoFitKind } from '../../../lib/gen/products.mjs';
 
 // Lịch hàng ngày: chọn NGẪU NHIÊN 1 folder sản phẩm (product_group) theo VÒNG XOAY
 // (mỗi folder dùng 1 lần mỗi vòng, hết cả folder mới sang vòng mới), rồi sinh bài chờ duyệt.
@@ -323,7 +323,8 @@ export async function GET(req: Request) {
       || (weightOfSug(b) - weightOfSug(a)));
   const candidateSuggestions = [...pendingBs, ...freshSorted];
 
-  type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number };
+  // slot = số ô trong saleSlots mà bài này lấp (21/10: ô video có thể bỏ trống cho khối bù, nên không dựa vào thứ tự mảng).
+  type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number; slot?: number };
   const pickedFolders: PickedFolder[] = [];
   const usedInThisRun = new Set<string>();
   // Khai bao skipped/results/logoActions SOM (24/8): fallback random block (~line 270) can
@@ -332,11 +333,15 @@ export async function GET(req: Request) {
   const results: any[] = [];
   const skipped: any[] = [];
   const logoActions: any[] = []; // nhat ky auto-logo cho moi anh (stamped/kept/already/skip)
-  for (const s of candidateSuggestions) {
+  // 21/10 (user gửi thẻ "Checklist vệ sinh túi lọc dầu" xếp ô YouTube 19:30: "sao mà đăng lên short ytb được"):
+  // bài bán thứ k vào ô saleSlots[k], trước rút hướng theo thứ tự nên hướng dạng checklist rơi vào ô video. Ô
+  // YouTube/TikTok chỉ nhận hướng có dạng hợp video (cùng luật video bài content 9/9: checklist, glossary, news,
+  // portrait vẫn là bài ảnh); hướng checklist để dành ô Facebook. Ô video không còn hướng hợp thì để trống ô đó cho
+  // khối bù bên dưới lấp, các ô sau vẫn rút hướng bình thường (mỗi bài ghi số ô của mình).
+  const fillFromSuggestion = (s: Suggestion, slotIdx: number): boolean => {
     // 29/8 (bỏ A/B): 1 hướng = 1 bài. 4/9: mỗi slot rút 1 HƯỚNG (sáng còn 1 bài bán).
     // Trước đây giới hạn cứng 1 hướng/run (di sản thời 1 suggestion = cặp A/B 2 bài) làm
     // slot sáng chỉ ra 1 bài bán thay vì 2 như kế hoạch.
-    if (pickedFolders.length >= salesCount) break;
     const guessed = (guessGroup as (t: string) => string | null)(s.product);
     // guessGroup trả NHÃN FOLDER đầy đủ KÈM STT ("6. Thiết bị lọc dầu SF-50") — phải strip
     // STT CẢ HAI vế mới khớp (bug bắt được khi chạy thật 18/8).
@@ -352,10 +357,20 @@ export async function GET(req: Request) {
     const matchedFolder = guessed
       ? pool.find((g) => productName(g).toLowerCase() === productName(guessed).toLowerCase() && !usedInThisRun.has(g))
       : null;
-    if (!matchedFolder) continue;
+    if (!matchedFolder) return false;
     usedInThisRun.add(matchedFolder);
     const idx = allSuggestions.findIndex((x) => x === s);
-    pickedFolders.push({ group: matchedFolder, suggestion: s, suggestionIdx: idx });
+    pickedFolders.push({ group: matchedFolder, suggestion: s, suggestionIdx: idx, slot: slotIdx });
+    return true;
+  };
+  const takenSugs = new Set<Suggestion>();
+  for (let k = 0; k < salesCount; k++) {
+    const slotIsVideo = saleSlots[k]?.channel === 'youtube' || saleSlots[k]?.channel === 'tiktok';
+    for (const s of candidateSuggestions) {
+      if (takenSugs.has(s)) continue;
+      if (slotIsVideo && !(isVideoFitKind as (k?: string) => boolean)(s.kind)) continue;
+      if (fillFromSuggestion(s, k)) { takenSugs.add(s); break; }
+    }
   }
   // Không có suggestion -> vòng xoay/weights như cũ, mỗi folder 1 bài đơn.
   // 24/8 (user "100% theo kế hoạch tuần, không xàm xàm"): NẾU plan đã áp có weights
@@ -379,7 +394,11 @@ export async function GET(req: Request) {
     const extra = hasWeights
       ? weightedSample(remaining, (g) => weights[productName(g)] ?? 1, need)
       : shuffle(remaining).slice(0, need);
-    for (const g of extra) { pickedFolders.push({ group: g }); usedInThisRun.add(g); }
+    // Bài bù lấp các ô còn trống theo thứ tự ô.
+    const filledSlots = new Set(pickedFolders.map((pf) => pf.slot));
+    const holes = Array.from({ length: salesCount }, (_, i) => i).filter((i) => !filledSlots.has(i));
+    extra.forEach((g, i) => { pickedFolders.push({ group: g, slot: holes[i] }); usedInThisRun.add(g); });
+    pickedFolders.sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
   }
 
   // User 20/8: MOI DOT phai co it nhat 1 bai ban tu folder co CLIP NGUON (video AI dung duoc).
@@ -396,7 +415,7 @@ export async function GET(req: Request) {
       const idx = pickedFolders.findIndex((pf) => !pf.suggestion) ;
       const swapAt = idx >= 0 ? idx : pickedFolders.length - 1;
       const old = pickedFolders[swapAt];
-      pickedFolders[swapAt] = { group: replacement };
+      pickedFolders[swapAt] = { group: replacement, slot: old.slot };
       usedInThisRun.delete(old.group); usedInThisRun.add(replacement);
     }
   }
@@ -467,7 +486,7 @@ export async function GET(req: Request) {
       //   TikTok (4/9 khuya): cần folder có clip gốc; máy viết bài + dựng video dọc, người Duyệt rồi
       //   XUẤT TAY (nút Xuất TikTok + Ghép TikTok ở /noi-dung) vì TikTok API không cho đăng.
       //   Không đủ điều kiện -> rơi về Facebook, ghi lý do vào skipped để đọc run_log là biết.
-      const ps = saleSlots[k] || saleSlots[saleSlots.length - 1] || null;
+      const ps = saleSlots[pf.slot ?? k] || saleSlots[saleSlots.length - 1] || null;
       let channels: string[] = ['facebook'];
       const noClipWhy = photoOnlyGroup ? 'san pham chi ra bai anh (PHOTO_ONLY_GROUPS)' : 'folder khong co clip goc';
       if (ps?.channel === 'youtube') {
@@ -479,7 +498,8 @@ export async function GET(req: Request) {
       }
       const planSlot = ps ? { date: todayDate, index: ps.index, time: ps.time, channel: channels[0], group_id: ps.group_id || null, group_label: ps.group_label } : null;
       const photoOnly = channels[0] === 'facebook' && (photoOnlyGroup || Math.random() < PHOTO_POST_RATE);
-      const videoWanted = wantVideo && !photoOnly;
+      // 21/10 (rà soát): hướng dạng checklist, glossary... rơi vào ô Facebook trước vẫn được dựng video và lên Reel.
+      const videoWanted = wantVideo && !photoOnly && (isVideoFitKind as (k?: string) => boolean)(sug?.kind);
       const assets = { image: img.id, video: null };
 
       // A bám góc tri thức (sug.why + tiêu đề gợi ý). B dùng góc đối chứng, tự do tiêu đề.
@@ -552,6 +572,8 @@ export async function GET(req: Request) {
               suggestion_index: pf.suggestionIdx,
               suggestion_title: sug.title,
               suggestion_sources: sug.sources,
+              // 21/10: dạng bài của hướng đi, build-video đọc để không dựng video cho bài checklist khi có người bấm tay.
+              ...(sug.kind ? { suggestion_kind: sug.kind } : {}),
               // 28/8: chữ cảm xúc BOSS chốt (NGHỀ/TIỀN/RỦI RO/TỰ HÀO) — build-video đọc để
               // chỉnh biểu cảm giọng theo loại bài (voiceStyleOf), tránh video 1 màu.
               ...(sug.emotion ? { emotion: sug.emotion } : {}),
@@ -577,6 +599,8 @@ export async function GET(req: Request) {
         payload: {
           content_id: contentId, format: 'social', keyword: name, intent: 'giao_dich',
           risk, assets, channels, authored: 'ai',
+          // 21/10: hướng đi bị ép gov mà risk không đỏ thì thẻ trước đây không hiện cờ quản lý (chỉ có "⚠️" ở tiêu đề).
+          needs_manager_approval: needsGov,
           ...(photoOnly ? { post_style: 'photo' } : {}),
           ...(sug ? { from_plan_direction: true, suggestion_sources: sug.sources } : {}),
           ...(planSlot ? { plan_time: planTimeLocal(todayDate, planSlot.time), plan_channel: planSlot.channel, plan_group: planSlot.group_label, plan_slot_index: planSlot.index } : {}),

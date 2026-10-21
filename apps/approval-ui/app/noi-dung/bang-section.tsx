@@ -85,7 +85,7 @@ export default async function BangSection() {
   const cids = [...byContent.keys()];
 
   // Nội dung + nháp + cờ video; bài đã đăng; số liệu; media để xem trước khi duyệt.
-  const contents = new Map<string, { title: string; draft: string; brief: any }>();
+  const contents = new Map<string, { title: string; draft: string; brief: any; needs_gov_review?: boolean }>();
   const postsByContent = new Map<string, { id: string; channel: string; url: string; at: string; madePublicAt: string | null; deletedAt: string | null }[]>();
   const fbFailed = new Set<string>(); // bài có lượt đăng Facebook thất bại, chưa có bản FB published
   const fbRetrying = new Set<string>(); // đang có lượt đăng lại chạy nền
@@ -95,7 +95,7 @@ export default async function BangSection() {
   const leadsByContent = new Map<string, number>();
   if (cids.length) {
     const [{ data: cs }, { data: ps }, { data: ms }, { data: fails }, { data: leadRows }] = await Promise.all([
-      client.from('mkt_content').select('id, title, draft, brief').in('id', cids).is('deleted_at', null),
+      client.from('mkt_content').select('id, title, draft, brief, needs_gov_review').in('id', cids).is('deleted_at', null),
       client.from('mkt_posts').select('id, content_id, channel, external_url, published_at, made_public_at, deleted_at').eq('status', 'published').in('content_id', cids),
       client.from('mkt_metrics').select('source, entity_ref, metrics, created_at').in('source', ['facebook', 'youtube']).in('entity_ref', cids).order('created_at', { ascending: false }).limit(700),
       // Lượt đăng FACEBOOK THẤT BẠI (23/8: token Page bị vô hiệu) -> thẻ hiện nút "Đăng lại Facebook".
@@ -116,7 +116,7 @@ export default async function BangSection() {
       const { data: rl } = await client.from('run_log').select('detail').eq('task', 'mkt.publish_facebook_retry').gte('created_at', since).order('created_at', { ascending: false }).limit(50);
       for (const r of rl || []) { const d = (r as any).detail || {}; if (d.phase === 'started' && d.contentId && fbFailed.has(d.contentId)) fbRetrying.add(String(d.contentId)); }
     }
-    for (const c of cs || []) contents.set((c as any).id, { title: (c as any).title || '', draft: String((c as any).draft || ''), brief: (c as any).brief || {} });
+    for (const c of cs || []) contents.set((c as any).id, { title: (c as any).title || '', draft: String((c as any).draft || ''), brief: (c as any).brief || {}, needs_gov_review: (c as any).needs_gov_review === true });
     for (const p of ps || []) {
       const cid = (p as any).content_id as string | null;
       if (!cid) continue;
@@ -282,7 +282,8 @@ export default async function BangSection() {
                   // tóm tắt (kênh, khung giờ, loại bài, lúc tạo), cờ cần quản lý/cần rà, đích đăng, Xem bài, Duyệt.
                   // Người viết/máy viết, insight, nguồn ảnh máy chọn, nhóm chia sẻ... gom vào "Chi tiết".
                   // Ảnh/video xem trong modal Xem bài (thumb trên thẻ bỏ, hay ra ô trống khi ảnh link ngoài lỗi).
-                  const needsManager = p.risk === 'red' || p.needs_manager_approval === true;
+                  // 21/10: tính cả mkt_content.needs_gov_review (rotate ép gov theo hướng đi mà phiếu không ghi cờ).
+                  const needsManager = p.risk === 'red' || p.needs_manager_approval === true || c?.needs_gov_review === true;
                   const purpose = purposeLabel(p.post_kind || brief.post_kind, p.format || c?.brief?.format);
                   const metaParts = [
                     planChannelLabel(p.plan_channel, chans, p.post_reel === true),
@@ -297,6 +298,12 @@ export default async function BangSection() {
                   const scenes = videoScenes(brief);
                   const secs = videoSeconds(scenes);
                   const hasVideo = !!reviewVid || scenes.length > 0;
+                  // 21/10: ô YouTube chưa có video thì không duyệt được (server decideForm chặn cùng điều kiện).
+                  const bAssets = (brief as any).assets || {};
+                  const videoFailed = (brief as any).video_failed === true;
+                  const approveBlocked = chans.includes('youtube') && !bAssets.video && !bAssets.video_v
+                    ? (videoFailed ? 'Video AI dựng lỗi: bấm Làm video lại hoặc Từ chối.' : 'Ô YouTube: chờ video AI dựng xong mới duyệt được.')
+                    : null;
                   const imgNote = (brief as any).image_note || (brief as any).image_via
                     ? `${String((brief as any).image_via || '')}${(brief as any).image_note ? ` · ${String((brief as any).image_note).replace(' (link, khong luu)', '')}` : ''}`
                     : '';
@@ -326,6 +333,7 @@ export default async function BangSection() {
                           <li>Tạo lúc {formatDateTimeVN(it.createdAt)}, {p.authored === 'human' ? 'người tự soạn' : 'máy soạn'}.</li>
                           {p.plan_group ? <li>Nhóm chia sẻ dự kiến: {String(p.plan_group)}</li> : null}
                           {brief.video_requested === true ? <li>Đang làm video AI cho bài này.</li> : null}
+                          {videoFailed ? <li>Video AI dựng lỗi nhiều lần, máy đã dừng thử.</li> : null}
                           {(brief as any).insight_line ? <li>Thông điệp: {String((brief as any).insight_line)}{(brief as any).insight_situation ? ` (${String((brief as any).insight_situation)})` : ''}</li> : null}
                           {imgWarn ? <li>Cảnh báo ảnh: {imgWarn}</li> : null}
                           {imgNote ? <li>Nguồn ảnh máy chọn: {imgNote}</li> : null}
@@ -423,6 +431,8 @@ export default async function BangSection() {
                         videoUrl={vidUrl ?? null}
                         caption={c?.draft ?? null}
                         defaultSchedule={typeof p.plan_time === 'string' && p.plan_channel !== 'tiktok' && isFutureVNLocal(p.plan_time, 15) ? String(p.plan_time) : ''}
+                        approveBlocked={approveBlocked}
+                        needsManager={needsManager}
                       />
                     </div>
                   );
