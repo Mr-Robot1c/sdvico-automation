@@ -12,7 +12,7 @@
 // (chính là lỗi user thấy 29/8: /ke-hoach trống trơn khối lịch).
 
 import type { getServerClient } from './supabase-server';
-import { weekWindowVN } from './plan';
+import { weekWindowVN, dropDuplicateDirections } from './plan';
 // @ts-ignore — module JS thuần
 import { guessGroup, isDiscontinuedGroup, isVideoFitKind } from './gen/products.mjs';
 import { CONTENT_KIND_BY_DOW, CONTENT_PURPOSE } from './plan-live';
@@ -128,7 +128,11 @@ export async function buildWeekPlanView(
   // Hàng đợi hướng đi cho phần DỰ KIẾN — cùng luật với /api/rotate: hướng chưa dùng
   // (pending_variant thời A/B cũ coi như đã dùng), bỏ sản phẩm ngừng bán, sort ổn định theo trọng số;
   // lúc rút (draw) sản phẩm chưa có bài tuần này đi trước (11/9 chiều).
-  const suggestions: any[] = Array.isArray(appliedData?.content_suggestions) ? appliedData.content_suggestions : [];
+  // 22/10: bỏ hướng trùng ý bài gần đây / hướng đứng trước, cùng hàm rotate và lúc sinh kế hoạch dùng.
+  const suggestions: any[] = await dropDuplicateDirections(
+    client as any,
+    Array.isArray(appliedData?.content_suggestions) ? appliedData.content_suggestions : []
+  );
   const weights: Record<string, number> = (appliedData?.weights || {}) as Record<string, number>;
   const wOf = (s: any) => weights[productNameOf(s.product)] ?? 1;
   const isDiscontinued = (product: string) => {

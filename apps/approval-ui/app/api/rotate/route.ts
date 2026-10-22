@@ -321,7 +321,35 @@ export async function GET(req: Request) {
       (runNeedsClip ? Number(sugHasClip(b)) - Number(sugHasClip(a)) : 0)
       || (Number(isFreshProduct(b)) - Number(isFreshProduct(a)))
       || (weightOfSug(b) - weightOfSug(a)));
-  const candidateSuggestions = [...pendingBs, ...freshSorted];
+  // 22/10 (user: "sao hôm nay lại tạo lại bài s-tracking rồi?"): kế hoạch có 3 hướng S-Tracking cùng ý "hậu quả khi
+  // giấu / ngắt / mất sóng VMS", prompt dặn không lặp nhưng Gemini đổi vài chữ là lọt. Bỏ hướng TRÙNG Ý (so bằng code,
+  // direction-dedupe.mjs) với bài cùng sản phẩm 14 ngày qua và với hướng đứng trước nó trong chính hàng đợi.
+  // @ts-ignore — module JS thuần
+  const { duplicateOf } = await import('../../../lib/gen/direction-dedupe.mjs');
+  const recentByGroup = new Map<string, string[]>();
+  {
+    const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+    const { data: recentRows } = await client
+      .from('mkt_content').select('title, brief')
+      .gte('created_at', since).eq('brief->>rotation', 'true').is('deleted_at', null).limit(300);
+    for (const r of (recentRows || []) as { title?: string; brief?: any }[]) {
+      const g = r.brief?.rotation_group;
+      if (!g || g === 'Bài content') continue;
+      const key = productName(String(g)).toLowerCase();
+      const list = recentByGroup.get(key) || [];
+      for (const t of [r.brief?.suggestion_title, r.title]) if (t) list.push(String(t));
+      recentByGroup.set(key, list);
+    }
+  }
+  const dedupedSkips: Array<{ title: string; duplicateOf: string }> = [];
+  const candidateSuggestions = [...pendingBs, ...freshSorted].filter((s) => {
+    const key = productName(groupOfSug(s) || s.product).toLowerCase();
+    const seen = recentByGroup.get(key) || [];
+    const dup = (duplicateOf as (t: string, r: string[]) => string | null)(s.title, seen);
+    if (dup) { dedupedSkips.push({ title: s.title, duplicateOf: dup }); return false; }
+    recentByGroup.set(key, [...seen, s.title]); // hướng sau trùng ý hướng này cũng bị bỏ
+    return true;
+  });
 
   // slot = số ô trong saleSlots mà bài này lấp (21/10: ô video có thể bỏ trống cho khối bù, nên không dựa vào thứ tự mảng).
   type PickedFolder = { group: string; suggestion?: Suggestion; suggestionIdx?: number; slot?: number };
@@ -884,6 +912,8 @@ export async function GET(req: Request) {
     // 14/10: lượt 8h chọn Thuraya mà ra 0 bài, run_log không có lý do nên chỉ đoán được (Gemini
     // lỗi). Ghi luôn lý do bỏ qua, cắt ngắn để dòng log không phình.
     ...(skipped.length ? { skipped: skipped.slice(0, 10).map((s) => ({ ...s, reason: String(s.reason || '').slice(0, 240) })) } : {}),
+    // 22/10: hướng bị bỏ vì trùng ý bài gần đây (đọc run_log là biết vì sao hướng đó không ra bài).
+    ...(dedupedSkips.length ? { duplicateDirections: dedupedSkips.slice(0, 10) } : {}),
     slots: winSlots.map((s) => `${s.time} ${s.kind} ${s.channel}${s.group_label ? ' 👥' + s.group_label : ''}`), planSaved: postingPlan.saved,
   });
   return NextResponse.json({

@@ -362,6 +362,34 @@ export async function loadRecentDirectionTitles(client: Client): Promise<string[
   return [...new Set([...planTitles, ...postedTitles])].slice(0, 45);
 }
 
+// Bỏ hướng TRÙNG Ý (lib/gen/direction-dedupe.mjs) với bài cùng sản phẩm đã sinh 14 ngày qua và với hướng đứng trước
+// nó trong danh sách. Hướng đã dùng (used_at) giữ nguyên để lịch sử kế hoạch không đổi.
+export async function dropDuplicateDirections(client: Client, sugs: ContentDirection[]): Promise<ContentDirection[]> {
+  // @ts-ignore — module JS thuần
+  const { duplicateOf } = await import('./gen/direction-dedupe.mjs');
+  const keyOf = (product: string) => String((guessGroup as (t: string) => string | null)(product) || product)
+    .replace(/^\s*\d+\.\s*/, '').trim().toLowerCase();
+  const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+  const { data: rows } = await client
+    .from('mkt_content').select('title, brief')
+    .gte('created_at', since).eq('brief->>rotation', 'true').is('deleted_at', null).limit(300);
+  const seen = new Map<string, string[]>();
+  for (const r of (rows || []) as { title?: string; brief?: any }[]) {
+    const g = r.brief?.rotation_group;
+    if (!g || g === 'Bài content') continue;
+    const k = keyOf(String(g));
+    seen.set(k, [...(seen.get(k) || []), ...[r.brief?.suggestion_title, r.title].filter(Boolean).map(String)]);
+  }
+  return sugs.filter((s) => {
+    if (s.used_at) return true;
+    const k = keyOf(s.product);
+    const list = seen.get(k) || [];
+    if ((duplicateOf as (t: string, r: string[]) => string | null)(s.title, list)) return false;
+    seen.set(k, [...list, s.title]);
+    return true;
+  });
+}
+
 // Thứ 4 (3) hoặc chủ nhật (0) theo giờ Việt Nam. Nhịp CŨ, giữ cho tương thích chỗ khác gọi.
 export function isPlanDayVN(now: Date): boolean {
   const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
@@ -618,6 +646,15 @@ export async function generateAndStorePlan(
     }
   } catch (e: any) {
     console.error('[plan] carry-over huong di loi (bo qua):', e?.message || e);
+  }
+
+  // 22/10 (user: "sao hôm nay lại tạo lại bài s-tracking rồi?"): avoidTitles chỉ là lời dặn trong prompt, Gemini đổi
+  // vài chữ là lọt (tuần 19-25/10 ra 3 hướng "hậu quả khi giấu / ngắt / mất sóng VMS"), carry-over còn mang hướng cũ
+  // cùng ý sang. Lọc bằng code: bỏ hướng trùng ý bài cùng sản phẩm 14 ngày qua hoặc trùng hướng đứng trước nó.
+  try {
+    plan.content_suggestions = await dropDuplicateDirections(client, plan.content_suggestions || []);
+  } catch (e: any) {
+    console.error('[plan] loc huong trung y loi (bo qua):', e?.message || e);
   }
 
   // 11/9 chiều (user "đã nói có truyền thông SDFish mà rốt cuộc mất tiêu"): buildPlan chỉ xếp sản phẩm
