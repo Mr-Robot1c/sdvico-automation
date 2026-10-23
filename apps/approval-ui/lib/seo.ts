@@ -129,15 +129,6 @@ function productOf(brief: any, title: string, draft: string = ''): string {
   return '';
 }
 
-// Đọc ảnh CHÍNH của bài (brief.assets.image = brand_assets.id → storage URL public).
-async function imageUrlOf(client: Client, assetId: string | null | undefined): Promise<string | null> {
-  if (!assetId) return null;
-  const { data } = await client.from('brand_assets').select('storage_path').eq('id', assetId).maybeSingle();
-  const sp = (data as any)?.storage_path as string | undefined;
-  if (!sp) return null;
-  return assetPublicUrl(client, sp);
-}
-
 // Liệt kê bài PUBLIC (mkt_posts đã publish + có draft hợp lệ). Sắp theo published_at giảm dần.
 // Không giới hạn số (SEO cần tất cả), nhưng limit 500 làm ngưỡng an toàn.
 export async function loadPublicPosts(client: Client, limit: number = 500): Promise<PublicPost[]> {
@@ -212,6 +203,19 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
     return null;
   };
 
+  // 23/10 (user: trang /blog sdvico.vn mở lần đầu chờ khoảng 17 giây): trước đây mỗi bài gọi imageUrlOf riêng, tuần tự,
+  // 136 bài là 136 lượt đi về Supabase (đo 19,8 giây). Đọc ảnh chính của mọi bài trong MỘT lượt.
+  const imageIds = [...new Set((contents || []).map((c: any) => c?.brief?.assets?.image).filter(Boolean).map(String))];
+  const imagePathById = new Map<string, string>();
+  for (let i = 0; i < imageIds.length; i += 200) {
+    const { data: imgRows } = await client.from('brand_assets').select('id, storage_path').in('id', imageIds.slice(i, i + 200));
+    for (const r of (imgRows || []) as any[]) if (r.storage_path) imagePathById.set(String(r.id), String(r.storage_path));
+  }
+  const mainImageOf = (assetId: unknown): string | null => {
+    const sp = assetId ? imagePathById.get(String(assetId)) : undefined;
+    return sp ? assetPublicUrl(client, sp) : null;
+  };
+
   const posts: PublicPost[] = [];
   for (const c of contents || []) {
     const id = String((c as any).id);
@@ -222,7 +226,7 @@ export async function loadPublicPosts(client: Client, limit: number = 500): Prom
     const info = byCid.get(id)!;
     // 28/8 tối (user): blog ĐƯỢC dùng ảnh link ngoài (Google/Unsplash) khi bài mang image_url
     // — miễn hợp bài; ảnh kho vẫn là fallback khi không có.
-    let imageUrl = String(brief?.assets?.image_url || '') || await imageUrlOf(client, brief?.assets?.image);
+    let imageUrl = String(brief?.assets?.image_url || '') || mainImageOf(brief?.assets?.image);
     if (!imageUrl) {
       // 3/9 tối (user: "các blog dùng hình y chang nhau"): prodKey RỖNG (bài content) làm vế
       // g.includes('') LUÔN đúng -> khớp mờ vớ ngay nhóm ĐỨNG ĐẦU pool (nhóm của ảnh up mới

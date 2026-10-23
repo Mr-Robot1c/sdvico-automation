@@ -8,6 +8,7 @@ The result is written to `run_log` with task `mkt.public_site_refresh`. A failed
 
 | Name | Purpose |
 |---|---|
+| `PUBLIC_SITE_DEPLOY_ENABLED` | Must be `on` to dispatch at all. Off by default since 23/10/2026: sdvico.vn/blog reads `/api/public/posts` live, and `sdvico-home-page` has no `deploy-public-site.yml`, so every dispatch returned 404. Turn on only after that workflow exists on `main`. |
 | `PUBLIC_SITE_GITHUB_OWNER` | Repository owner, normally `sdvico` |
 | `PUBLIC_SITE_GITHUB_REPO` | Repository name, normally `sdvico-home-page` |
 | `PUBLIC_SITE_DEPLOY_WORKFLOW` | Workflow file, normally `deploy-public-site.yml` |

@@ -47,6 +47,11 @@ export async function requestPublicSiteRefresh(
   input: { event: PublicSiteEvent; postId?: string | null; reason: string },
   dependencies: { dispatch?: typeof dispatchGithubWorkflow } = {},
 ): Promise<PublicSiteRefreshResult> {
+  // 23/10 (user: "tắt bước gọi workflow dựng web báo lỗi 404 giả"): sdvico.vn/blog đọc bài THẲNG từ /api/public/posts
+  // nên không cần dựng lại web, còn repo sdvico-home-page chưa từng có deploy-public-site.yml -> mọi lần gọi đều 404
+  // và ghi lỗi giả vào run_log (22 lần tới 22/10). Chỉ gọi khi bật PUBLIC_SITE_DEPLOY_ENABLED=on (khi repo web đã có
+  // workflow thật), mặc định tắt và không ghi nhật ký.
+  if ((process.env.PUBLIC_SITE_DEPLOY_ENABLED || '').trim() !== 'on') return { requested: false, skipped: true };
   const owner = (process.env.PUBLIC_SITE_GITHUB_OWNER || 'sdvico').trim();
   const repo = (process.env.PUBLIC_SITE_GITHUB_REPO || 'sdvico-home-page').trim();
   const workflow = (process.env.PUBLIC_SITE_DEPLOY_WORKFLOW || 'deploy-public-site.yml').trim();

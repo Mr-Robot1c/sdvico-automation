@@ -75,6 +75,7 @@ export async function publishContentToWebsite(
   return {
     ok: true,
     url: finalUrl,
-    ...(refresh.requested ? {} : { error: `Đã đăng bài nhưng chưa yêu cầu được website đồng bộ: ${refresh.error || 'unknown error'}` }),
+    // 23/10: tắt bước dựng web (skipped, không có error) thì không phải lỗi, sdvico.vn/blog đọc bài trực tiếp.
+    ...(refresh.requested || (refresh.skipped && !refresh.error) ? {} : { error: `Đã đăng bài nhưng chưa yêu cầu được website đồng bộ: ${refresh.error || 'unknown error'}` }),
   };
 }
