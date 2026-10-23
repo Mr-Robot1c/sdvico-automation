@@ -186,7 +186,7 @@ export default async function Page() {
           📣 Chia sẻ group: <b>{fmt(todayLot?.done || 0)}/{fmt(todayLot?.lotSize || 0)}</b> nhóm đã chia hôm nay
         </p>
         {todayView.rows.length === 0 ? (
-          <p className="sub" style={{ margin: 0 }}>Hôm nay lịch không có bài nào. <Link href="/ke-hoach#lich-dang" className="src">Sửa lịch đăng →</Link></p>
+          <p className="sub" style={{ margin: 0 }}>Hôm nay lịch không có bài nào. <Link href="/ke-hoach?tab=lich-dang" className="src">Sửa lịch đăng →</Link></p>
         ) : (
           <div className="tablewrap">
             <table className="datatable today-table">
@@ -267,7 +267,7 @@ export default async function Page() {
         ) : null}
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 8 }}>
           <Link href="/ke-hoach" className="src" style={{ fontSize: '.85rem' }}>Kế hoạch tuần →</Link>
-          <Link href="/ke-hoach#lich-dang" className="src" style={{ fontSize: '.85rem' }}>Sửa lịch đăng cố định →</Link>
+          <Link href="/ke-hoach?tab=lich-dang" className="src" style={{ fontSize: '.85rem' }}>Sửa lịch đăng cố định →</Link>
         </div>
       </section>
 

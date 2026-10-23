@@ -243,7 +243,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Kênh truyền thông</h1>
-          <p className="sub">4 nền tảng SDVICO đang chạy — số kênh quản trị, bài đã đăng, tổng lượt xem và bình luận. Bấm link để mở tài khoản thật.</p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link href="/do-luong" className="btn ghost">📈 Đo lường ngày</Link>

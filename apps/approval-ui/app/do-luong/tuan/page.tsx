@@ -155,12 +155,8 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
       <header className="head-row">
         <div>
           <h1>Báo cáo tuần</h1>
-          <p className="sub">
-            Gom số liệu cả tuần (Thứ 2 đến Chủ Nhật, giờ Việt Nam) mọi kênh: Facebook, TikTok, YouTube Shorts. So sánh với tuần liền trước để biết đang lên hay xuống. Xem số liệu HÔM NAY ở <Link className="src" href="/do-luong">Đo lường ngày</Link>.
-          </p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Link href="/do-luong" className="btn ghost">← Đo lường ngày</Link>
           <PullMetricsButton size="sm" />
           <CopyReport text={narrative} />
         </div>

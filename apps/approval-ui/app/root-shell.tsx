@@ -20,7 +20,8 @@ const AskBotFab = dynamic(() => import('./ask-bot-fab'), { ssr: false });
 import Tracking from './tracking';
 // 2/10 (responsive mobile đợt 1): thanh đầu trang gọn + menu trượt cho điện thoại.
 import ThemeToggle from './theme-toggle';
-import { crumbFor, parentFor, rootTabFor } from '../lib/routes';
+import { crumbFor, parentFor, rootTabFor, sectionFor } from '../lib/routes';
+import SectionTabs from './section-tabs';
 import { PUBLIC_HOTLINE_DISPLAY, PUBLIC_HOTLINE_TEL } from '../lib/public-contact';
 
 // Dưới 768px sidebar nội bộ thành menu trượt (off-canvas). Mốc này phải khớp @media (max-width: 767px) trong globals.css.
@@ -192,7 +193,13 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
               {' '}<a href={demoHref}>Tắt</a>
             </div>
           ) : null}
-          <div className="content">{children}</div>
+          <div className="content">
+            {(() => {
+              const sec = sectionFor(path);
+              return sec ? <SectionTabs tabs={sec.group.tabs} active={sec.active} label={sec.group.label} /> : null;
+            })()}
+            {children}
+          </div>
         </div>
       </div>
       <nav className="m-tabbar" aria-label="Việc chính">

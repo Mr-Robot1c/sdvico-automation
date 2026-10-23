@@ -101,7 +101,8 @@ Gộp / bỏ:
 
 ## Tiến độ
 - Đợt 1 (23/10/2026, user duyệt): menu 6 mục + Hệ thống, thanh 5 nút dưới cùng trên điện thoại; bài đăng chỉ duyệt ở /noi-dung (tiêu đề "Duyệt bài"), /hang-doi thành "Phiếu khác"; trang Hôm nay còn checklist người mới + Cần làm + Lịch hôm nay + 3 số tuần; bỏ tên biến môi trường, bảng, migration, lệnh chạy tay khỏi giao diện, nhật ký chạy thu vào "Chi tiết kỹ thuật"; xoá 3 file code chết. QA: next build sạch, screenshot 375px và khung máy tính.
-- Chưa làm: sidebar thu thành biểu tượng ở cỡ tablet (768–1023px); tab cho Kế hoạch, Số liệu, Khách hàng, Tư liệu (đợt 2); /huong-dan và gộp chat bot (đợt 3).
+- Đợt 2 (23/10/2026): hàng tab đầu trang dùng chung (app/section-tabs.tsx, nhóm khai ở lib/routes.ts SECTION_GROUPS). Số liệu: Theo tuần, Theo ngày, Theo kênh, Bài blog, Video đăng. Khách hàng: Hỏi mua, Hỏi đáp. Tư liệu: Tư liệu, Soạn bài, Video AI, Bản tin. Kế hoạch chia 4 tab qua ?tab=: Tuần này, Lịch đăng, Cài đặt (gồm các nút soạn lại và "Khi nào bấm nút nào"), Lịch sử. Menu bỏ mục con của 3 nhóm có tab. Bỏ đoạn giải thích dưới tiêu đề các trang này. Lệch so với màn 5: chưa có tab "Tin nhắn chờ gửi", phiếu đó vẫn ở Hệ thống → Phiếu khác.
+- Chưa làm: sidebar thu thành biểu tượng ở cỡ tablet (768–1023px); /huong-dan và gộp chat bot (đợt 3).
 
 ## Ngoại lệ đã duyệt (cơ chế [DEF] — SKILL.md)
 - STACK React + Tailwind + shadcn → giữ CSS tự viết (app/globals.css) — KỸ THUẬT: app đã có 2.000 dòng CSS và class riêng, đổi stack là viết lại toàn bộ 40 trang, ngoài phạm vi sắp xếp lại. Trang nào sửa thì gom style viết thẳng (style={{}}) về class trong globals.css. 23/10/2026.

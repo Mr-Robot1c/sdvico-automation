@@ -9,9 +9,6 @@ export default function Page() {
       <header className="head-row">
         <div>
           <h1>Studio bản tin</h1>
-          <p className="sub" style={{ margin: '4px 0 0' }}>
-            Xưởng dựng video bản tin (gói độc lập trên máy biên tập). Dựng xong, bản tin được nạp vào Hàng đợi duyệt như mọi bài khác.
-          </p>
         </div>
       </header>
       <StudioEmbed />

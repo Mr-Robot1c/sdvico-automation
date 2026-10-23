@@ -11,6 +11,7 @@ import GeneratePostsButton from './generate-posts-button';
 import SaveGenerateButton from './save-generate-button';
 import GenerateButton from './generate-button';
 import PostingPlanForm from './posting-plan-form';
+import SectionTabs from '../section-tabs';
 import { loadPostingPlan, summarizePlan, CHANNEL_LABEL } from '../../lib/posting-plan';
 
 export const dynamic = 'force-dynamic';
@@ -80,7 +81,16 @@ function isJunkProduct(name: string): boolean {
   return /\d{9,}/.test(name) || /^bài (fb|đăng tay)/i.test(name);
 }
 
-export default async function Page({ searchParams }: { searchParams?: { xem?: string } }) {
+// 23/10 (đợt 2 sắp xếp lại, design-spec-app-noi-bo.md màn 3): trang dài khoảng 12 khối chia 4 tab (?tab=).
+const KH_TABS = [
+  { key: 'tuan', href: '/ke-hoach', label: 'Tuần này' },
+  { key: 'lich-dang', href: '/ke-hoach?tab=lich-dang', label: 'Lịch đăng' },
+  { key: 'cai-dat', href: '/ke-hoach?tab=cai-dat', label: 'Cài đặt' },
+  { key: 'lich-su', href: '/ke-hoach?tab=lich-su', label: 'Lịch sử' },
+];
+
+export default async function Page({ searchParams }: { searchParams?: { xem?: string; tab?: string } }) {
+  const tab = KH_TABS.some((t) => t.key === searchParams?.tab) ? String(searchParams?.tab) : 'tuan';
   const client = getServerClient();
   const [{ data, error }, { data: goalRow }, { data: focusRow }, pp] = await Promise.all([
     client
@@ -196,14 +206,45 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
   // Bảng Sản phẩm ưu tiên: từ bản đang hiển thị, lọc tên rác.
   const products = ((displayData?.products || []) as Plan['products']).filter((p) => !isJunkProduct(p.product));
 
+  // "Khi nào bấm nút nào" nằm cạnh các nút ở tab Cài đặt.
+  const HELP_BLOCK = (
+<details className="blk">
+          <summary className="kh-summary">❓ Khi nào bấm nút nào</summary>
+          <div className="tablewrap table-scroll" style={{ marginTop: 10 }}>
+            <table className="datatable">
+              <thead><tr><th style={{ width: 170 }}>Nút</th><th>Bấm khi nào</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><b>💾 Lưu &amp; sinh kế hoạch mới</b></td>
+                  <td className="sub">Vừa đổi Mục tiêu hoặc Sản phẩm tập trung ở Cài đặt tuần — máy lưu rồi sinh bản mới bám cài đặt đó, áp ngay.</td>
+                </tr>
+                <tr>
+                  <td><b>🔄 BOSS chạy lại</b></td>
+                  <td className="sub">Không đổi cài đặt nhưng muốn 7 hướng khác (tri thức vừa cập nhật, hướng cũ chán).</td>
+                </tr>
+                <tr>
+                  <td><b>⚡ Sinh bài theo kế hoạch ngay</b></td>
+                  <td className="sub">Vừa đổi kế hoạch giữa ngày, muốn có bài mới liền không chờ khung 8h/14h.</td>
+                </tr>
+                <tr>
+                  <td><b>📝 Soạn đề xuất tuần sau</b></td>
+                  <td className="sub">Muốn có bản kế hoạch tuần sau sớm hơn Chủ nhật, hoặc vừa đổi mục tiêu mà muốn bản đề xuất theo cài đặt mới. Bản chưa áp, Thứ 2 8h máy áp.</td>
+                </tr>
+                <tr>
+                  <td><b>🧪 Áp dụng đề xuất mới</b></td>
+                  <td className="sub">Chỉ hiện sau khi BOSS học tuần Chủ nhật — nhập trọng số mới, không mất hướng đi cũ.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+  );
+
   return (
     <main>
       <header className="head-row">
         <div>
           <h1>Kế hoạch</h1>
-          <p className="sub">
-            Lịch đăng cố định: {summarizePlan(pp.plan)}. Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h. Tối 20h BOSS chỉnh nhẹ trọng số theo số liệu 4 tuần gần nhất, Chủ nhật 8h BOSS soạn kế hoạch tuần sau để bạn xem và sửa cả ngày, Chủ nhật tối BOSS học số liệu, Thứ 2 8h máy tự áp kế hoạch kèm trọng số vừa học (hoặc bạn bấm Áp ngay). Bài luôn chờ người bấm Duyệt.
-          </p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {learnSuggestion ? (
@@ -212,10 +253,10 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
               <button className="btn ok" type="submit">🧪 Áp dụng đề xuất mới</button>
             </form>
           ) : null}
-          <ProposeButton action={regenerateWeeklyProposalAction} label={weeklyProposal ? '📝 Soạn lại đề xuất tuần sau' : '📝 Soạn đề xuất tuần sau'} />
-          <GenerateButton action={generatePlanNow} />
         </div>
       </header>
+
+      <SectionTabs tabs={KH_TABS} active={KH_TABS.find((t) => t.key === tab)!.href} label="Kế hoạch" />
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
 
@@ -244,6 +285,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         );
       })()}
 
+      {tab === 'tuan' ? (<>
       {/* Đang xem lại bản cũ */}
       {viewing ? (
         <section className="blk" style={{ borderColor: 'var(--accent)', borderLeftWidth: 5 }} role="status">
@@ -395,17 +437,19 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             </tbody>
           </table>
         </div>
-        <p className="sub" style={{ margin: '10px 0 0' }}>
-          Tối 20h BOSS tự chỉnh trọng số theo số liệu ngày (tối đa 0,5 điểm). Chủ nhật 20h học số cả tuần trên Facebook, YouTube và TikTok. Thứ 2 8h ra kế hoạch tuần mới theo luật 70/30.
-          {week.hasFallback ? ' Ô "hướng cạn" nghĩa là hướng đi đã hết — máy tự nạp thêm hướng mới trong ngày.' : ''}
-          {' '}Lô nhóm: MỖI BUỔI đăng Facebook chia 4 nhóm khác nhau (ngày 2 bài Facebook = 8 nhóm). Buổi đã qua hiện nhóm đã bấm "Đánh dấu đã chia", hôm nay bấm được ngay trong bảng, buổi tới là dự kiến máy xoay (nhóm lâu chưa chia lên trước). Đổi giờ/kênh/ghim nhóm ở khối Lịch đăng cố định ngay bên dưới.
-        </p>
+        {week.hasFallback ? <p className="sub" style={{ margin: '10px 0 0' }}>Ô "hướng cạn": hướng đi đã hết, máy tự nạp thêm trong ngày.</p> : null}
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
           <GeneratePostsButton action={generatePostsNow} />
         </div>
       </section>
 
-      <PostingPlanForm pp={pp} lots={Object.fromEntries(week.days.filter((d) => d.lot).map((d) => [d.date, d.lot!]))} rowsByDate={Object.fromEntries(week.days.map((d) => [d.date, weekRowsOf(d)]))} changeLog={changeLog} />
+      </>) : null}
+
+      {tab === 'lich-dang' ? (
+        <PostingPlanForm pp={pp} lots={Object.fromEntries(week.days.filter((d) => d.lot).map((d) => [d.date, d.lot!]))} rowsByDate={Object.fromEntries(week.days.map((d) => [d.date, weekRowsOf(d)]))} changeLog={changeLog} />
+      ) : null}
+
+      {tab === 'tuan' ? (<>
 
       {/* ===== 3. HƯỚNG ĐI BÀI VIẾT ===== */}
       <section className="blk" id="huong-di">
@@ -462,8 +506,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </p>
       </section>
 
-      {/* ===== 4+5. HAI CỘT ĐỀU NHAU ===== */}
-      <div className="blk-cols">
+      {/* ===== 4. SẢN PHẨM ƯU TIÊN ===== */}
         <section className="blk">
           <h2>⚖️ Sản phẩm ưu tiên <span className="sub">trọng số BOSS chấm — cao thì hướng của sản phẩm đó chạy trước</span></h2>
           {products.length ? (
@@ -494,6 +537,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           </p>
         </section>
 
+      </>) : null}
+
+      {tab === 'cai-dat' ? (<>
         <section className="blk kh-settings">
           <h2>⚙️ Cài đặt tuần</h2>
           <form action={saveGoalFocusAndRegenerate}>
@@ -557,10 +603,18 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             <p className="sub" style={{ margin: '6px 0 0' }}>Sửa danh sách ở <a href="/noi-dung">Quản lý bài viết</a>. Group nào chia sẻ ngày nào đặt ở khối Lịch đăng cố định, người chia sẻ tay.</p>
           </div>
         </section>
-      </div>
+        <section className="blk">
+          <h2>🔄 Soạn lại kế hoạch</h2>
+          <div className="kh-strip">
+            <ProposeButton action={regenerateWeeklyProposalAction} label={weeklyProposal ? '📝 Soạn lại đề xuất tuần sau' : '📝 Soạn đề xuất tuần sau'} />
+            <GenerateButton action={generatePlanNow} />
+          </div>
+        </section>
+        {HELP_BLOCK}
+      </>) : null}
 
       {/* ===== 6. Đăng lại bài cũ ăn khách (khi có) ===== */}
-      {repostSuggestions.length ? (
+      {tab === 'tuan' && repostSuggestions.length ? (
         <section className="blk">
           <h2>🔁 Nên đăng lại <span className="sub">bài từ 7 ngày trước có tương tác tốt nhất — người mở bài và chia sẻ tay</span></h2>
           <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
@@ -581,10 +635,9 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         </section>
       ) : null}
 
-      {/* ===== 7. HAI DETAILS ĐỀU NHAU ===== */}
-      <div className="blk-cols">
-        <details className="blk">
-          <summary className="kh-summary">📚 Lịch sử các bản kế hoạch <span className="sub">{vnInt(history.length)} bản cũ</span></summary>
+      {tab === 'lich-su' ? (
+        <section className="blk">
+          <h2>📚 Các bản kế hoạch cũ <span className="sub">{vnInt(history.length)} bản</span></h2>
           {history.length ? (
             <div className="tablewrap table-scroll" style={{ marginTop: 10 }}>
               <table className="datatable">
@@ -607,39 +660,8 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             </div>
           ) : <p className="sub" style={{ marginTop: 10 }}>Chưa có bản cũ nào.</p>}
           {history.length > 6 ? <p className="sub" style={{ margin: '8px 0 0' }}>Chỉ hiện 6 bản gần nhất.</p> : null}
-        </details>
-
-        <details className="blk">
-          <summary className="kh-summary">❓ Khi nào bấm nút nào</summary>
-          <div className="tablewrap table-scroll" style={{ marginTop: 10 }}>
-            <table className="datatable">
-              <thead><tr><th style={{ width: 170 }}>Nút</th><th>Bấm khi nào</th></tr></thead>
-              <tbody>
-                <tr>
-                  <td><b>💾 Lưu &amp; sinh kế hoạch mới</b></td>
-                  <td className="sub">Vừa đổi Mục tiêu hoặc Sản phẩm tập trung ở Cài đặt tuần — máy lưu rồi sinh bản mới bám cài đặt đó, áp ngay.</td>
-                </tr>
-                <tr>
-                  <td><b>🔄 BOSS chạy lại</b></td>
-                  <td className="sub">Không đổi cài đặt nhưng muốn 7 hướng khác (tri thức vừa cập nhật, hướng cũ chán).</td>
-                </tr>
-                <tr>
-                  <td><b>⚡ Sinh bài theo kế hoạch ngay</b></td>
-                  <td className="sub">Vừa đổi kế hoạch giữa ngày, muốn có bài mới liền không chờ khung 8h/14h.</td>
-                </tr>
-                <tr>
-                  <td><b>📝 Soạn đề xuất tuần sau</b></td>
-                  <td className="sub">Muốn có bản kế hoạch tuần sau sớm hơn Chủ nhật, hoặc vừa đổi mục tiêu mà muốn bản đề xuất theo cài đặt mới. Bản chưa áp, Thứ 2 8h máy áp.</td>
-                </tr>
-                <tr>
-                  <td><b>🧪 Áp dụng đề xuất mới</b></td>
-                  <td className="sub">Chỉ hiện sau khi BOSS học tuần Chủ nhật — nhập trọng số mới, không mất hướng đi cũ.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </details>
-      </div>
+        </section>
+      ) : null}
     </main>
   );
 }

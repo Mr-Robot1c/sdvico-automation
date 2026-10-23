@@ -37,10 +37,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Xưởng sản xuất hôm nay</h1>
-          <p className="sub">
-            Gắn 1 ảnh và 1 video, gõ tiêu đề, bấm Sinh text, sửa lại rồi bấm Gửi duyệt.
-            Máy soạn, người bấm gửi: nội dung ở đây chưa lên trang, phải qua duyệt trước.
-          </p>
         </div>
       </header>
 

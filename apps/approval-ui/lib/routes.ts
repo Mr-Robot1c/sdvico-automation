@@ -114,3 +114,38 @@ export function rootTabFor(path: string): string | null {
   }
   return null;
 }
+
+// 23/10 (đợt 2 sắp xếp lại): mục menu có nhiều trang thì hiện HÀNG TAB đầu trang (app/section-tabs.tsx), menu không còn
+// mục con. Nhãn cùng một hàng: 2 chữ, cùng ngữ pháp, không xuống dòng. Kế hoạch tự dựng tab trong trang (?tab=).
+export type SectionTab = { href: string; label: string };
+export type SectionGroup = { label: string; tabs: SectionTab[] };
+export const SECTION_GROUPS: SectionGroup[] = [
+  { label: 'Số liệu', tabs: [
+    { href: '/do-luong/tuan', label: 'Theo tuần' },
+    { href: '/do-luong', label: 'Theo ngày' },
+    { href: '/kenh', label: 'Theo kênh' },
+    { href: '/seo/bai-viet', label: 'Bài blog' },
+    { href: '/video/da-dang', label: 'Video đăng' },
+  ] },
+  { label: 'Khách hàng', tabs: [
+    { href: '/khach-hang', label: 'Hỏi mua' },
+    { href: '/hoi-dap', label: 'Hỏi đáp' },
+  ] },
+  { label: 'Tư liệu', tabs: [
+    { href: '/tu-lieu', label: 'Tư liệu' },
+    { href: '/san-xuat', label: 'Soạn bài' },
+    { href: '/video', label: 'Video AI' },
+    { href: '/ban-tin', label: 'Bản tin' },
+  ] },
+];
+
+// Nhóm tab của trang đang đứng + tab đang sáng (tổ tiên gần nhất trong cây là một tab của nhóm).
+export function sectionFor(path: string): { group: SectionGroup; active: string } | null {
+  const chain = ancestorsOf(path);
+  for (const p of chain) {
+    for (const g of SECTION_GROUPS) {
+      if (g.tabs.some((t) => t.href === p)) return { group: g, active: p };
+    }
+  }
+  return null;
+}

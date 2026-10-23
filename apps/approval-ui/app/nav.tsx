@@ -34,12 +34,11 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
     { key: 'hom-nay', label: 'Hôm nay', icon: '🏠', href: '/tong-quan', children: [] },
     { key: 'duyet-bai', label: 'Duyệt bài', icon: '✅', href: '/noi-dung', children: [] },
     { key: 'ke-hoach', label: 'Kế hoạch', icon: '📅', href: '/ke-hoach', children: [] },
-    { key: 'so-lieu', label: 'Số liệu', icon: '📊', href: '/do-luong/tuan',
-      children: [child('/do-luong'), child('/kenh'), child('/seo/bai-viet'), child('/video/da-dang')] },
-    { key: 'khach-hang', label: 'Khách hàng', icon: '💬', href: '/khach-hang',
-      children: [child('/hoi-dap')] },
-    { key: 'tu-lieu', label: 'Tư liệu', icon: '🎬', href: '/tu-lieu',
-      children: [child('/san-xuat'), child('/video'), child('/ban-tin')] },
+    // 23/10 (đợt 2): trang con của Số liệu, Khách hàng, Tư liệu chuyển thành hàng tab đầu trang (lib/routes.ts
+    // SECTION_GROUPS), menu chỉ còn mục gốc.
+    { key: 'so-lieu', label: 'Số liệu', icon: '📊', href: '/do-luong/tuan', children: [] },
+    { key: 'khach-hang', label: 'Khách hàng', icon: '💬', href: '/khach-hang', children: [] },
+    { key: 'tu-lieu', label: 'Tư liệu', icon: '🎬', href: '/tu-lieu', children: [] },
   ];
   const heThong: NavGroup = {
     key: 'he-thong', label: 'Hệ thống', icon: '⚙️',

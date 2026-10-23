@@ -198,7 +198,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Đo lường ngày</h1>
-          <p className="sub">Số liệu bài đã đăng HÔM NAY (giờ Việt Nam). Xem tổng hợp cả tuần ở <Link className="src" href="/do-luong/tuan">📅 Báo cáo tuần</Link>.</p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <Link href="/do-luong/tuan" className="btn ghost">📅 Báo cáo tuần</Link>
