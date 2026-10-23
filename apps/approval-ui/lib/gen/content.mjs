@@ -11,6 +11,8 @@
 
 import { DEFAULT_HASHTAGS, productHashtags, guessGroup, sanitizePostText } from './products.mjs';
 import { guardLines, guardViolations, stripViolatingSentences } from './product-guard.mjs';
+// 23/10: dữ kiện công ty từ hồ sơ năng lực 2026, allowlist cho blog và kịch bản.
+import { companyLines } from './company-profile.mjs';
 import { logTokenUsage } from './token-log.mjs';
 import { wrapAi, modelFor } from './llm-client.mjs';
 
@@ -310,7 +312,8 @@ function boundarySystem(facts) {
     .filter((f) => f.value)
     .map((f) => `${f.brand || ''} ${f.model || ''} ${f.attribute}: ${f.value}${f.verified ? '' : ' (CHƯA XÁC NHẬN, dữ liệu test)'}`.trim());
   return [
-    'Bạn viết nội dung marketing cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
+    'Bạn viết nội dung marketing cho Công ty SDVICO, cung cấp sản phẩm và giải pháp công nghệ cho ngành biển và thủy sản: tự sản xuất một số sản phẩm (máy lọc nước biển, thiết bị SCONECT), đồng thời phân phối, lắp đặt thiết bị của các hãng.',
+    ...companyLines({ maxUse: 2 }),
     'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay ở câu đầu, đọc trên điện thoại.',
     'CẤM văn hoa mỹ / dịch máy. Không mở bài bằng cảnh vật lãng mạn ("nhìn ánh đèn vươn khơi lấp lánh", "giữa trùng khơi lộng gió", "sóng vỗ mạn tàu", "bình minh trên biển"). Không dùng cụm sáo "quan trọng nhường nào", "đóng vai trò cốt lõi", "sự an toàn và thông suốt", "trong thời đại ngày nay", "không thể phủ nhận". Vào việc ngay.',
     'Số theo chuẩn Việt Nam, dấu chấm ngăn cách hàng nghìn. Không gạch dài, mũi tên, dấu chấm tròn giữa câu.',
@@ -503,7 +506,8 @@ export async function generateDraftLLM(brief, facts = [], assetHint = '', format
     .map((f) => `${f.brand || ''} ${f.model || ''} ${f.attribute}: ${f.value}${f.verified ? '' : ' (CHƯA XÁC NHẬN, dữ liệu test)'}`.trim());
 
   const system = [
-    'Bạn viết nội dung marketing cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
+    'Bạn viết nội dung marketing cho Công ty SDVICO, cung cấp sản phẩm và giải pháp công nghệ cho ngành biển và thủy sản: tự sản xuất một số sản phẩm (máy lọc nước biển, thiết bị SCONECT), đồng thời phân phối, lắp đặt thiết bị của các hãng.',
+    ...companyLines({ maxUse: 2 }),
     'Giọng gần gũi bà con ngư dân, câu ngắn, trả lời ngay ở câu đầu, đọc trên điện thoại.',
     'Số theo chuẩn Việt Nam, dấu chấm ngăn cách hàng nghìn. Không gạch dài, mũi tên, dấu chấm tròn giữa câu.',
     'CẤM bịa model và thông số. Chỉ được nêu thông số có trong danh sách đã duyệt dưới đây. Không có thì nói chung chung.',

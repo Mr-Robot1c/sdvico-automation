@@ -13,10 +13,11 @@ Ghi chú: đây là dự án riêng cho SDVICO, tách khỏi thử nghiệm `aut
 - Tên: Công ty TNHH Hiệp Lực Phát Triển Việt, viết tắt SDVICO.
 - Khẩu hiệu: "Công nghệ số cho ngành biển và thủy sản".
 - Lĩnh vực: cung cấp sản phẩm và giải pháp công nghệ cho ngành biển và thủy sản, phục vụ ngư dân, tàu cá và doanh nghiệp trong ngành, hướng tới nâng cao hiệu quả đánh bắt và giảm chi phí đầu vào.
-- Nguồn gốc: theo trang sdvico.vn, công ty khởi đầu từ sản phẩm máy lọc nước biển thành nước ngọt cho tàu cá, do một nhóm giảng viên Trường Đại học Bà Rịa Vũng Tàu phát triển, thành lập năm 2014. `[CẦN XÁC NHẬN với Phòng Kinh doanh: năm thành lập và pháp nhân chính xác]`
+- Nguồn gốc: theo trang sdvico.vn, công ty khởi đầu từ sản phẩm máy lọc nước biển thành nước ngọt cho tàu cá, do một nhóm giảng viên Trường Đại học Bà Rịa Vũng Tàu phát triển. Theo hồ sơ năng lực 2026: SDVICO hoạt động từ năm 2014; pháp nhân hiện tại Công ty TNHH Hiệp Lực Phát Triển Việt (tên tiếng Anh Synergy Development Viet Company Limited), mã số doanh nghiệp 3502480764, đăng ký lần đầu 15/07/2022. Bài viết nói "từ năm 2014".
 - Khách hàng mục tiêu: ngư dân, chủ tàu cá, doanh nghiệp ngành biển và thủy sản.
-- Địa chỉ: 283 Nguyễn Hữu Cảnh, Vũng Tàu. `[CẦN XÁC NHẬN: tên phường và đơn vị hành chính hiện hành, vì các nguồn ghi khác nhau]`
-- Liên hệ: website sdvico.vn, hotline 1900 23 23 49, hộp thư tuyển dụng tuyendung@sdvico.vn.
+- Địa chỉ: 283 Nguyễn Hữu Cảnh, Phường Rạch Dừa, TP. Hồ Chí Minh (theo giấy ĐKKD thay đổi lần 3 ngày 25/06/2026).
+- Liên hệ: website sdvico.vn, hotline 1900 23 23 49, email chung info@sdvico.vn, hộp thư tuyển dụng tuyendung@sdvico.vn.
+- Năng lực được phép nêu (hồ sơ năng lực 2026): ISO 9001:2015; hơn 5.000 tàu cá dùng sản phẩm; hơn 40 đại lý bảo hành, xử lý sự cố 24/7; Bằng khen của Thủ tướng Chính phủ; Soba đạt danh hiệu "Sản phẩm tốt hướng đến quyền lợi người tiêu dùng năm 2026". Danh sách đầy đủ và phần cố ý không nạp (dữ liệu cá nhân, tài chính, tên khách hợp đồng, SF-50) ở `apps/approval-ui/lib/gen/company-profile.mjs`.
 - Vai trò trong chuỗi: SDVICO vừa phát triển một số sản phẩm, khởi đầu là máy lọc nước, vừa phân phối và lắp đặt thiết bị của các hãng. SDVICO không sở hữu phần mềm của các hãng đối tác, xem điều cấm 4.
 
 Nguyên tắc điền mục này: các dữ kiện lấy từ trang chính thức sdvico.vn, tra ngày 10/8/2026. Mục nào còn đánh dấu cần xác nhận thì Phòng Kinh doanh hoặc Phòng Nhân sự chốt lại. Không suy đoán, không lấy từ nguồn ngoài chưa kiểm chứng, điều cấm 5.
@@ -31,7 +32,7 @@ Nhóm sản phẩm theo trang sdvico.vn:
 4. Thiết bị xử lý dầu, giúp tiết kiệm dầu diesel cho tàu cá.
 5. Dầu nhớt: PVOil Nano Graphene và PV Engine RMI Nano Graphene. SDVICO là nhà phân phối ủy quyền dầu nhớt PVOIL.
 
-Thương hiệu và hãng nhắc trên trang: Viettel, Thuraya, PVOIL. Văn bản giao việc còn nêu VNPT VSS và Vishipel. `[CẦN XÁC NHẬN với Phòng Kinh doanh: SDVICO có phân phối VNPT VSS và Vishipel không, và danh mục đầy đủ còn sản phẩm nào khác]`
+Thương hiệu và hãng nhắc trên trang: Viettel, Thuraya, PVOIL. Hồ sơ năng lực 2026 xác nhận SDVICO phân phối, lắp đặt thiết bị giám sát hành trình Viettel S-Tracking, Thuraya MarineStar MNB-01, VNPT, Vishipel và điện thoại vệ tinh XT-Pro; đối tác gồm Viettel, VNPT, Vishipel, Gtel, Station Satcom, PV OIL, PV OIL Lube, Annovi Reverberi. Sản phẩm SDVICO tự làm: máy lọc nước biển, thiết bị SCONECT (hợp quy QCVN 54:2020/BTTTT), phần mềm Soba, SDfish.
 
 Ranh giới bắt buộc khi viết nội dung về sản phẩm:
 - Phân biệt rõ sản phẩm do SDVICO phát triển, như máy lọc nước, với thiết bị SDVICO phân phối và lắp đặt, như thiết bị định vị và dầu nhớt.

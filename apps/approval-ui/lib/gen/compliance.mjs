@@ -11,6 +11,7 @@
 //     để buộc người xác nhận, đúng nguyên tắc thà chặn nhầm còn hơn đăng bậy.
 
 import { PRODUCTS, PUBLIC_NAME } from './products.mjs';
+import { COMPANY_SPEC_TEXT } from './company-profile.mjs';
 
 // Từ khóa quy định nhà nước. So khớp trên văn bản đã hạ chữ thường.
 export const REGULATION_TERMS = [
@@ -100,13 +101,15 @@ const PRODUCT_NAME_TOKENS = new Set(
   [...PRODUCTS.map((p) => p.group), ...Object.values(PUBLIC_NAME)]
     .flatMap((name) => scanSpecTokens(name).map((t) => t.norm.replace(/-/g, '')))
 );
+// 23/10: chứng nhận và số trong hồ sơ năng lực (ISO 9001, QCVN 02, QCVN 54, 80 lít/giờ...) cũng là dữ kiện đã duyệt.
+const COMPANY_TOKENS = new Set(scanSpecTokens(COMPANY_SPEC_TEXT).map((t) => t.norm.replace(/-/g, '')));
 // So khớp bỏ dấu gạch: model viết "MNB01" hay "MNB-01" là một.
 const inSet = (set, norm) => set.has(norm) || set.has(norm.replace(/-/g, ''));
 
 // Thông số KHÔNG có trong nguồn đã duyệt (nghi bịa). knownValues gồm cả thật lẫn test.
 export function scanUnverifiedSpecs(text, knownValues = new Set()) {
   return scanSpecTokens(text)
-    .filter((t) => !inSet(knownValues, t.norm) && !PRODUCT_NAME_TOKENS.has(t.norm.replace(/-/g, '')))
+    .filter((t) => !inSet(knownValues, t.norm) && !PRODUCT_NAME_TOKENS.has(t.norm.replace(/-/g, '')) && !COMPANY_TOKENS.has(t.norm.replace(/-/g, '')))
     .map((t) => t.raw);
 }
 

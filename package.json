@@ -21,6 +21,7 @@
     "test:approve": "node apps/approval-ui/lib/test-approve-guard.mjs",
     "test:dedupe": "node apps/approval-ui/lib/gen/test-direction-dedupe.mjs",
     "test:rank": "node apps/approval-ui/lib/gen/test-rank-products.mjs",
+    "test:company": "node apps/approval-ui/lib/gen/test-company-profile.mjs",
     "test:llm": "node apps/approval-ui/lib/gen/test-llm-client.mjs",
     "test:clip": "node packages/marketing/src/test-fresh-clip.mjs",
     "test:clipguard": "node packages/marketing/src/test-clip-guard.mjs",

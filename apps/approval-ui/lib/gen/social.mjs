@@ -3,6 +3,8 @@
 import { assessDraft, scanPlaybook, countWords, firstBodyLine } from './compliance.mjs';
 import { knownFactValues, testFactValues, PRODUCT_FACTS, factsForGroup } from './product-facts.mjs';
 import { guardLines, guardViolations } from './product-guard.mjs';
+// 23/10: dữ kiện công ty từ hồ sơ năng lực 2026 (ISO 9001:2015, 5.000+ tàu, 40+ đại lý...), allowlist cho câu tin cậy.
+import { companyLines } from './company-profile.mjs';
 import { DEFAULT_HASHTAGS, productHashtags, getFeatures, CONTENT_TOPICS, getPriceTeaser, publicName, isDiscontinuedGroup, ensurePriceTeaser, redactExactPrices, commentCta, ensureCommentCta, audienceLines, benefitLines, pickBenefitBlock, applyBenefitBlock, sanitizePostText } from './products.mjs';
 import { insightBrief } from './insights.mjs';
 import { logTokenUsage } from './token-log.mjs';
@@ -112,7 +114,7 @@ export async function generateSocialPost({
   // 15/10: đoạn bài toán chọn TRƯỚC, viết sẵn thành lời; bài ảnh dùng câu số ngắn như TikTok (bài ảnh dưới 70 chữ).
   const benefit = pickBenefitBlock(productGroup, photoOnly ? 'tiktok' : channel);
   const system = [
-    'Bạn viết bài mạng xã hội cho Công ty SDVICO, nhà phân phối thiết bị hàng hải và giám sát tàu cá.',
+    'Bạn viết bài mạng xã hội cho Công ty SDVICO, cung cấp sản phẩm và giải pháp công nghệ cho ngành biển và thủy sản: tự sản xuất một số sản phẩm (máy lọc nước biển, thiết bị SCONECT), đồng thời phân phối, lắp đặt thiết bị của các hãng.',
     `ĐÂY LÀ BÀI BÁN HÀNG cho đúng MỘT sản phẩm: "${shownName}". Bắt buộc: nêu rõ tên sản phẩm này (gọi đúng tên "${shownName}", không gọi tên khác), 1 tới 2 lợi ích thật của nó. Không viết chung chung như bài tâm sự, không lạc sang sản phẩm khác.`,
     'Giọng BẠN THUYỀN kể chuyện cho bạn nghe (không phải tờ rơi kỹ thuật, không sáo rỗng, không "công nghệ tiên tiến", không "thiết kế gọn gàng"). Câu ngắn, trả lời ngay câu đầu, đọc trên điện thoại. Nhấn lợi ích ĐÚNG VỚI SẢN PHẨM ĐANG VIẾT (xem SỰ THẬT NGHỀ bên dưới); KHÔNG gán lợi ích của sản phẩm khác.',
     '',
@@ -124,10 +126,11 @@ export async function generateSocialPost({
     '2) ĐỒNG CẢM giọng bạn thuyền, tả đúng khoảnh khắc đau để chạm TIẾC + UẤT + LO. Ngư dân đọc phải thấy "ủa đúng mình rồi".',
     '3) LỐI THOÁT: sản phẩm xuất hiện như CÁCH GIẢI QUYẾT, nói bằng LỢI ÍCH (đỡ tốn dầu, đủ nước ngọt, bám biển dài hơn, ra khơi đúng quy định), KHÔNG liệt kê thông số kỹ thuật khô khan.',
     '4) PHẦN THƯỞNG cụ thể: cái được rõ ràng (chở thêm được đá/cá, tiết kiệm bao nhiêu, an tâm hơn).',
-    '5) TIN CẬY 1 CÂU DUY NHẤT: lắp tận bến, bảo hành, hướng dẫn tới khi quen tay. Đủ, không sa đà khoe.',
+    '5) TIN CẬY 1 CÂU DUY NHẤT: lắp tận bến, bảo hành, hướng dẫn tới khi quen tay; được thêm đúng 1 dữ kiện công ty bên dưới nếu hợp (ví dụ hơn 40 đại lý bảo hành, ISO 9001:2015). Đủ, không sa đà khoe.',
     `6) CÂU CUỐI BÀI (luật Thanh 9/9, BẮT BUỘC, chép NGUYÊN VĂN, đứng riêng dòng cuối): "${cta}". Câu đứng NGAY TRƯỚC câu kết là câu giá; KHÔNG chen câu hỏi mở (kiểu "anh thường đi mấy ngày một chuyến?"), KHÔNG nhắc Shopee hay dán link mua (11/9 chiều: hỏi xong lại kêu cmt nghe lạc nhịp). KHÔNG mời nhắn Page bằng từ khóa kiểu cũ, KHÔNG đòi gọi tổng đài trong bài (tệp mới, đòi gọi là quá sức).`,
     '',
     ...guardLines(shownName + ' ' + productName + ' ' + productGroup),
+    ...companyLines({ maxUse: 1 }),
     // 11/9: bài bán viết cho đúng tệp khách (A ghe nhỏ, B tàu khơi xa), xem AUDIENCE ở products.mjs.
     ...audienceLines(productGroup),
     // 11/9: phép tính lợi ích theo cỡ tàu, số có nguồn (BENEFIT_ASSUMPTIONS). 15/10: model chỉ đặt chỗ [BÀI TOÁN],
@@ -326,6 +329,7 @@ export async function generateContentPost({ topic, facts = PRODUCT_FACTS, client
     'KHÔNG bịa tin tức, số liệu, sự kiện, quy định cụ thể. Nói chung, đúng, không phịa chi tiết.',
     'KHÔNG mô tả phần mềm đối tác (Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya) như của SDVICO.',
     'Không biến bài thành lời bán hàng. Nhắc SDVICO tối đa 1 lần; nếu chủ đề đã nêu rõ vai trò của SDVICO thì được nói tự nhiên vai trò đó, không thì không gán vai trò.',
+    ...companyLines({ maxUse: 1 }),
     'KHÔNG tự viết hashtag, hệ thống tự thêm.',
     '',
     structure,

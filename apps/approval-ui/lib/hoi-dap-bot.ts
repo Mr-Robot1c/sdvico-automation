@@ -17,6 +17,7 @@ import { logTokenUsage } from './gen/token-log.mjs';
 import { PRODUCTS, getFeatures, PRICE_TEASER, SHOPEE_LINK, PUBLIC_NAME } from './gen/products.mjs';
 // @ts-ignore — module JS thuần
 import { REPLY_FRAME, CUSTOMER_PSYCHOLOGY } from './gen/reply-playbook.mjs';
+import { COMPANY_FACTS, COMPANY_SOURCE } from './gen/company-profile.mjs';
 
 type AnyClient = { from: (t: string) => any };
 
@@ -133,7 +134,10 @@ export async function buildKnowledgeText(client: AnyClient): Promise<{ qa: QaRow
   lines.push('');
   // 10/9: bối cảnh công ty cố định (từ CLAUDE.md) để bot trả lời câu chung về SDVICO không cần nạp lại.
   lines.push('=== D. BỐI CẢNH CÔNG TY (cố định) ===');
-  lines.push('- SDVICO = Công ty TNHH Hiệp Lực Phát Triển Việt. Nhà PHÂN PHỐI thiết bị hàng hải, giám sát hành trình tàu cá, thiết bị liên lạc. Web sdvico.vn, blog sdvico.vn/blog. Tổng đài 1900 23 23 49.');
+  lines.push('- SDVICO = Công ty TNHH Hiệp Lực Phát Triển Việt. Tự sản xuất một số sản phẩm (máy lọc nước biển, thiết bị SCONECT, phần mềm Soba), đồng thời PHÂN PHỐI, lắp đặt thiết bị hàng hải, giám sát hành trình tàu cá, thiết bị liên lạc. Blog sdvico.vn/blog.');
+  // 23/10: dữ kiện đã lọc từ hồ sơ năng lực 2026 (lib/gen/company-profile.mjs); không có CCCD, tài chính, tên khách hợp đồng.
+  lines.push(`- Dữ kiện công ty (${COMPANY_SOURCE}):`);
+  for (const f of COMPANY_FACTS) lines.push(`  ${f.text}`);
   lines.push('- Viettel S-Tracking, VNPT VSS, Vishipel, Thuraya là phần mềm/dịch vụ của ĐỐI TÁC. SDVICO chỉ phân phối thiết bị tương thích, không sở hữu phần mềm của họ.');
   lines.push('- Kênh online (Page Facebook, TikTok, Zalo, Shopee) do nhân viên kênh online tự trả lời và tự chốt, không chuyển Kinh doanh (lệnh sếp Long 9/9/2026). Kinh doanh (Tiến, Hòa, Linh) chỉ cấp thông tin sản phẩm.');
   lines.push('- Bài công khai chỉ ghi giá úp mở theo câu giá ở mục C; số đầy đủ chỉ nói trong inbox hoặc trên sàn. Nội dung về quy định nhà nước, IUU, Cục Thủy sản, Kiểm ngư phải qua duyệt cấp quản lý trước khi đăng.');
