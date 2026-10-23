@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 const ERROR_MESSAGES: Record<string, string> = {
   '1': 'Sai tài khoản hoặc mật khẩu. Thử lại.',
   khoa: 'Nhập sai quá nhiều lần. Chờ 15 phút rồi thử lại.',
-  cfg: 'Máy chủ chưa cấu hình AUTH_SECRET nên không tạo được phiên đăng nhập. Báo người quản trị đặt biến AUTH_SECRET trên Vercel rồi deploy lại.',
+  cfg: 'Máy chủ chưa cài đặt đăng nhập. Báo kỹ thuật.',
 };
 
 export default function Page({ searchParams }: { searchParams?: { next?: string; loi?: string } }) {

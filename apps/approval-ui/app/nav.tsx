@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ROUTES, rootTabFor } from '../lib/routes';
+import { ROUTES, rootTabFor, ancestorsOf } from '../lib/routes';
 
 // 2/10 (lệnh Thanh và sếp tối 2/10, theo ảnh mẫu menu "Tuyển dụng >"): sidebar thành NHÓM ĐÓNG/MỞ.
 // Mỗi mục gốc là một hàng cha (icon + nhãn + chevron). Bấm NHÃN = sang trang gốc của nhóm (và nhóm tự mở).
@@ -17,7 +17,6 @@ type NavGroup = {
   label: string;
   icon: string;
   href?: string; // có href = nhãn bấm được sang trang gốc; không có = cả hàng chỉ đóng/mở
-  also?: string[]; // route chưa khai trong cây, giữ để hàng cha vẫn sáng
   children: Child[];
 };
 
@@ -29,51 +28,46 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   const path = usePathname();
   const p = ((path || '/').replace(/\/+$/, '')) || '/';
 
-  // 28/8 (user): bo nhan "SDVICO Ops" tren sidebar — brand logo ngay tren da du.
+  // 23/10 (đợt 1 sắp xếp lại, docs/app-map/design-spec-app-noi-bo.md): menu theo VIỆC người dùng làm, 6 mục chính
+  // + nhóm Hệ thống thu gọn. Trước là 8 nhóm theo bộ phận kỹ thuật (Agent, Kênh, SEO...), người mới không biết vào đâu.
   const main: NavGroup[] = [
-    { key: 'tong-quan', label: 'Tổng quan', icon: '📊', href: '/tong-quan', also: ['/noi-dung', '/ke-hoach', '/hang-doi'],
-      children: [child('/noi-dung'), child('/ke-hoach'), child('/hang-doi')] },
-    // 15/9 (Thanh, kế hoạch sửa web): Khách hàng "đem ra ngoài luôn" — mục riêng trên menu,
-    // không còn nằm trong Tổng quan / Bảng bài viết.
-    { key: 'khach-hang', label: 'Khách hàng', icon: '🛒', href: '/khach-hang', also: ['/hoi-dap'],
+    { key: 'hom-nay', label: 'Hôm nay', icon: '🏠', href: '/tong-quan', children: [] },
+    { key: 'duyet-bai', label: 'Duyệt bài', icon: '✅', href: '/noi-dung', children: [] },
+    { key: 'ke-hoach', label: 'Kế hoạch', icon: '📅', href: '/ke-hoach', children: [] },
+    { key: 'so-lieu', label: 'Số liệu', icon: '📊', href: '/do-luong/tuan',
+      children: [child('/do-luong'), child('/kenh'), child('/seo/bai-viet'), child('/video/da-dang')] },
+    { key: 'khach-hang', label: 'Khách hàng', icon: '💬', href: '/khach-hang',
       children: [child('/hoi-dap')] },
-    // 2/10: thêm Studio bản tin (trang nhúng Studio chạy trên máy biên tập).
-    { key: 'video', label: 'Video', icon: '🎬', href: '/video', also: ['/san-xuat', '/tu-lieu', '/ban-tin'],
-      children: [child('/san-xuat'), child('/tu-lieu'), child('/video/da-dang'), child('/ban-tin')] },
-    { key: 'seo', label: 'SEO', icon: '🔍', href: '/seo', also: ['/tu-khoa', '/quang-cao', '/du-kien'],
-      children: [child('/tu-khoa'), child('/du-kien'), child('/quang-cao'), child('/seo/bai-viet')] },
-    { key: 'kenh', label: 'Kênh', icon: '📡', href: '/kenh', also: ['/do-luong', '/ket-noi', '/facebook', '/youtube', '/tiktok'],
-      children: [child('/do-luong'), child('/do-luong/tuan'), child('/ket-noi')] },
-    // 10/9 (Thanh: "hỏi bot cho vào chung với trang agent cùng với mấy con kia"): bỏ mục Hỏi bot
-    // khỏi Hệ thống; khung chat nằm ngay đầu trang /agent, kho ở /hoi-dap; nút nổi ask-bot-fab giữ.
-    { key: 'agent', label: 'Agent', icon: '🤖', href: '/agent', also: ['/du-lieu-ai', '/kho-tri-thuc'],
-      children: [child('/du-lieu-ai')] }
+    { key: 'tu-lieu', label: 'Tư liệu', icon: '🎬', href: '/tu-lieu',
+      children: [child('/san-xuat'), child('/video'), child('/ban-tin')] },
   ];
-  const tuyenDung: NavGroup = {
-    key: 'tuyen-dung', label: 'Tuyển dụng', icon: '👥',
-    children: [
-      { href: '/ho-so', label: 'Hồ sơ ứng viên' },
-      { href: '/vi-tri', label: 'Vị trí tuyển dụng' }
-    ]
-  };
   const heThong: NavGroup = {
     key: 'he-thong', label: 'Hệ thống', icon: '⚙️',
     children: [
-      child('/quy-tac'),
-      // 29/8 (user): thay link sdvico.vn bang BLOG cua chinh he thong (trang cong khai /blog).
-      // 13/9 (Thanh): sdvico.vn/blog da song (anh Thanh len IIS) -> menu tro thang sang do; /blog cua he thong van con.
-      { href: 'https://sdvico.vn/blog', label: 'Blog SDVICO', external: true }
-    ]
+      child('/ket-noi'),
+      child('/seo'),
+      child('/du-kien'),
+      child('/quang-cao'),
+      child('/agent'),
+      child('/hang-doi'),
+      ...(marketingOnly ? [] : [child('/ho-so'), child('/vi-tri')]),
+      // 13/9 (Thanh): sdvico.vn/blog đã sống, menu trỏ thẳng sang đó.
+      { href: 'https://sdvico.vn/blog', label: 'Blog SDVICO', external: true },
+    ],
   };
-  const groups: NavGroup[] = marketingOnly ? [...main, heThong] : [...main, tuyenDung, heThong];
+  const groups: NavGroup[] = [...main, heThong];
 
-  // Mục con sáng: khớp dài nhất trên TOÀN menu (/do-luong/tuan thắng /do-luong).
-  let best: { gKey: string; href: string; len: number } | null = null;
+  // Mục con sáng: khớp với trang đang đứng HOẶC tổ tiên gần nhất của nó trong cây (lib/routes.ts), vd /facebook sáng
+  // "Kết nối kênh". Ưu tiên tổ tiên gần nhất, cùng độ gần thì href dài hơn.
+  const chain = ancestorsOf(p);
+  let best: { gKey: string; href: string; len: number; depth: number } | null = null;
   for (const g of groups) {
     for (const c of g.children) {
       if (c.external) continue;
-      if (p === c.href || p.startsWith(c.href + '/')) {
-        if (!best || c.href.length > best.len) best = { gKey: g.key, href: c.href, len: c.href.length };
+      const depth = chain.indexOf(c.href);
+      if (depth < 0) continue;
+      if (!best || depth < best.depth || (depth === best.depth && c.href.length > best.len)) {
+        best = { gKey: g.key, href: c.href, len: c.href.length, depth };
       }
     }
   }
@@ -82,7 +76,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
   const isRootOn = (g: NavGroup) => {
     if (!g.href) return false;
     if (root) return root === g.href;
-    return p === g.href || (g.also || []).some((a) => p === a || p.startsWith(a + '/')) || p.startsWith(g.href + '/');
+    return p === g.href || p.startsWith(g.href + '/');
   };
   const activeKey: string | null = best ? best.gKey : (groups.find(isRootOn)?.key ?? null);
 
@@ -145,7 +139,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
                   <span className="tab-icon" aria-hidden="true">{g.icon}</span>
                   <span>{g.label}</span>
                 </Link>
-                {chev}
+                {g.children.length ? chev : null}
               </div>
             ) : (
               <button

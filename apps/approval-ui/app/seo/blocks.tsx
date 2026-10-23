@@ -96,8 +96,8 @@ export async function SeoPostsBlock() {
         {!gscOn ? (
           <p className="sub" style={{ margin: '-6px 0 12px', fontSize: '.85rem' }}>
             {gsc.site
-              ? <>Số Google ở đây là số đã lưu của lần đồng bộ {gsc.at ? fmtDT(gsc.at) : 'trước'}, không tự cập nhật vì bản đang chạy này chưa nối Search Console. Cần đặt <code>GOOGLE_SA_JSON</code> và <code>GSC_SITE_URL</code> theo <code>docs/runbook-search-console-setup.md</code>.</>
-              : <>Chưa nối Google Search Console: đặt <code>GOOGLE_SA_JSON</code> và <code>GSC_SITE_URL</code> trên Vercel theo <code>docs/runbook-search-console-setup.md</code>, số click và hiển thị sẽ tự về mỗi ngày.</>}
+              ? <>Số Google ở đây là số lần đồng bộ {gsc.at ? fmtDT(gsc.at) : 'trước'}, chưa tự cập nhật. Báo kỹ thuật nối lại Search Console.</>
+              : <>Chưa nối Google Search Console. Báo kỹ thuật nối để số click và hiển thị tự về mỗi ngày.</>}
           </p>
         ) : null}
 

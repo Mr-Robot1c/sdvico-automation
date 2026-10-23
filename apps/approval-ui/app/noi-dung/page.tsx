@@ -155,11 +155,12 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
             (đang đứng ở đây) và đoạn giải thích phạm vi dài; phạm vi chuyển vào tooltip của hàng lối tắt. */}
         <header className="head-row">
           <div>
-            <h1>Bảng bài viết</h1>
+            <h1>Duyệt bài</h1>
           </div>
           <div className="head-actions">
             <AutoRefresh seconds={60} />
-            <Link className="btn ok" href="/san-xuat">Tạo bài</Link>
+            {/* 23/10 (đợt 1): việc chính ở đây là Duyệt (nút trên từng thẻ), Tạo bài lùi thành nút phụ. */}
+            <Link className="btn ghost" href="/san-xuat">Tạo bài</Link>
           </div>
         </header>
         <nav className="filters" aria-label="Mở danh sách bài theo trạng thái">

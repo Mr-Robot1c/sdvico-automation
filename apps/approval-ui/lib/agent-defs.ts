@@ -8,7 +8,7 @@ function botModelLabel(): string {
   const ws = webSearchProvider();
   const search = ws ? `tìm web bằng ${ws === 'tavily' ? 'Tavily' : 'Google (Serper)'}` : 'chưa nối API tìm web (Google grounding key free hay hết hạn mức)';
   const main = oa ? `${oa.label} (chuẩn OpenAI) chạy trước, Gemini 3.6 / 3.5 Flash dự phòng` : 'Gemini 3.6 Flash (dự phòng 3.5 Flash, 3.5 Flash Lite)';
-  return `${main}; ${search}; số liệu SDVICO chỉ từ kho mkt_product_qa + product_facts`;
+  return `${main}; ${search}; giá, thông số SDVICO chỉ lấy từ kho hỏi đáp và catalog`;
 }
 
 type Client = ReturnType<typeof getServerClient>;
@@ -117,21 +117,28 @@ export async function loadAgentDefs(client: Client): Promise<AgentDef[]> {
     {
       key: 'boss', icon: '👑', name: 'AI BOSS', boss: true,
       /* 30/8 (audit H3): không phô tên biến môi trường / tên khóa / đường dẫn API ra giao diện. */
-      model: 'Gemini Flash Lite', runsAt: 'Cloud 6 tiếng một lần (1h, 7h, 13h, 19h) + máy nội bộ mỗi giờ khi bật',
-      role: 'Quản lý tất cả: học số liệu tuần, ra kế hoạch tuần, mỗi tối từ 20h chỉnh trọng số nhẹ (±0,5). 70% học bài mới, 30% dùng lại bài cũ đã chỉnh trọng số.',
+      /* 23/10 (user: "thẻ agent còn ghi thông tin cũ thì sao không sửa luôn"): đối chiếu lại với code và lịch thật. */
+      // Nhật ký token 16-23/10: cả 4 lượt viết hướng đi đều do Flash Lite trả lời (code thử 3.6 Flash trước).
+      model: 'Gemini Flash Lite viết hướng đi (thử Gemini 3.6 Flash trước); trọng số tính từ số liệu, không dùng LLM',
+      runsAt: 'Cloud 6 tiếng một lần (1h, 7h, 13h, 19h). Chủ nhật soạn kế hoạch tuần sau, 8h thứ Hai tự áp',
+      role: 'Quản lý tất cả: ra kế hoạch tuần (hướng đi bài viết, lịch đăng từng ô giờ, kênh), tự bỏ hướng trùng ý với bài 14 ngày qua. Học số liệu 4 tuần gần nhất, sáng thứ Hai tự gộp trọng số vừa học vào kế hoạch; mỗi tối từ 20h chỉnh trọng số nhẹ (±0,5). 70% hướng mới, 30% xoay lại bài đang ăn.',
       last: mkLast(bossRow, bossRow?.task === 'mkt.live_apply' ? 'chỉnh trọng số tối' : 'ra kế hoạch'),
       href: '/ke-hoach',
     },
     {
       key: 'creator', icon: '✍️', name: 'AI tạo kịch bản',
-      model: 'Gemini Flash Lite', runsAt: 'Chạy trên cloud — 8h và 14h mỗi ngày', role: 'Viết bài + kịch bản video theo hướng đi BOSS giao (Gemini). Vòng xoay mỗi ngày 2 khung giờ.',
+      // Nhật ký token 16-23/10: bài bán 10 lượt Gemma / 2 lượt lùi Flash Lite, bài content 6/6, kịch bản video 11/22.
+      model: 'Gemma 4 26B viết bài bán, bài content, kịch bản video; Gemma lỗi hay quá hạn mức thì lùi Gemini Flash Lite',
+      runsAt: 'Chạy trên cloud — 8h và 14h mỗi ngày',
+      role: 'Viết bài + kịch bản video theo hướng đi BOSS giao, thông số lấy từ catalog sản phẩm đã xác nhận. Ô YouTube/TikTok chỉ nhận hướng hợp làm video (checklist để dành ô Facebook). Bài qua lưới kiểm (không bịa thông số, đúng nghề, giá úp mở, cờ quy định) rồi vào hàng đợi duyệt.',
       last: mkLast(lastOf(['mkt.rotate', 'mkt.suggestions_refill']), 'sinh bài theo lịch'),
       href: '/noi-dung',
     },
     {
       key: 'video', icon: '🎬', name: 'AI làm video',
       /* 1/9 (user feedback): diễn đạt cho người dùng, bỏ jargon 9:16/burn/cân âm lượng. */
-      model: 'Dây chuyền dựng video (không dùng LLM)', runsAt: 'Cloud — 5h và 13h mỗi ngày, hoặc ngay khi bấm dựng', role: 'Ghép cảnh thành video dọc, gắn phụ đề, cân đều âm lượng, đưa vào kho tư liệu.',
+      model: 'Dây chuyền dựng video; kịch bản do AI tạo kịch bản viết, khớp cảnh dùng Gemini Flash Lite', runsAt: 'Cloud — 5h và 13h mỗi ngày, hoặc ngay khi bấm Làm video',
+      role: 'Chọn clip trong kho theo từng cảnh, ghép thành video dọc, gắn phụ đề, cân đều âm lượng, gắn vào chính bài. Không dựng cho sản phẩm ngừng bán hay bài dạng checklist.',
       last: lastVideoAsset
         ? { at: lastVideoAsset.created_at, state: 'ok', note: `video mới nhất: ${String(lastVideoAsset.title || '').slice(0, 50)}` }
         : { at: null, state: null, note: 'kho chưa có video nào' },
@@ -143,34 +150,36 @@ export async function loadAgentDefs(client: Client): Promise<AgentDef[]> {
       model: 'VieNeu giọng Mỹ Duyên; dự phòng Gemini TTS rồi edge-tts', runsAt: 'Chạy cùng lượt dựng video', role: 'Đọc lời thoại tiếng Việt giọng Mỹ Duyên; máy chủ giọng bận thì tự lui giọng dự phòng. Cả video luôn một giọng.',
       last: lastVideoAsset
         ? { at: lastVideoAsset.created_at, state: 'ok', note: 'chạy cùng lượt dựng video gần nhất' }
-        : { at: null, state: null, note: 'chạy cùng Watcher, chưa có video' },
+        : { at: null, state: null, note: 'chạy cùng lượt dựng video, chưa có video' },
       href: '/kho-tri-thuc?ai=video-ai',
     },
     {
       key: 'seo', icon: '🔍', name: 'AI quản lý SEO',
-      model: 'Gemini Flash Lite (đề xuất từ khóa) + bộ rà điểm SEO (không LLM)',
+      model: 'Gemma 4 26B viết blog, Gemini Flash Lite đề xuất từ khóa + bộ rà điểm SEO (không LLM)',
       runsAt: 'Chạy trên cloud — blog 6h mỗi ngày, rà SEO 8h30 thứ Hai',
-      role: 'Mỗi ngày viết bài blog theo kho từ khóa (vào hàng đợi duyệt), mỗi tuần tự rà điểm SEO trang sdvico.vn và trang bài viết, đề xuất từ khóa mới cho kho, giữ sitemap sạch cho Google đọc.',
+      role: 'Mỗi ngày viết bài blog theo kho từ khóa (vào hàng đợi duyệt), bài đăng xong hiện ngay ở sdvico.vn/blog. Mỗi tuần tự rà điểm SEO trang sdvico.vn và trang bài viết, đề xuất từ khóa mới cho kho, giữ sitemap sạch cho Google đọc.',
       last: mkLast(lastOf(['mkt.seo_audit', 'mkt.seed_keywords', 'mkt.keyword_suggest', 'mkt.blog_keyword']), 'viết blog / audit / đề xuất từ khóa'),
       href: '/kho-tri-thuc?ai=seo-ai',
     },
     {
       key: 'lich-kenh', icon: '📆', name: 'AI quản lý lịch và kênh',
-      model: 'Không LLM — Facebook Graph · YouTube Data · TikTok Display API', runsAt: 'Kéo số 6 tiếng một lần (mỗi giờ khi máy nội bộ bật) + ngay khi bấm Duyệt', role: 'Bài duyệt xong tự đăng đúng kênh (FB, YouTube; TikTok xuất tay), kéo số liệu các kênh.',
+      model: 'Không LLM — Facebook Graph · YouTube Data · TikTok Display API', runsAt: 'Kéo số 6 tiếng một lần (1h, 7h, 13h, 19h) + ngay khi bấm Duyệt',
+      role: 'Bài duyệt xong tự đăng đúng kênh (Facebook kèm Reel nếu có video, YouTube Shorts đúng giờ hẹn, blog; TikTok xuất tay), kéo số liệu các kênh. Ô YouTube phải có video mới duyệt được; bài chạm quy định phải tick Quản lý đã duyệt.',
       last: mkLast(lastOf(['mkt.publish_facebook_ui', 'mkt.publish_facebook', 'mkt.publish_youtube', 'mkt.publish_tiktok', 'mkt.metrics_pull']), 'đăng bài / kéo số liệu'),
       href: '/kho-tri-thuc?ai=lich-kenh',
     },
     {
       key: 'bao-cao', icon: '📈', name: 'AI báo cáo tuần',
-      model: 'Không LLM — tính trực tiếp từ số liệu đo lường', runsAt: 'Chủ nhật từ 20h, bù sáng thứ Hai nếu Chủ nhật không chạy', role: 'Chủ nhật tối gom số liệu tuần từ các bài đã đăng, gửi về BOSS học và đề xuất đổi trọng số.',
+      model: 'Không LLM — tính trực tiếp từ số liệu đo lường', runsAt: 'Chủ nhật từ 20h, bù sáng thứ Hai nếu Chủ nhật không chạy', role: 'Chủ nhật tối gom số liệu 4 tuần gần nhất từ các bài đã đăng, đề xuất trọng số; sáng thứ Hai máy tự gộp vào kế hoạch tuần (nút Áp dụng vẫn bấm sớm được).',
       last: mkLast(lastOf(['mkt.learn_weekly']), 'học tuần xong, có đề xuất'),
       href: '/kho-tri-thuc?ai=bao-cao',
     },
     {
       key: 'data1', icon: '🏠', name: 'AI DATA 1 — nội bộ',
       model: 'Gemini Flash Lite (đọc ảnh + tóm tắt file)',
-      // 4/9 (memory: đầu vào Zalo do phiên Claude desktop 16h tải, task Windows 20h đẩy kho).
-      runsAt: 'Chạy trên máy nội bộ 20h, 2 ngày một lần (đẩy kho, tóm tắt)',
+      // 23/10: máy nội bộ giờ là Mac mini chạy 24/7, lịch Claude quét Zalo 17h30 thứ Tư và thứ Bảy, đẩy kho cùng lượt
+      // (trước là task Windows 20h, 2 ngày một lần).
+      runsAt: 'Máy nội bộ chạy 24/7: quét Zalo 17h30 thứ Tư và thứ Bảy, đẩy kho và tóm tắt cùng lượt',
       role: 'Học tri thức nội bộ (file Zalo/tài liệu người phụ trách thả vào kho) thành insight cho BOSS.',
       last: lastInternal
         ? { at: lastInternal.created_at, state: 'ok', note: `${fmt(dataInternalCount.count || 0)} mẩu tri thức trong kho` }
@@ -192,8 +201,8 @@ export async function loadAgentDefs(client: Client): Promise<AgentDef[]> {
     {
       key: 'danh-gia', icon: '⚖️', name: 'AI Đánh giá',
       model: 'Không LLM — chấm điểm từ bảng số liệu đo lường',
-      runsAt: 'Cập nhật đề xuất cùng lượt kéo số, tối từ 20h chỉnh trọng số tối đa 0,5, Chủ nhật từ 20h xếp bậc tuần (bù sáng thứ Hai)',
-      role: 'Chấm điểm từng bài (tương tác, lượt xem, giây xem, tiếp cận), xếp bậc sản phẩm Thắng / Theo dõi / Đuối theo tuần, đề xuất trọng số cho BOSS. Từ 29/8 mỗi hướng đi ra đúng 1 bài, không còn cặp A/B.',
+      runsAt: 'Cập nhật đề xuất cùng lượt kéo số, tối từ 20h chỉnh trọng số tối đa 0,5, Chủ nhật từ 20h xếp bậc (bù sáng thứ Hai)',
+      role: 'Chấm điểm từng bài (tương tác, lượt xem, giây xem, tiếp cận), xếp bậc sản phẩm Thắng / Theo dõi / Đuối trên 4 tuần gần nhất, đề xuất trọng số cho BOSS. Chỉ xếp Thắng khi có tương tác hoặc đơn và có ít nhất 2 sản phẩm đủ 3 bài để so. Mỗi hướng đi ra đúng 1 bài.',
       last: mkLast(lastOf(['mkt.learn_weekly', 'mkt.live_apply']), 'chấm điểm / chỉnh trọng số'),
       href: '/kho-tri-thuc?ai=danh-gia',
     },

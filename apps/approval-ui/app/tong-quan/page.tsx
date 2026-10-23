@@ -1,14 +1,12 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
 import { cachedPlatformStatus, cachedWeekReport } from '../../lib/cached';
-import PlatformLogo, { type PlatformKey } from '../noi-dung/platform-logo';
-import PageSuiteBlock from '../do-luong/page-suite-block';
+import PlatformLogo from '../noi-dung/platform-logo';
 import { buildTodayView, TODAY_STAGE_LABEL } from '../../lib/today-plan';
 import { CHANNEL_LABEL, DOW_LONG } from '../../lib/posting-plan';
-import { computeShareLot, planShareLots } from '../../lib/share-lot';
+import { planShareLots } from '../../lib/share-lot';
 import ShareLotToday from './share-lot-today';
-import { isDemoMode, maskName, maskTextFor } from '../../lib/demo-mode';
-import { liveContentIds } from '../../lib/content-status';
+import NewcomerChecklist from './newcomer-checklist';
 
 // 27/8 REDESIGN theo file "redesign web.docx" cua sep — trang TONG QUAN kieu ForLife Ops.
 // v2 (feedback sep cung ngay): (1) icon kenh trong bang bam duoc -> mo bai tren nen tang do;
@@ -19,7 +17,6 @@ export const dynamic = 'force-dynamic';
 
 type QueueRow = { id: string; title: string | null; status: string; payload: any; created_at: string };
 type PostRow = { content_id: string | null; channel: string; status: string; external_url: string | null; published_at: string | null };
-type ContentRow = { id: string; title: string | null; brief: any; status: string; created_at: string };
 
 function fmtDT(iso: string | null): string {
   if (!iso) return '';
@@ -42,50 +39,22 @@ function todayVN(): string {
 }
 const fmt = (n: number) => (n || 0).toLocaleString('vi-VN');
 
-// Nhan "ke hoach" (campaign) cua 1 bai theo brief.generator.
-function campaignOf(brief: any): string {
-  const g = String(brief?.generator || '');
-  if (g === 'rotation') return 'Kế hoạch tuần (vòng xoay)';
-  if (g === 'trend') return 'Bài trend';
-  if (g === 'seven-angles' || g === 'angles') return 'Bung 7 góc';
-  if (g === 'manual-import') return 'Nhập tay từ Page';
-  if (String(brief?.source || '') === 'reimport_facebook') return 'Nhập lại lịch sử';
-  if (g) return g;
-  return brief?.rotation_group ? `Vòng xoay · ${brief.rotation_group}` : 'Xưởng sản xuất';
-}
-
-export default async function Page({ searchParams }: { searchParams?: { q?: string; gd?: string; kenh?: string; kh?: string } }) {
+export default async function Page() {
   const client = getServerClient();
-  const q = String(searchParams?.q || '').trim();
-  const fGd = String(searchParams?.gd || '').trim();      // filter giai doan
-  const fKenh = String(searchParams?.kenh || '').trim();  // filter kenh
-  const fKh = String(searchParams?.kh || '').trim();      // filter ke hoach
   const now = Date.now();
   const since60 = new Date(now - 60 * 24 * 3600 * 1000).toISOString();
   const since7 = new Date(now - 7 * 24 * 3600 * 1000).toISOString();
-  // 7/9: khách "Đã mua" TUẦN NÀY (Thứ 2 00:00 VN -> giờ, theo updated_at lúc đổi trạng thái) so với
-  // mục tiêu tuần user giao nhóm IT 5/9 (10 khách MUA). Mục tiêu đọc từ mkt_weekly_goal "<n> khách hàng mua".
-  const vnNow = new Date(now + 7 * 3600 * 1000);
-  const mondayVN = new Date(vnNow);
-  mondayVN.setUTCDate(vnNow.getUTCDate() - ((vnNow.getUTCDay() + 6) % 7));
-  const weekStartIso = new Date(mondayVN.toISOString().slice(0, 10) + 'T00:00:00+07:00').toISOString();
-
   const today = todayVN();
-  const dayStartIso = new Date(today + 'T00:00:00+07:00').toISOString();
 
-  // 200 bai moi nhat, KHONG ilike o DB — q loc bang JS de tile "Da viet" khong lech khi search.
-  const contentQuery = client
-    .from('mkt_content')
-    .select('id, title, brief, status, created_at')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(200);
-
-  const [queueRes, postsRes, failedRes, contentRes, planAppliedRes, todayView, leadsRes, yt, wonWeekRes, goalRes, shareLot, qaVerifiedRes, qaPendingRes, week, postsTodayRes, pageScansRes] = await Promise.all([
+  // 23/10 (đợt 1 sắp xếp lại, design-spec-app-noi-bo.md màn 1): trang Hôm nay chỉ còn Cần làm + Lịch hôm nay + 3 số
+  // tuần này. Bỏ "Số bài ở từng bước", "Người hỏi mua", "Tất cả nội dung", đo lường 5 ô (trùng Duyệt bài, Khách hàng,
+  // Số liệu), bỏ luôn các truy vấn chỉ phục vụ chúng.
+  const [queueRes, postsRes, failedRes, todayView, leadsRes, yt, qaPendingRes, week] = await Promise.all([
     client
       .from('approval_queue')
       .select('id, title, status, payload, created_at')
       .eq('kind', 'mkt_publish_content')
+      .eq('status', 'pending')
       .gte('created_at', since60)
       .order('created_at', { ascending: false })
       .limit(400),
@@ -93,6 +62,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       .from('mkt_posts')
       .select('content_id, channel, status, external_url, published_at')
       .eq('status', 'published')
+      .eq('channel', 'facebook')
       .is('deleted_at', null)
       .order('published_at', { ascending: false })
       .limit(1000),
@@ -103,193 +73,43 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       .eq('channel', 'facebook')
       .order('id', { ascending: false })
       .limit(50),
-    contentQuery,
-    client
-      .from('mkt_plans')
-      .select('id, period_start, period_end, data, applied, created_at')
-      .eq('applied', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
     buildTodayView(client),
     client
       .from('mkt_leads')
-      .select('id, source, fb_user_name, message, created_at, status, content_id')
+      .select('id, status')
       .neq('status', 'spam')
       .gte('created_at', since7)
-      .order('created_at', { ascending: false })
-      .limit(100),
+      .limit(500),
     cachedPlatformStatus().then((st) => st.yt),
-    client.from('mkt_leads').select('id', { count: 'exact', head: true }).eq('status', 'won').gte('updated_at', weekStartIso),
-    client.from('app_config').select('value').eq('key', 'mkt_weekly_goal').maybeSingle(),
-    computeShareLot(client),
-    // 12/9 (Thanh gật): dòng đếm kho hỏi đáp cho mục tiêu tuần 14–20/9 (kho tri thức bot live, đích 40 dòng đã xác nhận)
-    client.from('mkt_product_qa').select('id', { count: 'exact', head: true }).eq('verified', true),
     client.from('mkt_product_qa').select('id', { count: 'exact', head: true }).eq('verified', false),
-    // 2/10 (Thanh: "load page hơi chậm"): 3 truy vấn dưới trước chạy ở vòng chờ riêng, nhưng KHÔNG phụ thuộc
-    // kết quả nào ở trên (chỉ cần dayStartIso) — gom vào đây để chạy song song.
     (async () => { try { return await cachedWeekReport(0); } catch { return null as any; } })(),
-    client.from('mkt_posts').select('id', { count: 'exact', head: true }).eq('status', 'published').gte('published_at', dayStartIso).lte('published_at', new Date().toISOString()),
-    client.from('mkt_metrics').select('metrics, created_at').eq('source', 'facebook').eq('entity_ref', '__page_real__').not('metrics->suite28', 'is', null).order('created_at', { ascending: false }).limit(30),
   ]);
-  const qaVerified = qaVerifiedRes.count ?? 0;
   const qaPending = qaPendingRes.count ?? 0;
-
-  const queueRows = (queueRes.data || []) as QueueRow[];
-  const posts = (postsRes.data || []) as PostRow[];
-  const failedFb = (failedRes.data || []) as PostRow[];
-  const contents = (contentRes.data || []) as ContentRow[];
-  // 3/10 chế độ demo: che tên khách + số điện thoại/email trong câu hỏi trước khi render (lib/demo-mode.ts).
-  const demo = isDemoMode();
-  const leads = ((leadsRes.data || []) as any[]).map((l) => (demo ? { ...l, fb_user_name: maskName(l.fb_user_name), fb_profile_url: null, message: maskTextFor(l.message, l.fb_user_name) } : l));
-
-  // ---- Trang thai theo content id (tu queue + posts) ----
-  // 9/10: bài còn kênh hẹn giờ chưa tới giờ là Lên lịch, chưa phải Đã đăng (lib/content-status.ts).
-  const publishedCids = liveContentIds(posts);
-  const channelsByCid = new Map<string, Set<string>>();
-  const urlByCidChannel = new Map<string, Map<string, string>>(); // cid -> channel -> external_url
-  const firstPostAt = new Map<string, string>();
-  for (const p of posts) {
-    if (!p.content_id) continue;
-    if (!channelsByCid.has(p.content_id)) channelsByCid.set(p.content_id, new Set());
-    channelsByCid.get(p.content_id)!.add(p.channel);
-    if (p.published_at && (!firstPostAt.has(p.content_id) || p.published_at < firstPostAt.get(p.content_id)!)) firstPostAt.set(p.content_id, p.published_at);
-    if (p.external_url) {
-      if (!urlByCidChannel.has(p.content_id)) urlByCidChannel.set(p.content_id, new Map());
-      const m = urlByCidChannel.get(p.content_id)!;
-      // TikTok external_url dang "tiktok:<publishId>" khong mo duoc — bo, dung brief.tiktok_share_url.
-      if (!m.has(p.channel) && !String(p.external_url).startsWith('tiktok:')) m.set(p.channel, String(p.external_url));
-    }
-  }
-
-  const queueByCid = new Map<string, QueueRow>();
-  for (const r of queueRows) {
-    const cid = String(r.payload?.content_id || '');
-    if (cid && !queueByCid.has(cid)) queueByCid.set(cid, r);
-  }
-
-  // 23/9 (user: ô Cần làm báo "2 bài kẹt Chờ duyệt quá 24 giờ" mà Bảng bài viết trống): soft-delete
-  // (26/8, cách C) cố ý KHÔNG đụng approval_queue, nên bài đã vào Thùng rác vẫn còn thẻ pending —
-  // các trang bài viết ẩn bài deleted, người duyệt không thấy gì để bấm, thẻ treo mãi. Mọi con số
-  // pending ở đây (nút Duyệt bài + ô Cần làm) phải bỏ thẻ của bài đã xóa; khôi phục từ Thùng rác
-  // thì thẻ tự được đếm lại.
-  const pendingRaw = queueRows.filter((r) => r.status === 'pending');
-  const pendingCids = [...new Set(pendingRaw.map((r) => String(r.payload?.content_id || '')).filter(Boolean))];
-  const deletedCids = new Set<string>();
-
-  // Y tuong = huong di bai viet cua ban ke hoach dang ap.
-  const appliedPlan = planAppliedRes.data as any;
-  const ideaCount = Array.isArray(appliedPlan?.data?.content_suggestions) ? appliedPlan.data.content_suggestions.length : 0;
-
-  // FB failed ma content chua co ban published nao tren facebook -> con ket that.
-  const failedStuck = failedFb.filter((p) => p.content_id && !(channelsByCid.get(p.content_id) || new Set()).has('facebook'));
-  const failedStuckCids = [...new Set(failedStuck.map((p) => p.content_id))] as string[];
-
-  // Lead
+  const pendingRaw = (queueRes.data || []) as QueueRow[];
+  const fbPublished = new Set(((postsRes.data || []) as PostRow[]).map((p) => p.content_id).filter(Boolean) as string[]);
+  const failedStuckCids = [...new Set(((failedRes.data || []) as PostRow[])
+    .filter((p) => p.content_id && !fbPublished.has(p.content_id)).map((p) => p.content_id))] as string[];
+  const leads = (leadsRes.data || []) as Array<{ id: string; status: string | null }>;
   const leadNew = leads.filter((l) => String(l.status || 'new') === 'new');
-  const leadToday = leads.filter((l) => String(l.created_at || '') >= dayStartIso);
-  const leadAds = leads.filter((l) => String(l.source || '') === 'facebook_ads');
-  const wonWeek = Number(wonWeekRes.count || 0);
-  const goalText = String((goalRes.data as any)?.value?.text || '');
-  const wonTarget = Number(goalText.match(/(\d+)\s*khách\s*(?:hàng\s*)?mua/i)?.[1] || 10);
 
-  // 29/8 (sếp: "đem đo lường và báo cáo tuần ra tổng quan"): số liệu TUẦN NÀY (kênh chính,
-  // buildWeekReport offset 0) + đếm lượt đăng hôm nay + sức khoẻ Trang từ bộ quét Business Suite.
-  // 15/9 (web chậm): 3 việc dưới độc lập nhau — trước chạy TUẦN TỰ (3 vòng chờ), giờ chạy song song.
-  const leadByCidEarly = new Map<string, number>();
-  for (const l of leads) { const cid = String(l.content_id || ''); if (cid) leadByCidEarly.set(cid, (leadByCidEarly.get(cid) || 0) + 1); }
-  const topLeadCidsEarly = [...leadByCidEarly.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([cid]) => cid);
-  // 2/10: vòng chờ thứ 2 gom 3 truy vấn chỉ phụ thuộc kết quả vòng 1 (thẻ pending của bài đã xóa, tiêu đề bài hút khách, lô nhóm hôm nay).
-  const [delRowsRes, leadTitlesRes, todayLots] = await Promise.all([
+  // Bài đã vào Thùng rác vẫn còn phiếu pending (soft-delete 26/8 không đụng approval_queue): không đếm (23/9).
+  const pendingCids = [...new Set(pendingRaw.map((r) => String(r.payload?.content_id || '')).filter(Boolean))];
+  const [delRowsRes, todayLots] = await Promise.all([
     pendingCids.length ? client.from('mkt_content').select('id').in('id', pendingCids).not('deleted_at', 'is', null) : Promise.resolve({ data: [] as any[] }),
-    topLeadCidsEarly.length ? client.from('mkt_content').select('id, title').in('id', topLeadCidsEarly) : Promise.resolve({ data: [] as any[] }),
     planShareLots(client, { [today]: todayView.rows.map((r) => ({ index: r.slot.index, time: r.slot.time, kind: r.slot.kind, channel: r.slot.channel, group_id: r.slot.group_id, contentId: r.contentId })) }),
   ]);
-  for (const d of ((delRowsRes as any).data || []) as any[]) deletedCids.add(String(d.id));
+  const deletedCids = new Set(((delRowsRes as any).data || []).map((d: any) => String(d.id)));
   const pending = pendingRaw.filter((r) => !deletedCids.has(String(r.payload?.content_id || '')));
-  const rejected = queueRows.filter((r) => r.status === 'rejected');
-  const scheduled = queueRows.filter((r) => {
-    if (r.status !== 'approved') return false;
-    const s = String(r.payload?.scheduled_at || '');
-    if (!s) return false;
-    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-    if (!m) return false;
-    return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 7, +m[5]) > now;
-  });
   const pendingStale = pending.filter((r) => now - new Date(r.created_at).getTime() > 24 * 3600 * 1000);
-  const postsTodayCount = postsTodayRes.count;
-  const scanList = ((pageScansRes as any).data || []) as any[];
-  const scanCur = scanList[0]?.metrics || null;
-  const scanPrev = (scanList.find((r: any) => String(r.created_at) < dayStartIso) as any)?.metrics || null;
+  const pendingRed = pending.filter((r) => r.payload?.risk === 'red' || r.payload?.needs_manager_approval === true);
   const vnI = (n: number | null | undefined) => Number(n || 0).toLocaleString('vi-VN');
-  const deltaTag = (v: number) => (!v ? null : (
-    <span className={`sub ${v > 0 ? 'delta-up' : 'delta-down'}`} style={{ fontSize: '.78rem', marginLeft: 4 }}>{v > 0 ? '▲' : '▼'} {Math.abs(v)}%</span>
-  ));
 
-  // 27/8 dot 2 (docx sep: "nguoi hoi mua danh cho so nguoi cmt tren cac bai... de ghi nhan
-  // don lead"): dem lead theo TUNG BAI (content_id) -> bai nao hut khach nhat 7 ngay.
-  const leadByCid = new Map<string, number>();
-  for (const l of leads) {
-    const cid = String(l.content_id || '');
-    if (cid) leadByCid.set(cid, (leadByCid.get(cid) || 0) + 1);
-  }
-  const topLeadPosts = [...leadByCid.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
-  const leadPostTitles = new Map<string, string>();
-  for (const c of ((leadTitlesRes as any).data || []) as any[]) leadPostTitles.set(String(c.id), String(c.title || '(không tên)'));
-
-  // Giai doan cua tung bai trong bang Tat ca noi dung.
-  function stageOf(c: ContentRow): { key: string; cls: string; label: string } {
-    const qr = queueByCid.get(c.id);
-    if (publishedCids.has(c.id)) return { key: 'published', cls: 'stage-published', label: 'Đã đăng' };
-    if (qr?.status === 'rejected') return { key: 'rejected', cls: 'stage-rejected', label: 'Từ chối' };
-    if (qr?.status === 'approved') {
-      const s = String(qr.payload?.scheduled_at || '');
-      if (s) return { key: 'scheduled', cls: 'stage-scheduled', label: `Lên lịch ${fmtSched(s)}` };
-      return { key: 'scheduled', cls: 'stage-scheduled', label: 'Đang đăng' };
-    }
-    if (qr?.status === 'pending') return { key: 'pending', cls: 'stage-pending', label: 'Chờ duyệt' };
-    if (String(c.brief?.trend_generating) === 'true') return { key: 'draft', cls: 'stage-draft', label: 'Đang sinh' };
-    return { key: 'draft', cls: 'stage-draft', label: 'Nháp' };
-  }
-
-  // Link mo bai tren tung nen tang cho icon kenh (user 27/8: "bam icon dan den link bai").
-  // 29/8 (user): Facebook GIỐNG TikTok — CHỈ có link khi đã Ghép FB chính (fb_real_url);
-  // link page phụ vô nghĩa từ khi tắt kênh phụ, không fallback nữa (icon mờ khi chưa ghép).
-  function linkOf(c: ContentRow, ch: string): string | null {
-    if (ch === 'facebook') return c.brief?.fb_real_url ? String(c.brief.fb_real_url) : null;
-    const fromPost = urlByCidChannel.get(c.id)?.get(ch);
-    if (fromPost) return fromPost;
-    if (ch === 'tiktok' && c.brief?.tiktok_share_url) return String(c.brief.tiktok_share_url);
-    return null;
-  }
-
-  // "Da viet" = bai da viet xong con nam o buoc nhap/dang sinh (chua vao duyet, chua dang).
-  const writtenCount = contents.filter((c) => stageOf(c).key === 'draft').length;
-
-  // ---- Filter bang Tat ca noi dung (q loc JS — xem ghi chu o query) ----
-  const allCampaigns = [...new Set(contents.map((c) => campaignOf(c.brief)))].sort();
-  const qLower = q.toLowerCase();
-  const filtered = contents.filter((c) => {
-    if (qLower && !String(c.title || '').toLowerCase().includes(qLower)) return false;
-    if (fGd && stageOf(c).key !== fGd) return false;
-    if (fKenh) {
-      const chSet = new Set<string>([
-        ...((Array.isArray(c.brief?.channels) ? c.brief.channels : []) as string[]),
-        ...(channelsByCid.get(c.id) || []),
-      ]);
-      if (!chSet.has(fKenh)) return false;
-    }
-    if (fKh && campaignOf(c.brief) !== fKh) return false;
-    return true;
-  });
-  const shown = filtered.slice(0, 30);
-  const hasFilter = !!(q || fGd || fKenh || fKh);
-
-  // 16/9 (Thanh: mỗi BUỔI 4 nhóm): lô nhóm theo từng ô đăng hôm nay, hiện ngay trong bảng Kế hoạch hôm nay.
+  // 16/9 (Thanh: mỗi BUỔI 4 nhóm): lô nhóm theo từng ô đăng hôm nay, hiện ngay trong bảng Lịch hôm nay.
   const todayLot = todayLots[today] || null;
   const lotOfRow = (idx: number) => todayLot?.slots.find((s) => s.index === idx) || null;
 
-  const needCount = (pendingStale.length ? 1 : 0) + (failedStuckCids.length ? 1 : 0) + (yt.configured && yt.error ? 1 : 0) + (leadNew.length ? 1 : 0);
+  const needCount = (pending.length ? 1 : 0) + (pendingRed.length ? 1 : 0) + (failedStuckCids.length ? 1 : 0)
+    + (yt.configured && yt.error ? 1 : 0) + (leadNew.length ? 1 : 0) + (qaPending ? 1 : 0);
 
   const stageCls = (s: string) => ({ waiting: 'stage-waiting', missed: 'stage-missed', draft: 'stage-draft', pending: 'stage-pending', scheduled: 'stage-scheduled', manual: 'stage-manual', published: 'stage-published', rejected: 'stage-rejected' } as Record<string, string>)[s] || 'stage-draft';
   const todayLabel = `${DOW_LONG[todayView.dowIdx]} ${today.slice(8, 10)}/${today.slice(5, 7)}`;
@@ -298,53 +118,59 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
     <main>
       <header className="head-row">
         <div>
-          <h1>Tổng quan</h1>
-          <p className="sub">Hôm nay đăng gì, giờ nào, kênh nào. Máy soạn, người bấm Duyệt mới đăng.</p>
+          <h1>Hôm nay</h1>
         </div>
-        <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* 9/10 (review UI): không còn bài chờ duyệt mà vẫn có khách chưa trả lời thì việc khách là nút chính. */}
-          {pending.length === 0 && leadNew.length > 0 ? (
-            <>
-              <Link href="/khach-hang" className="btn ok">Trả lời khách ({fmt(leadNew.length)})</Link>
-              <Link href="/noi-dung" className="btn ghost">📥 Duyệt bài (0)</Link>
-            </>
-          ) : (
-            <Link href="/noi-dung" className="btn ok">📥 Duyệt bài ({fmt(pending.length)})</Link>
-          )}
-          <Link href="/ke-hoach#lich-dang" className="btn ghost">🗓 Sửa lịch đăng</Link>
+        <div className="head-actions">
+          {pending.length === 0 && leadNew.length > 0
+            ? <Link href="/khach-hang" className="btn ok">Trả lời khách ({fmt(leadNew.length)})</Link>
+            : <Link href="/noi-dung" className="btn ok">Duyệt bài ({fmt(pending.length)})</Link>}
         </div>
       </header>
 
+      <NewcomerChecklist pending={pending.length} />
+
       {/* ===== 1. CẦN LÀM — chỉ hiện khi có việc; không có thì 1 dòng xanh ===== */}
       {needCount === 0 ? (
-        <p className="ok-line"><span aria-hidden="true">✅</span> Không có việc gấp. Dây chuyền đang chạy bình thường.</p>
+        <p className="ok-line"><span aria-hidden="true">✅</span> Không có việc gấp.</p>
       ) : (
-        <section className="blk tone-red" style={{ marginTop: 16 }}>
-          <h2><span aria-hidden="true">🔔</span> Cần làm <span className="sub">({needCount} việc)</span></h2>
+        <section className="blk tone-red">
+          <h2><span aria-hidden="true">🔔</span> Cần làm</h2>
           <div className="need-list">
-            {pendingStale.length ? (
-              <div className="need-item warn">
-                <span className="need-n">{fmt(pendingStale.length)}</span>
-                <span style={{ flex: 1 }}>bài kẹt ở bước <b>Chờ duyệt</b> quá 24 giờ — duyệt hoặc từ chối để dây chuyền chạy tiếp. <Link href="/noi-dung">Mở Bảng bài viết →</Link></span>
-              </div>
+            {pending.length ? (
+              <Link href="/noi-dung" className="need-item">
+                <span className="need-n">{fmt(pending.length)}</span>
+                <span className="need-text">bài chờ duyệt{pendingStale.length ? `, ${fmt(pendingStale.length)} bài chờ quá 24 giờ` : ''}</span>
+              </Link>
+            ) : null}
+            {pendingRed.length ? (
+              <Link href="/noi-dung" className="need-item warn">
+                <span className="need-n">{fmt(pendingRed.length)}</span>
+                <span className="need-text">bài chạm quy định, cần quản lý duyệt</span>
+              </Link>
             ) : null}
             {failedStuckCids.length ? (
-              <div className="need-item warn">
+              <Link href="/noi-dung" className="need-item warn">
                 <span className="need-n">{fmt(failedStuckCids.length)}</span>
-                <span style={{ flex: 1 }}>bài đăng <b>Facebook thất bại</b> chưa đăng lại được — mở bài và bấm "Đăng lại Facebook". <Link href="/noi-dung">Mở Bảng bài viết →</Link></span>
-              </div>
-            ) : null}
-            {yt.configured && yt.error ? (
-              <div className="need-item warn">
-                <span>▶️</span>
-                <span style={{ flex: 1 }}><b>YouTube token lỗi</b>: {String(yt.error).slice(0, 120)}. Lấy token mới theo runbook. <Link href="/youtube">Trang YouTube →</Link></span>
-              </div>
+                <span className="need-text">bài đăng Facebook lỗi, cần bấm Đăng lại</span>
+              </Link>
             ) : null}
             {leadNew.length ? (
-              <div className="need-item">
+              <Link href="/khach-hang" className="need-item">
                 <span className="need-n">{fmt(leadNew.length)}</span>
-                <span style={{ flex: 1 }}>người hỏi mua <b>chưa được trả lời</b> (trong 7 ngày qua). Người trực kênh online tự trả lời và tự chốt; máy chỉ soạn nháp, không tự gửi. <Link href="/khach-hang">Mở Khách hàng →</Link></span>
-              </div>
+                <span className="need-text">khách hỏi mua chưa được trả lời</span>
+              </Link>
+            ) : null}
+            {qaPending ? (
+              <Link href="/hoi-dap" className="need-item">
+                <span className="need-n">{fmt(qaPending)}</span>
+                <span className="need-text">câu hỏi đáp chờ Kinh doanh xác nhận</span>
+              </Link>
+            ) : null}
+            {yt.configured && yt.error ? (
+              <Link href="/ket-noi" className="need-item warn">
+                <span className="need-n" aria-hidden="true">▶️</span>
+                <span className="need-text">Kết nối YouTube bị lỗi, báo kỹ thuật</span>
+              </Link>
             ) : null}
           </div>
         </section>
@@ -353,11 +179,11 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
       {/* ===== 2. KẾ HOẠCH HÔM NAY — bảng giờ · kênh · group · bài · trạng thái ===== */}
       <section className="blk tone-accent">
         <h2>
-          <span aria-hidden="true">📅</span> Kế hoạch hôm nay{' '}
+          <span aria-hidden="true">📅</span> Lịch hôm nay{' '}
           <span className="sub">· {todayLabel} · {fmt(todayView.counts.total)} bài theo lịch{todayView.overridden ? ' · ✏️ lịch riêng hôm nay' : ''}{!todayView.saved ? ' · lịch mặc định (chưa lưu)' : ''}</span>
         </h2>
-        <p className="sub" style={{ margin: '4px 0 8px', fontSize: '.85rem' }}>
-          📣 Chia sẻ group hôm nay: <b>{fmt(todayLot?.done || 0)}/{fmt(todayLot?.lotSize || 0)}</b> nhóm · mỗi buổi Facebook 4 nhóm, bấm <b>Mở nhóm</b> rồi <b>Đánh dấu đã chia</b> ngay trong cột Chia sẻ group bên dưới (máy không tự thấy việc chia trên Facebook).
+        <p className="sub today-share">
+          📣 Chia sẻ group: <b>{fmt(todayLot?.done || 0)}/{fmt(todayLot?.lotSize || 0)}</b> nhóm đã chia hôm nay
         </p>
         {todayView.rows.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Hôm nay lịch không có bài nào. <Link href="/ke-hoach#lich-dang" className="src">Sửa lịch đăng →</Link></p>
@@ -433,7 +259,7 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {e.publishedUrl ? <a href={e.publishedUrl} target="_blank" rel="noreferrer" className="src">{e.title.slice(0, 80)}</a> : e.title.slice(0, 80)}
                   </span>
-                  <span className="sub" style={{ fontSize: '.78rem', flexShrink: 0 }}>{e.generator} · {fmtDT(e.createdAt)}</span>
+                  <span className="sub" style={{ fontSize: '.78rem', flexShrink: 0 }}>{fmtDT(e.createdAt)}</span>
                 </div>
               ))}
             </div>
@@ -445,217 +271,22 @@ export default async function Page({ searchParams }: { searchParams?: { q?: stri
         </div>
       </section>
 
-      {/* ===== 3. TIẾN ĐỘ | NGƯỜI HỎI MUA (2 cột) ===== */}
-      <div className="blk-cols">
-        <section className="blk">
-          {/* 9/10 (review UI): các ô đếm trên những tập khác nhau, nên KHÔNG trình bày như dây chuyền có mũi tên nối;
-              tên khối nói rõ đây là số bài ở từng bước, không phải số chuyển từ bước trước sang. */}
-          <h2><span aria-hidden="true">📶</span> Số bài ở từng bước <span className="sub">mỗi ô đếm trên một tập riêng, ô đỏ là việc cần người làm</span></h2>
-          <div className="stage-flow">
-            <Link href="/ke-hoach#huong-di" className="stage-node" title="Hướng đi bài viết BOSS đề xuất trong bản kế hoạch đang áp — bấm để xem">
-              <b>{fmt(ideaCount)}</b><span>Ý tưởng</span><small className="stage-scope">kế hoạch đang áp</small>
-            </Link>
-            <Link href="/tong-quan?gd=draft#tat-ca-noi-dung" className="stage-node" title="Bài đã viết xong còn ở bước nháp / đang sinh (trong 200 bài mới nhất)">
-              <b>{fmt(writtenCount)}</b><span>Đã viết</span><small className="stage-scope">200 bài mới nhất</small>
-            </Link>
-            <Link href="/tong-quan?gd=pending#tat-ca-noi-dung" className={`stage-node ${pending.length ? 'act' : ''}`} title="Bài chờ người bấm Duyệt — bấm để xem danh sách">
-              <b>{fmt(pending.length)}</b><span>Chờ duyệt</span><small className="stage-scope">phiếu 60 ngày qua</small>
-            </Link>
-            <Link href="/tong-quan?gd=scheduled#tat-ca-noi-dung" className="stage-node" title="Bài đã duyệt kèm giờ hẹn, tới giờ máy tự đăng — bấm để xem danh sách">
-              <b>{fmt(scheduled.length)}</b><span>Đã lên lịch</span><small className="stage-scope">phiếu 60 ngày qua</small>
-            </Link>
-            <Link href="/tong-quan?gd=published#tat-ca-noi-dung" className="stage-node done" title="Bài đã đăng thật lên các kênh — bấm để xem danh sách">
-              <b>{fmt(publishedCids.size)}</b><span>Đã đăng</span><small className="stage-scope">mọi bài, mọi kênh, 1.000 lượt đăng mới nhất</small>
-            </Link>
-          </div>
-          {/* 2/10 (audit đợt A): các ô đếm trên tập khác nhau nên KHÔNG cộng được thành một tổng. */}
-          <p className="sub scope-note">Mỗi ô đếm trên một tập riêng (ghi dưới số) nên không cộng được thành tổng. Đã đăng gồm cả blog và bài ngoài 200 bài mới nhất.</p>
-        </section>
-        <section className="blk">
-          <h2><span aria-hidden="true">🛒</span> Người hỏi mua <span className="sub">({fmt(leads.length)} trong 7 ngày · {fmt(leadToday.length)} hôm nay · {fmt(leadAds.length)} từ quảng cáo)</span></h2>
-          {/* 7/9 (user): luôn có nút "Kiểm tra người mua" ở cuối khối, kể cả khi 7 ngày chưa ai hỏi,
-              để vào thẳng trang khách hàng xem lead cũ và đổi trạng thái. */}
-          <p className="sub" style={{ margin: '0 0 8px', fontSize: '.85rem' }}>
-            💰 Đã mua tuần này: <b>{fmt(wonWeek)}</b> / {fmt(wonTarget)} khách (mục tiêu tuần). Chốt được thì đổi trạng thái khách sang "Đã mua".
-          </p>
-          <p className="sub" style={{ margin: '0 0 8px', fontSize: '.85rem' }}>
-            📚 Kho hỏi đáp: <b>{fmt(qaVerified)}</b> dòng đã xác nhận · <b>{fmt(qaPending)}</b> dòng chờ Kinh doanh xác nhận.
-            {qaPending > 0 ? ' Hỏi anh Tiến, Hòa hoặc Linh rồi bấm Xác nhận.' : ''} <Link href="/hoi-dap" className="src">Mở Kho hỏi đáp →</Link>
-          </p>
-          {leads.length === 0 ? (
-            <div style={{ display: 'grid', gap: 10 }}>
-              <p className="sub" style={{ margin: 0 }}>Chưa có ai hỏi mua trong 7 ngày. Bài đăng đều + chia sẻ group để tăng tiếp cận.</p>
-              <Link href="/khach-hang" className="btn ghost sm" style={{ justifySelf: 'start' }}>🛒 Kiểm tra người mua</Link>
-            </div>
-          ) : (
-            // 3/10: minmax(0,1fr) để dòng khách nowrap cắt "…" trong khung, không giãn lưới rồi bị main cắt mép phải trên điện thoại.
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
-              {leads.slice(0, 4).map((l) => (
-                <div key={l.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: '.88rem', borderBottom: '1px dashed var(--line)', paddingBottom: 6 }}>
-                  <span className={`badge ${['new', 'lost'].includes(String(l.status || 'new')) ? 'tone-no' : 'tone-ok'}`} style={{ flexShrink: 0 }}>
-                    {String(l.status || 'new') === 'new' ? 'Mới' : String(l.status) === 'won' ? 'Đã mua' : String(l.status) === 'lost' ? 'Không chốt' : String(l.status) === 'closed' ? 'Xong' : 'Đã liên hệ'}
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <b>{String(l.fb_user_name || 'Khách')}</b> · {String(l.message || '').slice(0, 60)}
-                  </span>
-                  <span className="sub" style={{ fontSize: '.75rem', flexShrink: 0 }}>{fmtDT(l.created_at)}</span>
-                </div>
-              ))}
-              {topLeadPosts.length ? (
-                <div className="sub" style={{ fontSize: '.82rem', paddingTop: 2 }}>
-                  🔥 Bài hút khách nhất: {topLeadPosts.map(([cid, n]) => `${(leadPostTitles.get(cid) || '(không tên)').slice(0, 50)} (${n} người hỏi)`).join(' · ')}
-                </div>
-              ) : null}
-              <Link href="/khach-hang" className="btn ghost sm" style={{ justifySelf: 'start' }}>🛒 Kiểm tra người mua</Link>
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* ===== 4. ĐO LƯỜNG — 5 tile, phần chi tiết gấp lại ===== */}
+      {/* ===== 3. TUẦN NÀY — 3 số, chi tiết ở Số liệu ===== */}
       <section className="blk tone-ok">
-        <h2>
-          <span aria-hidden="true">📊</span> Đo lường{' '}
-          <span className="sub">tuần này (Thứ 2 → hôm nay) · kênh chính</span>
-        </h2>
+        <h2><span aria-hidden="true">📊</span> Tuần này</h2>
         {week ? (
-          <div className="pl-tiles" style={{ margin: '12px 0' }}>
-            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.posts)}</b><span>Bài đã đăng tuần này</span></Link>
-            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.engagement)}{deltaTag(week.delta.engagement)}</b><span>Tương tác</span></Link>
-            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.views)}{deltaTag(week.delta.views)}</b><span>Lượt xem</span></Link>
-            <Link href="/khach-hang" className="pl-tile"><b>{vnI(week.totals.conversions)}{deltaTag(week.delta.conversions)}</b><span>Khách hỏi mua</span></Link>
-            <Link href="/do-luong" className="pl-tile"><b>{vnI(postsTodayCount)}</b><span>Lượt đăng hôm nay</span></Link>
+          <div className="pl-tiles">
+            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.posts)}</b><span>Bài đã đăng</span></Link>
+            <Link href="/do-luong/tuan" className="pl-tile"><b>{vnI(week.totals.engagement)}</b><span>Tương tác</span></Link>
+            <Link href="/khach-hang" className="pl-tile"><b>{vnI(leads.length)}</b><span>Người hỏi mua 7 ngày</span></Link>
           </div>
         ) : (
           <p className="sub">Chưa đọc được số liệu tuần.</p>
         )}
-        <details className="tq-details">
-          <summary>🏆 Bài tốt nhất tuần và sức khoẻ Trang <span className="sub">bấm để mở</span></summary>
-          <div className="blk-cols" style={{ marginBottom: 10 }}>
-            <div>
-              <b style={{ fontSize: '.9rem' }}>🏆 Bài tốt nhất tuần</b>
-              {week && week.topPosts && week.topPosts.length ? (
-                week.topPosts.slice(0, 3).map((p: any, i: number) => (
-                  <div key={i} className="sub" style={{ fontSize: '.85rem', marginTop: 4 }}>
-                    {i + 1}. {String(p.title || '').slice(0, 70)} <b>· {vnI(p.m?.engagement || 0)} tương tác</b>
-                  </div>
-                ))
-              ) : (
-                <p className="sub" style={{ margin: '4px 0 0' }}>Tuần này chưa có bài nào có số liệu.</p>
-              )}
-            </div>
-            <div>
-              {scanCur ? (
-                <PageSuiteBlock cur={scanCur} prev={scanPrev} compareLabel="so với hôm qua" />
-              ) : (
-                <div>
-                  <b style={{ fontSize: '.9rem' }}>📈 Sức khoẻ Trang SDVICO VN</b>
-                  <p className="sub" style={{ margin: '4px 0 0' }}>Chưa có lần quét Business Suite nào — bộ quét trên máy chủ sẽ tự chộp phiên Brave rồi quét mỗi 2 giờ.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </details>
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <Link href="/do-luong" className="src" style={{ fontSize: '.85rem' }}>Đo lường ngày →</Link>
-          <Link href="/do-luong/tuan" className="src" style={{ fontSize: '.85rem' }}>Báo cáo tuần đầy đủ →</Link>
+        <div className="blk-links">
+          <Link href="/do-luong/tuan" className="src">Xem số liệu →</Link>
         </div>
       </section>
-
-      {/* ===== 5. TẤT CẢ NỘI DUNG — gấp mặc định, mở khi đang lọc ===== */}
-      <details className="blk tq-details" id="tat-ca-noi-dung" open={hasFilter}>
-        <summary><span aria-hidden="true">📄</span> Tất cả nội dung <span className="sub">{fmt(filtered.length)} bài trong 200 bài mới nhất · bấm để mở bảng và bộ lọc</span></summary>
-        <form method="get" style={{ margin: '0 0 10px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* 30/8 (audit L1): ô tìm + bộ lọc có aria-label, không chỉ dựa placeholder. */}
-          <input className="search" type="search" name="q" defaultValue={q} placeholder="Tìm theo tiêu đề bài..." aria-label="Tìm theo tiêu đề bài" style={{ maxWidth: 300, flex: '1 1 220px' }} />
-          <select name="gd" defaultValue={fGd} className="note" aria-label="Lọc theo giai đoạn" style={{ maxWidth: 170 }}>
-            <option value="">Mọi giai đoạn</option>
-            <option value="draft">Nháp / đang sinh</option>
-            <option value="pending">Chờ duyệt</option>
-            <option value="scheduled">Lên lịch / đang đăng</option>
-            <option value="published">Đã đăng</option>
-            <option value="rejected">Từ chối</option>
-          </select>
-          <select name="kenh" defaultValue={fKenh} className="note" aria-label="Lọc theo kênh" style={{ maxWidth: 150 }}>
-            <option value="">Mọi kênh</option>
-            <option value="facebook">Facebook</option>
-            <option value="youtube">YouTube</option>
-            <option value="tiktok">TikTok</option>
-            <option value="zalo">Zalo</option>
-          </select>
-          <select name="kh" defaultValue={fKh} className="note" aria-label="Lọc theo kế hoạch" style={{ maxWidth: 210 }}>
-            <option value="">Mọi kế hoạch</option>
-            {allCampaigns.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <button className="btn ghost sm" type="submit">Lọc</button>
-          {hasFilter ? <Link href="/tong-quan" className="src" style={{ fontSize: '.85rem' }}>Bỏ lọc</Link> : null}
-        </form>
-        <p className="sub" style={{ margin: '0 0 8px', fontSize: '.82rem' }}>Hiện {fmt(shown.length)} / {fmt(filtered.length)} bài khớp (trong 200 bài mới nhất).</p>
-        <div className="tablewrap">
-          <table className="datatable">
-            <thead>
-              <tr>
-                <th>Tiêu đề</th>
-                <th style={{ width: 160 }}>Giai đoạn</th>
-                <th style={{ width: 120 }}>Kênh</th>
-                <th style={{ width: 190 }}>Kế hoạch</th>
-                <th style={{ width: 110 }}>Cập nhật</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((c) => {
-                const st = stageOf(c);
-                const chSet = new Set<string>([
-                  ...((Array.isArray(c.brief?.channels) ? c.brief.channels : []) as string[]),
-                  ...(channelsByCid.get(c.id) || []),
-                ]);
-                const chs = ['facebook', 'youtube', 'tiktok', 'zalo'].filter((k) => chSet.has(k)) as PlatformKey[];
-                const fbUrl = linkOf(c, 'facebook');
-                return (
-                  <tr key={c.id}>
-                    <td className="cell-title">
-                      {fbUrl ? (
-                        <a href={fbUrl} target="_blank" rel="noreferrer" className="src" title="Mở bài trên Facebook"><b>{String(c.title || '(không tên)').slice(0, 90)}</b></a>
-                      ) : (
-                        <b className="cell-title-nolink" title="Bài chưa có link đăng để mở">{String(c.title || '(không tên)').slice(0, 90)}</b>
-                      )}
-                    </td>
-                    <td><span className={`stage-badge ${st.cls}`}>{st.label}</span></td>
-                    <td>
-                      <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                        {chs.length ? chs.map((k) => {
-                          const u = linkOf(c, k);
-                          return u ? (
-                            <a key={k} href={u} target="_blank" rel="noreferrer" title={`Mở bài trên ${k}`}>
-                              <PlatformLogo platform={k} size={16} />
-                            </a>
-                          ) : (
-                            <span key={k} title={`${k}: chưa có link bài (chưa đăng)`} style={{ opacity: 0.45 }}>
-                              <PlatformLogo platform={k} size={16} />
-                            </span>
-                          );
-                        }) : <span className="muted">—</span>}
-                      </span>
-                    </td>
-                    <td className="sub" style={{ fontSize: '.82rem' }}>{campaignOf(c.brief)}</td>
-                    <td className="sub" style={{ fontSize: '.82rem' }}>{fmtDT(firstPostAt.get(c.id) || c.created_at)}</td>
-                  </tr>
-                );
-              })}
-              {shown.length === 0 ? (
-                <tr><td colSpan={5} className="sub" style={{ textAlign: 'center', padding: 20 }}>{hasFilter ? 'Không có bài nào khớp bộ lọc.' : 'Chưa có bài nào.'}</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-        <p className="sub" style={{ margin: '10px 0 0', fontSize: '.85rem' }}>
-          <Link href="/noi-dung" className="src">Mở Bảng bài viết để duyệt/sửa/xoá →</Link>
-          {' · '}
-          <Link href="/noi-dung?loai=bai-viet" className="src">Danh sách đầy đủ →</Link>
-          {' · '}
-          <Link href="/noi-dung?loai=thung-rac" className="src">Thùng rác →</Link>
-        </p>
-      </details>
     </main>
   );
 }

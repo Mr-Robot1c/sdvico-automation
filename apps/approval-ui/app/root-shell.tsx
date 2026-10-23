@@ -20,11 +20,19 @@ const AskBotFab = dynamic(() => import('./ask-bot-fab'), { ssr: false });
 import Tracking from './tracking';
 // 2/10 (responsive mobile đợt 1): thanh đầu trang gọn + menu trượt cho điện thoại.
 import ThemeToggle from './theme-toggle';
-import { crumbFor, parentFor } from '../lib/routes';
+import { crumbFor, parentFor, rootTabFor } from '../lib/routes';
 import { PUBLIC_HOTLINE_DISPLAY, PUBLIC_HOTLINE_TEL } from '../lib/public-contact';
 
 // Dưới 768px sidebar nội bộ thành menu trượt (off-canvas). Mốc này phải khớp @media (max-width: 767px) trong globals.css.
 const MOBILE_MAX = 767;
+
+// 23/10 (đợt 1 sắp xếp lại): thanh 5 nút dưới cùng trên điện thoại cho 4 việc chính + Thêm (mở menu đầy đủ).
+const M_TABS = [
+  { href: '/tong-quan', label: 'Hôm nay', icon: '🏠' },
+  { href: '/noi-dung', label: 'Duyệt bài', icon: '✅' },
+  { href: '/ke-hoach', label: 'Kế hoạch', icon: '📅' },
+  { href: '/do-luong/tuan', label: 'Số liệu', icon: '📊' },
+];
 
 export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: { children: ReactNode; marketingOnly: boolean; pixelId?: string | null; ga4Id?: string | null }) {
   const path = usePathname() || '/';
@@ -187,6 +195,27 @@ export default function RootShell({ children, marketingOnly, pixelId, ga4Id }: {
           <div className="content">{children}</div>
         </div>
       </div>
+      <nav className="m-tabbar" aria-label="Việc chính">
+        {M_TABS.map((t) => {
+          const on = !navOpen && rootTabFor(path) === t.href;
+          return (
+            <Link key={t.href} href={t.href} className={`m-tab${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined}>
+              <span className="m-tab-ico" aria-hidden="true">{t.icon}</span>
+              <span>{t.label}</span>
+            </Link>
+          );
+        })}
+        <button
+          type="button"
+          className={`m-tab${navOpen || !M_TABS.some((t) => rootTabFor(path) === t.href) ? ' on' : ''}`}
+          aria-expanded={navOpen}
+          aria-controls="sidebar-nav"
+          onClick={() => setNavOpen((v) => !v)}
+        >
+          <span className="m-tab-ico" aria-hidden="true">☰</span>
+          <span>Thêm</span>
+        </button>
+      </nav>
       <BotChip />
       <AskBotFab />
     </>

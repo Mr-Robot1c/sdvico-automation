@@ -7,62 +7,74 @@
 
 export type RouteNode = { label: string; parent: string | null };
 
+// 23/10 (đợt 1 sắp xếp lại, docs/app-map/design-spec-app-noi-bo.md): menu theo VIỆC, 6 mục chính + nhóm Hệ thống.
 // Trang gốc của từng mục menu (không có nút Quay lại).
-export const ROOT_TABS = ['/tong-quan', '/khach-hang', '/video', '/seo', '/kenh', '/agent', '/'];
+export const ROOT_TABS = ['/tong-quan', '/noi-dung', '/ke-hoach', '/do-luong/tuan', '/khach-hang', '/tu-lieu', '/'];
 
 export const ROUTES: Record<string, RouteNode> = {
-  '/': { label: 'Tổng quan', parent: null },
-  '/tong-quan': { label: 'Tổng quan', parent: null },
+  '/': { label: 'Hôm nay', parent: null },
+  '/tong-quan': { label: 'Hôm nay', parent: null },
+  '/noi-dung': { label: 'Duyệt bài', parent: null },
+  '/ke-hoach': { label: 'Kế hoạch', parent: null },
+  '/do-luong/tuan': { label: 'Báo cáo tuần', parent: null },
   '/khach-hang': { label: 'Khách hàng', parent: null },
-  '/video': { label: 'Video', parent: null },
-  '/seo': { label: 'SEO', parent: null },
-  '/kenh': { label: 'Kênh', parent: null },
-  '/agent': { label: 'Agent', parent: null },
+  '/tu-lieu': { label: 'Kho tư liệu', parent: null },
 
-  // Con của Tổng quan
-  '/noi-dung': { label: 'Bảng bài viết', parent: '/tong-quan' },
-  '/ke-hoach': { label: 'Kế hoạch', parent: '/tong-quan' },
-  '/hang-doi': { label: 'Hàng đợi duyệt', parent: '/tong-quan' },
-  '/quy-tac': { label: 'Quy tắc', parent: '/tong-quan' },
+  // Duyệt bài: /hang-doi giờ chỉ còn phiếu KHÔNG phải bài đăng (tin nhắn gửi khách, tin tuyển dụng, bản tin).
+  '/hang-doi': { label: 'Phiếu khác', parent: '/noi-dung' },
 
-  // Con của Khách hàng
-  '/hoi-dap': { label: 'Kho hỏi đáp', parent: '/khach-hang' },
-
-  // Con của Video
-  '/san-xuat': { label: 'Xưởng sản xuất', parent: '/video' },
-  '/tu-lieu': { label: 'Kho tư liệu', parent: '/video' },
-  '/video/da-dang': { label: 'Video đã đăng', parent: '/video' },
-  '/ban-tin': { label: 'Studio bản tin', parent: '/video' },
-
-  // Con của SEO
-  '/tu-khoa': { label: 'Kho từ khóa', parent: '/seo' },
-  '/du-kien': { label: 'Nguồn dữ kiện', parent: '/seo' },
-  '/quang-cao': { label: 'Quảng cáo', parent: '/seo' },
-  '/seo/bai-viet': { label: 'Bài SEO đã đăng', parent: '/seo' },
-
-  // Con của Kênh
-  '/do-luong': { label: 'Đo lường ngày', parent: '/kenh' },
-  '/do-luong/tuan': { label: 'Báo cáo tuần', parent: '/kenh' },
-  '/ket-noi': { label: 'Kết nối', parent: '/kenh' },
-  '/facebook': { label: 'Kết nối Facebook', parent: '/kenh' },
-  '/youtube': { label: 'Kết nối YouTube', parent: '/kenh' },
-  '/tiktok': { label: 'Kết nối TikTok', parent: '/kenh' },
+  // Số liệu (gốc: Báo cáo tuần)
+  '/do-luong': { label: 'Số liệu ngày', parent: '/do-luong/tuan' },
+  '/kenh': { label: 'Theo kênh', parent: '/do-luong/tuan' },
   '/kenh/facebook': { label: 'Facebook', parent: '/kenh' },
   '/kenh/youtube': { label: 'YouTube', parent: '/kenh' },
   '/kenh/tiktok': { label: 'TikTok', parent: '/kenh' },
+  '/seo/bai-viet': { label: 'Bài blog', parent: '/do-luong/tuan' },
+  '/video/da-dang': { label: 'Video đã đăng', parent: '/do-luong/tuan' },
 
-  // Con của Agent
-  '/du-lieu-ai': { label: 'Nguồn học dữ liệu', parent: '/agent' },
-  '/kho-tri-thuc': { label: 'Nguồn học dữ liệu', parent: '/agent' },
+  // Khách hàng
+  '/hoi-dap': { label: 'Kho hỏi đáp', parent: '/khach-hang' },
 
-  // Tuyển dụng (khi không marketingOnly)
+  // Tư liệu
+  '/san-xuat': { label: 'Soạn bài tay', parent: '/tu-lieu' },
+  '/video': { label: 'Video', parent: '/tu-lieu' },
+  '/ban-tin': { label: 'Studio bản tin', parent: '/tu-lieu' },
+
+  // Hệ thống (ít dùng)
+  '/ket-noi': { label: 'Kết nối kênh', parent: '/tong-quan' },
+  '/facebook': { label: 'Kết nối Facebook', parent: '/ket-noi' },
+  '/youtube': { label: 'Kết nối YouTube', parent: '/ket-noi' },
+  '/tiktok': { label: 'Kết nối TikTok', parent: '/ket-noi' },
+  '/seo': { label: 'SEO', parent: '/tong-quan' },
+  '/tu-khoa': { label: 'Kho từ khóa', parent: '/seo' },
+  '/du-kien': { label: 'Catalog sản phẩm', parent: '/tong-quan' },
+  '/quang-cao': { label: 'Quảng cáo', parent: '/tong-quan' },
+  '/agent': { label: 'AI', parent: '/tong-quan' },
+  '/kho-tri-thuc': { label: 'Chi tiết AI', parent: '/agent' },
+  '/du-lieu-ai': { label: 'Chi tiết AI', parent: '/agent' },
   '/ho-so': { label: 'Hồ sơ ứng viên', parent: '/tong-quan' },
   '/vi-tri': { label: 'Vị trí tuyển dụng', parent: '/tong-quan' },
+  '/quy-tac': { label: 'Quy tắc', parent: '/tong-quan' },
 
   // Trang công khai
   '/privacy': { label: 'Chính sách quyền riêng tư', parent: '/tong-quan' },
   '/terms': { label: 'Điều khoản', parent: '/tong-quan' },
 };
+
+// Chuỗi tổ tiên của một trang theo cây (gồm chính nó), để menu sáng đúng mục khi đứng ở trang con không có trên
+// menu (vd /facebook -> /ket-noi -> /tong-quan).
+export function ancestorsOf(path: string): string[] {
+  const out: string[] = [];
+  let p: string | null = (path || '/').replace(/\/+$/, '') || '/';
+  for (let guard = 0; p && guard < 10; guard++) {
+    const hit = routeNodeFor(p);
+    if (!hit) break;
+    if (hit.key !== p) { out.push(p); p = hit.key; continue; }
+    out.push(p);
+    p = hit.node.parent;
+  }
+  return out;
+}
 
 // Tìm nút gần nhất: khớp đúng path, không thì cắt dần segment cuối (/kenh/facebook/123 -> /kenh/facebook).
 export function routeNodeFor(path: string): { key: string; node: RouteNode } | null {

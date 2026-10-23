@@ -71,8 +71,8 @@ export default async function Page() {
 
       {!tableReady ? (
         <div className="applied-banner" role="alert" style={{ borderLeftColor: 'var(--no, #d33)' }}>
-          <b>⚠️ Chưa chạy migration bảng quảng cáo.</b>
-          <p>Chạy file <code>supabase/migrations/20260820000000_mkt_ads.sql</code> trên Supabase (xem <code>supabase/README.md</code>) rồi tải lại trang.</p>
+          <b>⚠️ Cơ sở dữ liệu chưa sẵn sàng cho phần quảng cáo.</b>
+          <p>Báo kỹ thuật cài đặt rồi tải lại trang.</p>
         </div>
       ) : null}
 

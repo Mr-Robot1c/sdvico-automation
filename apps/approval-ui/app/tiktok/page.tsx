@@ -56,12 +56,11 @@ export default async function Page({ searchParams }: { searchParams: { connected
       <section className="card" style={{ display: 'grid', gap: 12, maxWidth: 640 }}>
         <div>
           <b>Cấu hình app TikTok</b>
-          <div className="metaline">TIKTOK_CLIENT_KEY: {hasClientKey ? '✅ đã đặt' : '❌ chưa đặt (Vercel env)'}</div>
-          <div className="metaline">TIKTOK_CLIENT_SECRET: {hasClientSecret ? '✅ đã đặt' : '❌ chưa đặt (Vercel env)'}</div>
+          <div className="metaline">{hasClientKey && hasClientSecret ? '✅ Đã cài app TikTok' : '❌ Chưa cài app TikTok, báo kỹ thuật'}</div>
         </div>
 
         {tableMissing ? (
-          <p className="err">Chưa có bảng <code>mkt_oauth_tokens</code>. Chạy migration <code>20260813000000_mkt_oauth_tokens.sql</code> trong Supabase SQL Editor trước.</p>
+          <p className="err">Cơ sở dữ liệu chưa sẵn sàng cho kết nối TikTok. Báo kỹ thuật.</p>
         ) : token ? (
           <div>
             <b>Trạng thái token</b>
@@ -80,7 +79,7 @@ export default async function Page({ searchParams }: { searchParams: { connected
             {token ? 'Kết nối lại TikTok' : 'Kết nối TikTok'}
           </a>
           {!hasClientKey ? (
-            <p className="muted">Đặt TIKTOK_CLIENT_KEY và TIKTOK_CLIENT_SECRET trên Vercel rồi Redeploy trước khi bấm.</p>
+            <p className="muted">Cần kỹ thuật cài app TikTok trước khi bấm.</p>
           ) : null}
         </div>
       </section>

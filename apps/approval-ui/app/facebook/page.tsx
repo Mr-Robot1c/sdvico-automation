@@ -53,7 +53,7 @@ export default async function Page() {
 
       <section className="card" style={{ display: 'grid', gap: 12, maxWidth: 640 }}>
         {!c.configured ? (
-          <p className="err">Chưa đặt <code>FACEBOOK_PAGE_ACCESS_TOKEN</code> trong Vercel env.</p>
+          <p className="err">Chưa kết nối Facebook Page. Báo kỹ thuật cài đặt quyền đăng bài.</p>
         ) : (
           <>
             <div>
@@ -70,10 +70,7 @@ export default async function Page() {
             </div>
           </>
         )}
-        <p className="muted">
-          Token Facebook đặt trong Vercel env <code>FACEBOOK_PAGE_ACCESS_TOKEN</code> (không có nút Kết nối như
-          TikTok). Đổi token: cập nhật env trên Vercel rồi Redeploy.
-        </p>
+        <p className="muted">Đổi hoặc cấp lại quyền đăng Facebook: báo kỹ thuật.</p>
       </section>
     </main>
   );

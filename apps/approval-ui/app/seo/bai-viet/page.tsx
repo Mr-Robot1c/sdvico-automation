@@ -42,7 +42,7 @@ export default async function Page({ searchParams }: { searchParams?: { sap?: st
         <div>
           <h1>Bài SEO đã đăng</h1>
           <p className="sub" style={{ margin: '4px 0 0' }}>
-            {fmt(rows.length)} bài công khai · {gscConfigured() ? (gsc.at ? <>Search Console 28 ngày (cập nhật {fmtDT(gsc.at)}): <b>{fmt(tot.clicks)}</b> click · <b>{fmt(tot.imp)}</b> hiển thị · {fmt(withGsc)} bài có số</> : 'Search Console đã cấu hình, chờ lượt kéo đầu tiên (mỗi ngày sau 6h).') : <>Chưa nối Search Console — xem <code>docs/runbook-search-console-setup.md</code>.</>}
+            {fmt(rows.length)} bài công khai · {gscConfigured() ? (gsc.at ? <>Search Console 28 ngày (cập nhật {fmtDT(gsc.at)}): <b>{fmt(tot.clicks)}</b> click · <b>{fmt(tot.imp)}</b> hiển thị · {fmt(withGsc)} bài có số</> : 'Search Console đã cấu hình, chờ lượt kéo đầu tiên (mỗi ngày sau 6h).') : 'Chưa nối Search Console, báo kỹ thuật.'}
           </p>
         </div>
         <form method="get" style={{ display: 'flex', gap: 6 }}>

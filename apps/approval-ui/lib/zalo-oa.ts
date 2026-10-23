@@ -34,7 +34,7 @@ async function getZaloToken(client: Client): Promise<string | null> {
 export async function zaloOaStatus(client: Client): Promise<{ configured: boolean; text: string }> {
   const token = await getZaloToken(client);
   if (!token) {
-    return { configured: false, text: 'Chưa kết nối. Cần Zalo OA đã xác thực + app developers.zalo.me. Xem docs/runbook-zalo-oa-setup.md.' };
+    return { configured: false, text: 'Chưa kết nối Zalo OA. Báo kỹ thuật cài đặt.' };
   }
   return { configured: true, text: 'Đã có token Zalo OA. Bài có thể tạo dưới dạng bài viết OA (draft) chờ đăng.' };
 }

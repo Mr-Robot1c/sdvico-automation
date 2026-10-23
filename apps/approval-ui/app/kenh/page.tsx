@@ -204,7 +204,7 @@ export default async function Page() {
       posts: ytPosts.count,
       views: ytViews,
       cmts: ytCmts,
-      warn: ytOk ? null : yt.configured ? `Token lỗi: ${String(yt.error || 'không rõ').slice(0, 90)} — lấy token mới theo runbook.` : 'Chưa cấu hình 3 biến YOUTUBE_* trên Vercel.',
+      warn: ytOk ? null : yt.configured ? 'Quyền đăng YouTube bị lỗi hoặc hết hạn. Báo kỹ thuật cấp lại.' : 'Chưa kết nối kênh YouTube. Báo kỹ thuật cài đặt.',
       link: yt.channelUrl ? { url: yt.channelUrl, label: `Mở kênh ${yt.channelTitle || 'SDVICO'} ↗` } : null,
       detail: { href: '/kenh/youtube', label: 'Từng video' },
     },

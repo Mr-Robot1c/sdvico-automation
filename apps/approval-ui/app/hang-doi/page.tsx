@@ -119,7 +119,11 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
   }
   // Bản deploy marketing-only chỉ hiện mục marketing (kind bắt đầu bằng 'mkt'), ẩn HR và demo.
   const marketingOnly = process.env.MARKETING_ONLY === 'true' || process.env.MARKETING_ONLY === '1';
-  const all = marketingOnly ? rawVisible.filter((it) => it.kind.startsWith('mkt')) : rawVisible;
+  const kept = marketingOnly ? rawVisible.filter((it) => it.kind.startsWith('mkt')) : rawVisible;
+  // 23/10 (đợt 1 sắp xếp lại): bài đăng chỉ duyệt ở /noi-dung (Duyệt bài). Trang này còn phiếu KHÁC: tin nhắn gửi
+  // khách, tin tuyển dụng, bản tin. Trước đây bài đăng duyệt được ở cả hai nơi, người mới không biết dùng chỗ nào.
+  const postCountPending = kept.filter((it) => it.kind === 'mkt_publish_content').length;
+  const all = kept.filter((it) => it.kind !== 'mkt_publish_content');
 
   // Đếm theo loại để dựng thanh lọc.
   const counts = new Map<string, number>();
@@ -238,46 +242,22 @@ export default async function Page({ searchParams }: { searchParams: { kind?: st
     }
   }
 
-  // Số liệu tổng quan cho thẻ thống kê trên cùng (đã bỏ thẻ "Từ khóa trong kho" vì kho từ
-  // khóa không còn dùng ở luồng sản xuất hiện tại).
-  const { count: postCount } = await client
-    .from('mkt_posts').select('*', { count: 'exact', head: true }).eq('status', 'published');
-
   return (
     <main>
       <header className="head-row">
         <div>
-          <h1>Hàng đợi duyệt</h1>
-          <p className="sub">Máy soạn, người bấm. Xem từng mục rồi Duyệt hoặc Từ chối.</p>
+          <h1>Phiếu khác</h1>
         </div>
         <div className="head-actions">
           <AutoRefresh seconds={30} />
         </div>
       </header>
 
-      <div className="statgrid">
-        <div className="statcard">
-          <span className="statcard-icon" aria-hidden="true">📥</span>
-          <div className="statcard-body">
-            <span className="statcard-label">Bài chờ duyệt</span>
-            <span className="statcard-num">{all.length}</span>
-          </div>
-        </div>
-        <div className="statcard red">
-          <span className="statcard-icon" aria-hidden="true">🚩</span>
-          <div className="statcard-body">
-            <span className="statcard-label">Cần xem xét hoặc ưu tiên</span>
-            <span className="statcard-num">{redCount}</span>
-          </div>
-        </div>
-        <div className="statcard">
-          <span className="statcard-icon" aria-hidden="true">🌐</span>
-          <div className="statcard-body">
-            <span className="statcard-label">Bài đã đăng</span>
-            <span className="statcard-num">{postCount ?? 0}</span>
-          </div>
-        </div>
-      </div>
+      {postCountPending > 0 ? (
+        <p className="sub" role="status">
+          {postCountPending} bài đăng đang chờ ở <a href="/noi-dung">Duyệt bài</a>.
+        </p>
+      ) : null}
 
       {error ? (
         <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p>

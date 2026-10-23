@@ -23,8 +23,8 @@ export default async function Page() {
       text: yt.configured && yt.channelTitle
         ? `Đã kết nối kênh: ${yt.channelTitle}. Video dọc tự đăng thành Shorts khi bấm Duyệt.`
         : yt.configured
-          ? `Token lỗi: ${yt.error || 'không rõ'}. Có thể hết hạn (7 ngày ở chế độ Testing) — lấy token mới theo runbook.`
-          : 'Chưa cấu hình 3 biến YOUTUBE_* trên Vercel (xem docs/runbook-youtube-setup.md).',
+          ? 'Quyền đăng YouTube bị lỗi hoặc hết hạn. Báo kỹ thuật cấp lại.'
+          : 'Chưa kết nối kênh YouTube. Báo kỹ thuật cài đặt.',
       href: '/youtube'
     },
     { icon: '💬', name: 'Zalo OA', status: za.configured, text: za.text, href: '/ket-noi' }

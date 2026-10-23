@@ -215,8 +215,7 @@ export default async function DoLuongSection() {
           <div style={{ minWidth: 0, flex: '1 1 320px' }}>
             <b>➕ Thêm bài đăng tay trên Page chính thức</b>
             <p className="sub" style={{ margin: '2px 0 6px' }}>
-              Dán link bài đã đăng tay trên Page (bài viết, ảnh, video, reel). Hệ thống kiểm bài có thật, lưu lại và kéo số liệu ngay; từ đó cron 30 phút cập nhật đều như bài máy đăng. Chỉ đọc số liệu, không đụng bài trên Facebook.
-              {' '}Bài trên <b>page chính thức</b> cần cấu hình token page đó (biến <code>FACEBOOK_REAL_PAGE_ACCESS_TOKEN</code> trên Vercel, có quyền <code>read_insights</code>); chưa có token thì Facebook không cho đọc số.
+              Dán link bài đã đăng tay trên Page. Hệ thống lưu lại và tự cập nhật số liệu như bài máy đăng.
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input name="fb_link" type="url" required placeholder="https://www.facebook.com/…/posts/… hoặc …/videos/…" className="note" style={{ flex: '1 1 320px', maxWidth: 'none' }} />

@@ -142,7 +142,7 @@ export async function generatePostsNow(): Promise<{ ok: boolean; created: number
     const created = Number(j?.created ?? (Array.isArray(j?.results) ? j.results.length : 0)) || 0;
     revalidatePath('/ke-hoach');
     revalidatePath('/noi-dung');
-    return { ok: true, created, note: created > 0 ? `Đã sinh ${created} bài vào Hàng đợi duyệt.` : (j?.note || 'Không sinh được bài (xem lý do bên dưới).') };
+    return { ok: true, created, note: created > 0 ? `Đã sinh ${created} bài, xem ở trang Duyệt bài.` : (j?.note || 'Không sinh được bài (xem lý do bên dưới).') };
   } catch (e: any) {
     return { ok: false, created: 0, note: String(e?.message || e).slice(0, 200) };
   }

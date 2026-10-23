@@ -186,7 +186,7 @@ export default function SanXuatForm({
           setVideoJob({ sourceId: res.contentId, status: 'waiting', startedAt: Date.now() });
           setMsg('');
         } else {
-          setMsg('Đã gửi duyệt. Bài nằm ở Hàng đợi duyệt, chờ người bấm Duyệt mới đăng.');
+          setMsg('Đã gửi duyệt. Bài nằm ở trang Duyệt bài, chờ người bấm Duyệt mới đăng.');
         }
         setTitle('');
         setTitleAuto(true);
@@ -587,7 +587,7 @@ export default function SanXuatForm({
                     <b>Video đã dựng xong!</b>
                     {videoJob.title ? <span className="muted">— {videoJob.title}</span> : null}
                     {videoJob.queueUrl ? (
-                      <a className="btn ok sm" href={videoJob.queueUrl}>Xem ở Hàng đợi duyệt</a>
+                      <a className="btn ok sm" href={videoJob.queueUrl}>Xem ở Duyệt bài</a>
                     ) : null}
                     <button type="button" className="btn ghost sm" onClick={() => setVideoJob(null)}>✕ Đóng</button>
                   </div>
@@ -613,7 +613,7 @@ export default function SanXuatForm({
 
           <p className="sx-note">
             Nút <b>Gửi duyệt</b> chỉ tạo bài và đưa vào hàng đợi duyệt. Nội dung chưa lên trang mạng xã hội:
-            người duyệt phải bấm <b>Duyệt</b> ở tab Hàng đợi duyệt thì mới thực sự đăng. Điều cấm 1: máy soạn, người bấm.
+            người duyệt phải bấm <b>Duyệt</b> ở trang Duyệt bài thì mới thực sự đăng. Điều cấm 1: máy soạn, người bấm.
           </p>
         </form>
       </section>

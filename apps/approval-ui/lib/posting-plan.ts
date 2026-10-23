@@ -212,7 +212,7 @@ export function proposePostingPlan(input: ProposeInput, now: Date = new Date()):
     `Khung ${BOSS_TIMES.bantin} hằng ngày: Bản tin thủy sản (video dọc người dựng gửi, máy soạn caption và đẩy hàng đợi, mục chính sách cần cấp quản lý duyệt). Máy KHÔNG tự sinh bài cho khung này — chưa có video thì khung để trống.`,
     input.youtubeReady
       ? `YouTube: máy tự đăng khi Duyệt (${input.clipFolders} folder sản phẩm có clip để dựng video).`
-      : 'YouTube chưa vào lịch: cần YOUTUBE_REFRESH_TOKEN trên Vercel và folder sản phẩm có clip gốc (ngày YouTube tạm về Facebook).',
+      : 'YouTube chưa vào lịch: cần kết nối kênh YouTube và folder sản phẩm có clip gốc (ngày YouTube tạm về Facebook).',
     input.tiktokReady
       ? 'TikTok: máy viết bài + dựng video dọc, bạn Duyệt rồi bấm Xuất TikTok và Ghép TikTok (TikTok không cho đăng qua API).'
       : 'TikTok chưa vào lịch: cần folder sản phẩm có clip gốc để dựng video (ngày TikTok tạm về Facebook).',

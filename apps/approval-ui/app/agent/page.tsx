@@ -144,10 +144,10 @@ export default async function Page() {
         {!digestReady ? (
           <div className="need-item warn">
             <span>⚙️</span>
-            <span style={{ flex: 1 }}>Chưa chấm được tier — cần chạy migration <code>20260827233000_knowledge_tier.sql</code> trên Supabase (SQL Editor) rồi chờ cron giờ tới chấm điểm.</span>
+            <span style={{ flex: 1 }}>Chưa chấm được điểm tin trên mạng. Báo kỹ thuật cài đặt.</span>
           </div>
         ) : digestRows.length === 0 ? (
-          <p className="sub" style={{ margin: 0 }}>7 ngày qua DATA 2 chưa học được mục nào. Kiểm tra cron hoặc chạy tay ở trang Nguồn.</p>
+          <p className="sub" style={{ margin: 0 }}>7 ngày qua chưa học được tin nào trên mạng. Báo kỹ thuật kiểm tra.</p>
         ) : (
           <div style={{ display: 'grid', gap: 14 }}>
             {/* Top bai theo score */}
@@ -175,13 +175,13 @@ export default async function Page() {
               </div>
             ) : (
               <div style={{ display: 'grid', gap: 6 }}>
-                <p className="sub" style={{ margin: 0 }}>Đã có {fmt(digestRows.length)} mục nhưng chưa mục nào được chấm — cron giờ tới sẽ chấm tự động (20 mục/lượt).</p>
+                <p className="sub" style={{ margin: 0 }}>Đã có {fmt(digestRows.length)} mục nhưng chưa mục nào được chấm. Máy sẽ tự chấm ở lượt chạy tới.</p>
                 {lastScoreLog ? (
                   <p className="sub" style={{ margin: 0, fontSize: '.82rem' }}>
                     Lần chấm gần nhất {fmtDT(lastScoreLog.created_at)}: {lastScoreLog.status === 'ok' ? `✅ chấm ${fmt(Number(lastScoreLog.detail?.scored) || 0)} mục` : `⛔ ${String(lastScoreLog.detail?.errors?.[0] || 'lỗi không rõ').slice(0, 160)}`}
                   </p>
                 ) : (
-                  <p className="sub" style={{ margin: 0, fontSize: '.82rem' }}>Chưa thấy lần chấm nào trong log — có thể cron bị hết giờ trước khi tới bước chấm. Chạy tay: <code>/api/knowledge-score?secret=...</code></p>
+                  <p className="sub" style={{ margin: 0, fontSize: '.82rem' }}>Chưa thấy lần chấm nào gần đây. Báo kỹ thuật kiểm tra.</p>
                 )}
               </div>
             )}

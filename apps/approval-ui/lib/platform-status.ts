@@ -23,7 +23,7 @@ export async function fbStatus(): Promise<FbStatus> {
   if (process.env.FACEBOOK_PAGE_ACCESS_TOKEN) tokens.push({ label: 'test', token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN, pageId: process.env.FACEBOOK_PAGE_ID || null });
   if (process.env.FACEBOOK_REAL_PAGE_ACCESS_TOKEN) tokens.push({ label: 'real', token: process.env.FACEBOOK_REAL_PAGE_ACCESS_TOKEN, pageId: process.env.FACEBOOK_REAL_PAGE_ID || null });
 
-  if (!tokens.length) return { ok: false, text: 'Chưa đặt token (FACEBOOK_PAGE_ACCESS_TOKEN trên Vercel).', pages: [], realPageUrl: realUrl };
+  if (!tokens.length) return { ok: false, text: 'Chưa kết nối Facebook Page. Báo kỹ thuật cài đặt.', pages: [], realPageUrl: realUrl };
 
   const pages: FbStatus['pages'] = [];
   let firstErr = '';

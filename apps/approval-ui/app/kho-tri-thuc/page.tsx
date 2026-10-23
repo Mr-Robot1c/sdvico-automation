@@ -177,7 +177,6 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
                   <div className="kt-item-head"><b>{r.title || '(không tiêu đề)'}</b>{r.needs_gov_review ? <span className="badge tone-no">Cần duyệt QL</span> : null}<span className="muted" style={{ fontSize: '.8rem' }}>{fmtDT(r.created_at)}</span></div>
                   {/* 3/10 chế độ demo: tài liệu nội bộ (tin Zalo Phòng Kinh doanh) chỉ hiện tiêu đề, ẩn đường dẫn + tóm tắt. */}
                   {demo ? <p className="sub">Nội dung nội bộ, ẩn khi demo.</p> : (<>
-                  <div className="sub">Nguồn: <code>{r.source_path}</code></div>
                   <p>{r.summary || '(chưa có tóm tắt)'}</p>
                   </>)}
                 </li>
@@ -474,7 +473,7 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
 
           <h2 style={{ fontSize: '1.05rem', margin: '18px 0 8px' }}>Theo tác vụ (30 ngày)</h2>
           {ts.gemini.tasks.length === 0 ? (
-            <p className="sub">Chưa có dữ liệu token — cron chạy vài lần rồi bảng này sẽ có số.</p>
+            <p className="sub">Chưa có dữ liệu token, sau vài lượt chạy bảng này sẽ có số.</p>
           ) : (
             <div className="tablewrap">
               <table className="datatable">
@@ -498,12 +497,11 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
               upload-claude-usage.mjs, cron Windows 1h/lần). */}
           <h2 style={{ fontSize: '1.05rem', margin: '28px 0 8px' }}>🤖 Claude Code (Anthropic Max)</h2>
           <p className="sub" style={{ margin: '0 0 12px' }}>
-            Token bạn dùng khi chat với Claude Code (dev tool riêng, không phải AI SDVICO chạy sản xuất). Cột "Tương đương API" là chi phí NẾU trả theo API pricing — dùng để so với Claude Max subscription ($200/tháng ≈ 5.200.000đ) xem tiết kiệm bao nhiêu. Script sync jsonl mỗi 1h (cron Windows Task Scheduler).
+            Token dùng khi làm việc với Claude Code (công cụ lập trình, không phải AI chạy sản xuất). Cột "Tương đương API" là chi phí nếu trả theo giá API, để so với gói Claude Max ($200/tháng, khoảng 5.200.000 đồng).
           </p>
           {ts.claude.count === 0 ? (
             <div className="empty" style={{ padding: '20px 8px' }}>
-              <p className="sub" style={{ margin: 0 }}>Chưa có dữ liệu Claude Code. Chạy tay: <code>node apps/approval-ui/scripts/upload-claude-usage.mjs</code></p>
-              <p className="sub" style={{ margin: '4px 0 0' }}>Sau đó thiết lập cron 1h/lần bằng file <code>apps/approval-ui/scripts/claude-usage-cron.xml</code> (Task Scheduler → Import Task).</p>
+              <p className="sub" style={{ margin: 0 }}>Chưa có dữ liệu Claude Code. Báo kỹ thuật bật đồng bộ.</p>
             </div>
           ) : (
             <>
@@ -582,7 +580,7 @@ function AgentLogTable({ rows }: { rows: Array<{ task: string; status: string; d
     'mkt.publish_facebook': 'Đăng bài lên Facebook',
     'mkt.publish_youtube': 'Đăng video lên YouTube',
     'mkt.publish_tiktok': 'Đăng TikTok',
-    'mkt.metrics_pull': 'Kéo số liệu (cron)',
+    'mkt.metrics_pull': 'Kéo số liệu (tự động)',
     'mkt.metrics_pull_manual': 'Kéo số liệu (bấm tay)',
     'mkt.learn_weekly': 'Học số liệu tuần',
     'mkt.apply_learn': 'Áp đề xuất tuần',
@@ -594,7 +592,11 @@ function AgentLogTable({ rows }: { rows: Array<{ task: string; status: string; d
   };
   const top = rows.slice(0, 12);
   if (!top.length) return <div className="empty"><p>Chưa thấy lần chạy nào trong log.</p></div>;
+  // 23/10 (đợt 1 sắp xếp lại): nhật ký chạy là thông tin kỹ thuật, thu vào mục "Chi tiết kỹ thuật" (mặc định đóng).
+  const errors = top.filter((l) => l.status === 'error').length;
   return (
+    <details className="tech-details">
+      <summary>Chi tiết kỹ thuật <span className="sub">({top.length} lần chạy gần nhất{errors ? `, ${errors} lỗi` : ''})</span></summary>
     <div className="tablewrap">
       <table className="datatable">
         <thead><tr><th style={{ width: 200 }}>Việc</th><th style={{ width: 90 }}>Kết quả</th><th>Chi tiết</th><th style={{ width: 110 }}>Lúc</th></tr></thead>
@@ -611,5 +613,6 @@ function AgentLogTable({ rows }: { rows: Array<{ task: string; status: string; d
         </tbody>
       </table>
     </div>
+    </details>
   );
 }

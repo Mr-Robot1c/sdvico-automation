@@ -1822,12 +1822,13 @@ button.topbar-back { font: inherit; cursor: pointer; }
   .bot-chip-wrap { display: none !important; }
   .askbot-fab {
     width: 48px; height: 48px; padding: 0; justify-content: center; gap: 0; font-size: 22px;
-    right: 12px !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+    /* 23/10: nằm trên thanh 5 nút dưới cùng (cao khoảng 57px), không bị che. */
+    right: 12px !important; bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
   }
   .askbot-fab-text { display: none; }
   .askbot-panel {
     left: 8px; right: 8px !important; width: auto;
-    bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(132px + env(safe-area-inset-bottom, 0px)) !important;
     max-height: 72vh; max-height: 72dvh;
   }
 
@@ -2080,3 +2081,38 @@ button.topbar-back { font: inherit; cursor: pointer; }
 @media (max-width: 767px) {
   .tablewrap:has(> .qa-table), .tablewrap:has(> .week-table), .table-scroll:has(> .week-table) { overflow-x: visible; }
 }
+
+/* 23/10 (đợt 1 sắp xếp lại, design-spec-app-noi-bo.md): thanh 5 nút dưới cùng trên điện thoại. */
+.m-tabbar { display: none; }
+@media (max-width: 767px) {
+  .m-tabbar {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10000;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    background: var(--surface); border-top: 1px solid var(--line);
+  }
+  .m-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-height: 48px; padding: 4px 0; border: 0; border-radius: 10px; background: none;
+    color: var(--ink-2); font: inherit; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer;
+  }
+  .m-tab-ico { font-size: 18px; line-height: 1; }
+  .m-tab.on { color: var(--accent); background: var(--accent-bg); }
+  .m-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  main { padding-bottom: 88px; }
+}
+
+/* 23/10 (đợt 1, trang Hôm nay): mỗi việc trong Cần làm là MỘT link bấm được, checklist người mới, dòng link cuối khối. */
+a.need-item { color: inherit; text-decoration: none; min-height: 44px; }
+a.need-item:hover .need-text { text-decoration: underline; }
+a.need-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.need-text { flex: 1; min-width: 0; }
+.newcomer-steps { margin: 4px 0 12px; padding-left: 20px; display: grid; gap: 6px; }
+.newcomer-steps a { color: var(--accent); font-weight: 600; }
+.today-share { margin: 4px 0 8px; font-size: .85rem; }
+.blk-links { display: flex; gap: 16px; flex-wrap: wrap; justify-content: flex-end; margin-top: 8px; font-size: .85rem; }
+
+/* 23/10 (đợt 1): nhật ký kỹ thuật thu gọn mặc định. */
+.tech-details { margin-top: 8px; }
+.tech-details > summary { cursor: pointer; font-size: .85rem; color: var(--ink-2); padding: 6px 0; min-height: 44px; display: flex; align-items: center; gap: 6px; }
+.tech-details > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

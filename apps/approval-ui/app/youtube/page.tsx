@@ -28,14 +28,11 @@ export default async function Page() {
           ) : info.configured && info.error ? (
             <>
               <div className="metaline" style={{ marginTop: 6 }}>⚠️ Đã đặt token nhưng gọi kênh lỗi: {info.error}</div>
-              <div className="metaline">Token có thể đã hết hạn (chế độ Testing hết hạn sau 7 ngày). Chạy lại script lấy token mới, cập nhật biến <code>YOUTUBE_REFRESH_TOKEN</code> trên Vercel rồi Redeploy.</div>
+              <div className="metaline">Quyền đăng YouTube có thể đã hết hạn. Báo kỹ thuật cấp lại.</div>
             </>
           ) : (
             <>
-              <div className="metaline" style={{ marginTop: 6 }}>❌ Chưa kết nối. Thiếu một trong ba biến môi trường trên Vercel:</div>
-              <div className="metaline"><code>YOUTUBE_CLIENT_ID</code></div>
-              <div className="metaline"><code>YOUTUBE_CLIENT_SECRET</code></div>
-              <div className="metaline"><code>YOUTUBE_REFRESH_TOKEN</code></div>
+              <div className="metaline" style={{ marginTop: 6 }}>❌ Chưa kết nối kênh YouTube. Báo kỹ thuật cài đặt.</div>
             </>
           )}
         </div>
@@ -51,8 +48,7 @@ export default async function Page() {
 
         <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
           <b>Lưu ý</b>
-          <div className="metaline" style={{ marginTop: 6 }}>Cách lấy token và cấu hình: xem file <code>docs/runbook-youtube-setup.md</code> trong mã nguồn.</div>
-          <div className="metaline">App đang chế độ Testing nên token sống khoảng 7 ngày. Hết hạn thì chạy lại script lấy token mới. Muốn bền lâu thì publish app trong Google Auth Platform (mục Audience).</div>
+          <div className="metaline" style={{ marginTop: 6 }}>Quyền đăng YouTube có thể hết hạn sau khoảng 7 ngày. Thấy báo lỗi thì báo kỹ thuật cấp lại.</div>
         </div>
       </section>
     </main>
