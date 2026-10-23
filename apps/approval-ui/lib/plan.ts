@@ -13,6 +13,8 @@
 import type { getServerClient } from './supabase-server';
 // @ts-ignore — module JS thuần
 import { guessGroup } from './gen/products.mjs';
+// @ts-ignore — module JS thuần
+import { rankProducts as rankShared, WEEKS_WINDOW } from './gen/rank-products.mjs';
 import { loadRecentKnowledge } from './knowledge';
 
 type Client = ReturnType<typeof getServerClient>;
@@ -470,6 +472,7 @@ export async function autoApplyWeeklyProposal(
     .order('created_at', { ascending: false }).limit(1).maybeSingle();
   const curRow = cur as { id: string; period_start: string | null; data: any } | null;
   if (curRow && (curRow.period_start === ws || curRow.data?.proposal?.week_start === ws)) {
+    await mergeWeeklyLearn(client, ws);
     return { applied: false, skipped: 'ban tuan nay da ap', planId: curRow.id };
   }
   const prop = await findWeeklyProposal(client, ws);
@@ -490,7 +493,24 @@ export async function autoApplyWeeklyProposal(
   try {
     await client.from('run_log').insert({ task: 'mkt.plan', actor: 'cron', status: 'ok', detail: { cadence: 'weekly', planId: prop.id, applied: true, from: 'de xuat chu nhat', by, directions: sugs.length, weekStart: ws } });
   } catch { /* bỏ qua */ }
+  await mergeWeeklyLearn(client, ws);
   return { applied: true, planId: prop.id };
+}
+
+// 22/10 (user chốt sửa vòng học BOSS): bản đề xuất Chủ nhật soạn lúc 11h, TRƯỚC lượt học tuần (20h), nên trọng số của
+// nó là số chưa học; bản học nằm chờ người bấm Áp dụng mà từ 24/8 không ai bấm. Sau khi áp đề xuất tuần, gộp luôn
+// trọng số của bản học cho đúng tuần đó. Lỗi không chặn việc áp kế hoạch.
+async function mergeWeeklyLearn(client: Client, weekStart: string): Promise<void> {
+  try {
+    const { data: learn } = await client.from('mkt_plans').select('id')
+      .eq('data->>origin', 'learn-weekly').eq('period_start', weekStart)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (!(learn as any)?.id) return;
+    const { mergeLearnIntoApplied } = await import('./learn-weekly');
+    await mergeLearnIntoApplied(client, (learn as any).id, 'cron', weekStart);
+  } catch (e: any) {
+    console.error('[plan] gop ban hoc tuan loi (bo qua):', e?.message || e);
+  }
 }
 
 // Sinh 1 bản kế hoạch từ số liệu hiện tại rồi lưu vào mkt_plans (applied = false).
@@ -503,8 +523,9 @@ export async function autoApplyWeeklyProposal(
 // quát tuần sau, không lấy 7 ngày trượt lẫn lộn hai tuần.
 export async function loadMeasurementFromWeekReport(client: Client, weekOffset: number, now: Date = new Date()): Promise<{ m: Measurement; label: string } | null> {
   try {
-    const { buildWeekReport } = await import('./week-report');
-    const report = await buildWeekReport(client, weekOffset, now);
+    // 22/10: gộp 4 tuần (tuần weekOffset và 3 tuần trước đó), cùng cửa sổ với học tuần.
+    const { buildProductWindow } = await import('./week-report');
+    const report = await buildProductWindow(client, weekOffset, WEEKS_WINDOW as number, now);
     if (!report || !report.totals.posts) return null;
     const products: ProductAgg[] = report.byProduct.map((p) => ({
       product: p.product,
@@ -519,10 +540,7 @@ export async function loadMeasurementFromWeekReport(client: Client, weekOffset: 
       totals: { posts: report.totals.posts, engagement: report.totals.engagement, conversions: report.totals.conversions },
       topPosts: report.topPosts.map((t) => ({ title: t.title, product: t.product, engagement: t.m.engagement })),
     };
-    const w: any = report.window || {};
-    // w.label da co san chu "Tuan truoc (...)" — dung them tien to "tuan" keo lap chu (24/8).
-    const label = w.label ? String(w.label) : `tuần ${String(w.start || w.startIso || '').slice(0, 10)} tới ${String(w.end || w.endIso || '').slice(0, 10)}`;
-    return { m, label };
+    return { m, label: report.label };
   } catch {
     return null;
   }
@@ -751,30 +769,18 @@ export function buildPlan(
   // "Khác" (bài không nhận diện được sản phẩm) và "Bài content" (bài nuôi trang, không bán)
   // KHÔNG phải sản phẩm — cấm vào bảng xếp hạng/trọng số, kẻo ra câu "Dẫn đầu là Khác" vô
   // nghĩa và weights không khớp folder nào của vòng xoay (user bắt 20/8).
-  const NOT_PRODUCT = new Set(['Khác', 'Bài content']);
-  const realProducts = m.products.filter((p) => !NOT_PRODUCT.has(p.product));
-  const ranked = realProducts
-    .filter((p) => p.count >= threshold)
-    .sort((a, b) => b.avgConv - a.avgConv || b.avgEng - a.avgEng);
-  const insufficient = realProducts.filter((p) => p.count < threshold);
-
-  // Chia bậc: đỉnh 1/3 là winner, đáy 1/3 mà chưa ra đơn là weak, còn lại watch.
-  const n = ranked.length;
-  const topCut = n ? Math.max(1, Math.round(n / 3)) : 0;
-  const botStart = n - Math.max(1, Math.round(n / 3));
-  const tierOf = (idx: number, p: ProductAgg): Tier => {
-    if (idx < topCut) return 'winner';
-    if (idx >= botStart && p.avgConv === 0) return 'weak';
-    return 'watch';
-  };
-
-  const rankedPlan: PlanProduct[] = ranked.map((p, idx) => {
-    const tier = tierOf(idx, p);
-    return { ...p, tier, weight: WEIGHT_BY_TIER[tier], postsPerWeek: 0, note: '' };
-  });
-  const insufficientPlan: PlanProduct[] = insufficient
-    .sort((a, b) => b.count - a.count)
-    .map((p) => ({ ...p, tier: 'insufficient' as Tier, weight: WEIGHT_BY_TIER.insufficient, postsPerWeek: 0, note: '' }));
+  // 22/10: luật xếp bậc dùng chung (lib/gen/rank-products.mjs): đỉnh 1/3 là winner NẾU có tương tác hoặc đơn, đáy
+  // 1/3 chưa ra đơn là weak, còn lại watch. Trước đây sản phẩm 2 bài 0 tương tác vẫn được xếp winner.
+  const byName = new Map(m.products.map((p) => [p.product, p] as const));
+  const shared = (rankShared as (p: any[], o?: any) => any[])(
+    m.products.map((p) => ({ product: p.product, count: p.count, totalEng: p.engagement, conversions: p.conversions, avgScore: p.avgEng, avgEng: p.avgEng })),
+    { minPosts: threshold }
+  );
+  const toPlan = (r: any): PlanProduct => ({ ...byName.get(r.product)!, tier: r.tier as Tier, weight: r.weight, postsPerWeek: 0, note: '' });
+  const rankedPlan: PlanProduct[] = shared.filter((r) => r.tier !== 'insufficient').map(toPlan);
+  const insufficientPlan: PlanProduct[] = shared.filter((r) => r.tier === 'insufficient').map(toPlan);
+  const ranked = rankedPlan;
+  const insufficient = insufficientPlan;
 
   const all = [...rankedPlan, ...insufficientPlan];
 

@@ -6,21 +6,23 @@
 // applied=false. Người quản lí xem ở /ke-hoach, bấm "Áp dụng đề xuất" mới có hiệu lực
 // (ba-spec NV4/R5: kế hoạch không tự áp dụng trọng số, chỉ có hiệu lực khi Bạn B xác nhận).
 //
+// 22/10 (user: "thật sự con BOSS agent có hoạt động kh vậy?", rồi chốt sửa vòng học): bản học tuần nằm chờ người bấm
+// "Áp dụng" mà từ 24/8 không ai bấm, nên kế hoạch tuần chạy với mọi trọng số bằng 1. Giờ máy TỰ GỘP trọng số học
+// được vào kế hoạch đang áp của tuần tới (mergeLearnIntoApplied): Thứ 2 sau khi áp đề xuất tuần, hoặc ngay khi học bù
+// sáng Thứ 2. Bài vẫn qua duyệt như cũ, chỉ trọng số chia bài là tự đổi. Số liệu đo GỘP 4 TUẦN, luật xếp bậc dùng
+// chung (lib/gen/rank-products.mjs): không xếp thắng khi 0 tương tác và 0 đơn.
+//
 // KHÔNG tự đổi KIND_WEIGHT (bài content) trong phiên này — chỉ đề xuất bằng thông tin trong
 // báo cáo tuần. Tôn trọng nguyên tắc máy đề xuất, người quyết.
 
 import type { getServerClient } from './supabase-server';
-import { buildWeekReport } from './week-report';
+import { buildProductWindow } from './week-report';
+// @ts-ignore — module JS thuần
+import { rankProducts, MIN_POSTS_4W, WEEKS_WINDOW } from './gen/rank-products.mjs';
 import type { Plan, PlanProduct, Tier } from './plan';
 import { vnInt, weekWindowVN } from './plan';
 
 type Client = ReturnType<typeof getServerClient>;
-
-const WEIGHT_BY_TIER: Record<Tier, number> = { winner: 3, watch: 2, weak: 1, insufficient: 1, manual: 1 };
-
-// Ngưỡng bài tối thiểu để xếp thắng/thua trong tuần. Tuần chỉ có 2 bài không đủ đại diện,
-// giữ nguyên trọng số mặc định 1 (không đẩy mạnh mà cũng không cắt).
-const MIN_POSTS_PER_PRODUCT = 2;
 
 function joinAnd(items: string[]): string {
   if (!items.length) return '';
@@ -28,46 +30,23 @@ function joinAnd(items: string[]): string {
   return items.slice(0, -1).join(', ') + ' và ' + items[items.length - 1];
 }
 
-// Xếp bậc sản phẩm theo điểm trung bình tuần: top 1/3 = winner, đáy 1/3 chưa ra đơn = weak,
-// còn lại = watch. Sản phẩm dưới ngưỡng bài = insufficient (giữ nhịp gom thêm số liệu).
-function tierProducts(products: Array<{ product: string; count: number; avgScore: number; avgEng: number; conversions: number }>) {
-  const eligible = products.filter((p) => p.count >= MIN_POSTS_PER_PRODUCT && p.product !== 'Bài content');
-  const insufficient = products.filter((p) => (p.count < MIN_POSTS_PER_PRODUCT || p.product === 'Bài content') && p.product !== 'Bài content');
-  const sorted = [...eligible].sort((a, b) => b.avgScore - a.avgScore);
-  const n = sorted.length;
-  const topCut = n ? Math.max(1, Math.round(n / 3)) : 0;
-  const botStart = n - Math.max(1, Math.round(n / 3));
-  const rows: PlanProduct[] = sorted.map((p, idx) => {
-    let tier: Tier;
-    if (idx < topCut) tier = 'winner';
-    else if (idx >= botStart && p.conversions === 0) tier = 'weak';
-    else tier = 'watch';
-    return {
-      product: p.product,
-      count: p.count,
-      engagement: 0,
-      conversions: p.conversions,
-      avgEng: p.avgEng,
-      avgConv: 0,
-      tier,
-      weight: WEIGHT_BY_TIER[tier],
-      postsPerWeek: 0,
-      note: noteFor(tier, p)
-    };
-  });
-  const insufRows: PlanProduct[] = insufficient.map((p) => ({
-    product: p.product, count: p.count, engagement: 0, conversions: p.conversions,
-    avgEng: p.avgEng, avgConv: 0, tier: 'insufficient' as Tier,
-    weight: WEIGHT_BY_TIER.insufficient, postsPerWeek: 0,
-    note: `Chỉ ${vnInt(p.count)} bài tuần rồi, chưa đủ để xếp — giữ nhịp để gom thêm số liệu.`
+// Luật xếp bậc chung (rank-products.mjs) đổi sang dạng PlanProduct của trang Kế hoạch.
+function tierProducts(products: Array<{ product: string; count: number; avgScore: number; avgEng: number; totalEng: number; conversions: number }>): PlanProduct[] {
+  const rows = (rankProducts as (p: any[], o?: any) => any[])(products, { minPosts: MIN_POSTS_4W });
+  return rows.map((p) => ({
+    product: p.product, count: p.count, engagement: p.totalEng || 0, conversions: p.conversions,
+    avgEng: p.avgEng, avgConv: 0, tier: p.tier as Tier, weight: p.weight, postsPerWeek: 0,
+    note: p.tier === 'insufficient'
+      ? `Chỉ ${vnInt(p.count)} bài trong ${WEEKS_WINDOW} tuần, chưa đủ để xếp. Giữ nhịp để gom thêm số liệu.`
+      : noteFor(p.tier as Tier, p, (p.totalEng || 0) === 0 && !p.conversions),
   }));
-  return [...rows, ...insufRows];
 }
 
-function noteFor(tier: Tier, p: { avgEng: number; count: number }): string {
-  if (tier === 'winner') return `Ăn nhất tuần rồi, trung bình ${vnInt(p.avgEng)} tương tác/bài. Đẩy mạnh nhịp đăng.`;
-  if (tier === 'weak') return `Đuối nhất tuần rồi, chỉ ${vnInt(p.avgEng)} tương tác/bài mà chưa có đơn. Giảm nhịp, đổi góc.`;
-  return `Ổn định (${vnInt(p.avgEng)} tương tác/bài, ${vnInt(p.count)} bài). Giữ nhịp hiện tại.`;
+function noteFor(tier: Tier, p: { avgEng: number; count: number }, noSignal = false): string {
+  if (tier === 'winner') return `Ăn nhất ${WEEKS_WINDOW} tuần qua, trung bình ${vnInt(p.avgEng)} tương tác/bài. Đẩy mạnh nhịp đăng.`;
+  if (tier === 'weak') return `Đuối nhất ${WEEKS_WINDOW} tuần qua, chỉ ${vnInt(p.avgEng)} tương tác/bài mà chưa có đơn. Giảm nhịp, đổi góc.`;
+  if (noSignal) return `${vnInt(p.count)} bài trong ${WEEKS_WINDOW} tuần mà chưa có tương tác hay đơn nào, chưa đủ cớ để đẩy mạnh. Giữ nhịp.`;
+  return `Ổn định (${vnInt(p.avgEng)} tương tác/bài, ${vnInt(p.count)} bài trong ${WEEKS_WINDOW} tuần). Giữ nhịp hiện tại.`;
 }
 
 export type LearnWeeklyResult = { planId: string | null; ranked: number; skipped?: string };
@@ -96,14 +75,15 @@ export async function learnWeekly(client: Client, opts: { force?: boolean } = {}
   // Đọc số liệu tuần VỪA KẾT THÚC. Chủ Nhật tối chạy thì offset=0 là tuần đang khép lại (T2-CN tuần
   // này). 15/10: chạy bù sáng thứ Hai thì tuần vừa kết thúc là offset=1, offset=0 lúc đó là tuần mới.
   const mondayCatchUp = isMondayVN(now);
-  const report = await buildWeekReport(client, mondayCatchUp ? 1 : 0, now);
+  const win4 = await buildProductWindow(client, mondayCatchUp ? 1 : 0, WEEKS_WINDOW, now);
+  const report = win4.newestWeek;
 
-  if (report.totals.posts === 0) {
-    return { planId: null, ranked: 0, skipped: 'tuan nay chua co bai nao dang' };
+  if (win4.totals.posts === 0) {
+    return { planId: null, ranked: 0, skipped: 'chua co bai nao dang trong 4 tuan' };
   }
 
-  const productRows = tierProducts(report.byProduct.map((p) => ({
-    product: p.product, count: p.count, avgScore: p.avgScore, avgEng: p.avgEng, conversions: p.conversions
+  const productRows = tierProducts(win4.byProduct.map((p) => ({
+    product: p.product, count: p.count, avgScore: p.avgScore, avgEng: p.avgEng, totalEng: p.totalEng, conversions: p.conversions
   })));
 
   // Chia số bài/tuần theo weight (giống buildPlan của lib/plan.ts).
@@ -128,6 +108,10 @@ export async function learnWeekly(client: Client, opts: { force?: boolean } = {}
       `So tuần trước, tương tác ${report.delta.engagement > 0 ? 'tăng' : 'giảm'} ${Math.abs(report.delta.engagement)} phần trăm, lượt xem ${report.delta.views > 0 ? 'tăng' : 'giảm'} ${Math.abs(report.delta.views)} phần trăm.`
     );
   }
+  narrative.push(`Trọng số tuần tới tính trên ${win4.label}: ${vnInt(win4.totals.posts)} bài, ${vnInt(win4.totals.engagement)} lượt tương tác.`);
+  if (!winners.length) {
+    narrative.push('Chưa sản phẩm nào đủ số bài và có tương tác hay đơn để xếp thắng, giữ nhịp đều các sản phẩm.');
+  }
   if (winners.length) {
     narrative.push(
       `Ăn nhất là ${joinAnd(winners.map((w) => w.product))}. Đề xuất tuần tới đẩy mạnh nhóm này (${winners.map((w) => `${w.product} ${vnInt(w.postsPerWeek)} bài/tuần`).join(', ')}).`
@@ -138,13 +122,11 @@ export async function learnWeekly(client: Client, opts: { force?: boolean } = {}
       `Đuối nhất là ${joinAnd(weakOnes.map((w) => w.product))}. Đề xuất giảm nhịp còn ${vnInt(weakOnes[0].postsPerWeek)} bài/tuần và đổi góc, nhấn lợi ích cụ thể như tiết kiệm dầu, đủ nước ngọt ngoài khơi hay ra khơi an toàn.`
     );
   }
-  narrative.push(
-    'Đây là ĐỀ XUẤT dựa vào số liệu tuần rồi, chưa tự áp. Bấm "Áp dụng đề xuất" bên dưới mới có hiệu lực cho tuần tới.'
-  );
+  narrative.push('Máy tự gộp trọng số này vào kế hoạch tuần tới sáng Thứ 2. Bài vẫn qua duyệt như cũ.');
 
   const plan: Plan = {
     generatedAt: now.toISOString(),
-    threshold: MIN_POSTS_PER_PRODUCT,
+    threshold: MIN_POSTS_4W,
     weeklyBudget: WEEKLY_BUDGET,
     products: productRows,
     weights,
@@ -152,12 +134,12 @@ export async function learnWeekly(client: Client, opts: { force?: boolean } = {}
     origin: 'learn-weekly',
     cadence: 'manual',
     summary: {
-      totalProducts: report.byProduct.length,
+      totalProducts: win4.byProduct.length,
       ranked: winners.length + productRows.filter((p) => p.tier === 'watch').length + weakOnes.length,
       insufficient: productRows.filter((p) => p.tier === 'insufficient').length,
-      totalPosts: report.totals.posts,
-      totalEngagement: report.totals.engagement,
-      totalConversions: report.totals.conversions,
+      totalPosts: win4.totals.posts,
+      totalEngagement: win4.totals.engagement,
+      totalConversions: win4.totals.conversions,
       topProduct: winners[0]?.product || null
     }
   };
@@ -179,7 +161,45 @@ export async function learnWeekly(client: Client, opts: { force?: boolean } = {}
     .select('id')
     .single();
   if (error) throw new Error(error.message);
-  return { planId: ((data as any)?.id as string) || null, ranked: plan.summary.ranked };
+  const planId = ((data as any)?.id as string) || null;
+  // Học bù sáng Thứ 2: kế hoạch tuần mới có thể đã được áp (rotate 8h) trước lượt học này, gộp luôn.
+  if (planId) {
+    try { await mergeLearnIntoApplied(client, planId, 'cron', nextWin.start); } catch (e: any) {
+      console.error('[learn-weekly] gop trong so vao ke hoach dang ap loi (bo qua):', e?.message || e);
+    }
+  }
+  return { planId, ranked: plan.summary.ranked };
+}
+
+// Gộp trọng số + bậc sản phẩm của một bản học tuần vào kế hoạch ĐANG ÁP, giữ nguyên hướng đi. weekStart có thì chỉ
+// gộp khi kế hoạch đang áp đúng là của tuần đó (bản học Chủ nhật không được đè lên kế hoạch tuần cũ sắp hết).
+// Dùng chung cho nút "Áp dụng đề xuất" (app/actions.ts) và tự gộp Thứ 2. Trả id bản được gộp vào, null nếu bỏ qua.
+export async function mergeLearnIntoApplied(client: Client, learnPlanId: string, actor: 'cron' | 'nguoi-bam', weekStart?: string): Promise<string | null> {
+  const { data: incoming } = await client.from('mkt_plans').select('id, data, applied_at').eq('id', learnPlanId).maybeSingle();
+  const inData = ((incoming as any)?.data || {}) as any;
+  if (!incoming || inData.origin !== 'learn-weekly') return null;
+  const { data: base } = await client.from('mkt_plans').select('id, period_start, data').eq('applied', true)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const baseData = ((base as any)?.data || {}) as any;
+  if (!(base as any)?.id || !Array.isArray(baseData.content_suggestions) || !baseData.content_suggestions.length) return null;
+  if (weekStart && (base as any).period_start !== weekStart && baseData.proposal?.week_start !== weekStart) return null;
+  if (baseData.appliedLearnPlanId === learnPlanId) return (base as any).id;
+  const nowIso = new Date().toISOString();
+  const merged = {
+    ...baseData,
+    weights: inData.weights || baseData.weights,
+    products: inData.products || baseData.products,
+    summary: { ...(baseData.summary || {}), ...(inData.summary || {}) },
+    narrative: [`Đã áp đề xuất cuối tuần: ${(inData.narrative || [])[0] || ''}`, ...(baseData.narrative || [])].slice(0, 6),
+    appliedLearnPlanId: learnPlanId,
+    appliedLearnAt: nowIso,
+  };
+  const { error } = await client.from('mkt_plans').update({ data: merged, applied_at: nowIso }).eq('id', (base as any).id);
+  if (error) throw new Error(error.message);
+  // Đánh dấu bản học đã áp (để nút không hiện lại), không set applied cho nó.
+  await client.from('mkt_plans').update({ applied_at: nowIso }).eq('id', learnPlanId);
+  try { await client.from('run_log').insert({ task: 'mkt.apply_learn', actor, status: 'ok', detail: { planId: learnPlanId, mergedInto: (base as any).id, weights: inData.weights || null } }); } catch { /* bỏ qua */ }
+  return (base as any).id;
 }
 
 function isMondayVN(now: Date): boolean {

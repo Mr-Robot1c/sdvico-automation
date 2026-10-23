@@ -202,7 +202,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         <div>
           <h1>Kế hoạch</h1>
           <p className="sub">
-            Lịch đăng cố định: {summarizePlan(pp.plan)}. Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h. Tối 20h BOSS chỉnh nhẹ trọng số theo số liệu ngày, Chủ nhật 8h BOSS soạn kế hoạch tuần sau để bạn xem và sửa cả ngày, Thứ 2 8h máy tự áp (hoặc bạn bấm Áp ngay). Bài luôn chờ người bấm Duyệt.
+            Lịch đăng cố định: {summarizePlan(pp.plan)}. Ô giờ trước 12h máy viết lúc 8h, từ 12h máy viết lúc 14h. Tối 20h BOSS chỉnh nhẹ trọng số theo số liệu 4 tuần gần nhất, Chủ nhật 8h BOSS soạn kế hoạch tuần sau để bạn xem và sửa cả ngày, Chủ nhật tối BOSS học số liệu, Thứ 2 8h máy tự áp kế hoạch kèm trọng số vừa học (hoặc bạn bấm Áp ngay). Bài luôn chờ người bấm Duyệt.
           </p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

@@ -2490,27 +2490,9 @@ export async function applyPlanWeights(formData: FormData) {
   const inData = ((incoming as any)?.data || {}) as any;
   const isLearn = inData.origin === 'learn-weekly';
   if (isLearn) {
-    const { data: base } = await client.from('mkt_plans').select('id, data').eq('applied', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
-    const baseData = ((base as any)?.data || {}) as any;
-    if ((base as any)?.id && Array.isArray(baseData.content_suggestions) && baseData.content_suggestions.length) {
-      // Merge INTO bản đang áp, giữ hướng đi. Bản learn-weekly chỉ đóng vai "đề xuất trọng số".
-      const merged = {
-        ...baseData,
-        weights: inData.weights || baseData.weights,
-        products: inData.products || baseData.products,
-        summary: { ...(baseData.summary || {}), ...(inData.summary || {}) },
-        narrative: [
-          `Đã áp đề xuất cuối tuần: ${(inData.narrative || [])[0] || ''}`,
-          ...(baseData.narrative || []),
-        ].slice(0, 6),
-        appliedLearnPlanId: planId,
-        appliedLearnAt: new Date().toISOString(),
-      };
-      const { error: e1 } = await client.from('mkt_plans').update({ data: merged, applied_at: new Date().toISOString() }).eq('id', (base as any).id);
-      if (e1) throw new Error(e1.message);
-      // Đánh dấu bản learn-weekly đã áp (để nút không hiện lại), nhưng KHÔNG set applied cho nó.
-      await client.from('mkt_plans').update({ applied_at: new Date().toISOString() }).eq('id', planId);
-      try { await client.from('run_log').insert({ task: 'mkt.apply_learn', actor: 'nguoi-bam', status: 'ok', detail: { planId, mergedInto: (base as any).id } }); } catch { /* bo qua */ }
+    // 22/10: dùng chung hàm gộp với lượt tự gộp sáng Thứ 2 (lib/learn-weekly.ts).
+    const { mergeLearnIntoApplied } = await import('../lib/learn-weekly');
+    if (await mergeLearnIntoApplied(client, planId, 'nguoi-bam')) {
       revalidatePath('/ke-hoach');
       return;
     }

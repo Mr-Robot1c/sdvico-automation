@@ -386,8 +386,9 @@ export async function GET(req: Request) {
   }
 
   // CHỦ NHẬT 20h+ VN, bù sáng thứ Hai trước 12h (15/10) — vòng HỌC TUẦN (item 1b, 20/8). Đọc số liệu tuần vừa kết thúc, đề xuất
-  // trọng số sản phẩm cho tuần tới. Ghi mkt_plans applied=false; người quản lí bấm Áp dụng ở
-  // /ke-hoach mới có hiệu lực (ba-spec NV4/R5). ?learn=1 ép chạy ngoài lịch (dùng khi test).
+  // trọng số sản phẩm cho tuần tới (4 tuần gộp). Ghi mkt_plans applied=false; 22/10 (user chốt): Thứ 2 máy tự gộp trọng
+  // số này vào kế hoạch tuần (mergeLearnIntoApplied), nút Áp dụng ở /ke-hoach vẫn dùng được để áp sớm. ?learn=1 ép
+  // chạy ngoài lịch (dùng khi test).
   const forceLearn = new URL(req.url).searchParams.get('learn') === '1';
   let learn: { planId?: string | null; ranked?: number; skipped?: string; error?: string } | null = null;
   if (forceLearn || shouldRunLearnWeekly(new Date())) {

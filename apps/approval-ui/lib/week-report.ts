@@ -411,3 +411,24 @@ export async function buildWeekReport(client: Client, offset: number = 0, now: D
 
   return { window: win, prevWindow: prevWin, totals, totalsPrev, delta, posts, topPosts, byProduct, byKind, narrative };
 }
+
+// 22/10: BOSS học trên 4 TUẦN gộp lại (rank-products.mjs). Một tuần chỉ khoảng 7 bài, gần 20 tương tác cả trang,
+// nên sản phẩm nào cũng "chưa đủ số liệu". baseOffset = tuần mới nhất trong cửa sổ (0 = tuần đang chạy, 1 = tuần
+// vừa xong); lấy thêm (weeks - 1) tuần trước đó.
+export async function buildProductWindow(client: Client, baseOffset: number, weeks: number, now: Date = new Date()) {
+  // @ts-ignore — module JS thuần
+  const { mergeProductWeeks } = await import('./gen/rank-products.mjs');
+  const reports = await Promise.all(Array.from({ length: weeks }, (_, i) => buildWeekReport(client, baseOffset + i, now)));
+  const newest = reports[0].window;
+  const oldest = reports[reports.length - 1].window;
+  const sum = (k: 'posts' | 'engagement' | 'views' | 'conversions') => reports.reduce((s, r) => s + (Number(r.totals[k]) || 0), 0);
+  return {
+    byProduct: (mergeProductWeeks as (w: any[]) => WeekReport['byProduct'])(reports.map((r) => r.byProduct)),
+    totals: { posts: sum('posts'), engagement: sum('engagement'), views: sum('views'), conversions: sum('conversions') },
+    topPosts: reports.flatMap((r) => r.topPosts).sort((a, b) => b.score - a.score).slice(0, 5),
+    window: { start: oldest.start, end: newest.end },
+    label: `${weeks} tuần từ ${oldest.start.split('-').reverse().join('/')} đến ${newest.end.split('-').reverse().join('/')}`,
+    newestWeek: reports[0],
+  };
+}
+

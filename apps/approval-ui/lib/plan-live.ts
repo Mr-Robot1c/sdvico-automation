@@ -14,7 +14,7 @@
 // mkt_posting_plan (rotate vẫn chạy theo slot + focus + weights, KHÔNG đọc phần này).
 
 import type { getServerClient } from './supabase-server';
-import { buildWeekReport } from './week-report';
+import { buildProductWindow } from './week-report';
 import type { Plan, PlanProduct, Tier, DailyPlan } from './plan';
 import { vnInt, weekWindowVN } from './plan';
 // @ts-ignore — module JS thuần
@@ -25,8 +25,10 @@ import { loadPostingPlan, slotsForDate, groupsForDate, type LoadedPostingPlan } 
 
 type Client = ReturnType<typeof getServerClient>;
 
-const WEIGHT_BY_TIER: Record<Tier, number> = { winner: 3, watch: 2, weak: 1, insufficient: 1, manual: 1 };
-const MIN_POSTS = 2;              // ngưỡng bài để xếp thắng/thua
+// 22/10: luật xếp bậc + ngưỡng bài dùng chung với học tuần và kế hoạch tuần (rank-products.mjs), đo 4 tuần.
+// @ts-ignore — module JS thuần
+import { rankProducts as rankShared, MIN_POSTS_4W, WEEKS_WINDOW } from './gen/rank-products.mjs';
+const MIN_POSTS = MIN_POSTS_4W as number;
 const CONTENT_PER_DAY = 1;        // 1 bài content nuôi trang mỗi ngày
 
 const DOW_VN = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -113,28 +115,12 @@ function vnDayInfo(now: Date, offsetDays: number): { date: string; dow: string; 
   return { date, dow: DOW_VN[vn.getUTCDay()], dowIdx: vn.getUTCDay() };
 }
 
-// Xếp bậc sản phẩm theo điểm trung bình tuần rồi gán trọng số 1..3.
-function rankProducts(byProduct: Array<{ product: string; count: number; avgScore: number; avgEng: number; conversions: number }>): PlanProduct[] {
-  // "Khác" (không nhận diện được sản phẩm) và "Bài content" không phải sản phẩm bán — loại
-  // khỏi xếp hạng/trọng số (cùng luật với buildPlan, tránh "Dẫn đầu là Khác").
-  const NOT_PRODUCT = new Set(['Khác', 'Bài content']);
-  const pool = byProduct.filter((p) => !NOT_PRODUCT.has(p.product));
-  const eligible = pool.filter((p) => p.count >= MIN_POSTS);
-  const sorted = [...eligible].sort((a, b) => b.avgScore - a.avgScore);
-  const n = sorted.length;
-  const topCut = n ? Math.max(1, Math.round(n / 3)) : 0;
-  const botStart = n - Math.max(1, Math.round(n / 3));
-  const ranked: PlanProduct[] = sorted.map((p, idx) => {
-    let tier: Tier;
-    if (idx < topCut) tier = 'winner';
-    else if (idx >= botStart && p.conversions === 0) tier = 'weak';
-    else tier = 'watch';
-    return { product: p.product, count: p.count, engagement: 0, conversions: p.conversions, avgEng: p.avgEng, avgConv: 0, tier, weight: WEIGHT_BY_TIER[tier], postsPerWeek: 0, note: '' };
-  });
-  const insufficient: PlanProduct[] = pool
-    .filter((p) => p.count < MIN_POSTS)
-    .map((p) => ({ product: p.product, count: p.count, engagement: 0, conversions: p.conversions, avgEng: p.avgEng, avgConv: 0, tier: 'insufficient' as Tier, weight: WEIGHT_BY_TIER.insufficient, postsPerWeek: 0, note: '' }));
-  return [...ranked, ...insufficient];
+// Xếp bậc sản phẩm (luật chung, 4 tuần gộp) rồi đổi sang dạng PlanProduct.
+function rankProducts(byProduct: Array<{ product: string; count: number; avgScore: number; avgEng: number; totalEng: number; conversions: number }>): PlanProduct[] {
+  return ((rankShared as (p: any[], o?: any) => any[])(byProduct, { minPosts: MIN_POSTS })).map((p) => ({
+    product: p.product, count: p.count, engagement: p.totalEng || 0, conversions: p.conversions,
+    avgEng: p.avgEng, avgConv: 0, tier: p.tier as Tier, weight: p.weight, postsPerWeek: 0, note: '',
+  }));
 }
 
 // Dự kiến HƯỚNG ĐI cho từng ngày tới, mô phỏng đúng thứ tự vòng xoay sẽ rút.
@@ -254,13 +240,16 @@ async function loadFocusKeys(client: Client): Promise<string[]> {
 
 // Cập nhật/đề xuất SỐNG: tính lại từ số liệu mới nhất, lưu 1 bản 'live' (update tại chỗ).
 export async function refreshLiveProposal(client: Client, now: Date = new Date()): Promise<{ id: string | null; skipped?: string }> {
-  const report = await buildWeekReport(client, 0, now);
+  // Số tuần này cho lời kể; xếp bậc trên 4 tuần gộp (cùng cửa sổ với học tuần, nên mỗi tối không kéo trọng số vừa
+  // học về 1 chỉ vì tuần đang chạy còn ít bài).
+  const win4 = await buildProductWindow(client, 0, WEEKS_WINDOW as number, now);
+  const report = win4.newestWeek;
   const [shareGroups, focusKeys, pp] = await Promise.all([loadShareGroups(client), loadFocusKeys(client), loadPostingPlan(client)]);
   // 4/9 khuya (đợt 3, bỏ hằng ngân sách cứng cũ): ngân sách bài bán/tuần = tổng ô bài bán
   // thật trong lịch cố định 7 ngày tới (mặc định 1/ngày = 7/tuần, tự đổi khi lịch đổi).
   const weeklyBudget = Array.from({ length: 7 }, (_, i) => vnDayInfo(now, i).date).reduce((s, d) => s + slotsForDate(pp.plan, d).filter((x) => x.kind === 'sale').length, 0) || 7;
 
-  let products = rankProducts(report.byProduct.map((p) => ({ product: p.product, count: p.count, avgScore: p.avgScore, avgEng: p.avgEng, conversions: p.conversions })));
+  let products = rankProducts(win4.byProduct.map((p) => ({ product: p.product, count: p.count, avgScore: p.avgScore, avgEng: p.avgEng, totalEng: p.totalEng, conversions: p.conversions })));
 
   // Nếu đang tập trung: chỉ giữ sản phẩm khớp focus. Focus product chưa có số liệu -> vẫn thêm
   // vào để BOSS chia bài (trọng số mặc định 1).
