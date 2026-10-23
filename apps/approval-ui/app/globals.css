@@ -2233,7 +2233,7 @@ a.need-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 .kh-repost li { display: flex; gap: 4px 12px; flex-wrap: wrap; align-items: baseline; }
 .kh-repost .sub { font-size: .82rem; }
 
-/* Khung chờ đổi tab (app/ke-hoach/loading.tsx). */
+/* Thanh xám khung chờ dùng chung (app/ke-hoach/loading.tsx, fallback Suspense ở Duyệt bài). */
 .kh-loading { opacity: 0; animation: kh-ld-in .01s linear .15s forwards; }
 @keyframes kh-ld-in { to { opacity: 1; } }
-.kh-ld-bar { display: block; height: 14px; border-radius: 8px; background: var(--surface-2); }
+.skel-bar { display: block; height: 14px; border-radius: 8px; background: var(--surface-2); }

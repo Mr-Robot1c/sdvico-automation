@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, Suspense } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getServerClient } from '../../lib/supabase-server';
@@ -85,70 +85,11 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
 
   const client = getServerClient();
 
-  // 26/8 (user): bo tab Video (du thua), thay bang tab Khach hang link sang /khach-hang.
-  // Van dem cBai cho tab "Bai viet" (bai article + social). Khong dem video nua.
-  // Filter deleted_at null: bai soft-delete an khoi dem tab Bai viet + tab Thung rac dem rieng.
-  const [{ count: cBai }, { count: cLeadNew }, { count: cTrash }] = await Promise.all([
-    client.from('mkt_content').select('*', { count: 'exact', head: true }).in('kind', ['article', 'social']).is('deleted_at', null),
-    client.from('mkt_leads').select('*', { count: 'exact', head: true }).eq('status', 'new'),
-    client.from('mkt_content').select('*', { count: 'exact', head: true }).not('deleted_at', 'is', null),
-  ]);
-
-  // 27/8 v3 (user: "bo het tat ca tru Bang bai viet va Thung rac"): chips chi con 2. Cac tab
-  // bai-viet / khach-hang VAN render qua URL truc tiep (link tu Tong quan + nut "Xem tat ca"
-  // tren board), chi khong chiem cho tren thanh chip.
-  const typeChips = (
-    <nav className="filters" aria-label="Loại nội dung">
-      {/* 4/9: dùng Link (chuyển trang phía client) thay <a> tải lại cả trang — giữ nguyên
-          data-theme và vị trí, không nháy. */}
-      <Link className={`chip ${tab === 'bang' ? 'on' : ''}`} href={withParams({ loai: 'bang', trangthai: null })}>
-        <span aria-hidden="true">📋</span> Bảng bài viết
-      </Link>
-      <Link className={`chip ${tab === 'thung-rac' ? 'on' : ''}`} href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn — giữ 7 ngày rồi máy tự xoá hẳn. Khôi phục hoặc xoá ngay tại đây.">
-        <span aria-hidden="true">🗑️</span> Thùng rác <span className="n">{cTrash ?? 0}</span>
-      </Link>
-    </nav>
-  );
-
   // Tab Bảng bài viết (mặc định): board duyệt + vận hành. Tab Tổng quan cũ (TongQuanSection)
   // đã bỏ 27/8 — dashboard mới nằm ở /tong-quan.
   if (tab === 'bang') {
-    // 21/9 (Thanh: "muốn xuất hiện mấy block như xem tất cả để khỏi kéo xuống"): thêm dải chip
-    // tóm tắt số bài theo trạng thái ngay dưới đầu bảng. Cùng công thức effStatus với tab
-    // "Bài viết" flat (đọc mkt_content 200 dòng gần nhất + đối chiếu approval_queue) nên số
-    // chip khớp với chip trong ảnh 2 anh gửi. Bấm chip -> chuyển sang danh sách flat có lọc.
-    const [{ data: recentRows }, { data: qRowsAll }] = await Promise.all([
-      client
-        .from('mkt_content')
-        .select('id, status')
-        .in('kind', ['article', 'social'])
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(200),
-      client
-        .from('approval_queue')
-        .select('payload, status')
-        .eq('kind', 'mkt_publish_content')
-        // 2/10: phải có order thì "phiếu mới nhất thắng" mới đúng (trước đây không order nên thứ tự tuỳ ý, số chip có thể lệch).
-        .order('created_at', { ascending: false })
-        .limit(1000),
-    ]);
-    const qStatusByCid = latestQueueStatusByCid(qRowsAll as any[]);
-    // Lượt đăng thật của 200 bài này: có lượt đăng thì tính "Đã đăng" dù phiếu gần nhất là Từ chối.
-    const recentIds = (recentRows || []).map((r: any) => String(r.id));
-    let liveCids = new Set<string>();
-    if (recentIds.length) {
-      const { data: pRows } = await client.from('mkt_posts').select('content_id, published_at').eq('status', 'published').in('content_id', recentIds);
-      liveCids = liveContentIds(pRows as any[]);
-    }
-    const effOf = (row: { id: string; status: string | null }) => effContentStatus(qStatusByCid.get(row.id), liveCids.has(row.id), row.status);
-    let cAll = 0;
-    const cByStatus = { review: 0, approved: 0, published: 0, rejected: 0 } as Record<string, number>;
-    for (const r of recentRows || []) {
-      cAll += 1;
-      const s = effOf(r as any);
-      if (s in cByStatus) cByStatus[s] += 1;
-    }
+    // 23/10 (web chậm, trang này 2,6-3,4s): trước đây trang đếm chip xong (3 lượt truy vấn) rồi BangSection mới bắt đầu
+    // tải (thêm 3-4 lượt). Giờ đầu trang vẽ ngay, hàng chip và bảng tải SONG SONG, mỗi phần có khung chờ riêng.
     return (
       <main>
         {/* 3/10 (đánh giá UI trước demo): một hành động chính (Tạo bài), MỘT hàng lối tắt. Bỏ chip "Bảng bài viết"
@@ -163,27 +104,41 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
             <Link className="btn ghost" href="/san-xuat">Tạo bài</Link>
           </div>
         </header>
-        <nav className="filters" aria-label="Mở danh sách bài theo trạng thái">
-          <span className="filters-label">Danh sách bài:</span>
-          <Link className="chip" href="/noi-dung?loai=bai-viet">
-            Tất cả <span className="n">{cAll}</span>
-          </Link>
-          {STATUS_TABS.map((s) => (
-            <Link key={s.key} className="chip" href={`/noi-dung?loai=bai-viet&trangthai=${s.key}`}>
-              {s.label} <span className="n">{cByStatus[s.key] || 0}</span>
-            </Link>
-          ))}
-          <Link className="chip chip-quiet" href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn, giữ 7 ngày rồi máy tự xoá hẳn.">
-            Thùng rác <span className="n">{cTrash ?? 0}</span>
-          </Link>
-        </nav>
-        <BangSection />
+        <Suspense fallback={<nav className="filters" aria-busy="true" aria-label="Đang đếm bài"><span className="filters-label">Danh sách bài:</span></nav>}>
+          <StatusChips />
+        </Suspense>
+        <Suspense fallback={<div className="blk" aria-busy="true" aria-label="Đang tải bảng bài"><span className="skel-bar" style={{ width: '30%', height: 18 }} /><span className="skel-bar" style={{ width: '100%', height: 220, marginTop: 12 }} /></div>}>
+          <BangSection />
+        </Suspense>
       </main>
     );
   }
 
   // 15/9 (Thanh): Khách hàng là trang riêng /khach-hang (mục menu riêng). Link cũ ?loai=khach-hang chuyển tiếp.
   if (tab === 'khach-hang') redirect('/khach-hang');
+
+  // 26/8 (user): bo tab Video (du thua), thay bang tab Khach hang link sang /khach-hang.
+  // Van dem cBai cho tab "Bai viet" (bai article + social). Khong dem video nua.
+  // Filter deleted_at null: bai soft-delete an khoi dem tab Bai viet + tab Thung rac dem rieng.
+  // 23/10 (web chậm): bỏ 2 truy vấn đếm cBai, cLeadNew không còn chỗ nào dùng; Bảng bài viết tự đếm trong StatusChips.
+  const { count: cTrash } = await client.from('mkt_content').select('*', { count: 'exact', head: true }).not('deleted_at', 'is', null);
+
+  // 27/8 v3 (user: "bo het tat ca tru Bang bai viet va Thung rac"): chips chi con 2. Cac tab
+  // bai-viet / khach-hang VAN render qua URL truc tiep (link tu Tong quan + nut "Xem tat ca"
+  // tren board), chi khong chiem cho tren thanh chip.
+  const typeChips = (
+    <nav className="filters" aria-label="Loại nội dung">
+      {/* 4/9: dùng Link (chuyển trang phía client) thay <a> tải lại cả trang — giữ nguyên
+          data-theme và vị trí, không nháy. */}
+      <Link className="chip" href={withParams({ loai: 'bang', trangthai: null })}>
+        <span aria-hidden="true">📋</span> Bảng bài viết
+      </Link>
+      <Link className={`chip ${tab === 'thung-rac' ? 'on' : ''}`} href={withParams({ loai: 'thung-rac', trangthai: null })} title="Bài đã ẩn — giữ 7 ngày rồi máy tự xoá hẳn. Khôi phục hoặc xoá ngay tại đây.">
+        <span aria-hidden="true">🗑️</span> Thùng rác <span className="n">{cTrash ?? 0}</span>
+      </Link>
+    </nav>
+  );
+
 
   // Tab Thung rac: hien danh sach bai soft-deleted (deleted_at NOT NULL) voi 2 nut Khoi phuc / Xoa han.
   // Cac tab khac loc deleted_at null de bai an sau soft-delete khong hien.
@@ -585,5 +540,61 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
         </div>
       ) : null}
     </main>
+  );
+}
+
+// Hàng chip đếm bài theo trạng thái của tab Bảng bài viết (21/9, Thanh: "muốn xuất hiện mấy block như xem tất cả để
+// khỏi kéo xuống"). Cùng công thức effStatus với tab "Bài viết" flat (mkt_content 200 dòng gần nhất + đối chiếu
+// approval_queue) nên số chip khớp. Bấm chip -> danh sách flat có lọc. 23/10: tách thành component tải song song với bảng.
+async function StatusChips() {
+  const client = getServerClient();
+  const [{ data: recentRows }, { data: qRowsAll }, { count: cTrash }] = await Promise.all([
+    client
+      .from('mkt_content')
+      .select('id, status')
+      .in('kind', ['article', 'social'])
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(200),
+    client
+      .from('approval_queue')
+      .select('payload, status')
+      .eq('kind', 'mkt_publish_content')
+      // 2/10: phải có order thì "phiếu mới nhất thắng" mới đúng (trước đây không order nên thứ tự tuỳ ý, số chip có thể lệch).
+      .order('created_at', { ascending: false })
+      .limit(1000),
+    client.from('mkt_content').select('*', { count: 'exact', head: true }).not('deleted_at', 'is', null),
+  ]);
+  const qStatusByCid = latestQueueStatusByCid(qRowsAll as any[]);
+  // Lượt đăng thật của 200 bài này: có lượt đăng thì tính "Đã đăng" dù phiếu gần nhất là Từ chối.
+  const recentIds = (recentRows || []).map((r: any) => String(r.id));
+  let liveCids = new Set<string>();
+  if (recentIds.length) {
+    const { data: pRows } = await client.from('mkt_posts').select('content_id, published_at').eq('status', 'published').in('content_id', recentIds);
+    liveCids = liveContentIds(pRows as any[]);
+  }
+  const effOf = (row: { id: string; status: string | null }) => effContentStatus(qStatusByCid.get(row.id), liveCids.has(row.id), row.status);
+  let cAll = 0;
+  const cByStatus = { review: 0, approved: 0, published: 0, rejected: 0 } as Record<string, number>;
+  for (const r of recentRows || []) {
+    cAll += 1;
+    const st = effOf(r as any);
+    if (st in cByStatus) cByStatus[st] += 1;
+  }
+  return (
+    <nav className="filters" aria-label="Mở danh sách bài theo trạng thái">
+      <span className="filters-label">Danh sách bài:</span>
+      <Link className="chip" href="/noi-dung?loai=bai-viet">
+        Tất cả <span className="n">{cAll}</span>
+      </Link>
+      {STATUS_TABS.map((s) => (
+        <Link key={s.key} className="chip" href={`/noi-dung?loai=bai-viet&trangthai=${s.key}`}>
+          {s.label} <span className="n">{cByStatus[s.key] || 0}</span>
+        </Link>
+      ))}
+      <Link className="chip chip-quiet" href="/noi-dung?loai=thung-rac" title="Bài đã ẩn, giữ 7 ngày rồi máy tự xoá hẳn.">
+        Thùng rác <span className="n">{cTrash ?? 0}</span>
+      </Link>
+    </nav>
   );
 }

@@ -107,8 +107,10 @@ export default async function Page() {
   if (fbAllCids.length) {
     // @ts-ignore — module JS thuần
     const { isOtherPage } = await import('../../lib/page-origin.mjs');
-    const { data: fbContents } = await client.from('mkt_content').select('id, brief').in('id', fbAllCids.slice(0, 500));
-    const briefOf = new Map((fbContents || []).map((c: any) => [String(c.id), c.brief || {}]));
+    // 23/10 (web chậm): chỉ lấy 2 trường brief cần (fb_real_url, page cho isOtherPage), không kéo cả brief của 500 bài.
+    const { data: fbContents } = await client.from('mkt_content')
+      .select('id, fb_real_url:brief->>fb_real_url, page:brief->>page').in('id', fbAllCids.slice(0, 500));
+    const briefOf = new Map((fbContents || []).map((c: any) => [String(c.id), { fb_real_url: c.fb_real_url || '', page: c.page || '' }]));
     for (const cid of fbAllCids) {
       const brief: any = briefOf.get(cid) || {};
       const realUrl = String(brief.fb_real_url || '');

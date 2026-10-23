@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../../lib/supabase-server';
 import { cachedWeekReport } from '../../../lib/cached';
+import { weekWindowVNOffset } from '../../../lib/week-report';
 import { vnInt } from '../../../lib/plan';
 import BarChart from '../bar-chart';
 import PostTitle from '../post-title';
@@ -26,34 +27,47 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
   // 15/9 (sếp): báo cáo tuần không còn là báo cáo chung — dashboard RIÊNG từng kênh (?kenh=facebook|youtube|tiktok),
   // "Tất cả" giữ bản gộp cũ.
   const kenhTab = ['facebook', 'youtube', 'tiktok'].includes(String(searchParams?.kenh || '')) ? String(searchParams?.kenh) as 'facebook' | 'youtube' | 'tiktok' : null;
-  const ttIds = await tiktokIdsCached();
-
-  // 16/9 (Thanh: web chậm là ưu tiên nhất): báo cáo tuần qua cache 2 phút (lib/cached.ts).
-  const report = await cachedWeekReport(offset);
-  const { window: win, totals, totalsPrev, delta, posts, topPosts, byProduct, byKind, narrative } = report;
-
-  // 26/8 (user tach 2 trang Do luong): trang tuan them bang "Tung bai — moi kenh" gom
-  // Facebook + TikTok + YouTube TRONG TUAN nay, icon platform, bo cot don/lead.
-  // Query mkt_metrics 3 source trong khung thoi gian tuan (dua published_at cua mkt_posts).
-  const { data: postsInWeek } = await client
-    .from('mkt_posts')
-    .select('content_id, channel, external_url, published_at')
-    .eq('status', 'published')
-    .gte('published_at', win.startIso)
-    .lt('published_at', win.endIso)
-    .limit(500);
+  // 23/10 (web chậm, trang này 1,1-1,7s): 7 lượt truy vấn nối đuôi gom còn 2. Khung tuần tính thẳng từ offset
+  // (cùng hàm buildWeekReport dùng), không phải chờ báo cáo xong mới truy vấn tiếp.
+  const win = weekWindowVNOffset(new Date(), offset);
+  const [ttIds, report, { data: postsInWeek }, { data: ttSnaps }, { data: scanRows }] = await Promise.all([
+    tiktokIdsCached(),
+    // 16/9 (Thanh: web chậm là ưu tiên nhất): báo cáo tuần qua cache 2 phút (lib/cached.ts).
+    cachedWeekReport(offset),
+    // 26/8 (user tach 2 trang Do luong): bang "Tung bai — moi kenh" gom Facebook + TikTok + YouTube TRONG TUAN nay,
+    // dua published_at cua mkt_posts.
+    client
+      .from('mkt_posts')
+      .select('content_id, channel, external_url, published_at')
+      .eq('status', 'published')
+      .gte('published_at', win.startIso)
+      .lt('published_at', win.endIso)
+      .limit(500),
+    // 28/8: TikTok ghép tay KHÔNG có mkt_posts — lấy từ snapshot mkt_metrics có createTime
+    // (giờ đăng thật) rơi trong tuần, gộp với mkt_posts tiktok (thời Direct Post) khử trùng.
+    client
+      .from('mkt_metrics')
+      .select('entity_ref, metrics, created_at')
+      .eq('source', 'tiktok')
+      .order('created_at', { ascending: false })
+      .limit(500),
+    // 28/8: sức khoẻ Trang từ bộ quét Business Suite — lần quét MỚI NHẤT trong tuần đang xem,
+    // so với lần quét cuối TRƯỚC tuần đó.
+    client
+      .from('mkt_metrics')
+      .select('metrics, created_at')
+      .eq('source', 'facebook')
+      .eq('entity_ref', '__page_real__')
+      .not('metrics->suite28', 'is', null)
+      .lt('created_at', win.endIso)
+      .order('created_at', { ascending: false })
+      .limit(30),
+  ]);
+  const { totals, totalsPrev, delta, posts, topPosts, byProduct, byKind, narrative } = report;
   type PostRow = { cid: string; channel: 'facebook' | 'tiktok' | 'youtube'; publishedAt: string; url: string };
   const weekPosts: PostRow[] = (postsInWeek || []).map((p: any) => ({
     cid: String(p.content_id || ''), channel: p.channel, publishedAt: String(p.published_at || ''), url: String(p.external_url || ''),
   })).filter((p) => p.cid && ['facebook', 'tiktok', 'youtube'].includes(p.channel));
-  // 28/8: TikTok ghép tay KHÔNG có mkt_posts — lấy từ snapshot mkt_metrics có createTime
-  // (giờ đăng thật) rơi trong tuần, gộp với mkt_posts tiktok (thời Direct Post) khử trùng.
-  const { data: ttSnaps } = await client
-    .from('mkt_metrics')
-    .select('entity_ref, metrics, created_at')
-    .eq('source', 'tiktok')
-    .order('created_at', { ascending: false })
-    .limit(500);
   const ttSeen = new Set(weekPosts.filter((p) => p.channel === 'tiktok').map((p) => p.cid));
   for (const r of (ttSnaps || []) as any[]) {
     const cid = String(r.entity_ref || '');
@@ -71,20 +85,22 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
   const weekTitles = new Map<string, string>();
   const weekBriefs = new Map<string, any>();
   const weekDeleted = new Set<string>();
-  if (weekCids.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, title, brief, deleted_at').in('id', weekCids);
-    for (const c of cs || []) {
-      if ((c as any).deleted_at) { weekDeleted.add((c as any).id); continue; }
-      weekTitles.set((c as any).id, (c as any).title || '(không tên)');
-      weekBriefs.set((c as any).id, (c as any).brief || {});
-    }
+  const [{ data: cs }, { data: weekMetrics }] = await Promise.all([
+    weekCids.length
+      ? client.from('mkt_content').select('id, title, brief, deleted_at').in('id', weekCids)
+      : Promise.resolve({ data: [] as any[] }),
+    client
+      .from('mkt_metrics')
+      .select('entity_ref, source, metrics, created_at')
+      .in('entity_ref', weekCids.length ? weekCids : ['__none__'])
+      .order('created_at', { ascending: false })
+      .limit(1500),
+  ]);
+  for (const c of cs || []) {
+    if ((c as any).deleted_at) { weekDeleted.add((c as any).id); continue; }
+    weekTitles.set((c as any).id, (c as any).title || '(không tên)');
+    weekBriefs.set((c as any).id, (c as any).brief || {});
   }
-  const { data: weekMetrics } = await client
-    .from('mkt_metrics')
-    .select('entity_ref, source, metrics, created_at')
-    .in('entity_ref', weekCids.length ? weekCids : ['__none__'])
-    .order('created_at', { ascending: false })
-    .limit(1500);
   // Snapshot mới nhất mỗi (cid, source).
   const latest = new Map<string, any>();
   const latestAt = new Map<string, string>();
@@ -113,17 +129,6 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
     };
   }).sort((a, b) => (b.views + b.engagement) - (a.views + a.engagement));
 
-  // 28/8: sức khoẻ Trang từ bộ quét Business Suite — lần quét MỚI NHẤT trong tuần đang xem,
-  // so với lần quét cuối TRƯỚC tuần đó.
-  const { data: scanRows } = await client
-    .from('mkt_metrics')
-    .select('metrics, created_at')
-    .eq('source', 'facebook')
-    .eq('entity_ref', '__page_real__')
-    .not('metrics->suite28', 'is', null)
-    .lt('created_at', win.endIso)
-    .order('created_at', { ascending: false })
-    .limit(30);
   const scanCur = ((scanRows || []).find((r: any) => r.created_at >= win.startIso) as any)?.metrics || null;
   const scanPrev = ((scanRows || []).find((r: any) => r.created_at < win.startIso) as any)?.metrics || null;
 

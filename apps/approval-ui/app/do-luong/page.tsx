@@ -41,26 +41,43 @@ export default async function Page() {
   const client = getServerClient();
   const dayStart = todayIsoVN();
 
-  // Bài đăng HÔM NAY VN (tất cả kênh) - dùng cho phần Facebook.
-  const { data: postsToday } = await client
-    .from('mkt_posts')
-    .select('content_id, channel, external_url, published_at')
-    .eq('status', 'published')
-    .gte('published_at', dayStart)
-    .order('published_at', { ascending: false })
-    .limit(200);
+  // 23/10 (web chậm, trang này 1,3-2,0s): 7 lượt truy vấn nối đuôi gom còn 2. Lượt 1: những gì không cần id bài.
+  const [{ data: postsToday }, { data: ttToday }, { data: pageScans }, { data: impRows }] = await Promise.all([
+    // Bài đăng HÔM NAY VN (tất cả kênh) - dùng cho phần Facebook.
+    client
+      .from('mkt_posts')
+      .select('content_id, channel, external_url, published_at')
+      .eq('status', 'published')
+      .gte('published_at', dayStart)
+      .order('published_at', { ascending: false })
+      .limit(200),
+    // 27/8: TikTok RIÊNG BIỆT - user link tay video profile qua brief.tiktok_video_id
+    // (không tạo mkt_posts). Query mkt_metrics source='tiktok' created_at HÔM NAY:
+    // bài nào có snapshot mới hôm nay là bài "đang chạy", hiện lên bảng.
+    client
+      .from('mkt_metrics')
+      .select('entity_ref, metrics, created_at')
+      .eq('source', 'tiktok')
+      .gte('created_at', dayStart)
+      .order('created_at', { ascending: false })
+      .limit(200),
+    // 28/8: lần quét Business Suite mới nhất (bộ quét máy chủ local quét mỗi 2h) — khối sức
+    // khoẻ Trang. Mốc so sánh: lần quét cuối của NGÀY HÔM TRƯỚC (so "lần quét trước" cách 2h
+    // thì lệch toàn 0, vô nghĩa).
+    client
+      .from('mkt_metrics')
+      .select('metrics, created_at')
+      .eq('source', 'facebook')
+      .eq('entity_ref', '__page_real__')
+      .not('metrics->suite28', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(30),
+    // Lần nhập tay gần nhất (giữ khối import manual như trang cũ).
+    client
+      .from('run_log').select('status, detail, created_at').eq('task', 'mkt.import_manual_post')
+      .order('created_at', { ascending: false }).limit(1),
+  ]);
   const posts = (postsToday || []) as any[];
-
-  // 27/8: TikTok RIÊNG BIỆT - user link tay video profile qua brief.tiktok_video_id
-  // (không tạo mkt_posts). Query mkt_metrics source='tiktok' created_at HÔM NAY:
-  // bài nào có snapshot mới hôm nay là bài "đang chạy", hiện lên bảng.
-  const { data: ttToday } = await client
-    .from('mkt_metrics')
-    .select('entity_ref, metrics, created_at')
-    .eq('source', 'tiktok')
-    .gte('created_at', dayStart)
-    .order('created_at', { ascending: false })
-    .limit(200);
   const ttLatest = new Map<string, { m: M; ts: string }>();
   for (const r of (ttToday || []) as any[]) {
     const cid = r.entity_ref;
@@ -72,19 +89,6 @@ export default async function Page() {
   const ytPostsToday = posts.filter((p) => p.channel === 'youtube');
   const ytCids = [...new Set(ytPostsToday.map((p) => p.content_id).filter(Boolean))] as string[];
   const latestYT = new Map<string, M>();
-  if (ytCids.length) {
-    const { data: ytMetricsRows } = await client
-      .from('mkt_metrics')
-      .select('entity_ref, metrics, created_at')
-      .eq('source', 'youtube')
-      .in('entity_ref', ytCids)
-      .order('created_at', { ascending: false })
-      .limit(400);
-    for (const r of (ytMetricsRows || []) as any[]) {
-      const cid = r.entity_ref;
-      if (!latestYT.has(cid)) latestYT.set(cid, r.metrics || {});
-    }
-  }
 
   // Gom content_id để lấy tên bài + brief (bài đăng hôm nay + snapshot TikTok link tay).
   const cids = [...new Set([
@@ -95,29 +99,33 @@ export default async function Page() {
   // bài user vừa xoá vẫn nằm nguyên trong bảng FB (user: "vẫn chưa xoá bài của page test hả").
   const contentsMap = new Map<string, { title: string; brief: any }>();
   const deletedCids = new Set<string>();
-  if (cids.length) {
-    const { data: cs } = await client.from('mkt_content').select('id, title, brief, deleted_at').in('id', cids);
-    for (const c of cs || []) {
-      if ((c as any).deleted_at) { deletedCids.add((c as any).id); continue; }
-      contentsMap.set((c as any).id, { title: (c as any).title || '(không tên)', brief: (c as any).brief || {} });
-    }
-  }
-
   // Số liệu Facebook mới nhất mỗi content_id (không giới hạn hôm nay - cần latest để so).
   const fbCids = [...new Set(posts.map((p) => p.content_id).filter((c) => c) as string[])];
   const latestFB = new Map<string, M>();
-  if (fbCids.length) {
-    const { data: fbMetricsRows } = await client
-      .from('mkt_metrics')
-      .select('entity_ref, metrics, created_at')
-      .eq('source', 'facebook')
-      .in('entity_ref', fbCids)
-      .order('created_at', { ascending: false })
-      .limit(400);
-    for (const r of (fbMetricsRows || []) as any[]) {
-      const cid = r.entity_ref;
-      if (!latestFB.has(cid)) latestFB.set(cid, r.metrics || {});
-    }
+  // Lượt 2 (song song): tên bài + brief, số liệu YouTube, số liệu Facebook của các bài trên.
+  const none = Promise.resolve({ data: [] as any[] });
+  const [{ data: ytMetricsRows }, { data: cs }, { data: fbMetricsRows }] = await Promise.all([
+    ytCids.length
+      ? client.from('mkt_metrics').select('entity_ref, metrics, created_at').eq('source', 'youtube').in('entity_ref', ytCids)
+          .order('created_at', { ascending: false }).limit(400)
+      : none,
+    cids.length ? client.from('mkt_content').select('id, title, brief, deleted_at').in('id', cids) : none,
+    fbCids.length
+      ? client.from('mkt_metrics').select('entity_ref, metrics, created_at').eq('source', 'facebook').in('entity_ref', fbCids)
+          .order('created_at', { ascending: false }).limit(400)
+      : none,
+  ]);
+  for (const r of (ytMetricsRows || []) as any[]) {
+    const cid = r.entity_ref;
+    if (!latestYT.has(cid)) latestYT.set(cid, r.metrics || {});
+  }
+  for (const c of cs || []) {
+    if ((c as any).deleted_at) { deletedCids.add((c as any).id); continue; }
+    contentsMap.set((c as any).id, { title: (c as any).title || '(không tên)', brief: (c as any).brief || {} });
+  }
+  for (const r of (fbMetricsRows || []) as any[]) {
+    const cid = r.entity_ref;
+    if (!latestFB.has(cid)) latestFB.set(cid, r.metrics || {});
   }
 
   // 28/8 (user: "lay so lieu tu KENH CHINH thoi - tat kenh phu"): MOT bang Facebook duy nhat.
@@ -169,25 +177,10 @@ export default async function Page() {
     });
   }
 
-  // 28/8: lần quét Business Suite mới nhất (bộ quét máy chủ local quét mỗi 2h) — khối sức
-  // khoẻ Trang. Mốc so sánh: lần quét cuối của NGÀY HÔM TRƯỚC (so "lần quét trước" cách 2h
-  // thì lệch toàn 0, vô nghĩa).
-  const { data: pageScans } = await client
-    .from('mkt_metrics')
-    .select('metrics, created_at')
-    .eq('source', 'facebook')
-    .eq('entity_ref', '__page_real__')
-    .not('metrics->suite28', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(30);
   const scanList = (pageScans || []) as any[];
   const scanCur = scanList[0]?.metrics || null;
   const scanPrev = (scanList.find((r: any) => String(r.created_at) < dayStart) as any)?.metrics || null;
 
-  // Lần nhập tay gần nhất (giữ khối import manual như trang cũ).
-  const { data: impRows } = await client
-    .from('run_log').select('status, detail, created_at').eq('task', 'mkt.import_manual_post')
-    .order('created_at', { ascending: false }).limit(1);
   const impRow = (impRows || [])[0] as any;
   const lastImport = impRow ? { status: String(impRow.status), msg: String(impRow.detail?.msg || ''), link: String(impRow.detail?.link || '') } : null;
 
