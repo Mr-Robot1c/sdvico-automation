@@ -2124,3 +2124,39 @@ a.need-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 .section-tab:hover { color: var(--ink); }
 .section-tab.on { color: var(--accent); border-bottom-color: var(--accent); }
 .section-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+
+/* ===== Trang Hướng dẫn (23/10, đợt 3) ===== */
+.guide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.guide-card { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; }
+.guide-card h3 { margin: 0 0 8px; font-size: 1rem; }
+.guide-card ul, .guide-rules { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 4px; }
+.newcomer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ===== Tablet 768–1023px (23/10, đợt 3, design-spec-app-noi-bo.md): sidebar thu thành cột biểu tượng có nhãn nhỏ.
+   Nhóm Hệ thống bấm ra ngăn bay bên phải (.is-fly, nav.tsx). Desktop ≥ 1024px và mobile < 768px không đổi. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* sidebar sticky tự tạo lớp xếp chồng: phải nổi trên topbar (z 10) để ngăn bay không bị che. */
+  .sidebar { width: 88px; padding: 12px 4px; z-index: 70; }
+  .brand { justify-content: center; margin: 0 0 12px; }
+  .brand-text { display: none; }
+  .nav-acc { gap: 2px; }
+  .sidebar .tab, .sidebar .nav-parent-btn {
+    flex-direction: column; justify-content: center; gap: 2px; text-align: center;
+    min-height: 56px; padding: 8px 2px; font-size: 11px; line-height: 1.2;
+  }
+  .sidebar .tab-icon { font-size: 20px; width: auto; }
+  .sidebar .nav-parent-btn .nav-parent-label { flex: none; }
+  .nav-chev, .nav-parent-btn .nav-chev-ico { display: none; }
+  .nav-sub, .nav-acc-group.is-open > .nav-sub { display: none; }
+  .nav-acc-group.is-fly > .nav-sub {
+    display: block; position: fixed; left: 88px; top: 0; bottom: 0; width: 232px; z-index: 60;
+    background: var(--surface); border-right: 1px solid var(--line); padding: 16px 8px; overflow-y: auto;
+    box-shadow: 4px 0 16px rgba(0, 0, 0, .12); opacity: 1; visibility: visible;
+  }
+  .nav-acc-group.is-fly .nav-sub-in { margin: 0; border-left: 0; overflow: visible; }
+  .nav-acc-group.is-fly .tab.nav-child { flex-direction: row; justify-content: flex-start; text-align: left; min-height: 44px; font-size: 14px; padding: 8px 12px; margin: 0; }
+  .nav-parent-btn.has-on, .nav-acc-group.is-fly > .nav-parent-btn { background: var(--accent-bg); color: var(--accent); }
+  .sidebar-foot { padding: 12px 2px 0; text-align: center; }
+  .sidebar-foot .foot-note:not(.foot-logout), .sidebar-foot .foot-logout[href="/api/logout"] { display: none; }
+  .sidebar-foot .foot-logout { font-size: 11px; }
+}

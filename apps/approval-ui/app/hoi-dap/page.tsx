@@ -1,11 +1,7 @@
 import Link from 'next/link';
 import { getServerClient } from '../../lib/supabase-server';
-import { type AgentDef } from '../../lib/agent-defs';
-import { cachedAgentDefs } from '../../lib/cached';
 import { loadQa, QA_GROUPS } from '../../lib/hoi-dap-bot';
-import AgentHeadCard from '../agent/agent-head-card';
 import { addProductQa } from '../actions';
-import BotChat from './bot-chat';
 import QaRowActions from './qa-row-actions';
 
 // Trang /hoi-dap — KHO KIẾN THỨC HỎI ĐÁP + BOT (lệnh sếp Long 9/9/2026 15:12: kênh online tự trả
@@ -27,13 +23,11 @@ export default async function Page({ searchParams }: { searchParams?: { group?: 
   const client = getServerClient();
   const group = searchParams?.group && QA_GROUPS.includes(searchParams.group) ? searchParams.group : '';
   const prefillQ = String(searchParams?.q || '').slice(0, 300);
-  const [rows, allRows, defs, botLog] = await Promise.all([
+  const [rows, allRows, botLog] = await Promise.all([
     loadQa(client, group || undefined),
     loadQa(client),
-    cachedAgentDefs(),
     client.from('run_log').select('detail, created_at').eq('task', 'mkt.hoi_dap_bot').eq('status', 'warn').order('created_at', { ascending: false }).limit(8),
   ]);
-  const agent = (defs as AgentDef[]).find((a) => a.key === 'hoi-dap');
   const counts: Record<string, number> = {};
   for (const r of allRows) counts[r.product_group] = (counts[r.product_group] || 0) + 1;
   const unverified = allRows.filter((r) => !r.verified).length;
@@ -48,15 +42,11 @@ export default async function Page({ searchParams }: { searchParams?: { group?: 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <a className="btn ghost sm" href="/api/hoi-dap?export=1" style={{ textDecoration: 'none' }}>⬇ Xuất JSON cho bot live</a>
           <Link className="btn ghost sm" href="/khach-hang" style={{ textDecoration: 'none' }}>👥 Khách hàng</Link>
-          <Link className="btn ghost sm" href="/agent" style={{ textDecoration: 'none' }}>🤖 Agent</Link>
         </div>
       </header>
 
-      {agent ? (
-        <AgentHeadCard a={agent} extra={<>📚 <b>Kho:</b> {allRows.length} hỏi đáp, {allRows.length - unverified} đã xác nhận, {unverified} chờ xác nhận</>} />
-      ) : null}
-
-      <BotChat />
+      {/* 23/10 (đợt 3): bỏ thẻ giới thiệu bot và khung chat lặp; hỏi bot qua nút nổi góc dưới. */}
+      <p className="sub" style={{ margin: '0 0 14px' }}>{allRows.length} hỏi đáp, {allRows.length - unverified} đã xác nhận, {unverified} chờ xác nhận</p>
 
       {missed.length ? (
         <details className="plan-card" style={{ marginBottom: 14 }}>

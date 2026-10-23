@@ -50,6 +50,7 @@ export const ROUTES: Record<string, RouteNode> = {
   '/du-kien': { label: 'Catalog sản phẩm', parent: '/tong-quan' },
   '/quang-cao': { label: 'Quảng cáo', parent: '/tong-quan' },
   '/agent': { label: 'AI', parent: '/tong-quan' },
+  '/huong-dan': { label: 'Hướng dẫn', parent: '/tong-quan' },
   '/kho-tri-thuc': { label: 'Chi tiết AI', parent: '/agent' },
   '/du-lieu-ai': { label: 'Chi tiết AI', parent: '/agent' },
   '/ho-so': { label: 'Hồ sơ ứng viên', parent: '/tong-quan' },

@@ -27,7 +27,10 @@ export default function NewcomerChecklist({ pending }: { pending: number }) {
         <li><Link href="/ke-hoach">Xem kế hoạch</Link> tuần này</li>
         <li><Link href="/do-luong/tuan">Xem số liệu</Link> bài nào đang ăn</li>
       </ol>
-      <button type="button" className="btn ghost sm" onClick={hide}>Đã hiểu, ẩn đi</button>
+      <div className="newcomer-actions">
+        <Link href="/huong-dan" className="btn ghost sm">Đọc hướng dẫn</Link>
+        <button type="button" className="btn ghost sm" onClick={hide}>Đã hiểu, ẩn đi</button>
+      </div>
     </section>
   );
 }

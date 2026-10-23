@@ -49,6 +49,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
       child('/quang-cao'),
       child('/agent'),
       child('/hang-doi'),
+      child('/huong-dan'),
       ...(marketingOnly ? [] : [child('/ho-so'), child('/vi-tri')]),
       // 13/9 (Thanh): sdvico.vn/blog đã sống, menu trỏ thẳng sang đó.
       { href: 'https://sdvico.vn/blog', label: 'Blog SDVICO', external: true },
@@ -107,6 +108,19 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
 
   const isOpen = (key: string) => (key in overrides ? overrides[key] : key === activeKey);
 
+  // 23/10 (đợt 3): cỡ tablet (768–1023px) menu thu thành cột biểu tượng; nhóm không có trang gốc (Hệ thống) mở mục
+  // con thành ngăn bay ra bên phải (CSS .is-fly). Ngăn chỉ mở khi người bấm, đóng khi đổi trang, Esc hoặc bấm ra ngoài.
+  const [flyKey, setFlyKey] = useState<string | null>(null);
+  useEffect(() => { setFlyKey(null); }, [p]);
+  useEffect(() => {
+    if (!flyKey) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFlyKey(null); };
+    const onDown = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest?.('.nav-acc-group.is-fly')) setFlyKey(null); };
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown);
+    return () => { window.removeEventListener('keydown', onKey); document.removeEventListener('pointerdown', onDown); };
+  }, [flyKey]);
+
   return (
     <nav className="nav-groups nav-acc" aria-label="Điều hướng chính">
       {groups.map((g) => {
@@ -127,7 +141,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
           </button>
         );
         return (
-          <div className={`nav-acc-group${open ? ' is-open' : ''}`} key={g.key}>
+          <div className={`nav-acc-group${open ? ' is-open' : ''}${flyKey === g.key ? ' is-fly' : ''}`} key={g.key}>
             {g.href ? (
               <div className={`nav-parent${hasActiveChild ? ' has-on' : ''}`}>
                 <Link
@@ -146,7 +160,7 @@ export default function Nav({ marketingOnly = false }: { marketingOnly?: boolean
                 className={`tab nav-parent-btn${hasActiveChild ? ' has-on' : ''}`}
                 aria-expanded={open}
                 aria-controls={subId}
-                onClick={() => setOpen(g.key, !open)}
+                onClick={() => { setOpen(g.key, !open); setFlyKey((k) => (k === g.key ? null : g.key)); }}
               >
                 <span className="tab-icon" aria-hidden="true">{g.icon}</span>
                 <span className="nav-parent-label">{g.label}</span>
