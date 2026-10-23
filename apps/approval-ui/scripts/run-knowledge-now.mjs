@@ -44,6 +44,15 @@ function loadRealEnv() {
 const env = loadRealEnv();
 const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const MKT_MODEL = env.MKT_MODEL || 'gemini-flash-lite-latest';
+// 19/10: DATA 1 (đọc ảnh chụp Zalo + tóm tắt) chạy được bằng model trên máy: MKT_MODEL_DATA1=ollama:sdvico-gemma.
+// Đi qua wrapAi như blog: lỗi hoặc Ollama tắt thì lùi flash-lite. Việc chạy theo lô 20h nên quỹ thời gian rộng.
+// Cách cài Ollama và bảng đo: docs/runbook-bot-tim-kiem-model.md.
+const DATA1_MODEL = env.MKT_MODEL_DATA1 || MKT_MODEL;
+async function data1Ai() {
+  const { GoogleGenAI } = await import('@google/genai');
+  const { wrapAi } = await import('../lib/gen/llm-client.mjs');
+  return wrapAi(new GoogleGenAI({ apiKey: env.GEMINI_API_KEY }), { budgetMs: 300000, gemmaTimeoutMs: 240000 });
+}
 
 // ===== NEEDS GOV REVIEW (dong bo lib/knowledge.ts) =====
 const GOV_KEYWORDS = [
@@ -87,11 +96,10 @@ async function readFileContent(path) {
   }
   if (IMAGE_EXT.includes(e)) {
     try {
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+      const ai = await data1Ai();
       const mimeType = e === '.png' ? 'image/png' : e === '.webp' ? 'image/webp' : 'image/jpeg';
       const res = await ai.models.generateContent({
-        model: MKT_MODEL,
+        model: DATA1_MODEL,
         contents: [{ role: 'user', parts: [
           { text: 'Trich xuat nguyen van moi chu tieng Viet trong anh chup man hinh nhom Zalo noi bo nay. Khong tom tat.' },
           { inlineData: { mimeType, data: buf.toString('base64') } }
@@ -107,10 +115,9 @@ async function readFileContent(path) {
 async function summarizeForPlan(text) {
   if (!text || text.trim().length < 20) return { title: '(nội dung quá ngắn)', summary: text.trim() };
   try {
-    const { GoogleGenAI } = await import('@google/genai');
-    const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+    const ai = await data1Ai();
     const res = await ai.models.generateContent({
-      model: MKT_MODEL,
+      model: DATA1_MODEL,
       contents: [{ role: 'user', parts: [{ text: [
         'Đây là nội dung trích xuất từ nhóm Zalo nội bộ của công ty phân phối thiết bị cho ngư dân và tàu cá (SDVICO).',
         'Nhiệm vụ: đọc kỹ, tóm tắt các điểm chính CÓ ÍCH cho lập kế hoạch marketing tuần tới.',

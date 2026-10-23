@@ -27,6 +27,61 @@ export function isGemma(model) {
   return /^(models\/)?gemma/i.test(String(model || ''));
 }
 
+// MODEL TRÊN MÁY (19/10): tên "ollama:<model>" (vd MKT_MODEL_BLOG=ollama:sdvico-gemma) gọi Ollama theo chuẩn OpenAI
+// ở MKT_OLLAMA_URL (mặc định localhost:11434/v1) thay cho Gemini API. Chỉ dùng khi chạy trên máy nội bộ (rotate-now.mjs);
+// Vercel và GitHub Actions không thấy localhost. Đi chung đường vá Gemma (lọc JSON, thử lại, lùi flash-lite) nhưng
+// không tính hạn mức token/phút. Cách cài và tạo model ngữ cảnh 32K: docs/runbook-bot-tim-kiem-model.md.
+export function isLocal(model) {
+  return /^ollama:/i.test(String(model || ''));
+}
+
+function contentsToText(contents) {
+  if (typeof contents === 'string') return contents;
+  const list = Array.isArray(contents) ? contents : [contents];
+  return list.map((c) => (typeof c === 'string' ? c : (c?.parts || []).map((p) => p?.text || '').join(''))).join('\n');
+}
+
+// Có ảnh (inlineData, vd DATA 1 đọc ảnh chụp Zalo) thì gửi dạng nhiều phần chuẩn OpenAI, ảnh là data URL base64.
+function contentsToMessage(contents) {
+  const list = Array.isArray(contents) ? contents : [contents];
+  const parts = list.flatMap((c) => (c && typeof c === 'object' && Array.isArray(c.parts) ? c.parts : []));
+  if (!parts.some((p) => p?.inlineData)) return contentsToText(contents);
+  return parts.map((p) => (p?.inlineData
+    ? { type: 'image_url', image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } }
+    : { type: 'text', text: String(p?.text || '') }));
+}
+
+// Gọi Ollama, trả về cùng dạng phản hồi Gemini mà wrapAi đọc (text, usageMetadata).
+// MKT_OLLAMA_REASONING mặc định "none": Gemma 4 trên Ollama tự "suy nghĩ" trước khi trả lời, chậm gấp 4 tới 10 lần (đo 19/10).
+export async function callLocal(params, signal, { fetchImpl = globalThis.fetch, env = process.env } = {}) {
+  const base = String(env.MKT_OLLAMA_URL || 'http://localhost:11434/v1').replace(/\/$/, '');
+  const cfg = params?.config || {};
+  const messages = [];
+  if (cfg.systemInstruction) messages.push({ role: 'system', content: String(cfg.systemInstruction) });
+  messages.push({ role: 'user', content: contentsToMessage(params?.contents) });
+  const effort = String(env.MKT_OLLAMA_REASONING ?? 'none').trim();
+  const r = await fetchImpl(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: String(params?.model).replace(/^ollama:/i, ''),
+      messages,
+      ...(cfg.temperature != null ? { temperature: cfg.temperature } : {}),
+      ...(cfg.responseMimeType === 'application/json' ? { response_format: { type: 'json_object' } } : {}),
+      ...(effort ? { reasoning_effort: effort } : {}),
+    }),
+    signal,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`ollama ${r.status}: ${String(j?.error?.message || j?.error || '').slice(0, 140)}`);
+  const u = j?.usage || {};
+  return {
+    text: String(j?.choices?.[0]?.message?.content || ''),
+    usageMetadata: { promptTokenCount: u.prompt_tokens || 0, candidatesTokenCount: u.completion_tokens || 0, totalTokenCount: u.total_tokens || 0 },
+    modelVersion: params?.model,
+  };
+}
+
 // Lấy khối JSON {...} đầu tiên CÂN NGOẶC (bỏ ```json, chữ dẫn trước, chữ thừa sau). Không có thì trả nguyên văn.
 export function extractJsonText(text) {
   const t = String(text || '').replace(/```(?:json)?/gi, '');
@@ -92,7 +147,8 @@ function withTimeout(promiseFactory, ms) {
 }
 
 // Bọc client. opts: budgetMs = quỹ thời gian cho CẢ lần sinh một bài (mọi lượt gọi qua client này),
-// gemmaTimeoutMs = hạn mỗi lượt Gemma, tries = số lượt Gemma tối đa mỗi lần gọi, fallbackModel, log.
+// gemmaTimeoutMs = hạn mỗi lượt Gemma, tries = số lượt Gemma tối đa mỗi lần gọi, fallbackModel, log,
+// local = hàm gọi model "ollama:" (mặc định callLocal, test thay bằng hàm giả).
 // Kết quả trả về có thêm usedModel (model thật đã trả lời) và fellBack (true khi đã lùi về dự phòng).
 export function wrapAi(ai, opts = {}) {
   const {
@@ -104,6 +160,7 @@ export function wrapAi(ai, opts = {}) {
     fallbackTimeoutMs = 30000,
     log = console,
     now = () => Date.now(),
+    local = callLocal,
   } = opts;
   const t0 = now();
   const deadline = runDeadline > t0 ? Math.min(t0 + budgetMs, runDeadline) : t0 + budgetMs;
@@ -111,7 +168,8 @@ export function wrapAi(ai, opts = {}) {
     models: {
       async generateContent(params) {
         const model = params?.model;
-        if (!isGemma(model)) {
+        const onMachine = isLocal(model);
+        if (!isGemma(model) && !onMachine) {
           const res = await ai.models.generateContent(params);
           return { text: res?.text, usageMetadata: res?.usageMetadata, modelVersion: res?.modelVersion, usedModel: model, fellBack: false };
         }
@@ -126,7 +184,7 @@ export function wrapAi(ai, opts = {}) {
         let lastErr = null;
         for (let i = 0; i < tries; i++) {
           const est = estimateTokens({ ...params, config: gemmaCfg });
-          const wait = gemmaWaitMs(est, now());
+          const wait = onMachine ? 0 : gemmaWaitMs(est, now());
           if (wait > 0) {
             if (deadline - now() - wait < minGemmaMs) { lastErr = new Error(`han muc 16.000 token/phut, phai cho ${Math.round(wait / 1000)} giay, khong kip quy`); break; }
             log?.warn?.(`[llm-client] ${model} cho ${Math.round(wait / 1000)} giay cho het han muc token/phut`);
@@ -135,10 +193,12 @@ export function wrapAi(ai, opts = {}) {
           const left = deadline - now();
           if (left < minGemmaMs) { lastErr = new Error(`het quy thoi gian (con ${Math.round(left / 1000)} giay)`); break; }
           const entry = { at: now(), tokens: est };
-          gemmaWindow.push(entry);
+          if (!onMachine) gemmaWindow.push(entry);
           try {
             const res = await withTimeout(
-              (signal) => ai.models.generateContent({ ...params, config: { ...gemmaCfg, abortSignal: signal } }),
+              (signal) => (onMachine
+                ? local({ ...params, config: gemmaCfg }, signal)
+                : ai.models.generateContent({ ...params, config: { ...gemmaCfg, abortSignal: signal } })),
               Math.min(gemmaTimeoutMs, left - 5000),
             );
             if (Number(res?.usageMetadata?.promptTokenCount) > 0) entry.tokens = Number(res.usageMetadata.promptTokenCount);

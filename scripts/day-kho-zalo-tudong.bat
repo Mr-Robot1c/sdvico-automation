@@ -10,4 +10,7 @@ node packages\marketing\src\tai-bu-media-zalo.mjs >> Zalo\upload-log.txt 2>&1
 node packages\marketing\src\hoc-video.mjs >> Zalo\upload-log.txt 2>&1
 node packages\marketing\src\upload-zalo-to-bucket.mjs >> Zalo\upload-log.txt 2>&1
 node packages\marketing\src\up-media-kho-tu-lieu.mjs >> Zalo\upload-log.txt 2>&1
+rem 19/10: AI Data 1 tom tat bang Gemma tren may (Ollama, model sdvico-gemma) neu co; Ollama tat
+rem hay chua co model thi tu lui Gemini flash-lite. Cai dat: docs\runbook-bot-tim-kiem-model.md.
+if not defined MKT_MODEL_DATA1 set MKT_MODEL_DATA1=ollama:sdvico-gemma
 node apps\approval-ui\scripts\run-knowledge-now.mjs --only-internal >> Zalo\upload-log.txt 2>&1

@@ -1,5 +1,5 @@
 // test-llm-client.mjs — kiểm bộ gọi model chung (Gemma 15/10). Không gọi mạng. Chạy: npm run test:llm
-import { wrapAi, modelFor, isGemma, extractJsonText, estimateTokens, gemmaWaitMs, setRunDeadline, _resetGemmaWindow } from './llm-client.mjs';
+import { wrapAi, modelFor, isGemma, isLocal, callLocal, extractJsonText, estimateTokens, gemmaWaitMs, setRunDeadline, _resetGemmaWindow } from './llm-client.mjs';
 
 let fails = 0;
 const check = (cond, msg) => { if (!cond) { fails += 1; console.error('  ✗', msg); } else console.log('  ✓', msg); };
@@ -136,6 +136,48 @@ console.log('6. Model không phải Gemma: đi thẳng, giữ nguyên params');
   const p = jsonParams('gemini-flash-lite-latest');
   const res = await wrapAi(ai, { log: silent }).models.generateContent(p);
   check(ai.calls[0] === p && res.text === '{"x":1} thừa' && res.usedModel === 'gemini-flash-lite-latest', 'gửi đúng params cũ, không lọc, không thử lại');
+}
+
+console.log('7. Model trên máy (ollama:)');
+check(isLocal('ollama:sdvico-gemma') && !isLocal('gemma-4-26b-a4b-it') && !isGemma('ollama:sdvico-gemma'), 'isLocal nhận đúng tên');
+check(modelFor('blog', { MKT_MODEL_BLOG: 'ollama:sdvico-gemma' }) === 'ollama:sdvico-gemma', 'MKT_MODEL_BLOG=ollama:... chọn model trên máy');
+{
+  _resetGemmaWindow();
+  const ai = fakeAi([]);
+  const sent = [];
+  const local = async (params) => { sent.push(params); return { text: 'Đây: {"article":"a","social":"b","video":"c"} xong', usageMetadata: { promptTokenCount: 14000 } }; };
+  const p = { model: 'ollama:sdvico-gemma', contents: 'x', config: { systemInstruction: 's', responseMimeType: 'application/json', responseSchema: { type: 'OBJECT', properties: { article: {}, social: {}, video: {} }, required: ['article', 'social', 'video'] } } };
+  const res = await wrapAi(ai, { log: silent, local }).models.generateContent(p);
+  check(ai.calls.length === 0 && sent.length === 1, 'gọi Ollama, không gọi Gemini API');
+  check(!('responseSchema' in sent[0].config) && sent[0].config.systemInstruction.includes('article, social, video'), 'bỏ responseSchema, ghi tên khóa vào chỉ dẫn như Gemma');
+  check(res.text === '{"article":"a","social":"b","video":"c"}' && res.usedModel === 'ollama:sdvico-gemma' && !res.fellBack, 'lọc JSON, usedModel là model trên máy');
+  check(gemmaWaitMs(15000, Date.now()) === 0, 'không tính vào hạn mức token/phút của Gemma trên Gemini API');
+}
+{
+  const ai = fakeAi(['{"body":"lite"}']);
+  let n = 0;
+  const local = async () => { n += 1; throw new Error('fetch failed'); };
+  const res = await wrapAi(ai, { log: silent, local }).models.generateContent(jsonParams('ollama:sdvico-gemma'));
+  check(n === 1 && res.fellBack && res.usedModel === 'gemini-flash-lite-latest', 'Ollama chưa bật: không thử lại, lùi thẳng flash-lite');
+}
+{
+  let req = null;
+  const fetchImpl = async (url, init) => { req = { url, body: JSON.parse(init.body) }; return { ok: true, json: async () => ({ choices: [{ message: { content: '{"a":1}' } }], usage: { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 } }) }; };
+  const out = await callLocal({ model: 'ollama:sdvico-gemma', contents: [{ role: 'user', parts: [{ text: 'hỏi' }] }], config: { systemInstruction: 'hệ', temperature: 1, responseMimeType: 'application/json' } }, undefined, { fetchImpl, env: {} });
+  check(req.url === 'http://localhost:11434/v1/chat/completions' && req.body.model === 'sdvico-gemma', 'gọi localhost mặc định, bỏ tiền tố ollama:');
+  check(req.body.messages[0].role === 'system' && req.body.messages[1].content === 'hỏi' && req.body.response_format?.type === 'json_object', 'chỉ dẫn hệ thống thành tin system, contents thành tin user, giữ JSON mode');
+  check(req.body.reasoning_effort === 'none', 'mặc định tắt suy nghĩ của Gemma 4');
+  check(out.text === '{"a":1}' && out.usageMetadata.promptTokenCount === 7 && out.usageMetadata.candidatesTokenCount === 3, 'trả về dạng Gemini (text, usageMetadata) cho token-log');
+  await callLocal({ model: 'ollama:x', contents: 'y', config: {} }, undefined, { fetchImpl, env: { MKT_OLLAMA_URL: 'http://may-noi-bo:11434/v1/', MKT_OLLAMA_REASONING: '' } });
+  check(req.url === 'http://may-noi-bo:11434/v1/chat/completions' && !('reasoning_effort' in req.body) && !('response_format' in req.body), 'MKT_OLLAMA_URL đổi máy chủ, MKT_OLLAMA_REASONING rỗng thì không gửi');
+}
+
+{
+  let req = null;
+  const fetchImpl = async (url, init) => { req = JSON.parse(init.body); return { ok: true, json: async () => ({ choices: [{ message: { content: 'chữ' } }] }) }; };
+  await callLocal({ model: 'ollama:x', contents: [{ role: 'user', parts: [{ text: 'Đọc chữ' }, { inlineData: { mimeType: 'image/png', data: 'QUJD' } }] }], config: {} }, undefined, { fetchImpl, env: {} });
+  const c = req.messages[0].content;
+  check(Array.isArray(c) && c[0].text === 'Đọc chữ' && c[1].image_url.url === 'data:image/png;base64,QUJD', 'ảnh (DATA 1) gửi dạng image_url data URL kèm chữ');
 }
 
 console.log(fails ? `\n${fails} kiểm tra SAI` : '\nOK: mọi kiểm tra đạt');
