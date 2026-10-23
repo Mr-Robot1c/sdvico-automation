@@ -16,8 +16,8 @@ import { weekWindowVN, dropDuplicateDirections } from './plan';
 // @ts-ignore — module JS thuần
 import { guessGroup, isDiscontinuedGroup, isVideoFitKind } from './gen/products.mjs';
 import { CONTENT_KIND_BY_DOW, CONTENT_PURPOSE } from './plan-live';
-import { loadPostingPlan, slotsForDate, groupsForDate, type EffectiveSlot } from './posting-plan';
-import { planShareLots, type DayLot, type SlotLot, type SlotLotInput } from './share-lot';
+import { loadPostingPlan, slotsForDate, groupsForDate, type EffectiveSlot, type LoadedPostingPlan } from './posting-plan';
+import { planShareLots, loadShareLotSource, type DayLot, type SlotLot, type SlotLotInput } from './share-lot';
 
 type Client = ReturnType<typeof getServerClient>;
 
@@ -78,10 +78,39 @@ export function productNameOf(raw: string): string {
   return String(g || raw || '').replace(/^\s*\d+\.\s*/, '').trim();
 }
 
+// Folder tư liệu theo loại: có ẢNH (điều kiện rotate sinh được bài bán) và có CLIP GỐC (ô YouTube/TikTok).
+// Tách riêng 23/10 để tab Hướng đi dùng lại mà không phải dựng cả bảng tuần.
+export async function loadAssetGroups(client: Client): Promise<{ productsWithImages: string[]; productsWithClips: string[] }> {
+  const { data: assetRows } = await client
+    .from('brand_assets')
+    .select('product_group, kind, source')
+    .in('kind', ['image', 'video', 'clip'])
+    .not('product_group', 'is', null)
+    .limit(1000);
+  const nameOfAsset = (a: any) => String(a.product_group || '').replace(/^\s*\d+\.\s*/, '').trim();
+  const productsWithImages = [...new Set(
+    ((assetRows || []) as any[])
+      .filter((a) => a.kind === 'image')
+      .map(nameOfAsset)
+      .filter((g) => g && g !== 'Content')
+  )];
+  // Không tính video-pipeline đã dựng: rotate chỉ thay folder không clip bằng folder có clip gốc (11/9 chiều).
+  const productsWithClips = [...new Set(
+    ((assetRows || []) as any[])
+      .filter((a) => (a.kind === 'video' || a.kind === 'clip') && a.source !== 'video-pipeline')
+      .map(nameOfAsset)
+      .filter((g) => g && g !== 'Content')
+  )];
+  return { productsWithImages, productsWithClips };
+}
+
+// 23/10 (web chậm, trang Kế hoạch 2-3 giây): mọi truy vấn của bảng tuần chạy SONG SONG một lượt, trang đã
+// tải lịch đăng / focus thì truyền vào `pre` để khỏi đọc lại.
 export async function buildWeekPlanView(
   client: Client,
   appliedData: any | null,
-  now: Date = new Date()
+  now: Date = new Date(),
+  pre: { pp?: LoadedPostingPlan; focus?: { groups?: string[]; until?: string } | null } = {}
 ): Promise<WeekPlanView> {
   const win = weekWindowVN(now);
   const todayVN = new Date(now.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
@@ -94,13 +123,28 @@ export async function buildWeekPlanView(
   // Bài rotation ĐÃ SINH trong tuần, gom theo ngày VN + slot. Bài không có rotation_slot
   // (chạy force/tay thời trước) xếp theo giờ tạo: trước 12h VN = sáng, còn lại = chiều.
   const weekStartIso = new Date(win.start + 'T00:00:00+07:00').toISOString();
-  const { data: rows } = await client
-    .from('mkt_content')
-    .select('id, title, brief, created_at, deleted_at')
-    .gte('created_at', weekStartIso)
-    .eq('brief->>generator', 'rotation')
-    .order('created_at', { ascending: true })
-    .limit(120);
+  // 22/10: hướng trùng ý bài gần đây / hướng đứng trước bị bỏ, cùng hàm rotate và lúc sinh kế hoạch dùng.
+  const [{ data: rows }, suggestions, fv, { productsWithImages, productsWithClips }, pp, lotSource] = await Promise.all([
+    client
+      .from('mkt_content')
+      .select('id, title, brief, created_at, deleted_at')
+      .gte('created_at', weekStartIso)
+      .eq('brief->>generator', 'rotation')
+      .order('created_at', { ascending: true })
+      .limit(120),
+    dropDuplicateDirections(
+      client as any,
+      Array.isArray(appliedData?.content_suggestions) ? appliedData.content_suggestions : []
+    ) as Promise<any[]>,
+    pre.focus !== undefined
+      ? Promise.resolve((pre.focus || {}) as { groups?: string[]; until?: string })
+      : client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle()
+          .then(({ data }) => ((data as any)?.value || {}) as { groups?: string[]; until?: string }),
+    loadAssetGroups(client),
+    // Số bài/ngày + nhóm chia sẻ đọc từ LỊCH ĐĂNG CỐ ĐỊNH (app_config mkt_posting_plan).
+    pre.pp ? Promise.resolve(pre.pp) : loadPostingPlan(client),
+    loadShareLotSource(client as any, now),
+  ]);
   type Actual = { morning: WeekCellItem[]; afternoon: WeekCellItem[]; content: WeekCellItem | null; ranMorning: boolean; ranAfternoon: boolean };
   const actualByDate = new Map<string, Actual>();
   // Sản phẩm (tên không STT, chữ thường) đã có bài bán tuần này — bài thật + bài dự kiến đã rút.
@@ -128,11 +172,6 @@ export async function buildWeekPlanView(
   // Hàng đợi hướng đi cho phần DỰ KIẾN — cùng luật với /api/rotate: hướng chưa dùng
   // (pending_variant thời A/B cũ coi như đã dùng), bỏ sản phẩm ngừng bán, sort ổn định theo trọng số;
   // lúc rút (draw) sản phẩm chưa có bài tuần này đi trước (11/9 chiều).
-  // 22/10: bỏ hướng trùng ý bài gần đây / hướng đứng trước, cùng hàm rotate và lúc sinh kế hoạch dùng.
-  const suggestions: any[] = await dropDuplicateDirections(
-    client as any,
-    Array.isArray(appliedData?.content_suggestions) ? appliedData.content_suggestions : []
-  );
   const weights: Record<string, number> = (appliedData?.weights || {}) as Record<string, number>;
   const wOf = (s: any) => weights[productNameOf(s.product)] ?? 1;
   const isDiscontinued = (product: string) => {
@@ -145,8 +184,6 @@ export async function buildWeekPlanView(
     .map((s) => ({ title: String(s.title || ''), product: productNameOf(String(s.product || '')), kind: s.kind ? String(s.kind) : undefined }));
 
   // Focus (sản phẩm tập trung còn hạn): hướng ngoài focus không được rút khi focus còn hiệu lực.
-  const { data: focusRow } = await client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle();
-  const fv = ((focusRow as any)?.value || {}) as { groups?: string[]; until?: string };
   const focusKeys = (Array.isArray(fv.groups) ? fv.groups : []).map((s) => String(s).toLowerCase().trim()).filter(Boolean);
   const focusUntilMs = fv.until ? new Date(fv.until).getTime() : 0;
   const focusActiveOn = (date: string) =>
@@ -156,34 +193,9 @@ export async function buildWeekPlanView(
     return focusKeys.some((k) => p === k || p.includes(k) || k.includes(p));
   };
 
-  // Folder có ẢNH (điều kiện rotate sinh được bài bán) — hướng của sản phẩm chưa có folder
-  // ảnh sẽ bị rotate bỏ qua, mô phỏng phải bỏ qua giống hệt kẻo lịch hứa bài không bao giờ ra.
-  const { data: assetRows } = await client
-    .from('brand_assets')
-    .select('product_group, kind, source')
-    .in('kind', ['image', 'video', 'clip'])
-    .not('product_group', 'is', null)
-    .limit(1000);
-  const nameOfAsset = (a: any) => String(a.product_group || '').replace(/^\s*\d+\.\s*/, '').trim();
-  const productsWithImages = [...new Set(
-    ((assetRows || []) as any[])
-      .filter((a) => a.kind === 'image')
-      .map(nameOfAsset)
-      .filter((g) => g && g !== 'Content')
-  )];
+  // Hướng của sản phẩm chưa có folder ảnh bị rotate bỏ qua, mô phỏng phải bỏ qua giống hệt kẻo lịch hứa bài không bao giờ ra.
   const hasImages = (product: string) => productsWithImages.some((p) => p.toLowerCase() === product.toLowerCase());
-  // Folder có CLIP GỐC (không tính video-pipeline đã dựng): ô YouTube/TikTok rotate thay folder không
-  // clip bằng folder có clip (11/9 chiều: chỉ ở ô video), nên dự kiến ô video ưu tiên sản phẩm có clip.
-  const productsWithClips = [...new Set(
-    ((assetRows || []) as any[])
-      .filter((a) => (a.kind === 'video' || a.kind === 'clip') && a.source !== 'video-pipeline')
-      .map(nameOfAsset)
-      .filter((g) => g && g !== 'Content')
-  )];
   const hasClips = (product: string) => productsWithClips.some((p) => p.toLowerCase() === product.toLowerCase());
-
-  // Số bài/ngày + nhóm chia sẻ đọc từ LỊCH ĐĂNG CỐ ĐỊNH (app_config mkt_posting_plan).
-  const pp = await loadPostingPlan(client);
 
   // Rút n hướng dự kiến cho 1 lượt chạy: mỗi bài trong lượt phải KHÁC sản phẩm
   // (usedInThisRun của rotate); hết hướng hợp lệ thì ô đó rơi về "theo trọng số".
@@ -286,7 +298,7 @@ export async function buildWeekPlanView(
       return { index: s.index, time: s.time, kind: s.kind, channel: s.channel, group_id: s.group_id, contentId: row?.contentId || null };
     });
   }
-  const lots = await planShareLots(client, slotsByDate, now);
+  const lots = await planShareLots(client as any, slotsByDate, now, lotSource);
   for (const d of days) {
     d.lot = lots[d.date] || null;
     const attach = (it: WeekCellItem | null) => { if (it && d.lot) it.lot = d.lot.slots.find((s) => s.index === it.slotIndex) || null; };

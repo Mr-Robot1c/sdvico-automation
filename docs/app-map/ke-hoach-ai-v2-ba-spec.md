@@ -2,6 +2,7 @@
 
 > Load khi: task chạm bot Kế hoạch (`/ke-hoach`, `lib/plan.ts`), nguồn tri thức nội bộ/public cho Kế hoạch, SEO backlink, mở rộng kênh Social, hoặc quảng cáo trả phí (AD) của mảng Marketing.
 covers: apps/approval-ui/app/ke-hoach
+<!-- re-verified: 2026-10-23 - SAP XEP LAI UI + TOC DO: /ke-hoach tach 5 duong dan (tuan, huong-di, lich-dang, cai-dat, lich-su), bang tuan thanh luoi 7 ngay; buildWeekPlanView chay truy van song song (nhan pp/focus tu trang), planShareLots nhan loadShareLotSource. Luat mo phong rotate, BOSS de xuat / NGUOI quyet KHONG doi. -->
 <!-- re-verified: 2026-10-09 - REVIEW UI 9/10: /ke-hoach khoi Cai dat tuan them 2 dong canh bao chi doc truong ngay co cau truc: mkt_focus.until da qua (rotate tu ve du san pham, khop goal-actions saveFocus) va app_config.updated_at cua mkt_weekly_goal (select them updated_at) qua 7 ngay chua sua. Logic BOSS, sinh ke hoach, luu muc tieu khong doi. -->
 <!-- re-verified: 2026-10-03 - /ke-hoach chi them data-label cho o bang tuan (.week-table) de duoi 768px hien thanh the; logic ke hoach, du lieu, hanh vi khong doi. -->
 <!-- re-verified: 2026-10-02 (4) - RESPONSIVE MOBILE DOT 1: /ke-hoach chi them class table-scroll vao cac .tablewrap (bang tuan, hang di, form lich); logic ke hoach/BOSS/lich dang khong doi. -->

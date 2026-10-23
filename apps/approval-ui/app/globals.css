@@ -2160,3 +2160,80 @@ a.need-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
   .sidebar-foot .foot-note:not(.foot-logout), .sidebar-foot .foot-logout[href="/api/logout"] { display: none; }
   .sidebar-foot .foot-logout { font-size: 11px; }
 }
+
+/* ===== /ke-hoach làm lại 23/10 (user: "rối rắm, đặc biệt là phần kế hoạch"): lưới 7 ngày thay bảng 8 cột ===== */
+.kh-status .kh-goal { margin: 6px 0 0; color: var(--ink-2); font-size: .88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kh-week-head { display: flex; align-items: baseline; gap: 6px 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.kh-week-head h2 { font-size: 1.02rem; margin: 0; }
+.kh-week-head .grow { flex: 1; }
+.kh-legend { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--ink-2); }
+.kh-legend .wk-dot + * { margin-right: 4px; }
+.wk-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.wk-dot.done { background: var(--ok); }
+.wk-dot.planned { background: transparent; border: 1.5px solid var(--ink-2); }
+.kh-week-foot { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+/* Mặc định (điện thoại, tablet, máy tính hẹp): mỗi ngày một hàng, ô bài xếp lưới bên phải. */
+.wk-grid { display: grid; gap: 8px; }
+.wk-col { display: grid; grid-template-columns: 76px 1fr; gap: 10px; padding: 10px; border-radius: 10px; background: var(--surface-2); border: 1px solid transparent; }
+.wk-col.is-today { border-color: var(--accent); background: var(--accent-bg); }
+.wk-col.is-past { opacity: .78; }
+.wk-col-head { display: flex; flex-direction: column; gap: 2px; font-size: .9rem; }
+.wk-col-head .sub { font-size: .78rem; }
+.wk-today { align-self: flex-start; font-size: .72rem; font-weight: 700; color: var(--accent); }
+.wk-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; align-items: start; }
+.wk-off { margin: 0; font-size: .85rem; }
+.wk-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; font-size: .84rem; }
+.wk-card.planned, .wk-card.fallback { border-style: dashed; }
+.wk-card > summary { list-style: none; cursor: pointer; padding: 8px 10px; display: grid; gap: 4px; }
+.wk-card > summary::-webkit-details-marker { display: none; }
+.wk-card > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 8px; }
+.wk-card-top { display: flex; align-items: center; gap: 6px; }
+.wk-card-top .wk-dot { margin-left: auto; }
+.wk-time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.wk-ch { font-size: .72rem; font-weight: 600; padding: 0 6px; border-radius: 999px; }
+.wk-ch.facebook { background: color-mix(in srgb, var(--ch-facebook) 14%, transparent); color: var(--ch-facebook); }
+.wk-ch.youtube { background: color-mix(in srgb, var(--ch-youtube) 12%, transparent); color: var(--ch-youtube); }
+.wk-ch.tiktok { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
+.wk-card-title { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; color: var(--ink); }
+.wk-card.fallback .wk-card-title { font-style: italic; color: var(--ink-2); }
+.wk-card[open] .wk-card-title { -webkit-line-clamp: unset; display: block; }
+.wk-card-more { padding: 0 10px 10px; display: grid; gap: 4px; color: var(--ink-2); font-size: .8rem; border-top: 1px solid var(--line); padding-top: 8px; }
+.wk-lot-ul { margin: 4px 0 0; padding-left: 16px; }
+
+/* Màn rộng: 7 cột ngày cạnh nhau, đọc cả tuần một lượt. */
+@media (min-width: 1280px) {
+  .wk-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+  .wk-col { grid-template-columns: 1fr; align-content: start; padding: 8px; gap: 8px; }
+  .wk-col-head { flex-direction: row; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .wk-cards { grid-template-columns: 1fr; }
+}
+@media (max-width: 767px) {
+  .wk-col { grid-template-columns: 1fr; }
+  .wk-col-head { flex-direction: row; align-items: baseline; gap: 8px; }
+  .wk-cards { grid-template-columns: 1fr; }
+}
+
+/* Chia sẻ nhóm hôm nay: mỗi buổi một hàng, tên bài bên trái, nút nhóm bên phải. */
+.kh-share { display: grid; gap: 10px; }
+.kh-share-row { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 12px; align-items: start; padding-top: 10px; border-top: 1px solid var(--line); }
+.kh-share-row:first-child { padding-top: 0; border-top: 0; }
+.kh-share-row > * { min-width: 0; }
+.kh-share-row .lot-box { margin: 0; }
+.kh-share-post { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.kh-share-title { font-weight: 600; font-size: .9rem; }
+@media (max-width: 767px) {
+  .kh-share-row { grid-template-columns: 1fr; }
+  /* Tên nhóm đọc được trên điện thoại: tên một dòng riêng, Mở nhóm + Đánh dấu xuống dòng dưới. */
+  .kh-share .lot-chip { flex-wrap: wrap; border-radius: 10px; padding: 6px 8px; width: 100%; }
+  .kh-share .lot-chips.compact .lot-label { flex: 1 1 100%; max-width: none; }
+}
+
+.kh-repost { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.kh-repost li { display: flex; gap: 4px 12px; flex-wrap: wrap; align-items: baseline; }
+.kh-repost .sub { font-size: .82rem; }
+
+/* Khung chờ đổi tab (app/ke-hoach/loading.tsx). */
+.kh-loading { opacity: 0; animation: kh-ld-in .01s linear .15s forwards; }
+@keyframes kh-ld-in { to { opacity: 1; } }
+.kh-ld-bar { display: block; height: 14px; border-radius: 8px; background: var(--surface-2); }

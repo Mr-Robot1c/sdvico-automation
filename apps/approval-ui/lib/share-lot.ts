@@ -101,22 +101,32 @@ export type SlotLotInput = { index: number; time: string; kind: string; channel:
 export type SlotLot = { index: number; time: string; kind: string; channel: string; contentId: string | null; lotSize: number; done: number; items: DayLotItem[] };
 export type DayLot = { date: string; kind: 'past' | 'today' | 'future'; lotSize: number; done: number; items: DayLotItem[]; slots: SlotLot[] };
 
+// 23/10 (web chậm): dữ liệu nguồn của lô (danh sách nhóm, cỡ lô, lượt chia 30 ngày) không phụ thuộc
+// ô đăng, nên tải riêng được và chạy SONG SONG với các truy vấn khác của trang (trước đây nối đuôi).
+export type ShareLotSource = { groups: ShareGroup[]; lotSize: number; rows: ShareRow[] };
+export async function loadShareLotSource(client: Client, now: Date = new Date()): Promise<ShareLotSource> {
+  const sinceIso = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString();
+  const [groups, lotSize, { data, error }] = await Promise.all([
+    loadShareGroups(client),
+    loadLotSize(client),
+    client
+      .from('mkt_group_shares')
+      .select('id, content_id, group_id, group_label, post_url, shared_at')
+      .gte('shared_at', sinceIso)
+      .order('shared_at', { ascending: false })
+      .limit(2000),
+  ]);
+  return { groups, lotSize, rows: !error && Array.isArray(data) ? (data as ShareRow[]) : [] };
+}
+
 export async function planShareLots(
   client: Client,
   slotsByDate: Record<string, SlotLotInput[]>,
-  now: Date = new Date()
+  now: Date = new Date(),
+  source?: ShareLotSource
 ): Promise<Record<string, DayLot>> {
   const today = todayVNDate(now);
-  const [groups, lotSize] = await Promise.all([loadShareGroups(client), loadLotSize(client)]);
-  const sinceIso = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString();
-  let rows: ShareRow[] = [];
-  const { data, error } = await client
-    .from('mkt_group_shares')
-    .select('id, content_id, group_id, group_label, post_url, shared_at')
-    .gte('shared_at', sinceIso)
-    .order('shared_at', { ascending: false })
-    .limit(2000);
-  if (!error && Array.isArray(data)) rows = data as ShareRow[];
+  const { groups, lotSize, rows } = source || await loadShareLotSource(client, now);
 
   const byId = new Map(groups.map((g) => [g.id, g]));
   const labelOf = (id: string) => byId.get(id)?.label || rows.find((r) => r.group_id === id)?.group_label || id;

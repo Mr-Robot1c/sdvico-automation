@@ -23,6 +23,12 @@ export const ROUTES: Record<string, RouteNode> = {
   // Duyệt bài: /hang-doi giờ chỉ còn phiếu KHÔNG phải bài đăng (tin nhắn gửi khách, tin tuyển dụng, bản tin).
   '/hang-doi': { label: 'Phiếu khác', parent: '/noi-dung' },
 
+  // Kế hoạch (23/10: mỗi tab một đường dẫn riêng, thay ?tab=, để bấm tab có khung chờ ngay và chỉ tải dữ liệu của tab đó)
+  '/ke-hoach/huong-di': { label: 'Hướng đi', parent: '/ke-hoach' },
+  '/ke-hoach/lich-dang': { label: 'Lịch đăng', parent: '/ke-hoach' },
+  '/ke-hoach/cai-dat': { label: 'Cài đặt', parent: '/ke-hoach' },
+  '/ke-hoach/lich-su': { label: 'Lịch sử', parent: '/ke-hoach' },
+
   // Số liệu (gốc: Báo cáo tuần)
   '/do-luong': { label: 'Số liệu ngày', parent: '/do-luong/tuan' },
   '/kenh': { label: 'Theo kênh', parent: '/do-luong/tuan' },
@@ -117,10 +123,17 @@ export function rootTabFor(path: string): string | null {
 }
 
 // 23/10 (đợt 2 sắp xếp lại): mục menu có nhiều trang thì hiện HÀNG TAB đầu trang (app/section-tabs.tsx), menu không còn
-// mục con. Nhãn cùng một hàng: 2 chữ, cùng ngữ pháp, không xuống dòng. Kế hoạch tự dựng tab trong trang (?tab=).
+// mục con. Nhãn cùng một hàng: 2 chữ, cùng ngữ pháp, không xuống dòng.
 export type SectionTab = { href: string; label: string };
 export type SectionGroup = { label: string; tabs: SectionTab[] };
 export const SECTION_GROUPS: SectionGroup[] = [
+  { label: 'Kế hoạch', tabs: [
+    { href: '/ke-hoach', label: 'Tuần này' },
+    { href: '/ke-hoach/huong-di', label: 'Hướng đi' },
+    { href: '/ke-hoach/lich-dang', label: 'Lịch đăng' },
+    { href: '/ke-hoach/cai-dat', label: 'Cài đặt' },
+    { href: '/ke-hoach/lich-su', label: 'Lịch sử' },
+  ] },
   { label: 'Số liệu', tabs: [
     { href: '/do-luong/tuan', label: 'Theo tuần' },
     { href: '/do-luong', label: 'Theo ngày' },

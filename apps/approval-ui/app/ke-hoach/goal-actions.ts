@@ -56,7 +56,7 @@ export async function saveWeeklyGoal(formData: FormData) {
   });
   if (error) throw new Error('Không lưu được mục tiêu: ' + error.message);
   await regeneratePlanAndApply(client);
-  revalidatePath('/ke-hoach');
+  revalidatePath('/ke-hoach', 'layout');
 }
 
 // Sản phẩm TẬP TRUNG tuần (user 19/8: "tuần này up lọc dầu với lọc nước"). Lưu app_config key
@@ -87,7 +87,7 @@ export async function saveFocus(formData: FormData) {
   if (error) throw new Error('Không lưu được sản phẩm tập trung: ' + error.message);
   await regeneratePlanAndApply(client);
   try { await refreshLiveProposal(client); } catch (e: any) { console.error('[focus] refresh live loi:', e?.message || e); }
-  revalidatePath('/ke-hoach');
+  revalidatePath('/ke-hoach', 'layout');
 }
 
 // GỘP: lưu Mục tiêu + Focus + sinh kế hoạch (user 24/8: "3 nút chả biết bấm gì, gộp lại 1
@@ -118,7 +118,7 @@ export async function saveGoalFocusAndRegenerate(formData: FormData) {
   if (e2) throw new Error('Không lưu được sản phẩm tập trung: ' + e2.message);
   await regeneratePlanAndApply(client);
   try { await refreshLiveProposal(client); } catch (e: any) { console.error('[goal-focus] refresh live loi:', e?.message || e); }
-  revalidatePath('/ke-hoach');
+  revalidatePath('/ke-hoach', 'layout');
 }
 
 // SINH BÀI NGAY theo kế hoạch (user 24/8: "doi ke hoach ma khong sinh bai moi, ket cai gi
@@ -140,7 +140,7 @@ export async function generatePostsNow(): Promise<{ ok: boolean; created: number
       return { ok: false, created: 0, note: `HTTP ${res.status}: ${String(j?.error || j?.note || '').slice(0, 200)}` };
     }
     const created = Number(j?.created ?? (Array.isArray(j?.results) ? j.results.length : 0)) || 0;
-    revalidatePath('/ke-hoach');
+    revalidatePath('/ke-hoach', 'layout');
     revalidatePath('/noi-dung');
     return { ok: true, created, note: created > 0 ? `Đã sinh ${created} bài, xem ở trang Duyệt bài.` : (j?.note || 'Không sinh được bài (xem lý do bên dưới).') };
   } catch (e: any) {
@@ -171,7 +171,7 @@ function readSlots(formData: FormData, prefix: string): PostingSlot[] {
 async function afterPlanSaved(client: ReturnType<typeof getServerClient>, detail: Record<string, unknown>) {
   try { await refreshLiveProposal(client); } catch (e: any) { console.error('[posting-plan] refresh live loi:', e?.message || e); }
   try { await client.from('run_log').insert({ task: 'mkt.posting_plan_save', actor: 'user', status: 'ok', detail }); } catch { /* bo qua */ }
-  revalidatePath('/ke-hoach'); revalidatePath('/tong-quan'); revalidatePath('/noi-dung');
+  revalidatePath('/ke-hoach', 'layout'); revalidatePath('/tong-quan'); revalidatePath('/noi-dung');
 }
 export type SaveReport = { ok: boolean; summary: string; changes: string[]; at: string } | null;
 export async function savePostingPlanAction(formData: FormData) { await savePostingPlanWithReport(null, formData); }
@@ -254,5 +254,5 @@ export async function regenerateWeeklyProposalAction() {
       await client.from('run_log').insert({ task: 'mkt.plan_manual', actor: 'user', status: 'error', detail: { proposal: true, weekStart: win.start, error: String(e?.message || e).slice(0, 300), ms: Date.now() - startedAt } });
     } catch { /* bỏ qua */ }
   }
-  revalidatePath('/ke-hoach');
+  revalidatePath('/ke-hoach', 'layout');
 }

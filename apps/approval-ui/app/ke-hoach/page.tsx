@@ -1,163 +1,185 @@
+import { Suspense } from 'react';
 import { getServerClient } from '../../lib/supabase-server';
-import type { Plan, Tier } from '../../lib/plan';
 import { vnInt, proposalTargetWeekVN } from '../../lib/plan';
-import { buildWeekPlanView, productNameOf, weekRowsOf } from '../../lib/week-plan';
+import { buildWeekPlanView, weekRowsOf, type WeekRow } from '../../lib/week-plan';
+import { loadPostingPlan } from '../../lib/posting-plan';
 import ShareLotToday from '../tong-quan/share-lot-today';
-import type { PlanChangeLog } from './posting-plan-form';
-import { generatePlanNow, applyPlanWeights, clearPlanWeights, deletePlan } from '../actions';
-import { saveGoalFocusAndRegenerate, generatePostsNow, regenerateWeeklyProposalAction } from './goal-actions';
-import ProposeButton from './propose-button';
+import { applyPlanWeights, clearPlanWeights } from '../actions';
+import { generatePostsNow } from './goal-actions';
 import GeneratePostsButton from './generate-posts-button';
-import SaveGenerateButton from './save-generate-button';
-import GenerateButton from './generate-button';
-import PostingPlanForm from './posting-plan-form';
-import SectionTabs from '../section-tabs';
-import { loadPostingPlan, summarizePlan, CHANNEL_LABEL } from '../../lib/posting-plan';
+import { loadPlans, loadAppliedPlan, fmtDate, fmtDateTime } from './shared';
 
 export const dynamic = 'force-dynamic';
-// Sinh kế hoạch gọi Gemini mất 30 giây tới ~2 phút (chuỗi 4 model fallback khi model đầu bị
-// rate-limit). Server action saveGoalFocusAndRegenerate chạy trong function của trang này —
-// KHÔNG set maxDuration thì bị cắt sớm, plan tạo được server-side nhưng response không về kịp
-// browser -> UI không refresh (user 24/8: "bấm Lưu mà không cập nhật"). Cho 300s.
+// Nút "Sinh bài ngay" (generatePostsNow) chạy rotate trong function của trang này, có thể quá 1 phút.
 export const maxDuration = 300;
 
-// TRANG KẾ HOẠCH LÀM LẠI TOÀN BỘ 29/8 (user: "không rườm rà rối mắt, thể hiện đầy đủ kế
-// hoạch cả tuần, các block phải đều nhau, không được lỗi UI"):
-//   Mọi khối dùng CHUNG .blk (nền, viền, bo góc, padding, margin giống hệt nhau).
-//   1. Thanh trạng thái bản đang áp (1 dòng).
-//   2. 📆 KẾ HOẠCH TUẦN: bảng 7 ngày T2..CN — ngày đã qua hiện BÀI THẬT đã sinh (✓),
-//      ngày tới hiện hướng máy SẼ rút (mô phỏng đúng /api/rotate, lib/week-plan.ts).
-//      KHÔNG phụ thuộc bản live trong DB nữa (bản đó bị xoá là lịch cũ trống trơn).
-//   3. 🧭 Hướng đi bài viết: đủ các hướng của bản đang áp + trạng thái đã dùng/chờ.
-//   4+5. Hai cột đều nhau: ⚖️ Sản phẩm ưu tiên | ⚙️ Cài đặt tuần.
-//   6. Cuối trang: 2 details đều nhau (Lịch sử | Hint nút).
+// TAB TUẦN NÀY — làm lại 23/10 (user: "giao diện vẫn còn rối rắm, đặc biệt là phần kế hoạch", "chuyển trang bị lag"):
+//   1. Một dòng trạng thái bản đang áp (+ banner bản đề xuất tuần sau nếu có).
+//   2. Chia sẻ nhóm hôm nay: việc người phải làm, đặt trước lịch.
+//   3. Lưới 7 ngày, mỗi bài một ô nhỏ; bấm ô mới mở chi tiết (sản phẩm, lô nhóm).
+//   4. Nên đăng lại: tải sau (Suspense), không giữ chân cả trang.
+// Hướng đi + Sản phẩm ưu tiên chuyển sang tab /ke-hoach/huong-di; các tab khác là đường dẫn riêng.
 
-type Row = {
-  id: string;
-  period_start: string | null;
-  period_end: string | null;
-  generated_by: string;
-  data: Plan;
-  applied: boolean;
-  applied_at: string | null;
-  created_at: string;
-};
+const CH_SHORT: Record<string, string> = { facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok' };
+const KIND_SHORT: Record<WeekRow['kind'], string> = { sale: 'Bài bán', content: 'Content', bantin: 'Bản tin' };
 
-const TIER_LABEL: Record<Tier, { text: string; icon: string; cls: string }> = {
-  winner: { text: 'Đẩy mạnh', icon: '🏆', cls: 'tone-ok' },
-  watch: { text: 'Giữ nhịp', icon: '➖', cls: 'tone-default' },
-  weak: { text: 'Đổi góc', icon: '⚠️', cls: 'tone-no' },
-  insufficient: { text: 'Gom số liệu', icon: '⏳', cls: 'tone-default' },
-  manual: { text: 'Ưu tiên tay', icon: '✋', cls: 'tone-accent' }
-};
-
-const ROLE_LABEL: Record<string, string> = {
-  giao_duc: 'Giáo dục', viral: 'Viral', ca_nhan: 'Cá nhân', seeding: 'Seeding', tuong_tac: 'Tương tác',
-};
-
-function fmtDateTime(iso: string | null): string {
-  if (!iso) return '';
-  // Tự ghép "HH:mm dd/mm" — toLocaleString('vi-VN') trên Node trả "16:10 20-08" (gạch).
-  try {
-    const p = new Intl.DateTimeFormat('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
-    }).formatToParts(new Date(iso));
-    const g = (t: string) => p.find((x) => x.type === t)?.value || '';
-    return `${g('hour')}:${g('minute')} ${g('day')}/${g('month')}`;
-  } catch { return iso; }
+function rowTitle(r: WeekRow): string {
+  return r.state === 'fallback' ? 'Bài theo trọng số sản phẩm' : r.label;
 }
 
-function fmtDate(d: string | null): string {
-  if (!d) return '';
-  const [y, m, day] = d.split('-');
-  return day && m && y ? `${day}/${m}/${y}` : d;
-}
-
-// Tên sản phẩm rác lọt vào weights/products từ bài nhập tay lịch sử (cùng luật productOf
-// trong lib/plan.ts) — không hiện lên bảng Sản phẩm ưu tiên.
-function isJunkProduct(name: string): boolean {
-  if (!name || name === 'Khác' || name === 'Bài content' || name === 'Bài trend') return true;
-  if (name.length > 60 || name.includes('\n')) return true;
-  return /\d{9,}/.test(name) || /^bài (fb|đăng tay)/i.test(name);
-}
-
-// 23/10 (đợt 2 sắp xếp lại, design-spec-app-noi-bo.md màn 3): trang dài khoảng 12 khối chia 4 tab (?tab=).
-const KH_TABS = [
-  { key: 'tuan', href: '/ke-hoach', label: 'Tuần này' },
-  { key: 'lich-dang', href: '/ke-hoach?tab=lich-dang', label: 'Lịch đăng' },
-  { key: 'cai-dat', href: '/ke-hoach?tab=cai-dat', label: 'Cài đặt' },
-  { key: 'lich-su', href: '/ke-hoach?tab=lich-su', label: 'Lịch sử' },
-];
-
-export default async function Page({ searchParams }: { searchParams?: { xem?: string; tab?: string } }) {
-  const tab = KH_TABS.some((t) => t.key === searchParams?.tab) ? String(searchParams?.tab) : 'tuan';
+// Link cũ /ke-hoach?tab=... và ?xem=<id> chuyển sang đường dẫn mới ở next.config.mjs (redirects).
+export default async function Page() {
   const client = getServerClient();
-  const [{ data, error }, { data: goalRow }, { data: focusRow }, pp] = await Promise.all([
-    client
-      .from('mkt_plans')
-      .select('id, period_start, period_end, generated_by, data, applied, applied_at, created_at')
-      .order('created_at', { ascending: false })
-      .limit(12),
-    client.from('app_config').select('value, updated_at').eq('key', 'mkt_weekly_goal').maybeSingle(),
-    client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle(),
+  const [{ rows }, appliedRow, pp, { data: focusRow }] = await Promise.all([
+    loadPlans(client),
+    loadAppliedPlan(client),
     loadPostingPlan(client),
+    client.from('app_config').select('value').eq('key', 'mkt_focus').maybeSingle(),
   ]);
-  const goalText = ((goalRow as any)?.value?.text as string) || '';
-  const focusVal = ((focusRow as any)?.value || {}) as { groups?: string[]; until?: string };
-  const focusGroups = Array.isArray(focusVal.groups) ? focusVal.groups : [];
-  const focusUntil = focusVal.until ? String(focusVal.until).slice(0, 10) : '';
-  const focusActive = focusGroups.length > 0 && (!focusVal.until || new Date(focusVal.until).getTime() > Date.now());
-  // 9/10 (review UI): cảnh báo hết hạn CHỈ dựa trên trường ngày có cấu trúc (mkt_focus.until, app_config.updated_at),
-  // không đoán hiệu lực từ chữ trong ô mục tiêu. Hết hạn tập trung thì /api/rotate tự quay về đủ sản phẩm.
-  const focusExpired = focusGroups.length > 0 && !!focusVal.until && new Date(focusVal.until).getTime() <= Date.now();
-  const goalUpdatedAt = ((goalRow as any)?.updated_at as string) || null;
-  const goalAgeDays = goalUpdatedAt ? Math.floor((Date.now() - new Date(goalUpdatedAt).getTime()) / 86400000) : null;
-  // Nhóm chia sẻ: nguồn CHUNG với popover 📣 ở Quản lý bài viết (app_config qua /api/share-groups).
-  const shareGroups: string[] = pp.shareGroups.map((g) => g.label);
-
-  const rowsInit = (data || []) as Row[];
-  // Bản live (origin='live') chỉ phục vụ tile Tổng quan/Quản lý bài viết — trang này không dùng.
-  const planRows = rowsInit.filter((r) => r.data?.origin !== 'live');
-  const appliedRow = rowsInit.find((r) => r.applied);
-  const learnSuggestion = rowsInit.find((r) => r.data?.origin === 'learn-weekly' && !r.applied);
-  // 5/9: bản ĐỀ XUẤT tuần sau (BOSS soạn Chủ nhật 8h, hoặc người bấm Soạn), chờ Thứ 2 8h máy áp.
   const proposalWeek = proposalTargetWeekVN(new Date());
-  const weeklyProposal = rowsInit.find((r) => !r.applied && r.data?.proposal?.week_start === proposalWeek.start) || null;
+  const weeklyProposal = rows.find((r) => !r.applied && r.proposal?.week_start === proposalWeek.start) || null;
 
-  // ?xem=<id>: xem lại bản cũ — bảng Hướng đi + Sản phẩm hiển thị theo bản đó.
-  const viewId = searchParams?.xem || null;
-  let viewing: Row | null = viewId ? planRows.find((r) => r.id === viewId) || null : null;
-  if (viewId && !viewing) {
-    const { data: one } = await client
-      .from('mkt_plans')
-      .select('id, period_start, period_end, generated_by, data, applied, applied_at, created_at')
-      .eq('id', viewId)
-      .maybeSingle();
-    viewing = (one as Row) || null;
-  }
-  const displayRow = viewing || appliedRow || planRows[0] || null;
-  const displayData = displayRow?.data || null;
-  const history = planRows.filter((r) => !r.applied && r.id !== (viewing?.id || ''));
+  // BẢNG TUẦN luôn dựng theo bản ĐANG ÁP (thực tế máy chạy).
+  const week = await buildWeekPlanView(client, appliedRow?.data || null, new Date(), { pp, focus: (focusRow as any)?.value || null });
+  const today = week.days.find((d) => d.isToday) || null;
+  const todayShare = today ? weekRowsOf(today).filter((r) => r.lot && r.lot.channel === 'facebook' && r.lot.items.length) : [];
 
-  // BẢNG TUẦN: luôn dựng theo bản ĐANG ÁP (thực tế máy chạy), kể cả khi đang xem bản cũ.
-  const week = await buildWeekPlanView(client, appliedRow?.data || null);
-  // 15/9: nhật ký máy/người đổi lịch đăng (run_log) — hiện dưới khối Lịch đăng cố định.
-  const { data: logRows } = await client
-    .from('run_log')
-    .select('created_at, actor, detail')
-    .in('task', ['mkt.posting_plan_save', 'mkt.posting_plan_boss'])
-    .order('created_at', { ascending: false })
-    .limit(8);
-  const changeLog: PlanChangeLog[] = ((logRows || []) as any[]).map((r) => ({
-    at: String(r.created_at), actor: String(r.actor || ''), kind: String(r.detail?.kind || (r.detail?.reason ? 'boss' : '')),
-    summary: String(r.detail?.summary || (r.detail?.slotsPerDay ? 'lưu lịch (bản cũ chưa ghi chi tiết)' : r.detail?.reason ? `BOSS xếp: ${r.detail.reason}` : '')),
-    changes: Array.isArray(r.detail?.changes) ? r.detail.changes.map((x: any) => String(x)) : [],
-  }));
+  return (
+    <>
+      {/* 1. Trạng thái bản đang áp */}
+      <section className="blk tone-ok kh-status">
+        {appliedRow ? (
+          <>
+            <div className="kh-strip">
+              <b>Bản đang áp</b>
+              <span className="sub">
+                {appliedRow.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}, sinh {fmtDateTime(appliedRow.created_at)}, {vnInt((appliedRow.data.content_suggestions || []).length)} hướng đi
+              </span>
+              <span className="grow" />
+              <a className="src" href="/kho-tri-thuc?ai=boss">Nhật ký BOSS</a>
+              <form action={clearPlanWeights} title="Gỡ bản đang áp: vòng xoay chạy ngẫu nhiên theo trọng số cũ, không bám hướng đi">
+                <button className="btn ghost sm" type="submit">Gỡ áp dụng</button>
+              </form>
+            </div>
+            {appliedRow.data.goal ? (
+              <p className="kh-goal" title={appliedRow.data.goal}>Mục tiêu: {appliedRow.data.goal.split('\n')[0]}</p>
+            ) : null}
+          </>
+        ) : (
+          <div className="kh-strip">
+            <b>Chưa có bản kế hoạch nào đang áp</b>
+            <a className="btn ghost sm" href="/ke-hoach/cai-dat">Soạn kế hoạch</a>
+          </div>
+        )}
+      </section>
 
-  const suggestions = (displayData?.content_suggestions || []) as any[];
-  const usedCount = suggestions.filter((s) => s.used_at || s.pending_variant).length;
+      {weeklyProposal ? (
+        <section className="blk tone-accent" role="status">
+          <div className="kh-strip">
+            <div className="grow">
+              BOSS đã soạn <b>kế hoạch tuần {fmtDate(proposalWeek.start)} tới {fmtDate(proposalWeek.end)}</b> lúc {fmtDateTime(weeklyProposal.created_at)}. Máy tự áp <b>Thứ 2 8h sáng</b>.
+            </div>
+            <a className="btn ghost sm" href={`/ke-hoach/huong-di?xem=${weeklyProposal.id}`}>Xem bản này</a>
+            <form action={applyPlanWeights}>
+              <input type="hidden" name="plan_id" value={weeklyProposal.id} />
+              <button className="btn ok sm" type="submit">Áp ngay</button>
+            </form>
+          </div>
+        </section>
+      ) : null}
 
-  // ĐĂNG LẠI BÀI CŨ ĂN KHÁCH (giữ từ bản cũ): bài đăng từ 7 ngày trước có tương tác tốt nhất.
+      {/* 2. Chia sẻ nhóm hôm nay */}
+      {todayShare.length ? (
+        <section className="blk">
+          <h2>Chia sẻ nhóm hôm nay</h2>
+          <div className="kh-share">
+            {todayShare.map((r) => (
+              <div key={`${r.slotIndex}-${r.time}`} className="kh-share-row">
+                <div className="kh-share-post">
+                  <span className="wk-time">{r.time || (r.window === 'sang' ? 'sáng' : 'chiều')}</span>
+                  <span className="kh-share-title">{rowTitle(r)}</span>
+                </div>
+                <ShareLotToday
+                  compact
+                  lot={r.lot!.items.map((g) => ({ id: g.id, label: g.label, url: g.url, sharedToday: g.done ? { id: 'da-ghi', content_id: r.contentId || null, shared_at: '' } : null }))}
+                  lotSize={r.lot!.lotSize}
+                  doneToday={r.lot!.done}
+                  post={r.contentId ? { contentId: r.contentId, url: null } : null}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* 3. Lưới 7 ngày */}
+      <section className="blk">
+        <div className="kh-week-head">
+          <h2>Kế hoạch tuần</h2>
+          <span className="sub">{fmtDate(week.window.start).slice(0, 5)} – {fmtDate(week.window.end)}</span>
+          <span className="grow" />
+          <span className="kh-legend"><i className="wk-dot done" /> đã sinh <i className="wk-dot planned" /> dự kiến</span>
+        </div>
+        <div className="wk-grid">
+          {week.days.map((d) => {
+            const dayRows = weekRowsOf(d);
+            return (
+              <div key={d.date} className={`wk-col${d.isToday ? ' is-today' : ''}${d.isPast ? ' is-past' : ''}`}>
+                <div className="wk-col-head">
+                  <b>{d.dowLabel.replace('Chủ nhật', 'CN').replace('Thứ ', 'T')}</b>
+                  <span className="sub">{fmtDate(d.date).slice(0, 5)}</span>
+                  {d.isToday ? <span className="wk-today">Hôm nay</span> : null}
+                  {d.overridden ? <span className="sub" title="Ngày này dùng lịch riêng">lịch riêng</span> : null}
+                </div>
+                <div className="wk-cards">
+                  {dayRows.length ? dayRows.map((r, k) => (
+                    <details key={k} className={`wk-card ${r.state}`}>
+                      <summary>
+                        <span className="wk-card-top">
+                          <span className="wk-time">{r.time || (r.window === 'sang' ? 'sáng' : 'chiều')}</span>
+                          <span className={`wk-ch ${r.channel || 'facebook'}`}>{CH_SHORT[r.channel || 'facebook']}</span>
+                          <i className={`wk-dot ${r.state === 'done' ? 'done' : 'planned'}`} aria-label={r.state === 'done' ? 'đã sinh' : 'dự kiến'} />
+                        </span>
+                        <span className="wk-card-title">{rowTitle(r)}</span>
+                      </summary>
+                      <div className="wk-card-more">
+                        <div>{KIND_SHORT[r.kind]}{r.kind === 'content' ? `, ${d.contentLabel}` : ''}</div>
+                        {r.product && r.kind === 'sale' ? <div>Sản phẩm: {r.product}</div> : null}
+                        {r.kind === 'bantin' ? <div>Video người dựng gửi, máy soạn caption, cần sếp duyệt.</div> : null}
+                        {r.group ? <div>Nhóm ghim: {r.group}</div> : null}
+                        {r.state === 'fallback' ? <div>Hướng đi đã hết, máy tự nạp thêm trong ngày.</div> : null}
+                        {r.lot && r.lot.channel === 'facebook' && r.lot.items.length ? (
+                          <div>
+                            {d.isPast ? `Đã chia ${r.lot.done}/${r.lot.lotSize} nhóm` : `Dự kiến chia ${r.lot.lotSize} nhóm`}:
+                            <ul className="wk-lot-ul">
+                              {r.lot.items.map((g) => <li key={g.id}>{g.done ? '✓ ' : ''}{g.label}</li>)}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
+                    </details>
+                  )) : <p className="sub wk-off">Máy nghỉ</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="kh-week-foot">
+          <GeneratePostsButton action={generatePostsNow} />
+        </div>
+      </section>
+
+      {/* 4. Nên đăng lại: tải sau, không chặn phần trên */}
+      <Suspense fallback={null}>
+        <RepostBlock />
+      </Suspense>
+    </>
+  );
+}
+
+// ĐĂNG LẠI BÀI CŨ ĂN KHÁCH: bài Facebook đăng từ 7 ngày trước có tương tác tốt nhất.
+async function RepostBlock() {
+  const client = getServerClient();
   const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const { data: oldPosts } = await client
     .from('mkt_posts')
@@ -168,456 +190,41 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
     .order('published_at', { ascending: false })
     .limit(60);
   const oldCids = [...new Set((oldPosts || []).map((p: any) => p.content_id).filter(Boolean))] as string[];
-  let repostSuggestions: Array<{ title: string; url: string; publishedAt: string; engagement: number }> = [];
-  if (oldCids.length) {
-    const [{ data: oldMetrics }, { data: oldContents }] = await Promise.all([
-      client.from('mkt_metrics').select('entity_ref, metrics, created_at')
-        .eq('source', 'facebook').in('entity_ref', oldCids)
-        .order('created_at', { ascending: false }).limit(300),
-      client.from('mkt_content').select('id, title').in('id', oldCids)
-    ]);
-    const engOf = new Map<string, number>();
-    for (const r of oldMetrics || []) {
-      const cid = (r as any).entity_ref as string;
-      if (!engOf.has(cid)) engOf.set(cid, Number((r as any).metrics?.engagement) || 0);
-    }
-    const titleOf = new Map((oldContents || []).map((c: any) => [c.id, String(c.title || '(không tên)')]));
-    const urlOf = new Map<string, { url: string; at: string }>();
-    for (const p of oldPosts || []) {
-      const cid = (p as any).content_id as string;
-      if (cid && !urlOf.has(cid)) urlOf.set(cid, { url: String((p as any).external_url), at: String((p as any).published_at || '') });
-    }
-    repostSuggestions = oldCids
-      .filter((cid) => titleOf.has(cid) && (engOf.get(cid) || 0) > 0)
-      .map((cid) => ({ title: titleOf.get(cid)!, url: urlOf.get(cid)!.url, publishedAt: urlOf.get(cid)!.at, engagement: engOf.get(cid) || 0 }))
-      .sort((a, b) => b.engagement - a.engagement)
-      .slice(0, 3);
+  if (!oldCids.length) return null;
+  const [{ data: oldMetrics }, { data: oldContents }] = await Promise.all([
+    client.from('mkt_metrics').select('entity_ref, metrics, created_at')
+      .eq('source', 'facebook').in('entity_ref', oldCids)
+      .order('created_at', { ascending: false }).limit(300),
+    client.from('mkt_content').select('id, title').in('id', oldCids)
+  ]);
+  const engOf = new Map<string, number>();
+  for (const r of oldMetrics || []) {
+    const cid = (r as any).entity_ref as string;
+    if (!engOf.has(cid)) engOf.set(cid, Number((r as any).metrics?.engagement) || 0);
   }
-
-  // Log lần sinh kế hoạch tay gần nhất — banner to khi < 60 giây, dòng nhỏ dưới nút Lưu.
-  const { data: lastManualPlan } = await client
-    .from('run_log')
-    .select('status, detail, created_at')
-    .eq('task', 'mkt.plan_manual')
-    .order('created_at', { ascending: false })
-    .limit(1);
-  const lastPlanLog = (lastManualPlan || [])[0] as any;
-
-  // Bảng Sản phẩm ưu tiên: từ bản đang hiển thị, lọc tên rác.
-  const products = ((displayData?.products || []) as Plan['products']).filter((p) => !isJunkProduct(p.product));
+  const titleOf = new Map((oldContents || []).map((c: any) => [c.id, String(c.title || '(không tên)')]));
+  const urlOf = new Map<string, { url: string; at: string }>();
+  for (const p of oldPosts || []) {
+    const cid = (p as any).content_id as string;
+    if (cid && !urlOf.has(cid)) urlOf.set(cid, { url: String((p as any).external_url), at: String((p as any).published_at || '') });
+  }
+  const list = oldCids
+    .filter((cid) => titleOf.has(cid) && (engOf.get(cid) || 0) > 0)
+    .map((cid) => ({ title: titleOf.get(cid)!, url: urlOf.get(cid)!.url, publishedAt: urlOf.get(cid)!.at, engagement: engOf.get(cid) || 0 }))
+    .sort((a, b) => b.engagement - a.engagement)
+    .slice(0, 3);
+  if (!list.length) return null;
   return (
-    <main>
-      <header className="head-row">
-        <div>
-          <h1>Kế hoạch</h1>
-        </div>
-        <div className="head-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {learnSuggestion ? (
-            <form action={applyPlanWeights} title={`Đề xuất cuối tuần từ số liệu — sinh ${fmtDateTime(learnSuggestion.created_at)}`}>
-              <input type="hidden" name="plan_id" value={learnSuggestion.id} />
-              <button className="btn ok" type="submit">🧪 Áp dụng đề xuất mới</button>
-            </form>
-          ) : null}
-        </div>
-      </header>
-
-      <SectionTabs tabs={KH_TABS} active={KH_TABS.find((t) => t.key === tab)!.href} label="Kế hoạch" />
-
-      {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
-
-      {/* Banner kết quả bấm "Lưu & sinh kế hoạch mới" — chỉ hiện 60 giây đầu, F5 là tự ẩn. */}
-      {(() => {
-        if (!lastPlanLog) return null;
-        const ageSec = (Date.now() - new Date(lastPlanLog.created_at).getTime()) / 1000;
-        if (ageSec > 60) return null;
-        const ok = lastPlanLog.status === 'ok';
-        return (
-          <section role="status" className="blk" style={{ borderColor: ok ? 'var(--ok, #16a34a)' : 'var(--no, #dc2626)', borderLeftWidth: 5 }}>
-            <div className="kh-strip">
-              <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>{ok ? '✅' : '⛔'}</span>
-              <div className="grow">
-                <b>{ok ? (lastPlanLog.detail?.proposal ? 'Đã soạn đề xuất tuần sau' : 'Đã thay đổi kế hoạch mới') : 'Sinh kế hoạch thất bại'}</b>
-                <div className="sub" style={{ marginTop: 2 }}>
-                  {ok
-                    ? (lastPlanLog.detail?.proposal
-                        ? <>Bản đề xuất có {vnInt(Number(lastPlanLog.detail?.suggestions) || 0)} hướng đi, chưa áp. Thứ 2 8h máy tự áp, hoặc bấm Áp ngay ở banner trên.</>
-                        : <>Bản mới có {vnInt(Number(lastPlanLog.detail?.suggestions) || 0)} hướng đi và đã được áp. Bảng tuần bên dưới đã theo bản mới.</>)
-                    : <>Lý do: {String(lastPlanLog.detail?.error || 'không rõ').slice(0, 200)}. Kế hoạch cũ vẫn giữ nguyên.</>}
-                </div>
-              </div>
-            </div>
-          </section>
-        );
-      })()}
-
-      {tab === 'tuan' ? (<>
-      {/* Đang xem lại bản cũ */}
-      {viewing ? (
-        <section className="blk" style={{ borderColor: 'var(--accent)', borderLeftWidth: 5 }} role="status">
-          <div className="kh-strip">
-            <div className="grow">
-              👀 Đang xem lại bản sinh lúc <b>{fmtDateTime(viewing.created_at)}</b> — bảng Hướng đi và Sản phẩm bên dưới theo bản này.
-            </div>
-            {!viewing.applied ? (
-              <form action={applyPlanWeights}>
-                <input type="hidden" name="plan_id" value={viewing.id} />
-                <button className="btn ok sm" type="submit">Áp dụng bản này</button>
-              </form>
-            ) : null}
-            <a className="btn ghost sm" href="/ke-hoach">Về bản đang áp</a>
-          </div>
-        </section>
-      ) : null}
-
-      {/* 5/9: bản đề xuất tuần sau đang chờ Thứ 2 8h máy áp */}
-      {weeklyProposal ? (
-        <section className="blk" style={{ borderColor: 'var(--accent)', borderLeftWidth: 5 }} role="status">
-          <div className="kh-strip">
-            <div className="grow">
-              📝 BOSS đã soạn <b>kế hoạch tuần {fmtDate(proposalWeek.start)} tới {fmtDate(proposalWeek.end)}</b> lúc {fmtDateTime(weeklyProposal.created_at)}, {vnInt((weeklyProposal.data.content_suggestions || []).length)} hướng đi. Máy tự áp <b>Thứ 2 8h sáng</b>. Muốn đổi: sửa mục tiêu hoặc tập trung ở khối Cài đặt tuần rồi bấm Soạn lại đề xuất.
-            </div>
-            <a className="btn ghost sm" href={`/ke-hoach?xem=${weeklyProposal.id}`}>Xem bản này</a>
-            <form action={applyPlanWeights}>
-              <input type="hidden" name="plan_id" value={weeklyProposal.id} />
-              <button className="btn ok sm" type="submit">Áp ngay</button>
-            </form>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ===== 1. THANH TRẠNG THÁI BẢN ĐANG ÁP ===== */}
-      <section className="blk" style={{ borderLeft: '5px solid var(--ok, #1a9e6f)' }}>
-        {appliedRow ? (
-          <div className="kh-strip">
-            <b>📋 Bản đang áp</b>
-            <span className="badge tone-ok">✓ Đang áp</span>
-            <span className="badge">{appliedRow.generated_by === 'cron' ? '🤖 Tự động' : '✍️ Tạo tay'}</span>
-            <span className="sub">Sinh {fmtDateTime(appliedRow.created_at)} · {vnInt((appliedRow.data.content_suggestions || []).length)} hướng đi</span>
-            {appliedRow.data.goal ? (
-              <span className="grow sub" title={appliedRow.data.goal}>🎯 {appliedRow.data.goal.split('\n')[0]}</span>
-            ) : <span className="grow" />}
-            <a className="src" href="/kho-tri-thuc?ai=boss">Nhật ký BOSS</a>
-            <form action={clearPlanWeights} title="Gỡ bản đang áp — vòng xoay chạy random theo trọng số cũ, không bám hướng đi">
-              <button className="btn ghost sm" type="submit">Gỡ áp dụng</button>
-            </form>
-          </div>
-        ) : (
-          <div className="kh-strip">
-            <b>⚠️ Chưa có bản kế hoạch nào đang áp</b>
-            
-          </div>
-        )}
-      </section>
-
-      {/* ===== 2. KẾ HOẠCH TUẦN (T2..CN) — 15/9 (Thanh): bảng NHIỀU CỘT, mỗi bài 1 dòng; cột Lô nhóm đủ 4 nhóm/ngày ===== */}
-      <section className="blk">
-        <h2>
-          📆 Kế hoạch tuần
-          <span className="sub">{fmtDate(week.window.start)} – {fmtDate(week.window.end)} · ✅ đã sinh, ▫️ dự kiến</span>
-        </h2>
-        <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
-          <table className="datatable week-table">
-            <thead>
-              <tr>
-                <th style={{ width: 84 }}>Ngày</th>
-                <th style={{ width: 60 }}>Giờ</th>
-                <th style={{ width: 96 }}>Loại</th>
-                <th style={{ width: 130 }}>Nền tảng</th>
-                <th>Bài / hướng đi</th>
-                <th style={{ width: 170 }}>Sản phẩm</th>
-                <th style={{ width: 96 }}>Trạng thái</th>
-                <th className="wk-lot">📣 Lô nhóm chia sẻ của BUỔI đó</th>
-              </tr>
-            </thead>
-            <tbody>
-              {week.days.map((d) => {
-                const rows = weekRowsOf(d);
-                const span = Math.max(rows.length, 1);
-                const dayCell = (
-                  <td rowSpan={span} className="wk-day">
-                    <b>{d.dowLabel.replace('Chủ nhật', 'CN').replace('Thứ ', 'T')}</b> <span className="sub">{fmtDate(d.date).slice(0, 5)}</span>
-                    {d.isToday ? <div className="sub">👉 hôm nay</div> : null}
-                    {d.overridden ? <div className="sub">✏️ lịch riêng</div> : null}
-                  </td>
-                );
-                const lotCellFor = (r: ReturnType<typeof weekRowsOf>[number]) => {
-                  const sl = r.lot;
-                  if (!sl || sl.channel !== 'facebook') return <td data-label="Lô nhóm chia sẻ" className="wk-lot"><span className="sub">— (không chia group: {r.channel && r.channel !== 'facebook' ? CHANNEL_LABEL[r.channel] : 'không phải Facebook'})</span></td>;
-                  if (!sl.items.length) return <td data-label="Lô nhóm chia sẻ" className="wk-lot"><span className="sub">—</span></td>;
-                  if (d.isToday) {
-                    return (
-                      <td data-label="Lô nhóm chia sẻ" className="wk-lot">
-                        <ShareLotToday
-                          compact
-                          lot={sl.items.map((g) => ({ id: g.id, label: g.label, url: g.url, sharedToday: g.done ? { id: 'da-ghi', content_id: r.contentId || null, shared_at: '' } : null }))}
-                          lotSize={sl.lotSize}
-                          doneToday={sl.done}
-                          post={r.contentId ? { contentId: r.contentId, url: null } : null}
-                        />
-                      </td>
-                    );
-                  }
-                  return (
-                    <td data-label="Lô nhóm chia sẻ" className="wk-lot">
-                      <div className="wk-lot-list">
-                        <span className="sub" style={{ fontSize: '.74rem' }}>{d.isPast ? `đã chia ${sl.done}/${sl.lotSize}` : `dự kiến ${sl.lotSize} nhóm cho buổi này`}</span>
-                        {sl.items.map((g) => (
-                          <span key={g.id} className={`wk-lot-item ${g.done ? 'done' : ''} ${g.pinned ? 'pinned' : ''}`}>
-                            <span className="lbl" title={g.label}>{g.done ? '✓' : '·'} {g.label}{g.pinned ? ' 📌' : ''}</span>
-                            {!d.isPast ? <a href={g.url} target="_blank" rel="noreferrer">mở ↗</a> : null}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                  );
-                };
-                if (!rows.length) {
-                  return (
-                    <tr key={d.date} className={d.isToday ? 'row-today' : undefined}>
-                      {dayCell}
-                      <td colSpan={7} className="sub">— máy nghỉ</td>
-                    </tr>
-                  );
-                }
-                return rows.map((r, k) => (
-                  <tr key={`${d.date}-${k}`} className={d.isToday ? 'row-today' : undefined}>
-                    {k === 0 ? dayCell : null}
-                    <td data-label="Giờ" style={{ whiteSpace: 'nowrap' }}>{r.time || (r.window === 'sang' ? 'sáng' : 'chiều')}</td>
-                    <td data-label="Loại">{r.kind === 'sale' ? 'Bài bán' : r.kind === 'bantin' ? 'Bản tin' : <span title={d.contentPurpose || ''}>Content</span>}</td>
-                    <td data-label="Nền tảng">
-                      <span className={`ch-chip ${r.channel || 'facebook'}`}>{r.channel ? CHANNEL_LABEL[r.channel] : 'Facebook Page'}</span>
-                      {r.group ? <div className="sub" style={{ fontSize: '.74rem', marginTop: 2 }}>📌 {r.group}</div> : null}
-                    </td>
-                    <td data-label="Bài / hướng đi">
-                      <span className="wk-t">{r.state === 'fallback' ? 'Bài theo trọng số sản phẩm' : r.label}</span>
-                      {r.kind === 'content' && r.state !== 'done' ? <span className="wk-sub"> · máy viết theo playbook {d.contentLabel}</span> : null}
-                      {r.kind === 'content' && r.state === 'done' ? <span className="wk-sub"> · {d.contentLabel}</span> : null}
-                    </td>
-                    <td data-label="Sản phẩm" className="sub">{r.product || (r.kind === 'content' ? 'Bài content' : '—')}</td>
-                    <td data-label="Trạng thái"><span className={`wk-state ${r.state}`}>{r.state === 'done' ? '✅ đã sinh' : r.state === 'fallback' ? 'hướng cạn' : '▫️ dự kiến'}</span></td>
-                    {lotCellFor(r)}
-                  </tr>
-                ));
-              })}
-            </tbody>
-          </table>
-        </div>
-        {week.hasFallback ? <p className="sub" style={{ margin: '10px 0 0' }}>Ô "hướng cạn": hướng đi đã hết, máy tự nạp thêm trong ngày.</p> : null}
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-          <GeneratePostsButton action={generatePostsNow} />
-        </div>
-      </section>
-
-      </>) : null}
-
-      {tab === 'lich-dang' ? (
-        <PostingPlanForm pp={pp} lots={Object.fromEntries(week.days.filter((d) => d.lot).map((d) => [d.date, d.lot!]))} rowsByDate={Object.fromEntries(week.days.map((d) => [d.date, weekRowsOf(d)]))} changeLog={changeLog} />
-      ) : null}
-
-      {tab === 'tuan' ? (<>
-
-      {/* ===== 3. HƯỚNG ĐI BÀI VIẾT ===== */}
-      <section className="blk" id="huong-di">
-        <h2>
-          🧭 Hướng đi bài viết
-        </h2>
-        {suggestions.length ? (
-          <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
-            <table className="datatable">
-              <thead>
-                <tr>
-                  <th style={{ width: 34 }}>#</th>
-                  <th>Hướng đi</th>
-                  <th style={{ width: 200 }}>Sản phẩm</th>
-                  <th style={{ width: 140 }}>Dạng bài</th>
-                  <th style={{ width: 130 }}>Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {suggestions.map((s, i) => {
-                  const used = s.used_at || s.pending_variant;
-                  const noAssets = !used && !week.productsWithImages.some((p) => p.toLowerCase() === productNameOf(String(s.product || '')).toLowerCase());
-                  return (
-                    <tr key={i}>
-                      <td className="sub">{i + 1}</td>
-                      <td>
-                        <div className="wk-t">{s.title}</div>
-                        {s.hook ? <div className="wk-sub" title={s.why || ''}>🪝 {s.hook}</div> : (s.why ? <div className="wk-sub kh-clamp" title={s.why}>{s.why}</div> : null)}
-                      </td>
-                      <td className="sub">{String(s.product || '—')}{s.needs_gov_review ? ' ⚠️' : ''}</td>
-                      <td className="sub">{ROLE_LABEL[String(s.role || '')] || '—'}{s.emotion ? ` · ${s.emotion}` : ''}</td>
-                      <td>
-                        {s.used_at
-                          ? <span className="badge tone-ok">✓ đã ra bài {fmtDate(String(s.used_at).slice(0, 10)).slice(0, 5)}</span>
-                          : s.pending_variant
-                            ? <span className="badge tone-default">✓ đã ra bài</span>
-                            : noAssets
-                              ? <span className="badge tone-no" title="Folder sản phẩm này chưa có ảnh — máy không sinh bài được. Thả ảnh vào Kho tư liệu.">📷 thiếu tư liệu</span>
-                              : <span className="badge tone-default">⏳ chờ tới lượt</span>}
-                        {!used && s.carried ? <div className="wk-sub" style={{ marginTop: 4 }}>giữ từ bản trước</div> : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="sub" style={{ marginTop: 8 }}>Bản này chưa có hướng đi nào. Bấm 🔄 BOSS chạy lại để sinh.</p>
-        )}
-      </section>
-
-      {/* ===== 4. SẢN PHẨM ƯU TIÊN ===== */}
-        <section className="blk">
-          <h2>⚖️ Sản phẩm ưu tiên</h2>
-          {products.length ? (
-            <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
-              <table className="datatable">
-                <thead><tr><th>Sản phẩm</th><th className="num">Ưu tiên</th><th className="num">Tương tác/bài</th><th>Hướng xử lý</th></tr></thead>
-                <tbody>
-                  {products.map((p) => {
-                    // 7/9: bản có tier lạ (dữ liệu chỉnh tay) không được làm sập cả trang -> rơi về nhãn Gom số liệu.
-                    const t = TIER_LABEL[p.tier] || TIER_LABEL.insufficient;
-                    return (
-                      <tr key={p.product}>
-                        <td>{p.product}</td>
-                        <td className="num"><b>×{vnInt(p.weight)}</b></td>
-                        <td className="num">{p.avgEng > 0 ? vnInt(p.avgEng) : '—'}</td>
-                        <td><span className={`badge ${t.cls}`}>{t.icon} {t.text}</span></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="sub" style={{ marginTop: 8 }}>Chưa có sản phẩm nào đủ số liệu.</p>
-          )}
-        </section>
-
-      </>) : null}
-
-      {tab === 'cai-dat' ? (<>
-        <section className="blk kh-settings">
-          <h2>⚙️ Cài đặt tuần</h2>
-          <form action={saveGoalFocusAndRegenerate}>
-            <label>
-              <b title="Câu ngắn bạn giao cho BOSS — được đưa vào prompt sinh hướng đi bài viết.">🎯 Mục tiêu tuần</b>
-              <textarea name="goal_text" defaultValue={goalText} rows={12} placeholder="Ví dụ: tuần này ưu tiên lọc dầu SF-50, cần 20 cuộc gọi." />
-              {goalUpdatedAt ? (
-                <span className={goalAgeDays !== null && goalAgeDays > 7 ? 'err-note' : 'sub'} style={{ display: 'block', fontSize: '.85rem', marginTop: 4 }}>
-                  Sửa lần cuối {fmtDateTime(goalUpdatedAt)}
-                  {goalAgeDays !== null && goalAgeDays > 7 ? `, đã ${vnInt(goalAgeDays)} ngày chưa sửa. Rà lại nếu tuần này đã đổi mục tiêu.` : '.'}
-                </span>
-              ) : null}
-            </label>
-            <label>
-              <b title="Máy chỉ đăng các sản phẩm liệt kê ở đây, sản phẩm khác bị chặn hoàn toàn.">🎯 Chỉ đăng sản phẩm này</b>
-              <input name="focus_groups" defaultValue={focusGroups.join(', ')} placeholder="lọc dầu, lọc nước" />
-            </label>
-            <label className="kh-inline">
-              <span className="sub">đến hết</span>
-              <input type="date" name="focus_until" defaultValue={focusUntil} style={{ maxWidth: 160 }} />
-            </label>
-            {focusExpired ? (
-              <p className="err-note" role="note" style={{ margin: '4px 0 0', fontSize: '.85rem' }}>
-                Hạn chỉ đăng {focusGroups.join(', ')} đã hết ngày {fmtDate(focusUntil)}. Máy đang đăng đủ mọi sản phẩm. Muốn giữ giới hạn thì đặt ngày mới rồi lưu, không cần nữa thì xoá ô sản phẩm.
-              </p>
-            ) : null}
-            <div className="settings-cta">
-              <SaveGenerateButton />
-            </div>
-            {lastPlanLog ? (
-              <p className={`sub ${lastPlanLog.status === 'error' ? 'err-note' : ''}`} style={{ margin: '8px 0 0' }}>
-                Lần sinh gần nhất ({fmtDateTime(lastPlanLog.created_at)}):{' '}
-                {lastPlanLog.status === 'ok'
-                  ? <>✅ xong — {vnInt(Number(lastPlanLog.detail?.suggestions) || 0)} hướng</>
-                  : <>⛔ lỗi — {String(lastPlanLog.detail?.error || 'không rõ').slice(0, 160)}</>}
-              </p>
-            ) : null}
-          </form>
-          {(() => {
-            const total = (appliedRow?.data?.content_suggestions || []).length;
-            if (!focusActive || !total) return null;
-            const keys = focusGroups.map((g) => String(g).toLowerCase().trim());
-            const inFocus = (appliedRow!.data.content_suggestions || []).filter((sg: any) => {
-              const pn = String(sg.product || '').toLowerCase();
-              return keys.some((k) => pn === k || pn.includes(k) || k.includes(pn));
-            }).length;
-            const allIn = inFocus === total;
-            return (
-              <p className="sub" style={{ margin: '10px 0 0' }}>
-                {allIn ? '✅' : '⚠️'} <b>{vnInt(inFocus)}/{vnInt(total)}</b> hướng đi bám sản phẩm tập trung ({focusGroups.join(', ')}){focusUntil ? ` — đến ${fmtDate(focusUntil)}` : ''}.{allIn ? '' : ' Hướng ngoài focus chờ tới khi hết hạn tập trung.'}
-              </p>
-            );
-          })()}
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-            <b style={{ display: 'block', marginBottom: 6 }}>👥 Nhóm chia sẻ Facebook</b>
-            {shareGroups.length ? (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
-              </div>
-            ) : <p className="sub" style={{ margin: 0 }}>Chưa có nhóm nào.</p>}
-          </div>
-        </section>
-        <section className="blk">
-          <h2>🔄 Soạn lại kế hoạch</h2>
-          <div className="kh-strip">
-            <ProposeButton action={regenerateWeeklyProposalAction} label={weeklyProposal ? '📝 Soạn lại đề xuất tuần sau' : '📝 Soạn đề xuất tuần sau'} />
-            <GenerateButton action={generatePlanNow} />
-          </div>
-        </section>
-      </>) : null}
-
-      {/* ===== 6. Đăng lại bài cũ ăn khách (khi có) ===== */}
-      {tab === 'tuan' && repostSuggestions.length ? (
-        <section className="blk">
-          <h2>🔁 Nên đăng lại</h2>
-          <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
-            <table className="datatable">
-              <thead><tr><th>Bài</th><th className="num">Tương tác</th><th>Đã đăng</th><th></th></tr></thead>
-              <tbody>
-                {repostSuggestions.map((r) => (
-                  <tr key={r.url}>
-                    <td>{r.title}</td>
-                    <td className="num"><b>{vnInt(r.engagement)}</b></td>
-                    <td className="sub">{fmtDateTime(r.publishedAt)}</td>
-                    <td><a className="btn ghost sm" href={r.url} target="_blank" rel="noopener noreferrer">Mở bài ↗</a></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
-
-      {tab === 'lich-su' ? (
-        <section className="blk">
-          <h2>📚 Các bản kế hoạch cũ <span className="sub">{vnInt(history.length)} bản</span></h2>
-          {history.length ? (
-            <div className="tablewrap table-scroll" style={{ marginTop: 10 }}>
-              <table className="datatable">
-                <thead><tr><th>Sinh lúc</th><th>Loại</th><th className="center"></th></tr></thead>
-                <tbody>
-                  {history.slice(0, 6).map((r) => (
-                    <tr key={r.id}>
-                      <td><a href={`/ke-hoach?xem=${r.id}`}>{fmtDateTime(r.created_at)}</a></td>
-                      <td className="sub">{r.data?.proposal ? `Đề xuất tuần ${fmtDate(r.data.proposal.week_start)}` : r.data?.cadence === 'weekly' ? 'Tuần' : r.data?.cadence === 'update' ? 'Cập nhật' : r.generated_by === 'cron' ? 'Tự động' : 'Tạo tay'}</td>
-                      <td className="center">
-                        <form action={deletePlan} style={{ display: 'inline' }}>
-                          <input type="hidden" name="plan_id" value={r.id} />
-                          <button className="btn no sm" type="submit" aria-label="Xóa kế hoạch">Xóa</button>
-                        </form>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : <p className="sub" style={{ marginTop: 10 }}>Chưa có bản cũ nào.</p>}
-          {history.length > 6 ? <p className="sub" style={{ margin: '8px 0 0' }}>Chỉ hiện 6 bản gần nhất.</p> : null}
-        </section>
-      ) : null}
-    </main>
+    <section className="blk">
+      <h2>Nên đăng lại</h2>
+      <ul className="kh-repost">
+        {list.map((r) => (
+          <li key={r.url}>
+            <a href={r.url} target="_blank" rel="noopener noreferrer">{r.title}</a>
+            <span className="sub">{vnInt(r.engagement)} tương tác, đăng {fmtDateTime(r.publishedAt)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

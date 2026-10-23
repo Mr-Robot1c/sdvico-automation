@@ -6,6 +6,18 @@ const nextConfig = {
   // bỏ auto-redirect; link nội bộ vẫn không dấu "/" cuối).
   skipTrailingSlashRedirect: true,
 
+  // 23/10: tab Kế hoạch đổi từ ?tab= sang đường dẫn riêng; link cũ (bookmark, Zalo) chuyển tiếp. Query gốc đi theo
+  // sang đích, nên ?xem=<id> tới thẳng tab Hướng đi.
+  async redirects() {
+    const tab = (value, destination) => ({ source: '/ke-hoach', has: [{ type: 'query', key: 'tab', value }], destination, permanent: false });
+    return [
+      tab('lich-dang', '/ke-hoach/lich-dang'),
+      tab('cai-dat', '/ke-hoach/cai-dat'),
+      tab('lich-su', '/ke-hoach/lich-su'),
+      { source: '/ke-hoach', has: [{ type: 'query', key: 'xem' }], destination: '/ke-hoach/huong-di', permanent: false },
+    ];
+  },
+
   // 3/9 GIẢM EGRESS: ảnh bucket Supabase đi qua máy nén ảnh Vercel (/_next/image) — khách và
   // Facebook kéo webp đúng cỡ từ CDN Vercel, Supabase chỉ bị gọi 1 lần mỗi cỡ. hostname CHỈ
   // nhận wildcard `*` MỘT cấp con (Next.js không cho `**` ở hostname, chỉ pathname) — bản đầu

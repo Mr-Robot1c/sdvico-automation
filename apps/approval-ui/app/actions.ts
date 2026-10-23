@@ -2469,7 +2469,7 @@ export async function generatePlanNow() {
       console.error('[plan-now] refresh live loi (bo qua):', e?.message || e);
     }
   }
-  revalidatePath('/ke-hoach');
+  revalidatePath('/ke-hoach', 'layout');
 }
 
 // Áp dụng trọng số của một bản kế hoạch: đánh dấu bản đó applied, gỡ áp các bản còn lại.
@@ -2493,7 +2493,7 @@ export async function applyPlanWeights(formData: FormData) {
     // 22/10: dùng chung hàm gộp với lượt tự gộp sáng Thứ 2 (lib/learn-weekly.ts).
     const { mergeLearnIntoApplied } = await import('../lib/learn-weekly');
     if (await mergeLearnIntoApplied(client, planId, 'nguoi-bam')) {
-      revalidatePath('/ke-hoach');
+      revalidatePath('/ke-hoach', 'layout');
       return;
     }
   }
@@ -2506,7 +2506,7 @@ export async function applyPlanWeights(formData: FormData) {
   if (error) throw new Error(error.message);
   const { error: offErr } = await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true).neq('id', planId);
   if (offErr) throw new Error(offErr.message);
-  revalidatePath('/ke-hoach');
+  revalidatePath('/ke-hoach', 'layout');
 }
 
 // Gỡ áp dụng: vòng xoay quay lại chọn ngẫu nhiên đều như trước.
@@ -2514,7 +2514,7 @@ export async function clearPlanWeights() {
   const client = getServerClient();
   const { error } = await client.from('mkt_plans').update({ applied: false, applied_at: null }).eq('applied', true);
   if (error) throw new Error(error.message);
-  revalidatePath('/ke-hoach');
+  revalidatePath('/ke-hoach', 'layout');
 }
 
 // Xóa một bản kế hoạch khỏi lịch sử.
@@ -2524,7 +2524,7 @@ export async function deletePlan(formData: FormData) {
   const client = getServerClient();
   const { error } = await client.from('mkt_plans').delete().eq('id', planId);
   if (error) throw new Error(error.message);
-  revalidatePath('/ke-hoach');
+  revalidatePath('/ke-hoach', 'layout');
 }
 
 // Kéo số liệu 3 nền tảng ngay (Facebook + YouTube + TikTok) — user bấm nút thay vì chờ
