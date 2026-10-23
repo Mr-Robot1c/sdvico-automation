@@ -1,7 +1,7 @@
-import { ago, fmtDT, type AgentDef } from '../../lib/agent-defs';
+import { ago, type AgentDef } from '../../lib/agent-defs';
 
-// 4/9 (user): thẻ đầu mỗi tab AI ở /kho-tri-thuc — cùng layout thẻ AI Video + Giọng
-// (icon, tên, mô tả, Model, Chạy tại) và THÊM dòng giờ hoạt động (lịch + lần chạy cuối).
+// Thẻ đầu mỗi tab AI ở /kho-tri-thuc. 23/10 (user: bỏ thông tin thừa): chỉ còn tên, trạng thái, việc làm, lần chạy cuối;
+// bỏ dòng model, nơi chạy và ghi chú kỹ thuật (extra vẫn nhận để chỗ gọi cũ không vỡ, không hiển thị).
 export default function AgentHeadCard({ a, extra }: { a: AgentDef; extra?: React.ReactNode }) {
   const s = a.last.state;
   const tone = s === 'ok' || s === 'skipped' ? 'tone-ok' : s === 'error' ? 'tone-no' : 'tone-demo';
@@ -15,10 +15,7 @@ export default function AgentHeadCard({ a, extra }: { a: AgentDef; extra?: React
         </span>
         <span style={{ display: 'block', marginTop: 2 }}>{a.role}</span>
         <span className="sub" style={{ display: 'block', fontSize: '.82rem', marginTop: 4 }}>
-          🧩 <b>Model:</b> {a.model}
-          <br />📍 <b>Chạy tại:</b> {a.runsAt}
-          <br />⏱ <b>Hoạt động:</b> {a.last.at ? `chạy lần cuối ${ago(a.last.at)} (${fmtDT(a.last.at)}) — ${a.last.note}` : a.last.note}
-          {extra ? <><br />{extra}</> : null}
+          {a.last.at ? `Chạy lần cuối ${ago(a.last.at)}` : a.last.note}
         </span>
       </span>
     </div>

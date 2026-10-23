@@ -52,9 +52,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Quảng cáo</h1>
-          <p className="sub">
-            Chuẩn bị đo lường cho quảng cáo trả phí. Người quản lý chạy quảng cáo tay trên Facebook Ads Manager hoặc Google Ads, hệ thống gắn Pixel và sinh link UTM để đo đơn về từ mỗi chiến dịch. Bot không tự chạy quảng cáo, không tiêu ngân sách.
-          </p>
         </div>
       </header>
 
@@ -80,9 +77,6 @@ export default async function Page() {
       <section className="goal-card">
         <form action={saveAdsConfig}>
           <div className="goal-head"><b>⚙️ Mã đo lường và kênh liên hệ</b></div>
-          <p className="sub" style={{ margin: '4px 0 10px' }}>
-            Dán mã Pixel và GA4 vào đây, hệ thống tự gắn lên trang bài viết và trang sản phẩm công khai. Đây là mã công khai, không phải mật khẩu.
-          </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
             <label className="field-col">
               <span className="sub">Meta Pixel ID (Facebook)</span>
@@ -116,9 +110,6 @@ export default async function Page() {
       <section className="goal-card" style={{ marginTop: 16 }}>
         <form action={createAd}>
           <div className="goal-head"><b>➕ Thêm chiến dịch quảng cáo</b></div>
-          <p className="sub" style={{ margin: '4px 0 10px' }}>
-            Khai báo chiến dịch bạn sắp chạy. Hệ thống sinh link UTM để bạn dán làm đích đến khi tạo quảng cáo trên Facebook hoặc Google.
-          </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <label className="field-col">
               <span className="sub">Tên chiến dịch</span>

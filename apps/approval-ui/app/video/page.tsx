@@ -112,16 +112,6 @@ export default async function Page() {
   const secs = (n: number) => `${Math.round(n)}s`;
   const ROLE_VI: Record<string, string> = { hook: 'mở', empathy: 'đồng cảm', story: 'chuyện', solution: 'lối ra', reward: 'phần thưởng', closing: 'chốt' };
 
-  // 1/9 (user feedback): văn phong cho NGƯỜI DÙNG, không phô jargon (ffmpeg, 1080x1920,
-  // burn phụ đề, cân âm lượng, brand-assets, Supabase). Diễn đạt việc bằng ngôn ngữ nghiệp vụ.
-  const steps = [
-    { icon: '📝', name: 'Viết kịch bản', tool: 'AI viết theo hướng đi của tuần', desc: 'BOSS ra hướng đi, máy viết kịch bản 3-8 cảnh (mở đầu hút mắt — đồng cảm — lối ra) và kịch bản bài trend kèm cảnh minh họa.' },
-    { icon: '🎙️', name: 'Đọc giọng', tool: 'Giọng Mỹ Duyên (dự phòng Gemini/Edge)', desc: 'Đọc tiếng Việt giọng Mỹ Duyên; máy chủ giọng bận thì tự lui giọng dự phòng. Cả video luôn dùng một giọng.' },
-    { icon: '🎬', name: 'Dựng video', tool: 'Máy nội bộ hoặc cloud', desc: 'Ghép các cảnh thành video dọc chuẩn TikTok/Reel, gắn phụ đề vào hình, cân đều âm lượng cho dễ nghe.' },
-    { icon: '☁️', name: 'Lưu vào kho', tool: 'Kho tư liệu của SDVICO', desc: 'Mỗi bài giữ MỘT video mới nhất trong kho, bản cũ tự dọn.' },
-    { icon: '📤', name: 'Đăng', tool: 'Facebook Reel · YouTube Shorts · TikTok', desc: 'Người bấm Duyệt mới đăng. TikTok xuất tay qua nút Xuất video (ứng dụng chưa qua duyệt của TikTok).' },
-  ];
-
   return (
     <main>
       <header className="head-row">
@@ -158,25 +148,6 @@ export default async function Page() {
           </div>
         </div>
       </div>
-
-      {/* ===== LUONG LAM VIDEO ===== */}
-      <section className="blk">
-        <h2><span aria-hidden="true">⚙️</span> Luồng làm video <span className="sub">5 bước, AI của SDVICO tự chạy — người chỉ bấm Duyệt</span></h2>
-        <div className="flow-steps">
-          {steps.map((s, i) => (
-            <div key={s.name} className="agent-card">
-              <div className="ag-head">
-                <span className="ag-name">{s.icon} {i + 1}. {s.name}</span>
-              </div>
-              {/* 29/9 (Thanh: "các ô ở trang video bị lòi ra ngoài"): .badge nowrap nên nhãn dài
-                  ("Facebook Reel · YouTube Shorts · TikTok") thò khỏi card hẹp — cho xuống dòng trong card. */}
-              <span className="badge tone-demo" style={{ justifySelf: 'start', maxWidth: '100%', whiteSpace: 'normal', lineHeight: 1.35 }}>{s.tool}</span>
-              <p className="ag-role" style={{ margin: 0 }}>{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* ===== BAI DANG CHO DUNG ===== */}
       {waiting.length || generating.length ? (
         <section className="blk">
@@ -201,7 +172,7 @@ export default async function Page() {
 
       {/* ===== ARTIFACT DANG NAM O DAU ===== */}
       <section className="blk">
-        <h2><span aria-hidden="true">📦</span> Video mới nhất trong kho <span className="sub">bấm ▶ Xem để mở ngay trong trang · cột "Ghép từ" cho biết video lấy tư liệu nào, ở giây nào</span></h2>
+        <h2><span aria-hidden="true">📦</span> Video mới nhất trong kho</h2>
         {assets.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Kho chưa có video nào.</p>
         ) : (

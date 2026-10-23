@@ -35,7 +35,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Kết nối kênh đăng</h1>
-          <p className="sub">Facebook và YouTube máy tự đăng khi người bấm Duyệt, TikTok phải xuất tay. Xanh là chạy được, vàng là làm tay, đỏ là cần cấu hình lại.</p>
         </div>
       </header>
 

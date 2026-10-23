@@ -132,10 +132,6 @@ export default function ImageStudio({
       ) : null}
 
       {msg ? <p className="muted">{msg}</p> : null}
-      <p className="sx-note">
-        "Ghép sản phẩm" sẽ cắt nền ảnh sản phẩm bạn đang chọn (bằng remove.bg) rồi đặt lên ảnh nền, ra một
-        tấm ảnh sản phẩm nằm trong cảnh. Đặt tên ảnh sản phẩm mô tả rõ để phần Sinh text viết bám theo hình.
-      </p>
     </section>
   );
 }

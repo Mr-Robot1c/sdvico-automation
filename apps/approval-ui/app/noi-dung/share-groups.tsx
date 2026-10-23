@@ -315,11 +315,6 @@ export default function ShareGroups({
                     {showAll ? `📣 Lô hôm nay (${size})` : `👁 Xem tất cả (${groups.length})`}
                   </button>
                 </div>
-                {!showAll ? (
-                  <p className="sub" style={{ margin: '0 0 6px', fontSize: 11 }}>
-                    Mỗi ngày {size} nhóm, mỗi nhóm 1 bài, xoay đều để 7 ngày phủ hết. Dán link, bấm Post trong group rồi bấm Đánh dấu đã chia.
-                  </p>
-                ) : null}
                 {/* 17/9: lot đã tải về mà vẫn rỗng thì nói đúng lý do, đừng treo chữ "Đang tải". */}
                 {items.length === 0 ? (
                   <p className="sub" style={{ margin: '0 0 8px' }}>{!groups.length ? 'Chưa có group nào. Thêm bên dưới.' : lot ? 'Các nhóm đều đã nhận bài hôm nay — bấm "Xem tất cả" nếu vẫn muốn chia.' : 'Đang tải lô hôm nay...'}</p>

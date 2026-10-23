@@ -133,7 +133,6 @@ export default function PostingPlanForm({ pp, lots = {}, rowsByDate = {}, change
     <section className="blk" id="lich-dang">
       <h2>
         🗓 Lịch đăng cố định
-        <span className="sub">BOSS xếp mỗi sáng Thứ 2 cho cả tuần: giờ, loại bài, nền tảng, group chia đều để không loãng · trong tuần đứng yên, chỉ bạn sửa hoặc thêm</span>
       </h2>
       <div className="kh-strip" style={{ marginBottom: 8 }}>
         <span className="grow sub">{statusLine}</span>

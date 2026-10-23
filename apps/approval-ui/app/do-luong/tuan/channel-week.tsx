@@ -101,7 +101,7 @@ export default function ChannelWeek({ channel, rows, weekLabel, offset }: { chan
             </table>
           </div>
           <p className="sub" style={{ margin: '10px 0 0', fontSize: '.82rem' }}>
-            Điểm = tương tác + 0,1 × lượt xem + 0,02 × giây xem + 0,05 × người thấy (cùng công thức BOSS học tuần). Tốt / Khá / Yếu = 1/3 trên, giữa, dưới trong tuần của kênh này. Toàn bộ bài kênh: <Link href={`/kenh/${channel}`} className="src">/kenh/{channel} →</Link>{offset === 0 ? ' · số tuần này còn thay đổi tới Chủ nhật.' : ''}
+            Toàn bộ bài kênh: <Link href={`/kenh/${channel}`} className="src">/kenh/{channel} →</Link>{offset === 0 ? ' · số tuần này còn thay đổi tới Chủ nhật.' : ''}
           </p>
         </>
       )}

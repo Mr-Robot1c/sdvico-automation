@@ -16,7 +16,6 @@ export default function Page() {
       <header className="head-row">
         <div>
           <h1>SEO</h1>
-          <p className="sub">Bài viết công khai trên web (Google đọc được), kho từ khóa và sức khỏe SEO. Bài blog sinh từ dây chuyền nội dung.</p>
         </div>
         <div className="head-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <a href={publicBlogUrl()} target="_blank" rel="noreferrer" className="btn ghost">🌐 Mở trang Bài viết ↗</a>

@@ -497,9 +497,6 @@ export default function SanXuatForm({
             >
               {genBusy ? 'Đang sinh...' : '✨ Sinh text bằng AI'}
             </button>
-            <span className="muted">
-              Máy soạn nháp theo tiêu đề (kèm gợi ý từ tên tất cả ảnh/video đã chọn). Người sửa lại trước khi đẩy hàng đợi.
-            </span>
           </div>
 
           <label className="sx-field">
@@ -576,9 +573,6 @@ export default function SanXuatForm({
                     <b>Đang dựng video...</b>
                     <span className="muted">GitHub Actions đang làm (~8 phút). Trang sẽ tự cập nhật.</span>
                   </div>
-                  <p className="muted" style={{ marginTop: 6, fontSize: '.85rem' }}>
-                    Chạy trên cloud của GitHub, không cần bật máy nào. Cứ để trang mở hoặc quay lại sau.
-                  </p>
                 </>
               ) : videoJob.status === 'done' ? (
                 <>
@@ -610,11 +604,6 @@ export default function SanXuatForm({
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
           ) : null}
-
-          <p className="sx-note">
-            Nút <b>Gửi duyệt</b> chỉ tạo bài và đưa vào hàng đợi duyệt. Nội dung chưa lên trang mạng xã hội:
-            người duyệt phải bấm <b>Duyệt</b> ở trang Duyệt bài thì mới thực sự đăng. Điều cấm 1: máy soạn, người bấm.
-          </p>
         </form>
       </section>
 

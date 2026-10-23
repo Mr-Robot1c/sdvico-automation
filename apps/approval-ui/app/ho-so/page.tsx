@@ -78,7 +78,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Hồ sơ ứng viên</h1>
-          <p className="sub">CV nạp tự động từ hộp thư. Máy xếp, người quyết, không tự loại ai.</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>
@@ -89,7 +88,6 @@ export default async function Page() {
         <div className="empty">
           <div className="empty-icon" aria-hidden="true">📭</div>
           <p>Chưa có hồ sơ nào.</p>
-          <p className="sub">Khi có CV mới trong hộp thư, hồ sơ sẽ hiện ở đây sau lượt nạp gần nhất.</p>
         </div>
       ) : null}
 

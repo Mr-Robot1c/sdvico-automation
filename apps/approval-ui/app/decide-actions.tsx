@@ -129,9 +129,6 @@ function TiktokComposer({ videoUrl, caption }: { videoUrl?: string | null; capti
           {(info.commentDisabled || info.duetDisabled || info.stitchDisabled) ? (
             <p className="sub">Tài khoản đang tắt: {[info.commentDisabled && 'bình luận', info.duetDisabled && 'duet', info.stitchDisabled && 'stitch'].filter(Boolean).join(', ')}.</p>
           ) : null}
-          {onlySelf ? (
-            <p className="sub">Chưa có mục "Công khai" vì app chưa qua audit TikTok (hiện chỉ đăng được cho Người theo dõi, Bạn bè hoặc Riêng tư). Sau khi audit đậu sẽ có "Công khai (mọi người)".</p>
-          ) : null}
         </>
       )}
     </div>

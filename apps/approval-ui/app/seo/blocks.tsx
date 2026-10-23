@@ -186,7 +186,7 @@ export async function SeoKeywordsBlock() {
       <section className="blk">
         <h2><span aria-hidden="true">🔑</span> Từ khóa mới thêm</h2>
         {keywords.length === 0 ? (
-          <p className="sub" style={{ margin: 0 }}>Kho từ khóa trống. Chạy seed keywords hoặc thêm tay ở trang Kho từ khóa.</p>
+          <p className="sub">Kho từ khóa trống.</p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
             <div className="tablewrap table-scroll">

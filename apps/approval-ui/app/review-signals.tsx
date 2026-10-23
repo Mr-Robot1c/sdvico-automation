@@ -128,7 +128,7 @@ export function VideoScript({ videoUrl, scenes, poster }: { videoUrl?: string | 
     <section className="rv-video" aria-label="Video và lời đọc">
       <div className="rv-video-head">
         <b>Video{secs ? ` ${secs} giây` : ''}</b>
-        <span className="sub">Xem hết và đọc lời đọc trước khi duyệt. Lời đọc hay bịa giờ giấc, con số, nhân vật.</span>
+        <span className="sub">Xem hết video trước khi duyệt</span>
       </div>
       <div className="rv-video-body">
         {videoUrl ? (

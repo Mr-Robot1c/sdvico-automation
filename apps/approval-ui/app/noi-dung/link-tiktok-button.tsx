@@ -137,9 +137,6 @@ export default function LinkTikTokButton({
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 8 }}>
-        Chọn video TikTok tương ứng với bài. Sau khi ghép, view/like/comment sẽ tự cập nhật mỗi giờ.
-      </div>
       {linkedVideoId ? (
         <div style={{ padding: 8, background: 'var(--surface-2)', borderRadius: 6, marginBottom: 8, fontSize: 12 }}>
           <b>Đã ghép:</b> video id <code>{linkedVideoId.slice(0, 20)}...</code>

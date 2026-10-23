@@ -110,7 +110,7 @@ export default function StudioEmbed() {
             </p>
             <a className="btn" href={cur.protocol}>Mở Studio Bản tin</a>
             <p className="sub" style={{ margin: '12px 0 0', fontSize: 13 }}>
-              Studio chạy trên máy người biên tập, chỉ mở được khi bạn đang ngồi đúng máy đó. Nếu trình duyệt hỏi quyền truy cập thiết bị trong mạng cục bộ, chọn Cho phép. Đang tự kiểm tra lại mỗi 2 giây.
+              Chỉ mở được trên máy biên tập. Trình duyệt hỏi quyền mạng cục bộ thì chọn Cho phép.
             </p>
           </div>
         ) : null}

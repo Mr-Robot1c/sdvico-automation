@@ -39,16 +39,6 @@ export default async function Page() {
           <h1>Xưởng sản xuất hôm nay</h1>
         </div>
       </header>
-
-      <div className="pipeline sx-pipeline">
-        <span className="pipe-step">1. Gắn ảnh và video</span>
-        <span className="pipe-step">2. Gõ tiêu đề</span>
-        <span className="pipe-step">3. Sinh text bằng AI</span>
-        <span className="pipe-step">4. Sửa nội dung</span>
-        <span className="pipe-step">5. Gửi duyệt</span>
-        <span className="pipe-step">6. Người bấm Duyệt mới đăng</span>
-      </div>
-
       <SanXuatForm images={images.map(withUrl)} videos={videos.map(withUrl)} />
     </main>
   );

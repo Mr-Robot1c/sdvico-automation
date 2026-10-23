@@ -95,7 +95,7 @@ export default function ShareLotToday({
             )}
           </div>
         ))}
-        {!items.length ? <span className="sub">Chưa có nhóm nào. Thêm nhóm ở popover 📣 Chia sẻ group trong Bảng bài viết.</span> : null}
+        {!items.length ? <p className="sub">Chưa có nhóm nào.</p> : null}
       </div>
       {err ? <p className="err-note sub" style={{ margin: '6px 0 0' }}>⛔ {err}</p> : null}
       {post?.url ? <p className="sub" style={{ margin: '6px 0 0', fontSize: '.78rem' }}>Bài Facebook hôm nay: <a href={post.url} target="_blank" rel="noreferrer" className="src">mở bài ↗</a> (sao chép link bài rồi dán vào nhóm).</p> : null}

@@ -153,7 +153,6 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
       <header className="head-row">
         <div>
           <h1>Nguồn học dữ liệu</h1>
-          <p className="sub">Tất cả AI đang chạy ở đâu, học được gì — kho tri thức chi tiết theo từng AI ở các tab dưới.</p>
         </div>
       </header>
       {chips}
@@ -205,11 +204,6 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
       {tab === 'danh-gia' ? (
         <section>
           <AgentHeadCard a={agentOf('danh-gia')} />
-          <div className="card" style={{ padding: '10px 14px', marginBottom: 14 }}>
-            <b>Cách chấm (từ 29/8, bỏ hẳn A/B):</b> mỗi hướng đi BOSS giao ra đúng 1 bài. Điểm bài = tương tác + 0,1 × lượt xem + 0,02 × giây xem + 0,05 × tiếp cận.
-            Bài được so với điểm trung bình của cùng sản phẩm trong tuần. Chủ nhật 19h máy gom theo sản phẩm: một phần ba đầu là Thắng (ưu tiên 3), giữa là Theo dõi (2), một phần ba cuối chưa ra đơn là Đuối (1), dưới 2 bài thì chưa xếp.
-            Đề xuất chờ người bấm Áp dụng ở trang Kế hoạch. Mỗi tối 19h máy chỉnh trọng số tối đa 0,5 theo số liệu ngày. Tuần sau giữ 70% hướng mới, 30% dùng lại bài thắng.
-          </div>
 
           <h2 style={{ fontSize: '1.05rem', margin: '0 0 8px' }}>Bài {wk.window.label.toLowerCase()} ({vn(wk.posts.length)} bài)</h2>
           {wk.posts.length === 0 ? <div className="empty"><p>Tuần này chưa có bài nào có số liệu.</p></div> : (
@@ -287,7 +281,6 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
                 <div><b>Bản đang áp</b> · tạo {fmtDT(plan.generatedAt || applied.created_at)} · nhịp {plan.cadence === 'weekly' ? 'tuần (Thứ 2)' : plan.cadence === 'update' ? 'cập nhật' : 'bấm tay'}</div>
                 <div>Nguồn số liệu: <b>{plan.measurement_source || '7 ngày gần nhất'}</b></div>
                 <div>Tri thức đã đọc khi lập: <b>{vn(kn.internal)}</b> nội bộ, <b>{vn(kn.publicSrc)}</b> public{verdicts.length ? <>, <b>{vn(verdicts.length)}</b> kết luận đánh giá</> : null}</div>
-                <div className="sub">Lịch: học tuần Chủ nhật 19h · kế hoạch tuần Thứ 2 8h (tự áp) · chỉnh dần mỗi tối 19h theo số liệu ngày, tối đa 0,5 điểm{learn ? ` · đề xuất học tuần gần nhất ${fmtDT(learn.created_at)}${learn.applied ? ' (đã áp)' : ' (chờ áp)'}` : ''}</div>
               </div>
 
               <h2 style={{ fontSize: '1.05rem', margin: '0 0 8px' }}>Xếp hạng sản phẩm</h2>
@@ -339,7 +332,6 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
       {tab === 'creator' ? (
         <section>
           <AgentHeadCard a={agentOf('creator')} />
-          <p className="sub" style={{ margin: '8px 0 12px' }}>Bài máy viết 7 ngày qua: theo hướng đi nào của BOSS, xoáy vào insight nào. {vn(creator.length)} bài.</p>
           {creator.length === 0 ? <div className="empty"><p>Chưa có bài nào trong 7 ngày.</p></div> : (
             <div className="tablewrap">
               <table className="datatable">
@@ -415,9 +407,6 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
 
       {tab === 'token' && ts ? (
         <section>
-          <p className="sub" style={{ margin: '8px 0 12px' }}>
-            Token Gemini đã dùng, tách theo từng AI trong hệ. Đã gắn đo: BOSS (hướng đi), Data 1 (đọc/tóm tắt file Zalo), Data 2 (báo ngành), Creator (viết bài, chọn ảnh, kịch bản video), Voice (Gemini TTS). Evaluator không dùng token (chỉ đọc số liệu). Whisper phụ đề chạy local nên không tính. Số chậm tối đa 5 phút.
-          </p>
           <div className="chart-grid" style={{ marginBottom: 18 }}>
             <div className="stat-tile">
               <div className="stat-num">{vn(ts.gemini.today)}</div>
@@ -496,9 +485,6 @@ export default async function Page({ searchParams }: { searchParams: { ai?: stri
               token dùng + quy đổi ra tiền". Nguồn: bảng claude_code_usage (script
               upload-claude-usage.mjs, cron Windows 1h/lần). */}
           <h2 style={{ fontSize: '1.05rem', margin: '28px 0 8px' }}>🤖 Claude Code (Anthropic Max)</h2>
-          <p className="sub" style={{ margin: '0 0 12px' }}>
-            Token dùng khi làm việc với Claude Code (công cụ lập trình, không phải AI chạy sản xuất). Cột "Tương đương API" là chi phí nếu trả theo giá API, để so với gói Claude Max ($200/tháng, khoảng 5.200.000 đồng).
-          </p>
           {ts.claude.count === 0 ? (
             <div className="empty" style={{ padding: '20px 8px' }}>
               <p className="sub" style={{ margin: 0 }}>Chưa có dữ liệu Claude Code. Báo kỹ thuật bật đồng bộ.</p>

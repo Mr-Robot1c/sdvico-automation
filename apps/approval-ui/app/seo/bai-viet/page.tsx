@@ -88,7 +88,6 @@ export default async function Page({ searchParams }: { searchParams?: { sap?: st
           </tbody>
         </table>
       </div>
-      {gscConfigured() ? <p className="sub" style={{ marginTop: 10 }}>Số Search Console tính 28 ngày gần nhất, Google trễ 2 ngày; "—" là bài chưa có lượt hiển thị nào trên Google.</p> : null}
     </main>
   );
 }

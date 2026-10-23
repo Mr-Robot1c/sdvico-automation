@@ -39,7 +39,6 @@ export default async function Page({ searchParams }: { searchParams?: { kenh?: s
       <header className="head-row">
         <div>
           <h1><PlatformLogo platform={KENH[kenh].key} size={22} /> Video đã đăng · {KENH[kenh].label}</h1>
-          <p className="sub" style={{ margin: '4px 0 0' }}>{fmt(rows.length)} video · {fmt(tot.views)} lượt xem · {fmt(tot.engagement)} tương tác · {fmt(tot.comments)} bình luận (số mới nhất máy kéo về). Bấm tiêu đề để mở bài thật.</p>
         </div>
         <nav className="filters" style={{ margin: 0 }} aria-label="Chọn nền tảng">
           {Object.entries(KENH).map(([k, v]) => (
@@ -88,7 +87,6 @@ export default async function Page({ searchParams }: { searchParams?: { kenh?: s
           </table>
         </div>
       )}
-      <p className="sub" style={{ marginTop: 10 }}>Số liệu chi tiết theo ngày ở <Link href="/do-luong" className="src">Đo lường</Link> · dashboard tuần từng kênh ở <Link href={`/do-luong/tuan?kenh=${kenh}`} className="src">Báo cáo tuần</Link>.</p>
     </main>
   );
 }

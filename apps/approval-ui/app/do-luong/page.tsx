@@ -212,9 +212,6 @@ export default async function Page() {
         <form action={importManualFacebookPost} className="import-manual-form">
           <div style={{ minWidth: 0, flex: '1 1 320px' }}>
             <b>➕ Thêm bài đăng tay trên Page chính thức</b>
-            <p className="sub" style={{ margin: '2px 0 6px' }}>
-              Dán link bài đã đăng tay trên Page. Hệ thống lưu lại và tự cập nhật số liệu như bài máy đăng.
-            </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input name="fb_link" type="url" required placeholder="https://www.facebook.com/…/posts/… hoặc …/videos/…" className="note" style={{ flex: '1 1 320px', maxWidth: 'none' }} />
               <input name="title" placeholder="Tên gợi nhớ (không bắt buộc)" className="note" style={{ flex: '1 1 200px', maxWidth: 260 }} />

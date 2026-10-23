@@ -81,12 +81,6 @@ export default async function Page() {
   const publicRows = (dataPublicRows.data || []) as any[];
   const lastScoreLog = ((scoreLogRes.data || [])[0] as any) || null;
 
-  const flow = [
-    'DATA 1 + DATA 2 thu thập', 'Ý tưởng', 'AI BOSS ra kế hoạch', 'AI kịch bản viết',
-    'AI video + giọng nói dựng', 'Người bấm Duyệt', 'Lên lịch', 'Đăng các kênh',
-    'AI báo cáo tuần đo', 'BOSS chỉnh trọng số (70/30)',
-  ];
-
   return (
     <main>
       <header className="head-row">
@@ -103,20 +97,6 @@ export default async function Page() {
       <BotStatusSection />
 
       {/* 23/10 (đợt 3, design-spec-app-noi-bo.md): khung chat bot chỉ còn ở nút nổi "Hỏi bot" (ask-bot-fab.tsx). */}
-
-      {/* ===== VONG LAP ===== */}
-      <section className="blk">
-        <h2><span aria-hidden="true">🔁</span> Vòng lặp học và làm <span className="sub">chạy tự động mỗi ngày, người chỉ duyệt</span></h2>
-        <div className="flow-strip">
-          {flow.map((s, i) => (
-            <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span className={`flow-step ${s.includes('BOSS') ? 'boss' : ''}`}>{s}</span>
-              {i < flow.length - 1 ? <span className="flow-arrow" aria-hidden="true">→</span> : <span className="flow-arrow" aria-hidden="true">↩</span>}
-            </span>
-          ))}
-        </div>
-      </section>
-
       {/* ===== 9 AI CARD (component dung chung voi trang Nguon hoc du lieu) ===== */}
       <section className="blk">
         <h2><span aria-hidden="true">🤖</span> Các AI trong hệ thống</h2>

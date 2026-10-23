@@ -248,9 +248,6 @@ export default async function Page({ searchParams }: { searchParams?: { tuan?: s
                   <Link href={`/do-luong/tuan?tuan=${offset + 1}`}>Xem {offset === 0 ? 'tuần trước' : `${offset + 1} tuần trước`}</Link>
                 )}
               </p>
-              <p className="sub" style={{ marginTop: 12, fontStyle: 'italic', opacity: 0.8 }}>
-                Số liệu cũ vẫn còn trong lịch sử — chỉ khung <b>{win.label}</b> trống vì chưa có bài đăng.
-              </p>
             </div>
           );
         })()

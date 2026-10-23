@@ -177,15 +177,6 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
             Thùng rác <span className="n">{cTrash ?? 0}</span>
           </Link>
         </nav>
-        {/* 3/10 (kiểm UI sau đợt 1): phạm vi đếm phải đọc được bằng chạm và bàn phím, không chỉ tooltip rê chuột. */}
-        <details className="bang-more bang-scope">
-          <summary>Cách đếm số</summary>
-          <ul>
-            <li>Hàng Danh sách bài: {cAll.toLocaleString('vi-VN')} bài chữ mới nhất, không tính video và Thùng rác. Bài đã có lượt đăng thật tính Đã đăng.</li>
-            <li>Số trên đầu cột bảng: tính trong 300 phiếu duyệt gần nhất, mỗi bài một thẻ, có thể gồm cả video.</li>
-            <li>Cột Đã đăng, từ chối gần đây chỉ hiện vài bài mới nhất của hai nhóm này, số trên đầu cột là tổng của cả hai nhóm. Bấm Xem tất cả để mở danh sách đủ.</li>
-          </ul>
-        </details>
         <BangSection />
       </main>
     );
@@ -393,22 +384,6 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
           </a>
         ))}
       </nav>
-      {/* 2/10 (audit đợt A): phạm vi số đếm. Bốn chip trạng thái + Nháp = Tất cả. */}
-      <p className="sub scope-note">
-        Phạm vi: {rawItems.length.toLocaleString('vi-VN')} {tab === 'video' ? 'kịch bản video' : 'bài chữ'} mới nhất{tab === 'thung-rac' ? ' trong Thùng rác' : ', không tính Thùng rác'} (tối đa 200).
-        {' '}Số Tất cả gồm cả {(rawItems.length - STATUS_TABS.reduce((s, t) => s + (statusCount.get(t.key) || 0), 0)).toLocaleString('vi-VN')} bài ở trạng thái Nháp không có chip riêng.
-        {' '}Bài đã có lượt đăng thật tính Đã đăng, kể cả khi phiếu duyệt gần nhất là Từ chối.
-      </p>
-
-      {tab === 'video' ? (
-        <div className="pipeline">
-          <span className="pipe-step">1. Máy sinh kịch bản</span>
-          <span className="pipe-step">2. Người duyệt</span>
-          <span className="pipe-step">3. Quay bằng tư liệu thật</span>
-          <span className="pipe-step">4. Whisper + FFmpeg dựng</span>
-          <span className="pipe-step">5. Duyệt và đăng</span>
-        </div>
-      ) : null}
 
       {error ? <p className="err" role="alert">Lỗi tải dữ liệu: {error.message}</p> : null}
 
@@ -417,17 +392,12 @@ export default async function Page({ searchParams }: { searchParams: { loai?: st
           <div className="empty">
             <div className="empty-icon" aria-hidden="true">🗑️</div>
             <p><b>Thùng rác trống.</b></p>
-            <p className="sub" style={{ maxWidth: 520, margin: '8px auto 0' }}>
-              Chưa có bài nào bị ẩn. Khi bấm nút <b>Xoá</b> trên bài viết, bài sẽ vào đây (soft-delete)
-              — lịch sử số liệu vẫn còn nguyên, có thể khôi phục hoặc xoá hẳn tại đây.
-              Bài nằm trong thùng rác <b>quá 7 ngày sẽ được máy tự xoá hẳn</b>.
-            </p>
+            <p className="sub">Bài trong thùng rác quá 7 ngày máy tự xoá hẳn.</p>
           </div>
         ) : (
           <div className="empty">
             <div className="empty-icon" aria-hidden="true">{tab === 'video' ? '🎬' : '📝'}</div>
             <p>Chưa có {tab === 'video' ? 'kịch bản video' : 'bài viết'} nào{statusFilter ? ` ở mục ${STATUS[statusFilter].label}` : ''}.</p>
-            <p className="sub">Vào <a className="src" href="/san-xuat">Xưởng sản xuất</a> để soạn bài mới.</p>
           </div>
         )
       ) : null}

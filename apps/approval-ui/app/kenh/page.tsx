@@ -297,7 +297,7 @@ export default async function Page() {
 
       {/* ===== BAI NOI BAT ===== */}
       <section className="blk" style={{ marginTop: 16 }}>
-        <h2><span aria-hidden="true">🔥</span> Bài nổi bật các nền tảng <span className="sub">7 ngày gần nhất, mọi nền tảng xếp chung theo tương tác + lượt xem — icon có nhãn TOP là nền tảng bài đó ăn nhất; bấm tiêu đề hoặc logo để mở bài thật</span></h2>
+        <h2><span aria-hidden="true">🔥</span> Bài nổi bật các nền tảng</h2>
         {hot.length === 0 ? (
           <p className="sub" style={{ margin: 0 }}>Chưa có bài nào có số liệu.</p>
         ) : (

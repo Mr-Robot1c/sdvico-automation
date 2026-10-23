@@ -58,11 +58,6 @@ export default async function Page({ params, searchParams }: { params: { kenh: s
       <header className="head-row">
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}><PlatformLogo platform={KENH[kenh].key} size={24} /> {KENH[kenh].label}</h1>
-          <p className="sub" style={{ margin: '4px 0 0' }}>
-            Mọi bài đã đăng lên kênh này, số mới nhất máy kéo về. Bấm ô số để sắp theo ô đó; bấm tiêu đề để mở bài thật.
-            {KENH[kenh].note ? ` ${KENH[kenh].note}` : ''}
-            {kenh === 'tiktok' ? <> Kênh: <a className="src" href={TIKTOK_PROFILE_URL} target="_blank" rel="noreferrer">{TIKTOK_PROFILE_URL.replace('https://www.tiktok.com/', '')} ↗</a>{ttIds === null ? ' (không đọc được danh sách video từ TikTok, tạm lọc theo ngày nối kênh)' : ''}.</> : null}
-          </p>
         </div>
         <nav className="filters" style={{ margin: 0 }} aria-label="Chọn nền tảng">
           {Object.entries(KENH).map(([k, v]) => (
@@ -100,7 +95,6 @@ export default async function Page({ params, searchParams }: { params: { kenh: s
                   <span className="when">{fmtDT(c.createdTime)}</span>
                 </div>
               ))}
-              <p className="sub" style={{ margin: '8px 0 0', fontSize: '.78rem' }}>Máy chỉ đọc, không tự trả lời khách (điều cấm 1). Khách hỏi mua thì ghi vào <Link href="/khach-hang" className="src">Khách hàng</Link>.</p>
             </div>
           )}
         </section>
@@ -157,7 +151,6 @@ export default async function Page({ params, searchParams }: { params: { kenh: s
           </table>
         </div>
       )}
-      <p className="sub" style={{ marginTop: 10 }}>Dashboard tuần của kênh này: <Link href={`/do-luong/tuan?kenh=${kenh}`} className="src">Báo cáo tuần · {KENH[kenh].label} →</Link> · số theo ngày ở <Link href="/do-luong" className="src">Đo lường</Link>.</p>
     </main>
   );
 }

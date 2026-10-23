@@ -195,12 +195,6 @@ export default async function DoLuongSection() {
     <section>
       <div className="head-row" style={{ marginTop: 4 }}>
         <div>
-          <p className="sub">So sánh tương tác + đơn/lead theo bài và theo sản phẩm. Sản phẩm nào cao thì đẩy mạnh hướng đó.</p>
-          {pageFollowers ? (
-            <p className="sub" style={{ marginTop: 4 }}>
-              📣 Trang có <b>{fmt(pageFollowers)}</b> người theo dõi. Cột <b>Người xem</b> là số người thật sự thấy bài (kèm % so với người theo dõi).
-            </p>
-          ) : null}
         </div>
         <div className="head-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link href="/do-luong/tuan" className="btn ghost" title="Báo cáo theo tuần (Thứ 2 đến Chủ Nhật)">📅 Báo cáo tuần</Link>
@@ -214,9 +208,6 @@ export default async function DoLuongSection() {
         <form action={importManualFacebookPost} className="import-manual-form">
           <div style={{ minWidth: 0, flex: '1 1 320px' }}>
             <b>➕ Thêm bài đăng tay trên Page chính thức</b>
-            <p className="sub" style={{ margin: '2px 0 6px' }}>
-              Dán link bài đã đăng tay trên Page. Hệ thống lưu lại và tự cập nhật số liệu như bài máy đăng.
-            </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input name="fb_link" type="url" required placeholder="https://www.facebook.com/…/posts/… hoặc …/videos/…" className="note" style={{ flex: '1 1 320px', maxWidth: 'none' }} />
               <input name="title" placeholder="Tên gợi nhớ (không bắt buộc)" className="note" style={{ flex: '1 1 200px', maxWidth: 260 }} />
@@ -235,7 +226,6 @@ export default async function DoLuongSection() {
         <div className="empty">
           <div className="empty-icon" aria-hidden="true">📊</div>
           <p>Chưa có số liệu.</p>
-          <p className="sub">Đăng bài lên Facebook, YouTube hoặc TikTok, chờ có tương tác, rồi bấm <b>Cập nhật số liệu</b>.</p>
         </div>
       ) : (
         <>
@@ -377,10 +367,6 @@ export default async function DoLuongSection() {
               </div>
             </>
           ) : null}
-          <p className="muted" style={{ marginTop: 10, fontSize: '.85rem' }}>
-            <b>Lượt xem</b>, <b>Người xem</b> và <b>Giây xem</b> (video) cần quyền <b>read_insights</b> trên trang Facebook. Chưa cấp thì
-            các cột này để trống, còn Like/Comment/Share vẫn có. Số liệu YouTube Shorts và TikTok kéo qua API mỗi 30 phút.
-          </p>
         </>
       )}
     </section>

@@ -74,9 +74,6 @@ export default function PexelsScenesButton({ scenes, title, hook }: { scenes: Sc
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
           <div>
             <b style={{ fontSize: '1.05rem' }}>🎥 Kịch bản video trend — {scenes.length} cảnh</b>
-            <p className="sub" style={{ fontSize: '.85rem', margin: '4px 0 0' }}>
-              Tải video + ảnh Pexels về máy, kéo vào CapCut/InShot, lồng tiếng theo narration BOSS đã viết.
-            </p>
           </div>
           <button type="button" className="btn ghost sm" onClick={closeDlg}>✕ Đóng</button>
         </div>

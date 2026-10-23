@@ -13,7 +13,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Kết nối YouTube</h1>
-          <p className="sub">Đăng video dọc (9:16) lên kênh YouTube dưới dạng Shorts. Cấu hình một lần bằng token, sau đó bài có video tự đăng khi được duyệt.</p>
         </div>
       </header>
 
@@ -23,7 +22,6 @@ export default async function Page() {
           {info.configured && info.channelTitle ? (
             <>
               <div className="metaline" style={{ marginTop: 6 }}>✅ Đã kết nối kênh: <b>{info.channelTitle}</b></div>
-              <div className="metaline">Bài có video dọc sẽ tự đăng lên đây khi người duyệt bấm Duyệt.</div>
             </>
           ) : info.configured && info.error ? (
             <>
@@ -35,20 +33,6 @@ export default async function Page() {
               <div className="metaline" style={{ marginTop: 6 }}>❌ Chưa kết nối kênh YouTube. Báo kỹ thuật cài đặt.</div>
             </>
           )}
-        </div>
-
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-          <b>Cách hoạt động</b>
-          <ol style={{ margin: '6px 0 0', paddingLeft: 20, lineHeight: 1.7 }}>
-            <li>Cron sinh bài có video, hệ thống tự thêm kênh YouTube vào bài.</li>
-            <li>Người duyệt vào hàng đợi, bấm Duyệt.</li>
-            <li>Bản video dọc 9:16 được đăng lên kênh dưới dạng Shorts (kèm mô tả, hashtag, số tổng đài).</li>
-          </ol>
-        </div>
-
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-          <b>Lưu ý</b>
-          <div className="metaline" style={{ marginTop: 6 }}>Quyền đăng YouTube có thể hết hạn sau khoảng 7 ngày. Thấy báo lỗi thì báo kỹ thuật cấp lại.</div>
         </div>
       </section>
     </main>

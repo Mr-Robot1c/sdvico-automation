@@ -159,7 +159,6 @@ export default async function Page({ searchParams }: { searchParams: { folder?: 
                 style={{ padding: '6px 8px', fontSize: '.85rem', borderRadius: 6 }}
               />
               <button type="submit" className="btn ok sm">Tạo folder</button>
-              <span className="sub" style={{ fontSize: '.72rem' }}>Số thứ tự tự thêm. Upload tư liệu rồi gán vào folder ngay bên dưới.</span>
             </form>
           </details>
         </nav>

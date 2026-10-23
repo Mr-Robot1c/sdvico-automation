@@ -11,7 +11,6 @@ export default function Page() {
       <header className="head-row">
         <div>
           <h1>Quy tắc</h1>
-          <p className="sub">Trang công khai cho người dùng và các nền tảng (TikTok, Facebook) xem khi duyệt app.</p>
         </div>
       </header>
 
@@ -20,7 +19,6 @@ export default function Page() {
           <span style={{ fontSize: 26 }} aria-hidden="true">🔒</span>
           <div style={{ flex: 1 }}>
             <b>Chính sách quyền riêng tư</b>
-            <p className="sub" style={{ margin: '4px 0 0' }}>Thu thập gì, dùng làm gì, lưu bao lâu. Bắt buộc khi đăng ký app TikTok và Facebook.</p>
           </div>
           <Link className="btn ghost sm" href="/privacy" style={{ flex: '0 0 auto' }}>Mở</Link>
         </div>

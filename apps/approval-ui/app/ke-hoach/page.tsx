@@ -205,41 +205,6 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
 
   // Bảng Sản phẩm ưu tiên: từ bản đang hiển thị, lọc tên rác.
   const products = ((displayData?.products || []) as Plan['products']).filter((p) => !isJunkProduct(p.product));
-
-  // "Khi nào bấm nút nào" nằm cạnh các nút ở tab Cài đặt.
-  const HELP_BLOCK = (
-<details className="blk">
-          <summary className="kh-summary">❓ Khi nào bấm nút nào</summary>
-          <div className="tablewrap table-scroll" style={{ marginTop: 10 }}>
-            <table className="datatable">
-              <thead><tr><th style={{ width: 170 }}>Nút</th><th>Bấm khi nào</th></tr></thead>
-              <tbody>
-                <tr>
-                  <td><b>💾 Lưu &amp; sinh kế hoạch mới</b></td>
-                  <td className="sub">Vừa đổi Mục tiêu hoặc Sản phẩm tập trung ở Cài đặt tuần — máy lưu rồi sinh bản mới bám cài đặt đó, áp ngay.</td>
-                </tr>
-                <tr>
-                  <td><b>🔄 BOSS chạy lại</b></td>
-                  <td className="sub">Không đổi cài đặt nhưng muốn 7 hướng khác (tri thức vừa cập nhật, hướng cũ chán).</td>
-                </tr>
-                <tr>
-                  <td><b>⚡ Sinh bài theo kế hoạch ngay</b></td>
-                  <td className="sub">Vừa đổi kế hoạch giữa ngày, muốn có bài mới liền không chờ khung 8h/14h.</td>
-                </tr>
-                <tr>
-                  <td><b>📝 Soạn đề xuất tuần sau</b></td>
-                  <td className="sub">Muốn có bản kế hoạch tuần sau sớm hơn Chủ nhật, hoặc vừa đổi mục tiêu mà muốn bản đề xuất theo cài đặt mới. Bản chưa áp, Thứ 2 8h máy áp.</td>
-                </tr>
-                <tr>
-                  <td><b>🧪 Áp dụng đề xuất mới</b></td>
-                  <td className="sub">Chỉ hiện sau khi BOSS học tuần Chủ nhật — nhập trọng số mới, không mất hướng đi cũ.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </details>
-  );
-
   return (
     <main>
       <header className="head-row">
@@ -339,7 +304,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         ) : (
           <div className="kh-strip">
             <b>⚠️ Chưa có bản kế hoạch nào đang áp</b>
-            <span className="grow sub">Máy đang chạy vòng xoay random. Bấm 🔄 BOSS chạy lại ở góc trên để sinh và áp kế hoạch.</span>
+            
           </div>
         )}
       </section>
@@ -348,7 +313,7 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       <section className="blk">
         <h2>
           📆 Kế hoạch tuần
-          <span className="sub">{fmtDate(week.window.start)} – {fmtDate(week.window.end)} · mỗi bài một dòng · ✅ đã sinh, ▫️ dự kiến máy rút theo thứ tự ưu tiên</span>
+          <span className="sub">{fmtDate(week.window.start)} – {fmtDate(week.window.end)} · ✅ đã sinh, ▫️ dự kiến</span>
         </h2>
         <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
           <table className="datatable week-table">
@@ -455,7 +420,6 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
       <section className="blk" id="huong-di">
         <h2>
           🧭 Hướng đi bài viết
-          <span className="sub">BOSS sinh từ tri thức + số liệu · sản phẩm ưu tiên cao được rút trước · mỗi hướng ra đúng 1 bài</span>
         </h2>
         {suggestions.length ? (
           <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
@@ -501,14 +465,11 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
         ) : (
           <p className="sub" style={{ marginTop: 8 }}>Bản này chưa có hướng đi nào. Bấm 🔄 BOSS chạy lại để sinh.</p>
         )}
-        <p className="sub" style={{ margin: '10px 0 0' }}>
-          Đã dùng {vnInt(usedCount)}/{vnInt(suggestions.length)} hướng. Hết hướng chưa dùng thì máy tự nạp thêm mỗi ngày từ tri thức mới.
-        </p>
       </section>
 
       {/* ===== 4. SẢN PHẨM ƯU TIÊN ===== */}
         <section className="blk">
-          <h2>⚖️ Sản phẩm ưu tiên <span className="sub">trọng số BOSS chấm — cao thì hướng của sản phẩm đó chạy trước</span></h2>
+          <h2>⚖️ Sản phẩm ưu tiên</h2>
           {products.length ? (
             <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
               <table className="datatable">
@@ -532,9 +493,6 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
           ) : (
             <p className="sub" style={{ marginTop: 8 }}>Chưa có sản phẩm nào đủ số liệu.</p>
           )}
-          <p className="sub" style={{ margin: '10px 0 0' }}>
-            Số liệu gộp cả Facebook, YouTube và TikTok theo bài. Bảng đầy đủ + nhật ký chỉnh từng tối: <a className="src" href="/kho-tri-thuc?ai=boss">tab AI Kế hoạch</a>.
-          </p>
         </section>
 
       </>) : null}
@@ -600,7 +558,6 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
                 {shareGroups.map((g) => (<span key={g} className="badge tone-default">👥 {g}</span>))}
               </div>
             ) : <p className="sub" style={{ margin: 0 }}>Chưa có nhóm nào.</p>}
-            <p className="sub" style={{ margin: '6px 0 0' }}>Sửa danh sách ở <a href="/noi-dung">Quản lý bài viết</a>. Group nào chia sẻ ngày nào đặt ở khối Lịch đăng cố định, người chia sẻ tay.</p>
           </div>
         </section>
         <section className="blk">
@@ -610,13 +567,12 @@ export default async function Page({ searchParams }: { searchParams?: { xem?: st
             <GenerateButton action={generatePlanNow} />
           </div>
         </section>
-        {HELP_BLOCK}
       </>) : null}
 
       {/* ===== 6. Đăng lại bài cũ ăn khách (khi có) ===== */}
       {tab === 'tuan' && repostSuggestions.length ? (
         <section className="blk">
-          <h2>🔁 Nên đăng lại <span className="sub">bài từ 7 ngày trước có tương tác tốt nhất — người mở bài và chia sẻ tay</span></h2>
+          <h2>🔁 Nên đăng lại</h2>
           <div className="tablewrap table-scroll" style={{ marginTop: 8 }}>
             <table className="datatable">
               <thead><tr><th>Bài</th><th className="num">Tương tác</th><th>Đã đăng</th><th></th></tr></thead>

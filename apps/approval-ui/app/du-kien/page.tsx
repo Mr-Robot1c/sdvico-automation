@@ -31,7 +31,6 @@ export default async function Page({ searchParams }: { searchParams?: { loi?: st
       <header className="head-row">
         <div>
           <h1>Nguồn dữ kiện sản phẩm</h1>
-          <p className="sub">Phòng Kinh doanh nhập thông số thật ở đây. Nội dung chỉ được nêu số có trong bảng này.</p>
         </div>
       </header>
 

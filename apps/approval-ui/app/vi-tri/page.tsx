@@ -47,7 +47,6 @@ export default async function Page() {
       <header className="head-row">
         <div>
           <h1>Vị trí tuyển dụng</h1>
-          <p className="sub">Vị trí và bốn phiên bản mô tả công việc theo kênh. Sinh bằng lệnh /hr-jd.</p>
         </div>
         <AutoRefresh seconds={30} />
       </header>
@@ -58,7 +57,7 @@ export default async function Page() {
         <div className="empty">
           <div className="empty-icon" aria-hidden="true">📋</div>
           <p>Chưa có vị trí nào.</p>
-          <p className="sub">Dùng lệnh /hr-jd để sinh mô tả công việc bốn kênh và lưu vào đây.</p>
+          <p className="sub">Chưa có vị trí nào.</p>
         </div>
       ) : null}
 

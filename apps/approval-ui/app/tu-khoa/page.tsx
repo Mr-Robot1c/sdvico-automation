@@ -52,7 +52,6 @@ export default async function Page({ searchParams }: { searchParams: { intent?: 
       <header className="head-row">
         <div>
           <h1>Kho từ khóa</h1>
-          <p className="sub">Từ khóa định hướng SEO, phân theo ý định tìm kiếm. Bấm nhóm để lọc.</p>
         </div>
       </header>
 

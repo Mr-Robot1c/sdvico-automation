@@ -254,7 +254,6 @@ export default async function Page({ searchParams }: { searchParams?: { status?:
         <div className="empty">
           <div className="empty-icon" aria-hidden="true">👥</div>
           <p>{q ? 'Không tìm thấy khách nào khớp.' : filter === 'all' ? 'Chưa có người hỏi mua nào.' : `Chưa có khách ở bước ${FILTER_LABEL[filter]}.`}</p>
-          <p className="sub">Máy bắt comment và tin nhắn hỏi mua dưới bài đăng; khách gọi / Zalo thì bấm ➕ Thêm khách.</p>
         </div>
       ) : (
         <div className="tablewrap table-scroll lead-wrap">

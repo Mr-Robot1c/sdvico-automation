@@ -49,11 +49,6 @@ export default function BotChat({ compact = false }: { compact?: boolean }) {
   return (
     <div className="plan-card" style={{ marginBottom: 14 }}>
       <div ref={boxRef} style={{ maxHeight: compact ? 360 : 460, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 2px' }}>
-        {turns.length === 0 ? (
-          <p className="sub" style={{ margin: 0 }}>
-            Hỏi gì cũng được, như hỏi Claude hay ChatGPT: kiến thức chung, kỹ thuật, tin mới, nhờ soạn chữ, dịch, tính toán. Riêng giá, thông số, bảo hành, link sàn của SDVICO thì bot chỉ lấy từ kho đã nạp, kho chưa có thì nói chưa có. Ví dụ: "giá máy lọc dầu bao nhiêu", "máy lọc nước biển RO hoạt động thế nào", "soạn giúp tin trả lời khách hỏi bảo hành".
-          </p>
-        ) : null}
         {turns.map((t, i) => (
           <div key={i} style={{
             alignSelf: t.role === 'user' ? 'flex-end' : 'flex-start',

@@ -42,7 +42,6 @@ export default async function Page({ searchParams }: { searchParams: { connected
       <header className="head-row">
         <div>
           <h1>Kết nối TikTok</h1>
-          <p className="sub">Cấp quyền cho hệ thống đăng video lên tài khoản TikTok của SDVICO (Direct Post).</p>
         </div>
       </header>
 

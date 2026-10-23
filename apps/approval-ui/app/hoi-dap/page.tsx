@@ -93,7 +93,6 @@ export default async function Page({ searchParams }: { searchParams?: { group?: 
         <div className="empty">
           <div className="empty-icon" aria-hidden="true">📚</div>
           <p>Kho chưa có hỏi đáp nào{group ? ` cho ${shortGroup(group)}` : ''}.</p>
-          <p className="sub">Nạp ở khung "Thêm hỏi đáp" phía trên, hoặc bấm "📚 Lưu hỏi đáp" ngay tại từng khách trong trang Khách hàng.</p>
         </div>
       ) : (
         <div className="tablewrap">
